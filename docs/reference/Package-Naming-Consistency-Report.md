@@ -7,7 +7,6 @@ This document reports on package naming inconsistencies found during the directo
 | Package | Current Name | Suggested Name | Reason |
 |---------|-------------|----------------|--------|
 | `packages/3-targets/3-targets/postgres/` | `@prisma-next/targets-postgres` | `@prisma-next/target-postgres` | Singular form for consistency with `adapter-` and `driver-` |
-| `packages/3-extensions/pgvector/` | `@prisma-next/extension-pgvector` | `@prisma-next/ext-pgvector` | Shorter prefix per Extension-Packs-Naming-and-Layout.md convention |
 
 ## Details
 
@@ -34,29 +33,7 @@ This document reports on package naming inconsistencies found during the directo
 
 ---
 
-### 2. `@prisma-next/extension-pgvector`
 
-**Current location:** `packages/3-extensions/pgvector/`  
-**Current name:** `@prisma-next/extension-pgvector`  
-**Suggested name:** `@prisma-next/ext-pgvector`
-
-**Issue:** The documented convention in `docs/reference/Extension-Packs-Naming-and-Layout.md` recommends:
-> Prefer `@prisma-next/ext-<name>` or `@prisma-next/extension-<name>`
-
-While `extension-` is acceptable per the doc, the shorter `ext-` prefix is preferred for brevity and consistency with future extension packs.
-
-**Rationale for `ext-` prefix:**
-- Shorter import paths
-- More memorable
-- Aligns with common npm conventions (e.g., `@types/...` instead of `@typescript-types/...`)
-
-**Impact if changed:**
-- Update `package.json` name field
-- Update all imports across the codebase
-- Update example apps and tests
-- Update documentation references
-
----
 
 ## Packages with Consistent Naming ✅
 
@@ -98,6 +75,7 @@ The following packages follow consistent naming patterns:
 ### Extensions Domain
 | Directory | Package Name | Pattern |
 |-----------|--------------|---------|
+| `packages/3-extensions/pgvector/` | `@prisma-next/extension-pgvector` | `extension-` prefix for extension packs ✅ |
 | `packages/3-extensions/compat-prisma/` | `@prisma-next/compat-prisma` | `compat-` prefix for compatibility layers ✅ |
 
 ---
@@ -106,12 +84,10 @@ The following packages follow consistent naming patterns:
 
 1. **Low priority:** Consider renaming `@prisma-next/targets-postgres` to `@prisma-next/target-postgres` for singular consistency.
 
-2. **Low priority:** Consider renaming `@prisma-next/extension-pgvector` to `@prisma-next/ext-pgvector` for brevity.
-
-3. **For new packages:** Follow the established patterns:
+2. **For new packages:** Follow the established patterns:
    - SQL family: `@prisma-next/sql-<name>`
    - Targets: `@prisma-next/target-<db>`, `@prisma-next/adapter-<db>`, `@prisma-next/driver-<db>`
-   - Extensions: `@prisma-next/ext-<name>`
+   - Extensions: `@prisma-next/extension-<name>`
    - Compatibility: `@prisma-next/compat-<name>`
    - Framework core: `@prisma-next/core-<name>` or just `@prisma-next/<name>`
 
@@ -122,6 +98,6 @@ The following packages follow consistent naming patterns:
 Before making any changes:
 - [ ] Review this report
 - [ ] Decide on `targets-` vs `target-` convention
-- [ ] Decide on `extension-` vs `ext-` convention
+- [x] ~~Decide on `extension-` vs `ext-` convention~~ — **Resolved:** Use `extension-` prefix exclusively (see [ADR 153](../architecture%20docs/adrs/ADR%20153%20-%20Extension%20Package%20Naming%20Convention.md))
 - [ ] Update naming conventions documentation if patterns are changed
 - [ ] Plan migration of imports if renames are approved

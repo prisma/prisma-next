@@ -1691,7 +1691,7 @@ const joinedPlan = sql
 import { emit } from '@prisma-next/emitter';
 import type { ContractIR } from '@prisma-next/emitter';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import pgVectorExt from '@prisma-next/ext-pgvector';
+import pgVectorExt from '@prisma-next/extension-pgvector';
 
 // Consumer imports/instantiates the packs explicitly
 const packs = [pgVectorExt()];

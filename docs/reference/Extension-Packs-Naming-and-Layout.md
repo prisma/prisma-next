@@ -3,9 +3,9 @@
 Purpose: define a consistent convention for naming, placing, and describing extension packs across domains.
 
 ## NPM Package Name
-- Prefer `@prisma-next/ext-<name>` or `@prisma-next/extension-<name>`
-  - Examples: `@prisma-next/extension-pgvector`, `@prisma-next/ext-postgis`, `@prisma-next/ext-views`
-- Include domain only when necessary to avoid ambiguity (rare): `@prisma-next/ext-sql-views`
+- Use `@prisma-next/extension-<name>` for all extension packs
+  - Examples: `@prisma-next/extension-pgvector`, `@prisma-next/extension-postgis`, `@prisma-next/extension-views`
+- Include domain only when necessary to avoid ambiguity (rare): `@prisma-next/extension-sql-views`
 
 ## Filesystem Location
 
@@ -25,7 +25,7 @@ packages/
 **Examples:**
 - `packages/3-extensions/pgvector/` → `@prisma-next/extension-pgvector`
 - `packages/3-extensions/compat-prisma/` → `@prisma-next/compat-prisma`
-- `packages/3-extensions/sql/views/` → `@prisma-next/ext-sql-views` (future)
+- `packages/3-extensions/sql/views/` → `@prisma-next/extension-sql-views` (future)
 
 ## Required package.json Metadata
 Add the following fields to support discovery and guardrails:
@@ -143,7 +143,7 @@ Extension packs require multiple entries in `architecture.config.json` to map ea
 - Control plane code cannot import from runtime plane (enforced by dependency cruiser)
 
 ## Rationale
-This convention keeps imports short and memorable, keeps the repo navigable, and scales across domains without overly verbose NPM names. The numbered directory prefix (`3-extensions/`) indicates that extensions are in domain 3, which can import from domains 1 (framework) and 2 (sql/document). Metadata enables automated loading and validation.
+This convention keeps imports clear and consistent, keeps the repo navigable, and scales across domains. The `extension-` prefix is preferred over shorter alternatives (like `ext-`) for clarity and discoverability. The numbered directory prefix (`3-extensions/`) indicates that extensions are in domain 3, which can import from domains 1 (framework) and 2 (sql/document). Metadata enables automated loading and validation.
 
 ## Related Documentation
 - [Package Naming and Path Aliases](./Package%20Naming%20and%20Path%20Aliases.md)
