@@ -101,7 +101,7 @@ The repository is organized by **Domains → Layers → Planes**:
 - **Runtime layer** (runtime plane): `@prisma-next/sql-runtime` lives in `packages/2-sql/5-runtime`
 
 **Targets Domain** (`packages/3-targets/**`):
-- **Target descriptors** (migration plane): `@prisma-next/targets-postgres` lives in `packages/3-targets/3-targets/postgres`
+- **Target descriptors** (migration plane): `@prisma-next/target-postgres` lives in `packages/3-targets/3-targets/postgres`
 - **Adapters** (multi-plane): `@prisma-next/adapter-postgres` lives in `packages/3-targets/6-adapters/postgres`
 - **Drivers** (runtime plane): `@prisma-next/driver-postgres` lives in `packages/3-targets/7-drivers/postgres`
 

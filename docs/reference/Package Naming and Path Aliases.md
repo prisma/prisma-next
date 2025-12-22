@@ -81,7 +81,7 @@ Planes (shared, migration, runtime) appear as subdirectories only when a layer c
 
 | Directory | Package Name |
 |-----------|--------------|
-| `packages/3-targets/3-targets/postgres/` | `@prisma-next/targets-postgres` |
+| `packages/3-targets/3-targets/postgres/` | `@prisma-next/target-postgres` |
 | `packages/3-targets/6-adapters/postgres/` | `@prisma-next/adapter-postgres` |
 | `packages/3-targets/7-drivers/postgres/` | `@prisma-next/driver-postgres` |
 

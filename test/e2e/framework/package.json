@@ -29,7 +29,7 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
-    "@prisma-next/targets-postgres": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*"
   }
 }

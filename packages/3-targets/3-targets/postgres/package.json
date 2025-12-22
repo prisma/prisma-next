@@ -1,5 +1,5 @@
 {
-  "name": "@prisma-next/targets-postgres",
+  "name": "@prisma-next/target-postgres",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,

@@ -58,9 +58,9 @@ This is conceptually wrong: it compares a **codec ID** to a **native type ID**.
 We already have a shared **SQL type metadata registry** (see `docs/briefs/Sql-Type-Metadata-Registry.md`):
 
 - Built in `@prisma-next/family-sql` from manifests of:
-  - Target pack (`targets-postgres`).
-  - Adapter pack (`targets-postgres-adapter`).
-  - Extension packs (`extensions/pgvector`, etc.).
+  - Target pack (`target-postgres`).
+  - Adapter pack (`adapter-postgres`).
+  - Extension packs (`extension-pgvector`, etc.).
 - Maps `typeId` (codec ID, e.g. `'pg/int4@1'`) to:
   - `nativeType` (e.g. `'integer'`, `'timestamp with time zone'`, `'vector'`).
 

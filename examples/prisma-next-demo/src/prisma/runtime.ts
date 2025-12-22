@@ -9,7 +9,7 @@ import {
   type Runtime,
   type RuntimeContext,
 } from '@prisma-next/sql-runtime';
-import postgresTarget from '@prisma-next/targets-postgres/runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };

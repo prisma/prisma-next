@@ -103,7 +103,7 @@ The targets domain (`packages/3-targets/`) contains concrete target extension pa
 ```
 * 3-targets
 |-- 3-targets/postgres (migration plane)
-|   |-- → @prisma-next/targets-postgres (target descriptor)
+|   |-- → @prisma-next/target-postgres (target descriptor)
 |-- 6-adapters/postgres (multi-plane: shared, migration, runtime)
 |   |-- → @prisma-next/adapter-postgres (adapter with control/runtime entrypoints)
 |-- 7-drivers/postgres (runtime plane)
@@ -255,7 +255,7 @@ Target-agnostic runtime kernel plus per-family runtime implementations.
 Database adapters, drivers, and targets (dialects) live in the Targets domain as separate packages. Adapters use multi-plane entrypoints to support both control (migration) and runtime usage.
 
 **Targets (Migration Plane):**
-- `packages/3-targets/3-targets/postgres/` → `@prisma-next/targets-postgres` - Postgres target descriptor
+- `packages/3-targets/3-targets/postgres/` → `@prisma-next/target-postgres` - Postgres target descriptor
 
 **Adapters (Multi-Plane: Shared, Migration, Runtime):**
 - `packages/3-targets/6-adapters/postgres/` → `@prisma-next/adapter-postgres` - Postgres adapter with multi-plane entrypoints:
@@ -306,7 +306,7 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/2-sql/4-lanes/sql-lane/` | `@prisma-next/sql-lane` |
 | `packages/2-sql/4-lanes/orm-lane/` | `@prisma-next/sql-orm-lane` |
 | `packages/2-sql/5-runtime/` | `@prisma-next/sql-runtime` |
-| `packages/3-targets/3-targets/postgres/` | `@prisma-next/targets-postgres` |
+| `packages/3-targets/3-targets/postgres/` | `@prisma-next/target-postgres` |
 | `packages/3-targets/6-adapters/postgres/` | `@prisma-next/adapter-postgres` |
 | `packages/3-targets/7-drivers/postgres/` | `@prisma-next/driver-postgres` |
 | `packages/3-extensions/compat-prisma/` | `@prisma-next/compat-prisma` |
@@ -343,7 +343,7 @@ Path aliases map published package names to source entry files:
       "@prisma-next/sql-lane": ["packages/2-sql/4-lanes/sql-lane/src/index.ts"],
       "@prisma-next/sql-orm-lane": ["packages/2-sql/4-lanes/orm-lane/src/index.ts"],
       "@prisma-next/sql-runtime": ["packages/2-sql/5-runtime/src/index.ts"],
-      "@prisma-next/targets-postgres": ["packages/3-targets/3-targets/postgres/src/index.ts"],
+      "@prisma-next/target-postgres": ["packages/3-targets/3-targets/postgres/src/index.ts"],
       "@prisma-next/adapter-postgres": ["packages/3-targets/6-adapters/postgres/src/exports/index.ts"],
       "@prisma-next/driver-postgres": ["packages/3-targets/7-drivers/postgres/src/exports/index.ts"],
       "@prisma-next/compat-prisma": ["packages/3-extensions/compat-prisma/src/index.ts"],

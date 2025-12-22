@@ -1,4 +1,4 @@
-# @prisma-next/targets-postgres
+# @prisma-next/target-postgres
 
 Postgres target pack for Prisma Next.
 
@@ -27,7 +27,7 @@ This package spans multiple planes:
 ### Migration Plane (CLI)
 
 ```typescript
-import postgres from '@prisma-next/targets-postgres/control';
+import postgres from '@prisma-next/target-postgres/control';
 
 // postgres is a TargetDescriptor with:
 // - kind: 'target'
@@ -40,7 +40,7 @@ import postgres from '@prisma-next/targets-postgres/control';
 
 ```typescript
 // Runtime entry point (future)
-import { ... } from '@prisma-next/targets-postgres/runtime';
+import { ... } from '@prisma-next/target-postgres/runtime';
 ```
 
 ## Architecture

@@ -28,7 +28,7 @@
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
-    "@prisma-next/targets-postgres": "workspace:*"
+    "@prisma-next/target-postgres": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
