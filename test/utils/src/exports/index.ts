@@ -1,5 +1,4 @@
-import type { StartServerOptions } from '@prisma/dev';
-import { unstable_startServer } from '@prisma/dev';
+import { type StartPrismaDevServerOptions, startPrismaDevServer } from '@prisma/dev';
 import getPort from 'get-port';
 import { Client } from 'pg';
 
@@ -26,17 +25,15 @@ export interface DevDatabase {
  * Lets the OS pick ephemeral ports for parallel-safe allocation.
  */
 async function allocatePorts(): Promise<{
-  acceleratePort: number;
   databasePort: number;
   shadowDatabasePort: number;
 }> {
-  const [acceleratePort, databasePort, shadowDatabasePort] = await Promise.all([
-    getPort({ host: '127.0.0.1' }),
+  const [databasePort, shadowDatabasePort] = await Promise.all([
     getPort({ host: '127.0.0.1' }),
     getPort({ host: '127.0.0.1' }),
   ]);
 
-  return { acceleratePort, databasePort, shadowDatabasePort };
+  return { databasePort, shadowDatabasePort };
 }
 
 /**
@@ -80,17 +77,15 @@ function isPortError(error: unknown): boolean {
  * Automatically handles connection string normalization and cleanup.
  * Retries with new ports if port conflicts occur (race condition handling).
  */
-export async function createDevDatabase(options?: StartServerOptions): Promise<DevDatabase> {
+export async function createDevDatabase(
+  options?: StartPrismaDevServerOptions,
+): Promise<DevDatabase> {
   const maxRetries = 10; // Increased retries for high concurrency scenarios
-  let currentOptions: StartServerOptions = options || {};
+  let currentOptions: StartPrismaDevServerOptions = options || {};
   let lastError: unknown;
 
   // If no ports provided, allocate them before first attempt
-  if (
-    !currentOptions.acceleratePort &&
-    !currentOptions.databasePort &&
-    !currentOptions.shadowDatabasePort
-  ) {
+  if (!currentOptions.databasePort && !currentOptions.shadowDatabasePort) {
     const allocatedPorts = await allocatePorts();
     currentOptions = { ...currentOptions, ...allocatedPorts };
     // Larger initial delay to spread out concurrent attempts (reduces initial contention)
@@ -100,7 +95,7 @@ export async function createDevDatabase(options?: StartServerOptions): Promise<D
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const server = await unstable_startServer(currentOptions);
+      const server = await startPrismaDevServer(currentOptions);
       return {
         connectionString: normalizeConnectionString(server.database.connectionString),
         async close() {
@@ -124,7 +119,6 @@ export async function createDevDatabase(options?: StartServerOptions): Promise<D
         // Replace all port values to ensure we're using fresh ports
         currentOptions = {
           ...currentOptions,
-          acceleratePort: newPorts.acceleratePort,
           databasePort: newPorts.databasePort,
           shadowDatabasePort: newPorts.shadowDatabasePort,
         };
@@ -145,15 +139,11 @@ export async function createDevDatabase(options?: StartServerOptions): Promise<D
  */
 export async function withDevDatabase<T>(
   fn: (ctx: DevDatabase) => Promise<T>,
-  options?: StartServerOptions,
+  options?: StartPrismaDevServerOptions,
 ): Promise<T> {
   // If no ports specified, automatically allocate available ones to avoid conflicts in parallel execution
-  const finalOptions: StartServerOptions = options || {};
-  if (
-    !finalOptions.acceleratePort &&
-    !finalOptions.databasePort &&
-    !finalOptions.shadowDatabasePort
-  ) {
+  const finalOptions: StartPrismaDevServerOptions = options || {};
+  if (!finalOptions.databasePort && !finalOptions.shadowDatabasePort) {
     const allocatedPorts = await allocatePorts();
     Object.assign(finalOptions, allocatedPorts);
   }
