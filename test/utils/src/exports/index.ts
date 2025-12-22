@@ -27,7 +27,7 @@ export interface DevDatabase {
 export async function createDevDatabase(
   options?: StartPrismaDevServerOptions,
 ): Promise<DevDatabase> {
-  const server = await startPrismaDevServer(options);
+  const server = await startPrismaDevServer({ databaseConnectTimeoutMillis: 3000, ...options });
   return {
     connectionString: normalizeConnectionString(server.database.connectionString),
     async close() {
