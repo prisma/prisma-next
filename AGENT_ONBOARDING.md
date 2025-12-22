@@ -85,26 +85,32 @@ The repository is organized by **Domains → Layers → Planes**:
 - **Layers**: Core → Authoring → Targets → Lanes → Runtime → Adapters (dependency direction enforced)
 - **Planes**: Migration (authoring, tooling, targets), Runtime (lanes, runtime, adapters), and Shared — cross‑plane code and artifacts safe for both
 
-**Framework Domain** (`packages/framework/**`):
-- **Core layer** (shared plane): `@prisma-next/plan`, `@prisma-next/operations`, `@prisma-next/control-plane` live in `packages/framework/core-*`
-- **Authoring layer** (migration plane): `@prisma-next/contract-authoring`, `@prisma-next/contract-ts`, `@prisma-next/contract-psl` live in `packages/framework/authoring/*`
-- **Tooling layer** (migration plane): `@prisma-next/cli`, `@prisma-next/emitter` live in `packages/framework/tooling/*`
-- **Runtime-executor layer** (runtime plane): `@prisma-next/runtime-executor` lives in `packages/framework/runtime-executor`
+**Framework Domain** (`packages/1-framework/**`):
+- **Core layer** (shared plane): `@prisma-next/plan`, `@prisma-next/operations`, `@prisma-next/contract` live in `packages/1-framework/1-core/shared/*`
+- **Core layer** (migration plane): `@prisma-next/core-control-plane` lives in `packages/1-framework/1-core/migration/control-plane`
+- **Core layer** (runtime plane): `@prisma-next/core-execution-plane` lives in `packages/1-framework/1-core/runtime/execution-plane`
+- **Authoring layer** (migration plane): `@prisma-next/contract-authoring`, `@prisma-next/contract-ts`, `@prisma-next/contract-psl` live in `packages/1-framework/2-authoring/*`
+- **Tooling layer** (migration plane): `@prisma-next/cli`, `@prisma-next/emitter` live in `packages/1-framework/3-tooling/*`
+- **Runtime-executor layer** (runtime plane): `@prisma-next/runtime-executor` lives in `packages/1-framework/4-runtime-executor`
 
-**SQL Domain (Target‑Family)** (`packages/sql/**`):
-- **Core layer** (shared plane): `@prisma-next/sql-contract`, `@prisma-next/sql-operations` live in `packages/sql/{contract,operations}`
-- **Authoring layer** (migration plane): `@prisma-next/sql-contract-ts` lives in `packages/sql/authoring/sql-contract-ts`
-- **Tooling layer** (migration plane): `@prisma-next/sql-contract-emitter` lives in `packages/sql/tooling/emitter` (mirrors Framework domain organization)
-- **Lanes layer** (runtime plane): `@prisma-next/sql-relational-core`, `@prisma-next/sql-lane`, `@prisma-next/sql-orm-lane` live in `packages/sql/lanes/*`
-- **Runtime layer** (runtime plane): `@prisma-next/sql-runtime` lives in `packages/sql/sql-runtime`
-- **Adapters layer** (runtime plane): `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres` live in `packages/sql/runtime/{adapters,drivers}/*`
+**SQL Domain (Target‑Family)** (`packages/2-sql/**`):
+- **Core layer** (shared plane): `@prisma-next/sql-contract`, `@prisma-next/sql-operations`, `@prisma-next/sql-schema-ir` live in `packages/2-sql/1-core/*`
+- **Authoring layer** (migration plane): `@prisma-next/sql-contract-ts` lives in `packages/2-sql/2-authoring/contract-ts`
+- **Tooling layer** (migration plane): `@prisma-next/sql-contract-emitter`, `@prisma-next/family-sql` live in `packages/2-sql/3-tooling/*`
+- **Lanes layer** (runtime plane): `@prisma-next/sql-relational-core`, `@prisma-next/sql-lane`, `@prisma-next/sql-orm-lane` live in `packages/2-sql/4-lanes/*`
+- **Runtime layer** (runtime plane): `@prisma-next/sql-runtime` lives in `packages/2-sql/5-runtime`
 
-**Extensions Domain (Concrete Targets & Packs)**:
-- Concrete adapters/drivers (e.g., Postgres) and ecosystem packs live under `packages/extensions/**` and implement SPIs from Framework/SQL family.
-- Examples: `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`, `@prisma-next/compat-prisma`.
+**Targets Domain** (`packages/3-targets/**`):
+- **Target descriptors** (migration plane): `@prisma-next/targets-postgres` lives in `packages/3-targets/3-targets/postgres`
+- **Adapters** (multi-plane): `@prisma-next/adapter-postgres` lives in `packages/3-targets/6-adapters/postgres`
+- **Drivers** (runtime plane): `@prisma-next/driver-postgres` lives in `packages/3-targets/7-drivers/postgres`
+
+**Extensions Domain** (`packages/3-extensions/**`):
+- Ecosystem extensions and compatibility layers live under `packages/3-extensions/**`
+- Examples: `@prisma-next/compat-prisma`, `@prisma-next/extension-pgvector`
 
 **General Principles**:
-- **Core contract types** (`ContractBase`) live in `@prisma-next/contract` (located at `packages/framework/core-contract/`)
+- **Core contract types** (`ContractBase`) live in `@prisma-next/contract` (located at `packages/1-framework/1-core/shared/contract/`)
 - **Target-neutral operations** (operation registry, capability helpers) live in `@prisma-next/operations` (framework/core layer)
 - **Emitter is hook-based**: Target family hooks (e.g., SQL) extend emission with family-specific validation and type generation
 - **Adapters are extension packs**: Adapters and extension packs use the same manifest structure and are treated identically
@@ -541,7 +547,7 @@ const deletePlan = o.user().delete(
 - **No backwards-compat exports** unless explicitly requested
 - **Test descriptions**: Omit "should" - `it("returns correct value")` not `it("should return correct value")`
 - **Test imports**: Tests within a package should import from source files (`../src/...`), not from package exports. Integration tests and fixtures should use package exports. See `.cursor/rules/test-import-patterns.mdc` for details.
-- **Node.js globals restriction**: `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files (`**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`), `packages/framework/tooling/emitter/**/*.ts`, and `packages/cli/**/*.ts`. Other packages should not use these globals directly.
+- **Node.js globals restriction**: `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files (`**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`), `packages/1-framework/3-tooling/emitter/**/*.ts`, and `packages/1-framework/3-tooling/cli/**/*.ts`. Other packages should not use these globals directly.
 - **Index signature property access**: When TypeScript requires it (e.g., `TS4111` error), use bracket notation: `contract['targetFamily']` instead of `contract.targetFamily`. This is required when accessing properties from index signatures.
 - **Unsafe assignments in tests**: When working with `JSON.parse()` results or dynamic imports in tests, prefer using `toMatchObject` for assertions instead of type casts. Only use type assertions when constructing typed objects from parsed JSON (e.g., `ContractIR` from `contractJson`). For assertions, use `expect(parsed).toMatchObject({ ... })` instead of `const json = JSON.parse(content) as Record<string, unknown>; expect(json['key']).toBe(...)`
 - **Avoid unnecessary type casts**: Always check the actual type signature before adding type casts. If a codec accepts `string | Date`, don't cast `Date` to `string` - pass it directly. Only use type casts when testing invalid inputs with `@ts-expect-error`.
@@ -613,12 +619,12 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
 - **CLI Assembly**: The CLI loads only the user’s config module. It reads `family.hook` and calls family-provided helpers (exposed via `config.family`) to assemble the operation registry, extract codec/operation type imports, and derive extension IDs from `{ adapter, target, extensions }`. This keeps assembly logic in the family layer and the CLI family‑agnostic.
 
 **Implementation:**
-- Core emitter: `packages/framework/tooling/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
+- Core emitter: `packages/1-framework/3-tooling/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
 - Target family SPI: The `emit()` function accepts a `targetFamily: TargetFamilyHook` parameter directly. Authoring surfaces (CLI, tests) determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry or auto-registration.
-- SQL family SPI: `packages/sql/tooling/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
-- Extension pack loading: `packages/framework/tooling/cli/src/pack-loading.ts` - loads manifests (CLI-only, not exported from emitter)
-- Manifest types: `packages/framework/tooling/cli/src/pack-manifest-types.ts` - defines manifest type interfaces (CLI-only, not exported from emitter)
-- Framework CLI assembly: `packages/framework/tooling/cli/src/pack-assembly.ts` - generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for family-specific conversion
+- SQL family SPI: `packages/2-sql/3-tooling/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
+- Extension pack loading: `packages/1-framework/3-tooling/cli/src/pack-loading.ts` - loads manifests (CLI-only, not exported from emitter)
+- Manifest types: `packages/1-framework/3-tooling/cli/src/pack-manifest-types.ts` - defines manifest type interfaces (CLI-only, not exported from emitter)
+- Framework CLI assembly: `packages/1-framework/3-tooling/cli/src/pack-assembly.ts` - generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for family-specific conversion
 
 **Outputs:**
 - `contract.json`: Canonical JSON with `coreHash` and `profileHash`, all column types as fully qualified IDs (`ns/name@version`). Includes `_generated` metadata field to indicate it's a generated artifact (excluded from canonicalization/hashing).
@@ -1053,7 +1059,7 @@ describe('end-to-end tests', () => {
 - **Developer responsibility**: Developers are responsible for keeping the on-disk contract artifacts up-to-date when they change the contract source. The verification test will fail if artifacts are out of sync.
 - **Benefits**: Reduces test execution time, ensures contract artifacts are stable, and enables compile-time type checking using the emitted contract types.
 
-See `test/utils/README.md` for full documentation of generic helpers, `packages/sql/sql-runtime/test/utils.ts` for runtime-specific test utilities, and `test/e2e/framework/README.md` for contract-related E2E test utilities.
+See `test/utils/README.md` for full documentation of generic helpers, `packages/2-sql/5-runtime/test/utils.ts` for runtime-specific test utilities, and `test/e2e/framework/README.md` for contract-related E2E test utilities.
 
 ### Package Layering & Import Validation
 
@@ -1170,7 +1176,7 @@ test('Type IDs are literal types', () => {
 24. **No Global Registry Pattern** - The emitter accepts `targetFamily: TargetFamilyHook` as a direct parameter to `emit()`. Authoring surfaces determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry, auto-registration, or hidden state. Dependencies are explicit and passed as parameters.
 25. **SQL Types Import Path** - **CRITICAL**: SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`, etc.) should be imported from `@prisma-next/sql-target` during migration (Slice 5-7) for backward compatibility. After Slice 7, imports should use `@prisma-next/sql-contract-types` directly. **Never** import from `@prisma-next/contract/types`. See `.cursor/rules/sql-types-imports.mdc` for details.
 26. **DML `returning()` Capability Gating** - The `returning()` method on DML operations (INSERT, UPDATE, DELETE) is capability-gated and requires `returning: true` in contract capabilities. Calling `returning()` without the capability will throw an error. PostgreSQL supports RETURNING clauses; MySQL does not. This follows the same pattern as `includeMany` capability gating.
-27. **Node.js Globals Restriction** - `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files, `packages/framework/tooling/emitter`, and `packages/cli`. Other packages should not use these globals directly. If needed, use `// biome-ignore lint: <reason>` with a comment explaining why.
+27. **Node.js Globals Restriction** - `console`, `process`, `__dirname`, `__filename`, and `URL` are only permitted in test files, `packages/1-framework/3-tooling/emitter`, and `packages/1-framework/3-tooling/cli`. Other packages should not use these globals directly. If needed, use `// biome-ignore lint: <reason>` with a comment explaining why.
 28. **Generated File Metadata** - `contract.json` files include a `_generated` metadata field to indicate they're generated artifacts. This field is excluded from canonicalization/hashing. `contract.d.ts` files include warning header comments. Both are generated by `prisma-next emit` and should not be edited manually.
 29. **Avoid Unnecessary Type Casts** - **CRITICAL**: Always check the actual type signature before adding type casts (`as unknown as T`) or optional chaining (`?.`). Unnecessary casts are a code smell that indicates the actual type already supports what you're trying to do. For example, if a codec accepts `string | Date`, don't cast `Date` to `string` - pass it directly. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
 30. **Use Dot Notation for Guaranteed Values** - When accessing values that are guaranteed to exist (e.g., in test fixtures, constants), use dot notation (`.`) instead of optional chaining (`?.`). Optional chaining should only be used for values that might not exist (e.g., user input, API responses). Similarly, don't include `| undefined` in type assertions when values are guaranteed to exist. See `.cursor/rules/typescript-patterns.mdc` for details.
@@ -1306,31 +1312,33 @@ pnpm test:coverage
 
 ### Moving Packages (Domain/Layer/Plane Relocation)
 
-When moving packages to reflect domain/layer/plane structure (e.g., moving framework packages under `packages/framework/**`), you must update:
+When moving packages to reflect domain/layer/plane structure (e.g., moving framework packages under `packages/1-framework/**`), you must update:
 
 1. **Use `git mv`** to preserve file history:
    ```bash
-   git mv packages/core/plan packages/framework/core-plan
-   git mv packages/authoring/contract-authoring packages/framework/authoring/contract-authoring
-   git mv packages/cli packages/framework/tooling/cli
+   git mv packages/core/plan packages/1-framework/1-core/shared/plan
+   git mv packages/authoring/contract-authoring packages/1-framework/2-authoring/contract
+   git mv packages/cli packages/1-framework/3-tooling/cli
    ```
 
-2. **Update `pnpm-workspace.yaml`**: Replace old globs with new patterns:
+2. **Update `pnpm-workspace.yaml`**: The current config uses a simple glob:
    ```yaml
    packages:
-     - packages/framework/**  # Replaces packages/core/*, packages/authoring/*, etc.
+     - packages/**
+     - examples/*
+     - test/**
    ```
 
 3. **Update `tsconfig.base.json`**: Update path mappings and project references:
    ```json
    {
      "paths": {
-       "@prisma-next/plan": ["packages/framework/core-plan/src/index.ts"],
-       "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"]
+       "@prisma-next/plan": ["packages/1-framework/1-core/shared/plan/src/index.ts"],
+       "@prisma-next/cli": ["packages/1-framework/3-tooling/cli/src/exports/index.ts"]
      },
      "references": [
-       { "path": "./packages/framework/core-plan" },
-       { "path": "./packages/framework/tooling/cli" }
+       { "path": "./packages/1-framework/1-core/shared/plan" },
+       { "path": "./packages/1-framework/3-tooling/cli" }
      ]
    }
    ```
@@ -1338,7 +1346,7 @@ When moving packages to reflect domain/layer/plane structure (e.g., moving frame
 4. **Update `architecture.config.json`**: Update glob patterns for moved packages:
    ```json
    {
-     "glob": "packages/framework/core-plan/**",
+     "glob": "packages/1-framework/1-core/shared/**",
      "domain": "framework",
      "layer": "core",
      "plane": "shared"
@@ -1346,17 +1354,18 @@ When moving packages to reflect domain/layer/plane structure (e.g., moving frame
    ```
 
 5. **Update package-level configs** (relative paths change based on depth):
-   - **`tsconfig.json`**: Update `extends` path (e.g., `../../../../tsconfig.base.json` for `packages/framework/tooling/cli`, `../../../tsconfig.base.json` for `test/integration/`)
+   - **`tsconfig.json`**: Update `extends` path (e.g., `../../../../tsconfig.base.json` for `packages/1-framework/3-tooling/cli`, `../../../../../tsconfig.base.json` for `packages/1-framework/1-core/shared/plan`)
    - **`package.json`**: Update `biome.json` and `clean.mjs` script paths
-   - **Depth calculation**:
-     - From `packages/framework/tooling/cli` to root = 4 levels up (`../../../../`)
-     - From `test/integration/test/` to root = 3 levels up (`../../../`)
-     - From `test/e2e/framework/` to root = 3 levels up (`../../../`)
+   - **Depth calculation** (numbered prefixes count as one directory):
+     - From `packages/1-framework/3-tooling/cli` to root = 4 levels up (`../../../../`)
+     - From `packages/1-framework/1-core/shared/plan` to root = 5 levels up (`../../../../../`)
+     - From `packages/3-extensions/pgvector` to root = 3 levels up (`../../../`)
+     - From `test/integration/` to root = 2 levels up (`../../`)
    - **See `.cursor/rules/moving-packages.mdc`** for detailed guidance on calculating relative paths
 
 6. **Update hardcoded paths**:
    - Test files that reference package paths (e.g., `test/e2e/framework/test/runtime.basic.test.ts`)
-   - Extension pack manifest paths (e.g., `../../../packages/sql/runtime/adapters/postgres` from `test/integration/test/`)
+   - Extension pack manifest paths (e.g., `../../../packages/3-targets/6-adapters/postgres` from `test/integration/test/`)
    - `scripts/check-imports.mjs` exceptions for moved packages
 
 7. **Run `pnpm install`** to update the lockfile after moving packages
@@ -1369,7 +1378,8 @@ When moving packages to reflect domain/layer/plane structure (e.g., moving frame
 
 **Key Learnings:**
 - Relative paths in `tsconfig.json`, `biome.json`, and `clean.mjs` scripts must be recalculated based on new package depth
-- Framework domain packages are organized as: `packages/framework/{core-*,authoring/*,tooling/*,runtime-executor}`
+- Framework domain packages are organized as: `packages/1-framework/{1-core/*,2-authoring/*,3-tooling/*,4-runtime-executor}`
+- Numbered prefixes indicate dependency direction: lower numbers can be imported by higher numbers, never the reverse
 - Always use `git mv` to preserve history
 - Published package names (`@prisma-next/*`) remain unchanged - only filesystem paths change
 
@@ -1559,7 +1569,7 @@ pnpm coverage:packages
 ### Recent Implementation (Completed)
 
 1. **Query Patterns Standard Practice** - Established standard practice of exporting `tables` from `query.ts` as a convenience export (`export const tables = schema.tables`). This improves DX by making code shorter and more readable (`tables.user` instead of `schema.tables.user`). Users can import `tables` directly and optionally extract table/column variables for reuse. Pattern documented in `.cursor/rules/query-patterns.mdc` and updated in `AGENT_ONBOARDING.md`.
-2. **Emitter Target Family SPI** - Refactored emitter to accept `TargetFamilyHook` as a direct parameter to `emit()`. Removed global registry pattern. Authoring surfaces determine which target family SPI to use based on contract's `targetFamily` and pass it directly. No auto-registration or global state. SQL family SPI (`sqlTargetFamilyHook`) lives in `@prisma-next/sql-contract-emitter` under `packages/sql/tooling/emitter`. Adapters are treated identically to extension packs.
+2. **Emitter Target Family SPI** - Refactored emitter to accept `TargetFamilyHook` as a direct parameter to `emit()`. Removed global registry pattern. Authoring surfaces determine which target family SPI to use based on contract's `targetFamily` and pass it directly. No auto-registration or global state. SQL family SPI (`sqlTargetFamilyHook`) lives in `@prisma-next/sql-contract-emitter` under `packages/2-sql/3-tooling/emitter`. Adapters are treated identically to extension packs.
 3. **Type Canonicalization at Authoring Time** - Type canonicalization (shorthand → fully qualified IDs) happens at authoring time (PSL parser or TS builder), not during emission or validation. Emitter only validates type IDs come from referenced extensions.
 4. **Removed Canonicalization from validateContract** - `validateContract()` no longer performs canonicalization. Contracts must always have fully qualified type IDs (`pg/int4@1`, not `int4`). This enforces the design principle that canonicalization happens at authoring time, not during validation.
 5. **Removed canonicalScalarMap** - Extension pack manifests no longer include `canonicalScalarMap`. Type canonicalization happens at authoring time using extension manifests, not via a scalar map. This keeps manifests focused on type imports for code generation.
@@ -1567,7 +1577,7 @@ pnpm coverage:packages
 7. **Emitter I/O Decoupling** - Emitter returns strings (`contractJson`, `contractDts`); caller handles all file I/O. Enables testing without file system dependencies and flexible build system integration.
 8. **SQL Contract Types Migration** - Moved SQL contract types (`SqlContract`, `SqlStorage`, etc.) from `sql-query` to `sql-target` to break circular dependency. In Slice 5, split `sql-target` into separate packages: `@prisma-next/sql-contract-types` (contract types), `@prisma-next/sql-operations` (operations), `@prisma-next/sql-contract-emitter` (emitter hook), and `@prisma-next/operations` (target-neutral operations). `@prisma-next/sql-target` now provides transitional re-exports for backward compatibility (will be removed in Slice 7).
 9. **Package Rename** - Renamed `@prisma-next/sql` to `@prisma-next/sql-query` to better reflect its purpose as query builder.
-10. **Contract Authoring Extraction (Phase 1 & 2)** - Moved SQL contract authoring code (`defineContract`, `validateContract`) from `@prisma-next/sql-query` to `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`). Phase 2 extracted the target-agnostic contract authoring core to `@prisma-next/contract-authoring` in the authoring ring (`packages/authoring/contract-authoring`). `@prisma-next/sql-contract-ts` now composes `@prisma-next/contract-authoring` with SQL-specific types. Integration tests that depend on both `sql-contract-ts` and `sql-query` were moved to `@prisma-next/integration-tests` to avoid cyclic dependencies. `@prisma-next/sql-query` maintains backward compatibility through re-exports (will be removed in Slice 7). Duplicate implementation files were removed from `@prisma-next/sql-query` after migration.
+10. **Contract Authoring Extraction (Phase 1 & 2)** - Moved SQL contract authoring code (`defineContract`, `validateContract`) from `@prisma-next/sql-query` to `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/2-sql/2-authoring/contract-ts`). Phase 2 extracted the target-agnostic contract authoring core to `@prisma-next/contract-authoring` in the authoring ring (`packages/1-framework/2-authoring/contract`). `@prisma-next/sql-contract-ts` now composes `@prisma-next/contract-authoring` with SQL-specific types. Integration tests that depend on both `sql-contract-ts` and `sql-query` were moved to `@prisma-next/integration-tests` to avoid cyclic dependencies. `@prisma-next/sql-query` maintains backward compatibility through re-exports (will be removed in Slice 7). Duplicate implementation files were removed from `@prisma-next/sql-query` after migration.
 12. **Unified Type Identifiers** - All column types are fully qualified type IDs (`ns/name@version`). Canonicalization happens at authoring time.
 13. **Simplified Type Inference** - `ComputeColumnJsType` pre-computes JS types in `ColumnBuilder` using `CodecTypes[typeId].output`. No fallbacks or scalar mappings.
 14. **Runtime Simplification** - Removed target-specific logic from runtime. Codec resolution uses type IDs directly.
@@ -1576,13 +1586,13 @@ pnpm coverage:packages
 17. **Test Infrastructure** - Fixed port conflicts in parallel test execution by assigning unique port ranges to each test suite.
 18. **E2E Tests Package** - Created `@prisma-next/e2e-tests` package that tests the full flow: CLI emission → contract validation → runtime execution → type verification. Tests emit contracts via CLI, spin up dev Postgres DB, execute queries, and verify both runtime results and compile-time types.
 19. **Shared Test Utilities Package** - Created `@prisma-next/test-utils` package to centralize common test patterns across all test suites. Provides helpers for database management, plan execution, runtime creation, contract management, and E2E testing. Refactored e2e tests to use shared utilities, reducing duplication by 28% (1219 → 882 lines). E2E tests now load contracts from committed fixtures rather than emitting on every test run, with a single test verifying contract emission correctness. The `executePlanAndCollect` function now properly infers return types from plans using `ResultType<P>[]`, preserving full type information. Contract loading uses a generic type parameter pattern (`loadContractFromDisk<Contract>`) to enable compile-time type checking with emitted contract types. See "E2E Test Patterns" section above for usage examples.
-20. **Test Utilities Dependency Refactoring** - Broke circular dependency between `test-utils` and `runtime` by moving runtime-specific utilities (`executePlanAndCollect`, `drainPlanExecution`, `setupTestDatabase`, `writeTestContractMarker`, `createTestRuntime`, `createTestRuntimeFromClient`, `setupE2EDatabase`) to `packages/sql/sql-runtime/test/utils.ts`. Removed all dependencies from `test-utils` on other `@prisma-next/*` packages by moving contract-related functions (`loadContractFromDisk`, `emitAndVerifyContract`) to `test/e2e/framework/test/utils.ts`. `test-utils` now has zero dependencies on other `@prisma-next/*` packages, allowing it to be used by all packages without circular dependencies. Runtime-specific utilities are in `packages/sql/sql-runtime/test/utils.ts`, and contract helpers are in `test/e2e/framework/test/utils.ts` (local to e2e-tests).
+20. **Test Utilities Dependency Refactoring** - Broke circular dependency between `test-utils` and `runtime` by moving runtime-specific utilities (`executePlanAndCollect`, `drainPlanExecution`, `setupTestDatabase`, `writeTestContractMarker`, `createTestRuntime`, `createTestRuntimeFromClient`, `setupE2EDatabase`) to `packages/2-sql/5-runtime/test/utils.ts`. Removed all dependencies from `test-utils` on other `@prisma-next/*` packages by moving contract-related functions (`loadContractFromDisk`, `emitAndVerifyContract`) to `test/e2e/framework/test/utils.ts`. `test-utils` now has zero dependencies on other `@prisma-next/*` packages, allowing it to be used by all packages without circular dependencies. Runtime-specific utilities are in `packages/2-sql/5-runtime/test/utils.ts`, and contract helpers are in `test/e2e/framework/test/utils.ts` (local to e2e-tests).
 21. **SQL Types Import Correction** - Fixed incorrect imports of SQL types from `@prisma-next/contract/types` to use `@prisma-next/sql-target` instead. SQL-specific types (`SqlContract`, `SqlStorage`, `SqlMappings`) must be imported from `@prisma-next/sql-target` during migration (Slice 5-7). After Slice 7, imports should use `@prisma-next/sql-contract-types` directly. See `.cursor/rules/sql-types-imports.mdc` for details.
 22. **GitHub Actions CI Workflow** - Set up comprehensive CI workflow with separate jobs for typecheck, lint, build, test, e2e tests, and coverage. Workflow includes concurrency control, Postgres service configuration, coverage artifact uploads, and optional Codecov integration. All jobs run in parallel where possible for faster feedback.
 23. **Generated File Metadata** - Added `_generated` metadata field to `contract.json` files to indicate they're generated artifacts. This field is excluded from canonicalization/hashing to ensure determinism. Added warning header comments to `contract.d.ts` files. Both prevent accidental manual edits and guide users to regenerate using `prisma-next emit`.
 
 24. **Config-Based CLI** - Refactored `prisma-next emit` to use config-only approach. Contract is defined in `prisma-next.config.ts` with nested structure (`contract: { source, output?, types? }`). All flag overrides removed - config is the single source of truth. `defineConfig()` validates and normalizes configs using Arktype, applying defaults (e.g., `output` defaults to `'src/prisma/contract.json'`). See `.cursor/rules/config-validation-and-normalization.mdc` for patterns.
-24. **Node.js Globals Restriction** - Restricted Node.js globals (`console`, `process`, `__dirname`, `__filename`, `URL`) to only be permitted in test files, `packages/framework/tooling/emitter`, and `packages/cli` via Biome configuration. This enforces better separation of concerns and prevents accidental use of Node.js-specific APIs in core packages.
+24. **Node.js Globals Restriction** - Restricted Node.js globals (`console`, `process`, `__dirname`, `__filename`, `URL`) to only be permitted in test files, `packages/1-framework/3-tooling/emitter`, and `packages/1-framework/3-tooling/cli` via Biome configuration. This enforces better separation of concerns and prevents accidental use of Node.js-specific APIs in core packages.
 25. **Avoiding Unnecessary Type Casts and Optional Chaining** - Added guidance on avoiding unnecessary type casts and optional chaining. Always check the actual type signature before adding casts. Use dot notation (`.`) instead of optional chaining (`?.`) when values are guaranteed to exist. Only use type casts when testing invalid inputs with `@ts-expect-error`. See `.cursor/rules/typescript-patterns.mdc` for details.
 26. **Test File Organization** - Established 500-line limit for test files. Large test files should be split by functionality (basic, errors, structure, generation), feature area (joins, projections, includes), or test type (unit, integration, edge-cases). Use descriptive file names following the pattern `{base}.{category}.test.ts` (e.g., `codecs.registry.test.ts`, `runtime.joins.test.ts`, `driver.errors.test.ts`). Split files at natural boundaries (describe blocks, functional groups) and ensure each new file has all necessary imports and setup. Integration tests that depend on multiple packages should be placed in `@prisma-next/integration-tests` to avoid cyclic dependencies. See `.cursor/rules/test-file-organization.mdc` for detailed guidelines.
 27. **Test Assertion Patterns** - Refactored brittle test patterns to use object comparison (`expect(row).toEqual({ ... })`) instead of piece-by-piece property checks. Use `toMatchObject` for partial comparisons, `expect.any()` for type-only checks, and `expect.not.objectContaining()` for absence checks. For plan structure assertions, compare entire AST structures rather than checking individual properties. This improves maintainability, readability, type safety, and reduces brittleness. See `.cursor/rules/test-file-organization.mdc` for details.

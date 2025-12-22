@@ -12,67 +12,114 @@ The package structure encodes **three orthogonal ideas**:
 
 This separation keeps the architecture flexible (per the original Clean Architecture guidance) while still making it obvious where SQL/document packages live and enforcing clear boundaries between migration and runtime concerns.
 
+## Directory Structure
+
+The repository uses numbered prefixes in directory names to make the hierarchy explicit:
+
+```
+packages/
+  1-framework/           # Domain 1: Framework (target-agnostic)
+    1-core/              # Layer 1: Core
+      shared/            # Plane: Shared
+      migration/         # Plane: Migration
+      runtime/           # Plane: Runtime
+    2-authoring/         # Layer 2: Authoring
+    3-tooling/           # Layer 3: Tooling
+    4-runtime-executor/  # Layer 4: Runtime Executor
+  2-document/            # Domain 2: Document (placeholder)
+  2-sql/                 # Domain 2: SQL family
+    1-core/              # Layer 1: Core
+    2-authoring/         # Layer 2: Authoring
+    3-tooling/           # Layer 3: Tooling
+    4-lanes/             # Layer 4: Lanes
+    5-runtime/           # Layer 5: Runtime
+  3-extensions/          # Domain 3: Extensions
+  3-targets/             # Domain 3: Targets
+    3-targets/           # Layer 3: Target descriptors
+    6-adapters/          # Layer 6: Adapters
+    7-drivers/           # Layer 7: Drivers
+```
+
+The numbered prefixes serve two purposes:
+1. **Visual hierarchy**: Makes domain/layer relationships clear at a glance
+2. **Dependency direction**: Lower numbers can be imported by higher numbers, never the reverse
+
+Planes (shared, migration, runtime) appear as subdirectories only when a layer contains packages in multiple planes.
+
 ## Domain and Layer Structure
 
 ### Framework Domain (Target-Agnostic)
 
-The framework domain contains target-agnostic packages that work across all target families:
+The framework domain (`packages/1-framework/`) contains target-agnostic packages that work across all target families:
 
 ```
-* framework
-|-- core (shared plane)
-|   |-- @prisma-next/contract
-|   |-- @prisma-next/plan
-|   |-- @prisma-next/operations
-|-- core (migration plane)
-|   |-- @prisma-next/core-control-plane
-|-- authoring (migration plane)
-|   |-- @prisma-next/contract-authoring
-|   |-- @prisma-next/contract-ts (future)
-|   |-- @prisma-next/contract-psl (future)
-|-- tooling (migration plane)
-|   |-- @prisma-next/cli
-|   |-- @prisma-next/emitter
-|-- runtime-executor (runtime plane)
-    |-- @prisma-next/runtime-executor
+* 1-framework
+|-- 1-core/shared (shared plane)
+|   |-- contract/      → @prisma-next/contract
+|   |-- plan/          → @prisma-next/plan
+|   |-- operations/    → @prisma-next/operations
+|-- 1-core/migration (migration plane)
+|   |-- control-plane/ → @prisma-next/core-control-plane
+|-- 1-core/runtime (runtime plane)
+|   |-- execution-plane/ → @prisma-next/core-execution-plane
+|-- 2-authoring (migration plane)
+|   |-- contract/      → @prisma-next/contract-authoring
+|   |-- contract-ts/   → @prisma-next/contract-ts (future)
+|   |-- contract-psl/  → @prisma-next/contract-psl (future)
+|-- 3-tooling (migration plane)
+|   |-- cli/           → @prisma-next/cli
+|   |-- emitter/       → @prisma-next/emitter
+|-- 4-runtime-executor (runtime plane)
+    |-- → @prisma-next/runtime-executor
 ```
 
 ### SQL Family Domain
 
-The SQL domain contains SQL-specific packages organized by layer:
+The SQL domain (`packages/2-sql/`) contains SQL-specific packages organized by layer:
 
 ```
-* sql family
-|-- authoring (migration plane)
-|   |-- @prisma-next/sql-contract-ts
-|-- tooling (migration plane)
-|   |-- @prisma-next/sql-contract-emitter
-|-- core (shared plane)
-|   |-- @prisma-next/sql-contract
-|   |-- @prisma-next/sql-operations
-|-- lanes (runtime plane)
-|   |-- @prisma-next/sql-relational-core
-|   |-- @prisma-next/sql-lane
-|   |-- @prisma-next/sql-orm-lane
-|-- runtime (runtime plane)
-|   |-- @prisma-next/sql-runtime
-|-- adapters (runtime plane)
-    |-- @prisma-next/driver-postgres
-    |-- @prisma-next/compat-prisma
+* 2-sql
+|-- 1-core (shared plane)
+|   |-- contract/      → @prisma-next/sql-contract
+|   |-- operations/    → @prisma-next/sql-operations
+|   |-- schema-ir/     → @prisma-next/sql-schema-ir
+|-- 2-authoring (migration plane)
+|   |-- contract-ts/   → @prisma-next/sql-contract-ts
+|-- 3-tooling (migration plane)
+|   |-- emitter/       → @prisma-next/sql-contract-emitter
+|   |-- family/        → @prisma-next/family-sql
+|-- 4-lanes (runtime plane)
+|   |-- relational-core/ → @prisma-next/sql-relational-core
+|   |-- sql-lane/      → @prisma-next/sql-lane
+|   |-- orm-lane/      → @prisma-next/sql-orm-lane
+|-- 5-runtime (runtime plane)
+    |-- → @prisma-next/sql-runtime
 ```
 
 ### Targets Domain (Extension Packs)
 
-The targets domain contains concrete target extension packs (e.g., Postgres, MySQL). Dialect (target), adapter, and driver are kept as separate packages to enable mix-and-match:
+The targets domain (`packages/3-targets/`) contains concrete target extension packs (e.g., Postgres, MySQL). Dialect (target), adapter, and driver are kept as separate packages to enable mix-and-match:
 
 ```
-* targets
-|-- postgres (migration plane)
-|   |-- @prisma-next/targets-postgres (target descriptor)
-|-- postgres-adapter (multi-plane: shared, migration, runtime)
-|   |-- @prisma-next/adapter-postgres (adapter with CLI/runtime entrypoints)
-|-- postgres-driver (runtime plane)
-    |-- @prisma-next/driver-postgres (driver implementation)
+* 3-targets
+|-- 3-targets/postgres (migration plane)
+|   |-- → @prisma-next/targets-postgres (target descriptor)
+|-- 6-adapters/postgres (multi-plane: shared, migration, runtime)
+|   |-- → @prisma-next/adapter-postgres (adapter with control/runtime entrypoints)
+|-- 7-drivers/postgres (runtime plane)
+    |-- → @prisma-next/driver-postgres (driver implementation)
+```
+
+### Extensions Domain
+
+The extensions domain (`packages/3-extensions/`) contains ecosystem extensions and compatibility layers:
+
+```
+* 3-extensions
+|-- compat-prisma/ (runtime plane)
+|   |-- → @prisma-next/compat-prisma
+|-- pgvector/ (multi-plane)
+    |-- → @prisma-next/extension-pgvector
 ```
 
 ### Layer Structure
@@ -146,12 +193,15 @@ Plane import constraints are enforced declaratively via `planeRules` in `archite
 The innermost layer containing target-family agnostic types and utilities.
 
 **Shared Plane:**
-- `packages/framework/core-plan/` → `@prisma-next/plan` - Plan helpers, diagnostics, shared errors
-- `packages/framework/core-operations/` → `@prisma-next/operations` - Target-neutral operation registry + capability helpers
-- `packages/contract/` → `@prisma-next/contract` - Core contract types + plan metadata (legacy, will be migrated)
+- `packages/1-framework/1-core/shared/plan/` → `@prisma-next/plan` - Plan helpers, diagnostics, shared errors
+- `packages/1-framework/1-core/shared/operations/` → `@prisma-next/operations` - Target-neutral operation registry + capability helpers
+- `packages/1-framework/1-core/shared/contract/` → `@prisma-next/contract` - Core contract types + plan metadata
 
 **Migration Plane:**
-- `packages/framework/core-control-plane/` → `@prisma-next/core-control-plane` - Control plane domain actions (contract emission, database verification), config types, validation, error factories (no file I/O or CLI awareness)
+- `packages/1-framework/1-core/migration/control-plane/` → `@prisma-next/core-control-plane` - Control plane domain actions (contract emission, database verification), config types, validation, error factories (no file I/O or CLI awareness)
+
+**Runtime Plane:**
+- `packages/1-framework/1-core/runtime/execution-plane/` → `@prisma-next/core-execution-plane` - Execution plane descriptor and instance types
 
 **Dependency Rules:** Cannot import from any other layer.
 
@@ -160,12 +210,12 @@ The innermost layer containing target-family agnostic types and utilities.
 Contract authoring surfaces for creating contracts programmatically.
 
 **Framework Domain (Migration Plane):**
-- `packages/framework/authoring/contract-authoring/` → `@prisma-next/contract-authoring` - TS builders, canonicalization, schema DSL
-- `packages/framework/authoring/contract-ts/` → `@prisma-next/contract-ts` - TS authoring surface (future)
-- `packages/framework/authoring/contract-psl/` → `@prisma-next/contract-psl` - PSL parser + IR (future)
+- `packages/1-framework/2-authoring/contract/` → `@prisma-next/contract-authoring` - TS builders, canonicalization, schema DSL
+- `packages/1-framework/2-authoring/contract-ts/` → `@prisma-next/contract-ts` - TS authoring surface (future)
+- `packages/1-framework/2-authoring/contract-psl/` → `@prisma-next/contract-psl` - PSL parser + IR (future)
 
 **SQL Domain (Migration Plane):**
-- `packages/sql/authoring/sql-contract-ts/` → `@prisma-next/sql-contract-ts` - SQL TS authoring surface wraps `@prisma-next/contract-authoring`
+- `packages/2-sql/2-authoring/contract-ts/` → `@prisma-next/sql-contract-ts` - SQL TS authoring surface wraps `@prisma-next/contract-authoring`
 
 **Dependency Rules:** Can import from `core/*` only. SQL authoring may also import from SQL tooling layer.
 
@@ -173,10 +223,10 @@ Contract authoring surfaces for creating contracts programmatically.
 
 Target-family specific emitter hooks and family‑provided helpers for CLI assembly.
 
-- `packages/sql/tooling/emitter/` → `@prisma-next/sql-contract-emitter` - SQL emitter hook
-- `packages/sql/tooling/cli/` → `@prisma-next/family-sql` - SQL family CLI entry point (exports `FamilyDescriptor` with hook and `convertOperationManifest`)
-- `packages/framework/tooling/cli/src/pack-assembly.ts` - Generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for conversion
-- Pack entrypoints: use `/cli` for IR descriptors and helpers (no runtime), `/runtime` for factories (runtime only). The app config imports from `/cli` to keep emit pure.
+- `packages/2-sql/3-tooling/emitter/` → `@prisma-next/sql-contract-emitter` - SQL emitter hook
+- `packages/2-sql/3-tooling/family/` → `@prisma-next/family-sql` - SQL family descriptor (exports `ControlFamilyDescriptor` with hooks and `convertOperationManifest`)
+- `packages/1-framework/3-tooling/cli/src/pack-assembly.ts` - Generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for conversion
+- Pack entrypoints: use `/control` for control plane descriptors and helpers (no runtime), `/runtime` for factories (runtime only). The app config imports from `/control` to keep emit pure.
 
 **Dependency Rules:** Can import from `core/*` and `authoring/*` only.
 
@@ -184,40 +234,40 @@ Target-family specific emitter hooks and family‑provided helpers for CLI assem
 
 Lanes consume targets and relational-core helpers to produce AST plans. Packages in this layer may depend laterally on other lane utilities (e.g., shared relational helpers) and on inner layers, but not on runtime/adapter layers.
 
-- `packages/sql/lanes/relational-core/` → `@prisma-next/sql-relational-core` – shared schema/column builders, operation attachment, AST factories
-- `packages/sql/lanes/sql-lane/` → `@prisma-next/sql-lane` – SQL DSL + raw lane (Phase 1 refactor keeps API stable while using shared factories)
-- `packages/sql/lanes/orm-lane/` → `@prisma-next/sql-orm-lane` – ORM builder (Phase 1 removes dependency on `sql-lane`)
+- `packages/2-sql/4-lanes/relational-core/` → `@prisma-next/sql-relational-core` – shared schema/column builders, operation attachment, AST factories
+- `packages/2-sql/4-lanes/sql-lane/` → `@prisma-next/sql-lane` – SQL DSL + raw lane (Phase 1 refactor keeps API stable while using shared factories)
+- `packages/2-sql/4-lanes/orm-lane/` → `@prisma-next/sql-orm-lane` – ORM builder (Phase 1 removes dependency on `sql-lane`)
 
 ### Runtime Layer
 
 Target-agnostic runtime kernel plus per-family runtime implementations.
 
 **Framework Domain (Runtime Plane):**
-- `packages/framework/runtime-executor/` → `@prisma-next/runtime-executor` – verification, marker checks, plugin SPI (Slice 6 moves code here)
+- `packages/1-framework/4-runtime-executor/` → `@prisma-next/runtime-executor` – verification, marker checks, plugin SPI
 
 **SQL Domain (Runtime Plane):**
-- `packages/sql/sql-runtime/` → `@prisma-next/sql-runtime` – SQL family runtime that composes runtime-executor with SQL adapters (future document runtimes will mirror this)
+- `packages/2-sql/5-runtime/` → `@prisma-next/sql-runtime` – SQL family runtime that composes runtime-executor with SQL adapters (future document runtimes will mirror this)
 
 **Dependency Rules:** runtime-executor can import from inner layers only. Family runtimes can import from runtime-executor, targets, and their family's adapters.
 
 ### Adapters Layer (Targets Domain, Multi-Plane)
 
-Database adapters, drivers, and targets (dialects) live in the Targets domain as separate packages. Adapters use multi-plane entrypoints to support both CLI (migration) and runtime usage.
+Database adapters, drivers, and targets (dialects) live in the Targets domain as separate packages. Adapters use multi-plane entrypoints to support both control (migration) and runtime usage.
 
 **Targets (Migration Plane):**
-- `packages/targets/postgres/` → `@prisma-next/targets-postgres` - Postgres target descriptor
+- `packages/3-targets/3-targets/postgres/` → `@prisma-next/targets-postgres` - Postgres target descriptor
 
 **Adapters (Multi-Plane: Shared, Migration, Runtime):**
-- `packages/targets/postgres-adapter/` → `@prisma-next/adapter-postgres` - Postgres adapter with multi-plane entrypoints:
+- `packages/3-targets/6-adapters/postgres/` → `@prisma-next/adapter-postgres` - Postgres adapter with multi-plane entrypoints:
   - `src/core/**` → shared plane (adapter SPI implementation)
-  - `src/exports/cli.ts` → migration plane (CLI descriptor)
+  - `src/exports/control.ts` → migration plane (control plane descriptor)
   - `src/exports/runtime.ts` → runtime plane (runtime factory)
 
 **Drivers (Runtime Plane):**
-- `packages/targets/postgres-driver/` → `@prisma-next/driver-postgres` - Postgres driver
+- `packages/3-targets/7-drivers/postgres/` → `@prisma-next/driver-postgres` - Postgres driver
 
 **Compatibility (Runtime Plane):**
-- `packages/extensions/compat-prisma/` → `@prisma-next/compat-prisma` (compat layer that lives alongside adapters)
+- `packages/3-extensions/compat-prisma/` → `@prisma-next/compat-prisma` (compat layer that lives alongside adapters)
 
 ## Naming Conventions
 
@@ -235,26 +285,32 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 
 | Directory | Published Package Name |
 |-----------|------------------------|
-| `packages/contract/` | `@prisma-next/contract` (legacy, will be migrated) |
-| `packages/framework/core-plan/` | `@prisma-next/plan` |
-| `packages/framework/core-operations/` | `@prisma-next/operations` |
-| `packages/framework/authoring/contract-authoring/` | `@prisma-next/contract-authoring` |
-| `packages/framework/authoring/contract-ts/` | `@prisma-next/contract-ts` |
-| `packages/framework/authoring/contract-psl/` | `@prisma-next/contract-psl` |
-| `packages/framework/tooling/cli/` | `@prisma-next/cli` |
-| `packages/framework/tooling/emitter/` | `@prisma-next/emitter` |
-| `packages/framework/runtime-executor/` | `@prisma-next/runtime-executor` |
-| `packages/sql/contract/` | `@prisma-next/sql-contract` |
-| `packages/sql/operations/` | `@prisma-next/sql-operations` |
-| `packages/sql/tooling/emitter/` | `@prisma-next/sql-contract-emitter` |
-| `packages/sql/lanes/relational-core/` | `@prisma-next/sql-relational-core` |
-| `packages/sql/lanes/sql-lane/` | `@prisma-next/sql-lane` |
-| `packages/sql/lanes/orm-lane/` | `@prisma-next/sql-orm-lane` |
-| `packages/sql/sql-runtime/` | `@prisma-next/sql-runtime` |
-| `packages/targets/postgres/` | `@prisma-next/targets-postgres` |
-| `packages/targets/postgres-adapter/` | `@prisma-next/adapter-postgres` |
-| `packages/targets/postgres-driver/` | `@prisma-next/driver-postgres` |
-| `packages/extensions/compat-prisma/` | `@prisma-next/compat-prisma` |
+| `packages/1-framework/1-core/shared/contract/` | `@prisma-next/contract` |
+| `packages/1-framework/1-core/shared/plan/` | `@prisma-next/plan` |
+| `packages/1-framework/1-core/shared/operations/` | `@prisma-next/operations` |
+| `packages/1-framework/1-core/migration/control-plane/` | `@prisma-next/core-control-plane` |
+| `packages/1-framework/1-core/runtime/execution-plane/` | `@prisma-next/core-execution-plane` |
+| `packages/1-framework/2-authoring/contract/` | `@prisma-next/contract-authoring` |
+| `packages/1-framework/2-authoring/contract-ts/` | `@prisma-next/contract-ts` |
+| `packages/1-framework/2-authoring/contract-psl/` | `@prisma-next/contract-psl` |
+| `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |
+| `packages/1-framework/3-tooling/emitter/` | `@prisma-next/emitter` |
+| `packages/1-framework/4-runtime-executor/` | `@prisma-next/runtime-executor` |
+| `packages/2-sql/1-core/contract/` | `@prisma-next/sql-contract` |
+| `packages/2-sql/1-core/operations/` | `@prisma-next/sql-operations` |
+| `packages/2-sql/1-core/schema-ir/` | `@prisma-next/sql-schema-ir` |
+| `packages/2-sql/2-authoring/contract-ts/` | `@prisma-next/sql-contract-ts` |
+| `packages/2-sql/3-tooling/emitter/` | `@prisma-next/sql-contract-emitter` |
+| `packages/2-sql/3-tooling/family/` | `@prisma-next/family-sql` |
+| `packages/2-sql/4-lanes/relational-core/` | `@prisma-next/sql-relational-core` |
+| `packages/2-sql/4-lanes/sql-lane/` | `@prisma-next/sql-lane` |
+| `packages/2-sql/4-lanes/orm-lane/` | `@prisma-next/sql-orm-lane` |
+| `packages/2-sql/5-runtime/` | `@prisma-next/sql-runtime` |
+| `packages/3-targets/3-targets/postgres/` | `@prisma-next/targets-postgres` |
+| `packages/3-targets/6-adapters/postgres/` | `@prisma-next/adapter-postgres` |
+| `packages/3-targets/7-drivers/postgres/` | `@prisma-next/driver-postgres` |
+| `packages/3-extensions/compat-prisma/` | `@prisma-next/compat-prisma` |
+| `packages/3-extensions/pgvector/` | `@prisma-next/extension-pgvector` |
 
 ## TypeScript Path Aliases
 
@@ -266,41 +322,32 @@ Path aliases map published package names to source entry files:
 {
   "compilerOptions": {
     "paths": {
-      "@prisma-next/contract": ["packages/contract/src/exports/types.ts"],
-      "@prisma-next/plan": ["packages/framework/core-plan/src/index.ts"],
-      "@prisma-next/operations": ["packages/framework/core-operations/src/index.ts"],
-      "@prisma-next/contract-authoring": ["packages/framework/authoring/contract-authoring/src/index.ts"],
-      "@prisma-next/contract-ts": ["packages/framework/authoring/contract-ts/src/index.ts"],
-      "@prisma-next/contract-psl": ["packages/framework/authoring/contract-psl/src/index.ts"],
-      "@prisma-next/cli": ["packages/framework/tooling/cli/src/exports/index.ts"],
-      "@prisma-next/emitter": ["packages/framework/tooling/emitter/src/exports/index.ts"],
-      "@prisma-next/runtime-executor": ["packages/framework/runtime-executor/src/index.ts"],
-      "@prisma-next/sql-contract": ["packages/sql/contract/src/exports/types.ts"],
-      "@prisma-next/sql-operations": ["packages/sql/operations/src/index.ts"],
-      "@prisma-next/sql-contract-emitter": ["packages/sql/tooling/emitter/src/index.ts"],
-      "@prisma-next/sql-lane": ["packages/sql/lanes/sql-lane/src/index.ts"],
-      "@prisma-next/sql-runtime": ["packages/sql/sql-runtime/src/index.ts"],
-      "@prisma-next/adapter-postgres": ["packages/adapter-postgres/src/exports/index.ts"],
-      "@prisma-next/driver-postgres": ["packages/driver-postgres/src/exports/index.ts"]
-    }
-  }
-}
-```
-
-### Optional Layer Aliases (Dev-Time Only)
-
-Layer aliases are optional ergonomic helpers for internal development. They are **not** for published imports:
-
-```json
-{
-  "compilerOptions": {
-    "paths": {
-      "@core/*": ["packages/core/*/src"],
-      "@authoring/*": ["packages/authoring/*/src"],
-      "@targets/*": ["packages/targets/*/src"],
-      "@sql/*": ["packages/sql/*/src"],
-      "@runtime/*": ["packages/runtime/*/src"],
-      "@adapters/*": ["packages/sql/*/*/src"]
+      "@prisma-next/contract": ["packages/1-framework/1-core/shared/contract/src/exports/types.ts"],
+      "@prisma-next/plan": ["packages/1-framework/1-core/shared/plan/src/index.ts"],
+      "@prisma-next/operations": ["packages/1-framework/1-core/shared/operations/src/index.ts"],
+      "@prisma-next/core-control-plane": ["packages/1-framework/1-core/migration/control-plane/src/index.ts"],
+      "@prisma-next/core-execution-plane": ["packages/1-framework/1-core/runtime/execution-plane/src/index.ts"],
+      "@prisma-next/contract-authoring": ["packages/1-framework/2-authoring/contract/src/index.ts"],
+      "@prisma-next/contract-ts": ["packages/1-framework/2-authoring/contract-ts/src/index.ts"],
+      "@prisma-next/contract-psl": ["packages/1-framework/2-authoring/contract-psl/src/index.ts"],
+      "@prisma-next/cli": ["packages/1-framework/3-tooling/cli/src/exports/index.ts"],
+      "@prisma-next/emitter": ["packages/1-framework/3-tooling/emitter/src/exports/index.ts"],
+      "@prisma-next/runtime-executor": ["packages/1-framework/4-runtime-executor/src/index.ts"],
+      "@prisma-next/sql-contract": ["packages/2-sql/1-core/contract/src/exports/types.ts"],
+      "@prisma-next/sql-operations": ["packages/2-sql/1-core/operations/src/index.ts"],
+      "@prisma-next/sql-schema-ir": ["packages/2-sql/1-core/schema-ir/src/index.ts"],
+      "@prisma-next/sql-contract-ts": ["packages/2-sql/2-authoring/contract-ts/src/index.ts"],
+      "@prisma-next/sql-contract-emitter": ["packages/2-sql/3-tooling/emitter/src/index.ts"],
+      "@prisma-next/family-sql": ["packages/2-sql/3-tooling/family/src/index.ts"],
+      "@prisma-next/sql-relational-core": ["packages/2-sql/4-lanes/relational-core/src/index.ts"],
+      "@prisma-next/sql-lane": ["packages/2-sql/4-lanes/sql-lane/src/index.ts"],
+      "@prisma-next/sql-orm-lane": ["packages/2-sql/4-lanes/orm-lane/src/index.ts"],
+      "@prisma-next/sql-runtime": ["packages/2-sql/5-runtime/src/index.ts"],
+      "@prisma-next/targets-postgres": ["packages/3-targets/3-targets/postgres/src/index.ts"],
+      "@prisma-next/adapter-postgres": ["packages/3-targets/6-adapters/postgres/src/exports/index.ts"],
+      "@prisma-next/driver-postgres": ["packages/3-targets/7-drivers/postgres/src/exports/index.ts"],
+      "@prisma-next/compat-prisma": ["packages/3-extensions/compat-prisma/src/index.ts"],
+      "@prisma-next/extension-pgvector": ["packages/3-extensions/pgvector/src/index.ts"]
     }
   }
 }
@@ -320,11 +367,11 @@ Layer aliases are optional ergonomic helpers for internal development. They are 
 
 - **`core/*`** → cannot import from any other layer
 - **`authoring/*`** → can import from `core/*` only
-- **`sql/tooling/*`** → can import from `core/*` and `authoring/*` only
-- **`sql/lanes/*`** → can import from `core/*`, `authoring/*`, `sql/tooling/*` only
-- **`runtime/core`** → can import from `core/*`, `authoring/*`, `sql/tooling/*` only (no direct imports from `targets/*`)
-- **`sql/sql-runtime`** → can import from `runtime/core` and `sql/tooling/*` and `targets/postgres-adapter/*` only
-- **`targets/postgres-adapter/*`** → can import from `sql/tooling/*` and `sql/sql-runtime` only
+- **`2-sql/3-tooling/*`** → can import from `1-core/*` and `2-authoring/*` only
+- **`2-sql/4-lanes/*`** → can import from `1-core/*`, `2-authoring/*`, `2-sql/3-tooling/*` only
+- **`1-framework/4-runtime-executor`** → can import from `1-core/*`, `2-authoring/*`, `3-tooling/*` only (no direct imports from `3-targets/*`)
+- **`2-sql/5-runtime`** → can import from `4-runtime-executor` and `2-sql/3-tooling/*` and `3-targets/6-adapters/*` only
+- **`3-targets/6-adapters/*`** → can import from `2-sql/3-tooling/*` and `2-sql/5-runtime` only
 
 ### Domain Rules
 
@@ -365,19 +412,16 @@ Use curated subpath exports to keep public API stable across internal moves:
 
 ## Workspace Configuration
 
-The `pnpm-workspace.yaml` includes patterns for all layers:
+The `pnpm-workspace.yaml` includes patterns for all packages:
 
 ```yaml
 packages:
-  - packages/core/*
-  - packages/authoring/*
-  - packages/sql/tooling/*
-  - packages/sql/**
-  - packages/runtime/*
-  - packages/compat/*
-  - packages/*
+  - packages/**
   - examples/*
+  - test/**
 ```
+
+The numbered directory prefixes ensure packages appear in dependency order when browsing the filesystem.
 
 ## Import Validation
 
@@ -426,50 +470,47 @@ When adding a new package:
 
 ## Multi-Plane Packages
 
-Some packages span multiple planes (e.g., adapters that have both CLI entry points and runtime code). These packages use a structured layout:
+Some packages span multiple planes (e.g., adapters that have both control plane entry points and runtime code). These packages use a structured layout:
 
 - **`src/core/**`**: Shared plane code that can be imported by both migration and runtime planes
-- **`src/exports/cli.ts`**: Migration plane entry point (CLI descriptors)
+- **`src/exports/control.ts`**: Migration plane entry point (control plane descriptors)
 - **`src/exports/runtime.ts`**: Runtime plane entry point (runtime factories)
 
 **Example:** `@prisma-next/adapter-postgres` spans three planes:
-- `packages/targets/postgres-adapter/src/core/**` → domain: `extensions` (or `targets`), layer: `adapters`, plane: `shared`
-- `packages/targets/postgres-adapter/src/exports/cli.ts` → domain: `extensions` (or `targets`), layer: `adapters`, plane: `migration`
-- `packages/targets/postgres-adapter/src/exports/runtime.ts` → domain: `extensions` (or `targets`), layer: `adapters`, plane: `runtime`
+- `packages/3-targets/6-adapters/postgres/src/core/**` → domain: `targets`, layer: `adapters`, plane: `shared`
+- `packages/3-targets/6-adapters/postgres/src/exports/control.ts` → domain: `targets`, layer: `adapters`, plane: `migration`
+- `packages/3-targets/6-adapters/postgres/src/exports/runtime.ts` → domain: `targets`, layer: `adapters`, plane: `runtime`
 
-**Note:** Dialect (target), adapter, and driver are separate packages under `packages/targets/**` to enable mix-and-match. The adapter package uses multi-plane entrypoints to support both CLI configuration (migration plane) and runtime usage (runtime plane) while keeping shared core code (shared plane) accessible to both.
+**Note:** Dialect (target), adapter, and driver are separate packages under `packages/3-targets/**` to enable mix-and-match. The adapter package uses multi-plane entrypoints to support both control plane configuration (migration plane) and runtime usage (runtime plane) while keeping shared core code (shared plane) accessible to both.
 
-This structure allows the same package to provide both CLI configuration (migration plane) and runtime implementation (runtime plane) while keeping shared code (core) accessible to both.
+This structure allows the same package to provide both control plane configuration (migration plane) and runtime implementation (runtime plane) while keeping shared code (core) accessible to both.
 
 ## Migration Notes
 
-**Scaffolding Status:** ✅ Complete (Slice 1)
+**Directory Structure Status:** ✅ Complete
 
-The package layering structure has been scaffolded with placeholder packages:
-- All layer directories created (`core/`, `authoring/`, `targets/`, `lanes/`, `runtime/`, `sql/`, `compat/`, `document/`)
-- Placeholder packages with basic structure (package.json, tsconfig.json, src/index.ts, tsup.config.ts, README.md)
+The package layering structure uses numbered directory prefixes for visual hierarchy:
+- All domain directories created with numbered prefixes (`1-framework/`, `2-sql/`, `2-document/`, `3-targets/`, `3-extensions/`)
+- All layer directories created with numbered prefixes (e.g., `1-core/`, `2-authoring/`, `3-tooling/`, `4-lanes/`, `5-runtime/`)
+- Plane subdirectories added where needed (`shared/`, `migration/`, `runtime/`)
 - Workspace configuration updated (`pnpm-workspace.yaml`)
-- TypeScript path aliases and project references added (`tsconfig.base.json`)
+- TypeScript path aliases and project references updated (`tsconfig.base.json`)
 - Import validation configured (Dependency Cruiser with `dependency-cruiser.config.mjs`)
-- Architecture configuration file created (`architecture.config.json`)
-- `pnpm lint:deps` script added to root package.json
+- Architecture configuration file updated (`architecture.config.json`)
+- `pnpm lint:deps` script validates dependency direction
 
-**Migration Status:** ✅ Phase 2 Complete (Slice 2)
+**Package Layout:**
 
-- **Contract Authoring (Phase 1)**: SQL contract authoring code moved from `@prisma-next/sql-query` to `@prisma-next/sql-contract-ts` in the SQL family namespace (`packages/sql/authoring/sql-contract-ts`)
-- **Contract Authoring (Phase 2)**: Target-agnostic contract authoring core extracted to `@prisma-next/contract-authoring` in the authoring layer (`packages/framework/authoring/contract-authoring`)
-- `@prisma-next/sql-contract-ts` now composes `@prisma-next/contract-authoring` with SQL-specific types
-- Integration tests that depend on both `sql-contract-ts` and `sql-query` moved to `@prisma-next/integration-tests` (located at `test/integration/`) to avoid cyclic dependencies
-- Test packages (`e2e-tests`, `integration-tests`, `test-utils`) moved from `packages/` to `test/` directory to separate test suites from source packages
-- **Package Cleanup (Slice 7)**: `@prisma-next/sql-query` legacy package removed; all imports updated to use new package structure
+- `packages/1-framework/` - Framework domain (target-agnostic)
+- `packages/2-sql/` - SQL family domain
+- `packages/2-document/` - Document family domain (placeholder)
+- `packages/3-targets/` - Targets domain (concrete dialects, adapters, drivers)
+- `packages/3-extensions/` - Extensions domain (compat layers, extension packs)
 
-During migration from the old structure:
-
-- Old packages remain in `packages/*` (legacy location)
-- New packages are created in ring-based structure
-- Path aliases support both old and new locations during transition
-- Import check script validates both old and new packages
-- Once migration is complete, old packages will be removed
+The numbered prefixes ensure:
+1. Packages appear in dependency order when browsing the filesystem
+2. Visual reinforcement of the architecture hierarchy
+3. Lower numbers can be imported by higher numbers, never the reverse
 
 ## References
 
