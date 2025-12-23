@@ -67,6 +67,10 @@
     "./query-lane-context": {
       "types": "./dist/exports/query-lane-context.d.ts",
       "import": "./dist/exports/query-lane-context.js"
+    },
+    "./utils/guards": {
+      "types": "./dist/exports/guards.d.ts",
+      "import": "./dist/exports/guards.js"
     }
   }
 }

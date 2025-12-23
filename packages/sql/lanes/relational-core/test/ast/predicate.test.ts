@@ -4,6 +4,23 @@ import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate';
 import { createSelectAst } from '../../src/ast/select';
 import type { ColumnRef, OperationExpr, ParamRef, SelectAst } from '../../src/ast/types';
 
+function createTestOperationExpr(self: ColumnRef): OperationExpr {
+  return {
+    kind: 'operation',
+    method: 'test',
+    forTypeId: 'pg/text@1',
+    self,
+    args: [],
+    returns: { kind: 'builtin', type: 'string' },
+    lowering: {
+      targetFamily: 'sql',
+      strategy: 'function',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+      template: 'test(${self})',
+    },
+  };
+}
+
 describe('ast/predicate', () => {
   describe('createBinaryExpr', () => {
     it('creates binary expr with column ref and param ref', () => {
@@ -25,20 +42,7 @@ describe('ast/predicate', () => {
     });
 
     it('creates binary expr with operation expr and param ref', () => {
-      const left: OperationExpr = {
-        kind: 'operation',
-        method: 'test',
-        forTypeId: 'pg/text@1',
-        self: createColumnRef('user', 'email'),
-        args: [],
-        returns: { kind: 'builtin', type: 'string' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'test(${self})',
-        },
-      };
+      const left = createTestOperationExpr(createColumnRef('user', 'email'));
       const right: ParamRef = createParamRef(0, 'value');
 
       const binaryExpr = createBinaryExpr('eq', left, right);
@@ -53,10 +57,11 @@ describe('ast/predicate', () => {
 
       const binaryExpr = createBinaryExpr('eq', left, right);
 
-      expect(binaryExpr.right).toBe(right);
-      if (binaryExpr.right.kind === 'param') {
-        expect(binaryExpr.right.index).toBe(1);
-      }
+      expect(binaryExpr.right).toMatchObject({
+        kind: 'param',
+        index: 1,
+        name: 'email',
+      });
     });
 
     it('creates binary expr with column ref on the right', () => {
@@ -71,15 +76,11 @@ describe('ast/predicate', () => {
         left,
         right,
       });
-      expect(binaryExpr.kind).toBe('bin');
-      expect(binaryExpr.op).toBe('eq');
-      expect(binaryExpr.left).toBe(left);
-      expect(binaryExpr.right).toBe(right);
-      expect(binaryExpr.right.kind).toBe('col');
-      if (binaryExpr.right.kind === 'col') {
-        expect(binaryExpr.right.table).toBe('post');
-        expect(binaryExpr.right.column).toBe('userId');
-      }
+      expect(binaryExpr.right).toMatchObject({
+        kind: 'col',
+        table: 'post',
+        column: 'userId',
+      });
     });
 
     it('creates binary expr with column ref on the right for different operators', () => {
@@ -95,20 +96,7 @@ describe('ast/predicate', () => {
     });
 
     it('creates binary expr with operation expr and column ref on the right', () => {
-      const left: OperationExpr = {
-        kind: 'operation',
-        method: 'test',
-        forTypeId: 'pg/text@1',
-        self: createColumnRef('user', 'email'),
-        args: [],
-        returns: { kind: 'builtin', type: 'string' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: 'test(${self})',
-        },
-      };
+      const left = createTestOperationExpr(createColumnRef('user', 'email'));
       const right: ColumnRef = createColumnRef('post', 'email');
 
       const binaryExpr = createBinaryExpr('eq', left, right);

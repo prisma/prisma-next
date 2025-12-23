@@ -7,7 +7,7 @@ import type {
   ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
-import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
+import type { BinaryBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
 import { createBinaryExpr, createColumnRef, createParamRef } from '../utils/ast';
 import {
   errorFailedToBuildWhereClause,
@@ -63,7 +63,7 @@ export function buildWhereExpr(
   // Handle where.right - can be ParamPlaceholder or AnyColumnBuilder
   if (isParamPlaceholder(where.right)) {
     // Handle param placeholder (existing logic)
-    const placeholder = where.right;
+    const placeholder: ParamPlaceholder = where.right;
     paramName = placeholder.name;
 
     if (!Object.hasOwn(paramsMap, paramName)) {

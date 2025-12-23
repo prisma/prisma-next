@@ -1,4 +1,4 @@
-import type { StorageColumn } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
   BinaryExpr,
   ColumnRef,
@@ -9,30 +9,62 @@ import type {
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import type { IncludeState } from '../../src/relations/include-plan';
 import type { ProjectionState } from '../../src/selection/projection';
 import { buildProjectionItems, buildSelectAst } from '../../src/selection/select-builder';
 
-function createMockColumnBuilder(
-  table: string,
-  column: string,
-  columnMeta: StorageColumn,
-): AnyColumnBuilder {
-  return {
-    kind: 'column',
-    table,
-    column,
-    columnMeta,
-    eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-    asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-    desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-    __jsType: undefined,
-  } as unknown as AnyColumnBuilder;
-}
-
 describe('select-builder', () => {
+  const contract: SqlContract<SqlStorage> = {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    coreHash: 'sha256:test',
+    models: {},
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+        post: {
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
+    relations: {},
+    mappings: {
+      modelToTable: {},
+      tableToModel: {},
+      fieldToColumn: {},
+      columnToField: {},
+      codecTypes: {},
+      operationTypes: {},
+    },
+    meta: {},
+    sources: {},
+  };
+
+  const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
+  const tables = schema(context).tables;
+
   describe('buildProjectionItems', () => {
     const int4ColumnMeta: StorageColumn = {
       nativeType: 'int4',
@@ -43,7 +75,7 @@ describe('select-builder', () => {
     it('builds projection items with include reference', () => {
       const projectionState: ProjectionState = {
         aliases: ['posts'],
-        columns: [createMockColumnBuilder('user', 'id', int4ColumnMeta)],
+        columns: [tables['user']!.columns['id']!],
       };
       const includesForMeta: IncludeState[] = [
         {
@@ -56,7 +88,7 @@ describe('select-builder', () => {
           },
           childProjection: {
             aliases: ['id'],
-            columns: [createMockColumnBuilder('post', 'id', int4ColumnMeta)],
+            columns: [tables['post']!.columns['id']!],
           },
         },
       ];
@@ -86,9 +118,9 @@ describe('select-builder', () => {
         },
       };
       const columnWithOperation = {
-        ...createMockColumnBuilder('user', 'id', int4ColumnMeta),
+        ...tables['user']!.columns['id']!,
         _operationExpr: operationExpr,
-      };
+      } as AnyColumnBuilder & { _operationExpr?: OperationExpr };
       const projectionState: ProjectionState = {
         aliases: ['id_plus_one'],
         columns: [columnWithOperation],
@@ -106,7 +138,7 @@ describe('select-builder', () => {
     it('builds projection items with column reference', () => {
       const projectionState: ProjectionState = {
         aliases: ['id'],
-        columns: [createMockColumnBuilder('user', 'id', int4ColumnMeta)],
+        columns: [tables['user']!.columns['id']!],
       };
 
       const result = buildProjectionItems(projectionState, []);
@@ -134,14 +166,14 @@ describe('select-builder', () => {
         },
       };
       const columnWithOperation = {
-        ...createMockColumnBuilder('user', 'id', int4ColumnMeta),
+        ...tables['user']!.columns['id']!,
         _operationExpr: operationExpr,
-      };
+      } as AnyColumnBuilder & { _operationExpr?: OperationExpr };
       const projectionState: ProjectionState = {
         aliases: ['id', 'posts', 'email'],
         columns: [
-          createMockColumnBuilder('user', 'id', int4ColumnMeta),
-          createMockColumnBuilder('user', 'id', int4ColumnMeta),
+          tables['user']!.columns['id']!,
+          tables['user']!.columns['id']!,
           columnWithOperation,
         ],
       };
@@ -156,7 +188,7 @@ describe('select-builder', () => {
           },
           childProjection: {
             aliases: ['id'],
-            columns: [createMockColumnBuilder('post', 'id', int4ColumnMeta)],
+            columns: [tables['post']!.columns['id']!],
           },
         },
       ];
@@ -181,7 +213,7 @@ describe('select-builder', () => {
     it('throws error when alias is missing', () => {
       const projectionState: ProjectionState = {
         aliases: [undefined as unknown as string],
-        columns: [createMockColumnBuilder('user', 'id', int4ColumnMeta)],
+        columns: [tables['user']!.columns['id']!],
       };
 
       expect(() => buildProjectionItems(projectionState, [])).toThrow('Missing alias at index 0');
@@ -203,7 +235,7 @@ describe('select-builder', () => {
         aliases: ['id'],
         columns: [
           {
-            ...createMockColumnBuilder('user', 'id', int4ColumnMeta),
+            ...tables['user']!.columns['id']!,
             table: undefined as unknown as string,
             column: undefined as unknown as string,
           },

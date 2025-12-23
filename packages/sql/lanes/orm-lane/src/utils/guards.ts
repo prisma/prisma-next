@@ -1,11 +1,13 @@
-import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
   ColumnRef,
   LiteralExpr,
   OperationExpr,
   ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
-import type { AnyColumnBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
+import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import { getColumnMeta, isParamPlaceholder } from '@prisma-next/sql-relational-core/utils/guards';
+
+export { getColumnMeta, isParamPlaceholder };
 
 export function extractBaseColumnRef(expr: ColumnRef | OperationExpr): ColumnRef {
   if (expr.kind === 'col') {
@@ -37,6 +39,14 @@ export function isOperationExpr(expr: AnyColumnBuilder | OperationExpr): expr is
 /**
  * Helper to extract operation expression from builder.
  * Returns OperationExpr if present, undefined otherwise.
+ *
+ * @design-note: This function accesses the hidden `_operationExpr` property, which is a code smell.
+ * The issue is that `executeOperation()` in relational-core returns a ColumnBuilder-shaped object
+ * with a hidden `_operationExpr` property, creating coupling between lanes and relational-core
+ * implementation details. A cleaner design would be to have operation results be a separate
+ * type (e.g., `OperationResultBuilder`) that properly represents expression nodes rather than
+ * pretending to be a ColumnBuilder. This would require refactoring the operation execution
+ * system in relational-core to return proper expression types.
  */
 export function getOperationExpr(
   builder: AnyColumnBuilder | OperationExpr,
@@ -60,41 +70,11 @@ export function getColumnInfo(expr: AnyColumnBuilder | OperationExpr): {
   return { table: colBuilder.table, column: colBuilder.column };
 }
 
-/**
- * Helper to extract columnMeta from a ColumnBuilder.
- * Returns StorageColumn if present, undefined otherwise.
- * AnyColumnBuilder is a union that includes types with columnMeta property,
- * so we can safely access it after checking for existence.
- */
-export function getColumnMeta(expr: AnyColumnBuilder): StorageColumn | undefined {
-  // AnyColumnBuilder includes AnyColumnBuilderBase which has columnMeta: StorageColumn
-  // and ColumnBuilder which has columnMeta: ColumnMeta extends StorageColumn
-  // TypeScript should narrow the type after the 'in' check
-  if ('columnMeta' in expr) {
-    return expr.columnMeta;
-  }
-  return undefined;
-}
-
 export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
   return (
     typeof value === 'object' &&
     value !== null &&
     'kind' in value &&
     (value as { kind: unknown }).kind === 'column'
-  );
-}
-
-/**
- * Type predicate to check if a value is a ParamPlaceholder.
- */
-export function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'kind' in value &&
-    (value as { kind: unknown }).kind === 'param-placeholder' &&
-    'name' in value &&
-    typeof (value as { name: unknown }).name === 'string'
   );
 }

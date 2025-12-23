@@ -210,33 +210,6 @@ describe('delete builder', () => {
     expect(plan).toBeDefined();
   });
 
-  it('builds delete plan without codecId when whereResult.codecId is undefined', () => {
-    // biome-ignore lint/suspicious/noExplicitAny: test helper with complex type inference
-    const where = (model: any) => {
-      return model.id.eq(param('userId')) as AnyBinaryBuilder;
-    };
-
-    // Create a contract where the column has codecId but we use an operation expression
-    // that doesn't return codecId in whereResult
-    const plan = buildDeletePlan(context, 'User', where, getModelAccessor, {
-      params: { userId: 1 },
-    });
-
-    // When codecId is not available, paramCodecs should be empty
-    // This tests the branch where whereResult.codecId is undefined
-    expect({
-      annotationsDefined: plan.meta.annotations !== undefined,
-      codecsDefined: plan.meta.annotations?.codecs !== undefined,
-      intent: plan.meta.annotations?.['intent'],
-      isMutation: plan.meta.annotations?.['isMutation'],
-    }).toMatchObject({
-      annotationsDefined: true,
-      codecsDefined: true, // In this case, codecId is available from contract
-      intent: 'write',
-      isMutation: true,
-    });
-  });
-
   it('builds delete plan with annotations without codecs when paramCodecs is empty', () => {
     // biome-ignore lint/suspicious/noExplicitAny: test helper with complex type inference
     const where = (model: any) => {

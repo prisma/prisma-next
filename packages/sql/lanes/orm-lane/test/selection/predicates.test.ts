@@ -3,7 +3,9 @@ import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-co
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { buildWhereExpr } from '../../src/selection/predicates';
 
@@ -54,21 +56,11 @@ describe('predicates', () => {
 
   describe('buildWhereExpr', () => {
     it('builds where expr with column builder', () => {
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          kind: 'column',
-          table: 'user',
-          column: 'id',
-          columnMeta: int4ColumnMeta,
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['left'],
-        right: param('userId'),
-        op: 'eq',
-      };
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const userTable = tables['user']!;
+      const where = userTable.columns['id']!.eq(param('userId'));
       const paramsMap = { userId: 1 };
       const descriptors: ParamDescriptor[] = [];
       const values: unknown[] = [];
@@ -306,30 +298,11 @@ describe('predicates', () => {
     });
 
     it('builds where expr with column builder on right side', () => {
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          kind: 'column',
-          table: 'user',
-          column: 'id',
-          columnMeta: int4ColumnMeta,
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['left'],
-        right: {
-          kind: 'column',
-          table: 'user',
-          column: 'id',
-          columnMeta: int4ColumnMeta,
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['right'],
-        op: 'eq',
-      };
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const userTable = tables['user']!;
+      const where = userTable.columns['id']!.eq(userTable.columns['id']!);
       const paramsMap = {};
       const descriptors: ParamDescriptor[] = [];
       const values: unknown[] = [];
@@ -358,30 +331,17 @@ describe('predicates', () => {
     });
 
     it('builds where expr with column builder on right side when column not found in contract', () => {
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          kind: 'column',
-          table: 'user',
-          column: 'id',
-          columnMeta: int4ColumnMeta,
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['left'],
-        right: {
-          kind: 'column',
-          table: 'user',
-          column: 'unknown',
-          columnMeta: int4ColumnMeta,
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['right'],
-        op: 'eq',
-      };
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const userTable = tables['user']!;
+      // Create a column builder for a non-existent column by accessing it directly
+      // This simulates the scenario where a column builder references a column not in the contract
+      const unknownColumn = {
+        ...userTable.columns['id']!,
+        column: 'unknown' as const,
+      } as (typeof userTable.columns)['id'];
+      const where = userTable.columns['id']!.eq(unknownColumn);
       const paramsMap = {};
       const descriptors: ParamDescriptor[] = [];
       const values: unknown[] = [];

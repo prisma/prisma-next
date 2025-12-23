@@ -3,6 +3,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { UpdateAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
 import { buildUpdatePlan } from '../../src/mutations/update-builder';
@@ -63,57 +64,19 @@ describe('update builder', () => {
     Record<string, never>,
     'User'
   > = () => {
-    const userTable = contract.storage.tables['user']!;
-    const idColumnBuilder = {
-      kind: 'column' as const,
-      table: 'user',
-      column: 'id',
-      columnMeta: userTable.columns['id']!,
-      eq: () => ({
-        kind: 'binary' as const,
-        op: 'eq' as const,
-        left: {} as unknown,
-        right: {} as unknown,
-      }),
-      asc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'asc' as const }),
-      desc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'desc' as const }),
-      __jsType: undefined,
-    };
-    const emailColumnBuilder = {
-      kind: 'column' as const,
-      table: 'user',
-      column: 'email',
-      columnMeta: userTable.columns['email']!,
-      eq: () => ({
-        kind: 'binary' as const,
-        op: 'eq' as const,
-        left: {} as unknown,
-        right: {} as unknown,
-      }),
-      asc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'asc' as const }),
-      desc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'desc' as const }),
-      __jsType: undefined,
-    };
+    const tables = schema(context).tables;
+    const userTable = tables['user']!;
     return {
-      id: {
-        eq: (p: unknown) => ({
-          kind: 'binary' as const,
-          left: idColumnBuilder,
-          right: p,
-          op: 'eq' as const,
-        }),
-      },
-      email: emailColumnBuilder,
-    } as unknown as ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>;
+      id: userTable.columns['id']!,
+      email: userTable.columns['email']!,
+    } as ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>;
   };
 
   it('builds update plan with data and where clause', () => {
     const where = (
       model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
-    ) => {
-      return (model as Record<string, { eq: (p: unknown) => AnyBinaryBuilder }>)['id']!.eq(
-        param('userId'),
-      ) as AnyBinaryBuilder;
+    ): AnyBinaryBuilder => {
+      return (model as { id: { eq: (p: unknown) => AnyBinaryBuilder } }).id.eq(param('userId'));
     };
 
     const plan = buildUpdatePlan(
@@ -144,9 +107,7 @@ describe('update builder', () => {
     const where = (
       model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
     ) => {
-      return (model as Record<string, { eq: (p: unknown) => AnyBinaryBuilder }>)['id']!.eq(
-        param('userId'),
-      ) as AnyBinaryBuilder;
+      return (model as { id: { eq: (p: unknown) => AnyBinaryBuilder } }).id.eq(param('userId'));
     };
 
     expect(() => {
@@ -158,9 +119,7 @@ describe('update builder', () => {
     const where = (
       model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
     ) => {
-      return (model as Record<string, { eq: (p: unknown) => AnyBinaryBuilder }>)['id']!.eq(
-        param('userId'),
-      ) as AnyBinaryBuilder;
+      return (model as { id: { eq: (p: unknown) => AnyBinaryBuilder } }).id.eq(param('userId'));
     };
 
     expect(() => {
@@ -179,9 +138,7 @@ describe('update builder', () => {
     const where = (
       model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
     ) => {
-      return (model as Record<string, { eq: (p: unknown) => AnyBinaryBuilder }>)['id']!.eq(
-        param('userId'),
-      ) as AnyBinaryBuilder;
+      return (model as { id: { eq: (p: unknown) => AnyBinaryBuilder } }).id.eq(param('userId'));
     };
 
     const contractWithoutModel: SqlContract<SqlStorage> = {
@@ -208,9 +165,7 @@ describe('update builder', () => {
     const where = (
       model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
     ) => {
-      return (model as Record<string, { eq: (p: unknown) => AnyBinaryBuilder }>)['id']!.eq(
-        param('userId'),
-      ) as AnyBinaryBuilder;
+      return (model as { id: { eq: (p: unknown) => AnyBinaryBuilder } }).id.eq(param('userId'));
     };
 
     const contractWithoutTable: SqlContract<SqlStorage> = {
@@ -236,9 +191,7 @@ describe('update builder', () => {
     const where = (
       model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
     ) => {
-      return (model as Record<string, { eq: (p: unknown) => AnyBinaryBuilder }>)['id']!.eq(
-        param('userId'),
-      ) as AnyBinaryBuilder;
+      return (model as { id: { eq: (p: unknown) => AnyBinaryBuilder } }).id.eq(param('userId'));
     };
 
     const contractWithInvalidColumn: SqlContract<SqlStorage> = {
@@ -275,9 +228,7 @@ describe('update builder', () => {
     const where = (
       model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
     ) => {
-      return (model as Record<string, { eq: (p: unknown) => AnyBinaryBuilder }>)['id']!.eq(
-        param('userId'),
-      ) as AnyBinaryBuilder;
+      return (model as { id: { eq: (p: unknown) => AnyBinaryBuilder } }).id.eq(param('userId'));
     };
 
     expect(() => {
@@ -298,9 +249,7 @@ describe('update builder', () => {
     const where = (
       model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
     ) => {
-      return (model as Record<string, { eq: (p: unknown) => AnyBinaryBuilder }>)['id']!.eq(
-        param('userId'),
-      ) as AnyBinaryBuilder;
+      return (model as { id: { eq: (p: unknown) => AnyBinaryBuilder } }).id.eq(param('userId'));
     };
 
     const plan = buildUpdatePlan(
@@ -327,9 +276,7 @@ describe('update builder', () => {
     const where = (
       model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
     ) => {
-      return (model as Record<string, { eq: (p: unknown) => AnyBinaryBuilder }>)['id']!.eq(
-        param('userId'),
-      ) as AnyBinaryBuilder;
+      return (model as { id: { eq: (p: unknown) => AnyBinaryBuilder } }).id.eq(param('userId'));
     };
 
     const plan = buildUpdatePlan(
@@ -350,9 +297,7 @@ describe('update builder', () => {
     const where = (
       model: ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>,
     ) => {
-      return (model as Record<string, { eq: (p: unknown) => AnyBinaryBuilder }>)['id']!.eq(
-        param('userId'),
-      ) as AnyBinaryBuilder;
+      return (model as { id: { eq: (p: unknown) => AnyBinaryBuilder } }).id.eq(param('userId'));
     };
 
     const plan = buildUpdatePlan(

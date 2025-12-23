@@ -11,6 +11,7 @@ export default defineConfig({
     'exports/ast': 'src/exports/ast.ts',
     'exports/plan': 'src/exports/plan.ts',
     'exports/query-lane-context': 'src/exports/query-lane-context.ts',
+    'exports/guards': 'src/exports/guards.ts',
   },
   outDir: 'dist',
   format: ['esm'],

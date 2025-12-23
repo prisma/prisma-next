@@ -69,15 +69,7 @@ export class ColumnBuilderImpl<
     if (value == null) {
       throw planInvalid('Parameter placeholder or column builder required for column comparison');
     }
-    if (value.kind === 'param-placeholder') {
-      return Object.freeze({
-        kind: 'binary' as const,
-        op,
-        left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
-        right: value,
-      }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-    }
-    if (isColumnBuilder(value)) {
+    if (value.kind === 'param-placeholder' || isColumnBuilder(value)) {
       return Object.freeze({
         kind: 'binary' as const,
         op,
