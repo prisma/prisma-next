@@ -27,7 +27,7 @@ import {
   errorLimitMustBeNonNegativeInteger,
   errorMissingColumnForAlias,
 } from '../utils/errors';
-import { extractBaseColumnRef, isOperationExpr } from '../utils/guards';
+import { extractBaseColumnRef, extractExpression, isOperationExpr } from '../utils/guards';
 import type { IncludeState, ProjectionState } from '../utils/state';
 import { buildWhereExpr } from './predicate-builder';
 import { buildProjectionState } from './projection';
@@ -189,14 +189,15 @@ export function buildIncludeAst(
     ? (() => {
         const orderBy = include.childOrderBy as OrderBuilder<string, StorageColumn, unknown>;
         const orderExpr = orderBy.expr;
+        // Extract the underlying expression from ExpressionBuilder
+        const extractedExpr = extractExpression(orderExpr);
         const expr: ColumnRef | OperationExpr = (() => {
-          if (isOperationExpr(orderExpr)) {
-            const baseCol = extractBaseColumnRef(orderExpr);
+          if (isOperationExpr(extractedExpr)) {
+            const baseCol = extractBaseColumnRef(extractedExpr);
             return createColumnRef(baseCol.table, baseCol.column);
           }
-          // orderExpr is ColumnBuilder - TypeScript can't narrow properly
-          const colBuilder = orderExpr as { table: string; column: string };
-          return createColumnRef(colBuilder.table, colBuilder.column);
+          // extractedExpr is ColumnRef
+          return extractedExpr;
         })();
         return [createOrderByItem(expr, orderBy.dir)];
       })()

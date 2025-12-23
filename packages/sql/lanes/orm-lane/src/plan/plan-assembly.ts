@@ -5,7 +5,6 @@ import type {
   BinaryExpr,
   ExistsExpr,
   LoweredStatement,
-  OperationExpr,
   SelectAst,
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';

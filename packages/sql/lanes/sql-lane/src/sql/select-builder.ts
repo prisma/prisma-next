@@ -11,7 +11,6 @@ import type {
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import {
-  createColumnRef,
   createJoinOnBuilder,
   createOrderByItem,
   createSelectAst,
@@ -39,7 +38,6 @@ import {
   errorChildProjectionEmpty,
   errorFromMustBeCalled,
   errorIncludeAliasCollision,
-  errorInvalidColumnForAlias,
   errorLimitMustBeNonNegativeInteger,
   errorMissingAlias,
   errorMissingColumnForAlias,
@@ -323,12 +321,11 @@ export class SelectBuilderImpl<
       ? (() => {
           const orderBy = this.state.orderBy as OrderBuilder<string, StorageColumn, unknown>;
           const orderExpr = orderBy.expr;
-          const expr: ColumnRef | OperationExpr = isOperationExpr(orderExpr)
-            ? orderExpr
-            : (() => {
-                const colBuilder = orderExpr as { table: string; column: string };
-                return createColumnRef(colBuilder.table, colBuilder.column);
-              })();
+          // Extract the underlying expression from ExpressionBuilder
+          const extractedExpr = extractExpression(orderExpr);
+          const expr: ColumnRef | OperationExpr = isOperationExpr(extractedExpr)
+            ? extractedExpr
+            : extractedExpr; // extractedExpr is ColumnRef
           return [createOrderByItem(expr, orderBy.dir)];
         })()
       : undefined;

@@ -10,7 +10,6 @@ import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { createExpressionBuilder } from '@prisma-next/sql-relational-core/expression-builder';
 import type {
   AnyColumnBuilder,
-  AnyExpressionBuilder,
   AnyOrderBuilder,
   BinaryBuilder,
 } from '@prisma-next/sql-relational-core/types';

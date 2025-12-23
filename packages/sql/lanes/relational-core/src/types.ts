@@ -370,22 +370,43 @@ type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB extends Co
   ? JsType
   : never;
 
+/**
+ * Extracts the inferred JsType carried by an ExpressionBuilder.
+ */
+type ExtractJsTypeFromExpressionBuilder<EB extends AnyExpressionBuilder> =
+  EB extends ExpressionBuilder<
+    infer _ColumnName extends string,
+    infer _ColumnMeta extends StorageColumn,
+    infer JsType
+  >
+    ? JsType
+    : never;
+
 export type InferProjectionRow<P extends Record<string, AnyColumnBuilder>> = {
   [K in keyof P]: ExtractJsTypeFromColumnBuilder<P[K]>;
 };
 
 /**
- * Nested projection type - allows recursive nesting of ColumnBuilder or nested objects.
+ * Nested projection type - allows recursive nesting of ColumnBuilder, ExpressionBuilder, or nested objects.
  */
 export type NestedProjection = Record<
   string,
   | AnyColumnBuilder
+  | AnyExpressionBuilder
   | Record<
       string,
       | AnyColumnBuilder
+      | AnyExpressionBuilder
       | Record<
           string,
-          AnyColumnBuilder | Record<string, AnyColumnBuilder | Record<string, AnyColumnBuilder>>
+          | AnyColumnBuilder
+          | AnyExpressionBuilder
+          | Record<
+              string,
+              | AnyColumnBuilder
+              | AnyExpressionBuilder
+              | Record<string, AnyColumnBuilder | AnyExpressionBuilder>
+            >
         >
     >
 >;
@@ -401,24 +422,26 @@ type ExtractIncludeType<
 
 /**
  * Infers Row type from a nested projection object.
- * Recursively maps Record<string, ColumnBuilder | boolean | NestedProjection> to nested object types.
+ * Recursively maps Record<string, ColumnBuilder | ExpressionBuilder | boolean | NestedProjection> to nested object types.
  *
- * Extracts the pre-computed JsType from each ColumnBuilder at leaves.
+ * Extracts the pre-computed JsType from each ColumnBuilder or ExpressionBuilder at leaves.
  * When a value is `true`, it represents an include reference and infers `Array<ChildShape>`
  * by looking up the include alias in the Includes type map.
  */
 export type InferNestedProjectionRow<
-  P extends Record<string, AnyColumnBuilder | boolean | NestedProjection>,
+  P extends Record<string, AnyColumnBuilder | AnyExpressionBuilder | boolean | NestedProjection>,
   CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Includes extends Record<string, unknown> = Record<string, never>,
 > = {
   [K in keyof P]: P[K] extends AnyColumnBuilder
     ? ExtractJsTypeFromColumnBuilder<P[K]>
-    : P[K] extends true
-      ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
-      : P[K] extends NestedProjection
-        ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
-        : never;
+    : P[K] extends AnyExpressionBuilder
+      ? ExtractJsTypeFromExpressionBuilder<P[K]>
+      : P[K] extends true
+        ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
+        : P[K] extends NestedProjection
+          ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
+          : never;
 };
 
 /**
