@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import {
   collectColumnRefs,
   extractBaseColumnRef,
+  extractExpression,
   getColumnInfo,
   isColumnBuilder,
   isOperationExpr,
@@ -200,7 +201,8 @@ describe('guards', () => {
         column: 'id',
         columnMeta: int4ColumnMeta,
       } as unknown as AnyColumnBuilder;
-      expect(isOperationExpr(colBuilder)).toBe(false);
+      const expr = extractExpression(colBuilder);
+      expect(isOperationExpr(expr)).toBe(false);
     });
 
     it('returns false for null', () => {

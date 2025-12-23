@@ -1,6 +1,7 @@
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import { createExpressionBuilder } from '@prisma-next/sql-relational-core/expression-builder';
 import type { OrderBuilder } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
 import { buildChildOrderByClause, buildOrderByClause } from '../../src/selection/ordering';
@@ -14,10 +15,12 @@ describe('ordering', () => {
 
     it('builds orderBy clause with column builder', () => {
       const orderBy = {
-        expr: {
-          table: 'user',
-          column: 'id',
-        },
+        kind: 'order' as const,
+        expr: createExpressionBuilder(createColumnRef('user', 'id'), {
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         dir: 'asc' as const,
       } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildOrderByClause(orderBy);
@@ -50,7 +53,12 @@ describe('ordering', () => {
         },
       };
       const orderBy = {
-        expr: operationExpr,
+        kind: 'order' as const,
+        expr: createExpressionBuilder(operationExpr, {
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         dir: 'desc' as const,
       } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildOrderByClause(orderBy);
@@ -69,10 +77,12 @@ describe('ordering', () => {
 
     it('builds orderBy clause with desc direction', () => {
       const orderBy = {
-        expr: {
-          table: 'user',
-          column: 'createdAt',
-        },
+        kind: 'order' as const,
+        expr: createExpressionBuilder(createColumnRef('user', 'createdAt'), {
+          codecId: 'pg/timestamp@1',
+          nativeType: 'timestamp',
+          nullable: false,
+        }),
         dir: 'desc' as const,
       } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildOrderByClause(orderBy);
@@ -94,10 +104,12 @@ describe('ordering', () => {
 
     it('builds child orderBy clause with column builder', () => {
       const orderBy = {
-        expr: {
-          table: 'post',
-          column: 'id',
-        },
+        kind: 'order' as const,
+        expr: createExpressionBuilder(createColumnRef('post', 'id'), {
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         dir: 'asc' as const,
       } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildChildOrderByClause(orderBy);
@@ -130,7 +142,12 @@ describe('ordering', () => {
         },
       };
       const orderBy = {
-        expr: operationExpr,
+        kind: 'order' as const,
+        expr: createExpressionBuilder(operationExpr, {
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         dir: 'desc' as const,
       } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildChildOrderByClause(orderBy);
@@ -177,7 +194,12 @@ describe('ordering', () => {
         },
       };
       const orderBy = {
-        expr: outerOp,
+        kind: 'order' as const,
+        expr: createExpressionBuilder(outerOp, {
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         dir: 'asc' as const,
       } as OrderBuilder<string, StorageColumn, unknown>;
       const result = buildChildOrderByClause(orderBy);

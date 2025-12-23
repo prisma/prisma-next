@@ -8,10 +8,8 @@ import { createExpressionBuilder } from '@prisma-next/sql-relational-core/expres
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
-  AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyExpressionBuilder,
-  AnyOrderBuilder,
   JoinOnPredicate,
 } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';

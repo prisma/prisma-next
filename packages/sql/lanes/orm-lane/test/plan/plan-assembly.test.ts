@@ -387,10 +387,12 @@ describe('plan assembly', () => {
       };
 
       const orderBy: AnyOrderBuilder = {
-        expr: {
-          table: 'user',
-          column: 'id',
-        },
+        kind: 'order',
+        expr: createExpressionBuilder(createColumnRef('user', 'id'), {
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         dir: 'asc',
       } as AnyOrderBuilder;
 
@@ -446,7 +448,12 @@ describe('plan assembly', () => {
       };
 
       const orderBy: AnyOrderBuilder = {
-        expr: operationExpr,
+        kind: 'order',
+        expr: createExpressionBuilder(operationExpr, {
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+          nullable: false,
+        }),
         dir: 'desc',
       } as AnyOrderBuilder;
 
@@ -568,10 +575,12 @@ describe('plan assembly', () => {
             ],
           },
           childOrderBy: {
-            expr: {
-              table: 'post',
-              column: 'id',
-            },
+            kind: 'order',
+            expr: createExpressionBuilder(createColumnRef('post', 'id'), {
+              codecId: 'pg/int4@1',
+              nativeType: 'int4',
+              nullable: false,
+            }),
             dir: 'asc',
           } as AnyOrderBuilder,
         },
