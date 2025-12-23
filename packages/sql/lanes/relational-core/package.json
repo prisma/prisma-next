@@ -71,6 +71,10 @@
     "./utils/guards": {
       "types": "./dist/exports/guards.d.ts",
       "import": "./dist/exports/guards.js"
+    },
+    "./expression-builder": {
+      "types": "./dist/exports/expression-builder.d.ts",
+      "import": "./dist/exports/expression-builder.js"
     }
   }
 }

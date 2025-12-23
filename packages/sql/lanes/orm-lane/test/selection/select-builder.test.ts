@@ -9,6 +9,7 @@ import type {
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import { createExpressionBuilder } from '@prisma-next/sql-relational-core/expression-builder';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -117,10 +118,11 @@ describe('select-builder', () => {
           template: '${self} + ${arg0}',
         },
       };
-      const columnWithOperation = {
-        ...tables['user']!.columns['id']!,
-        _operationExpr: operationExpr,
-      } as AnyColumnBuilder & { _operationExpr?: OperationExpr };
+      const columnWithOperation = createExpressionBuilder(operationExpr, {
+        nativeType: 'int4',
+        codecId: 'pg/int4@1',
+        nullable: false,
+      });
       const projectionState: ProjectionState = {
         aliases: ['id_plus_one'],
         columns: [columnWithOperation],
@@ -165,10 +167,11 @@ describe('select-builder', () => {
           template: '${self} + ${arg0}',
         },
       };
-      const columnWithOperation = {
-        ...tables['user']!.columns['id']!,
-        _operationExpr: operationExpr,
-      } as AnyColumnBuilder & { _operationExpr?: OperationExpr };
+      const columnWithOperation = createExpressionBuilder(operationExpr, {
+        nativeType: 'int4',
+        codecId: 'pg/int4@1',
+        nullable: false,
+      });
       const projectionState: ProjectionState = {
         aliases: ['id', 'posts', 'email'],
         columns: [

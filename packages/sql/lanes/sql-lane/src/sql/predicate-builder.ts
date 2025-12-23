@@ -19,8 +19,8 @@ import {
   errorUnknownTable,
 } from '../utils/errors';
 import {
+  extractExpression,
   getColumnInfo,
-  getOperationExpr,
   isColumnBuilder,
   isParamPlaceholder,
 } from '../utils/guards';
@@ -43,30 +43,22 @@ export function buildWhereExpr(
   let rightExpr: ColumnRef | ParamRef;
   let paramName: string;
 
-  // Check if where.left is an OperationExpr directly (from operation.eq())
-  // or a ColumnBuilder with _operationExpr property
-  const operationExpr = getOperationExpr(where.left);
-  if (operationExpr) {
-    leftExpr = operationExpr;
-  } else if (isColumnBuilder(where.left)) {
-    // where.left is a ColumnBuilder - use proper type narrowing
-    const { table, column } = getColumnInfo(where.left);
+  // Extract expression from ColumnBuilder or ExpressionBuilder
+  leftExpr = extractExpression(where.left);
 
-    const contractTable = contract.storage.tables[table];
+  // If it's a ColumnRef, get codecId from contract
+  if (leftExpr.kind === 'col') {
+    const contractTable = contract.storage.tables[leftExpr.table];
     if (!contractTable) {
-      errorUnknownTable(table);
+      errorUnknownTable(leftExpr.table);
     }
 
-    const columnMeta: StorageColumn | undefined = contractTable.columns[column];
+    const columnMeta: StorageColumn | undefined = contractTable.columns[leftExpr.column];
     if (!columnMeta) {
-      errorUnknownColumn(column, table);
+      errorUnknownColumn(leftExpr.column, leftExpr.table);
     }
 
     codecId = columnMeta.codecId;
-    leftExpr = createColumnRef(table, column);
-  } else {
-    // where.left is neither OperationExpr nor ColumnBuilder - invalid state
-    errorFailedToBuildWhereClause();
   }
 
   // Handle where.right - can be ParamPlaceholder or AnyColumnBuilder
@@ -83,15 +75,14 @@ export function buildWhereExpr(
     const index = values.push(value);
 
     // Construct descriptor directly from validated StorageColumn
-    if (isColumnBuilder(where.left)) {
-      const { table, column } = getColumnInfo(where.left);
-      const contractTable = contract.storage.tables[table];
-      const columnMeta = contractTable?.columns[column];
+    if (leftExpr.kind === 'col') {
+      const contractTable = contract.storage.tables[leftExpr.table];
+      const columnMeta = contractTable?.columns[leftExpr.column];
       if (columnMeta) {
         descriptors.push({
           name: paramName,
           source: 'dsl',
-          refs: { table, column },
+          refs: { table: leftExpr.table, column: leftExpr.column },
           nullable: columnMeta.nullable,
           codecId: columnMeta.codecId,
           nativeType: columnMeta.nativeType,

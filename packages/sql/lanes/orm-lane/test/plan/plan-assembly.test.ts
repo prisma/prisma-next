@@ -7,8 +7,10 @@ import type {
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import { createExpressionBuilder } from '@prisma-next/sql-relational-core/expression-builder';
 import type {
   AnyColumnBuilder,
+  AnyExpressionBuilder,
   AnyOrderBuilder,
   BinaryBuilder,
 } from '@prisma-next/sql-relational-core/types';
@@ -146,17 +148,11 @@ describe('plan assembly', () => {
       const projection: ProjectionState = {
         aliases: ['sum'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-            _operationExpr: operationExpr,
-          } as unknown as ProjectionState['columns'][0],
+          createExpressionBuilder(operationExpr, {
+            nativeType: 'int4',
+            codecId: 'pg/int4@1',
+            nullable: false,
+          }) as unknown as ProjectionState['columns'][0],
         ],
       };
 
@@ -202,17 +198,11 @@ describe('plan assembly', () => {
       const projection: ProjectionState = {
         aliases: ['count'],
         columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-            _operationExpr: operationExpr,
-          } as unknown as ProjectionState['columns'][0],
+          createExpressionBuilder(operationExpr, {
+            nativeType: 'int4',
+            codecId: 'pg/int4@1',
+            nullable: false,
+          }) as unknown as ProjectionState['columns'][0],
         ],
       };
 
@@ -355,9 +345,11 @@ describe('plan assembly', () => {
 
       const where: BinaryBuilder = {
         kind: 'binary',
-        left: {
-          _operationExpr: operationExpr,
-        } as unknown as BinaryBuilder['left'],
+        left: createExpressionBuilder(operationExpr, {
+          nativeType: 'int4',
+          codecId: 'pg/int4@1',
+          nullable: false,
+        }),
         right: { kind: 'param-placeholder', name: 'value' },
         op: 'eq',
       };

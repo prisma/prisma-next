@@ -5,6 +5,7 @@ import {
   createLiteralExpr,
   createParamRef,
 } from '@prisma-next/sql-relational-core/ast';
+import { createExpressionBuilder } from '@prisma-next/sql-relational-core/expression-builder';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
 import {
@@ -224,7 +225,7 @@ describe('guards', () => {
   });
 
   describe('getColumnInfo', () => {
-    it('extracts column info from operation expr', () => {
+    it('extracts column info from expression builder with operation expr', () => {
       const baseCol = createColumnRef('user', 'id');
       const operationExpr: OperationExpr = {
         kind: 'operation',
@@ -240,7 +241,8 @@ describe('guards', () => {
           template: '${self} + ${arg0}',
         },
       };
-      const result = getColumnInfo(operationExpr);
+      const exprBuilder = createExpressionBuilder(operationExpr, int4ColumnMeta);
+      const result = getColumnInfo(exprBuilder);
       expect(result).toEqual({ table: 'user', column: 'id' });
     });
 

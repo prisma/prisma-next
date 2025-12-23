@@ -4,12 +4,16 @@ import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
+  AnyExpressionBuilder,
   AnyOrderBuilder,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
 import type { ProjectionState } from '../utils/state';
 
-export type ProjectionInput = Record<string, AnyColumnBuilder | boolean | NestedProjection>;
+export type ProjectionInput = Record<
+  string,
+  AnyColumnBuilder | AnyExpressionBuilder | boolean | NestedProjection
+>;
 
 export interface MetaBuildArgs {
   readonly contract: SqlContract<SqlStorage>;

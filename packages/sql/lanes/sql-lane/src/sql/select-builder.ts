@@ -21,6 +21,8 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
   AnyBinaryBuilder,
+  AnyColumnBuilder,
+  AnyExpressionBuilder,
   AnyOrderBuilder,
   BinaryBuilder,
   BuildOptions,
@@ -45,7 +47,7 @@ import {
   errorSelfJoinNotSupported,
   errorUnknownTable,
 } from '../utils/errors';
-import { isOperationExpr } from '../utils/guards';
+import { extractExpression, isOperationExpr } from '../utils/guards';
 import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state';
 import {
   buildIncludeAst,
@@ -359,27 +361,12 @@ export class SelectBuilderImpl<
           expr: { kind: 'includeRef', alias },
         });
       } else {
-        // Check if this column has an operation expression
-        const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-        if (operationExpr) {
-          projectEntries.push({
-            alias,
-            expr: operationExpr,
-          });
-        } else {
-          // This is a regular column
-          // TypeScript can't narrow ColumnBuilder properly
-          const col = column as { table: string; column: string };
-          const tableName = col.table;
-          const columnName = col.column;
-          if (!tableName || !columnName) {
-            errorInvalidColumnForAlias(alias, i);
-          }
-          projectEntries.push({
-            alias,
-            expr: createColumnRef(tableName, columnName),
-          });
-        }
+        // Extract expression from ColumnBuilder or ExpressionBuilder
+        const expr = extractExpression(column as AnyColumnBuilder | AnyExpressionBuilder);
+        projectEntries.push({
+          alias,
+          expr,
+        });
       }
     }
 

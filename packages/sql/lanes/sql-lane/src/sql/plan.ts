@@ -1,13 +1,17 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
-import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import type {
+  AnyColumnBuilder,
+  AnyExpressionBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import type { MetaBuildArgs } from '../types/internal';
 import { errorMissingColumnForAlias } from '../utils/errors';
 import {
   collectColumnRefs,
+  extractExpression,
   getColumnInfo,
   isColumnBuilder,
+  isExpressionBuilder,
   isOperationExpr,
 } from '../utils/guards';
 
@@ -16,9 +20,9 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
   const refsTables = new Set<string>([args.table.name]);
 
   for (const column of args.projection.columns) {
-    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
-      const allRefs = collectColumnRefs(operationExpr);
+    const expr = extractExpression(column as AnyColumnBuilder | AnyExpressionBuilder);
+    if (isOperationExpr(expr)) {
+      const allRefs = collectColumnRefs(expr);
       for (const ref of allRefs) {
         refsColumns.set(`${ref.table}.${ref.column}`, {
           table: ref.table,
@@ -26,14 +30,11 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         });
       }
     } else {
-      // column is ColumnBuilder - TypeScript can't narrow properly
-      const col = column as unknown as { table?: string; column?: string };
-      if (col.table && col.column) {
-        refsColumns.set(`${col.table}.${col.column}`, {
-          table: col.table,
-          column: col.column,
-        });
-      }
+      // expr is ColumnRef
+      refsColumns.set(`${expr.table}.${expr.column}`, {
+        table: expr.table,
+        column: expr.column,
+      });
     }
   }
 
@@ -116,9 +117,9 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
 
   if (args.where) {
     const whereLeft = args.where.left;
-    const operationExpr = (whereLeft as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
-      const allRefs = collectColumnRefs(operationExpr);
+    const expr = extractExpression(whereLeft as AnyColumnBuilder | AnyExpressionBuilder);
+    if (isOperationExpr(expr)) {
+      const allRefs = collectColumnRefs(expr);
       for (const ref of allRefs) {
         refsColumns.set(`${ref.table}.${ref.column}`, {
           table: ref.table,
@@ -126,14 +127,11 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         });
       }
     } else {
-      // whereLeft is ColumnBuilder - TypeScript can't narrow properly
-      const colBuilder = whereLeft as unknown as { table?: string; column?: string };
-      if (colBuilder.table && colBuilder.column) {
-        refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
-          table: colBuilder.table,
-          column: colBuilder.column,
-        });
-      }
+      // expr is ColumnRef
+      refsColumns.set(`${expr.table}.${expr.column}`, {
+        table: expr.table,
+        column: expr.column,
+      });
     }
 
     // Handle right side of WHERE clause - can be ParamPlaceholder or AnyColumnBuilder
@@ -186,21 +184,12 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       if (!column) {
         errorMissingColumnForAlias(alias, index);
       }
-      // TypeScript can't narrow ColumnBuilder properly
-      const col = column as unknown as {
-        table?: string;
-        column?: string;
-        _operationExpr?: OperationExpr;
-      };
-      if (!col.table || !col.column) {
-        // This is a placeholder column for an include - skip it
-        return [alias, `include:${alias}`];
+      const expr = extractExpression(column as AnyColumnBuilder | AnyExpressionBuilder);
+      if (isOperationExpr(expr)) {
+        return [alias, `operation:${expr.method}`];
       }
-      const operationExpr = col._operationExpr;
-      if (operationExpr) {
-        return [alias, `operation:${operationExpr.method}`];
-      }
-      return [alias, `${col.table}.${col.column}`];
+      // expr is ColumnRef
+      return [alias, `${expr.table}.${expr.column}`];
     }),
   );
 
@@ -216,20 +205,28 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column) {
       continue;
     }
-    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
-      if (operationExpr.returns.kind === 'typeId') {
-        projectionTypes[alias] = operationExpr.returns.type;
-      } else if (operationExpr.returns.kind === 'builtin') {
-        projectionTypes[alias] = operationExpr.returns.type;
+    const expr = extractExpression(column as AnyColumnBuilder | AnyExpressionBuilder);
+    if (isOperationExpr(expr)) {
+      if (expr.returns.kind === 'typeId') {
+        projectionTypes[alias] = expr.returns.type;
+      } else if (expr.returns.kind === 'builtin') {
+        projectionTypes[alias] = expr.returns.type;
       }
     } else {
-      // TypeScript can't narrow ColumnBuilder properly
-      const col = column as unknown as { columnMeta?: { codecId: string } };
-      const columnMeta = col.columnMeta;
-      const codecId = columnMeta?.codecId;
-      if (codecId) {
-        projectionTypes[alias] = codecId;
+      // expr is ColumnRef - get codecId from columnMeta
+      if (isExpressionBuilder(column)) {
+        const codecId = column.columnMeta.codecId;
+        if (codecId) {
+          projectionTypes[alias] = codecId;
+        }
+      } else {
+        // column is ColumnBuilder
+        const col = column as { columnMeta?: { codecId: string } };
+        const columnMeta = col.columnMeta;
+        const codecId = columnMeta?.codecId;
+        if (codecId) {
+          projectionTypes[alias] = codecId;
+        }
       }
     }
   }
@@ -246,19 +243,26 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column) {
       continue;
     }
-    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
-      if (operationExpr.returns.kind === 'typeId') {
-        projectionCodecs[alias] = operationExpr.returns.type;
+    const expr = extractExpression(column as AnyColumnBuilder | AnyExpressionBuilder);
+    if (isOperationExpr(expr)) {
+      if (expr.returns.kind === 'typeId') {
+        projectionCodecs[alias] = expr.returns.type;
       }
     } else {
-      // Use columnMeta.codecId directly as typeId (already canonicalized)
-      // TypeScript can't narrow ColumnBuilder properly
-      const col = column as unknown as { columnMeta?: { codecId: string } };
-      const columnMeta = col.columnMeta;
-      const codecId = columnMeta?.codecId;
-      if (codecId) {
-        projectionCodecs[alias] = codecId;
+      // expr is ColumnRef - get codecId from columnMeta
+      if (isExpressionBuilder(column)) {
+        const codecId = column.columnMeta.codecId;
+        if (codecId) {
+          projectionCodecs[alias] = codecId;
+        }
+      } else {
+        // column is ColumnBuilder
+        const col = column as { columnMeta?: { codecId: string } };
+        const columnMeta = col.columnMeta;
+        const codecId = columnMeta?.codecId;
+        if (codecId) {
+          projectionCodecs[alias] = codecId;
+        }
       }
     }
   }

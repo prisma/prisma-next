@@ -2,6 +2,7 @@ import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import { createExpressionBuilder } from '@prisma-next/sql-relational-core/expression-builder';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
@@ -148,9 +149,11 @@ describe('predicates', () => {
       };
       const where: BinaryBuilder = {
         kind: 'binary',
-        left: {
-          _operationExpr: operationExpr,
-        } as unknown as BinaryBuilder['left'],
+        left: createExpressionBuilder(operationExpr, {
+          nativeType: 'int4',
+          codecId: 'pg/int4@1',
+          nullable: false,
+        }),
         right: param('userId'),
         op: 'eq',
       };

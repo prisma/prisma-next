@@ -505,10 +505,12 @@ if (isColumnBuilder(where.left)) {
   // TypeScript knows where.left is ColumnBuilder here
 }
 
-// ✅ CORRECT: Use type predicate to check and extract
-const operationExpr = getOperationExpr(where.left);
-if (operationExpr) {
-  // TypeScript knows operationExpr is OperationExpr here
+// ✅ CORRECT: Use extractExpression to get the underlying AST node
+const expr = extractExpression(where.left);
+if (expr.kind === 'operation') {
+  // TypeScript knows expr is OperationExpr here
+} else {
+  // TypeScript knows expr is ColumnRef here
 }
 ```
 
@@ -590,25 +592,37 @@ export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
 }
 
 /**
- * Helper to extract operation expression from builder.
- * Returns OperationExpr if present, undefined otherwise.
+ * Type predicate to check if a value is an ExpressionBuilder.
  */
-export function getOperationExpr(
-  builder: AnyColumnBuilder | OperationExpr,
-): OperationExpr | undefined {
-  if (isOperationExpr(builder)) {
-    return builder;
+export function isExpressionBuilder(value: unknown): value is AnyExpressionBuilder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'expression'
+  );
+}
+
+/**
+ * Helper to extract the underlying AST expression from a builder.
+ * Returns ColumnRef or OperationExpr depending on the builder type.
+ */
+export function extractExpression(
+  builder: AnyColumnBuilder | AnyExpressionBuilder,
+): ColumnRef | OperationExpr {
+  if (isExpressionBuilder(builder)) {
+    return builder.expr; // ExpressionBuilder exposes expr property directly
   }
-  const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
-  return builderWithExpr._operationExpr;
+  // If it's a ColumnBuilder, convert it to a ColumnRef
+  return { kind: 'col', table: builder.table, column: builder.column };
 }
 ```
 
-**Note**: The `getOperationExpr` helper still uses a cast internally, but it's:
-- Centralized in one place
-- Documented and tested
-- Used consistently across the codebase
-- Better than having blind casts everywhere
+**Note**: The `extractExpression` helper provides a clean, type-safe way to access the underlying AST node without blind casts:
+- Works with both `ColumnBuilder` and `ExpressionBuilder`
+- Returns the appropriate AST node type (`ColumnRef` or `OperationExpr`)
+- No hidden properties or implementation details exposed
+- Type-safe and documented
 
 ### Related Patterns
 
@@ -644,15 +658,13 @@ if (isColumnBuilder(where.left)) {
   // TypeScript knows where.left is ColumnBuilder here
 }
 
-// ✅ CORRECT: Use type predicate to check and extract
-const operationExpr = getOperationExpr(where.left);
-if (operationExpr) {
-  // TypeScript knows operationExpr is OperationExpr here
-} else if (isColumnBuilder(where.left)) {
-  // TypeScript knows where.left is ColumnBuilder here
+// ✅ CORRECT: Use extractExpression to get the underlying AST node
+const expr = extractExpression(where.left);
+if (expr.kind === 'operation') {
+  // TypeScript knows expr is OperationExpr here
 } else {
-  // Throw error for invalid state
-  errorFailedToBuildWhereClause();
+  // TypeScript knows expr is ColumnRef here
+  // Handle ColumnRef case
 }
 ```
 
@@ -695,7 +707,7 @@ const colBuilder = where.left as unknown as { table: string; column: string };
 ### How to Replace Blind Casts
 
 1. **Create or use a type predicate**: Check if a value matches a type using a type guard function
-2. **Use helper functions**: Extract common type-checking logic into reusable helpers (e.g., `isColumnBuilder`, `getOperationExpr`, `getColumnInfo`)
+2. **Use helper functions**: Extract common type-checking logic into reusable helpers (e.g., `isColumnBuilder`, `isExpressionBuilder`, `extractExpression`, `getColumnInfo`)
 3. **Throw errors for invalid states**: If a value doesn't match expected types, throw an error
 
 **Example: Replacing blind cast with type predicate**
@@ -736,31 +748,174 @@ export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
 }
 
 /**
- * Helper to extract operation expression from builder.
- * Returns OperationExpr if present, undefined otherwise.
+ * Type predicate to check if a value is an ExpressionBuilder.
  */
-export function getOperationExpr(
-  builder: AnyColumnBuilder | OperationExpr,
-): OperationExpr | undefined {
-  if (isOperationExpr(builder)) {
-    return builder;
+export function isExpressionBuilder(value: unknown): value is AnyExpressionBuilder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'expression'
+  );
+}
+
+/**
+ * Helper to extract the underlying AST expression from a builder.
+ * Returns ColumnRef or OperationExpr depending on the builder type.
+ */
+export function extractExpression(
+  builder: AnyColumnBuilder | AnyExpressionBuilder,
+): ColumnRef | OperationExpr {
+  if (isExpressionBuilder(builder)) {
+    return builder.expr; // ExpressionBuilder exposes expr property directly
   }
-  const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
-  return builderWithExpr._operationExpr;
+  // If it's a ColumnBuilder, convert it to a ColumnRef
+  return { kind: 'col', table: builder.table, column: builder.column };
 }
 ```
 
-**Note**: Helper functions like `getOperationExpr` may still use casts internally, but they:
-- Centralize the cast logic in one place
-- Are documented and tested
-- Are used consistently across the codebase
-- Are better than having blind casts scattered everywhere
+**Note**: The `extractExpression` helper provides a clean, type-safe way to access the underlying AST node:
+- Works with both `ColumnBuilder` and `ExpressionBuilder`
+- Returns the appropriate AST node type (`ColumnRef` or `OperationExpr`)
+- No hidden properties or implementation details exposed
+- Type-safe and documented
 
 ### Related Patterns
 
 - See "Type Safety is Non-Negotiable" section for why type safety matters
 - See "Test Mock Type Assertions" section for acceptable test patterns
 - See "Avoiding Unnecessary Type Casts" section below for avoiding unnecessary casts
+- See "ExpressionBuilder Pattern" section below for handling operation expressions
+
+## ExpressionBuilder Pattern
+
+**Pattern**: Use `ExpressionBuilder` to represent expressions (both `ColumnRef` and `OperationExpr`) instead of conflating them with `ColumnBuilder` via hidden properties.
+
+### The Problem
+
+Previously, when calling operations (e.g., `col.distance(...)`), the result was represented as a `ColumnBuilder`-shaped object with a hidden `_operationExpr` property. This required blind casts (`as unknown as { _operationExpr?: OperationExpr }`) to access the operation expression, coupling query lanes to implementation details from `relational-core`.
+
+**❌ WRONG: Hidden property pattern (removed)**
+
+```typescript
+// Operation result was a ColumnBuilder with hidden _operationExpr
+const result = col.distance(otherCol); // Returns ColumnBuilder & { _operationExpr?: OperationExpr }
+
+// Required blind cast to access the operation expression
+const operationExpr = (result as unknown as { _operationExpr?: OperationExpr })._operationExpr;
+```
+
+**Why this was problematic:**
+- Hidden properties violate encapsulation
+- Required blind casts in production code
+- Coupled query lanes to implementation details
+- Operation results aren't really columns - they're expressions
+
+### The Solution
+
+**✅ CORRECT: Use ExpressionBuilder for explicit expression representation**
+
+```typescript
+import type { ExpressionBuilder, AnyExpressionBuilder } from '@prisma-next/sql-relational-core/types';
+import { extractExpression, isExpressionBuilder } from '@prisma-next/sql-relational-core/utils/guards';
+
+// Operation result is now an ExpressionBuilder
+const result = col.distance(otherCol); // Returns ExpressionBuilder
+
+// Access the underlying expression directly via the expr property
+const expr = result.expr; // ColumnRef | OperationExpr
+
+// Or use the helper function
+const extractedExpr = extractExpression(result); // ColumnRef | OperationExpr
+if (extractedExpr.kind === 'operation') {
+  // Handle OperationExpr
+} else {
+  // Handle ColumnRef
+}
+```
+
+### ExpressionBuilder Interface
+
+`ExpressionBuilder` explicitly represents expressions and provides type-safe access to the underlying AST node:
+
+```typescript
+export interface ExpressionBuilder<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
+> {
+  readonly kind: 'expression';
+  readonly expr: ColumnRef | OperationExpr; // Direct access to AST node
+  readonly columnMeta: ColumnMeta;
+  // Comparison methods (eq, neq, gt, lt, gte, lte)
+  eq(value: ParamPlaceholder | AnyColumnBuilderBase): BinaryBuilder<...>;
+  // Ordering methods (asc, desc)
+  asc(): OrderBuilder<...>;
+  desc(): OrderBuilder<...>;
+  readonly __jsType: JsType;
+}
+```
+
+### Converting ColumnBuilder to ExpressionBuilder
+
+`ColumnBuilder` provides a `toExpression()` method to convert to `ExpressionBuilder`:
+
+```typescript
+const col = tables.user.columns.id;
+const expr = col.toExpression(); // ExpressionBuilder wrapping ColumnRef
+```
+
+### Helper Functions
+
+**`extractExpression()`**: Extracts the underlying AST node from either a `ColumnBuilder` or `ExpressionBuilder`:
+
+```typescript
+export function extractExpression(
+  builder: AnyColumnBuilder | AnyExpressionBuilder,
+): ColumnRef | OperationExpr {
+  if (isExpressionBuilder(builder)) {
+    return builder.expr; // Direct access to expr property
+  }
+  // Convert ColumnBuilder to ColumnRef
+  return { kind: 'col', table: builder.table, column: builder.column };
+}
+```
+
+**`isExpressionBuilder()`**: Type predicate to check if a value is an `ExpressionBuilder`:
+
+```typescript
+export function isExpressionBuilder(value: unknown): value is AnyExpressionBuilder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'expression'
+  );
+}
+```
+
+### When to Use ExpressionBuilder
+
+- **Operation results**: Operations (e.g., `col.distance(...)`) return `ExpressionBuilder`
+- **Binary expressions**: `BinaryBuilder.left` is now `ExpressionBuilder` (was `ColumnBuilder | OperationExpr`)
+- **Order expressions**: `OrderBuilder.expr` is now `ExpressionBuilder` (was `ColumnBuilder | OperationExpr`)
+- **Projections**: Projection columns can be `AnyColumnBuilder | AnyExpressionBuilder`
+
+### Benefits
+
+1. **Explicit representation**: Expressions are explicitly represented, not hidden in `ColumnBuilder`
+2. **Type safety**: No blind casts needed - `expr` property is part of the public interface
+3. **Clean abstraction**: Query lanes work with `ExpressionBuilder`, not implementation details
+4. **Better semantics**: Operation results are expressions, not "pretend columns"
+5. **Maintainability**: Changes to expression representation don't require blind casts
+
+### Migration Notes
+
+- **Removed**: `_operationExpr` hidden property pattern
+- **Removed**: `getOperationExpr()` helper function (replaced with `extractExpression()`)
+- **Added**: `ExpressionBuilder` interface and `AnyExpressionBuilder` type
+- **Added**: `extractExpression()` and `isExpressionBuilder()` helper functions
+- **Updated**: `executeOperation()` now returns `ExpressionBuilder` instead of `ColumnBuilder` with hidden property
 
 ## Avoiding Unnecessary Type Casts and Optional Chaining
 

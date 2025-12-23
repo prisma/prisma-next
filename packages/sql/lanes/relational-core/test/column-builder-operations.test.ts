@@ -323,19 +323,16 @@ describe('ColumnBuilder operations', () => {
     const distance = (
       normalized as unknown as {
         cosineDistance: (arg: unknown) => unknown;
-        _operationExpr?: OperationExpr;
       }
     ).cosineDistance(otherVectorColumn);
 
-    // Verify the result has an operation expression
-    expect(distance).toHaveProperty('kind', 'column');
-    const distanceWithExpr = distance as unknown as {
-      _operationExpr?: OperationExpr;
-    };
-    expect(distanceWithExpr._operationExpr).toBeDefined();
+    // Verify the result is an ExpressionBuilder
+    expect(distance).toHaveProperty('kind', 'expression');
+    const distanceExpr = distance as { kind: 'expression'; expr: OperationExpr };
+    expect(distanceExpr.expr).toBeDefined();
 
     // Verify the outer operation (cosineDistance) has the inner operation (normalize) as its self
-    const outerOp = distanceWithExpr._operationExpr;
+    const outerOp = distanceExpr.expr;
     expect(outerOp).toMatchObject({
       kind: 'operation',
       method: 'cosineDistance',
@@ -345,7 +342,7 @@ describe('ColumnBuilder operations', () => {
     });
 
     // Verify the inner operation (normalize) has the column as its self
-    const innerOp = outerOp?.self as OperationExpr;
+    const innerOp = outerOp.self as OperationExpr;
     expect(innerOp).toMatchObject({
       kind: 'operation',
       method: 'normalize',

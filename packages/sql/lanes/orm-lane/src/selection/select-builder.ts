@@ -9,9 +9,14 @@ import type {
   SelectAst,
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
+import type {
+  AnyColumnBuilder,
+  AnyExpressionBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import type { IncludeState } from '../relations/include-plan';
-import { createColumnRef, createSelectAst, createTableRef } from '../utils/ast';
-import { errorInvalidColumn, errorMissingAlias, errorMissingColumn } from '../utils/errors';
+import { createSelectAst, createTableRef } from '../utils/ast';
+import { errorMissingAlias, errorMissingColumn } from '../utils/errors';
+import { extractExpression } from '../utils/guards';
 import type { ProjectionState } from './projection';
 
 export function buildProjectionItems(
@@ -36,24 +41,12 @@ export function buildProjectionItems(
         expr: { kind: 'includeRef', alias },
       });
     } else {
-      const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-      if (operationExpr) {
-        projectEntries.push({
-          alias,
-          expr: operationExpr,
-        });
-      } else {
-        const col = column as { table: string; column: string };
-        const tableName = col.table;
-        const columnName = col.column;
-        if (!tableName || !columnName) {
-          errorInvalidColumn(alias, i);
-        }
-        projectEntries.push({
-          alias,
-          expr: createColumnRef(tableName, columnName),
-        });
-      }
+      // Extract expression from ColumnBuilder or ExpressionBuilder
+      const expr = extractExpression(column as AnyColumnBuilder | AnyExpressionBuilder);
+      projectEntries.push({
+        alias,
+        expr,
+      });
     }
   }
   return projectEntries;

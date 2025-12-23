@@ -28,7 +28,7 @@ export interface OrderBuilder<
   JsType = unknown,
 > {
   readonly kind: 'order';
-  readonly expr: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
+  readonly expr: ExpressionBuilder<ColumnName, ColumnMeta, JsType>;
   readonly dir: Direction;
 }
 
@@ -71,7 +71,42 @@ export type ColumnBuilder<
         JsType
       >
     : Record<string, never>
-  : Record<string, never>);
+  : Record<string, never>) & {
+    toExpression(): ExpressionBuilder<ColumnName, ColumnMeta, JsType>;
+  };
+
+/**
+ * ExpressionBuilder represents an expression node (either a ColumnRef or OperationExpr).
+ * This is the return type for operations, providing a clean separation between column handles
+ * and expression nodes.
+ */
+export interface ExpressionBuilder<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
+> {
+  readonly kind: 'expression';
+  readonly expr: ColumnRef | OperationExpr;
+  readonly columnMeta: ColumnMeta;
+  eq(value: ParamPlaceholder | AnyColumnBuilderBase): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  neq(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  gt(value: ParamPlaceholder | AnyColumnBuilderBase): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  lt(value: ParamPlaceholder | AnyColumnBuilderBase): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  gte(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  lte(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
+  desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
+  // Helper property for type extraction (not used at runtime)
+  readonly __jsType: JsType;
+}
+
+export type AnyExpressionBuilder = ExpressionBuilder<string, StorageColumn, unknown>;
 
 export interface BinaryBuilder<
   ColumnName extends string = string,
@@ -80,7 +115,7 @@ export interface BinaryBuilder<
 > {
   readonly kind: 'binary';
   readonly op: BinaryOp;
-  readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
+  readonly left: ExpressionBuilder<ColumnName, ColumnMeta, JsType>;
   readonly right: ParamPlaceholder | AnyColumnBuilderBase;
 }
 
@@ -263,8 +298,8 @@ type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
 
 /**
  * Maps operation return spec to return type.
- * - builtin types: ColumnBuilder with appropriate JsType (matches runtime behavior)
- * - typeId types: ColumnBuilder (for now, could be more specific in future)
+ * - builtin types: ExpressionBuilder with appropriate JsType (matches runtime behavior)
+ * - typeId types: ExpressionBuilder (for now, could be more specific in future)
  */
 type OperationReturn<
   Returns extends ReturnSpec,
@@ -273,15 +308,15 @@ type OperationReturn<
   _JsType,
 > = Returns extends { kind: 'builtin'; type: infer T }
   ? T extends 'number'
-    ? ColumnBuilder<ColumnName, ColumnMeta, number>
+    ? ExpressionBuilder<ColumnName, ColumnMeta, number>
     : T extends 'boolean'
-      ? ColumnBuilder<ColumnName, ColumnMeta, boolean>
+      ? ExpressionBuilder<ColumnName, ColumnMeta, boolean>
       : T extends 'string'
-        ? ColumnBuilder<ColumnName, ColumnMeta, string>
-        : ColumnBuilder<ColumnName, ColumnMeta, unknown>
+        ? ExpressionBuilder<ColumnName, ColumnMeta, string>
+        : ExpressionBuilder<ColumnName, ColumnMeta, unknown>
   : Returns extends { kind: 'typeId' }
-    ? AnyColumnBuilder
-    : ColumnBuilder<ColumnName, ColumnMeta, unknown>;
+    ? AnyExpressionBuilder
+    : ExpressionBuilder<ColumnName, ColumnMeta, unknown>;
 
 /**
  * Computes JavaScript type for a column at column creation time.

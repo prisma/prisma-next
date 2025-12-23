@@ -8,6 +8,7 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
 import type { BinaryOp, TableRef } from './ast/types';
+import { columnToExpression } from './expression-builder';
 import { attachOperationsToColumnBuilder } from './operations-registry';
 import type { QueryLaneContext } from './query-lane-context';
 import type {
@@ -16,6 +17,7 @@ import type {
   CodecTypes as CodecTypesType,
   ColumnBuilder,
   ComputeColumnJsType,
+  ExpressionBuilder,
   OperationTypeSignature,
   OperationTypes,
   OrderBuilder,
@@ -73,11 +75,15 @@ export class ColumnBuilderImpl<
       return Object.freeze({
         kind: 'binary' as const,
         op,
-        left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+        left: this.toExpression(),
         right: value,
       }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
     }
     throw planInvalid('Parameter placeholder or column builder required for column comparison');
+  }
+
+  toExpression(): ExpressionBuilder<ColumnName, ColumnMeta, JsType> {
+    return columnToExpression(this);
   }
 
   eq(
@@ -119,7 +125,7 @@ export class ColumnBuilderImpl<
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType> {
     return Object.freeze({
       kind: 'order' as const,
-      expr: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+      expr: this.toExpression(),
       dir: 'asc' as const,
     }) as OrderBuilder<ColumnName, ColumnMeta, JsType>;
   }
@@ -127,7 +133,7 @@ export class ColumnBuilderImpl<
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType> {
     return Object.freeze({
       kind: 'order' as const,
-      expr: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+      expr: this.toExpression(),
       dir: 'desc' as const,
     }) as OrderBuilder<ColumnName, ColumnMeta, JsType>;
   }

@@ -15,6 +15,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
+  AnyExpressionBuilder,
   AnyOrderBuilder,
   BuildOptions,
   NestedProjection,
@@ -41,6 +42,7 @@ import {
   errorMultiColumnJoinsNotSupported,
   errorTableNotFound,
 } from '../utils/errors';
+import { extractExpression } from '../utils/guards';
 
 export interface IncludeState {
   readonly alias: string;
@@ -162,13 +164,8 @@ export function buildIncludeAsts(
       if (!column) {
         errorMissingColumn(alias, i);
       }
-      const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-      if (operationExpr) {
-        childProjectionItems.push({ alias, expr: operationExpr });
-      } else {
-        const col = column as { table: string; column: string };
-        childProjectionItems.push({ alias, expr: createColumnRef(col.table, col.column) });
-      }
+      const expr = extractExpression(column as AnyColumnBuilder | AnyExpressionBuilder);
+      childProjectionItems.push({ alias, expr });
     }
 
     const includeAst: IncludeAst = compact({

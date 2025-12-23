@@ -4,7 +4,10 @@ import type {
   OperationExpr,
   ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
-import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import type {
+  AnyColumnBuilder,
+  AnyExpressionBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import { getColumnMeta, isParamPlaceholder } from '@prisma-next/sql-relational-core/utils/guards';
 
 export { getColumnMeta, isParamPlaceholder };
@@ -32,38 +35,47 @@ export function collectColumnRefs(
   return [];
 }
 
-export function isOperationExpr(expr: AnyColumnBuilder | OperationExpr): expr is OperationExpr {
-  return typeof expr === 'object' && expr !== null && 'kind' in expr && expr.kind === 'operation';
+export function isOperationExpr(expr: ColumnRef | OperationExpr): expr is OperationExpr {
+  return expr.kind === 'operation';
 }
 
 /**
- * Helper to extract operation expression from builder.
- * Returns OperationExpr if present, undefined otherwise.
- *
- * @design-note: This function accesses the hidden `_operationExpr` property, which is a code smell.
- * The issue is that `executeOperation()` in relational-core returns a ColumnBuilder-shaped object
- * with a hidden `_operationExpr` property, creating coupling between lanes and relational-core
- * implementation details. A cleaner design would be to have operation results be a separate
- * type (e.g., `OperationResultBuilder`) that properly represents expression nodes rather than
- * pretending to be a ColumnBuilder. This would require refactoring the operation execution
- * system in relational-core to return proper expression types.
+ * Type predicate to check if a value is an ExpressionBuilder.
  */
-export function getOperationExpr(
-  builder: AnyColumnBuilder | OperationExpr,
-): OperationExpr | undefined {
-  if (isOperationExpr(builder)) {
-    return builder;
-  }
-  const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
-  return builderWithExpr._operationExpr;
+export function isExpressionBuilder(value: unknown): value is AnyExpressionBuilder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'expression'
+  );
 }
 
-export function getColumnInfo(expr: AnyColumnBuilder | OperationExpr): {
+/**
+ * Extracts the expression from a ColumnBuilder or ExpressionBuilder.
+ * Returns the underlying ColumnRef or OperationExpr.
+ */
+export function extractExpression(
+  builder: AnyColumnBuilder | AnyExpressionBuilder,
+): ColumnRef | OperationExpr {
+  if (isExpressionBuilder(builder)) {
+    return builder.expr;
+  }
+  // It's a ColumnBuilder - convert to ColumnRef
+  const colBuilder = builder as { table: string; column: string };
+  return {
+    kind: 'col',
+    table: colBuilder.table,
+    column: colBuilder.column,
+  };
+}
+
+export function getColumnInfo(expr: AnyColumnBuilder | AnyExpressionBuilder): {
   table: string;
   column: string;
 } {
-  if (isOperationExpr(expr)) {
-    const baseCol = extractBaseColumnRef(expr);
+  if (isExpressionBuilder(expr)) {
+    const baseCol = extractBaseColumnRef(expr.expr);
     return { table: baseCol.table, column: baseCol.column };
   }
   const colBuilder = expr as unknown as { table: string; column: string };

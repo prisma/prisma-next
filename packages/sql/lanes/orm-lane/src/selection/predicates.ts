@@ -15,9 +15,9 @@ import {
   errorUnknownTable,
 } from '../utils/errors';
 import {
+  extractExpression,
   getColumnInfo,
   getColumnMeta,
-  getOperationExpr,
   isColumnBuilder,
   isParamPlaceholder,
 } from '../utils/guards';
@@ -38,26 +38,22 @@ export function buildWhereExpr(
   let rightExpr: ColumnRef | ParamRef;
   let paramName: string;
 
-  const operationExpr = getOperationExpr(where.left);
-  if (operationExpr) {
-    leftExpr = operationExpr;
-  } else if (isColumnBuilder(where.left)) {
-    const { table, column } = getColumnInfo(where.left);
+  // Extract expression from ColumnBuilder or ExpressionBuilder
+  leftExpr = extractExpression(where.left);
 
-    const contractTable = contract.storage.tables[table];
+  // If it's a ColumnRef, get codecId from contract
+  if (leftExpr.kind === 'col') {
+    const contractTable = contract.storage.tables[leftExpr.table];
     if (!contractTable) {
-      errorUnknownTable(table);
+      errorUnknownTable(leftExpr.table);
     }
 
-    const columnMeta: StorageColumn | undefined = contractTable.columns[column];
+    const columnMeta: StorageColumn | undefined = contractTable.columns[leftExpr.column];
     // If column not found in contract, still build expression but without codecId
     // This allows flexibility when columnMeta is available on the column builder
     if (columnMeta) {
       codecId = columnMeta.codecId;
     }
-    leftExpr = createColumnRef(table, column);
-  } else {
-    errorFailedToBuildWhereClause();
   }
 
   // Handle where.right - can be ParamPlaceholder or AnyColumnBuilder

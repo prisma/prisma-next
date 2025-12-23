@@ -2,6 +2,7 @@ import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
+  AnyExpressionBuilder,
   AnyOrderBuilder,
   JoinOnPredicate,
   NestedProjection,
@@ -14,14 +15,17 @@ import {
   errorInvalidProjectionValue,
   errorProjectionEmpty,
 } from '../utils/errors';
-import { isColumnBuilder } from '../utils/guards';
+import { isColumnBuilder, isExpressionBuilder } from '../utils/guards';
 
 export interface ProjectionState {
   readonly aliases: string[];
-  readonly columns: AnyColumnBuilder[];
+  readonly columns: Array<AnyColumnBuilder | AnyExpressionBuilder>;
 }
 
-export type ProjectionInput = Record<string, AnyColumnBuilder | boolean | NestedProjection>;
+export type ProjectionInput = Record<
+  string,
+  AnyColumnBuilder | AnyExpressionBuilder | boolean | NestedProjection
+>;
 
 function generateAlias(path: string[]): string {
   if (path.length === 0) {
@@ -58,14 +62,14 @@ export function flattenProjection(
   projection: NestedProjection,
   tracker: AliasTracker,
   currentPath: string[] = [],
-): { aliases: string[]; columns: AnyColumnBuilder[] } {
+): { aliases: string[]; columns: Array<AnyColumnBuilder | AnyExpressionBuilder> } {
   const aliases: string[] = [];
-  const columns: AnyColumnBuilder[] = [];
+  const columns: Array<AnyColumnBuilder | AnyExpressionBuilder> = [];
 
   for (const [key, value] of Object.entries(projection)) {
     const path = [...currentPath, key];
 
-    if (isColumnBuilder(value)) {
+    if (isColumnBuilder(value) || isExpressionBuilder(value)) {
       const alias = tracker.register(path);
       aliases.push(alias);
       columns.push(value);
@@ -96,7 +100,7 @@ export function buildProjectionState(
 ): ProjectionState {
   const tracker = new AliasTracker();
   const aliases: string[] = [];
-  const columns: AnyColumnBuilder[] = [];
+  const columns: Array<AnyColumnBuilder | AnyExpressionBuilder> = [];
 
   for (const [key, value] of Object.entries(projection)) {
     if (value === true) {
@@ -115,7 +119,7 @@ export function buildProjectionState(
           nullable: true,
         },
       } as AnyColumnBuilder);
-    } else if (isColumnBuilder(value)) {
+    } else if (isColumnBuilder(value) || isExpressionBuilder(value)) {
       const alias = tracker.register([key]);
       aliases.push(alias);
       columns.push(value);

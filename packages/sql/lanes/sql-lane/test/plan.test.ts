@@ -4,11 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
+import { createExpressionBuilder } from '@prisma-next/sql-relational-core/expression-builder';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
+  AnyExpressionBuilder,
   AnyOrderBuilder,
   JoinOnPredicate,
 } from '@prisma-next/sql-relational-core/types';
@@ -51,17 +53,11 @@ describe('buildMeta', () => {
       },
     };
 
-    const columnWithOp = {
-      kind: 'column' as const,
-      table: 'user',
-      column: 'id',
-      columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      eq: () => ({}) as unknown as AnyBinaryBuilder,
-      asc: () => ({}) as unknown as AnyOrderBuilder,
-      desc: () => ({}) as unknown as AnyOrderBuilder,
-      __jsType: undefined as unknown,
-      _operationExpr: operationExpr,
-    } as unknown as AnyColumnBuilder;
+    const columnWithOp = createExpressionBuilder(operationExpr, {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
+    }) as AnyExpressionBuilder;
 
     const meta = buildMeta({
       contract,
@@ -100,17 +96,11 @@ describe('buildMeta', () => {
       },
     };
 
-    const columnWithOp = {
-      kind: 'column' as const,
-      table: 'user',
-      column: 'id',
-      columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      eq: () => ({}) as unknown as AnyBinaryBuilder,
-      asc: () => ({}) as unknown as AnyOrderBuilder,
-      desc: () => ({}) as unknown as AnyOrderBuilder,
-      __jsType: undefined as unknown,
-      _operationExpr: operationExpr,
-    } as unknown as AnyColumnBuilder;
+    const columnWithOp = createExpressionBuilder(operationExpr, {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
+    }) as AnyExpressionBuilder;
 
     const meta = buildMeta({
       contract,
