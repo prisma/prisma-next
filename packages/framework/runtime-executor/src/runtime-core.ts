@@ -1,5 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
+import { AsyncIterableResult } from './async-iterable-result';
 import { runtimeError } from './errors';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow } from './marker';
@@ -36,7 +37,7 @@ export interface RuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = 
   readonly _typeContract?: TContract;
   readonly _typeAdapter?: TAdapter;
   readonly _typeDriver?: TDriver;
-  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterable<Row>;
+  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
   operations(): OperationRegistry;
@@ -178,7 +179,7 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
     });
   }
 
-  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterable<Row> {
+  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row> {
     this.validatePlan(plan);
     this._telemetry = null;
 
@@ -257,7 +258,7 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
       }
     };
 
-    return iterator(this);
+    return new AsyncIterableResult(iterator(this));
   }
 
   telemetry(): RuntimeTelemetryEvent | null {

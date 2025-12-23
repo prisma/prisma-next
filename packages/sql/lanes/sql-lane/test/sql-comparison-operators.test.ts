@@ -72,7 +72,8 @@ describe('sql comparison operators', () => {
       const { id } = tables.user.columns;
 
       expect(() => {
-        (id as { neq: (value: unknown) => unknown }).neq({ kind: 'invalid' } as unknown);
+        // @ts-expect-error testing invalid input
+        id.neq({ kind: 'invalid' });
       }).toThrow('Parameter placeholder or column builder required for column comparison');
     });
   });

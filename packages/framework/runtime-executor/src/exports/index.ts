@@ -1,3 +1,4 @@
+export { AsyncIterableResult } from '../async-iterable-result';
 export type { RuntimeErrorEnvelope } from '../errors';
 export { runtimeError } from '../errors';
 export { computeSqlFingerprint } from '../fingerprint';
