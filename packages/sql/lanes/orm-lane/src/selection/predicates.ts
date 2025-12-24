@@ -19,6 +19,7 @@ import {
   getColumnInfo,
   getColumnMeta,
   isColumnBuilder,
+  isExpressionBuilder,
   isParamPlaceholder,
 } from '../utils/guards';
 
@@ -69,17 +70,23 @@ export function buildWhereExpr(
     const value = paramsMap[paramName];
     const index = values.push(value);
 
-    // Construct descriptor if where.left is a ColumnBuilder
-    if (isColumnBuilder(where.left)) {
-      const { table, column } = getColumnInfo(where.left);
-      const contractTable = contract.storage.tables[table];
-      const columnMeta = contractTable?.columns[column];
-      const builderColumnMeta = getColumnMeta(where.left);
+    // Construct descriptor only if where.left is a ColumnRef (not OperationExpr)
+    // OperationExpr doesn't have contract metadata, so we can't create a descriptor
+    if (leftExpr.kind === 'col') {
+      const contractTable = contract.storage.tables[leftExpr.table];
+      const columnMeta = contractTable?.columns[leftExpr.column];
+      // Get columnMeta from builder (works for both ColumnBuilder and ExpressionBuilder)
+      const builderColumnMeta = isColumnBuilder(where.left)
+        ? getColumnMeta(where.left)
+        : isExpressionBuilder(where.left)
+          ? where.left.columnMeta
+          : undefined;
 
       descriptors.push({
         name: paramName,
         source: 'dsl',
-        refs: { table, column },
+        refs: { table: leftExpr.table, column: leftExpr.column },
+        // Only include nullable if builderColumnMeta has it (don't fall back to contract)
         ...(typeof builderColumnMeta?.nullable === 'boolean'
           ? { nullable: builderColumnMeta.nullable }
           : {}),

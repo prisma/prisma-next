@@ -136,8 +136,8 @@ function executeOperation(
   if (returnTypeId && operationRegistry) {
     const operations = operationRegistry.byType(returnTypeId) as SqlOperationSignature[];
     if (operations.length > 0) {
-      // Attach operations as methods on the ExpressionBuilder
-      const resultWithOps = result as unknown as AnyExpressionBuilder & Record<string, unknown>;
+      // Create an unfrozen copy to attach operations (result is frozen from createExpressionBuilder)
+      const resultWithOps = { ...result } as AnyExpressionBuilder & Record<string, unknown>;
       for (const operation of operations) {
         if (operation.capabilities && operation.capabilities.length > 0) {
           if (!contractCapabilities) {

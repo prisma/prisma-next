@@ -15,7 +15,7 @@ import type {
 } from '@prisma-next/sql-relational-core/types';
 import type { IncludeState } from '../relations/include-plan';
 import { createSelectAst, createTableRef } from '../utils/ast';
-import { errorMissingAlias, errorMissingColumn } from '../utils/errors';
+import { errorInvalidColumn, errorMissingAlias, errorMissingColumn } from '../utils/errors';
 import { extractExpression } from '../utils/guards';
 import type { ProjectionState } from './projection';
 
@@ -43,6 +43,10 @@ export function buildProjectionItems(
     } else {
       // Extract expression from ColumnBuilder or ExpressionBuilder
       const expr = extractExpression(column as AnyColumnBuilder | AnyExpressionBuilder);
+      // Validate that ColumnRef has valid table/column names
+      if (expr.kind === 'col' && (!expr.table || !expr.column)) {
+        errorInvalidColumn(alias, i);
+      }
       projectEntries.push({
         alias,
         expr,

@@ -35,8 +35,10 @@ export function collectColumnRefs(
   return [];
 }
 
-export function isOperationExpr(expr: ColumnRef | OperationExpr): expr is OperationExpr {
-  return expr.kind === 'operation';
+export function isOperationExpr(
+  expr: ColumnRef | OperationExpr | null | undefined,
+): expr is OperationExpr {
+  return expr != null && expr.kind === 'operation';
 }
 
 /**

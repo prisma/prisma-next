@@ -172,7 +172,7 @@ describe('ColumnBuilder operations', () => {
       vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
     ).cosineDistance(param('other'));
     expect(result).toBeDefined();
-    expect(result).toHaveProperty('kind', 'column');
+    expect(result).toHaveProperty('kind', 'expression');
   });
 
   it('registered method returns ColumnBuilder with correct return type', () => {
@@ -204,7 +204,7 @@ describe('ColumnBuilder operations', () => {
     const result = (
       vectorColumn as unknown as { cosineDistance: (arg: unknown) => unknown }
     ).cosineDistance(param('other'));
-    expect(result).toHaveProperty('kind', 'column');
+    expect(result).toHaveProperty('kind', 'expression');
     expect(result).toHaveProperty('columnMeta');
   });
 

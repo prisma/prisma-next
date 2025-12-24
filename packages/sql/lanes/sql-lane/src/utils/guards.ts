@@ -44,8 +44,10 @@ export function collectColumnRefs(
 /**
  * Type predicate to check if an expression is an OperationExpr.
  */
-export function isOperationExpr(expr: ColumnRef | OperationExpr): expr is OperationExpr {
-  return expr.kind === 'operation';
+export function isOperationExpr(
+  expr: ColumnRef | OperationExpr | null | undefined,
+): expr is OperationExpr {
+  return expr != null && expr.kind === 'operation';
 }
 
 /**

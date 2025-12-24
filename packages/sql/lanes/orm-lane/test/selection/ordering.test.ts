@@ -159,7 +159,7 @@ describe('ordering', () => {
       }).toMatchObject({
         defined: true,
         length: 1,
-        expr: { kind: 'col', table: 'post', column: 'id' },
+        expr: { kind: 'operation', method: 'multiply', forTypeId: 'pg/int4@1' },
         dir: 'desc',
       });
     });
@@ -211,7 +211,7 @@ describe('ordering', () => {
       }).toMatchObject({
         defined: true,
         length: 1,
-        expr: { kind: 'col', table: 'post', column: 'id' },
+        expr: { kind: 'operation', method: 'multiply', forTypeId: 'pg/int4@1' },
         dir: 'asc',
       });
     });
