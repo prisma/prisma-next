@@ -7,8 +7,8 @@ settings:
 catalogs:
   default:
     '@prisma/dev':
-      specifier: 0.19.0
-      version: 0.19.0
+      specifier: 0.19.1
+      version: 0.19.1
 
 importers:
 
@@ -104,7 +104,7 @@ importers:
         version: link:../../test/utils
       '@prisma/dev':
         specifier: 'catalog:'
-        version: 0.19.0(typescript@5.9.3)
+        version: 0.19.1(typescript@5.9.3)
       '@types/node':
         specifier: ^20.16.5
         version: 20.19.24
@@ -174,7 +174,7 @@ importers:
         version: link:../../packages/framework/tooling/cli
       '@prisma/dev':
         specifier: 'catalog:'
-        version: 0.19.0(typescript@5.9.3)
+        version: 0.19.1(typescript@5.9.3)
       '@types/node':
         specifier: ^20.16.5
         version: 20.19.24
@@ -235,7 +235,7 @@ importers:
         version: link:../../../test/utils
       '@prisma/dev':
         specifier: 'catalog:'
-        version: 0.19.0(typescript@5.9.3)
+        version: 0.19.1(typescript@5.9.3)
       '@types/pg':
         specifier: ^8.11.10
         version: 8.15.6
@@ -473,7 +473,7 @@ importers:
         version: link:../../../test/utils
       '@prisma/dev':
         specifier: 'catalog:'
-        version: 0.19.0(typescript@5.9.3)
+        version: 0.19.1(typescript@5.9.3)
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -1297,7 +1297,7 @@ importers:
     devDependencies:
       '@prisma/dev':
         specifier: 'catalog:'
-        version: 0.19.0(typescript@5.9.3)
+        version: 0.19.1(typescript@5.9.3)
       '@types/pg':
         specifier: ^8.11.10
         version: 8.15.6
@@ -2012,8 +2012,8 @@ packages:
   '@prisma/debug@7.1.0':
     resolution: {integrity: sha512-pPAckG6etgAsEBusmZiFwM9bldLSNkn++YuC4jCTJACdK5hLOVnOzX7eSL2FgaU6Gomd6wIw21snUX2dYroMZQ==}
 
-  '@prisma/dev@0.19.0':
-    resolution: {integrity: sha512-vgifbNxXNRS1jBuNRSHAZCXnNnY9yl7Mf43VDmPvi0aoa3hbqaUrMp9B4L28BJTyRuPuLm5HPezmV+acUIr08A==}
+  '@prisma/dev@0.19.1':
+    resolution: {integrity: sha512-auWLpOrUO7u8MMQS5/oxAC8cdli3In4QveUyng+WS0BeWCpPiPFr5HLQCmcchuHPb4MqLY8POAX9sHjjnQI0BA==}
 
   '@prisma/engines-version@6.18.0-8.34b5a692b7bd79939a9a2c3ef97d816e749cda2f':
     resolution: {integrity: sha512-T7Af4QsJQnSgWN1zBbX+Cha5t4qjHRxoeoWpK4JugJzG/ipmmDMY5S+O0N1ET6sCBNVkf6lz+Y+ZNO9+wFU8pQ==}
@@ -4435,7 +4435,7 @@ snapshots:
 
   '@prisma/debug@7.1.0': {}
 
-  '@prisma/dev@0.19.0(typescript@5.9.3)':
+  '@prisma/dev@0.19.1(typescript@5.9.3)':
     dependencies:
       '@electric-sql/pglite': 0.3.14
       '@electric-sql/pglite-socket': 0.0.19(@electric-sql/pglite@0.3.14)
