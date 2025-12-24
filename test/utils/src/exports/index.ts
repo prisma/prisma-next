@@ -21,7 +21,8 @@ export interface DevDatabase {
 /**
  * Creates a dev database instance for testing.
  * Automatically handles connection string normalization and cleanup.
- * @prisma/dev automatically assigns ports to avoid conflicts in parallel execution.
+ * @prisma/dev automatically assigns ports to avoid conflicts and enforces a single
+ * active connection (second connections are rejected until the first is closed).
  */
 export async function createDevDatabase(options?: ServerOptions): Promise<DevDatabase> {
   const server = await startPrismaDevServer({
@@ -37,7 +38,9 @@ export async function createDevDatabase(options?: ServerOptions): Promise<DevDat
 
 /**
  * Executes a function with a dev database, automatically cleaning up afterward.
- * @prisma/dev automatically assigns ports to avoid conflicts in parallel execution.
+ * @prisma/dev automatically assigns ports and will reject any attempt to open a
+ * second connection while the first is active, so ensure each helper call closes
+ * before starting another.
  */
 export async function withDevDatabase<T>(
   fn: (ctx: DevDatabase) => Promise<T>,

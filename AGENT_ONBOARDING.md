@@ -940,7 +940,7 @@ await withDevDatabase(async ({ connectionString }) => {
 });
 ```
 
-**Note**: Ports are automatically allocated, so you don't need to specify them. Use `createDevDatabase()` or `withDevDatabase()` without port options to get automatic port allocation.
+**Note**: Ports are automatically allocated, so you don't need to specify them. Use `createDevDatabase()` or `withDevDatabase()` without port options to get automatic port allocation. `@prisma/dev` still allows only a single active connection—any attempt to open a second connection while the first is active is rejected—so close each helper block before opening another connection.
 
 ## 🧪 Testing
 
