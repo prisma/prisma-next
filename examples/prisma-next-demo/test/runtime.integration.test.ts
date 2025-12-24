@@ -14,6 +14,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import type { Client } from 'pg';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
@@ -94,7 +95,7 @@ describe('runtime execute integration', () => {
           annotations: { intent: 'report', limit: 1 },
         });
 
-        await withClient(connectionString, async (client: import('pg').Client) => {
+        const rowCount = await withClient(connectionString, async (client: Client) => {
           await client.query(
             'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
           );
@@ -105,9 +106,6 @@ describe('runtime execute integration', () => {
           await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
             'alice@example.com',
           ]);
-        });
-
-        const rowCount = await withClient(connectionString, async (client: import('pg').Client) => {
           const result = await client.query('select count(*)::int as count from "user"');
           return result.rows[0]?.count as number;
         });
@@ -220,7 +218,7 @@ describe('runtime execute integration', () => {
             profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          await withClient(connectionString, async (client: import('pg').Client) => {
+          await withClient(connectionString, async (client: Client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
@@ -320,7 +318,7 @@ describe('runtime execute integration', () => {
             profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          await withClient(connectionString, async (client: import('pg').Client) => {
+          await withClient(connectionString, async (client: Client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
@@ -406,7 +404,7 @@ describe('runtime execute integration', () => {
             profileHash: contract.profileHash ?? contract.coreHash,
           });
 
-          await withClient(connectionString, async (client: import('pg').Client) => {
+          await withClient(connectionString, async (client: Client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
             );
