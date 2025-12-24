@@ -5,7 +5,10 @@ import { augmentDescriptorWithColumnMeta } from '../src/plan';
 
 describe('plan', () => {
   describe('augmentDescriptorWithColumnMeta', () => {
-    it('augments descriptor with codecId and nativeType when both are present', () => {
+    // StorageColumn always has codecId and nativeType (required fields),
+    // while ParamDescriptor has them as optional. `augmentDescriptorWithColumnMeta` copies
+    // these fields from StorageColumn to ParamDescriptor when columnMeta is provided.
+    it('augments descriptor with codecId and nativeType from columnMeta', () => {
       const descriptors: ParamDescriptor[] = [
         {
           name: 'userId',
