@@ -425,6 +425,8 @@ await withClient(connectionString, async (client) => {
 
 **Why?** Automatic cleanup prevents resource leaks and test interference.
 
+**Single Connection Rule:** `@prisma/dev` only accepts one active connection at a time and immediately rejects a second connection until the first is closed. Chain helpers sequentially (finish a `withClient` block before calling another helper that connects) to avoid hangs or timeouts.
+
 ### Port Management
 
 **Automatic Port Allocation:** Ports are automatically allocated using `get-port` to find available ports in the range 10,000-65,000. This eliminates port conflicts in parallel test execution without requiring manual port assignment.

@@ -34,22 +34,6 @@ export interface OperationExpr {
 }
 ```
 
-## When Are Inline Imports Acceptable?
-
-Inline imports are **only acceptable** in:
-
-1. **Test files**: When using external library types in type assertions (e.g., `import('pg').Client`)
-2. **Type assertions in tests**: When casting to external types for test purposes
-
-**Example of acceptable inline import in tests:**
-
-```typescript
-// ✅ ACCEPTABLE: In test file with external library type
-await withClient(connectionString, async (client: import('pg').Client) => {
-  // test code
-});
-```
-
 ## Benefits
 
 - **Better readability**: All imports are visible at the top of the file

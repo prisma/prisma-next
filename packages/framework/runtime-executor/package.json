@@ -20,7 +20,7 @@
     "arktype": "^2.1.25"
   },
   "devDependencies": {
-    "@prisma/dev": "^0.1.1",
+    "@prisma/dev": "catalog:",
     "@prisma-next/test-utils": "workspace:*",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
