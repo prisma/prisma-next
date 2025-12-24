@@ -18,6 +18,7 @@
     "coverage:packages": "turbo run test:coverage --filter='!./examples/**' --filter='!./test/**'",
     "lint": "turbo run lint",
     "lint:fix": "pnpm biome check --write .",
+    "lint:fix:unsafe": "pnpm biome check --write --unsafe .",
     "lint:packages": "turbo run lint --filter='!./examples/**'",
     "lint:examples": "turbo run lint --filter='./examples/**'",
     "lint:deps": "depcruise --config dependency-cruiser.config.mjs packages",
