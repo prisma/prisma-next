@@ -206,7 +206,7 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('operationTypes: Record<string, never>');
   });
 
-  it('generates mappings type when models is undefined with codecTypes', () => {
+  it('generates mappings type with explicitly empty models and codecTypes', () => {
     const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
       {
         manifest: {
@@ -255,7 +255,7 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('operationTypes: Record<string, never>');
   });
 
-  it('generates mappings type when models is undefined with codecTypes', () => {
+  it('generates mappings type with default models and codecTypes from packs', () => {
     const ir = createContractIR({
       storage: {
         tables: {

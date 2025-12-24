@@ -5,15 +5,15 @@ import { fileURLToPath } from 'node:url';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import { emit } from '@prisma-next/emitter';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../../../packages/2-sql/3-tooling/family/src/core/assembly';
+} from '@prisma-next/family-sql/test-utils';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = resolve(__dirname, '../../../packages/1-framework/3-tooling/cli/test/fixtures');

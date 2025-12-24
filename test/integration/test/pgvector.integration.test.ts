@@ -2,14 +2,14 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { createOperationRegistry } from '@prisma-next/operations';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import { describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../../../packages/2-sql/3-tooling/family/src/core/assembly';
+} from '@prisma-next/family-sql/test-utils';
+import { createOperationRegistry } from '@prisma-next/operations';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { describe, expect, it } from 'vitest';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

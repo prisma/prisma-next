@@ -6,6 +6,7 @@ export default defineConfig({
     'control-adapter': 'src/core/control-adapter.ts',
     runtime: 'src/exports/runtime.ts',
     verify: 'src/exports/verify.ts',
+    'test-utils': 'src/exports/test-utils.ts',
   },
   outDir: 'dist/exports',
   format: ['esm'],
