@@ -10,6 +10,7 @@ import type {
   BinaryOp,
   ColumnRef,
   Direction,
+  NullCheckOp,
   OperationExpr,
   ParamRef,
   QueryAst,
@@ -73,7 +74,12 @@ export type ColumnBuilder<
     : Record<string, never>
   : Record<string, never>) & {
     toExpression(): ExpressionBuilder<ColumnName, ColumnMeta, JsType>;
-  };
+  } & (ColumnMeta['nullable'] extends true
+    ? {
+        isNull(): NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
+        isNotNull(): NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
+      }
+    : Record<string, never>);
 
 /**
  * ExpressionBuilder represents an expression node (either a ColumnRef or OperationExpr).
@@ -119,6 +125,24 @@ export interface BinaryBuilder<
   readonly right: ParamPlaceholder | AnyColumnBuilderBase;
 }
 
+export interface NullCheckBuilder<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
+> {
+  readonly kind: 'nullCheck';
+  readonly op: NullCheckOp;
+  readonly expr: ExpressionBuilder<ColumnName, ColumnMeta, JsType>;
+}
+
+export type PredicateBuilder<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
+> =
+  | BinaryBuilder<ColumnName, ColumnMeta, JsType>
+  | NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
+
 // Helper aliases for usage sites where the specific column parameters are irrelevant
 // Accepts any ColumnBuilder regardless of its Operations parameter
 // Note: We use `any` here because TypeScript's variance rules don't allow us to express
@@ -156,6 +180,7 @@ export type AnyColumnBuilder =
     >
   | AnyColumnBuilderBase;
 export type AnyBinaryBuilder = BinaryBuilder<string, StorageColumn, unknown>;
+export type AnyPredicateBuilder = PredicateBuilder<string, StorageColumn, unknown>;
 export type AnyOrderBuilder = OrderBuilder<string, StorageColumn, unknown>;
 
 export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {

@@ -830,6 +830,42 @@ describe('createPostgresAdapter', () => {
         expect(lowered.body.sql).toContain('ASC');
       });
     });
+
+    it('lowers SELECT with IS NULL in WHERE clause', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+        where: {
+          kind: 'nullCheck',
+          op: 'isNull',
+          expr: { kind: 'col', table: 'user', column: 'createdAt' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, { contract, params: [] });
+      expect(lowered.body.sql).toContain('"user"."createdAt" IS NULL');
+    });
+
+    it('lowers SELECT with IS NOT NULL in WHERE clause', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+        where: {
+          kind: 'nullCheck',
+          op: 'isNotNull',
+          expr: { kind: 'col', table: 'user', column: 'createdAt' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, { contract, params: [] });
+      expect(lowered.body.sql).toContain('"user"."createdAt" IS NOT NULL');
+    });
   });
 
   describe('vector type casting', () => {

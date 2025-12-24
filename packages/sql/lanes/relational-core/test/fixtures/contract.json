@@ -22,7 +22,8 @@
         "columns": {
           "id": { "type": "pg/int4@1", "nullable": false },
           "email": { "type": "pg/text@1", "nullable": false },
-          "createdAt": { "type": "pg/timestamptz@1", "nullable": false }
+          "createdAt": { "type": "pg/timestamptz@1", "nullable": false },
+          "deletedAt": { "type": "pg/timestamptz@1", "nullable": true }
         },
         "primaryKey": {
           "columns": ["id"]

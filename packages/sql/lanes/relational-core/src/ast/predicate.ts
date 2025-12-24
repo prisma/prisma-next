@@ -3,6 +3,8 @@ import type {
   BinaryOp,
   ColumnRef,
   ExistsExpr,
+  NullCheckExpr,
+  NullCheckOp,
   OperationExpr,
   ParamRef,
   SelectAst,
@@ -26,5 +28,16 @@ export function createExistsExpr(not: boolean, subquery: SelectAst): ExistsExpr 
     kind: 'exists',
     not,
     subquery,
+  };
+}
+
+export function createNullCheckExpr(
+  op: NullCheckOp,
+  expr: ColumnRef | OperationExpr,
+): NullCheckExpr {
+  return {
+    kind: 'nullCheck',
+    op,
+    expr,
   };
 }

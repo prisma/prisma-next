@@ -3,9 +3,9 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
-  AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
+  AnyPredicateBuilder,
   InferNestedProjectionRow,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
@@ -18,7 +18,7 @@ export interface OrmIncludeChildBuilder<
   ChildRow = unknown,
 > {
   where(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyBinaryBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyPredicateBuilder,
   ): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow>;
   orderBy(
     fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyOrderBuilder,
@@ -44,7 +44,7 @@ export class OrmIncludeChildBuilderImpl<
   private readonly context: QueryLaneContext<TContract>;
   private readonly contract: TContract;
   private readonly childModelName: ChildModelName;
-  private childWhere: AnyBinaryBuilder | undefined;
+  private childWhere: AnyPredicateBuilder | undefined;
   private childOrderBy: AnyOrderBuilder | undefined;
   private childLimit: number | undefined;
   private childProjection:
@@ -58,7 +58,7 @@ export class OrmIncludeChildBuilderImpl<
   }
 
   where(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyBinaryBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyPredicateBuilder,
   ): OrmIncludeChildBuilder<TContract, CodecTypes, ChildModelName, ChildRow> {
     const builder = new OrmIncludeChildBuilderImpl<TContract, CodecTypes, ChildModelName, ChildRow>(
       { context: this.context },
@@ -119,7 +119,7 @@ export class OrmIncludeChildBuilderImpl<
   }
 
   getState(): {
-    childWhere?: AnyBinaryBuilder;
+    childWhere?: AnyPredicateBuilder;
     childOrderBy?: AnyOrderBuilder;
     childLimit?: number;
     childProjection?: Record<string, AnyColumnBuilder | boolean | NestedProjection>;

@@ -4,7 +4,6 @@ import type {
   BinaryExpr,
   ColumnRef,
   DeleteAst,
-  ExistsExpr,
   IncludeRef,
   InsertAst,
   JoinAst,
@@ -12,6 +11,7 @@ import type {
   LowererContext,
   OperationExpr,
   ParamRef,
+  PredicateExpr,
   QueryAst,
   SelectAst,
   UpdateAst,
@@ -129,11 +129,17 @@ function renderProjection(ast: SelectAst, contract?: PostgresContract): string {
     .join(', ');
 }
 
-function renderWhere(expr: BinaryExpr | ExistsExpr, contract?: PostgresContract): string {
+function renderWhere(expr: PredicateExpr, contract?: PostgresContract): string {
   if (expr.kind === 'exists') {
     const notKeyword = expr.not ? 'NOT ' : '';
     const subquery = renderSelect(expr.subquery, contract);
     return `${notKeyword}EXISTS (${subquery})`;
+  }
+  if (expr.kind === 'nullCheck') {
+    const rendered = renderExpr(expr.expr, contract);
+    const leftRendered = isOperationExpr(expr.expr) ? `(${rendered})` : rendered;
+    const op = expr.op === 'isNull' ? 'IS NULL' : 'IS NOT NULL';
+    return `${leftRendered} ${op}`;
   }
   return renderBinary(expr, contract);
 }
@@ -401,7 +407,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
     return `${column} = ${value}`;
   });
 
-  const whereClause = ` WHERE ${renderBinary(ast.where, contract)}`;
+  const whereClause = ` WHERE ${renderWhere(ast.where, contract)}`;
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';
@@ -411,7 +417,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
 
 function renderDelete(ast: DeleteAst, contract?: PostgresContract): string {
   const table = quoteIdentifier(ast.table.name);
-  const whereClause = ` WHERE ${renderBinary(ast.where, contract)}`;
+  const whereClause = ` WHERE ${renderWhere(ast.where, contract)}`;
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';

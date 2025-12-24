@@ -18,6 +18,7 @@ import type {
   ColumnBuilder,
   ComputeColumnJsType,
   ExpressionBuilder,
+  NullCheckBuilder,
   OperationTypeSignature,
   OperationTypes,
   OrderBuilder,
@@ -120,6 +121,22 @@ export class ColumnBuilderImpl<
     value: ParamPlaceholder | AnyColumnBuilderBase,
   ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('lte', value);
+  }
+
+  isNull(): NullCheckBuilder<ColumnName, ColumnMeta, JsType> {
+    return Object.freeze({
+      kind: 'nullCheck' as const,
+      op: 'isNull' as const,
+      expr: this.toExpression(),
+    }) as NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
+  }
+
+  isNotNull(): NullCheckBuilder<ColumnName, ColumnMeta, JsType> {
+    return Object.freeze({
+      kind: 'nullCheck' as const,
+      op: 'isNotNull' as const,
+      expr: this.toExpression(),
+    }) as NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
   }
 
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType> {

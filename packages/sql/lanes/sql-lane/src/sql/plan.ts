@@ -84,19 +84,32 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
-        const colInfo = getColumnInfo(include.childWhere.left);
-        refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
-          table: colInfo.table,
-          column: colInfo.column,
-        });
-        // Handle right side of child WHERE clause
-        const childWhereRight = include.childWhere.right;
-        if (isColumnBuilder(childWhereRight)) {
-          const rightColInfo = getColumnInfo(childWhereRight);
-          refsColumns.set(`${rightColInfo.table}.${rightColInfo.column}`, {
-            table: rightColInfo.table,
-            column: rightColInfo.column,
+        if (include.childWhere.kind === 'binary') {
+          const colInfo = getColumnInfo(include.childWhere.left);
+          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+            table: colInfo.table,
+            column: colInfo.column,
           });
+          // Handle right side of child WHERE clause
+          const childWhereRight = include.childWhere.right;
+          if (isColumnBuilder(childWhereRight)) {
+            const rightColInfo = getColumnInfo(childWhereRight);
+            refsColumns.set(`${rightColInfo.table}.${rightColInfo.column}`, {
+              table: rightColInfo.table,
+              column: rightColInfo.column,
+            });
+          }
+        } else if (include.childWhere.kind === 'nullCheck') {
+          const colInfo = getColumnInfo(include.childWhere.expr);
+          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+            table: colInfo.table,
+            column: colInfo.column,
+          });
+        } else {
+          const _exhaustive: never = include.childWhere;
+          throw new Error(
+            `Unsupported predicate builder kind: ${(_exhaustive as { kind: string }).kind}`,
+          );
         }
       }
       // Add child ORDER BY columns if present
@@ -116,32 +129,55 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
   }
 
   if (args.where) {
-    const whereLeft = args.where.left;
-    const expr = extractExpression(whereLeft as AnyColumnBuilder | AnyExpressionBuilder);
-    if (isOperationExpr(expr)) {
-      const allRefs = collectColumnRefs(expr);
-      for (const ref of allRefs) {
-        refsColumns.set(`${ref.table}.${ref.column}`, {
-          table: ref.table,
-          column: ref.column,
+    if (args.where.kind === 'binary') {
+      const whereLeft = args.where.left;
+      const expr = extractExpression(whereLeft as AnyColumnBuilder | AnyExpressionBuilder);
+      if (isOperationExpr(expr)) {
+        const allRefs = collectColumnRefs(expr);
+        for (const ref of allRefs) {
+          refsColumns.set(`${ref.table}.${ref.column}`, {
+            table: ref.table,
+            column: ref.column,
+          });
+        }
+      } else {
+        // expr is ColumnRef
+        refsColumns.set(`${expr.table}.${expr.column}`, {
+          table: expr.table,
+          column: expr.column,
+        });
+      }
+
+      // Handle right side of WHERE clause - can be ParamPlaceholder or AnyColumnBuilder
+      const whereRight = args.where.right;
+      if (isColumnBuilder(whereRight)) {
+        const colInfo = getColumnInfo(whereRight);
+        refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+          table: colInfo.table,
+          column: colInfo.column,
+        });
+      }
+    } else if (args.where.kind === 'nullCheck') {
+      const expr = extractExpression(args.where.expr as AnyColumnBuilder | AnyExpressionBuilder);
+      if (isOperationExpr(expr)) {
+        const allRefs = collectColumnRefs(expr);
+        for (const ref of allRefs) {
+          refsColumns.set(`${ref.table}.${ref.column}`, {
+            table: ref.table,
+            column: ref.column,
+          });
+        }
+      } else {
+        refsColumns.set(`${expr.table}.${expr.column}`, {
+          table: expr.table,
+          column: expr.column,
         });
       }
     } else {
-      // expr is ColumnRef
-      refsColumns.set(`${expr.table}.${expr.column}`, {
-        table: expr.table,
-        column: expr.column,
-      });
-    }
-
-    // Handle right side of WHERE clause - can be ParamPlaceholder or AnyColumnBuilder
-    const whereRight = args.where.right;
-    if (isColumnBuilder(whereRight)) {
-      const colInfo = getColumnInfo(whereRight);
-      refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
-        table: colInfo.table,
-        column: colInfo.column,
-      });
+      const _exhaustive: never = args.where;
+      throw new Error(
+        `Unsupported predicate builder kind: ${(_exhaustive as { kind: string }).kind}`,
+      );
     }
   }
 

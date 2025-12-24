@@ -34,6 +34,11 @@ export type Contract = SqlContract<
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
           };
+          readonly deletedAt: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: true;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: ReadonlyArray<never>;

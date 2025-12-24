@@ -2,9 +2,9 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
-  AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyOrderBuilder,
+  AnyPredicateBuilder,
   BuildOptions,
   ColumnBuilder,
   ComputeColumnJsType,
@@ -115,7 +115,7 @@ export interface OrmRelationFilterBuilder<
   ChildModelName extends string,
 > {
   where(
-    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyBinaryBuilder,
+    fn: (model: ModelColumnAccessor<TContract, CodecTypes, ChildModelName>) => AnyPredicateBuilder,
   ): OrmRelationFilterBuilder<TContract, CodecTypes, ChildModelName>;
 }
 
@@ -153,7 +153,7 @@ export type OrmWhereProperty<
   Includes extends Record<string, unknown>,
   Row,
 > = ((
-  fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
+  fn: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyPredicateBuilder,
 ) => OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>) & {
   related: ModelRelations<TContract, ModelName> extends Record<string, { to: infer To }>
     ? To extends string
@@ -233,17 +233,17 @@ export interface OrmModelBuilder<
   findMany(options?: BuildOptions): SqlQueryPlan<Row>;
   findFirst(options?: BuildOptions): SqlQueryPlan<Row>;
   findUnique(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyPredicateBuilder,
     options?: BuildOptions,
   ): SqlQueryPlan<Row>;
   create(data: Record<string, unknown>, options?: BuildOptions): SqlQueryPlan<number>;
   update(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyPredicateBuilder,
     data: Record<string, unknown>,
     options?: BuildOptions,
   ): SqlQueryPlan<number>;
   delete(
-    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
+    where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyPredicateBuilder,
     options?: BuildOptions,
   ): SqlQueryPlan<number>;
 }

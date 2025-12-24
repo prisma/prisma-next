@@ -1,14 +1,19 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
-  BinaryExpr,
   ColumnRef,
   OperationExpr,
   ParamRef,
+  PredicateExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
-import type { BinaryBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
-import { createBinaryExpr, createColumnRef, createParamRef } from '../utils/ast';
+import type { ParamPlaceholder, PredicateBuilder } from '@prisma-next/sql-relational-core/types';
+import {
+  createBinaryExpr,
+  createColumnRef,
+  createNullCheckExpr,
+  createParamRef,
+} from '../utils/ast';
 import {
   errorFailedToBuildWhereClause,
   errorMissingParameter,
@@ -24,16 +29,24 @@ import {
 } from '../utils/guards';
 
 export function buildWhereExpr(
-  where: BinaryBuilder,
+  where: PredicateBuilder,
   contract: SqlContract<SqlStorage>,
   paramsMap: Record<string, unknown>,
   descriptors: ParamDescriptor[],
   values: unknown[],
 ): {
-  expr: BinaryExpr;
+  expr: PredicateExpr;
   codecId?: string;
   paramName: string;
 } {
+  if (where.kind === 'nullCheck') {
+    const expr = extractExpression(where.expr);
+    return {
+      expr: createNullCheckExpr(where.op, expr),
+      paramName: '',
+    };
+  }
+
   let leftExpr: ColumnRef | OperationExpr;
   let codecId: string | undefined;
   let rightExpr: ColumnRef | ParamRef;

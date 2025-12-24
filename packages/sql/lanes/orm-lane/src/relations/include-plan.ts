@@ -1,22 +1,22 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
-  BinaryExpr,
   ColumnRef,
   ExistsExpr,
   IncludeAst,
   OperationExpr,
   ParamRef,
+  PredicateExpr,
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
-  AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyExpressionBuilder,
   AnyOrderBuilder,
+  AnyPredicateBuilder,
   BuildOptions,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
@@ -53,7 +53,7 @@ export interface IncludeState {
     right: StorageColumn;
   };
   readonly childProjection: ProjectionState;
-  readonly childWhere?: AnyBinaryBuilder;
+  readonly childWhere?: AnyPredicateBuilder;
   readonly childOrderBy?: AnyOrderBuilder;
   readonly childLimit?: number;
 }
@@ -137,7 +137,7 @@ export function buildIncludeAsts(
       filteredProjection as ProjectionInput,
     );
 
-    let childWhere: BinaryExpr | undefined;
+    let childWhere: PredicateExpr | undefined;
     if (includeState.childWhere) {
       const whereResult = buildWhereExpr(
         includeState.childWhere,
@@ -234,7 +234,7 @@ export function buildExistsSubqueries(
       });
     }
 
-    let childWhere: BinaryExpr | undefined;
+    let childWhere: PredicateExpr | undefined;
     if (filter.childWhere) {
       const paramsMap = (options?.params ?? {}) as Record<string, unknown>;
       const paramDescriptors: ParamDescriptor[] = [];
@@ -249,11 +249,11 @@ export function buildExistsSubqueries(
       childWhere = whereResult.expr;
     }
 
-    let subqueryWhere: BinaryExpr | undefined = childWhere;
+    let subqueryWhere: PredicateExpr | undefined = childWhere;
     if (joinConditions.length > 0) {
       const firstJoinCondition = joinConditions[0];
       if (firstJoinCondition) {
-        const joinWhere: BinaryExpr = {
+        const joinWhere: PredicateExpr = {
           kind: 'bin',
           op: 'eq',
           left: firstJoinCondition.left,
@@ -274,7 +274,7 @@ export function buildExistsSubqueries(
     } as {
       from: TableRef;
       project: ReadonlyArray<{ alias: string; expr: ColumnRef }>;
-      where?: BinaryExpr | ExistsExpr;
+      where?: PredicateExpr;
     });
 
     const notExists = filter.filterType === 'none' || filter.filterType === 'every';
@@ -292,9 +292,9 @@ export function buildExistsSubqueries(
 }
 
 export function combineWhereClauses(
-  mainWhere: BinaryExpr | ExistsExpr | undefined,
+  mainWhere: PredicateExpr | undefined,
   existsExprs: ExistsExpr[],
-): BinaryExpr | ExistsExpr | undefined {
+): PredicateExpr | undefined {
   if (existsExprs.length === 1) {
     return existsExprs[0];
   }

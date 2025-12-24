@@ -67,6 +67,9 @@ describe('predicates', () => {
       const values: unknown[] = [];
 
       const result = buildWhereExpr(where, contract, paramsMap, descriptors, values);
+      if (result.expr.kind !== 'bin') {
+        throw new Error(`Expected BinaryExpr, got: ${result.expr.kind}`);
+      }
 
       expect({
         exprKind: result.expr.kind,
@@ -162,6 +165,9 @@ describe('predicates', () => {
       const values: unknown[] = [];
 
       const result = buildWhereExpr(where, contract, paramsMap, descriptors, values);
+      if (result.expr.kind !== 'bin') {
+        throw new Error(`Expected BinaryExpr, got: ${result.expr.kind}`);
+      }
 
       expect({
         exprLeftKind: result.expr.left.kind,
@@ -311,6 +317,9 @@ describe('predicates', () => {
       const values: unknown[] = [];
 
       const result = buildWhereExpr(where, contract, paramsMap, descriptors, values);
+      if (result.expr.kind !== 'bin') {
+        throw new Error(`Expected BinaryExpr, got: ${result.expr.kind}`);
+      }
 
       expect({
         exprKind: result.expr.kind,
@@ -350,6 +359,9 @@ describe('predicates', () => {
       const values: unknown[] = [];
 
       const result = buildWhereExpr(where, contract, paramsMap, descriptors, values);
+      if (result.expr.kind !== 'bin') {
+        throw new Error(`Expected BinaryExpr, got: ${result.expr.kind}`);
+      }
 
       expect({
         exprRightKind: result.expr.right.kind,

@@ -13,10 +13,10 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
   AnyColumnBuilder,
-  BinaryBuilder,
   BuildOptions,
   InferReturningRow,
   ParamPlaceholder,
+  PredicateBuilder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
 import { checkReturningCapability } from '../utils/capabilities';
@@ -48,7 +48,7 @@ export interface UpdateBuilder<
   CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Row = unknown,
 > {
-  where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes, Row>;
+  where(predicate: PredicateBuilder): UpdateBuilder<TContract, CodecTypes, Row>;
   returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): UpdateBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
@@ -60,7 +60,7 @@ export interface DeleteBuilder<
   CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Row = unknown,
 > {
-  where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes, Row>;
+  where(predicate: PredicateBuilder): DeleteBuilder<TContract, CodecTypes, Row>;
   returning<const Columns extends readonly AnyColumnBuilder[]>(
     ...columns: Columns
   ): DeleteBuilder<TContract, CodecTypes, InferReturningRow<Columns>>;
@@ -206,7 +206,7 @@ export class UpdateBuilderImpl<
   private readonly context: QueryLaneContext<TContract>;
   private readonly table: TableRef;
   private readonly set: Record<string, ParamPlaceholder>;
-  private wherePredicate?: BinaryBuilder;
+  private wherePredicate?: PredicateBuilder;
   private returningColumns: AnyColumnBuilder[] = [];
 
   constructor(
@@ -220,7 +220,7 @@ export class UpdateBuilderImpl<
     this.set = set;
   }
 
-  where(predicate: BinaryBuilder): UpdateBuilder<TContract, CodecTypes, Row> {
+  where(predicate: PredicateBuilder): UpdateBuilder<TContract, CodecTypes, Row> {
     const builder = new UpdateBuilderImpl<TContract, CodecTypes, Row>(
       {
         context: this.context,
@@ -374,7 +374,7 @@ export class DeleteBuilderImpl<
   private readonly contract: TContract;
   private readonly context: QueryLaneContext<TContract>;
   private readonly table: TableRef;
-  private wherePredicate?: BinaryBuilder;
+  private wherePredicate?: PredicateBuilder;
   private returningColumns: AnyColumnBuilder[] = [];
 
   constructor(options: SqlBuilderOptions<TContract>, table: TableRef) {
@@ -383,7 +383,7 @@ export class DeleteBuilderImpl<
     this.table = table;
   }
 
-  where(predicate: BinaryBuilder): DeleteBuilder<TContract, CodecTypes, Row> {
+  where(predicate: PredicateBuilder): DeleteBuilder<TContract, CodecTypes, Row> {
     const builder = new DeleteBuilderImpl<TContract, CodecTypes, Row>(
       {
         context: this.context,

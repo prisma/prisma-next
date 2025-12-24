@@ -1,13 +1,13 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
-  BinaryExpr,
   ColumnRef,
   Direction,
   IncludeAst,
   IncludeRef,
   JoinAst,
   OperationExpr,
+  PredicateExpr,
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -19,11 +19,10 @@ import {
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
-  AnyBinaryBuilder,
   AnyColumnBuilder,
   AnyExpressionBuilder,
   AnyOrderBuilder,
-  BinaryBuilder,
+  AnyPredicateBuilder,
   BuildOptions,
   InferNestedProjectionRow,
   JoinOnBuilder,
@@ -238,7 +237,7 @@ export class SelectBuilderImpl<
     );
   }
 
-  where(expr: AnyBinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+  where(expr: AnyPredicateBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
         context: this.context,
@@ -380,7 +379,7 @@ export class SelectBuilderImpl<
       joins?: ReadonlyArray<JoinAst>;
       includes?: ReadonlyArray<IncludeAst>;
       project: ReadonlyArray<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
-      where?: BinaryExpr;
+      where?: PredicateExpr;
       orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
       limit?: number;
     });
@@ -401,7 +400,7 @@ export class SelectBuilderImpl<
       projection: ProjectionState;
       joins?: ReadonlyArray<JoinState>;
       includes?: ReadonlyArray<IncludeState>;
-      where?: BinaryBuilder;
+      where?: AnyPredicateBuilder;
       orderBy?: AnyOrderBuilder;
       paramDescriptors: ParamDescriptor[];
       paramCodecs?: Record<string, string>;

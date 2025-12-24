@@ -1,10 +1,10 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
-  BinaryExpr,
   ColumnRef,
   IncludeAst,
   OperationExpr,
+  PredicateExpr,
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -14,13 +14,13 @@ import {
   createTableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import type {
-  AnyBinaryBuilder,
   AnyOrderBuilder,
-  BinaryBuilder,
+  AnyPredicateBuilder,
   CodecTypes as CodecTypesMap,
   InferNestedProjectionRow,
   NestedProjection,
   OrderBuilder,
+  PredicateBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import {
   errorChildProjectionMustBeSpecified,
@@ -40,7 +40,7 @@ export interface IncludeChildBuilder<
   select<P extends NestedProjection>(
     projection: P,
   ): IncludeChildBuilder<TContract, CodecTypes, InferNestedProjectionRow<P, CodecTypes>>;
-  where(expr: AnyBinaryBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
+  where(expr: AnyPredicateBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
   orderBy(order: AnyOrderBuilder): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
   limit(count: number): IncludeChildBuilder<TContract, CodecTypes, ChildRow>;
 }
@@ -55,7 +55,7 @@ export class IncludeChildBuilderImpl<
   private readonly codecTypes: CodecTypes;
   private readonly table: TableRef;
   private childProjection?: ProjectionState;
-  private childWhere?: BinaryBuilder;
+  private childWhere?: PredicateBuilder;
   private childOrderBy?: OrderBuilder;
   private childLimit?: number;
 
@@ -87,7 +87,7 @@ export class IncludeChildBuilderImpl<
     return builder;
   }
 
-  where(expr: AnyBinaryBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
+  where(expr: AnyPredicateBuilder): IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow> {
     const builder = new IncludeChildBuilderImpl<TContract, CodecTypes, ChildRow>(
       this.contract,
       this.codecTypes,
@@ -150,7 +150,7 @@ export class IncludeChildBuilderImpl<
 
   getState(): {
     childProjection: ProjectionState;
-    childWhere?: AnyBinaryBuilder;
+    childWhere?: AnyPredicateBuilder;
     childOrderBy?: AnyOrderBuilder;
     childLimit?: number;
   } {
@@ -159,7 +159,7 @@ export class IncludeChildBuilderImpl<
     }
     const state: {
       childProjection: ProjectionState;
-      childWhere?: AnyBinaryBuilder;
+      childWhere?: AnyPredicateBuilder;
       childOrderBy?: AnyOrderBuilder;
       childLimit?: number;
     } = {
@@ -203,7 +203,7 @@ export function buildIncludeAst(
       })()
     : undefined;
 
-  let childWhere: BinaryExpr | undefined;
+  let childWhere: PredicateExpr | undefined;
   if (include.childWhere) {
     const whereResult = buildWhereExpr(
       contract,

@@ -2,9 +2,8 @@ import type { ExecutionPlan, ParamDescriptor, PlanMeta } from '@prisma-next/cont
 import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
-  BinaryExpr,
-  ExistsExpr,
   LoweredStatement,
+  PredicateExpr,
   SelectAst,
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
@@ -13,7 +12,7 @@ import type {
   AnyColumnBuilder,
   AnyExpressionBuilder,
   AnyOrderBuilder,
-  BinaryBuilder,
+  AnyPredicateBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import type { IncludeState } from '../relations/include-plan';
 import type { ProjectionState } from '../selection/projection';
@@ -31,7 +30,7 @@ export interface MetaBuildArgs {
   readonly table: TableRef;
   readonly projection: ProjectionState;
   readonly includes?: ReadonlyArray<IncludeState>;
-  readonly where?: BinaryBuilder;
+  readonly where?: AnyPredicateBuilder;
   readonly orderBy?: AnyOrderBuilder;
   readonly paramDescriptors: ParamDescriptor[];
   readonly paramCodecs?: Record<string, string>;
@@ -85,11 +84,24 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         }
       }
       if (include.childWhere) {
-        const colInfo = getColumnInfo(include.childWhere.left);
-        refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
-          table: colInfo.table,
-          column: colInfo.column,
-        });
+        if (include.childWhere.kind === 'binary') {
+          const colInfo = getColumnInfo(include.childWhere.left);
+          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+            table: colInfo.table,
+            column: colInfo.column,
+          });
+        } else if (include.childWhere.kind === 'nullCheck') {
+          const colInfo = getColumnInfo(include.childWhere.expr);
+          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+            table: colInfo.table,
+            column: colInfo.column,
+          });
+        } else {
+          const _exhaustive: never = include.childWhere;
+          throw new Error(
+            `Unsupported predicate builder kind: ${(_exhaustive as { kind: string }).kind}`,
+          );
+        }
       }
       if (include.childOrderBy) {
         const orderBy = include.childOrderBy as unknown as {
@@ -107,8 +119,23 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
   }
 
   if (args.where) {
-    const whereLeft = args.where.left;
-    const expr = extractExpression(whereLeft as AnyColumnBuilder | AnyExpressionBuilder);
+    let whereExprBuilder: AnyColumnBuilder | AnyExpressionBuilder;
+    switch (args.where.kind) {
+      case 'binary':
+        whereExprBuilder = args.where.left as AnyColumnBuilder | AnyExpressionBuilder;
+        break;
+      case 'nullCheck':
+        whereExprBuilder = args.where.expr as AnyColumnBuilder | AnyExpressionBuilder;
+        break;
+      default: {
+        const _exhaustive: never = args.where;
+        throw new Error(
+          `Unsupported predicate builder kind: ${(_exhaustive as { kind: string }).kind}`,
+        );
+      }
+    }
+
+    const expr = extractExpression(whereExprBuilder);
     if (isOperationExpr(expr)) {
       const allRefs = collectColumnRefs(expr);
       for (const ref of allRefs) {
@@ -284,7 +311,7 @@ export function createPlan<Row>(
 
 export function createPlanWithExists<Row>(
   ast: SelectAst,
-  combinedWhere: BinaryExpr | ExistsExpr | undefined,
+  combinedWhere: PredicateExpr | undefined,
   lowered: { body: LoweredStatement },
   paramValues: unknown[],
   planMeta: PlanMeta,

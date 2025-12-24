@@ -185,4 +185,28 @@ describe('sql comparison operators', () => {
       }).toThrow('Parameter placeholder or column builder required for column comparison');
     });
   });
+
+  describe('null checks', () => {
+    it.each([
+      { op: 'isNull', method: 'isNull' },
+      { op: 'isNotNull', method: 'isNotNull' },
+    ] as const)('builds query with $op filter', ({ op, method }) => {
+      const { id, deletedAt } = tables.user.columns;
+
+      const plan = sql({ context })
+        .from(tables.user)
+        .select({ id })
+        .where(deletedAt[method]())
+        .build();
+
+      expect(plan.ast).toMatchObject({
+        kind: 'select',
+        where: {
+          kind: 'nullCheck',
+          op,
+          expr: createColumnRef('user', 'deletedAt'),
+        },
+      });
+    });
+  });
 });

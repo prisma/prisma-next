@@ -1,11 +1,10 @@
 import type {
-  BinaryExpr,
   ColumnRef,
   Direction,
-  ExistsExpr,
   IncludeAst,
   IncludeRef,
   OperationExpr,
+  PredicateExpr,
   SelectAst,
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
@@ -60,7 +59,7 @@ export function buildSelectAst(
   table: TableRef,
   projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>,
   includesAst: ReadonlyArray<IncludeAst> | undefined,
-  whereExpr: BinaryExpr | ExistsExpr | undefined,
+  whereExpr: PredicateExpr | undefined,
   orderByClause:
     | ReadonlyArray<{
         expr: ColumnRef | OperationExpr;
@@ -80,7 +79,7 @@ export function buildSelectAst(
     from: TableRef;
     project: ReadonlyArray<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
     includes?: ReadonlyArray<IncludeAst>;
-    where?: BinaryExpr | ExistsExpr;
+    where?: PredicateExpr;
     orderBy?: ReadonlyArray<{
       expr: ColumnRef | OperationExpr;
       dir: Direction;

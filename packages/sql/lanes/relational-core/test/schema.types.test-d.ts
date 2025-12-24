@@ -16,6 +16,7 @@ const userTable = schemaHandle.tables.user;
 const idColumn = userTable.columns.id;
 const emailColumn = userTable.columns.email;
 const createdAtColumn = userTable.columns.createdAt;
+const deletedAtColumn = userTable.columns.deletedAt;
 
 // Type-level checks that should fail if index signatures exist
 type TableKeys = keyof typeof schemaHandle.tables;
@@ -41,9 +42,18 @@ test('table columns have literal keys, not index signatures', () => {
   expectTypeOf(idColumn).not.toBeUndefined();
   expectTypeOf(emailColumn).not.toBeUndefined();
   expectTypeOf(createdAtColumn).not.toBeUndefined();
+  expectTypeOf(deletedAtColumn).not.toBeUndefined();
 
   // Verify column keys are literal types
-  expectTypeOf<ColumnKeys>().toEqualTypeOf<'id' | 'email' | 'createdAt'>();
+  expectTypeOf<ColumnKeys>().toEqualTypeOf<'id' | 'email' | 'createdAt' | 'deletedAt'>();
+});
+
+test('nullable columns expose isNull/isNotNull', () => {
+  expectTypeOf(deletedAtColumn).toHaveProperty('isNull');
+  expectTypeOf(deletedAtColumn.isNull).toBeFunction();
+
+  type IsNullMethodOnId = typeof idColumn extends { isNull: infer M } ? M : never;
+  expectTypeOf<IsNullMethodOnId>().toEqualTypeOf<never>();
 });
 
 test('schema returns correct SchemaHandle type', () => {

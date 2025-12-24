@@ -1,12 +1,11 @@
 import type {
-  BinaryExpr,
   ColumnRef,
   Direction,
-  ExistsExpr,
   IncludeAst,
   IncludeRef,
   JoinAst,
   OperationExpr,
+  PredicateExpr,
   SelectAst,
   TableRef,
 } from './types';
@@ -20,7 +19,7 @@ export interface CreateSelectAstOptions {
     alias: string;
     expr: ColumnRef | IncludeRef | OperationExpr;
   }>;
-  readonly where?: BinaryExpr | ExistsExpr;
+  readonly where?: PredicateExpr;
   readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
   readonly limit?: number;
 }

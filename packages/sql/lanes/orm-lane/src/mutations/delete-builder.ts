@@ -1,7 +1,7 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { AnyBinaryBuilder, BuildOptions } from '@prisma-next/sql-relational-core/types';
+import type { AnyPredicateBuilder, BuildOptions } from '@prisma-next/sql-relational-core/types';
 import type { OrmContext } from '../orm/context';
 import type { ModelColumnAccessor } from '../orm-types';
 import { buildWhereExpr } from '../selection/predicates';
@@ -15,7 +15,7 @@ export function buildDeletePlan<
 >(
   context: OrmContext<TContract>,
   modelName: ModelName,
-  where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyBinaryBuilder,
+  where: (model: ModelColumnAccessor<TContract, CodecTypes, ModelName>) => AnyPredicateBuilder,
   getModelAccessor: () => ModelColumnAccessor<TContract, CodecTypes, ModelName>,
   options?: BuildOptions,
 ): SqlQueryPlan<number> {

@@ -1,10 +1,10 @@
-import type { BinaryExpr, ColumnRef, ParamRef, TableRef, UpdateAst } from './types';
+import type { ColumnRef, ParamRef, PredicateExpr, TableRef, UpdateAst } from './types';
 import { compact } from './util';
 
 export interface CreateUpdateAstOptions {
   readonly table: TableRef;
   readonly set: Record<string, ColumnRef | ParamRef>;
-  readonly where: BinaryExpr;
+  readonly where: PredicateExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 

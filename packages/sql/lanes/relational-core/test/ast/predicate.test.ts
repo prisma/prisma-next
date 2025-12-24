@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
-import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate';
+import { createBinaryExpr, createExistsExpr, createNullCheckExpr } from '../../src/ast/predicate';
 import { createSelectAst } from '../../src/ast/select';
 import type { ColumnRef, OperationExpr, ParamRef, SelectAst } from '../../src/ast/types';
 
@@ -163,6 +163,30 @@ describe('ast/predicate', () => {
 
       expect(existsExpr.subquery).toBe(subquery);
       expect(existsExpr.subquery.from.name).toBe('post');
+    });
+  });
+
+  describe('createNullCheckExpr', () => {
+    it('creates IS NULL expr', () => {
+      const expr = createColumnRef('user', 'deletedAt');
+      const nullCheck = createNullCheckExpr('isNull', expr);
+
+      expect(nullCheck).toEqual({
+        kind: 'nullCheck',
+        op: 'isNull',
+        expr,
+      });
+    });
+
+    it('creates IS NOT NULL expr', () => {
+      const expr = createTestOperationExpr(createColumnRef('user', 'email'));
+      const nullCheck = createNullCheckExpr('isNotNull', expr);
+
+      expect(nullCheck).toEqual({
+        kind: 'nullCheck',
+        op: 'isNotNull',
+        expr,
+      });
     });
   });
 });

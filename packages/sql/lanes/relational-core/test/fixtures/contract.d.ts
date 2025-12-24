@@ -21,6 +21,7 @@ export type Contract = SqlContract<
           readonly id: { readonly nativeType: 'int4'; readonly codecId: 'pg/int4@1'; nullable: false };
           readonly email: { readonly nativeType: 'text'; readonly codecId: 'pg/text@1'; nullable: false };
           readonly createdAt: { readonly nativeType: 'timestamptz'; readonly codecId: 'pg/timestamptz@1'; nullable: false };
+          readonly deletedAt: { readonly nativeType: 'timestamptz'; readonly codecId: 'pg/timestamptz@1'; nullable: true };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: ReadonlyArray<never>;
