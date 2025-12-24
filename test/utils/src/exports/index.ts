@@ -81,6 +81,7 @@ export async function createDevDatabase(options?: ServerOptions): Promise<DevDat
   const maxRetries = 10; // Increased retries for high concurrency scenarios
   let currentOptions: ServerOptions = {
     databaseConnectTimeoutMillis: 3000,
+    databaseIdleTimeoutMillis: 1000,
     ...options,
   };
   let lastError: unknown;
