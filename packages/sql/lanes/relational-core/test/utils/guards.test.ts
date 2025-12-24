@@ -51,44 +51,21 @@ describe('guards', () => {
       expect(isParamPlaceholder(paramPlaceholder)).toBe(true);
     });
 
-    it('returns false for null', () => {
-      expect(isParamPlaceholder(null)).toBe(false);
-    });
+    it.each([null, undefined, 'test', 42, true])(
+      'returns false for non-object value: %s',
+      (value) => {
+        expect(isParamPlaceholder(value)).toBe(false);
+      },
+    );
 
-    it('returns false for undefined', () => {
-      expect(isParamPlaceholder(undefined)).toBe(false);
-    });
-
-    it('returns false for string', () => {
-      expect(isParamPlaceholder('test')).toBe(false);
-    });
-
-    it('returns false for number', () => {
-      expect(isParamPlaceholder(42)).toBe(false);
-    });
-
-    it('returns false for boolean', () => {
-      expect(isParamPlaceholder(true)).toBe(false);
-    });
-
-    it('returns false for object without kind property', () => {
-      expect(isParamPlaceholder({ name: 'test' })).toBe(false);
-    });
-
-    it('returns false for object with wrong kind', () => {
-      expect(isParamPlaceholder({ kind: 'invalid', name: 'test' })).toBe(false);
-    });
-
-    it('returns false for object with correct kind but missing name', () => {
-      expect(isParamPlaceholder({ kind: 'param-placeholder' })).toBe(false);
-    });
-
-    it('returns false for object with correct kind but name is not string', () => {
-      expect(isParamPlaceholder({ kind: 'param-placeholder', name: 123 })).toBe(false);
-    });
-
-    it('returns false for object with correct kind but name is null', () => {
-      expect(isParamPlaceholder({ kind: 'param-placeholder', name: null })).toBe(false);
+    it.each([
+      { name: 'test' },
+      { kind: 'invalid', name: 'test' },
+      { kind: 'param-placeholder' },
+      { kind: 'param-placeholder', name: 123 },
+      { kind: 'param-placeholder', name: null },
+    ])('returns false for invalid object structure: %s', (value) => {
+      expect(isParamPlaceholder(value)).toBe(false);
     });
   });
 });

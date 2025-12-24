@@ -108,50 +108,29 @@ describe('expression-builder', () => {
       });
     });
 
-    it.each(operators)('%s throws for null value', (op) => {
+    it.each(operators)('%s throws for invalid values', (op) => {
       const columnRef: ColumnRef = createColumnRef('user', 'id');
       const expr = createExpressionBuilder(columnRef, columnMeta);
+      const invalidValues = [null, undefined, { kind: 'invalid' }] as unknown[];
 
-      expect(() => {
-        expr[op](
-          null as unknown as
-            | import('../src/types').ParamPlaceholder
-            | import('../src/types').AnyColumnBuilderBase,
-        );
-      }).toThrow('Parameter placeholder or column builder required for expression comparison');
-    });
-
-    it.each(operators)('%s throws for undefined value', (op) => {
-      const columnRef: ColumnRef = createColumnRef('user', 'id');
-      const expr = createExpressionBuilder(columnRef, columnMeta);
-
-      expect(() => {
-        expr[op](
-          undefined as unknown as
-            | import('../src/types').ParamPlaceholder
-            | import('../src/types').AnyColumnBuilderBase,
-        );
-      }).toThrow('Parameter placeholder or column builder required for expression comparison');
-    });
-
-    it.each(operators)('%s throws for invalid kind', (op) => {
-      const columnRef: ColumnRef = createColumnRef('user', 'id');
-      const expr = createExpressionBuilder(columnRef, columnMeta);
-
-      expect(() => {
-        expr[op]({ kind: 'invalid' } as unknown as
-          | import('../src/types').ParamPlaceholder
-          | import('../src/types').AnyColumnBuilderBase);
-      }).toThrow('Parameter placeholder or column builder required for expression comparison');
+      for (const invalidValue of invalidValues) {
+        expect(() => {
+          expr[op](
+            invalidValue as unknown as
+              | import('../src/types').ParamPlaceholder
+              | import('../src/types').AnyColumnBuilderBase,
+          );
+        }).toThrow('Parameter placeholder or column builder required for expression comparison');
+      }
     });
   });
 
   describe('ordering methods', () => {
-    it('asc creates order builder', () => {
+    it.each(['asc', 'desc'] as const)('%s creates order builder', (method) => {
       const columnRef: ColumnRef = createColumnRef('user', 'id');
       const expr = createExpressionBuilder(columnRef, columnMeta);
 
-      const order = expr.asc();
+      const order = expr[method]();
 
       expect({
         kind: order.kind,
@@ -159,24 +138,7 @@ describe('expression-builder', () => {
         exprKind: order.expr.kind,
       }).toMatchObject({
         kind: 'order',
-        dir: 'asc',
-        exprKind: 'expression',
-      });
-    });
-
-    it('desc creates order builder', () => {
-      const columnRef: ColumnRef = createColumnRef('user', 'id');
-      const expr = createExpressionBuilder(columnRef, columnMeta);
-
-      const order = expr.desc();
-
-      expect({
-        kind: order.kind,
-        dir: order.dir,
-        exprKind: order.expr.kind,
-      }).toMatchObject({
-        kind: 'order',
-        dir: 'desc',
+        dir: method,
         exprKind: 'expression',
       });
     });
