@@ -102,7 +102,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       // Add child ORDER BY columns if present
       if (include.childOrderBy) {
         const orderBy = include.childOrderBy as unknown as {
-          expr?: AnyColumnBuilder | OperationExpr;
+          expr?: AnyColumnBuilder | AnyExpressionBuilder;
         };
         if (orderBy.expr) {
           const colInfo = getColumnInfo(orderBy.expr);
@@ -147,12 +147,13 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
 
   if (args.orderBy) {
     const orderBy = args.orderBy as unknown as {
-      expr?: AnyColumnBuilder | OperationExpr;
+      expr?: AnyColumnBuilder | AnyExpressionBuilder;
     };
     const orderByExpr = orderBy.expr;
     if (orderByExpr) {
-      if (isOperationExpr(orderByExpr)) {
-        const allRefs = collectColumnRefs(orderByExpr);
+      const extractedExpr = extractExpression(orderByExpr);
+      if (isOperationExpr(extractedExpr)) {
+        const allRefs = collectColumnRefs(extractedExpr);
         for (const ref of allRefs) {
           refsColumns.set(`${ref.table}.${ref.column}`, {
             table: ref.table,
@@ -160,14 +161,11 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
           });
         }
       } else {
-        // orderByExpr is ColumnBuilder - TypeScript can't narrow properly
-        const colBuilder = orderByExpr as unknown as { table?: string; column?: string };
-        if (colBuilder.table && colBuilder.column) {
-          refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
-            table: colBuilder.table,
-            column: colBuilder.column,
-          });
-        }
+        // extractedExpr is ColumnRef
+        refsColumns.set(`${extractedExpr.table}.${extractedExpr.column}`, {
+          table: extractedExpr.table,
+          column: extractedExpr.column,
+        });
       }
     }
   }

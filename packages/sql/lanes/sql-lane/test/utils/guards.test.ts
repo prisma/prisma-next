@@ -4,11 +4,13 @@ import {
   createLiteralExpr,
   createParamRef,
 } from '@prisma-next/sql-relational-core/ast';
+import { createExpressionBuilder } from '@prisma-next/sql-relational-core/expression-builder';
 import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
 import {
   collectColumnRefs,
   extractBaseColumnRef,
+  extractExpression,
   getColumnInfo,
   isColumnBuilder,
   isOperationExpr,
@@ -185,7 +187,8 @@ describe('guards', () => {
         columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       } as ColumnBuilder;
 
-      expect(isOperationExpr(columnBuilder)).toBe(false);
+      const expr = extractExpression(columnBuilder);
+      expect(isOperationExpr(expr)).toBe(false);
     });
 
     it('returns false for null', () => {
@@ -234,7 +237,12 @@ describe('guards', () => {
         },
       };
 
-      const result = getColumnInfo(operation);
+      const exprBuilder = createExpressionBuilder(operation, {
+        nativeType: 'vector',
+        codecId: 'pg/vector@1',
+        nullable: false,
+      });
+      const result = getColumnInfo(exprBuilder);
       expect(result).toEqual({ table: 'user', column: 'id' });
     });
 
@@ -269,7 +277,12 @@ describe('guards', () => {
         },
       };
 
-      const result = getColumnInfo(outerOp);
+      const exprBuilder = createExpressionBuilder(outerOp, {
+        nativeType: 'vector',
+        codecId: 'pg/vector@1',
+        nullable: false,
+      });
+      const result = getColumnInfo(exprBuilder);
       expect(result).toEqual({ table: 'user', column: 'id' });
     });
   });
