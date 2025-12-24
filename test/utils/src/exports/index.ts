@@ -112,7 +112,7 @@ export async function createDevDatabase(options?: ServerOptions): Promise<DevDat
         // Exponential backoff: 50ms base delay, increasing with each attempt
         // Plus random jitter to avoid thundering herd
         const baseDelay = 50;
-        const exponentialDelay = baseDelay * 2 ** attempt;
+        const exponentialDelay = Math.min(baseDelay * 2 ** attempt, 2000);
         const jitter = Math.random() * 50; // 0-50ms random jitter
         const totalDelay = exponentialDelay + jitter;
         await new Promise((resolve) => setTimeout(resolve, totalDelay));
@@ -144,10 +144,10 @@ export async function withDevDatabase<T>(
   options?: ServerOptions,
 ): Promise<T> {
   // If no ports specified, automatically allocate available ones to avoid conflicts in parallel execution
-  const finalOptions: ServerOptions = options || {};
+  let finalOptions: ServerOptions = options || {};
   if (!finalOptions.databasePort && !finalOptions.shadowDatabasePort) {
     const allocatedPorts = await allocatePorts();
-    Object.assign(finalOptions, allocatedPorts);
+    finalOptions = { ...finalOptions, ...allocatedPorts };
   }
   const database = await createDevDatabase(finalOptions);
   try {
