@@ -30,10 +30,7 @@ describe('runtime execute integration', () => {
     database = await createDevDatabase();
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
-    const client2 = new Client({ connectionString: database.connectionString });
-    // This is an intentional unsupported second connection to test @prisma/dev's idle timeout
-    await client2.connect();
-  }, 90_000);
+  }, timeouts.spinUpPpgDev);
 
   afterAll(async () => {
     try {
