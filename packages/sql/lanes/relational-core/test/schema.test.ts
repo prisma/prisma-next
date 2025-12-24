@@ -316,4 +316,45 @@ describe('schema', () => {
     const numberAccess = (userTable as unknown as Record<number, unknown>)[0];
     expect(numberAccess).toBeUndefined();
   });
+
+  it('throws error for unknown table name', () => {
+    const adapter = createStubAdapter();
+    const invalidContract = validateContract<TestContract>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+              email: { ...textColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const invalidContext = createTestContext(invalidContract, adapter);
+    // Manually set storage.tables to have a table entry that is null/undefined
+    // This simulates the case where storage.tables[tableName] is falsy
+    const invalidStorage = invalidContext.contract.storage as unknown as MutableStorage;
+    // Set a table to null to trigger the error
+    invalidStorage.tables = {
+      user: null as unknown as { columns: Record<string, unknown> },
+    };
+
+    // This will fail when buildColumns tries to access storage.tables['user']
+    // and finds it's null/undefined, triggering the error at line 188
+    expect(() => {
+      schema(invalidContext);
+    }).toThrow('Unknown table user');
+  });
 });

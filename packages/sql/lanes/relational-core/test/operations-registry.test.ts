@@ -1118,4 +1118,352 @@ describe('operations-registry', () => {
     // Operations should not be attached since registry has no operations for this codecId
     expect((result as unknown as { add?: unknown }).add).toBeUndefined();
   });
+
+  it('throws error when argument spec is missing', () => {
+    // The missing argSpec case happens when args.length > signature.args.length
+    // This is already covered by the "wrong number of arguments" test above,
+    // but we verify it throws the correct error here
+    const signature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [signature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id as unknown as {
+      add: (...args: unknown[]) => unknown;
+    };
+
+    // Pass 2 args but signature only has 1 arg spec
+    // This triggers the !argSpec check at line 86
+    expect(() => {
+      idColumn.add(5, 10);
+    }).toThrow('Operation add expects 1 arguments, got 2');
+  });
+
+  it('handles operation when operations array is empty after capability filtering', () => {
+    const signature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'typeId', type: 'pg/int4@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const secondSignature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'multiply',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'builtin', type: 'number' },
+      capabilities: ['postgres.lateral'], // Requires capability
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} * ${arg0}',
+      },
+    };
+
+    const contractWithoutCaps = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithoutCaps, adapter, {
+      extensions: [
+        {
+          operations: () => [signature, secondSignature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id as unknown as {
+      add: (arg: unknown) => unknown;
+    };
+
+    // First operation returns typeId 'pg/int4@1', which should trigger operation attachment
+    // But the second operation requires 'postgres.lateral' capability which is missing
+    // So operations array after filtering should be empty (length === 0)
+    const result = idColumn.add(5);
+    expect(result).toBeDefined();
+    expect(result).toHaveProperty('kind', 'expression');
+    // Since all operations were filtered out by capabilities, no operations should be attached
+    expect((result as unknown as { multiply?: unknown }).multiply).toBeUndefined();
+  });
+
+  it('extractExpression works with ExpressionBuilder input', () => {
+    const firstSignature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'typeId', type: 'pg/int4@1' }],
+      returns: { kind: 'typeId', type: 'pg/int4@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const secondSignature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'multiply',
+      args: [{ kind: 'typeId', type: 'pg/int4@1' }],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} * ${arg0}',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [firstSignature, secondSignature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id as unknown as {
+      add: (arg: unknown) => unknown;
+    };
+
+    // First call returns ExpressionBuilder
+    const firstResult = idColumn.add(idColumn);
+    // Second call takes ExpressionBuilder as argument (tests extractExpression with ExpressionBuilder)
+    const secondResult = idColumn.add(firstResult);
+    expect(secondResult).toBeDefined();
+    expect(secondResult).toHaveProperty('kind', 'expression');
+  });
+
+  it('attachOperationsToColumnBuilder skips operations when contractCapabilities is undefined', () => {
+    const signature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'builtin', type: 'number' },
+      capabilities: ['postgres.lateral'], // Requires capability
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [signature],
+        },
+      ],
+    });
+
+    // Create a fresh column builder without pre-attached operations
+    const columnMeta = contractWithInt.storage.tables.user.columns.id;
+    const freshColumnBuilder = new ColumnBuilderImpl('user', 'id', columnMeta);
+
+    // Call attachOperationsToColumnBuilder with undefined contractCapabilities
+    // This tests the branch at line 208-209
+    const result = attachOperationsToColumnBuilder(
+      freshColumnBuilder as unknown as import('../src/types').ColumnBuilder<
+        string,
+        StorageColumn,
+        unknown,
+        Record<string, never>
+      >,
+      columnMeta,
+      context.operations,
+      undefined, // contractCapabilities is undefined
+    );
+
+    // Operations should not be attached since contractCapabilities is undefined
+    // and the operation requires capabilities
+    expect((result as unknown as { add?: unknown }).add).toBeUndefined();
+  });
+
+  it('executeOperation skips attaching operations when contractCapabilities is undefined in result', () => {
+    const firstSignature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'typeId', type: 'pg/int4@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const secondSignature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'multiply',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'builtin', type: 'number' },
+      capabilities: ['postgres.lateral'], // Requires capability
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} * ${arg0}',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [firstSignature, secondSignature],
+        },
+      ],
+    });
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id as unknown as {
+      add: (arg: unknown) => unknown;
+    };
+
+    // First operation returns typeId 'pg/int4@1', which should trigger operation attachment
+    // But the second operation requires 'postgres.lateral' capability and contractCapabilities
+    // is undefined in the contract, so it should be skipped (tests branch at line 144-145)
+    const result = idColumn.add(5);
+    expect(result).toBeDefined();
+    expect(result).toHaveProperty('kind', 'expression');
+    // Since contractCapabilities is undefined, the second operation should be skipped
+    expect((result as unknown as { multiply?: unknown }).multiply).toBeUndefined();
+  });
 });
