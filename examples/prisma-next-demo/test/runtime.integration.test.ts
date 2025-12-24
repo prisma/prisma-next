@@ -69,66 +69,79 @@ describe('runtime execute integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         const adapter = createPostgresAdapter();
-        const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
         const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
-        const runtime = createRuntime({
-          context,
-          adapter,
-          driver,
-          verify: { mode: 'always', requireMarker: true },
-          plugins: [
-            budgets({
-              maxRows: 10_000,
-              defaultTableRows: 10_000,
-              tableRows: { user: 10_000, post: 10_000 },
-            }),
-          ],
+        const tables = schema(context).tables;
+        const userTable = tables['user']!;
+        const root = sql({ context });
+        const plan = root
+          .from(userTable)
+          .select({
+            id: userTable.columns['id']!,
+            email: userTable.columns['email']!,
+          })
+          .limit(10)
+          .build();
+
+        const templatePlan = root.raw.with({ annotations: { limit: 1 } })`
+          select id, email from "user"
+          where email = ${'alice@example.com'}
+          limit ${1}
+        `;
+
+        const functionPlan = root.raw('select id from "user" where email = $1 limit $2', {
+          params: ['alice@example.com', 1],
+          refs: { tables: ['user'], columns: [{ table: 'user', column: 'email' }] },
+          annotations: { intent: 'report', limit: 1 },
         });
 
-        try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client: import('pg').Client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query(
-              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-            );
-            await client.query('truncate table "post", "user" restart identity cascade');
-            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-              'alice@example.com',
-            ]);
-          });
-
-          const rowCount = await withClient(
-            connectionString,
-            async (client: import('pg').Client) => {
-              const result = await client.query('select count(*)::int as count from "user"');
-              return result.rows[0]?.count as number;
-            },
+        await withClient(connectionString, async (client: import('pg').Client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
           );
-          expect(rowCount).toBe(1);
+          await client.query(
+            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+          );
+          await client.query('truncate table "post", "user" restart identity cascade');
+          await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
+            'alice@example.com',
+          ]);
+        });
 
-          const tables = schema(context).tables;
-          const userTable = tables['user']!;
-          const plan = sql({ context })
-            .from(tables['user']!)
-            .select({
-              id: userTable.columns['id']!,
-              email: userTable.columns['email']!,
-            })
-            .limit(10)
-            .build();
+        const rowCount = await withClient(connectionString, async (client: import('pg').Client) => {
+          const result = await client.query('select count(*)::int as count from "user"');
+          return result.rows[0]?.count as number;
+        });
+        expect(rowCount).toBe(1);
 
+        const createRuntimeInstance = () => {
+          const pool = new Pool({ connectionString });
+          const driver = createPostgresDriverFromOptions({
+            connect: { pool },
+            cursor: { disabled: true },
+          });
+          return createRuntime({
+            context,
+            adapter,
+            driver,
+            verify: { mode: 'always', requireMarker: true },
+            plugins: [
+              budgets({
+                maxRows: 10_000,
+                defaultTableRows: 10_000,
+                tableRows: { user: 10_000, post: 10_000 },
+              }),
+            ],
+          });
+        };
+
+        await stampMarker({
+          connectionString,
+          coreHash: contract.coreHash,
+          profileHash: contract.profileHash ?? contract.coreHash,
+        });
+
+        const runtime = createRuntimeInstance();
+        try {
           type PlanRow = ResultType<typeof plan>;
           const rows: PlanRow[] = [];
           for await (const row of runtime.execute(plan)) {
@@ -138,13 +151,6 @@ describe('runtime execute integration', () => {
           expect(rows).toHaveLength(1);
           expect(rows[0]).toMatchObject({ email: 'alice@example.com' });
 
-          const root = sql({ context });
-          const templatePlan = root.raw.with({ annotations: { limit: 1 } })`
-          select id, email from "user"
-          where email = ${'alice@example.com'}
-          limit ${1}
-        `;
-
           type TemplatePlanRow = ResultType<typeof templatePlan>;
           const templateRows: TemplatePlanRow[] = [];
           for await (const row of runtime.execute(templatePlan)) {
@@ -152,31 +158,30 @@ describe('runtime execute integration', () => {
           }
           expect(templateRows).toHaveLength(1);
 
-          const functionPlan = root.raw('select id from "user" where email = $1 limit $2', {
-            params: ['alice@example.com', 1],
-            refs: { tables: ['user'], columns: [{ table: 'user', column: 'email' }] },
-            annotations: { intent: 'report', limit: 1 },
-          });
-
           type FunctionPlanRow = ResultType<typeof functionPlan>;
           const functionRows: FunctionPlanRow[] = [];
           for await (const row of runtime.execute(functionPlan)) {
             functionRows.push(row);
           }
           expect(functionRows).toHaveLength(1);
+        } finally {
+          await runtime.close();
+        }
 
-          await stampMarker({
-            connectionString,
-            coreHash: 'sha256:mismatched-core',
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
+        await stampMarker({
+          connectionString,
+          coreHash: 'sha256:mismatched-core',
+          profileHash: contract.profileHash ?? contract.coreHash,
+        });
 
+        const mismatchedRuntime = createRuntimeInstance();
+        try {
           await expect(async () => {
-            const iterator = runtime.execute(plan)[Symbol.asyncIterator]();
+            const iterator = mismatchedRuntime.execute(plan)[Symbol.asyncIterator]();
             await iterator.next();
           }).rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISMATCH' });
         } finally {
-          await runtime.close();
+          await mismatchedRuntime.close();
         }
       }, {});
     },
