@@ -24,6 +24,8 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
+    "lint:fix": "biome check --write . --config-path ../../../../biome.json",
+    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../../biome.json",
     "clean": "node ../../../../scripts/clean.mjs"
   },
   "dependencies": {
