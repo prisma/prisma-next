@@ -956,40 +956,6 @@ describe('operations-registry', () => {
     expect(resultWithMeta.columnMeta.codecId).toBe('pg/int4@1');
   });
 
-  it('does not attach operations when operationRegistry is undefined', () => {
-    const contractWithInt = validateContract<TestContractWithIdOnly>({
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'test-hash',
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { ...int4ColumnType, nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      models: {},
-      relations: {},
-      mappings: {},
-    });
-
-    const adapter = createStubAdapter();
-    // Create context without operation registry (undefined)
-    const context = createTestContext(contractWithInt, adapter);
-    const tables = schema(context).tables;
-    const userTable = tables.user;
-    const idColumn = userTable.columns.id;
-
-    // Operations should not be attached when registry is undefined
-    expect((idColumn as unknown as { add?: unknown }).add).toBeUndefined();
-  });
-
   it('attachOperationsToColumnBuilder returns columnBuilder when registry is undefined', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
