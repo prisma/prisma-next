@@ -17,8 +17,8 @@ import type { IncludeState } from '../../src/relations/include-plan';
 import type { ProjectionState } from '../../src/selection/projection';
 import { buildProjectionItems, buildSelectAst } from '../../src/selection/select-builder';
 
-describe('select-builder', () => {
-  const contract: SqlContract<SqlStorage> = {
+function createTestContract(): SqlContract<SqlStorage> {
+  return {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
@@ -60,18 +60,104 @@ describe('select-builder', () => {
     meta: {},
     sources: {},
   };
+}
 
+function createTestOperationExpr(): OperationExpr {
+  return {
+    kind: 'operation',
+    method: 'add',
+    forTypeId: 'pg/int4@1',
+    self: createColumnRef('user', 'id'),
+    args: [],
+    returns: { kind: 'builtin', type: 'number' },
+    lowering: {
+      targetFamily: 'sql',
+      strategy: 'infix',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+      template: '${self} + ${arg0}',
+    },
+  };
+}
+
+function createTestIncludeState(): IncludeState {
+  const int4ColumnMeta: StorageColumn = {
+    nativeType: 'int4',
+    codecId: 'pg/int4@1',
+    nullable: false,
+  };
+
+  return {
+    alias: 'posts',
+    table: { kind: 'table', name: 'post' },
+    on: {
+      kind: 'join-on',
+      left: int4ColumnMeta,
+      right: int4ColumnMeta,
+    },
+    childProjection: {
+      aliases: ['id'],
+      columns: [], // Will be filled by test
+    },
+  };
+}
+
+function createTestIncludeAst(): IncludeAst[] {
+  return [
+    {
+      kind: 'includeMany',
+      alias: 'posts',
+      child: {
+        table: { kind: 'table', name: 'post' },
+        on: {
+          kind: 'eqCol',
+          left: createColumnRef('user', 'id'),
+          right: createColumnRef('post', 'userId'),
+        },
+        project: [{ alias: 'id', expr: createColumnRef('post', 'id') }],
+      },
+    },
+  ];
+}
+
+function createTestWhereExpr(): BinaryExpr {
+  return {
+    kind: 'bin',
+    op: 'eq',
+    left: createColumnRef('user', 'id'),
+    right: { kind: 'param', index: 1, name: 'userId' },
+  };
+}
+
+function createTestOrderByClause(
+  dir: Direction = 'asc',
+): Array<{ expr: ColumnRef | OperationExpr; dir: Direction }> {
+  return [
+    {
+      expr: createColumnRef('user', 'id'),
+      dir,
+    },
+  ];
+}
+
+function createTestExistsExpr(): ExistsExpr {
+  return {
+    kind: 'exists',
+    subquery: {
+      kind: 'select',
+      from: { kind: 'table', name: 'post' },
+      project: [{ alias: '_exists', expr: createColumnRef('post', 'id') }],
+    },
+    not: false,
+  };
+}
+
+describe('select-builder', () => {
+  const contract = createTestContract();
   const adapter = createStubAdapter();
   const context = createTestContext(contract, adapter);
   const tables = schema(context).tables;
 
   describe('buildProjectionItems', () => {
-    const int4ColumnMeta: StorageColumn = {
-      nativeType: 'int4',
-      codecId: 'pg/int4@1',
-      nullable: false,
-    };
-
     it('builds projection items with include reference', () => {
       const projectionState: ProjectionState = {
         aliases: ['posts'],
@@ -79,13 +165,7 @@ describe('select-builder', () => {
       };
       const includesForMeta: IncludeState[] = [
         {
-          alias: 'posts',
-          table: { kind: 'table', name: 'post' },
-          on: {
-            kind: 'join-on',
-            left: int4ColumnMeta,
-            right: int4ColumnMeta,
-          },
+          ...createTestIncludeState(),
           childProjection: {
             aliases: ['id'],
             columns: [tables['post']!.columns['id']!],
@@ -103,20 +183,7 @@ describe('select-builder', () => {
     });
 
     it('builds projection items with operation expression', () => {
-      const operationExpr: OperationExpr = {
-        kind: 'operation',
-        method: 'add',
-        forTypeId: 'pg/int4@1',
-        self: createColumnRef('user', 'id'),
-        args: [],
-        returns: { kind: 'builtin', type: 'number' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'infix',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: '${self} + ${arg0}',
-        },
-      };
+      const operationExpr = createTestOperationExpr();
       const columnWithOperation = {
         ...tables['user']!.columns['id']!,
         _operationExpr: operationExpr,
@@ -151,20 +218,7 @@ describe('select-builder', () => {
     });
 
     it('builds projection items with mixed includes and columns', () => {
-      const operationExpr: OperationExpr = {
-        kind: 'operation',
-        method: 'add',
-        forTypeId: 'pg/int4@1',
-        self: createColumnRef('user', 'id'),
-        args: [],
-        returns: { kind: 'builtin', type: 'number' },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'infix',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: '${self} + ${arg0}',
-        },
-      };
+      const operationExpr = createTestOperationExpr();
       const columnWithOperation = {
         ...tables['user']!.columns['id']!,
         _operationExpr: operationExpr,
@@ -179,13 +233,7 @@ describe('select-builder', () => {
       };
       const includesForMeta: IncludeState[] = [
         {
-          alias: 'posts',
-          table: { kind: 'table', name: 'post' },
-          on: {
-            kind: 'join-on',
-            left: int4ColumnMeta,
-            right: int4ColumnMeta,
-          },
+          ...createTestIncludeState(),
           childProjection: {
             aliases: ['id'],
             columns: [tables['post']!.columns['id']!],
@@ -258,43 +306,19 @@ describe('select-builder', () => {
     ];
 
     it('builds select AST with all optional parameters', () => {
-      const includesAst: IncludeAst[] = [
-        {
-          kind: 'includeMany',
-          alias: 'posts',
-          child: {
-            table: { kind: 'table', name: 'post' },
-            on: {
-              kind: 'eqCol',
-              left: createColumnRef('user', 'id'),
-              right: createColumnRef('post', 'userId'),
-            },
-            project: [{ alias: 'id', expr: createColumnRef('post', 'id') }],
-          },
-        },
-      ];
-      const whereExpr: BinaryExpr = {
-        kind: 'bin',
-        op: 'eq',
-        left: createColumnRef('user', 'id'),
-        right: { kind: 'param', index: 1, name: 'userId' },
-      };
-      const orderByClause: Array<{ expr: ColumnRef | OperationExpr; dir: Direction }> = [
-        {
-          expr: createColumnRef('user', 'id'),
-          dir: 'asc',
-        },
-      ];
+      const includesAst = createTestIncludeAst();
+      const whereExpr = createTestWhereExpr();
+      const orderByClause = createTestOrderByClause('asc');
       const limit = 10;
 
-      const result = buildSelectAst(
+      const result = buildSelectAst({
         table,
         projectEntries,
         includesAst,
         whereExpr,
         orderByClause,
         limit,
-      );
+      });
 
       expect(result).toMatchObject({
         kind: 'select',
@@ -308,14 +332,10 @@ describe('select-builder', () => {
     });
 
     it('builds select AST without optional parameters', () => {
-      const result = buildSelectAst(
+      const result = buildSelectAst({
         table,
         projectEntries,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-      );
+      });
 
       expect(result).toMatchObject({
         kind: 'select',
@@ -329,101 +349,77 @@ describe('select-builder', () => {
     });
 
     it('builds select AST with only includes', () => {
-      const includesAst: IncludeAst[] = [
-        {
-          kind: 'includeMany',
-          alias: 'posts',
-          child: {
-            table: { kind: 'table', name: 'post' },
-            on: {
-              kind: 'eqCol',
-              left: createColumnRef('user', 'id'),
-              right: createColumnRef('post', 'userId'),
-            },
-            project: [{ alias: 'id', expr: createColumnRef('post', 'id') }],
-          },
-        },
-      ];
-
-      const result = buildSelectAst(
+      const includesAst = createTestIncludeAst();
+      const result = buildSelectAst({
         table,
         projectEntries,
         includesAst,
-        undefined,
-        undefined,
-        undefined,
-      );
+      });
 
-      expect(result.includes).toEqual(includesAst);
+      expect(result).toMatchObject({
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: projectEntries,
+        includes: includesAst,
+      });
     });
 
     it('builds select AST with only where clause', () => {
-      const whereExpr: BinaryExpr = {
-        kind: 'bin',
-        op: 'eq',
-        left: createColumnRef('user', 'id'),
-        right: { kind: 'param', index: 1, name: 'userId' },
-      };
-
-      const result = buildSelectAst(
+      const whereExpr = createTestWhereExpr();
+      const result = buildSelectAst({
         table,
         projectEntries,
-        undefined,
         whereExpr,
-        undefined,
-        undefined,
-      );
+      });
 
-      expect(result.where).toEqual(whereExpr);
+      expect(result).toMatchObject({
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: projectEntries,
+        where: whereExpr,
+      });
     });
 
     it('builds select AST with only orderBy clause', () => {
-      const orderByClause: Array<{ expr: ColumnRef | OperationExpr; dir: Direction }> = [
-        {
-          expr: createColumnRef('user', 'id'),
-          dir: 'desc',
-        },
-      ];
-
-      const result = buildSelectAst(
+      const orderByClause = createTestOrderByClause('desc');
+      const result = buildSelectAst({
         table,
         projectEntries,
-        undefined,
-        undefined,
         orderByClause,
-        undefined,
-      );
+      });
 
-      expect(result.orderBy).toEqual(orderByClause);
+      expect(result).toMatchObject({
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: projectEntries,
+        orderBy: orderByClause,
+      });
     });
 
     it('builds select AST with only limit', () => {
       const limit = 5;
+      const result = buildSelectAst({
+        table,
+        projectEntries,
+        limit,
+      });
 
-      const result = buildSelectAst(table, projectEntries, undefined, undefined, undefined, limit);
-
-      expect(result.limit).toBe(limit);
+      expect(result).toMatchObject({
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: projectEntries,
+        limit,
+      });
     });
 
     it('builds select AST with ExistsExpr in where clause', () => {
-      const existsExpr: ExistsExpr = {
-        kind: 'exists',
-        subquery: {
-          kind: 'select',
-          from: { kind: 'table', name: 'post' },
-          project: [{ alias: '_exists', expr: createColumnRef('post', 'id') }],
-        },
-        not: false,
-      };
+      const existsExpr = createTestExistsExpr();
 
-      const result = buildSelectAst(
+      const result = buildSelectAst({
         table,
         projectEntries,
-        undefined,
-        existsExpr,
-        undefined,
-        undefined,
-      );
+        whereExpr: existsExpr,
+      });
 
       expect(result.where).toEqual(existsExpr);
     });

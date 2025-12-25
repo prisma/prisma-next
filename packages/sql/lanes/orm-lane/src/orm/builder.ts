@@ -605,14 +605,14 @@ export class OrmModelBuilderImpl<
     const projectEntries = buildProjectionItems(projectionState, includesForMeta);
 
     // Build SELECT AST
-    const ast = buildSelectAst(
-      this.table,
+    const ast = buildSelectAst({
+      table: this.table,
       projectEntries,
-      includesAst.length > 0 ? includesAst : undefined,
+      includesAst: includesAst.length > 0 ? includesAst : undefined,
       whereExpr,
       orderByClause,
-      this.limitValue,
-    );
+      limit: this.limitValue,
+    });
 
     // Build plan metadata
     const planMeta = buildMeta({
