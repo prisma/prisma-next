@@ -1,6 +1,4 @@
-import type { StartServerOptions } from '@prisma/dev';
-import { unstable_startServer } from '@prisma/dev';
-import getPort from 'get-port';
+import { type ServerOptions, startPrismaDevServer } from '@prisma/dev';
 import { Client } from 'pg';
 
 export * from '../column-descriptors';
@@ -8,7 +6,6 @@ export * from '../operation-descriptors';
 export * from '../timeouts';
 
 function normalizeConnectionString(raw: string): string {
-  // eslint-disable-next-line no-undef
   const url = new URL(raw);
   if (url.hostname === 'localhost' || url.hostname === '::1') {
     url.hostname = '127.0.0.1';
@@ -22,142 +19,34 @@ export interface DevDatabase {
 }
 
 /**
- * Allocates available ports automatically using get-port.
- * Lets the OS pick ephemeral ports for parallel-safe allocation.
- */
-async function allocatePorts(): Promise<{
-  acceleratePort: number;
-  databasePort: number;
-  shadowDatabasePort: number;
-}> {
-  const [acceleratePort, databasePort, shadowDatabasePort] = await Promise.all([
-    getPort({ host: '127.0.0.1' }),
-    getPort({ host: '127.0.0.1' }),
-    getPort({ host: '127.0.0.1' }),
-  ]);
-
-  return { acceleratePort, databasePort, shadowDatabasePort };
-}
-
-/**
- * Checks if an error is a port availability error from @prisma/dev.
- * Handles various error formats that @prisma/dev might throw.
- */
-function isPortError(error: unknown): boolean {
-  if (error === null || typeof error !== 'object') {
-    return false;
-  }
-  // Check error name (most reliable)
-  if ('name' in error && error.name === 'PortNotAvailableError') {
-    return true;
-  }
-  // Check error message as fallback (handles wrapped errors)
-  if ('message' in error && typeof error.message === 'string') {
-    const message = error.message;
-    // Match patterns like "Port number `11601` is not available for service database."
-    if (
-      (message.includes('Port number') || message.includes('port number')) &&
-      (message.includes('is not available') ||
-        message.includes('not available') ||
-        message.includes('not available for service'))
-    ) {
-      return true;
-    }
-  }
-  // Check constructor name as additional fallback
-  if (error instanceof Error && error.constructor.name === 'PortNotAvailableError') {
-    return true;
-  }
-  // Check if error has a code property that might indicate port errors
-  if ('code' in error && typeof error.code === 'string' && error.code.includes('PORT')) {
-    return true;
-  }
-  return false;
-}
-
-/**
  * Creates a dev database instance for testing.
  * Automatically handles connection string normalization and cleanup.
- * Retries with new ports if port conflicts occur (race condition handling).
+ * @prisma/dev automatically assigns ports to avoid conflicts and enforces a single
+ * active connection (second connections are rejected until the first is closed).
  */
-export async function createDevDatabase(options?: StartServerOptions): Promise<DevDatabase> {
-  const maxRetries = 10; // Increased retries for high concurrency scenarios
-  let currentOptions: StartServerOptions = options || {};
-  let lastError: unknown;
-
-  // If no ports provided, allocate them before first attempt
-  if (
-    !currentOptions.acceleratePort &&
-    !currentOptions.databasePort &&
-    !currentOptions.shadowDatabasePort
-  ) {
-    const allocatedPorts = await allocatePorts();
-    currentOptions = { ...currentOptions, ...allocatedPorts };
-    // Larger initial delay to spread out concurrent attempts (reduces initial contention)
-    const initialJitter = Math.random() * 100; // 0-100ms random delay
-    await new Promise((resolve) => setTimeout(resolve, initialJitter));
-  }
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const server = await unstable_startServer(currentOptions);
-      return {
-        connectionString: normalizeConnectionString(server.database.connectionString),
-        async close() {
-          await server.close();
-        },
-      };
-    } catch (error) {
-      lastError = error;
-      const isPort = isPortError(error);
-      // If it's a port error and we have retries left, allocate new ports and retry
-      if (isPort && attempt < maxRetries - 1) {
-        // Exponential backoff: 50ms base delay, increasing with each attempt
-        // Plus random jitter to avoid thundering herd
-        const baseDelay = 50;
-        const exponentialDelay = baseDelay * 2 ** attempt;
-        const jitter = Math.random() * 50; // 0-50ms random jitter
-        const totalDelay = exponentialDelay + jitter;
-        await new Promise((resolve) => setTimeout(resolve, totalDelay));
-        // Allocate new ports for the next attempt (always get fresh ports)
-        const newPorts = await allocatePorts();
-        // Replace all port values to ensure we're using fresh ports
-        currentOptions = {
-          ...currentOptions,
-          acceleratePort: newPorts.acceleratePort,
-          databasePort: newPorts.databasePort,
-          shadowDatabasePort: newPorts.shadowDatabasePort,
-        };
-        continue;
-      }
-      // If it's not a port error or we're out of retries, throw
-      throw error;
-    }
-  }
-
-  // Should never reach here, but TypeScript needs this
-  throw lastError;
+export async function createDevDatabase(options?: ServerOptions): Promise<DevDatabase> {
+  const server = await startPrismaDevServer({
+    databaseConnectTimeoutMillis: 1000,
+    databaseIdleTimeoutMillis: 1000,
+    ...options,
+  });
+  return {
+    ...server,
+    connectionString: normalizeConnectionString(server.database.connectionString),
+  };
 }
 
 /**
  * Executes a function with a dev database, automatically cleaning up afterward.
- * If no ports are provided, available ports will be automatically allocated to avoid conflicts in parallel execution.
+ * @prisma/dev automatically assigns ports and will reject any attempt to open a
+ * second connection while the first is active, so ensure each helper call closes
+ * before starting another.
  */
 export async function withDevDatabase<T>(
   fn: (ctx: DevDatabase) => Promise<T>,
-  options?: StartServerOptions,
+  options?: ServerOptions,
 ): Promise<T> {
-  // If no ports specified, automatically allocate available ones to avoid conflicts in parallel execution
-  const finalOptions: StartServerOptions = options || {};
-  if (
-    !finalOptions.acceleratePort &&
-    !finalOptions.databasePort &&
-    !finalOptions.shadowDatabasePort
-  ) {
-    const allocatedPorts = await allocatePorts();
-    Object.assign(finalOptions, allocatedPorts);
-  }
-  const database = await createDevDatabase(finalOptions);
+  const database = await createDevDatabase(options);
   try {
     return await fn(database);
   } finally {

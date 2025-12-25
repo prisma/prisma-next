@@ -12,6 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
+    "lint:fix": "biome check --write . --config-path ../../../biome.json",
+    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../biome.json",
     "clean": "node ../../../scripts/clean.mjs"
   },
   "dependencies": {
@@ -24,7 +26,7 @@
     "@prisma-next/sql-runtime": "workspace:*"
   },
   "devDependencies": {
-    "@prisma/dev": "^0.1.1",
+    "@prisma/dev": "catalog:",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@types/pg": "^8.11.10",

@@ -1,0 +1,11 @@
+version: 2.1.1
+last_compiled: 2025-12-05 16:51:06
+
+# ================================================
+# Compiled with the following settings:
+# ================================================
+profile: typescript
+claude_code_commands: true
+use_claude_code_subagents: true
+agent_os_commands: false
+standards_as_claude_code_skills: false

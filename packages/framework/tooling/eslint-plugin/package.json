@@ -1,0 +1,54 @@
+{
+  "name": "@prisma-next/eslint-plugin",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "description": "ESLint plugin for Prisma Next query builder type checking and linting",
+  "keywords": [
+    "eslint",
+    "eslintplugin",
+    "typescript",
+    "prisma-next",
+    "query-builder"
+  ],
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup --config tsup.config.ts && tsc --emitDeclarationOnly",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
+    "lint:fix": "biome check --write . --config-path ../../../../biome.json",
+    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../../biome.json",
+    "clean": "node ../../../../scripts/clean.mjs"
+  },
+  "dependencies": {
+    "@typescript-eslint/types": "^8.0.0",
+    "@typescript-eslint/utils": "^8.0.0"
+  },
+  "devDependencies": {
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-lane": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@types/eslint": "^9.0.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^9.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.1"
+  },
+  "peerDependencies": {
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "*"
+  }
+}

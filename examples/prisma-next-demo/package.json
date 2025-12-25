@@ -33,7 +33,7 @@
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
-    "@prisma/dev": "^0.1.1",
+    "@prisma/dev": "catalog:",
     "@types/node": "^20.16.5",
     "@types/pg": "^8.11.10",
     "tsup": "^8.3.0",

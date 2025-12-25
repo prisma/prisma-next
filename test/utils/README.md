@@ -153,7 +153,7 @@ it('compiles TypeScript', async () => {
 **Zero dependencies on other `@prisma-next/*` packages** - This allows test-utils to be used by all packages without circular dependencies.
 
 **External dependencies (devDependencies only):**
-- `@prisma/dev`: Dev database server
+- `@prisma/dev`: Dev database server (one connection at a time; attempts to open a second connection while the first is active will fail, and ports are auto-assigned per server)
 - `pg`: PostgreSQL client
 
 ## Usage

@@ -55,6 +55,12 @@
       "plane": "migration"
     },
     {
+      "glob": "packages/framework/tooling/eslint-plugin/**",
+      "domain": "framework",
+      "layer": "tooling",
+      "plane": "migration"
+    },
+    {
       "glob": "packages/framework/runtime-executor/**",
       "domain": "framework",
       "layer": "runtime-executor",
