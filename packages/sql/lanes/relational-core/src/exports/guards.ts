@@ -1,1 +1,10 @@
-export { getColumnMeta, isParamPlaceholder } from '../utils/guards';
+export {
+  collectColumnRefs,
+  extractBaseColumnRef,
+  getColumnInfo,
+  getColumnMeta,
+  getOperationExpr,
+  isColumnBuilder,
+  isOperationExpr,
+  isParamPlaceholder,
+} from '../utils/guards';

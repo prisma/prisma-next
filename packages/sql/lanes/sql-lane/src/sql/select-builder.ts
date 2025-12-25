@@ -45,7 +45,7 @@ import {
   errorSelfJoinNotSupported,
   errorUnknownTable,
 } from '../utils/errors';
-import { isOperationExpr } from '../utils/guards';
+import { getOperationExpr } from '../utils/guards';
 import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state';
 import {
   buildIncludeAst,
@@ -321,8 +321,9 @@ export class SelectBuilderImpl<
       ? (() => {
           const orderBy = this.state.orderBy as OrderBuilder<string, StorageColumn, unknown>;
           const orderExpr = orderBy.expr;
-          const expr: ColumnRef | OperationExpr = isOperationExpr(orderExpr)
-            ? orderExpr
+          const operationExpr = getOperationExpr(orderExpr);
+          const expr: ColumnRef | OperationExpr = operationExpr
+            ? operationExpr
             : (() => {
                 const colBuilder = orderExpr as { table: string; column: string };
                 return createColumnRef(colBuilder.table, colBuilder.column);

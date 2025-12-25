@@ -3,9 +3,16 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type {
+  Adapter,
+  BinaryExpr,
+  ExistsExpr,
+  LoweredStatement,
+  SelectAst,
+} from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
@@ -134,11 +141,10 @@ describe('orm includes', () => {
     const ast = plan as { ast: { includes?: unknown[] } };
     expect(ast.ast?.includes).toBeDefined();
     expect(Array.isArray(ast.ast?.includes)).toBe(true);
-    if (Array.isArray(ast.ast?.includes) && ast.ast.includes.length > 0) {
-      const include = ast.ast.includes[0] as { kind: string; alias: string };
-      expect(include.kind).toBe('includeMany');
-      expect(include.alias).toBe('posts');
-    }
+    expect(ast.ast?.includes?.[0]).toMatchObject({
+      kind: 'includeMany',
+      alias: 'posts',
+    });
   });
 
   it('supports chaining include with other methods', () => {
@@ -174,9 +180,8 @@ describe('orm includes', () => {
     expect(plan).toBeDefined();
     const ast = plan as { ast: { includes?: unknown[] } };
     expect(ast.ast?.includes).toBeDefined();
-    if (Array.isArray(ast.ast?.includes)) {
-      expect(ast.ast.includes.length).toBe(1);
-    }
+    expect(Array.isArray(ast.ast?.includes)).toBe(true);
+    expect(ast.ast?.includes?.length).toBe(1);
   });
 
   it('throws error when accessing invalid relation', () => {
@@ -357,11 +362,13 @@ describe('orm includes', () => {
 
 describe('include-plan functions', () => {
   const contract = loadContract('contract-with-relations');
+  const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
 
   describe('buildExistsSubqueries', () => {
     function createRelationFilter(
       filterType: 'some' | 'none' | 'every',
-      childWhere?: import('@prisma-next/sql-relational-core/types').AnyBinaryBuilder,
+      childWhere?: AnyBinaryBuilder,
     ): RelationFilter {
       return {
         relationName: 'posts',
@@ -379,26 +386,10 @@ describe('include-plan functions', () => {
       };
     }
 
-    function createTestWhereBuilder(): import('@prisma-next/sql-relational-core/types').AnyBinaryBuilder {
-      return {
-        kind: 'binary' as const,
-        op: 'eq' as const,
-        left: {
-          kind: 'column' as const,
-          table: 'post',
-          column: 'id',
-          columnMeta: {
-            nativeType: 'int4',
-            codecId: 'pg/int4@1',
-            nullable: false,
-          },
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown,
-        right: param('postId'),
-      } as AnyBinaryBuilder;
+    function createTestWhereBuilder(): AnyBinaryBuilder {
+      const tables = schema(context).tables;
+      const postTable = tables['post']!;
+      return postTable.columns['id']!.eq(param('postId'));
     }
 
     it('builds exists subquery with filterType "some"', () => {
@@ -417,14 +408,10 @@ describe('include-plan functions', () => {
       const existsExprs = buildExistsSubqueries([filter], contract, 'User');
 
       expect(existsExprs).toHaveLength(1);
-      const firstExpr = existsExprs[0];
-      expect(firstExpr).toBeDefined();
-      if (firstExpr) {
-        expect(firstExpr).toMatchObject({
-          kind: 'exists',
-          not: true,
-        });
-      }
+      expect(existsExprs[0]).toMatchObject({
+        kind: 'exists',
+        not: true,
+      });
     });
 
     it('builds exists subquery with filterType "every"', () => {
@@ -432,14 +419,10 @@ describe('include-plan functions', () => {
       const existsExprs = buildExistsSubqueries([filter], contract, 'User');
 
       expect(existsExprs).toHaveLength(1);
-      const firstExpr = existsExprs[0];
-      expect(firstExpr).toBeDefined();
-      if (firstExpr) {
-        expect(firstExpr).toMatchObject({
-          kind: 'exists',
-          not: true,
-        });
-      }
+      expect(existsExprs[0]).toMatchObject({
+        kind: 'exists',
+        not: true,
+      });
     });
 
     it('builds exists subquery with childWhere undefined', () => {
@@ -447,11 +430,7 @@ describe('include-plan functions', () => {
       const existsExprs = buildExistsSubqueries([filter], contract, 'User');
 
       expect(existsExprs).toHaveLength(1);
-      const firstExpr = existsExprs[0];
-      expect(firstExpr).toBeDefined();
-      if (firstExpr) {
-        expect(firstExpr.subquery.where).toBeDefined();
-      }
+      expect(existsExprs[0]?.subquery.where).toBeDefined();
     });
 
     it('builds exists subquery with childWhere defined', () => {
@@ -462,11 +441,7 @@ describe('include-plan functions', () => {
       });
 
       expect(existsExprs).toHaveLength(1);
-      const firstExpr = existsExprs[0];
-      expect(firstExpr).toBeDefined();
-      if (firstExpr) {
-        expect(firstExpr.subquery.where).toBeDefined();
-      }
+      expect(existsExprs[0]?.subquery.where).toBeDefined();
     });
 
     it('builds exists subquery with joinConditions.length === 0', () => {
@@ -487,20 +462,16 @@ describe('include-plan functions', () => {
       const existsExprs = buildExistsSubqueries([filter], contract, 'User');
 
       expect(existsExprs).toHaveLength(1);
-      const firstExpr = existsExprs[0];
-      expect(firstExpr).toBeDefined();
-      if (firstExpr) {
-        expect(firstExpr.subquery.project[0]?.expr).toMatchObject({
-          kind: 'col',
-          table: 'post',
-          column: 'id',
-        });
-      }
+      expect(existsExprs[0]?.subquery.project[0]?.expr).toMatchObject({
+        kind: 'col',
+        table: 'post',
+        column: 'id',
+      });
     });
   });
 
   describe('combineWhereClauses', () => {
-    function createBinaryExpr(): import('@prisma-next/sql-relational-core/ast').BinaryExpr {
+    function createBinaryExpr(): BinaryExpr {
       return {
         kind: 'bin',
         op: 'eq',
@@ -509,7 +480,7 @@ describe('include-plan functions', () => {
       };
     }
 
-    function createExistsExpr(): import('@prisma-next/sql-relational-core/ast').ExistsExpr {
+    function createExistsExpr(): ExistsExpr {
       return {
         kind: 'exists',
         subquery: {

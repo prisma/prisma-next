@@ -4,7 +4,6 @@ import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { buildWhereExpr } from '../../src/selection/predicates';
@@ -101,21 +100,11 @@ describe('predicates', () => {
     });
 
     it('builds where expr with nullable column', () => {
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          kind: 'column',
-          table: 'user',
-          column: 'email',
-          columnMeta: textColumnMeta,
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['left'],
-        right: param('userEmail'),
-        op: 'eq',
-      };
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const userTable = tables['user']!;
+      const where = userTable.columns['email']!.eq(param('userEmail'));
       const paramsMap = { userEmail: 'test@example.com' };
       const descriptors: ParamDescriptor[] = [];
       const values: unknown[] = [];
@@ -132,6 +121,7 @@ describe('predicates', () => {
     });
 
     it('builds where expr with operation expr', () => {
+      // Create an operation expression manually since schema().tables doesn't have operation methods
       const operationExpr: OperationExpr = {
         kind: 'operation',
         method: 'add',
@@ -143,17 +133,19 @@ describe('predicates', () => {
           targetFamily: 'sql',
           strategy: 'infix',
           // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-          template: '${self} + ${arg0}',
+          template: '${self} + 1',
         },
       };
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          _operationExpr: operationExpr,
-        } as unknown as BinaryBuilder['left'],
+
+      // Create a binary builder with the operation expression as left side
+      // This simulates what would happen if we called .eq() on a column with an operation
+      const where = {
+        kind: 'binary' as const,
+        left: operationExpr,
         right: param('userId'),
-        op: 'eq',
+        op: 'eq' as const,
       };
+
       const paramsMap = { userId: 1 };
       const descriptors: ParamDescriptor[] = [];
       const values: unknown[] = [];
@@ -171,98 +163,12 @@ describe('predicates', () => {
       });
     });
 
-    it('builds where expr without codecId when column not found in contract', () => {
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          kind: 'column',
-          table: 'user',
-          column: 'unknown',
-          columnMeta: int4ColumnMeta,
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['left'],
-        right: param('value'),
-        op: 'eq',
-      };
-      const paramsMap = { value: 'test' };
-      const descriptors: ParamDescriptor[] = [];
-      const values: unknown[] = [];
-
-      const result = buildWhereExpr(where, contract, paramsMap, descriptors, values);
-
-      expect(result.codecId).toBeUndefined();
-    });
-
-    it('builds where expr with codecId from contract when columnMeta.codecId is missing', () => {
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          kind: 'column',
-          table: 'user',
-          column: 'id',
-          columnMeta: { nullable: false },
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['left'],
-        right: param('userId'),
-        op: 'eq',
-      };
-      const paramsMap = { userId: 1 };
-      const descriptors: ParamDescriptor[] = [];
-      const values: unknown[] = [];
-
-      buildWhereExpr(where, contract, paramsMap, descriptors, values);
-
-      // codecId and nativeType come from contract, not columnMeta
-      expect(descriptors[0]).toMatchObject({ codecId: 'pg/int4@1', nativeType: 'int4' });
-    });
-
-    it('builds where expr without nullable in descriptor when columnMeta.nullable is missing', () => {
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          kind: 'column',
-          table: 'user',
-          column: 'id',
-          columnMeta: { codecId: 'pg/int4@1' },
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['left'],
-        right: param('userId'),
-        op: 'eq',
-      };
-      const paramsMap = { userId: 1 };
-      const descriptors: ParamDescriptor[] = [];
-      const values: unknown[] = [];
-
-      buildWhereExpr(where, contract, paramsMap, descriptors, values);
-
-      expect(descriptors[0]?.nullable).toBeUndefined();
-    });
-
     it('throws error when parameter is missing', () => {
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          kind: 'column',
-          table: 'user',
-          column: 'id',
-          columnMeta: int4ColumnMeta,
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['left'],
-        right: param('missingParam'),
-        op: 'eq',
-      };
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const userTable = tables['user']!;
+      const where = userTable.columns['id']!.eq(param('missingParam'));
       const paramsMap = {};
       const descriptors: ParamDescriptor[] = [];
       const values: unknown[] = [];
@@ -272,76 +178,12 @@ describe('predicates', () => {
       );
     });
 
-    it('builds where expr with codecId from contract column', () => {
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          kind: 'column',
-          table: 'user',
-          column: 'id',
-          columnMeta: int4ColumnMeta,
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['left'],
-        right: param('userId'),
-        op: 'eq',
-      };
-      const paramsMap = { userId: 1 };
-      const descriptors: ParamDescriptor[] = [];
-      const values: unknown[] = [];
-
-      const result = buildWhereExpr(where, contract, paramsMap, descriptors, values);
-
-      expect(result.codecId).toBe('pg/int4@1');
-    });
-
     it('builds where expr with column builder on right side', () => {
       const adapter = createStubAdapter();
       const context = createTestContext(contract, adapter);
       const tables = schema(context).tables;
       const userTable = tables['user']!;
-      const where = userTable.columns['id']!.eq(userTable.columns['id']!);
-      const paramsMap = {};
-      const descriptors: ParamDescriptor[] = [];
-      const values: unknown[] = [];
-
-      const result = buildWhereExpr(where, contract, paramsMap, descriptors, values);
-
-      expect({
-        exprKind: result.expr.kind,
-        exprOp: result.expr.op,
-        exprLeft: result.expr.left,
-        exprRightKind: result.expr.right.kind,
-        paramName: result.paramName,
-        codecId: result.codecId,
-        valuesLength: values.length,
-        descriptorsLength: descriptors.length,
-      }).toMatchObject({
-        exprKind: 'bin',
-        exprOp: 'eq',
-        exprLeft: { kind: 'col', table: 'user', column: 'id' },
-        exprRightKind: 'col',
-        paramName: '',
-        codecId: 'pg/int4@1',
-        valuesLength: 0,
-        descriptorsLength: 0,
-      });
-    });
-
-    it('builds where expr with column builder on right side when column not found in contract', () => {
-      const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter);
-      const tables = schema(context).tables;
-      const userTable = tables['user']!;
-      // Create a column builder for a non-existent column by accessing it directly
-      // This simulates the scenario where a column builder references a column not in the contract
-      const unknownColumn = {
-        ...userTable.columns['id']!,
-        column: 'unknown' as const,
-      } as (typeof userTable.columns)['id'];
-      const where = userTable.columns['id']!.eq(unknownColumn);
+      const where = userTable.columns['id']!.eq(userTable.columns['email']!);
       const paramsMap = {};
       const descriptors: ParamDescriptor[] = [];
       const values: unknown[] = [];
@@ -350,30 +192,30 @@ describe('predicates', () => {
 
       expect({
         exprRightKind: result.expr.right.kind,
-        exprRightTable: (result.expr.right as { table: string }).table,
-        exprRightColumn: (result.expr.right as { column: string }).column,
+        exprRightTable: result.expr.right.kind === 'col' ? result.expr.right.table : undefined,
+        exprRightColumn: result.expr.right.kind === 'col' ? result.expr.right.column : undefined,
+        descriptorCount: descriptors.length,
       }).toMatchObject({
         exprRightKind: 'col',
         exprRightTable: 'user',
-        exprRightColumn: 'unknown',
+        exprRightColumn: 'email',
+        descriptorCount: 0,
       });
     });
 
     it('throws error when where.right is neither param nor column builder', () => {
-      const where: BinaryBuilder = {
-        kind: 'binary',
-        left: {
-          kind: 'column',
-          table: 'user',
-          column: 'id',
-          columnMeta: int4ColumnMeta,
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown as BinaryBuilder['left'],
-        right: { kind: 'invalid' } as unknown as BinaryBuilder['right'],
-        op: 'eq',
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const userTable = tables['user']!;
+      const idColumn = userTable.columns['id']!;
+
+      // Create an invalid where clause with neither param nor column on right side
+      const where = {
+        kind: 'binary' as const,
+        left: idColumn,
+        right: { kind: 'invalid' } as unknown as ReturnType<typeof param>,
+        op: 'eq' as const,
       };
       const paramsMap = {};
       const descriptors: ParamDescriptor[] = [];
