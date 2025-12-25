@@ -22,8 +22,8 @@ export class AsyncIterableResult<Row> implements AsyncIterable<Row> {
           consumedBy: this.consumedBy,
           suggestion:
             this.consumedBy === 'toArray'
-              ? 'If you need to iterate multiple times, call runtime.execute() again to get a new AsyncIterableResult, or store the results from toArray() in a variable and reuse that.'
-              : 'If you need to iterate multiple times, call runtime.execute() again to get a new AsyncIterableResult, or use toArray() to collect all results first.',
+              ? 'If you need to iterate multiple times, store the results from toArray() in a variable and reuse that.'
+              : 'If you need to iterate multiple times, use toArray() to collect all results first.',
         },
       );
     }
@@ -46,7 +46,7 @@ export class AsyncIterableResult<Row> implements AsyncIterable<Row> {
           suggestion:
             this.consumedBy === 'toArray'
               ? 'You cannot call toArray() twice on the same AsyncIterableResult. Store the result from the first call in a variable and reuse that.'
-              : 'The iterator was already consumed by a for-await loop. Call runtime.execute() again to get a new AsyncIterableResult, or use toArray() before iterating.',
+              : 'The iterator was already consumed by a for-await loop. Use toArray() before iterating.',
         },
       );
     }
