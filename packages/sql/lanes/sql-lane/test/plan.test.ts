@@ -285,4 +285,376 @@ describe('buildMeta', () => {
       }),
     ).toThrow('Missing column for alias id at index 0');
   });
+
+  it('builds meta with nullCheck predicate in where clause (isNull)', () => {
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      where: userColumns.deletedAt.isNull(),
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'deletedAt' });
+  });
+
+  it('builds meta with nullCheck predicate in where clause (isNotNull)', () => {
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      where: userColumns.deletedAt.isNotNull(),
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'deletedAt' });
+  });
+
+  it('builds meta with operation expression in where clause', () => {
+    const operationExpr: OperationExpr = {
+      kind: 'operation',
+      method: 'normalize',
+      forTypeId: 'pg/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'normalize(${self})',
+      },
+    };
+
+    const columnWithOp = createExpressionBuilder(operationExpr, {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
+    }) as AnyExpressionBuilder;
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      where: columnWithOp.eq(param('value')),
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
+  });
+
+  it('builds meta with operation expression in orderBy clause', () => {
+    const operationExpr: OperationExpr = {
+      kind: 'operation',
+      method: 'normalize',
+      forTypeId: 'pg/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'normalize(${self})',
+      },
+    };
+
+    const columnWithOp = createExpressionBuilder(operationExpr, {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
+    }) as AnyExpressionBuilder;
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      orderBy: columnWithOp.asc(),
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
+  });
+
+  it('builds meta with includes having child WHERE with nullCheck predicate', () => {
+    const includes = [
+      {
+        alias: 'posts',
+        table: createTableRef('post'),
+        on: {
+          kind: 'join-on' as const,
+          left: userColumns.id,
+          right: userColumns.id,
+        },
+        childProjection: {
+          aliases: ['id'],
+          columns: [userColumns.id],
+        },
+        childWhere: userColumns.deletedAt.isNull(),
+      },
+    ];
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id', 'posts'],
+        columns: [
+          userColumns.id,
+          {
+            kind: 'column' as const,
+            table: 'post',
+            column: '',
+            columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
+          } as AnyColumnBuilder,
+        ],
+      },
+      includes,
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'deletedAt' });
+  });
+
+  it('builds meta with includes having child WHERE with column-to-column comparison', () => {
+    const includes = [
+      {
+        alias: 'posts',
+        table: createTableRef('post'),
+        on: {
+          kind: 'join-on' as const,
+          left: userColumns.id,
+          right: userColumns.id,
+        },
+        childProjection: {
+          aliases: ['id'],
+          columns: [userColumns.id],
+        },
+        childWhere: userColumns.id.eq(userColumns.email as unknown as typeof userColumns.id),
+      },
+    ];
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id', 'posts'],
+        columns: [
+          userColumns.id,
+          {
+            kind: 'column' as const,
+            table: 'post',
+            column: '',
+            columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
+          } as AnyColumnBuilder,
+        ],
+      },
+      includes,
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'email' });
+  });
+
+  it('builds meta with includes having child ORDER BY with operation expression', () => {
+    const operationExpr: OperationExpr = {
+      kind: 'operation',
+      method: 'normalize',
+      forTypeId: 'pg/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'normalize(${self})',
+      },
+    };
+
+    const columnWithOp = createExpressionBuilder(operationExpr, {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
+    }) as AnyExpressionBuilder;
+
+    const includes = [
+      {
+        alias: 'posts',
+        table: createTableRef('post'),
+        on: {
+          kind: 'join-on' as const,
+          left: userColumns.id,
+          right: userColumns.id,
+        },
+        childProjection: {
+          aliases: ['id'],
+          columns: [userColumns.id],
+        },
+        childOrderBy: columnWithOp.asc(),
+      },
+    ];
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id', 'posts'],
+        columns: [
+          userColumns.id,
+          {
+            kind: 'column' as const,
+            table: 'post',
+            column: '',
+            columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
+          } as AnyColumnBuilder,
+        ],
+      },
+      includes,
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
+  });
+
+  it('builds meta with ExpressionBuilder columns in projection', () => {
+    const operationExpr: OperationExpr = {
+      kind: 'operation',
+      method: 'normalize',
+      forTypeId: 'pg/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'normalize(${self})',
+      },
+    };
+
+    const columnWithOp = createExpressionBuilder(operationExpr, {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
+    }) as AnyExpressionBuilder;
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['normalized'],
+        columns: [columnWithOp],
+      },
+      paramDescriptors: [],
+    });
+
+    expect(meta.projectionTypes).toEqual({
+      normalized: 'pg/vector@1',
+    });
+    expect(meta.annotations?.codecs).toEqual({
+      normalized: 'pg/vector@1',
+    });
+  });
+
+  it('builds meta with ColumnBuilder columns having codecId', () => {
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id', 'email'],
+        columns: [userColumns.id, userColumns.email],
+      },
+      paramDescriptors: [],
+    });
+
+    expect(meta.projectionTypes).toEqual({
+      id: 'pg/int4@1',
+      email: 'pg/text@1',
+    });
+    expect(meta.annotations?.codecs).toEqual({
+      id: 'pg/int4@1',
+      email: 'pg/text@1',
+    });
+  });
+
+  it('handles empty paramCodecs', () => {
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      paramDescriptors: [],
+      paramCodecs: {},
+    });
+
+    expect(meta.annotations?.codecs).toEqual({
+      id: 'pg/int4@1',
+    });
+  });
+
+  it('builds meta with includes having missing ON condition columns', () => {
+    const includes = [
+      {
+        alias: 'posts',
+        table: createTableRef('post'),
+        on: {
+          kind: 'join-on' as const,
+          left: {
+            kind: 'column' as const,
+            table: '',
+            column: '',
+            columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          } as AnyColumnBuilder,
+          right: {
+            kind: 'column' as const,
+            table: '',
+            column: '',
+            columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          } as AnyColumnBuilder,
+        },
+        childProjection: {
+          aliases: ['id'],
+          columns: [userColumns.id],
+        },
+      },
+    ];
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id', 'posts'],
+        columns: [
+          userColumns.id,
+          {
+            kind: 'column' as const,
+            table: 'post',
+            column: '',
+            columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
+          } as AnyColumnBuilder,
+        ],
+      },
+      includes,
+      paramDescriptors: [],
+    });
+
+    // Should not throw, but ON condition columns won't be added to refs
+    expect(meta.refs?.tables).toContain('post');
+  });
 });

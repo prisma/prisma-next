@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -75,6 +76,48 @@ describe('mutation builder edge cases', () => {
           createColumnRef('user', 'email'),
         ]),
       });
+    });
+
+    it('builds insert without returning columns', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .insert(userTable, {
+          email: param('email'),
+        })
+        .build({ params: { email: 'test@example.com' } });
+
+      const insertAst = plan.ast as InsertAst;
+      expect(insertAst).toMatchObject({
+        kind: 'insert',
+      });
+      expect(insertAst.returning).toBeUndefined();
+      // When there are no returning columns, projection map is empty
+      expect(plan.meta.projection).toEqual({});
+    });
+
+    it('handles nullable columns in insert', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .insert(userTable, {
+          email: param('email'),
+          deletedAt: param('deletedAt'),
+        })
+        .returning(userColumns.id, userColumns.deletedAt)
+        .build({ params: { email: 'test@example.com', deletedAt: null } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'insert',
+        returning: expect.arrayContaining([
+          createColumnRef('user', 'id'),
+          createColumnRef('user', 'deletedAt'),
+        ]),
+      });
+      expect(plan.meta.paramDescriptors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'deletedAt',
+            nullable: true,
+          }),
+        ]),
+      );
     });
   });
 
@@ -151,6 +194,51 @@ describe('mutation builder edge cases', () => {
         ]),
       });
     });
+
+    it('chains returning in update', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .update(userTable, {
+          email: param('email'),
+        })
+        .where(userColumns.id.eq(param('userId')))
+        .returning(userColumns.id)
+        .returning(userColumns.email)
+        .build({ params: { email: 'test@example.com', userId: 1 } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'update',
+        returning: expect.arrayContaining([
+          createColumnRef('user', 'id'),
+          createColumnRef('user', 'email'),
+        ]),
+      });
+    });
+
+    it('handles nullable columns in update', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .update(userTable, {
+          deletedAt: param('deletedAt'),
+        })
+        .where(userColumns.id.eq(param('userId')))
+        .returning(userColumns.id, userColumns.deletedAt)
+        .build({ params: { deletedAt: null, userId: 1 } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'update',
+        returning: expect.arrayContaining([
+          createColumnRef('user', 'id'),
+          createColumnRef('user', 'deletedAt'),
+        ]),
+      });
+      expect(plan.meta.paramDescriptors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'deletedAt',
+            nullable: true,
+          }),
+        ]),
+      );
+    });
   });
 
   describe('delete', () => {
@@ -184,6 +272,23 @@ describe('mutation builder edge cases', () => {
         .delete(userTable)
         .where(userColumns.id.eq(param('userId')))
         .returning(userColumns.id, userColumns.email)
+        .build({ params: { userId: 1 } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'delete',
+        returning: expect.arrayContaining([
+          createColumnRef('user', 'id'),
+          createColumnRef('user', 'email'),
+        ]),
+      });
+    });
+
+    it('chains returning in delete', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .delete(userTable)
+        .where(userColumns.id.eq(param('userId')))
+        .returning(userColumns.id)
+        .returning(userColumns.email)
         .build({ params: { userId: 1 } });
 
       expect(plan.ast).toMatchObject({

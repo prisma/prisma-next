@@ -2,9 +2,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { createTableRef } from '@prisma-next/sql-relational-core/ast';
+import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
+import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
+import { createExpressionBuilder } from '@prisma-next/sql-relational-core/expression-builder';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { AnyExpressionBuilder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { buildIncludeAst, IncludeChildBuilderImpl } from '../src/sql/include-builder';
@@ -139,6 +142,136 @@ describe('IncludeChildBuilderImpl', () => {
 
     expect(() => builder.limit(1.5)).toThrow('Limit must be a non-negative integer');
   });
+
+  it('preserves state when chaining select after where', () => {
+    const tables = schema<Contract>(context).tables;
+    const userColumns = tables.user.columns;
+
+    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef)
+      .where(userColumns.id.eq(param('userId')))
+      .select({
+        id: userColumns.id,
+      });
+
+    const state = builder.getState();
+    expect({
+      hasProjection: state.childProjection !== undefined,
+      hasWhere: state.childWhere !== undefined,
+    }).toMatchObject({
+      hasProjection: true,
+      hasWhere: true,
+    });
+  });
+
+  it('preserves state when chaining select after orderBy', () => {
+    const tables = schema<Contract>(context).tables;
+    const userColumns = tables.user.columns;
+
+    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef)
+      .orderBy(userColumns.id.asc())
+      .select({
+        id: userColumns.id,
+      });
+
+    const state = builder.getState();
+    expect({
+      hasProjection: state.childProjection !== undefined,
+      hasOrderBy: state.childOrderBy !== undefined,
+    }).toMatchObject({
+      hasProjection: true,
+      hasOrderBy: true,
+    });
+  });
+
+  it('preserves state when chaining select after limit', () => {
+    const tables = schema<Contract>(context).tables;
+    const userColumns = tables.user.columns;
+
+    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef).limit(5).select({
+      id: userColumns.id,
+    });
+
+    const state = builder.getState();
+    expect({
+      hasProjection: state.childProjection !== undefined,
+      limit: state.childLimit,
+    }).toMatchObject({
+      hasProjection: true,
+      limit: 5,
+    });
+  });
+
+  it('preserves where and orderBy when chaining where after select', () => {
+    const tables = schema<Contract>(context).tables;
+    const userColumns = tables.user.columns;
+
+    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef)
+      .select({
+        id: userColumns.id,
+      })
+      .orderBy(userColumns.id.asc())
+      .where(userColumns.id.eq(param('userId')));
+
+    const state = builder.getState();
+    expect({
+      hasProjection: state.childProjection !== undefined,
+      hasWhere: state.childWhere !== undefined,
+      hasOrderBy: state.childOrderBy !== undefined,
+    }).toMatchObject({
+      hasProjection: true,
+      hasWhere: true,
+      hasOrderBy: true,
+    });
+  });
+
+  it('preserves where and limit when chaining orderBy after select', () => {
+    const tables = schema<Contract>(context).tables;
+    const userColumns = tables.user.columns;
+
+    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef)
+      .select({
+        id: userColumns.id,
+      })
+      .where(userColumns.id.eq(param('userId')))
+      .orderBy(userColumns.id.asc());
+
+    const state = builder.getState();
+    expect({
+      hasProjection: state.childProjection !== undefined,
+      hasWhere: state.childWhere !== undefined,
+      hasOrderBy: state.childOrderBy !== undefined,
+    }).toMatchObject({
+      hasProjection: true,
+      hasWhere: true,
+      hasOrderBy: true,
+    });
+  });
+
+  it('preserves where and orderBy when chaining limit after select', () => {
+    const tables = schema<Contract>(context).tables;
+    const userColumns = tables.user.columns;
+
+    const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef)
+      .select({
+        id: userColumns.id,
+      })
+      .where(userColumns.id.eq(param('userId')))
+      .orderBy(userColumns.id.asc())
+      .limit(10);
+
+    const state = builder.getState();
+    expect({
+      hasProjection: state.childProjection !== undefined,
+      hasWhere: state.childWhere !== undefined,
+      hasOrderBy: state.childOrderBy !== undefined,
+      limit: state.childLimit,
+    }).toMatchObject({
+      hasProjection: true,
+      hasWhere: true,
+      hasOrderBy: true,
+      limit: 10,
+    });
+  });
 });
 
 describe('buildIncludeAst', () => {
@@ -234,5 +367,82 @@ describe('buildIncludeAst', () => {
     expect(() => buildIncludeAst(includeState, contract, {}, [], [])).toThrow(
       'Missing column for alias',
     );
+  });
+
+  it('throws when alias is undefined in projection', () => {
+    const includeState = {
+      alias: 'posts',
+      table: postTableRef,
+      on: {
+        kind: 'join-on' as const,
+        left: userColumns.id,
+        right: userColumns.id,
+      },
+      childProjection: {
+        aliases: [undefined as unknown as string],
+        columns: [userColumns.id],
+      },
+    };
+
+    expect(() => buildIncludeAst(includeState, contract, {}, [], [])).toThrow(
+      'Missing column for alias',
+    );
+  });
+
+  it('builds include AST with operation expression in childOrderBy', () => {
+    const operationExpr: OperationExpr = {
+      kind: 'operation',
+      method: 'normalize',
+      forTypeId: 'pg/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'normalize(${self})',
+      },
+    };
+
+    const columnWithOp = createExpressionBuilder(operationExpr, {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
+    }) as AnyExpressionBuilder;
+
+    const orderByWithOp = columnWithOp.asc();
+
+    const includeState = {
+      alias: 'posts',
+      table: postTableRef,
+      on: {
+        kind: 'join-on' as const,
+        left: userColumns.id,
+        right: userColumns.id,
+      },
+      childProjection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      childOrderBy: orderByWithOp,
+    };
+
+    const ast = buildIncludeAst(includeState, contract, {}, [], []);
+
+    expect({
+      kind: ast.kind,
+      alias: ast.alias,
+      hasOrderBy: ast.child.orderBy !== undefined,
+    }).toMatchObject({
+      kind: 'includeMany',
+      alias: 'posts',
+      hasOrderBy: true,
+    });
+    expect(ast.child.orderBy?.[0]?.expr).toMatchObject({
+      kind: 'col',
+      table: 'user',
+      column: 'id',
+    });
   });
 });
