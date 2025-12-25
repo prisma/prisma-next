@@ -74,9 +74,9 @@ export function buildSelectAst(params: {
   return createSelectAst({
     from: createTableRef(table.name),
     project: projectEntries,
-    includes: includesAst,
-    where: whereExpr,
-    orderBy: orderByClause,
-    limit,
+    ...(includesAst ? { includes: includesAst } : {}),
+    ...(whereExpr ? { where: whereExpr } : {}),
+    ...(orderByClause ? { orderBy: orderByClause } : {}),
+    ...(limit !== undefined ? { limit } : {}),
   });
 }

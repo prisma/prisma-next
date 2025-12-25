@@ -608,10 +608,10 @@ export class OrmModelBuilderImpl<
     const ast = buildSelectAst({
       table: this.table,
       projectEntries,
-      includesAst: includesAst.length > 0 ? includesAst : undefined,
-      whereExpr,
-      orderByClause,
-      limit: this.limitValue,
+      ...(includesAst.length > 0 ? { includesAst } : {}),
+      ...(whereExpr ? { whereExpr } : {}),
+      ...(orderByClause ? { orderByClause } : {}),
+      ...(this.limitValue !== undefined ? { limit: this.limitValue } : {}),
     });
 
     // Build plan metadata

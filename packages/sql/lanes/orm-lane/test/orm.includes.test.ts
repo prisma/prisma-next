@@ -378,6 +378,28 @@ describe('include-plan functions', () => {
       };
     }
 
+    function createTestWhereBuilder(): import('@prisma-next/sql-relational-core/types').AnyBinaryBuilder {
+      return {
+        kind: 'binary' as const,
+        op: 'eq' as const,
+        left: {
+          kind: 'column' as const,
+          table: 'post',
+          column: 'id',
+          columnMeta: {
+            nativeType: 'int4',
+            codecId: 'pg/int4@1',
+            nullable: false,
+          },
+          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
+          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
+          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+          __jsType: undefined,
+        } as unknown,
+        right: param('postId'),
+      } as import('@prisma-next/sql-relational-core/types').AnyBinaryBuilder;
+    }
+
     it('builds exists subquery with filterType "some"', () => {
       const filter = createRelationFilter('some');
       const existsExprs = buildExistsSubqueries([filter], contract, 'User');
@@ -432,25 +454,7 @@ describe('include-plan functions', () => {
     });
 
     it('builds exists subquery with childWhere defined', () => {
-      const whereBuilder = {
-        kind: 'binary' as const,
-        op: 'eq' as const,
-        left: {
-          kind: 'column' as const,
-          table: 'post',
-          column: 'id',
-          columnMeta: {
-            nativeType: 'int4',
-            codecId: 'pg/int4@1',
-            nullable: false,
-          },
-          eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-          asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-          desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
-          __jsType: undefined,
-        } as unknown,
-        right: param('postId'),
-      } as import('@prisma-next/sql-relational-core/types').AnyBinaryBuilder;
+      const whereBuilder = createTestWhereBuilder();
       const filter = createRelationFilter('some', whereBuilder);
       const existsExprs = buildExistsSubqueries([filter], contract, 'User', {
         params: { postId: 1 },
