@@ -3,8 +3,6 @@ last_compiled: 2025-12-05 16:51:06
 
 # ================================================
 # Compiled with the following settings:
-#
-# To change these settings, run ~/agent-os/scripts/project-update.sh to re-compile your project with the new settings.
 # ================================================
 profile: typescript
 claude_code_commands: true
