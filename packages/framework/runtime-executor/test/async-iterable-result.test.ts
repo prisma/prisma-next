@@ -1,4 +1,4 @@
-import { expectDefined } from '@prisma-next/test-utils';
+import { expectDefined } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import { AsyncIterableResult } from '../src/async-iterable-result';
 

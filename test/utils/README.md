@@ -148,6 +148,86 @@ it('compiles TypeScript', async () => {
 
 **Note**: For runtime-specific utilities (plan execution, runtime creation, contract markers), see `@prisma-next/runtime/test/utils`. For contract-related utilities (contract loading, emission verification), see `test/e2e/framework/test/utils.ts`.
 
+### Typed Expectations
+
+Type-safe assertion helpers that wrap Vitest's `expect` API.
+
+**Available helpers:**
+- `expectDefined<T>(value)`: Asserts that a value is defined (not `undefined`)
+
+**Usage:**
+```typescript
+import { expectDefined } from '@prisma-next/test-utils/typed-expectations';
+
+it('handles defined values', () => {
+  const value: string | undefined = getValue();
+  expectDefined(value);
+  // TypeScript now knows value is string, not undefined
+  const length = value.length; // Type-safe!
+});
+```
+
+**Important**: This utility must be imported from the separate `./typed-expectations` export path, not from the main export. See "Vitest Import Pattern" below for details.
+
+## Vitest Import Pattern
+
+**CRITICAL**: Test utilities that import `vitest` directly (e.g., `typed-expectations`) must be exported via a separate path in `package.json` and must NOT be re-exported from `src/exports/index.ts`.
+
+### Why?
+
+When Vitest loads a `vitest.config.ts` file, it imports the config module. If the config imports from the main `@prisma-next/test-utils` export, and that export includes utilities that import `vitest`, it creates a circular dependency:
+
+1. Vitest tries to load `vitest.config.ts`
+2. Config imports from `@prisma-next/test-utils` (main export)
+3. Main export includes utilities that import `vitest`
+4. This causes "Vitest failed to access its internal state" error
+
+### Solution
+
+1. **Separate export path**: Add a dedicated export path in `package.json`:
+   ```json
+   {
+     "exports": {
+       "./typed-expectations": {
+         "types": "./dist/exports/typed-expectations.d.ts",
+         "import": "./dist/exports/typed-expectations.js"
+       }
+     }
+   }
+   ```
+
+2. **Build configuration**: Add the utility as a separate entry point in `tsup.config.ts`:
+   ```typescript
+   entry: {
+     'typed-expectations': 'src/typed-expectations.ts',
+   },
+   external: ['vitest', ...], // Mark vitest as external
+   ```
+
+3. **Do NOT re-export**: Do not include the utility in `src/exports/index.ts`:
+   ```typescript
+   // ❌ WRONG: Don't do this
+   export * from '../typed-expectations';
+   ```
+
+4. **Import from separate path**: Test files import from the separate path:
+   ```typescript
+   // ✅ CORRECT
+   import { expectDefined } from '@prisma-next/test-utils/typed-expectations';
+   
+   // ❌ WRONG: Don't import from main export
+   import { expectDefined } from '@prisma-next/test-utils';
+   ```
+
+### When to Use This Pattern
+
+Use this pattern for any utility that:
+- Imports `vitest` directly (e.g., `import { expect } from 'vitest'`)
+- Is used in `vitest.config.ts` files
+- Would create a circular dependency if included in the main export
+
+Utilities that don't import `vitest` (e.g., `timeouts`, database helpers) can safely be included in the main export.
+
 ## Dependencies
 
 **Zero dependencies on other `@prisma-next/*` packages** - This allows test-utils to be used by all packages without circular dependencies.
@@ -203,7 +283,9 @@ import { loadContractFromDisk, emitAndVerifyContract } from './utils';
 
 ## Exports
 
-- `.`: All test utilities (database helpers, async iterable helpers, column descriptors, operation descriptors, timeouts)
+- `.`: All test utilities (database helpers, async iterable helpers, column descriptors, operation descriptors, timeouts). **Note**: Does not include utilities that import `vitest` directly - see separate export paths below.
 - `./column-descriptors`: Adapter-agnostic column type descriptors for test fixtures
 - `./operation-descriptors`: Adapter-agnostic operation type descriptors for type-level test fixtures
+- `./timeouts`: Centralized timeout values (also available from main export)
+- `./typed-expectations`: Type-safe assertion helpers that wrap Vitest's `expect` API. **Must be imported from this path, not from the main export** (see "Vitest Import Pattern" above)
 

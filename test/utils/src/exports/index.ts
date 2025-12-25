@@ -4,7 +4,6 @@ import { Client } from 'pg';
 export * from '../column-descriptors';
 export * from '../operation-descriptors';
 export * from '../timeouts';
-export * from '../typed-expectations';
 
 function normalizeConnectionString(raw: string): string {
   const url = new URL(raw);
