@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { attachOperationsToColumnBuilder } from '../src/operations-registry';
 import { param } from '../src/param';
 import { ColumnBuilderImpl, schema } from '../src/schema';
+import type { ColumnBuilder } from '../src/types';
 import { createStubAdapter, createTestContext } from './utils';
 
 type TestContract = SqlContract<
@@ -986,12 +987,7 @@ describe('operations-registry', () => {
     const idColumn = userTable.columns.id;
 
     const result = attachOperationsToColumnBuilder(
-      idColumn as unknown as import('../src/types').ColumnBuilder<
-        string,
-        StorageColumn,
-        unknown,
-        Record<string, never>
-      >,
+      idColumn as unknown as ColumnBuilder<string, StorageColumn, unknown, Record<string, never>>,
       idColumn.columnMeta,
       undefined, // registry is undefined
       undefined,
@@ -1056,7 +1052,7 @@ describe('operations-registry', () => {
     } as unknown as StorageColumn;
 
     const result = attachOperationsToColumnBuilder(
-      freshColumnBuilder as unknown as import('../src/types').ColumnBuilder<
+      freshColumnBuilder as unknown as ColumnBuilder<
         string,
         StorageColumn,
         unknown,
@@ -1103,12 +1099,7 @@ describe('operations-registry', () => {
     const idColumn = userTable.columns.id;
 
     const result = attachOperationsToColumnBuilder(
-      idColumn as unknown as import('../src/types').ColumnBuilder<
-        string,
-        StorageColumn,
-        unknown,
-        Record<string, never>
-      >,
+      idColumn as unknown as ColumnBuilder<string, StorageColumn, unknown, Record<string, never>>,
       idColumn.columnMeta,
       context.operations, // Registry exists but has no operations for this codecId
       undefined,

@@ -6,6 +6,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
+import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { orm } from '../src/orm';
@@ -397,7 +398,7 @@ describe('include-plan functions', () => {
           __jsType: undefined,
         } as unknown,
         right: param('postId'),
-      } as import('@prisma-next/sql-relational-core/types').AnyBinaryBuilder;
+      } as AnyBinaryBuilder;
     }
 
     it('builds exists subquery with filterType "some"', () => {

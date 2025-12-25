@@ -175,9 +175,7 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-    expect(
-      (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.joins,
-    ).toEqual([
+    expect((plan.ast as SelectAst | undefined)?.joins).toEqual([
       {
         kind: 'join',
         joinType: 'inner',
@@ -210,12 +208,8 @@ describe('SQL builder joins', () => {
       })
       .build();
 
-    expect(
-      (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.joins,
-    ).toBeDefined();
-    expect(
-      (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.joins,
-    ).toEqual([
+    expect((plan.ast as SelectAst | undefined)?.joins).toBeDefined();
+    expect((plan.ast as SelectAst | undefined)?.joins).toEqual([
       {
         kind: 'join',
         joinType: 'inner',
@@ -259,9 +253,7 @@ describe('SQL builder joins', () => {
       .build();
 
     expect(
-      (
-        plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined
-      )?.joins?.map((j) => ({
+      (plan.ast as SelectAst | undefined)?.joins?.map((j) => ({
         kind: j.kind,
         joinType: j.joinType,
       })),
@@ -290,12 +282,8 @@ describe('SQL builder joins', () => {
       })
       .build({ params: { userId: 42 } });
 
-    expect(
-      (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.joins,
-    ).toBeDefined();
-    expect(
-      (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.joins,
-    ).toHaveLength(1);
+    expect((plan.ast as SelectAst | undefined)?.joins).toBeDefined();
+    expect((plan.ast as SelectAst | undefined)?.joins).toHaveLength(1);
     const ast = plan.ast as SelectAst;
     expect(ast?.where).toBeDefined();
     expect(plan.params).toEqual([42]);
@@ -352,10 +340,7 @@ describe('SQL builder joins', () => {
 
       const builtPlan = plan.select({ userId: userColumns.id }).build();
 
-      expect(
-        (builtPlan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)
-          ?.joins?.[0]?.joinType,
-      ).toBe(joinType);
+      expect((builtPlan.ast as SelectAst | undefined)?.joins?.[0]?.joinType).toBe(joinType);
     }
   });
 
@@ -456,9 +441,7 @@ describe('SQL builder joins', () => {
         | undefined;
       expect(selectAst?.joins).toBeDefined();
       expect(selectAst?.joins?.length).toBe(1);
-      expect(
-        (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.project,
-      ).toEqual([
+      expect((plan.ast as SelectAst | undefined)?.project).toEqual([
         { alias: 'name', expr: createColumnRef('user', 'email') },
         { alias: 'post_title', expr: createColumnRef('post', 'title') },
         { alias: 'post_id', expr: createColumnRef('post', 'id') },
@@ -526,9 +509,7 @@ describe('SQL builder joins', () => {
         })
         .build();
 
-      expect(
-        (plan.ast as import('@prisma-next/sql-relational-core/ast').SelectAst | undefined)?.project,
-      ).toEqual([
+      expect((plan.ast as SelectAst | undefined)?.project).toEqual([
         { alias: 'user_id', expr: createColumnRef('user', 'id') },
         { alias: 'user_email', expr: createColumnRef('user', 'email') },
         { alias: 'post_info_title', expr: createColumnRef('post', 'title') },

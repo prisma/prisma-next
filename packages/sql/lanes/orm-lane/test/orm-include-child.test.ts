@@ -1,5 +1,6 @@
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { AnyBinaryBuilder, AnyOrderBuilder } from '@prisma-next/sql-relational-core/types';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -73,11 +74,7 @@ describe('orm-include-child', () => {
       profileId: 'stub-profile',
       body: Object.freeze({ sql: '', params: [] }),
     }),
-  } as unknown as import('@prisma-next/sql-relational-core/ast').Adapter<
-    import('@prisma-next/sql-relational-core/ast').SelectAst,
-    SqlContract<SqlStorage>,
-    import('@prisma-next/sql-relational-core/ast').LoweredStatement
-  >;
+  } as unknown as Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   const context = createTestContext(contract, adapter);
   const options: OrmBuilderOptions<SqlContract<SqlStorage>> = { context };
 
