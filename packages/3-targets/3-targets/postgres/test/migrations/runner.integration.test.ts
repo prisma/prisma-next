@@ -93,7 +93,6 @@ describe.sequential('PostgresMigrationRunner', () => {
       plan: result.plan,
       driver,
       contract,
-      contractPath: 'runner.integration.test.ts',
     });
     expect(executeResult).toMatchObject({
       operationsPlanned: result.plan.operations.length,
@@ -148,7 +147,6 @@ describe.sequential('PostgresMigrationRunner', () => {
       plan: initialPlan.plan,
       driver,
       contract,
-      contractPath: 'runner.integration.test.ts',
     });
 
     const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -162,7 +160,6 @@ describe.sequential('PostgresMigrationRunner', () => {
       plan: emptyPlan,
       driver,
       contract,
-      contractPath: 'runner.integration.test.ts',
     });
     expect(result).toMatchObject({
       operationsPlanned: 0,
@@ -199,7 +196,6 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: failingPlan,
           driver,
           contract,
-          contractPath: 'runner.integration.test.ts',
         }),
       ).rejects.toThrow(/precheck/i);
 

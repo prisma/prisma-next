@@ -61,8 +61,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         driver,
         contractIR: options.contract,
         strict: options.strictVerification ?? true,
-        contractPath: options.contractPath,
-        ...(options.configPath ? { configPath: options.configPath } : {}),
+        context: options.context ?? {},
       };
       await this.family.schemaVerify(schemaVerifyOptions);
 

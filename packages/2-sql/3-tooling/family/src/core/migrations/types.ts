@@ -1,6 +1,7 @@
 import type {
   ControlDriverInstance,
   ControlTargetDescriptor,
+  OperationContext,
 } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -110,10 +111,9 @@ export interface MigrationRunnerExecuteOptions<TTargetDetails = Record<string, n
   readonly driver: ControlDriverInstance;
   readonly contract: SqlContract<SqlStorage>;
   readonly schemaName?: string;
-  readonly contractPath?: string;
-  readonly configPath?: string;
   readonly strictVerification?: boolean;
   readonly callbacks?: MigrationRunnerExecuteCallbacks<TTargetDetails>;
+  readonly context?: OperationContext;
 }
 
 export interface MigrationRunnerResult {

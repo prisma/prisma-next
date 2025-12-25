@@ -10,6 +10,7 @@ import type {
   ControlFamilyInstance,
   ControlTargetDescriptor,
   EmitContractResult,
+  OperationContext,
   SchemaIssue,
   SchemaVerificationNode,
   SignDatabaseResult,
@@ -778,8 +779,7 @@ export interface SchemaVerifyOptions {
   readonly driver: ControlDriverInstance;
   readonly contractIR: unknown;
   readonly strict: boolean;
-  readonly contractPath: string;
-  readonly configPath?: string;
+  readonly context?: OperationContext;
 }
 
 /**
@@ -1123,14 +1123,8 @@ export function createSqlFamilyInstance<
       });
     },
 
-    async schemaVerify(options: {
-      readonly driver: ControlDriverInstance;
-      readonly contractIR: unknown;
-      readonly strict: boolean;
-      readonly contractPath: string;
-      readonly configPath?: string;
-    }): Promise<VerifyDatabaseSchemaResult> {
-      const { driver, contractIR, strict, contractPath, configPath } = options;
+    async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
+      const { driver, contractIR, strict, context } = options;
       const startTime = Date.now();
 
       // Validate contractIR as SqlContract<SqlStorage>
@@ -1641,9 +1635,9 @@ export function createSqlFamilyInstance<
           counts,
         },
         meta: {
-          contractPath,
           strict,
-          ...(configPath ? { configPath } : {}),
+          ...(context?.contractPath ? { contractPath: context.contractPath } : {}),
+          ...(context?.configPath ? { configPath: context.configPath } : {}),
         },
         timings: {
           total: totalTime,
