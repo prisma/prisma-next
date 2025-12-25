@@ -48,7 +48,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     const schema = options.schemaName ?? this.config.defaultSchema;
     const driver = options.driver;
     const lockKey = `${LOCK_DOMAIN}:${schema}`;
-    await driver.query('BEGIN');
+    await this.beginTransaction(driver);
     try {
       await this.acquireLock(driver, lockKey);
       await this.ensureControlTables(driver);
@@ -61,22 +61,22 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         driver,
         contractIR: options.contract,
         strict: options.strictVerification ?? true,
-        contractPath: options.contractPath ?? 'prisma-next db init',
+        contractPath: options.contractPath,
         ...(options.configPath ? { configPath: options.configPath } : {}),
       };
       await this.family.schemaVerify(schemaVerifyOptions);
 
       await this.upsertMarker(driver, options, existingMarker);
-      await this.appendLedger(driver, options, existingMarker);
+      await this.recordLedgerEntry(driver, options, existingMarker);
 
-      await driver.query('COMMIT');
+      await this.commitTransaction(driver);
       await this.releaseLock(driver, lockKey);
       return {
         operationsPlanned: options.plan.operations.length,
         operationsExecuted,
       };
     } catch (error) {
-      await driver.query('ROLLBACK');
+      await this.rollbackTransaction(driver);
       await this.releaseLock(driver, lockKey).catch(() => {
         // ignore unlock errors during rollback
       });
@@ -182,7 +182,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     await this.executeStatement(driver, statement);
   }
 
-  private async appendLedger(
+  private async recordLedgerEntry(
     driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
@@ -214,6 +214,24 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     key: string,
   ): Promise<void> {
     await driver.query('select pg_advisory_unlock(hashtext($1))', [key]);
+  }
+
+  private async beginTransaction(
+    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+  ): Promise<void> {
+    await driver.query('BEGIN');
+  }
+
+  private async commitTransaction(
+    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+  ): Promise<void> {
+    await driver.query('COMMIT');
+  }
+
+  private async rollbackTransaction(
+    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+  ): Promise<void> {
+    await driver.query('ROLLBACK');
   }
 
   private async executeStatement(
