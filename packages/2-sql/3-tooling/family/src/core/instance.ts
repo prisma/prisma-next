@@ -772,6 +772,17 @@ interface SqlFamilyInstanceState {
 }
 
 /**
+ * Options for schema verification.
+ */
+export interface SchemaVerifyOptions {
+  readonly driver: ControlDriverInstance;
+  readonly contractIR: unknown;
+  readonly strict: boolean;
+  readonly contractPath: string;
+  readonly configPath?: string;
+}
+
+/**
  * SQL control family instance interface.
  * Extends ControlFamilyInstance with SQL-specific domain actions.
  */
@@ -800,13 +811,7 @@ export interface SqlControlFamilyInstance
    * Verifies the database schema against the contract.
    * Compares contract requirements against live database schema.
    */
-  schemaVerify(options: {
-    readonly driver: ControlDriverInstance;
-    readonly contractIR: unknown;
-    readonly strict: boolean;
-    readonly contractPath: string;
-    readonly configPath?: string;
-  }): Promise<VerifyDatabaseSchemaResult>;
+  schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult>;
 
   /**
    * Signs the database with the contract marker.

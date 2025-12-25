@@ -5,7 +5,8 @@ import type {
   MigrationRunner,
   MigrationRunnerExecuteOptions,
   MigrationRunnerResult,
-  SqlControlTargetDescriptor,
+  SchemaVerifyOptions,
+  SqlControlFamilyInstance,
 } from '@prisma-next/family-sql/control';
 import { readMarker } from '@prisma-next/family-sql/verify';
 import type { PostgresPlanTargetDetails } from './planner';
@@ -18,10 +19,6 @@ import {
   type SqlStatement,
 } from './statement-builders';
 
-type SqlFamilyForRunner = Parameters<
-  SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails>['createRunner']
->[0];
-
 interface RunnerConfig {
   readonly defaultSchema: string;
 }
@@ -33,7 +30,7 @@ const DEFAULT_CONFIG: RunnerConfig = {
 const LOCK_DOMAIN = 'prisma_next.contract.marker';
 
 export function createPostgresMigrationRunner(
-  family: SqlFamilyForRunner,
+  family: SqlControlFamilyInstance,
   config: Partial<RunnerConfig> = {},
 ): MigrationRunner<PostgresPlanTargetDetails> {
   return new PostgresMigrationRunner(family, { ...DEFAULT_CONFIG, ...config });
@@ -41,7 +38,7 @@ export function createPostgresMigrationRunner(
 
 class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetails> {
   constructor(
-    private readonly family: SqlFamilyForRunner,
+    private readonly family: SqlControlFamilyInstance,
     private readonly config: RunnerConfig,
   ) {}
 
@@ -60,7 +57,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
       const operationsExecuted = await this.applyPlan(driver, options);
 
-      const schemaVerifyOptions: Parameters<typeof this.family.schemaVerify>[0] = {
+      const schemaVerifyOptions: SchemaVerifyOptions = {
         driver,
         contractIR: options.contract,
         strict: options.strictVerification ?? true,
