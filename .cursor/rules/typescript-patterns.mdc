@@ -997,6 +997,84 @@ const fixtureContract = validateContract<Contract>(contractJson);
 - Avoids linting errors about `require()` and undefined globals
 - Better type safety and module resolution
 
+## Dynamic Imports
+
+**CRITICAL RULE**: Never use dynamic imports (`import()`) of TypeScript packages, not even for types only, unless explicitly required by the user.
+
+### The Problem
+
+Dynamic imports create several issues:
+1. **Build complexity**: Bundlers must handle code splitting and lazy loading
+2. **Type resolution**: TypeScript's type system works best with static imports
+3. **Dependency analysis**: Static analysis tools can't properly track dependencies
+4. **Runtime overhead**: Dynamic imports add runtime module resolution overhead
+5. **Type-only imports**: Even `import type` in dynamic imports can cause issues with type resolution
+
+**❌ WRONG: Dynamic import of TypeScript package**
+
+```typescript
+// ❌ WRONG: Dynamic import even for types
+const { SqlContract } = await import('@prisma-next/sql-contract/types');
+
+// ❌ WRONG: Dynamic import for runtime code
+const { validateContract } = await import('@prisma-next/sql-query/schema');
+
+// ❌ WRONG: Dynamic import with type-only usage
+const module = await import('@prisma-next/sql-lane/sql');
+type SqlBuilder = typeof module.sql;
+
+// ❌ WRONG: Localized dynamic import with type-only cast usage
+const builder = { /* .. */ } as import('@prisma-next/sql-relational-core/types').AnyBinaryBuilder;
+```
+
+**✅ CORRECT: Use static imports**
+
+```typescript
+// ✅ CORRECT: Static import for types
+import type { SqlContract } from '@prisma-next/sql-contract/types';
+
+// ✅ CORRECT: Static import for runtime code
+import { validateContract } from '@prisma-next/sql-query/schema';
+
+// ✅ CORRECT: Static import for both types and values
+import { sql } from '@prisma-next/sql-lane/sql';
+import type { ResultType } from '@prisma-next/sql-query/types';
+```
+
+### Exception: User-Explicit Requirement
+
+Dynamic imports are **only acceptable** when:
+- The user explicitly requires dynamic loading (e.g., lazy loading for performance)
+- The use case genuinely requires runtime module resolution
+- The requirement is documented and justified
+
+**✅ ACCEPTABLE: When user explicitly requires dynamic loading**
+
+```typescript
+// ✅ ACCEPTABLE: User explicitly requested lazy loading
+// Only use when user requirement is documented
+async function loadAdapterLazily(adapterName: string) {
+  const adapterModule = await import(`@prisma-next/adapter-${adapterName}`);
+  return adapterModule.createAdapter();
+}
+```
+
+### Why This Matters
+
+1. **Type safety**: Static imports allow TypeScript to properly resolve and check types
+2. **Build optimization**: Bundlers can optimize static imports better than dynamic ones
+3. **Dependency tracking**: Static analysis tools can properly track dependencies
+4. **Performance**: Static imports are resolved at build time, not runtime
+5. **Consistency**: Static imports are the standard pattern in TypeScript codebases
+6. **IDE support**: Better autocomplete and type checking with static imports
+
+### Best Practices
+
+1. **Always use static imports**: Use `import` and `import type` statements at the top of files
+2. **Avoid `import()`**: Never use dynamic `import()` unless explicitly required by the user
+3. **Type-only imports**: Use `import type` for type-only imports, but still use static imports
+4. **Document exceptions**: If dynamic imports are required, document why in comments
+
 ## Type Extraction from Column Builders
 
 **Pattern**: When extracting types from `ColumnBuilder` instances, use `infer` for all type parameters to allow correct type inference.
