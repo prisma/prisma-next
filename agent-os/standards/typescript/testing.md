@@ -556,6 +556,48 @@ expect(users.length > 0).toBe(true);
 expect(response).toBeDefined();
 ```
 
+### Avoid Conditional Expectations
+
+**CRITICAL**: Never use conditional logic (`if` statements) to conditionally run `expect()` calls in test files. All expectations should execute unconditionally.
+
+**❌ WRONG: Conditional expectations**
+
+```typescript
+it("should process user data", () => {
+  const result = processUser(input);
+  
+  if (result.status === "success") {
+    expect(result.data).toBeDefined();
+    expect(result.data.email).toBe("test@example.com");
+  } else {
+    expect(result.error).toBeDefined();
+  }
+});
+```
+
+**✅ CORRECT: Split into separate tests**
+
+```typescript
+it("returns success with user data when processing succeeds", () => {
+  const result = processUser(validInput);
+  expect(result.status).toBe("success");
+  expect(result.data).toBeDefined();
+  expect(result.data.email).toBe("test@example.com");
+});
+
+it("returns error when processing fails", () => {
+  const result = processUser(invalidInput);
+  expect(result.status).toBe("error");
+  expect(result.error).toBeDefined();
+});
+```
+
+**Why?**
+- Conditional expectations make tests unpredictable and harder to debug
+- Each test should verify one specific behavior
+- Test failures are clearer when expectations always run
+- Test coverage is more accurate when all code paths are tested separately
+
 ## Pre-Commit Testing
 
 ### Always Run Tests Before Committing
@@ -607,6 +649,7 @@ it.skip("should handle edge case - see TICKET-123", () => {
 - [ ] Each test focuses on one behavior
 - [ ] Async tests use async/await
 - [ ] Test fixtures and helpers are reusable
+- [ ] No conditional expectations (`if` statements around `expect()` calls)
 - [ ] Coverage meets minimum requirements (80%+ for new features)
 - [ ] All tests pass before committing
 - [ ] Critical paths have 100% coverage
