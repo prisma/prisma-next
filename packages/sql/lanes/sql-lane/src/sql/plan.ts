@@ -192,7 +192,6 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         errorMissingColumnForAlias(alias, index);
       }
 
-      // Check for operation expression before asserting column builder
       const operationExpr = getOperationExpr(column);
       if (operationExpr) {
         return [alias, `operation:${operationExpr.method}`];
