@@ -235,4 +235,24 @@ describe('buildIncludeAst', () => {
       'Missing column for alias',
     );
   });
+
+  it('throws when alias is missing in child projection', () => {
+    const includeState = {
+      alias: 'posts',
+      table: postTableRef,
+      on: {
+        kind: 'join-on' as const,
+        left: userColumns.id,
+        right: userColumns.id,
+      },
+      childProjection: {
+        aliases: [undefined as unknown as string],
+        columns: [userColumns.id],
+      },
+    };
+
+    expect(() => buildIncludeAst(includeState, contract, {}, [], [])).toThrow(
+      'Missing column for alias',
+    );
+  });
 });

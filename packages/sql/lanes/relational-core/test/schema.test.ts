@@ -266,6 +266,18 @@ describe('schema', () => {
         'Parameter placeholder or column builder required for column comparison',
       );
     });
+
+    it.each(operators)('%s throws for null value', (op) => {
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const idColumn = tables.user.columns.id;
+
+      const method = idColumn[op] as (p: unknown) => unknown;
+      expect(() => method.call(idColumn, null)).toThrow(
+        'Parameter placeholder or column builder required for column comparison',
+      );
+    });
   });
 
   it('column builder asc creates order builder', () => {
