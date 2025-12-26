@@ -3,6 +3,7 @@ import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import type { MetaBuildArgs } from '../types/internal';
+import { assertColumnBuilder, assertJoinOnPredicate } from '../utils/assertions';
 import { errorMissingColumnForAlias } from '../utils/errors';
 import {
   collectColumnRefs,
@@ -28,12 +29,11 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     } else {
       // column is ColumnBuilder - TypeScript can't narrow properly
       const col = column as unknown as { table?: string; column?: string };
-      if (col.table && col.column) {
-        refsColumns.set(`${col.table}.${col.column}`, {
-          table: col.table,
-          column: col.column,
-        });
-      }
+      assertColumnBuilder(col, 'projection column');
+      refsColumns.set(`${col.table}.${col.column}`, {
+        table: col.table,
+        column: col.column,
+      });
     }
   }
 
@@ -59,27 +59,25 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       refsTables.add(include.table.name);
       // Add ON condition columns
       // JoinOnPredicate.left and .right are always ColumnBuilder
-      const onLeft = include.on.left as unknown as { table: string; column: string };
-      const onRight = include.on.right as unknown as { table: string; column: string };
-      if (onLeft.table && onLeft.column && onRight.table && onRight.column) {
-        refsColumns.set(`${onLeft.table}.${onLeft.column}`, {
-          table: onLeft.table,
-          column: onLeft.column,
-        });
-        refsColumns.set(`${onRight.table}.${onRight.column}`, {
-          table: onRight.table,
-          column: onRight.column,
-        });
-      }
+      const onLeft = include.on.left as unknown as { table?: string; column?: string };
+      const onRight = include.on.right as unknown as { table?: string; column?: string };
+      assertJoinOnPredicate({ left: onLeft, right: onRight });
+      refsColumns.set(`${onLeft.table}.${onLeft.column}`, {
+        table: onLeft.table,
+        column: onLeft.column,
+      });
+      refsColumns.set(`${onRight.table}.${onRight.column}`, {
+        table: onRight.table,
+        column: onRight.column,
+      });
       // Add child projection columns
       for (const column of include.childProjection.columns) {
         const col = column as unknown as { table?: string; column?: string };
-        if (col.table && col.column) {
-          refsColumns.set(`${col.table}.${col.column}`, {
-            table: col.table,
-            column: col.column,
-          });
-        }
+        assertColumnBuilder(col, 'include child projection column');
+        refsColumns.set(`${col.table}.${col.column}`, {
+          table: col.table,
+          column: col.column,
+        });
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
@@ -128,12 +126,11 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     } else {
       // whereLeft is ColumnBuilder - TypeScript can't narrow properly
       const colBuilder = whereLeft as unknown as { table?: string; column?: string };
-      if (colBuilder.table && colBuilder.column) {
-        refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
-          table: colBuilder.table,
-          column: colBuilder.column,
-        });
-      }
+      assertColumnBuilder(colBuilder, 'where clause');
+      refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
+        table: colBuilder.table,
+        column: colBuilder.column,
+      });
     }
 
     // Handle right side of WHERE clause - can be ParamPlaceholder or AnyColumnBuilder
@@ -164,12 +161,11 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       } else {
         // orderByExpr is ColumnBuilder - TypeScript can't narrow properly
         const colBuilder = orderByExpr as unknown as { table?: string; column?: string };
-        if (colBuilder.table && colBuilder.column) {
-          refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
-            table: colBuilder.table,
-            column: colBuilder.column,
-          });
-        }
+        assertColumnBuilder(colBuilder, 'orderBy clause');
+        refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
+          table: colBuilder.table,
+          column: colBuilder.column,
+        });
       }
     }
   }
