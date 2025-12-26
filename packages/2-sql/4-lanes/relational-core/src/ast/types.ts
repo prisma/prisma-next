@@ -48,7 +48,7 @@ export interface BinaryExpr {
   readonly kind: 'bin';
   readonly op: BinaryOp;
   readonly left: ColumnRef | OperationExpr;
-  readonly right: ParamRef;
+  readonly right: ColumnRef | ParamRef;
 }
 
 export interface ExistsExpr {

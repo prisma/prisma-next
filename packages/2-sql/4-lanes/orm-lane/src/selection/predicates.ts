@@ -1,10 +1,26 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { BinaryExpr, ColumnRef, OperationExpr } from '@prisma-next/sql-relational-core/ast';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type {
+  BinaryExpr,
+  ColumnRef,
+  OperationExpr,
+  ParamRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
-import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
+import type { BinaryBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
+import {
+  getColumnInfo,
+  getColumnMeta,
+  getOperationExpr,
+  isColumnBuilder,
+  isParamPlaceholder,
+} from '@prisma-next/sql-relational-core/utils/guards';
 import { createBinaryExpr, createColumnRef, createParamRef } from '../utils/ast';
-import { errorMissingParameter } from '../utils/errors';
+import {
+  errorFailedToBuildWhereClause,
+  errorMissingParameter,
+  errorUnknownTable,
+} from '../utils/errors';
 
 export function buildWhereExpr(
   where: BinaryBuilder,
@@ -17,48 +33,87 @@ export function buildWhereExpr(
   codecId?: string;
   paramName: string;
 } {
-  const placeholder = where.right;
-  const paramName = placeholder.name;
-
-  if (!Object.hasOwn(paramsMap, paramName)) {
-    errorMissingParameter(paramName);
-  }
-
-  const value = paramsMap[paramName];
-  const index = values.push(value);
-
   let leftExpr: ColumnRef | OperationExpr;
   let codecId: string | undefined;
+  let rightExpr: ColumnRef | ParamRef;
+  let paramName: string;
 
-  const operationExpr = (where.left as { _operationExpr?: OperationExpr })._operationExpr;
+  const operationExpr = getOperationExpr(where.left);
   if (operationExpr) {
     leftExpr = operationExpr;
+  } else if (isColumnBuilder(where.left)) {
+    const { table, column } = getColumnInfo(where.left);
+
+    const contractTable = contract.storage.tables[table];
+    if (!contractTable) {
+      errorUnknownTable(table);
+    }
+
+    const columnMeta: StorageColumn | undefined = contractTable.columns[column];
+    // If column not found in contract, still build expression but without codecId
+    // This allows flexibility when columnMeta is available on the column builder
+    if (columnMeta) {
+      codecId = columnMeta.codecId;
+    }
+    leftExpr = createColumnRef(table, column);
   } else {
-    const colBuilder = where.left as unknown as {
-      table: string;
-      column: string;
-      columnMeta?: { codecId?: string; nullable?: boolean };
-    };
-    const meta = colBuilder.columnMeta ?? {};
+    errorFailedToBuildWhereClause();
+  }
 
-    descriptors.push({
-      name: paramName,
-      source: 'dsl',
-      refs: { table: colBuilder.table, column: colBuilder.column },
-      ...(typeof meta.nullable === 'boolean' ? { nullable: meta.nullable } : {}),
-    });
+  // Handle where.right - can be ParamPlaceholder or AnyColumnBuilder
+  if (isParamPlaceholder(where.right)) {
+    // Handle param placeholder (existing logic)
+    const placeholder: ParamPlaceholder = where.right;
+    paramName = placeholder.name;
 
-    const contractTable = contract.storage.tables[colBuilder.table];
-    const columnMeta = contractTable?.columns[colBuilder.column];
-    codecId = columnMeta?.codecId;
+    if (!Object.hasOwn(paramsMap, paramName)) {
+      errorMissingParameter(paramName);
+    }
 
-    augmentDescriptorWithColumnMeta(descriptors, columnMeta);
+    const value = paramsMap[paramName];
+    const index = values.push(value);
 
-    leftExpr = createColumnRef(colBuilder.table, colBuilder.column);
+    // Construct descriptor if where.left is a ColumnBuilder
+    if (isColumnBuilder(where.left)) {
+      const { table, column } = getColumnInfo(where.left);
+      const contractTable = contract.storage.tables[table];
+      const columnMeta = contractTable?.columns[column];
+      const builderColumnMeta = getColumnMeta(where.left);
+
+      descriptors.push({
+        name: paramName,
+        source: 'dsl',
+        refs: { table, column },
+        ...(typeof builderColumnMeta?.nullable === 'boolean'
+          ? { nullable: builderColumnMeta.nullable }
+          : {}),
+      });
+
+      augmentDescriptorWithColumnMeta(descriptors, columnMeta);
+    }
+
+    rightExpr = createParamRef(index, paramName);
+  } else if (isColumnBuilder(where.right)) {
+    // Handle column builder on the right
+    const { table, column } = getColumnInfo(where.right);
+
+    const contractTable = contract.storage.tables[table];
+    if (!contractTable) {
+      errorUnknownTable(table);
+    }
+
+    // If column not found in contract, still build expression
+    // This allows flexibility when columnMeta is available on the column builder
+    rightExpr = createColumnRef(table, column);
+    // Use a placeholder paramName for column references (not used for params)
+    paramName = '';
+  } else {
+    // where.right is neither ParamPlaceholder nor ColumnBuilder - invalid state
+    errorFailedToBuildWhereClause();
   }
 
   return {
-    expr: createBinaryExpr(where.op, leftExpr, createParamRef(index, paramName)),
+    expr: createBinaryExpr(where.op, leftExpr, rightExpr),
     ...(codecId ? { codecId } : {}),
     paramName,
   };

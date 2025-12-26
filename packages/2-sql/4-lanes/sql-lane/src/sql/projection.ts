@@ -1,5 +1,6 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder, NestedProjection } from '@prisma-next/sql-relational-core/types';
+import { isColumnBuilder } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
 import {
   errorAliasCollision,
@@ -9,7 +10,6 @@ import {
   errorInvalidProjectionValue,
   errorProjectionEmpty,
 } from '../utils/errors';
-import { isColumnBuilder } from '../utils/guards';
 import type { IncludeState, ProjectionState } from '../utils/state';
 
 export function generateAlias(path: string[]): string {
@@ -77,7 +77,7 @@ export function buildProjectionState(
 ): ProjectionState {
   const tracker = new AliasTracker();
   const aliases: string[] = [];
-  const columns: AnyColumnBuilder[] = [];
+  const columns: (AnyColumnBuilder | null)[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     if (value === true) {
@@ -86,17 +86,11 @@ export function buildProjectionState(
       if (!matchingInclude) {
         errorIncludeAliasNotFound(key);
       }
-      // For include references, we track the alias but use a placeholder column
+      // For include references, we track the alias but use null as placeholder
       // The actual handling happens in AST building where we create includeRef
+      // Using null instead of invalid ColumnBuilder avoids code smell
       aliases.push(key);
-      // Use a placeholder column - this won't be used for includes, but we need
-      // to maintain the same array length for aliases and columns
-      columns.push({
-        kind: 'column',
-        table: matchingInclude.table.name,
-        column: '',
-        columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
-      } as AnyColumnBuilder);
+      columns.push(null);
     } else if (isColumnBuilder(value)) {
       const alias = tracker.register([key]);
       aliases.push(alias);

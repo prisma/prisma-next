@@ -56,19 +56,32 @@ export interface IncludeState {
   readonly childLimit?: number;
 }
 
-export function buildIncludeAsts(
-  includes: OrmIncludeState[],
-  contract: SqlContract<SqlStorage>,
-  context: QueryLaneContext<SqlContract<SqlStorage>>,
-  modelName: string,
-  paramsMap: Record<string, unknown>,
-  paramDescriptors: ParamDescriptor[],
-  paramValues: unknown[],
-  paramCodecs: Record<string, string>,
-): {
+interface BuildIncludeAstsInput {
+  readonly includes: OrmIncludeState[];
+  readonly contract: SqlContract<SqlStorage>;
+  readonly context: QueryLaneContext<SqlContract<SqlStorage>>;
+  readonly modelName: string;
+  readonly paramsMap: Record<string, unknown>;
+  readonly paramDescriptors: ParamDescriptor[];
+  readonly paramValues: unknown[];
+  readonly paramCodecs: Record<string, string>;
+}
+
+export function buildIncludeAsts(input: BuildIncludeAstsInput): {
   includesAst: IncludeAst[];
   includesForMeta: IncludeState[];
 } {
+  const {
+    includes,
+    contract,
+    context,
+    modelName,
+    paramsMap,
+    paramDescriptors,
+    paramValues,
+    paramCodecs,
+  } = input;
+
   const includesAst: IncludeAst[] = [];
   const includesForMeta: IncludeState[] = [];
 

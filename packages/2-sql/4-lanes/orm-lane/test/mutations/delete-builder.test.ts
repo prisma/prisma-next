@@ -63,9 +63,29 @@ describe('delete builder', () => {
     Record<string, never>,
     'User'
   > = () => {
+    const columnBuilder = {
+      kind: 'column' as const,
+      table: 'user',
+      column: 'id',
+      columnMeta: int4Column,
+      eq: () => ({
+        kind: 'binary' as const,
+        op: 'eq' as const,
+        left: {} as unknown,
+        right: {} as unknown,
+      }),
+      asc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'asc' as const }),
+      desc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'desc' as const }),
+      __jsType: undefined,
+    };
     return {
       id: {
-        eq: (p: unknown) => ({ left: { table: 'user', column: 'id' }, right: p, op: 'eq' }),
+        eq: (p: unknown) => ({
+          kind: 'binary' as const,
+          left: columnBuilder,
+          right: p,
+          op: 'eq' as const,
+        }),
       },
     } as unknown as ModelColumnAccessor<SqlContract<SqlStorage>, Record<string, never>, 'User'>;
   };
@@ -188,5 +208,52 @@ describe('delete builder', () => {
     });
 
     expect(plan).toBeDefined();
+  });
+
+  it('builds delete plan with annotations without codecs when paramCodecs is empty', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: test helper with complex type inference
+    const where = (model: any) => {
+      // Use a where clause that results in no codecId (e.g., operation expression)
+      return model.id.eq(param('userId')) as AnyBinaryBuilder;
+    };
+
+    // Create a contract where column doesn't exist in contract storage
+    // This will cause codecId to be undefined in whereResult
+    const contractWithUnknownColumn: SqlContract<SqlStorage> = {
+      ...contract,
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              // Column 'id' is missing - this will cause codecId to be undefined
+              email: {
+                nativeType: 'text',
+                codecId: 'pg/text@1',
+                nullable: false,
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    };
+
+    const contextWithUnknownColumn: OrmContext<SqlContract<SqlStorage>> = {
+      ...context,
+      contract: contractWithUnknownColumn,
+    };
+
+    const plan = buildDeletePlan(contextWithUnknownColumn, 'User', where, getModelAccessor, {
+      params: { userId: 1 },
+    });
+
+    // Should have annotations but no codecs property when paramCodecs is empty
+    expect(plan.meta.annotations).toBeDefined();
+    // When codecId is undefined, paramCodecs will be empty, so annotations won't have codecs
+    expect(plan.meta.annotations?.['intent']).toBe('write');
+    expect(plan.meta.annotations?.['isMutation']).toBe(true);
   });
 });

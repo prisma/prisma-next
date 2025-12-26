@@ -1,4 +1,4 @@
-import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlMappings, StorageColumn } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
@@ -6,8 +6,10 @@ import {
   vectorColumn as vectorColumnType,
 } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { attachOperationsToColumnBuilder } from '../src/operations-registry';
 import { param } from '../src/param';
-import { schema } from '../src/schema';
+import { ColumnBuilderImpl, schema } from '../src/schema';
+import type { ColumnBuilder } from '../src/types';
 import { createStubAdapter, createTestContext } from './utils';
 
 type TestContract = SqlContract<
@@ -953,5 +955,158 @@ describe('operations-registry', () => {
     // When return type is 'builtin', columnMeta should use original columnMeta (not modified)
     const resultWithMeta = result as unknown as { columnMeta: { codecId: string } };
     expect(resultWithMeta.columnMeta.codecId).toBe('pg/int4@1');
+  });
+
+  it('attachOperationsToColumnBuilder returns columnBuilder when registry is undefined', () => {
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id;
+
+    const result = attachOperationsToColumnBuilder(
+      idColumn as unknown as ColumnBuilder<string, StorageColumn, unknown, Record<string, never>>,
+      idColumn.columnMeta,
+      undefined, // registry is undefined
+      undefined,
+    );
+
+    expect(result).toBe(idColumn);
+  });
+
+  it('attachOperationsToColumnBuilder returns columnBuilder when codecId is undefined', () => {
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [
+            {
+              forTypeId: 'pg/int4@1',
+              method: 'add',
+              args: [{ kind: 'literal' }],
+              returns: { kind: 'builtin', type: 'number' },
+              lowering: {
+                targetFamily: 'sql',
+                strategy: 'infix',
+                // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+                template: '${self} + ${arg0}',
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    // Create a fresh column builder without pre-attached operations
+    const columnMeta = contractWithInt.storage.tables.user.columns.id;
+    const freshColumnBuilder = new ColumnBuilderImpl('user', 'id', columnMeta);
+
+    // Create columnMeta without codecId - use type assertion since StorageColumn requires codecId
+    const columnMetaWithoutCodecId = {
+      ...columnMeta,
+      codecId: undefined,
+    } as unknown as StorageColumn;
+
+    const result = attachOperationsToColumnBuilder(
+      freshColumnBuilder as unknown as ColumnBuilder<
+        string,
+        StorageColumn,
+        unknown,
+        Record<string, never>
+      >,
+      columnMetaWithoutCodecId,
+      context.operations,
+      undefined,
+    );
+
+    expect(result).toBe(freshColumnBuilder);
+    // Operations should not be attached since codecId is undefined
+    expect((result as unknown as { add?: unknown }).add).toBeUndefined();
+  });
+
+  it('attachOperationsToColumnBuilder returns columnBuilder when operations.length === 0', () => {
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    // Create context with empty operation registry (no operations registered)
+    const context = createTestContext(contractWithInt, adapter);
+    const tables = schema(context).tables;
+    const userTable = tables.user;
+    const idColumn = userTable.columns.id;
+
+    const result = attachOperationsToColumnBuilder(
+      idColumn as unknown as ColumnBuilder<string, StorageColumn, unknown, Record<string, never>>,
+      idColumn.columnMeta,
+      context.operations, // Registry exists but has no operations for this codecId
+      undefined,
+    );
+
+    expect(result).toBe(idColumn);
+    // Operations should not be attached since registry has no operations for this codecId
+    expect((result as unknown as { add?: unknown }).add).toBeUndefined();
   });
 });

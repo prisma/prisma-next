@@ -31,13 +31,14 @@ import type {
   OrderBuilder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
+import { getOperationExpr } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
+import { assertColumnBuilder } from '../utils/assertions';
 import { checkIncludeCapabilities } from '../utils/capabilities';
 import {
   errorChildProjectionEmpty,
   errorFromMustBeCalled,
   errorIncludeAliasCollision,
-  errorInvalidColumnForAlias,
   errorLimitMustBeNonNegativeInteger,
   errorMissingAlias,
   errorMissingColumnForAlias,
@@ -45,7 +46,6 @@ import {
   errorSelfJoinNotSupported,
   errorUnknownTable,
 } from '../utils/errors';
-import { isOperationExpr } from '../utils/guards';
 import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state';
 import {
   buildIncludeAst,
@@ -321,8 +321,9 @@ export class SelectBuilderImpl<
       ? (() => {
           const orderBy = this.state.orderBy as OrderBuilder<string, StorageColumn, unknown>;
           const orderExpr = orderBy.expr;
-          const expr: ColumnRef | OperationExpr = isOperationExpr(orderExpr)
-            ? orderExpr
+          const operationExpr = getOperationExpr(orderExpr);
+          const expr: ColumnRef | OperationExpr = operationExpr
+            ? operationExpr
             : (() => {
                 const colBuilder = orderExpr as { table: string; column: string };
                 return createColumnRef(colBuilder.table, colBuilder.column);
@@ -346,19 +347,21 @@ export class SelectBuilderImpl<
         errorMissingAlias(i);
       }
       const column = projection.columns[i];
-      if (!column) {
-        errorMissingColumnForAlias(alias, i);
-      }
 
-      // Check if this alias matches an include alias
+      // Check if this alias matches an include alias first
+      // Include placeholders have null columns
       const matchingInclude = this.state.includes?.find((inc) => inc.alias === alias);
       if (matchingInclude) {
-        // This is an include reference
+        // This is an include reference - column can be null for placeholders
         projectEntries.push({
           alias,
           expr: { kind: 'includeRef', alias },
         });
       } else {
+        // Not an include - column must not be null
+        if (!column) {
+          errorMissingColumnForAlias(alias, i);
+        }
         // Check if this column has an operation expression
         const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
         if (operationExpr) {
@@ -370,14 +373,10 @@ export class SelectBuilderImpl<
           // This is a regular column
           // TypeScript can't narrow ColumnBuilder properly
           const col = column as { table: string; column: string };
-          const tableName = col.table;
-          const columnName = col.column;
-          if (!tableName || !columnName) {
-            errorInvalidColumnForAlias(alias, i);
-          }
+          assertColumnBuilder(col, 'projection column');
           projectEntries.push({
             alias,
-            expr: createColumnRef(tableName, columnName),
+            expr: createColumnRef(col.table, col.column),
           });
         }
       }

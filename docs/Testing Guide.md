@@ -658,6 +658,46 @@ expect(err).toBeUndefined();
 
 **Impact:** Obscures the actual test logic
 
+### Anti-Pattern 5: Conditional Expectations
+
+**Symptom:** `if` conditions are used to conditionally run `expect()` calls in test files
+
+**Example:**
+```typescript
+// ANTI-PATTERN: Conditional expectations
+it('processes user data', () => {
+  const result = processUser(input);
+  
+  if (result.status === 'success') {
+    expect(result.data).toBeDefined();
+    expect(result.data.email).toBe('test@example.com');
+  } else {
+    expect(result.error).toBeDefined();
+  }
+});
+```
+
+**Solution:** Split into separate tests, each verifying one specific behavior
+
+**✅ CORRECT: Separate tests for each behavior**
+
+```typescript
+it('returns success with user data when processing succeeds', () => {
+  const result = processUser(validInput);
+  expect(result.status).toBe('success');
+  expect(result.data).toBeDefined();
+  expect(result.data.email).toBe('test@example.com');
+});
+
+it('returns error when processing fails', () => {
+  const result = processUser(invalidInput);
+  expect(result.status).toBe('error');
+  expect(result.error).toBeDefined();
+});
+```
+
+**Impact:** Conditional expectations make tests unpredictable, harder to debug, and reduce test coverage accuracy. Each test should verify one specific behavior with all expectations executing unconditionally.
+
 ---
 
 ## Common Mistakes and Corrections

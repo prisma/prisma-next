@@ -34,6 +34,14 @@
     "./operation-descriptors": {
       "types": "./dist/exports/operation-descriptors.d.ts",
       "import": "./dist/exports/operation-descriptors.js"
+    },
+    "./timeouts": {
+      "types": "./dist/exports/timeouts.d.ts",
+      "import": "./dist/exports/timeouts.js"
+    },
+    "./typed-expectations": {
+      "types": "./dist/exports/typed-expectations.d.ts",
+      "import": "./dist/exports/typed-expectations.js"
     }
   }
 }

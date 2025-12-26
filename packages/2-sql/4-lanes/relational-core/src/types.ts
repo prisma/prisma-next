@@ -46,12 +46,18 @@ export type ColumnBuilder<
   readonly table: string;
   readonly column: ColumnName;
   readonly columnMeta: ColumnMeta;
-  eq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  neq(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  gt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  lt(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  gte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  lte(value: ParamPlaceholder): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  eq(value: ParamPlaceholder | AnyColumnBuilderBase): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  neq(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  gt(value: ParamPlaceholder | AnyColumnBuilderBase): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  lt(value: ParamPlaceholder | AnyColumnBuilderBase): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  gte(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  lte(
+    value: ParamPlaceholder | AnyColumnBuilderBase,
+  ): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   // Helper property for type extraction (not used at runtime)
@@ -75,7 +81,7 @@ export interface BinaryBuilder<
   readonly kind: 'binary';
   readonly op: BinaryOp;
   readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
-  readonly right: ParamPlaceholder;
+  readonly right: ParamPlaceholder | AnyColumnBuilderBase;
 }
 
 // Helper aliases for usage sites where the specific column parameters are irrelevant
@@ -87,17 +93,17 @@ export interface BinaryBuilder<
 // Helper type that accepts any ColumnBuilder regardless of its generic parameters
 // This is needed because conditional types in ColumnBuilder create incompatible intersection types
 // when Operations differs, even though structurally they're compatible
-type AnyColumnBuilderBase = {
+export type AnyColumnBuilderBase = {
   readonly kind: 'column';
   readonly table: string;
   readonly column: string;
   readonly columnMeta: StorageColumn;
-  eq(value: ParamPlaceholder): AnyBinaryBuilder;
-  neq(value: ParamPlaceholder): AnyBinaryBuilder;
-  gt(value: ParamPlaceholder): AnyBinaryBuilder;
-  lt(value: ParamPlaceholder): AnyBinaryBuilder;
-  gte(value: ParamPlaceholder): AnyBinaryBuilder;
-  lte(value: ParamPlaceholder): AnyBinaryBuilder;
+  eq(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
+  neq(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
+  gt(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
+  lt(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
+  gte(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
+  lte(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
   asc(): AnyOrderBuilder;
   desc(): AnyOrderBuilder;
   readonly __jsType: unknown;
