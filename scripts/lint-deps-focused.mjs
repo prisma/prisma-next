@@ -8,8 +8,9 @@
  */
 
 import { execSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -45,19 +46,24 @@ function getStagedFiles() {
 function getPackageRoots(files) {
   const packageRoots = new Set();
   for (const file of files) {
-    // Extract package root from path like "packages/framework/core-plan/src/index.ts"
-    const match = file.match(/^packages\/([^/]+(?:\/[^/]+)*)/);
-    if (match) {
-      const packagePath = match[1];
-      // Get the top-level package directory
-      const parts = packagePath.split('/');
-      if (parts.length >= 2) {
-        // For paths like "framework/core-plan", use "framework/core-plan"
-        packageRoots.add(`packages/${parts[0]}/${parts[1]}`);
-      } else {
-        // For paths like "node-utils", use "packages/node-utils"
-        packageRoots.add(`packages/${parts[0]}`);
+    if (!file.startsWith('packages/')) continue;
+
+    // Walk up from the file's directory to find the nearest package.json.
+    // This supports nested monorepo layouts like:
+    // - packages/1-framework/1-core/shared/plan/...
+    // - packages/2-sql/4-lanes/sql-lane/...
+    let currentDir = join(repoRoot, dirname(file));
+    const packagesRoot = join(repoRoot, 'packages');
+
+    while (currentDir.startsWith(packagesRoot)) {
+      const pkgJson = join(currentDir, 'package.json');
+      if (existsSync(pkgJson)) {
+        packageRoots.add(relative(repoRoot, currentDir));
+        break;
       }
+      const parent = dirname(currentDir);
+      if (parent === currentDir) break;
+      currentDir = parent;
     }
   }
   return Array.from(packageRoots);
@@ -80,9 +86,15 @@ if (packageRoots.length === 0) {
   process.exit(0);
 }
 
-// Build include-only pattern from package roots
-// Convert ["packages/framework/core-plan", "packages/sql/authoring"] to "^packages/(framework/core-plan|sql/authoring)/"
-const includePattern = `^packages/(${packageRoots.map((root) => root.replace(/^packages\//, '')).join('|')})/`;
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Build include-only pattern from package roots.
+// Example roots:
+// - packages/1-framework/1-core/shared/plan
+// - packages/2-sql/4-lanes/sql-lane
+const includePattern = `^(${packageRoots.map(escapeRegex).join('|')})(/|$)`;
 
 console.log(`Running dependency check on staged packages: ${packageRoots.join(', ')}`);
 
