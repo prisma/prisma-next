@@ -4,19 +4,19 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
+import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../../../packages/sql/family/src/core/assembly';
+} from '@prisma-next/family-sql/test-utils';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 
@@ -101,7 +101,7 @@ describe('contract.d.ts imports resolution', () => {
       };
 
       const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/targets/postgres-adapter'),
+        join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
         [],
       );
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
@@ -171,13 +171,13 @@ type UserIdColumn = UserColumns['id'];
           baseUrl: '.',
           paths: {
             '@prisma-next/sql-contract/types': [
-              `${relativeToWorkspace}/packages/sql/contract/dist/exports/types.d.ts`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types.d.ts`,
             ],
             '@prisma-next/sql-contract/types/*': [
-              `${relativeToWorkspace}/packages/sql/contract/dist/exports/types/*`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
-              `${relativeToWorkspace}/packages/targets/postgres-adapter/dist/exports/*`,
+              `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/exports/*`,
             ],
           },
         },
@@ -275,7 +275,7 @@ type UserIdColumn = UserColumns['id'];
       };
 
       const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/targets/postgres-adapter'),
+        join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
         [],
       );
       const operationRegistry = assembleOperationRegistryFromPacks(packs);
@@ -348,16 +348,16 @@ type CodecIntType = CodecTypes['pg/int4@1'];
           baseUrl: '.',
           paths: {
             '@prisma-next/sql-contract-ts/*': [
-              `${relativeToWorkspace}/packages/sql/authoring/sql-contract-ts/dist/exports/*.d.ts`,
+              `${relativeToWorkspace}/packages/2-sql/2-authoring/contract-ts/dist/exports/*.d.ts`,
             ],
             '@prisma-next/sql-contract/types': [
-              `${relativeToWorkspace}/packages/sql/contract/dist/exports/types.d.ts`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types.d.ts`,
             ],
             '@prisma-next/sql-contract/types/*': [
-              `${relativeToWorkspace}/packages/sql/contract/dist/exports/*`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
-              `${relativeToWorkspace}/packages/targets/postgres-adapter/dist/exports/*`,
+              `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/exports/*`,
             ],
             '@prisma-next/sql-query/*': [
               `${relativeToWorkspace}/packages/sql-query/dist/exports/*.d.ts`,

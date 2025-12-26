@@ -3,7 +3,7 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import sqlFamily from '@prisma-next/family-sql/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { budgets, type Runtime } from '@prisma-next/sql-runtime';
-import postgresTarget from '@prisma-next/targets-postgres/runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Client } from 'pg';
 import contractJson from './contract.json' with { type: 'json' };
 

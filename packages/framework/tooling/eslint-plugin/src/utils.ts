@@ -3,7 +3,10 @@ import type { ParserServices } from '@typescript-eslint/utils';
 import { ESLintUtils } from '@typescript-eslint/utils';
 import type * as ts from 'typescript';
 
-const PRISMA_NEXT_SQL_PACKAGES = ['@prisma-next/sql-lane', 'packages/sql/lanes/sql-lane'] as const;
+const PRISMA_NEXT_SQL_PACKAGES = [
+  '@prisma-next/sql-lane',
+  'packages/2-sql/4-lanes/sql-lane',
+] as const;
 
 const PLAN_TYPE_PATTERNS = [/^SqlQueryPlan$/] as const;
 

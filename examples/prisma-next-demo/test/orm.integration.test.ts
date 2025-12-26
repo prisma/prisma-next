@@ -1,33 +1,36 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { loadContractFromTs } from '@prisma-next/cli';
+import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
+import {
+  assembleOperationRegistryFromPacks,
+  extractCodecTypeImportsFromPacks,
+  extractExtensionIdsFromPacks,
+  extractOperationTypeImportsFromPacks,
+} from '@prisma-next/family-sql/test-utils';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { loadExtensionPacks } from '../../../packages/framework/tooling/cli/src/pack-loading';
-import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
-} from '../../../packages/sql/family/src/core/assembly';
 import { stampMarker } from '../scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
 
 let contract: Contract;
 
 beforeAll(async () => {
+  const require = createRequire(import.meta.url);
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
-  const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
-  const pgvectorPath = resolve(__dirname, '../../../packages/extensions/pgvector');
+  // Dynamically resolve package directories
+  const adapterPath = dirname(require.resolve('@prisma-next/adapter-postgres/package.json'));
+  const pgvectorPath = dirname(require.resolve('@prisma-next/extension-pgvector/package.json'));
 
   const contractIR = await loadContractFromTs(contractPath);
   const packs = loadExtensionPacks(adapterPath, [pgvectorPath]);

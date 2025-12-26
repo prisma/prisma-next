@@ -5,18 +5,18 @@ import { fileURLToPath } from 'node:url';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import { emit } from '@prisma-next/emitter';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
   extractExtensionIdsFromPacks,
   extractOperationTypeImportsFromPacks,
-} from '../../../packages/sql/family/src/core/assembly';
+} from '@prisma-next/family-sql/test-utils';
+import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixturesDir = resolve(__dirname, '../../../packages/framework/tooling/cli/test/fixtures');
+const fixturesDir = resolve(__dirname, '../../../packages/1-framework/3-tooling/cli/test/fixtures');
 
 describe('emit command functionality', () => {
   let outputDir: string;
@@ -39,7 +39,7 @@ describe('emit command functionality', () => {
     'loads TS contract and emits contract.json and contract.d.ts',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -91,7 +91,7 @@ describe('emit command functionality', () => {
     'emits contract with correct coreHash',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);
@@ -122,7 +122,7 @@ describe('emit command functionality', () => {
     async () => {
       const newOutputDir = join(tmpdir(), `prisma-next-test-new-${Date.now()}`);
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/targets/postgres-adapter');
+      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
 
       const contract = await loadContractFromTs(contractPath);
       const packs = loadExtensionPacks(adapterPath, []);

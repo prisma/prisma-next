@@ -75,7 +75,10 @@ describe('contract emit command (CLI process e2e)', () => {
   it(
     'executes CLI as separate process to emit contract and verifies artifacts',
     async () => {
-      const cliPath = resolve(__dirname, '../../../../packages/framework/tooling/cli/dist/cli.js');
+      const cliPath = resolve(
+        __dirname,
+        '../../../../packages/1-framework/3-tooling/cli/dist/cli.js',
+      );
 
       try {
         // Set cwd for spawned process so relative paths in config resolve correctly
@@ -133,7 +136,10 @@ describe('contract emit command (CLI process e2e)', () => {
       // loadContractFromTs can resolve packages because testDir is within the fixture app
       const originalContract = await loadContractFromTs(contractPath);
 
-      const cliPath = resolve(__dirname, '../../../../packages/framework/tooling/cli/dist/cli.js');
+      const cliPath = resolve(
+        __dirname,
+        '../../../../packages/1-framework/3-tooling/cli/dist/cli.js',
+      );
 
       try {
         // Set cwd for spawned process so relative paths in config resolve correctly

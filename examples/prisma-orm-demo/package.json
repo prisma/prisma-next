@@ -20,7 +20,7 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/targets-postgres": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",

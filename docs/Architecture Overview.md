@@ -268,39 +268,54 @@ Key points:
 - CLI is family-agnostic: framework CLI reads config and calls family-provided helpers; pack assembly logic lives in family packages, not the framework CLI.
 - No long-lived transitional shims are maintained; there are no external consumers. Short-lived internal bridges are allowed only during migration.
 
-Example layout
+Example layout (with numbered prefixes for visual hierarchy):
 
 ```
 packages/
-  framework/
-    core-contract/       # contract types + plan metadata
-    core-plan/           # diagnostics, shared errors
-    core-operations/     # target-neutral operation registry + helpers
-    authoring/
-      contract-authoring/  # TS builders, canonicalization, schema DSL
-    tooling/
+  1-framework/           # Domain 1: Framework (target-agnostic)
+    1-core/
+      shared/
+        contract/        # contract types + plan metadata
+        plan/            # diagnostics, shared errors
+        operations/      # target-neutral operation registry + helpers
+      migration/
+        control-plane/   # control plane domain actions
+      runtime/
+        execution-plane/ # execution plane types
+    2-authoring/
+      contract/          # TS builders, canonicalization, schema DSL
+    3-tooling/
       cli/               # framework CLI (config-only, family-agnostic)
       emitter/           # contract emitter with family hooks
-    runtime-executor/    # target-agnostic runtime kernel (verification, plugins, SPI)
-  sql/
-    contract/            # SQL contract types (shared plane)
-    operations/          # SQL operation types (shared plane)
-    tooling/
+    4-runtime-executor/  # target-agnostic runtime kernel (verification, plugins, SPI)
+  2-sql/                 # Domain 2: SQL family
+    1-core/
+      contract/          # SQL contract types (shared plane)
+      operations/        # SQL operation types (shared plane)
+      schema-ir/         # SQL schema IR types
+    2-authoring/
+      contract-ts/       # SQL TS authoring surface
+    3-tooling/
       emitter/           # SQL emitter hook
-      assembly/          # SQL family assembly helpers
-      cli/               # SQL family CLI entry point
-    lanes/
+      family/            # SQL family descriptor and helpers
+    4-lanes/
       relational-core/   # schema + column builders, operation attachment
       sql-lane/          # relational DSL + raw lane
       orm-lane/          # ORM builder, includes, relation filters
-    sql-runtime/         # SQL runtime implementing the runtime SPI
-  targets/
-    postgres/            # Postgres target descriptor
-    postgres-adapter/    # Postgres adapter (multi-plane: shared, migration, runtime)
-    postgres-driver/     # Postgres driver
+    5-runtime/           # SQL runtime implementing the runtime SPI
+  3-targets/             # Domain 3: Targets
+    3-targets/
+      postgres/          # Postgres target descriptor
+    6-adapters/
+      postgres/          # Postgres adapter (multi-plane: shared, migration, runtime)
+    7-drivers/
+      postgres/          # Postgres driver
+  3-extensions/          # Domain 3: Extensions
+    compat-prisma/       # Prisma ORM compatibility layer
+    pgvector/            # pgvector extension pack
 ```
 
-Dependency direction is strictly one-way: `core → authoring → targets → lanes → runtime(core) → family runtime → adapters`. Inner rings never import outer rings. Enforce with tsconfig path groups, ESLint path rules, and an import-graph CI check.
+Dependency direction is strictly one-way: `core → authoring → tooling → lanes → runtime-executor → family runtime → adapters`. Numbered prefixes reinforce the hierarchy: lower numbers can be imported by higher numbers, never the reverse. Enforce with Dependency Cruiser using data-driven configuration from `architecture.config.json`.
 
 ### Diagram — Thin core, fat targets
 
