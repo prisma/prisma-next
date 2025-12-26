@@ -3,7 +3,7 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import type { ControlFamilyDescriptor } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import postgres from '@prisma-next/targets-postgres/control';
+import postgres from '@prisma-next/target-postgres/control';
 import { contract } from './contract';
 
 // Create family descriptor without create method

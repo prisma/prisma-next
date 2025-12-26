@@ -1,0 +1,39 @@
+{
+  "name": "@prisma-next/plan",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Plan helpers, diagnostics, and shared errors for Prisma Next",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --config-path ../../../../../biome.json --error-on-warnings",
+    "lint:fix": "biome check --write . --config-path ../../../biome.json",
+    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../biome.json",
+    "clean": "node ../../../../../scripts/clean.mjs"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.1"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./errors": {
+      "types": "./dist/exports/errors.d.ts",
+      "import": "./dist/exports/errors.js"
+    },
+    "./types": {
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
+    }
+  }
+}

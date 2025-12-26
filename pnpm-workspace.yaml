@@ -1,14 +1,7 @@
 packages:
-  - packages/framework/**
-  - packages/sql/**
-  - packages/targets/**
-  - packages/extensions/**
-  - packages/compat/*
-  - packages/document
-  - packages/*
+  - packages/**
   - examples/*
   - test/**
 
 catalog:
   "@prisma/dev": "0.19.1"
-

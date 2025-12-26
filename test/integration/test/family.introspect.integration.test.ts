@@ -1,7 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import postgres from '@prisma-next/targets-postgres/control';
+import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
