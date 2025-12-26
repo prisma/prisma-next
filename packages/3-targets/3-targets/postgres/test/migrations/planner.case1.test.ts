@@ -1,8 +1,12 @@
+import type { MigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import {
+  createPostgresMigrationPlanner,
+  type PostgresPlanTargetDetails,
+} from '../../src/core/migrations/planner';
 
 const contract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -75,7 +79,9 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     }
     const operations = result.plan.operations;
     expect(operations.length).toBeGreaterThan(0);
-    expect(operations.map((op) => op.id)).toEqual([
+    expect(
+      operations.map((op: MigrationPlanOperation<PostgresPlanTargetDetails>) => op.id),
+    ).toEqual([
       'extension.pgvector',
       'table.post',
       'table.user',
@@ -87,7 +93,11 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       label: 'Enable extension "pgvector"',
       execute: [{ sql: 'CREATE EXTENSION IF NOT EXISTS vector' }],
     });
-    expect(operations.find((op) => op.id === 'table.user')).toMatchObject({
+    expect(
+      operations.find(
+        (op: MigrationPlanOperation<PostgresPlanTargetDetails>) => op.id === 'table.user',
+      ),
+    ).toMatchObject({
       execute: [
         {
           sql: expect.stringContaining('CREATE TABLE "public"."user"'),
