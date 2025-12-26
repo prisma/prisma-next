@@ -30,7 +30,7 @@
     { "path": "./packages/extensions/compat-prisma" },
     { "path": "./packages/schema-emitter" },
     { "path": "./packages/framework/tooling/cli" },
-    { "path": "./packages/framework/tooling/eslint-plugin" },
+    { "path": "./packages/1-framework/3-tooling/eslint-plugin" },
     { "path": "./packages/framework/core-plan" },
     { "path": "./packages/framework/core-operations" },
     { "path": "./packages/framework/core-control-plane" },
