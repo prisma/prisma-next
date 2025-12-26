@@ -85,7 +85,7 @@ describe('mutation builder edge cases', () => {
         .build({ params: { email: 'test@example.com' } });
 
       expect(plan.meta.annotations?.codecs).toBeDefined();
-      expect(plan.meta.annotations?.codecs?.email).toBe('pg/text@1');
+      expect(plan.meta.annotations?.codecs?.['email']).toBe('pg/text@1');
     });
   });
 
@@ -172,7 +172,7 @@ describe('mutation builder edge cases', () => {
         .build({ params: { email: 'test@example.com', userId: 1 } });
 
       expect(plan.meta.annotations?.codecs).toBeDefined();
-      expect(plan.meta.annotations?.codecs?.email).toBe('pg/text@1');
+      expect(plan.meta.annotations?.codecs?.['email']).toBe('pg/text@1');
     });
 
     it('includes paramCodecs in meta.annotations.codecs for UPDATE where clause', () => {
@@ -184,7 +184,7 @@ describe('mutation builder edge cases', () => {
         .build({ params: { email: 'test@example.com', userId: 1 } });
 
       expect(plan.meta.annotations?.codecs).toBeDefined();
-      expect(plan.meta.annotations?.codecs?.userId).toBe('pg/int4@1');
+      expect(plan.meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
     });
   });
 
@@ -237,7 +237,7 @@ describe('mutation builder edge cases', () => {
         .build({ params: { userId: 1 } });
 
       expect(plan.meta.annotations?.codecs).toBeDefined();
-      expect(plan.meta.annotations?.codecs?.userId).toBe('pg/int4@1');
+      expect(plan.meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
     });
   });
 });

@@ -234,11 +234,10 @@ export function buildIncludeAst(
         if (!column || !alias) {
           errorMissingColumnForAlias(alias ?? 'unknown', idx);
         }
-        // TypeScript can't narrow ColumnBuilder properly
-        const col = column as { table: string; column: string };
+
         return {
           alias,
-          expr: createColumnRef(col.table, col.column),
+          expr: createColumnRef(column.table, column.column),
         };
       }),
     },

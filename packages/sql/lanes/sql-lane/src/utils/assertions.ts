@@ -1,16 +1,21 @@
 import { planInvalid } from '@prisma-next/plan';
+import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
 
 /**
  * Asserts that a ColumnBuilder has table and column properties.
- * Used after type casts when TypeScript can't narrow properly.
  */
-export function assertColumnBuilder(
-  col: { table?: string; column?: string },
-  context: string,
-): asserts col is { table: string; column: string } {
-  if (!col.table || !col.column) {
-    throw planInvalid(`ColumnBuilder missing table/column in ${context}`);
+export function assertColumnBuilder(col: unknown, context: string): AnyColumnBuilder {
+  if (
+    typeof col === 'object' &&
+    col !== null &&
+    'table' in col &&
+    'column' in col &&
+    typeof (col as { table: unknown }).table === 'string' &&
+    typeof (col as { column: unknown }).column === 'string'
+  ) {
+    return col as AnyColumnBuilder;
   }
+  throw planInvalid(`ColumnBuilder missing table/column in ${context}`);
 }
 
 /**

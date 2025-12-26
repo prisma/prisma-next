@@ -33,6 +33,7 @@ describe('buildWhereExpr', () => {
       right: param('userId'),
     };
 
+    // @ts-expect-error - Intentionally testing invalid input
     expect(() => buildWhereExpr(contract, invalidBinary, { userId: 1 }, [], [])).toThrow(
       'Failed to build WHERE clause',
     );
@@ -46,6 +47,7 @@ describe('buildWhereExpr', () => {
       right: { kind: 'invalid' } as unknown,
     };
 
+    // @ts-expect-error - Intentionally testing invalid input
     expect(() => buildWhereExpr(contract, invalidBinary, { userId: 1 }, [], [])).toThrow(
       'Failed to build WHERE clause',
     );
