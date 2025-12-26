@@ -38,7 +38,7 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
     - `mode: 'init' | 'update'` (extensible).
     - `allowedOperationClasses: readonly ('additive' | 'widening' | 'destructive')[]`.
   - Document how `db init` uses `mode: 'init'` + `['additive']` and how `db update` will extend this later.
-  - ✅ Implemented via `MigrationPolicy` in `packages/sql/family/src/core/migrations/types.ts` plus `INIT_ADDITIVE_POLICY` in `packages/sql/family/src/core/migrations/policies.ts`. The CLI now keeps "init vs update" context separately while the shared policy carries only the enforcement set (`allowedOperationClasses`), eliminating the incentive for downstream systems to branch on mode.
+  - ✅ Implemented via `MigrationPolicy` in `packages/2-sql/3-tooling/family/src/core/migrations/types.ts` plus `INIT_ADDITIVE_POLICY` in `packages/2-sql/3-tooling/family/src/core/migrations/policies.ts`. The CLI now keeps "init vs update" context separately while the shared policy carries only the enforcement set (`allowedOperationClasses`), eliminating the incentive for downstream systems to branch on mode.
 
 - [x] **1.2 Define planner result shape**
   - Design a `PlannerResult` type that can represent:
@@ -48,7 +48,7 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
     - Conflict kind (e.g., `typeMismatch`, `nullabilityConflict`, `indexIncompatible`, `missingButNonAdditive`).
     - Location (table, column, constraint, index).
     - Human-oriented `summary`/`why` fields suitable for CLI error mapping.
-  - ✅ `PlannerResult`, `PlannerConflict*`, `plannerSuccess`, and `plannerFailure` live in `packages/sql/family/src/core/migrations/types.ts`.
+  - ✅ `PlannerResult`, `PlannerConflict*`, `plannerSuccess`, and `plannerFailure` live in `packages/2-sql/3-tooling/family/src/core/migrations/types.ts`.
 
 - [x] **1.3 Define migration plan IR**
   - Introduce an in-memory `MigrationPlan` type for additive operations, including:
@@ -56,7 +56,7 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
     - Per-operation identifiers.
     - Per-operation `precheckSql`, `executeSql`, `postcheckSql` (or equivalent execution units).
   - Ensure the IR is target-agnostic at the interface level, but can carry Postgres-specific details via the target implementation.
-  - ✅ `MigrationPlan`, `MigrationPlanOperation`, `MigrationPlanOperationStep`, and `createMigrationPlan()` (same path as above) provide the IR plus helpers and tests under `packages/sql/family/test/migrations/types.test.ts`.
+  - ✅ `MigrationPlan`, `MigrationPlanOperation`, `MigrationPlanOperationStep`, and `createMigrationPlan()` (same path as above) provide the IR plus helpers and tests under `packages/2-sql/3-tooling/family/test/migrations.types.test.ts`.
 
 - **1.4 Establish planner SPI between family and target**
   - Define a `MigrationPlanner` interface in the SQL family/control-plane layer (shared plane).

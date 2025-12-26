@@ -3,13 +3,13 @@ import {
   createMigrationPlan,
   plannerFailure,
   plannerSuccess,
-} from '../../src/core/migrations/plan-helpers';
-import { INIT_ADDITIVE_POLICY } from '../../src/core/migrations/policies';
+} from '../src/core/migrations/plan-helpers';
+import { INIT_ADDITIVE_POLICY } from '../src/core/migrations/policies';
 import type {
   MigrationPlan,
   MigrationPlanOperation,
   PlannerConflict,
-} from '../../src/core/migrations/types';
+} from '../src/core/migrations/types';
 
 type TestTargetDetails = { readonly schema: string };
 
