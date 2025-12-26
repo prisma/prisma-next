@@ -4,6 +4,7 @@ import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { buildWhereExpr } from '../../src/selection/predicates';
@@ -216,7 +217,7 @@ describe('predicates', () => {
         left: idColumn,
         right: { kind: 'invalid' } as unknown as ReturnType<typeof param>,
         op: 'eq' as const,
-      };
+      } as unknown as BinaryBuilder;
       const paramsMap = {};
       const descriptors: ParamDescriptor[] = [];
       const values: unknown[] = [];
