@@ -569,16 +569,16 @@ export class OrmModelBuilderImpl<
       })();
 
     // Build includes AST
-    const { includesAst, includesForMeta } = buildIncludeAsts(
-      this.includes,
-      this.contract,
-      this.context,
-      this.modelName,
+    const { includesAst, includesForMeta } = buildIncludeAsts({
+      includes: this.includes,
+      contract: this.contract,
+      context: this.context,
+      modelName: this.modelName,
       paramsMap,
       paramDescriptors,
       paramValues,
       paramCodecs,
-    );
+    });
 
     // Build projection state
     const projectionState = buildProjectionState(
