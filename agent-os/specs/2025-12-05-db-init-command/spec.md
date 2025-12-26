@@ -298,9 +298,9 @@ Responsibilities:
 
 - `docs/Db-Init-Command.md` — original, more detailed design and slicing; this spec intentionally relaxes over‑prescriptive implementation details while preserving the core problem and constraints.
 - `docs/Architecture Overview.md` — overall architecture, contract-first and migration model.
-- `docs/architecture docs/1. Data Contract.md` — SQL contract structure and semantics.
-- `docs/architecture docs/3. Query Lanes.md` — SQL family and runtime context.
-- `docs/architecture docs/5. Adapters & Targets.md` — control-plane descriptors and target/family separation.
+- `docs/architecture docs/subsystems/1. Data Contract.md` — SQL contract structure and semantics.
+- `docs/architecture docs/subsystems/3. Query Lanes.md` — SQL family and runtime context.
+- `docs/architecture docs/subsystems/5. Adapters & Targets.md` — control-plane descriptors and target/family separation.
 - `docs/Testing Guide.md` — testing expectations for new CLI commands and migration features.
 
 

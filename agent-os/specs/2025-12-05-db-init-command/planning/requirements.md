@@ -394,38 +394,54 @@ The implementation will follow this order (different from design doc):
 ### Migration Structure
 
 **Operation Definition:**
+
+> Note: The following interfaces are simplified examples for this spec. For the canonical, implementation-accurate types, see:
+> `packages/2-sql/3-tooling/family/src/core/migrations/types.ts`
+
 ```typescript
-interface Operation {
-  type: 'createTable' | 'addColumn' | 'addIndex' | 'createExtension' | ...
-  precheck: (db: Connection) => Promise<boolean>  // Idempotency check
-  statement: string | ((db: Connection) => Promise<string>)  // SQL to execute
-  postcheck: (db: Connection) => Promise<boolean>  // Verify success
-  metadata: {
-    classification: 'additive' | 'widening' | 'destructive'
-    description: string
-  }
+interface MigrationPlanOperationStep {
+  description: string
+  sql: string
+  meta?: Record<string, unknown>
+}
+
+interface MigrationPlanOperationTarget<TTargetDetails = Record<string, never>> {
+  id: string
+  details?: TTargetDetails
+}
+
+interface MigrationPlanOperation<TTargetDetails = Record<string, never>> {
+  id: string
+  label: string
+  summary?: string
+  operationClass: 'additive' | 'widening' | 'destructive'
+  target: MigrationPlanOperationTarget<TTargetDetails>
+  precheck: MigrationPlanOperationStep[]
+  execute: MigrationPlanOperationStep[]
+  postcheck: MigrationPlanOperationStep[]
+  meta?: Record<string, unknown>
 }
 ```
 
 **Migration Plan:**
 ```typescript
-interface MigrationPlan {
-  fromCoreHash: string
-  toCoreHash: string
-  fromProfileHash: string
-  toProfileHash: string
-  operations: Operation[]
-  metadata: {
-    mode: 'init' | 'update'
-    policy: MigrationPolicy
-  }
+interface MigrationPlanContractInfo {
+  coreHash: string
+  profileHash?: string
+}
+
+interface MigrationPlan<TTargetDetails = Record<string, never>> {
+  targetId: string
+  policy: MigrationPolicy
+  contract: MigrationPlanContractInfo
+  operations: MigrationPlanOperation<TTargetDetails>[]
+  meta?: Record<string, unknown>
 }
 ```
 
 **Migration Policy:**
 ```typescript
 interface MigrationPolicy {
-  mode: 'init' | 'update'
   allowedOperationClasses: ('additive' | 'widening' | 'destructive')[]
 }
 ```
