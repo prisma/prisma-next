@@ -26,6 +26,7 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 - Helpers should hide implementation details
 - Helpers should express intent clearly
 - Helpers should reduce line count significantly
+- **Behavioral invariants:** Prefer tests that prove observable behavior (clone/freeze, metadata safety) using minimal fixtures, mutate original inputs to ensure outputs stay immutable, and only add `expectTypeOf` assertions when they validate a public surface.
 
 **Test Descriptions:**
 - Omit "should" - `it('returns correct value')` not `it('should return correct value')`
