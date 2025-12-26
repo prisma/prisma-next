@@ -82,7 +82,7 @@ const familyInstance = config.family.create({
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
 import sql from '@prisma-next/family-sql/control';
-import postgres from '@prisma-next/targets-postgres/control';
+import postgres from '@prisma-next/target-postgres/control';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 
@@ -107,7 +107,7 @@ export default defineConfig({
 Control plane entry points export default descriptors:
 
 - `@prisma-next/family-sql/control` → `ControlFamilyDescriptor<'sql'>`
-- `@prisma-next/targets-postgres/control` → `ControlTargetDescriptor<'sql', 'postgres'>`
+- `@prisma-next/target-postgres/control` → `ControlTargetDescriptor<'sql', 'postgres'>`
 - `@prisma-next/adapter-postgres/control` → `ControlAdapterDescriptor<'sql', 'postgres'>`
 - `@prisma-next/driver-postgres/control` → `ControlDriverDescriptor<'sql', 'postgres'>`
 - `@prisma-next/extensions-*/control` → `ControlExtensionDescriptor<'sql', 'postgres'>`

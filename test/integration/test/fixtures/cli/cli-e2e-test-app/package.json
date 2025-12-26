@@ -8,7 +8,7 @@
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
-    "@prisma-next/targets-postgres": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
     "pg": "^8.16.3"
   }
 }

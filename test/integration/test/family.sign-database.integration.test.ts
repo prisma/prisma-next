@@ -14,7 +14,7 @@ import {
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
-import postgres from '@prisma-next/targets-postgres/control';
+import postgres from '@prisma-next/target-postgres/control';
 import type { DevDatabase } from '@prisma-next/test-utils';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';

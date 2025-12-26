@@ -20,7 +20,7 @@ const repoRoot = resolve(__dirname, '../../../../');
 
 describe('end-to-end basic queries', () => {
   const configPath = resolve(__dirname, 'fixtures/prisma-next.config.ts');
-  const cliPath = resolve(repoRoot, 'packages/framework/tooling/cli/dist/cli.js');
+  const cliPath = resolve(repoRoot, 'packages/1-framework/3-tooling/cli/dist/cli.js');
   const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
   it(

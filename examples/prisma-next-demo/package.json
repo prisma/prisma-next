@@ -24,7 +24,7 @@
     "@prisma-next/sql-orm-lane": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
-    "@prisma-next/targets-postgres": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
     "dotenv": "^16.4.5",
     "pg": "^8.11.5"
   },

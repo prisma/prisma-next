@@ -8,58 +8,58 @@ This document provides a visual representation of all domains, planes, and layer
 graph TB
     subgraph "SHARED PLANE"
         subgraph "Framework Domain - Shared"
-            FW_Core_Plan[core-plan<br/>Plan helpers, diagnostics]
-            FW_Core_Ops[core-operations<br/>Operation registry]
-            FW_Core_Contract[core-contract<br/>Contract types]
+            FW_Core_Plan[1-framework/1-core/shared/plan<br/>Plan helpers, diagnostics]
+            FW_Core_Ops[1-framework/1-core/shared/operations<br/>Operation registry]
+            FW_Core_Contract[1-framework/1-core/shared/contract<br/>Contract types]
         end
 
         subgraph "SQL Domain - Shared"
-            SQL_Contract[sql/contract<br/>SQL contract types]
-            SQL_Ops[sql/operations<br/>SQL operations]
+            SQL_Contract[2-sql/1-core/contract<br/>SQL contract types]
+            SQL_Ops[2-sql/1-core/operations<br/>SQL operations]
         end
 
         subgraph "Targets Domain - Shared"
-            Tgt_Adapter_Core[postgres-adapter/core<br/>Adapter core]
+            Tgt_Adapter_Core[3-targets/6-adapters/postgres/core<br/>Adapter core]
         end
     end
 
     subgraph "MIGRATION PLANE"
         subgraph "Framework Domain - Migration"
-            FW_Authoring[authoring/contract-authoring<br/>TS builders, canonicalization]
-            FW_Authoring_TS[authoring/contract-ts<br/>TS authoring]
-            FW_Authoring_PSL[authoring/contract-psl<br/>PSL parser]
-            FW_Tooling_CLI[tooling/cli<br/>Framework CLI]
-            FW_Tooling_Emitter[tooling/emitter<br/>Contract emitter]
+            FW_Authoring[1-framework/2-authoring/contract<br/>TS builders, canonicalization]
+            FW_Authoring_TS[1-framework/2-authoring/contract-ts<br/>TS authoring]
+            FW_Authoring_PSL[1-framework/2-authoring/contract-psl<br/>PSL parser]
+            FW_Tooling_CLI[1-framework/3-tooling/cli<br/>Framework CLI]
+            FW_Tooling_Emitter[1-framework/3-tooling/emitter<br/>Contract emitter]
         end
 
         subgraph "SQL Domain - Migration"
-            SQL_Authoring[sql/authoring<br/>SQL contract authoring]
-            SQL_Tooling[sql/tooling<br/>SQL emitter hooks, CLI helpers]
+            SQL_Authoring[2-sql/2-authoring/contract-ts<br/>SQL contract authoring]
+            SQL_Tooling[2-sql/3-tooling<br/>SQL emitter hooks, family helpers]
         end
 
         subgraph "Targets Domain - Migration"
-            Tgt_Adapter_CLI[postgres-adapter/cli<br/>CLI descriptors]
+            Tgt_Adapter_CLI[3-targets/6-adapters/postgres/control<br/>Control plane descriptors]
         end
     end
 
     subgraph "RUNTIME PLANE"
         subgraph "Framework Domain - Runtime"
-            FW_Runtime_Exec[runtime-executor<br/>Runtime kernel, plugins]
+            FW_Runtime_Exec[1-framework/4-runtime-executor<br/>Runtime kernel, plugins]
         end
 
         subgraph "SQL Domain - Runtime"
-            SQL_Lanes[sql/lanes<br/>Query DSLs, ORM]
-            SQL_Runtime[sql/sql-runtime<br/>SQL runtime implementation]
-            SQL_Adapters[sql/adapters<br/>Database adapters]
-            SQL_Drivers[sql/drivers<br/>Database drivers]
+            SQL_Lanes[2-sql/4-lanes<br/>Query DSLs, ORM]
+            SQL_Runtime[2-sql/5-runtime<br/>SQL runtime implementation]
+            SQL_Adapters[3-targets/6-adapters<br/>Database adapters]
+            SQL_Drivers[3-targets/7-drivers<br/>Database drivers]
         end
 
         subgraph "Targets Domain - Runtime"
-            Tgt_Adapter_Runtime[postgres-adapter/runtime<br/>Runtime factories]
+            Tgt_Adapter_Runtime[3-targets/6-adapters/postgres/runtime<br/>Runtime factories]
         end
 
         subgraph "Extensions Domain - Runtime"
-            Ext_Compat[extensions/compat-prisma<br/>Prisma ORM compat]
+            Ext_Compat[3-extensions/compat-prisma<br/>Prisma ORM compat]
         end
     end
 
@@ -225,10 +225,10 @@ graph TB
 ## Key Relationships
 
 ### Domain Structure
-- **Framework**: Target-agnostic core (contracts, plans, runtime kernel, tooling)
-- **SQL**: SQL family-specific packages (contract types, operations, lanes, runtime)
-- **Targets**: Concrete target extension packs (Postgres adapter, driver)
-- **Extensions**: Ecosystem extensions (compat layers, extension packs)
+- **Framework** (`packages/1-framework/`): Target-agnostic core (contracts, plans, runtime kernel, tooling)
+- **SQL** (`packages/2-sql/`): SQL family-specific packages (contract types, operations, lanes, runtime)
+- **Targets** (`packages/3-targets/`): Concrete target extension packs (Postgres adapter, driver)
+- **Extensions** (`packages/3-extensions/`): Ecosystem extensions (compat layers, extension packs)
 
 ### Layer Order (Dependency Direction)
 **Framework Domain:**

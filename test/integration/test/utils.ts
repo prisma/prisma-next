@@ -5,7 +5,7 @@ import sqlFamily from '@prisma-next/family-sql/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Extension, Log, Plugin, Runtime } from '@prisma-next/sql-runtime';
 import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
-import postgresTarget from '@prisma-next/targets-postgres/runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Client } from 'pg';
 
 export interface CreateTestRuntimeOptions {
