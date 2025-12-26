@@ -2,14 +2,15 @@ import type { PlanMeta } from '@prisma-next/contract/types';
 import type { Expression } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
 import type { AnyExpressionSource } from '@prisma-next/sql-relational-core/types';
-import type { MetaBuildArgs } from '../types/internal';
-import { errorMissingColumnForAlias } from '../utils/errors';
 import {
   collectColumnRefs,
   isColumnBuilder,
   isExpressionBuilder,
   isOperationExpr,
-} from '../utils/guards';
+} from '@prisma-next/sql-relational-core/utils/guards';
+import type { MetaBuildArgs } from '../types/internal';
+import { assertColumnBuilder } from '../utils/assertions';
+import { errorMissingColumnForAlias } from '../utils/errors';
 
 /**
  * Extracts column references from an ExpressionSource (ColumnBuilder or ExpressionBuilder).
@@ -71,9 +72,8 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
   if (args.joins) {
     for (const join of args.joins) {
       refsTables.add(join.table.name);
-      // TypeScript can't narrow ColumnBuilder properly
-      const onLeft = join.on.left as unknown as { table: string; column: string };
-      const onRight = join.on.right as unknown as { table: string; column: string };
+      const onLeft = assertColumnBuilder(join.on.left, 'join ON left');
+      const onRight = assertColumnBuilder(join.on.right, 'join ON right');
       refsColumns.set(`${onLeft.table}.${onLeft.column}`, {
         table: onLeft.table,
         column: onLeft.column,
@@ -90,27 +90,24 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       refsTables.add(include.table.name);
       // Add ON condition columns
       // JoinOnPredicate.left and .right are always ColumnBuilder
-      const onLeft = include.on.left as unknown as { table: string; column: string };
-      const onRight = include.on.right as unknown as { table: string; column: string };
-      if (onLeft.table && onLeft.column && onRight.table && onRight.column) {
-        refsColumns.set(`${onLeft.table}.${onLeft.column}`, {
-          table: onLeft.table,
-          column: onLeft.column,
-        });
-        refsColumns.set(`${onRight.table}.${onRight.column}`, {
-          table: onRight.table,
-          column: onRight.column,
-        });
-      }
+      const leftCol = assertColumnBuilder(include.on.left, 'include ON left');
+      const rightCol = assertColumnBuilder(include.on.right, 'include ON right');
+      refsColumns.set(`${leftCol.table}.${leftCol.column}`, {
+        table: leftCol.table,
+        column: leftCol.column,
+      });
+      refsColumns.set(`${rightCol.table}.${rightCol.column}`, {
+        table: rightCol.table,
+        column: rightCol.column,
+      });
       // Add child projection columns
       for (const column of include.childProjection.columns) {
-        const col = column as unknown as { table?: string; column?: string };
-        if (col.table && col.column) {
-          refsColumns.set(`${col.table}.${col.column}`, {
-            table: col.table,
-            column: col.column,
-          });
-        }
+        const col = assertColumnBuilder(column, 'include child projection column');
+
+        refsColumns.set(`${col.table}.${col.column}`, {
+          table: col.table,
+          column: col.column,
+        });
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
@@ -186,6 +183,8 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
       const column = args.projection.columns[index];
       if (!column) {
+        // Null column means this is an include placeholder, but alias doesn't match includes
+        // This shouldn't happen if projection building is correct, but handle gracefully
         errorMissingColumnForAlias(alias, index);
       }
       // Check if column is an ExpressionBuilder (operation result)
@@ -198,7 +197,8 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         // This is a placeholder column for an include - skip it
         return [alias, `include:${alias}`];
       }
-      return [alias, `${col.table}.${col.column}`];
+
+      return [alias, `${column.table}.${column.column}`];
     }),
   );
 

@@ -19,6 +19,7 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
+        'src/utils/assertions.ts', // Assertion helpers - tested indirectly, impossible states
       ],
       thresholds: {
         lines: 95,

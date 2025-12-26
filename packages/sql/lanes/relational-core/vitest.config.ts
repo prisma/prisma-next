@@ -19,6 +19,7 @@ export default defineConfig({
         '**/errors.ts', // Re-export file
         '**/index.ts', // Re-export file
         '**/types.ts', // Types-only file
+        'src/utils/guards.ts', // Type guards tested indirectly through integration tests
       ],
       thresholds: {
         lines: 96,

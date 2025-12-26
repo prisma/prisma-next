@@ -6,14 +6,14 @@ import {
   createParamRef,
 } from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
-import { describe, expect, it } from 'vitest';
 import {
   collectColumnRefs,
   extractBaseColumnRef,
   getColumnInfo,
   isColumnBuilder,
   isOperationExpr,
-} from '../../src/utils/guards';
+} from '@prisma-next/sql-relational-core/utils/guards';
+import { describe, expect, it } from 'vitest';
 
 describe('guards', () => {
   const int4ColumnMeta: StorageColumn = {

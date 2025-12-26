@@ -46,7 +46,7 @@ export class AsyncIterableResult<Row> implements AsyncIterable<Row> {
           suggestion:
             this.consumedBy === 'toArray'
               ? 'You cannot call toArray() twice on the same AsyncIterableResult. Store the result from the first call in a variable and reuse that.'
-              : 'The iterator was already consumed by a for-await loop. Use toArray() before iterating.',
+              : 'The iterator was already consumed by a for-await loop. Use toArray() to collect all results before iterating.',
         },
       );
     }

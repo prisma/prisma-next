@@ -1,9 +1,6 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
-import type {
-  AnyColumnBuilder,
-  AnyExpressionSource,
-  NestedProjection,
-} from '@prisma-next/sql-relational-core/types';
+import type { AnyExpressionSource, NestedProjection } from '@prisma-next/sql-relational-core/types';
+import { isExpressionSource } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
 import {
   errorAliasCollision,
@@ -13,7 +10,6 @@ import {
   errorInvalidProjectionValue,
   errorProjectionEmpty,
 } from '../utils/errors';
-import { isExpressionSource } from '../utils/guards';
 import type { IncludeState, ProjectionState } from '../utils/state';
 
 export function generateAlias(path: string[]): string {
@@ -90,11 +86,9 @@ export function buildProjectionState(
       if (!matchingInclude) {
         errorIncludeAliasNotFound(key);
       }
-      // For include references, we track the alias but use a placeholder column
+      // For include references, we track the alias but use a placeholder object
       // The actual handling happens in AST building where we create includeRef
       aliases.push(key);
-      // Use a placeholder column - this won't be used for includes, but we need
-      // to maintain the same array length for aliases and columns
       columns.push({
         kind: 'column',
         table: matchingInclude.table.name,

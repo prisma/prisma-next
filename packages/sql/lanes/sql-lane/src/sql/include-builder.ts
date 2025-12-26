@@ -23,11 +23,14 @@ import type {
   OrderBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import {
+  extractBaseColumnRef,
+  isOperationExpr,
+} from '@prisma-next/sql-relational-core/utils/guards';
+import {
   errorChildProjectionMustBeSpecified,
   errorLimitMustBeNonNegativeInteger,
   errorMissingColumnForAlias,
 } from '../utils/errors';
-import { extractBaseColumnRef, isOperationExpr } from '../utils/guards';
 import type { IncludeState, ProjectionState } from '../utils/state';
 import { buildWhereExpr } from './predicate-builder';
 import { buildProjectionState } from './projection';
@@ -234,11 +237,10 @@ export function buildIncludeAst(
         if (!column || !alias) {
           errorMissingColumnForAlias(alias ?? 'unknown', idx);
         }
-        // TypeScript can't narrow ColumnBuilder properly
-        const col = column as { table: string; column: string };
+
         return {
           alias,
-          expr: createColumnRef(col.table, col.column),
+          expr: column.toExpr(),
         };
       }),
     },

@@ -1013,15 +1013,15 @@ Dynamic imports create several issues:
 **❌ WRONG: Dynamic import of TypeScript package**
 
 ```typescript
-// ❌ WRONG: Dynamic import even for types
-const { SqlContract } = await import('@prisma-next/sql-contract/types');
-
 // ❌ WRONG: Dynamic import for runtime code
 const { validateContract } = await import('@prisma-next/sql-query/schema');
 
 // ❌ WRONG: Dynamic import with type-only usage
 const module = await import('@prisma-next/sql-lane/sql');
 type SqlBuilder = typeof module.sql;
+
+// ❌ WRONG: Type-only dynamic import (type import() syntax)
+type SqlContract = import('@prisma-next/sql-contract/types').SqlContract;
 
 // ❌ WRONG: Localized dynamic import with type-only cast usage
 const builder = { /* .. */ } as import('@prisma-next/sql-relational-core/types').AnyBinaryBuilder;

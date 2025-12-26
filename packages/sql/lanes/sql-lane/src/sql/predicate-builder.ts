@@ -4,12 +4,16 @@ import type { BinaryExpr, Expression, ParamRef } from '@prisma-next/sql-relation
 import { createBinaryExpr, createParamRef } from '@prisma-next/sql-relational-core/ast';
 import type { BinaryBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
 import {
+  isColumnBuilder,
+  isExpressionBuilder,
+  isParamPlaceholder,
+} from '@prisma-next/sql-relational-core/utils/guards';
+import {
   errorFailedToBuildWhereClause,
   errorMissingParameter,
   errorUnknownColumn,
   errorUnknownTable,
 } from '../utils/errors';
-import { isColumnBuilder, isExpressionBuilder, isParamPlaceholder } from '../utils/guards';
 
 export interface BuildWhereExprResult {
   expr: BinaryExpr;
@@ -28,6 +32,16 @@ export function buildWhereExpr(
   let codecId: string | undefined;
   let rightExpr: Expression | ParamRef;
   let paramName: string;
+
+  // Validate where.left is a valid Expression (col, operation, literal, param)
+  const validExpressionKinds = ['col', 'operation', 'literal', 'param'];
+  if (
+    !where.left ||
+    typeof where.left !== 'object' ||
+    !validExpressionKinds.includes((where.left as { kind?: string }).kind ?? '')
+  ) {
+    errorFailedToBuildWhereClause();
+  }
 
   // where.left is an Expression (already converted at builder creation time)
   // It could be a ColumnRef or OperationExpr

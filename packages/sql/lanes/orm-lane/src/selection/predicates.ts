@@ -3,13 +3,17 @@ import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-co
 import type { BinaryExpr, Expression, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
 import type { BinaryBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
+import {
+  isColumnBuilder,
+  isExpressionBuilder,
+  isParamPlaceholder,
+} from '@prisma-next/sql-relational-core/utils/guards';
 import { createBinaryExpr, createParamRef } from '../utils/ast';
 import {
   errorFailedToBuildWhereClause,
   errorMissingParameter,
   errorUnknownTable,
 } from '../utils/errors';
-import { isColumnBuilder, isExpressionBuilder, isParamPlaceholder } from '../utils/guards';
 
 export function buildWhereExpr(
   where: BinaryBuilder,

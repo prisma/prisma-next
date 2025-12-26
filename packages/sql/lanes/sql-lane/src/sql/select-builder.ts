@@ -30,6 +30,7 @@ import type {
   OrderBuilder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
+import { isExpressionBuilder } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
 import { checkIncludeCapabilities } from '../utils/capabilities';
 import {
@@ -38,12 +39,10 @@ import {
   errorIncludeAliasCollision,
   errorLimitMustBeNonNegativeInteger,
   errorMissingAlias,
-  errorMissingColumnForAlias,
   errorSelectMustBeCalled,
   errorSelfJoinNotSupported,
   errorUnknownTable,
 } from '../utils/errors';
-import { isExpressionBuilder } from '../utils/guards';
 import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state';
 import {
   buildIncludeAst,
@@ -338,25 +337,23 @@ export class SelectBuilderImpl<
         errorMissingAlias(i);
       }
       const column = projection.columns[i];
-      if (!column) {
-        errorMissingColumnForAlias(alias, i);
-      }
 
-      // Check if this alias matches an include alias
+      // Check if this alias matches an include alias first
+      // Include placeholders have null columns
       const matchingInclude = this.state.includes?.find((inc) => inc.alias === alias);
       if (matchingInclude) {
-        // This is an include reference
+        // This is an include reference - column can be null for placeholders
         projectEntries.push({
           alias,
           expr: { kind: 'includeRef', alias },
         });
-      } else if (isExpressionBuilder(column)) {
+      } else if (column && isExpressionBuilder(column)) {
         // This is an ExpressionBuilder (operation result) - use its expr
         projectEntries.push({
           alias,
           expr: column.expr,
         });
-      } else {
+      } else if (column) {
         // This is a regular ColumnBuilder - use toExpr() to get ColumnRef
         const columnRef = column.toExpr();
         projectEntries.push({
