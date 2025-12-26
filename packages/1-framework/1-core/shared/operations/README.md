@@ -94,7 +94,7 @@ This package is part of the **framework domain**, **core layer**, **shared plane
 - **Domain**: framework (target-agnostic)
 - **Layer**: core
 - **Plane**: shared
-- **Path**: `packages/framework/core-operations`
+- **Path**: `packages/1-framework/1-core/shared/operations`
 
 ## Related Documentation
 

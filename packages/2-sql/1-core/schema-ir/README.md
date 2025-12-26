@@ -140,6 +140,6 @@ This package sits at the core layer in the shared plane, making it accessible to
 
 - `docs/briefs/11-schema-ir.md` - Schema IR project brief
 - `docs/briefs/SQL Schema IR and Verification.md` - Detailed design document
-- `packages/framework/core-control-plane/src/actions/verify-database-schema.ts` - Core verification action
-- `packages/targets/postgres-adapter/src/exports/introspect.ts` - Postgres introspection implementation
+- `packages/1-framework/1-core/migration/control-plane/src/verify-database-schema.ts` - Core verification action
+- `packages/3-targets/6-adapters/postgres/src/exports/control.ts` - Postgres introspection entrypoint
 

@@ -112,7 +112,7 @@ This package is part of the **framework domain**, **tooling layer**, **migration
 - **Domain**: framework (target-agnostic)
 - **Layer**: tooling
 - **Plane**: migration
-- **Path**: `packages/framework/tooling/emitter`
+- **Path**: `packages/1-framework/3-tooling/emitter`
 
 ## Related Subsystems
 

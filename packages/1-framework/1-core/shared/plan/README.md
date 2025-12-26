@@ -77,7 +77,7 @@ This package is part of the **framework domain**, **core layer**, **shared plane
 - **Domain**: framework (target-agnostic)
 - **Layer**: core
 - **Plane**: shared
-- **Path**: `packages/framework/core-plan`
+- **Path**: `packages/1-framework/1-core/shared/plan`
 
 ## Related Subsystems
 

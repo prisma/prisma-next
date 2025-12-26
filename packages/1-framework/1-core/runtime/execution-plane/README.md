@@ -83,11 +83,11 @@ This package is part of the **framework domain**, **core layer**, **runtime plan
 - **Domain**: framework (target-agnostic)
 - **Layer**: core
 - **Plane**: runtime
-- **Path**: `packages/framework/core-execution-plane`
+- **Path**: `packages/1-framework/1-core/runtime/execution-plane`
 
 ## Related Documentation
 
 - `docs/architecture docs/adrs/ADR 152 - Runtime Plane Descriptors and Instances.md`: Complete ADR specification
 - `.cursor/rules/multi-plane-packages.mdc`: Multi-plane package structure
-- `packages/framework/core-control-plane/README.md`: Control plane counterpart
+- `packages/1-framework/1-core/migration/control-plane/README.md`: Control plane counterpart
 

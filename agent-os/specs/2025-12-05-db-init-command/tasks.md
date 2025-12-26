@@ -126,7 +126,7 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 ## 3. CLI Command Wiring (`prisma-next db init`)
 
 - **3.1 Add command factory**
-  - Implement `createDbInitCommand()` under the CLI package (e.g., `packages/framework/tooling/cli/src/commands/db-init.ts`).
+  - Implement `createDbInitCommand()` under the CLI package (e.g., `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`).
   - Register the new command in the CLI command tree so `prisma-next db init` is available.
 
 - **3.2 Use CLI style and error-handling patterns**
