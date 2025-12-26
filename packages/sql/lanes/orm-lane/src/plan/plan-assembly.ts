@@ -15,9 +15,14 @@ import type {
   AnyOrderBuilder,
   BinaryBuilder,
 } from '@prisma-next/sql-relational-core/types';
+import {
+  collectColumnRefs,
+  getColumnInfo,
+  getColumnMeta,
+  isOperationExpr,
+} from '@prisma-next/sql-relational-core/utils/guards';
 import type { IncludeState } from '../relations/include-plan';
 import type { ProjectionState } from '../selection/projection';
-import { collectColumnRefs, getColumnInfo, getColumnMeta, isOperationExpr } from '../utils/guards';
 
 export interface MetaBuildArgs {
   readonly contract: SqlContract<SqlStorage>;

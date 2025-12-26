@@ -23,11 +23,14 @@ import type {
   OrderBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import {
+  extractBaseColumnRef,
+  isOperationExpr,
+} from '@prisma-next/sql-relational-core/utils/guards';
+import {
   errorChildProjectionMustBeSpecified,
   errorLimitMustBeNonNegativeInteger,
   errorMissingColumnForAlias,
 } from '../utils/errors';
-import { extractBaseColumnRef, isOperationExpr } from '../utils/guards';
 import type { IncludeState, ProjectionState } from '../utils/state';
 import { buildWhereExpr } from './predicate-builder';
 import { buildProjectionState } from './projection';

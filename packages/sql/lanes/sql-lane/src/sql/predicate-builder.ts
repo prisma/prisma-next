@@ -13,17 +13,17 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { BinaryBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
 import {
+  getColumnInfo,
+  getOperationExpr,
+  isColumnBuilder,
+  isParamPlaceholder,
+} from '@prisma-next/sql-relational-core/utils/guards';
+import {
   errorFailedToBuildWhereClause,
   errorMissingParameter,
   errorUnknownColumn,
   errorUnknownTable,
 } from '../utils/errors';
-import {
-  getColumnInfo,
-  getOperationExpr,
-  isColumnBuilder,
-  isParamPlaceholder,
-} from '../utils/guards';
 
 export interface BuildWhereExprResult {
   expr: BinaryExpr;

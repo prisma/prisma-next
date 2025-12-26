@@ -2,16 +2,16 @@ import type { PlanMeta } from '@prisma-next/contract/types';
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
-import type { MetaBuildArgs } from '../types/internal';
-import { assertColumnBuilder } from '../utils/assertions';
-import { errorMissingColumnForAlias } from '../utils/errors';
 import {
   collectColumnRefs,
   getColumnInfo,
   getOperationExpr,
   isColumnBuilder,
   isOperationExpr,
-} from '../utils/guards';
+} from '@prisma-next/sql-relational-core/utils/guards';
+import type { MetaBuildArgs } from '../types/internal';
+import { assertColumnBuilder } from '../utils/assertions';
+import { errorMissingColumnForAlias } from '../utils/errors';
 
 export function buildMeta(args: MetaBuildArgs): PlanMeta {
   const refsColumns = new Map<string, { table: string; column: string }>();

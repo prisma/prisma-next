@@ -31,6 +31,7 @@ import type {
   OrderBuilder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
+import { getOperationExpr } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
 import { assertColumnBuilder } from '../utils/assertions';
 import { checkIncludeCapabilities } from '../utils/capabilities';
@@ -45,7 +46,6 @@ import {
   errorSelfJoinNotSupported,
   errorUnknownTable,
 } from '../utils/errors';
-import { getOperationExpr } from '../utils/guards';
 import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state';
 import {
   buildIncludeAst,
