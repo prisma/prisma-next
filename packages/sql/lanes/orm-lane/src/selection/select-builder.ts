@@ -59,35 +59,24 @@ export function buildProjectionItems(
   return projectEntries;
 }
 
-export function buildSelectAst(
-  table: TableRef,
-  projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>,
-  includesAst: ReadonlyArray<IncludeAst> | undefined,
-  whereExpr: BinaryExpr | ExistsExpr | undefined,
-  orderByClause:
-    | ReadonlyArray<{
-        expr: ColumnRef | OperationExpr;
-        dir: Direction;
-      }>
-    | undefined,
-  limit: number | undefined,
-): SelectAst {
+export function buildSelectAst(params: {
+  table: TableRef;
+  projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
+  includesAst?: ReadonlyArray<IncludeAst>;
+  whereExpr?: BinaryExpr | ExistsExpr;
+  orderByClause?: ReadonlyArray<{
+    expr: ColumnRef | OperationExpr;
+    dir: Direction;
+  }>;
+  limit?: number;
+}): SelectAst {
+  const { table, projectEntries, includesAst, whereExpr, orderByClause, limit } = params;
   return createSelectAst({
     from: createTableRef(table.name),
     project: projectEntries,
-    includes: includesAst,
-    where: whereExpr,
-    orderBy: orderByClause,
-    limit,
-  } as {
-    from: TableRef;
-    project: ReadonlyArray<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
-    includes?: ReadonlyArray<IncludeAst>;
-    where?: BinaryExpr | ExistsExpr;
-    orderBy?: ReadonlyArray<{
-      expr: ColumnRef | OperationExpr;
-      dir: Direction;
-    }>;
-    limit?: number;
+    ...(includesAst ? { includes: includesAst } : {}),
+    ...(whereExpr ? { where: whereExpr } : {}),
+    ...(orderByClause ? { orderBy: orderByClause } : {}),
+    ...(limit !== undefined ? { limit } : {}),
   });
 }

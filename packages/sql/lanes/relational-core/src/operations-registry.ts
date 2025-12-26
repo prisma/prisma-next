@@ -5,17 +5,7 @@ import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { BinaryOp, ColumnRef, LiteralExpr, OperationExpr, ParamRef } from './ast/types';
 import type { AnyColumnBuilder, ColumnBuilder, OperationTypes, ParamPlaceholder } from './types';
-
-function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'kind' in value &&
-    (value as { kind: unknown }).kind === 'param-placeholder' &&
-    'name' in value &&
-    typeof (value as { name: unknown }).name === 'string'
-  );
-}
+import { isParamPlaceholder } from './utils/guards';
 
 function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
   return (

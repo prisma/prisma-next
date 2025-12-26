@@ -569,16 +569,16 @@ export class OrmModelBuilderImpl<
       })();
 
     // Build includes AST
-    const { includesAst, includesForMeta } = buildIncludeAsts(
-      this.includes,
-      this.contract,
-      this.context,
-      this.modelName,
+    const { includesAst, includesForMeta } = buildIncludeAsts({
+      includes: this.includes,
+      contract: this.contract,
+      context: this.context,
+      modelName: this.modelName,
       paramsMap,
       paramDescriptors,
       paramValues,
       paramCodecs,
-    );
+    });
 
     // Build projection state
     const projectionState = buildProjectionState(
@@ -605,14 +605,14 @@ export class OrmModelBuilderImpl<
     const projectEntries = buildProjectionItems(projectionState, includesForMeta);
 
     // Build SELECT AST
-    const ast = buildSelectAst(
-      this.table,
+    const ast = buildSelectAst({
+      table: this.table,
       projectEntries,
-      includesAst.length > 0 ? includesAst : undefined,
-      whereExpr,
-      orderByClause,
-      this.limitValue,
-    );
+      ...(includesAst.length > 0 ? { includesAst } : {}),
+      ...(whereExpr ? { whereExpr } : {}),
+      ...(orderByClause ? { orderByClause } : {}),
+      ...(this.limitValue !== undefined ? { limit: this.limitValue } : {}),
+    });
 
     // Build plan metadata
     const planMeta = buildMeta({

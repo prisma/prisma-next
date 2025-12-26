@@ -1,12 +1,6 @@
+import { expectDefined } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import { AsyncIterableResult } from '../src/async-iterable-result';
-
-/**
- * TODO: once we have enough test utilities like this one, we should move them to a shared test utils package.
- */
-function expectDefined<T>(value: T | undefined): asserts value is T {
-  expect(value).not.toBeUndefined();
-}
 
 describe('AsyncIterableResult', () => {
   it('works with for await loop', async () => {

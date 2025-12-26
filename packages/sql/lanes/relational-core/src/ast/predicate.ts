@@ -11,7 +11,7 @@ import type {
 export function createBinaryExpr(
   op: BinaryOp,
   left: ColumnRef | OperationExpr,
-  right: ParamRef,
+  right: ColumnRef | ParamRef,
 ): BinaryExpr {
   return {
     kind: 'bin',

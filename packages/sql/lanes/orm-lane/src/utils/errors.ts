@@ -94,11 +94,11 @@ export function errorMissingAlias(index: number): never {
 }
 
 export function errorMissingColumn(alias: string, index: number): never {
-  throw planInvalid(`Missing column for alias ${alias} at index ${index}`);
+  throw planInvalid(`Missing column for alias "${alias}" at index ${index}`);
 }
 
 export function errorInvalidColumn(alias: string, index: number): never {
-  throw planInvalid(`Invalid column for alias ${alias} at index ${index}`);
+  throw planInvalid(`Invalid column for alias "${alias}" at index ${index}`);
 }
 
 export function errorRelationNotFound(relationName: string, modelName: string): never {

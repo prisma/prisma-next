@@ -1,10 +1,36 @@
-import type {
-  ColumnRef,
-  LiteralExpr,
-  OperationExpr,
-  ParamRef,
-} from '@prisma-next/sql-relational-core/ast';
-import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
+import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef } from '../ast/types';
+import type { AnyColumnBuilder, ParamPlaceholder } from '../types';
+
+/**
+ * Helper to extract columnMeta from a ColumnBuilder.
+ * Returns StorageColumn if present, undefined otherwise.
+ * AnyColumnBuilder is a union that includes types with columnMeta property,
+ * so we can safely access it after checking for existence.
+ */
+export function getColumnMeta(expr: AnyColumnBuilder): StorageColumn | undefined {
+  // AnyColumnBuilder includes AnyColumnBuilderBase which has columnMeta: StorageColumn
+  // and ColumnBuilder which has columnMeta: ColumnMeta extends StorageColumn
+  // TypeScript should narrow the type after the 'in' check
+  if ('columnMeta' in expr) {
+    return expr.columnMeta;
+  }
+  return undefined;
+}
+
+/**
+ * Type predicate to check if a value is a ParamPlaceholder.
+ */
+export function isParamPlaceholder(value: unknown): value is ParamPlaceholder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'param-placeholder' &&
+    'name' in value &&
+    typeof (value as { name: unknown }).name === 'string'
+  );
+}
 
 /**
  * Recursively extracts the base ColumnRef from an OperationExpr.
@@ -77,6 +103,14 @@ export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
  * Extracts and returns an OperationExpr from a builder.
  * Returns the OperationExpr if the builder is an OperationExpr or has an _operationExpr property,
  * otherwise returns undefined.
+ *
+ * @design-note: This function accesses the hidden `_operationExpr` property, which is a code smell.
+ * The issue is that `executeOperation()` in relational-core returns a ColumnBuilder-shaped object
+ * with a hidden `_operationExpr` property, creating coupling between lanes and relational-core
+ * implementation details. A cleaner design would be to have operation results be a separate
+ * type (e.g., `OperationResultBuilder`) that properly represents expression nodes rather than
+ * pretending to be a ColumnBuilder. This would require refactoring the operation execution
+ * system in relational-core to return proper expression types.
  */
 export function getOperationExpr(
   builder: AnyColumnBuilder | OperationExpr,

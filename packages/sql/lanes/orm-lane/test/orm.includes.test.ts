@@ -3,12 +3,22 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type {
+  Adapter,
+  BinaryExpr,
+  ExistsExpr,
+  LoweredStatement,
+  SelectAst,
+} from '@prisma-next/sql-relational-core/ast';
+import { createCodecRegistry, createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { orm } from '../src/orm';
+import type { RelationFilter } from '../src/orm/state';
+import { buildExistsSubqueries, combineWhereClauses } from '../src/relations/include-plan';
 import type { Contract as RelationsContract } from './fixtures/contract-with-relations.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -131,11 +141,10 @@ describe('orm includes', () => {
     const ast = plan as { ast: { includes?: unknown[] } };
     expect(ast.ast?.includes).toBeDefined();
     expect(Array.isArray(ast.ast?.includes)).toBe(true);
-    if (Array.isArray(ast.ast?.includes) && ast.ast.includes.length > 0) {
-      const include = ast.ast.includes[0] as { kind: string; alias: string };
-      expect(include.kind).toBe('includeMany');
-      expect(include.alias).toBe('posts');
-    }
+    expect(ast.ast?.includes?.[0]).toMatchObject({
+      kind: 'includeMany',
+      alias: 'posts',
+    });
   });
 
   it('supports chaining include with other methods', () => {
@@ -171,9 +180,8 @@ describe('orm includes', () => {
     expect(plan).toBeDefined();
     const ast = plan as { ast: { includes?: unknown[] } };
     expect(ast.ast?.includes).toBeDefined();
-    if (Array.isArray(ast.ast?.includes)) {
-      expect(ast.ast.includes.length).toBe(1);
-    }
+    expect(Array.isArray(ast.ast?.includes)).toBe(true);
+    expect(ast.ast?.includes?.length).toBe(1);
   });
 
   it('throws error when accessing invalid relation', () => {
@@ -349,5 +357,179 @@ describe('orm includes', () => {
     expect(() => {
       (builderWithInclude as { findMany: () => unknown }).findMany();
     }).toThrow('Child projection must not be empty after filtering boolean values');
+  });
+});
+
+describe('include-plan functions', () => {
+  const contract = loadContract('contract-with-relations');
+  const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
+
+  describe('buildExistsSubqueries', () => {
+    function createRelationFilter(
+      filterType: 'some' | 'none' | 'every',
+      childWhere?: AnyBinaryBuilder,
+    ): RelationFilter {
+      return {
+        relationName: 'posts',
+        childModelName: 'Post',
+        filterType,
+        childWhere,
+        relation: {
+          to: 'User',
+          cardinality: 'many',
+          on: {
+            parentCols: ['id'],
+            childCols: ['userId'],
+          },
+        },
+      };
+    }
+
+    function createTestWhereBuilder(): AnyBinaryBuilder {
+      const tables = schema(context).tables;
+      const postTable = tables['post']!;
+      return postTable.columns['id']!.eq(param('postId'));
+    }
+
+    it('builds exists subquery with filterType "some"', () => {
+      const filter = createRelationFilter('some');
+      const existsExprs = buildExistsSubqueries([filter], contract, 'User');
+
+      expect(existsExprs).toHaveLength(1);
+      expect(existsExprs[0]).toMatchObject({
+        kind: 'exists',
+        not: false,
+      });
+    });
+
+    it('builds exists subquery with filterType "none"', () => {
+      const filter = createRelationFilter('none');
+      const existsExprs = buildExistsSubqueries([filter], contract, 'User');
+
+      expect(existsExprs).toHaveLength(1);
+      expect(existsExprs[0]).toMatchObject({
+        kind: 'exists',
+        not: true,
+      });
+    });
+
+    it('builds exists subquery with filterType "every"', () => {
+      const filter = createRelationFilter('every');
+      const existsExprs = buildExistsSubqueries([filter], contract, 'User');
+
+      expect(existsExprs).toHaveLength(1);
+      expect(existsExprs[0]).toMatchObject({
+        kind: 'exists',
+        not: true,
+      });
+    });
+
+    it('builds exists subquery with childWhere undefined', () => {
+      const filter = createRelationFilter('some', undefined);
+      const existsExprs = buildExistsSubqueries([filter], contract, 'User');
+
+      expect(existsExprs).toHaveLength(1);
+      expect(existsExprs[0]?.subquery.where).toBeDefined();
+    });
+
+    it('builds exists subquery with childWhere defined', () => {
+      const whereBuilder = createTestWhereBuilder();
+      const filter = createRelationFilter('some', whereBuilder);
+      const existsExprs = buildExistsSubqueries([filter], contract, 'User', {
+        params: { postId: 1 },
+      });
+
+      expect(existsExprs).toHaveLength(1);
+      expect(existsExprs[0]?.subquery.where).toBeDefined();
+    });
+
+    it('builds exists subquery with joinConditions.length === 0', () => {
+      const filter: RelationFilter = {
+        relationName: 'posts',
+        childModelName: 'Post',
+        filterType: 'some',
+        childWhere: undefined,
+        relation: {
+          to: 'User',
+          cardinality: 'many',
+          on: {
+            parentCols: [],
+            childCols: [],
+          },
+        },
+      };
+      const existsExprs = buildExistsSubqueries([filter], contract, 'User');
+
+      expect(existsExprs).toHaveLength(1);
+      expect(existsExprs[0]?.subquery.project[0]?.expr).toMatchObject({
+        kind: 'col',
+        table: 'post',
+        column: 'id',
+      });
+    });
+  });
+
+  describe('combineWhereClauses', () => {
+    function createBinaryExpr(): BinaryExpr {
+      return {
+        kind: 'bin',
+        op: 'eq',
+        left: createColumnRef('user', 'id'),
+        right: { kind: 'param', index: 1, name: 'userId' },
+      };
+    }
+
+    function createExistsExpr(): ExistsExpr {
+      return {
+        kind: 'exists',
+        subquery: {
+          kind: 'select',
+          from: { kind: 'table', name: 'post' },
+          project: [{ alias: '_exists', expr: createColumnRef('post', 'id') }],
+        },
+        not: false,
+      };
+    }
+
+    it('returns first existsExpr when existsExprs.length === 1', () => {
+      const existsExpr = createExistsExpr();
+      const result = combineWhereClauses(undefined, [existsExpr]);
+
+      expect(result).toBe(existsExpr);
+    });
+
+    it('returns first existsExpr when existsExprs.length === 1 even if mainWhere is defined', () => {
+      const mainWhere = createBinaryExpr();
+      const existsExpr = createExistsExpr();
+      // When existsExprs.length === 1, it returns existsExprs[0] first (line 301-302)
+      const result = combineWhereClauses(mainWhere, [existsExpr]);
+
+      expect(result).toBe(existsExpr);
+    });
+
+    it('returns first existsExpr when existsExprs.length > 0 and no mainWhere', () => {
+      const existsExpr1 = createExistsExpr();
+      const existsExpr2 = createExistsExpr();
+      const result = combineWhereClauses(undefined, [existsExpr1, existsExpr2]);
+
+      expect(result).toBe(existsExpr1);
+    });
+
+    it('returns undefined when no mainWhere and existsExprs.length === 0', () => {
+      const result = combineWhereClauses(undefined, []);
+
+      expect(result).toBeUndefined();
+    });
+
+    it('returns mainWhere when both mainWhere and existsExprs are defined', () => {
+      const mainWhere = createBinaryExpr();
+      const existsExpr1 = createExistsExpr();
+      const existsExpr2 = createExistsExpr();
+      // When existsExprs.length > 1, mainWhere is returned if defined (line 304-305)
+      const result = combineWhereClauses(mainWhere, [existsExpr1, existsExpr2]);
+
+      expect(result).toBe(mainWhere);
+    });
   });
 });

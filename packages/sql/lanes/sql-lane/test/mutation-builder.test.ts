@@ -76,6 +76,17 @@ describe('mutation builder edge cases', () => {
         ]),
       });
     });
+
+    it('includes paramCodecs in meta.annotations.codecs for INSERT', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .insert(userTable, {
+          email: param('email'),
+        })
+        .build({ params: { email: 'test@example.com' } });
+
+      expect(plan.meta.annotations?.codecs).toBeDefined();
+      expect(plan.meta.annotations?.codecs?.['email']).toBe('pg/text@1');
+    });
   });
 
   describe('update', () => {
@@ -151,6 +162,30 @@ describe('mutation builder edge cases', () => {
         ]),
       });
     });
+
+    it('includes paramCodecs in meta.annotations.codecs for UPDATE set values', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .update(userTable, {
+          email: param('email'),
+        })
+        .where(userColumns.id.eq(param('userId')))
+        .build({ params: { email: 'test@example.com', userId: 1 } });
+
+      expect(plan.meta.annotations?.codecs).toBeDefined();
+      expect(plan.meta.annotations?.codecs?.['email']).toBe('pg/text@1');
+    });
+
+    it('includes paramCodecs in meta.annotations.codecs for UPDATE where clause', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .update(userTable, {
+          email: param('email'),
+        })
+        .where(userColumns.id.eq(param('userId')))
+        .build({ params: { email: 'test@example.com', userId: 1 } });
+
+      expect(plan.meta.annotations?.codecs).toBeDefined();
+      expect(plan.meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
+    });
   });
 
   describe('delete', () => {
@@ -193,6 +228,16 @@ describe('mutation builder edge cases', () => {
           createColumnRef('user', 'email'),
         ]),
       });
+    });
+
+    it('includes paramCodecs in meta.annotations.codecs for DELETE where clause', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .delete(userTable)
+        .where(userColumns.id.eq(param('userId')))
+        .build({ params: { userId: 1 } });
+
+      expect(plan.meta.annotations?.codecs).toBeDefined();
+      expect(plan.meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
     });
   });
 });

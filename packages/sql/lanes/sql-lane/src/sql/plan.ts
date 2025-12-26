@@ -2,16 +2,27 @@ import type { PlanMeta } from '@prisma-next/contract/types';
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
 import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import {
+  collectColumnRefs,
+  getColumnInfo,
+  getOperationExpr,
+  isColumnBuilder,
+  isOperationExpr,
+} from '@prisma-next/sql-relational-core/utils/guards';
 import type { MetaBuildArgs } from '../types/internal';
+import { assertColumnBuilder } from '../utils/assertions';
 import { errorMissingColumnForAlias } from '../utils/errors';
-import { collectColumnRefs, getColumnInfo, isOperationExpr } from '../utils/guards';
 
 export function buildMeta(args: MetaBuildArgs): PlanMeta {
   const refsColumns = new Map<string, { table: string; column: string }>();
   const refsTables = new Set<string>([args.table.name]);
 
   for (const column of args.projection.columns) {
-    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
+    // Skip null columns (include placeholders)
+    if (!column) {
+      continue;
+    }
+    const operationExpr = getOperationExpr(column);
     if (operationExpr) {
       const allRefs = collectColumnRefs(operationExpr);
       for (const ref of allRefs) {
@@ -21,23 +32,18 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         });
       }
     } else {
-      // column is ColumnBuilder - TypeScript can't narrow properly
-      const col = column as unknown as { table?: string; column?: string };
-      if (col.table && col.column) {
-        refsColumns.set(`${col.table}.${col.column}`, {
-          table: col.table,
-          column: col.column,
-        });
-      }
+      refsColumns.set(`${column.table}.${column.column}`, {
+        table: column.table,
+        column: column.column,
+      });
     }
   }
 
   if (args.joins) {
     for (const join of args.joins) {
       refsTables.add(join.table.name);
-      // TypeScript can't narrow ColumnBuilder properly
-      const onLeft = join.on.left as unknown as { table: string; column: string };
-      const onRight = join.on.right as unknown as { table: string; column: string };
+      const onLeft = assertColumnBuilder(join.on.left, 'join ON left');
+      const onRight = assertColumnBuilder(join.on.right, 'join ON right');
       refsColumns.set(`${onLeft.table}.${onLeft.column}`, {
         table: onLeft.table,
         column: onLeft.column,
@@ -54,27 +60,24 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       refsTables.add(include.table.name);
       // Add ON condition columns
       // JoinOnPredicate.left and .right are always ColumnBuilder
-      const onLeft = include.on.left as unknown as { table: string; column: string };
-      const onRight = include.on.right as unknown as { table: string; column: string };
-      if (onLeft.table && onLeft.column && onRight.table && onRight.column) {
-        refsColumns.set(`${onLeft.table}.${onLeft.column}`, {
-          table: onLeft.table,
-          column: onLeft.column,
-        });
-        refsColumns.set(`${onRight.table}.${onRight.column}`, {
-          table: onRight.table,
-          column: onRight.column,
-        });
-      }
+      const leftCol = assertColumnBuilder(include.on.left, 'include ON left');
+      const rightCol = assertColumnBuilder(include.on.right, 'include ON right');
+      refsColumns.set(`${leftCol.table}.${leftCol.column}`, {
+        table: leftCol.table,
+        column: leftCol.column,
+      });
+      refsColumns.set(`${rightCol.table}.${rightCol.column}`, {
+        table: rightCol.table,
+        column: rightCol.column,
+      });
       // Add child projection columns
       for (const column of include.childProjection.columns) {
-        const col = column as unknown as { table?: string; column?: string };
-        if (col.table && col.column) {
-          refsColumns.set(`${col.table}.${col.column}`, {
-            table: col.table,
-            column: col.column,
-          });
-        }
+        const col = assertColumnBuilder(column, 'include child projection column');
+
+        refsColumns.set(`${col.table}.${col.column}`, {
+          table: col.table,
+          column: col.column,
+        });
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
@@ -83,6 +86,15 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
           table: colInfo.table,
           column: colInfo.column,
         });
+        // Handle right side of child WHERE clause
+        const childWhereRight = include.childWhere.right;
+        if (isColumnBuilder(childWhereRight)) {
+          const rightColInfo = getColumnInfo(childWhereRight);
+          refsColumns.set(`${rightColInfo.table}.${rightColInfo.column}`, {
+            table: rightColInfo.table,
+            column: rightColInfo.column,
+          });
+        }
       }
       // Add child ORDER BY columns if present
       if (include.childOrderBy) {
@@ -102,9 +114,9 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
 
   if (args.where) {
     const whereLeft = args.where.left;
-    const operationExpr = (whereLeft as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
-      const allRefs = collectColumnRefs(operationExpr);
+    // Check if whereLeft is an OperationExpr directly (not wrapped in ColumnBuilder)
+    if (isOperationExpr(whereLeft)) {
+      const allRefs = collectColumnRefs(whereLeft);
       for (const ref of allRefs) {
         refsColumns.set(`${ref.table}.${ref.column}`, {
           table: ref.table,
@@ -112,14 +124,33 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         });
       }
     } else {
-      // whereLeft is ColumnBuilder - TypeScript can't narrow properly
-      const colBuilder = whereLeft as unknown as { table?: string; column?: string };
-      if (colBuilder.table && colBuilder.column) {
+      // Check if whereLeft is a ColumnBuilder with an _operationExpr property
+      const operationExpr = (whereLeft as { _operationExpr?: OperationExpr })._operationExpr;
+      if (operationExpr) {
+        const allRefs = collectColumnRefs(operationExpr);
+        for (const ref of allRefs) {
+          refsColumns.set(`${ref.table}.${ref.column}`, {
+            table: ref.table,
+            column: ref.column,
+          });
+        }
+      } else {
+        const colBuilder = assertColumnBuilder(whereLeft, 'where clause must be a ColumnBuilder');
         refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
           table: colBuilder.table,
           column: colBuilder.column,
         });
       }
+    }
+
+    // Handle right side of WHERE clause - can be ParamPlaceholder or AnyColumnBuilder
+    const whereRight = args.where.right;
+    if (isColumnBuilder(whereRight)) {
+      const colInfo = getColumnInfo(whereRight);
+      refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
+        table: colInfo.table,
+        column: colInfo.column,
+      });
     }
   }
 
@@ -138,14 +169,10 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
           });
         }
       } else {
-        // orderByExpr is ColumnBuilder - TypeScript can't narrow properly
-        const colBuilder = orderByExpr as unknown as { table?: string; column?: string };
-        if (colBuilder.table && colBuilder.column) {
-          refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
-            table: colBuilder.table,
-            column: colBuilder.column,
-          });
-        }
+        refsColumns.set(`${orderByExpr.table}.${orderByExpr.column}`, {
+          table: orderByExpr.table,
+          column: orderByExpr.column,
+        });
       }
     }
   }
@@ -160,23 +187,17 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
       const column = args.projection.columns[index];
       if (!column) {
+        // Null column means this is an include placeholder, but alias doesn't match includes
+        // This shouldn't happen if projection building is correct, but handle gracefully
         errorMissingColumnForAlias(alias, index);
       }
-      // TypeScript can't narrow ColumnBuilder properly
-      const col = column as unknown as {
-        table?: string;
-        column?: string;
-        _operationExpr?: OperationExpr;
-      };
-      if (!col.table || !col.column) {
-        // This is a placeholder column for an include - skip it
-        return [alias, `include:${alias}`];
-      }
-      const operationExpr = col._operationExpr;
+
+      const operationExpr = getOperationExpr(column);
       if (operationExpr) {
         return [alias, `operation:${operationExpr.method}`];
       }
-      return [alias, `${col.table}.${col.column}`];
+
+      return [alias, `${column.table}.${column.column}`];
     }),
   );
 

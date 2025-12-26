@@ -5,6 +5,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import { createTestContext, executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
@@ -119,11 +120,7 @@ describe('DML Integration Tests', () => {
           email: param('email'),
           createdAt: param('createdAt'),
         })
-        .returning(
-          idCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
-          emailCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
-          createdAtCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
-        )
+        .returning(idCol as ColumnBuilder, emailCol as ColumnBuilder, createdAtCol as ColumnBuilder)
         .build({
           params: {
             email: 'test@example.com',
@@ -225,10 +222,7 @@ describe('DML Integration Tests', () => {
           email: param('newEmail'),
         })
         .where(idCol.eq(param('userId')))
-        .returning(
-          idCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
-          emailCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
-        )
+        .returning(idCol as ColumnBuilder, emailCol as ColumnBuilder)
         .build({
           params: {
             newEmail: 'updated@example.com',
@@ -334,10 +328,7 @@ describe('DML Integration Tests', () => {
       const deletePlan = builder
         .delete(userTable)
         .where(idCol.eq(param('userId')))
-        .returning(
-          idCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
-          emailCol as import('@prisma-next/sql-relational-core/types').ColumnBuilder,
-        )
+        .returning(idCol as ColumnBuilder, emailCol as ColumnBuilder)
         .build({
           params: {
             userId: 1,

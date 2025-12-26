@@ -6,6 +6,7 @@ import type {
   JoinOnPredicate,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
+import { isColumnBuilder } from '@prisma-next/sql-relational-core/utils/guards';
 import {
   errorAliasCollision,
   errorAliasPathEmpty,
@@ -14,7 +15,6 @@ import {
   errorInvalidProjectionValue,
   errorProjectionEmpty,
 } from '../utils/errors';
-import { isColumnBuilder } from '../utils/guards';
 
 export interface ProjectionState {
   readonly aliases: string[];

@@ -654,4 +654,70 @@ describe('orm relation filters', () => {
     expect((plan as { meta: { lane: string } }).meta.lane).toBe('orm');
     expect((plan as { ast: { kind: string } }).ast?.kind).toBe('select');
   });
+
+  it('calls _getModelAccessor() when modelAccessor is undefined', () => {
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const filterBuilder = (
+      builder as {
+        where: {
+          related: {
+            posts: {
+              some: (fn: (child: unknown) => unknown) => unknown;
+            };
+          };
+        };
+      }
+    ).where.related.posts.some((child: unknown) => {
+      const childFilterBuilder = child as {
+        where: (fn: (model: unknown) => unknown) => unknown;
+      };
+      return childFilterBuilder.where((model: unknown) => {
+        const m = model as { id: { eq: (p: unknown) => unknown } };
+        return m.id.eq(param('postId'));
+      });
+    });
+
+    // The modelAccessor should be available after calling where()
+    // We can verify this by checking that the filter builder works correctly
+    expect(filterBuilder).toBeDefined();
+    expect(typeof (filterBuilder as { findMany: () => unknown }).findMany).toBe('function');
+  });
+
+  it('throws error when _getModelAccessor() fails to return accessor', () => {
+    const invalidContract = {
+      ...contract,
+      models: {
+        ...contract.models,
+        Post: null as unknown as typeof contract.models.Post,
+      },
+    };
+    const invalidContext = createTestContext(invalidContract, adapter);
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    const invalidO = orm<Contract>({ context: invalidContext as any });
+    const builder = (invalidO as unknown as { user: () => unknown }).user();
+
+    // This should fail when trying to get model accessor for Post
+    // The error will be thrown when _getModelAccessor() is called
+    expect(() => {
+      (
+        builder as {
+          where: {
+            related: {
+              posts: {
+                some: (fn: (child: unknown) => unknown) => unknown;
+              };
+            };
+          };
+        }
+      ).where.related.posts.some((child: unknown) => {
+        const childFilterBuilder = child as {
+          where: (fn: (model: unknown) => unknown) => unknown;
+        };
+        return childFilterBuilder.where((model: unknown) => {
+          const m = model as { id: { eq: (p: unknown) => unknown } };
+          return m.id.eq(param('postId'));
+        });
+      });
+    }).toThrow('Model Post does not have fields');
+  });
 });

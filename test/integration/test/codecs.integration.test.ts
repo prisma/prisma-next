@@ -1,4 +1,5 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -300,7 +301,7 @@ describe('Codecs Integration Tests', () => {
           },
         },
       },
-    } as unknown as import('@prisma-next/contract/types').ExecutionPlan<unknown>;
+    } as unknown as ExecutionPlan<unknown>;
 
     const rows = await executePlanAndCollect(runtime, planWithOverride);
     expect(rows.length).toBe(1);
