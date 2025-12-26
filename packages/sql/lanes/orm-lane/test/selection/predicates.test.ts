@@ -213,7 +213,7 @@ describe('predicates', () => {
       // Create an invalid where clause with neither param nor column on right side
       const where = {
         kind: 'binary' as const,
-        left: idColumn,
+        left: idColumn.toExpr(),
         right: { kind: 'invalid' } as unknown as ReturnType<typeof param>,
         op: 'eq' as const,
       };

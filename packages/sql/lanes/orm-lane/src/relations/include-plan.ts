@@ -19,6 +19,7 @@ import type {
   BuildOptions,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
+import { isExpressionBuilder } from '@prisma-next/sql-relational-core/utils/guards';
 import { checkIncludeCapabilities } from '../orm/capabilities';
 import type { OrmIncludeState, RelationFilter } from '../orm/state';
 import { buildJoinOnExpr } from '../selection/join';
@@ -162,12 +163,11 @@ export function buildIncludeAsts(
       if (!column) {
         errorMissingColumn(alias, i);
       }
-      const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-      if (operationExpr) {
-        childProjectionItems.push({ alias, expr: operationExpr });
+      if (isExpressionBuilder(column)) {
+        childProjectionItems.push({ alias, expr: column.expr });
       } else {
-        const col = column as { table: string; column: string };
-        childProjectionItems.push({ alias, expr: createColumnRef(col.table, col.column) });
+        // ColumnBuilder - use toExpr() to get ColumnRef
+        childProjectionItems.push({ alias, expr: column.toExpr() });
       }
     }
 

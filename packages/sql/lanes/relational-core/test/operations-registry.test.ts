@@ -570,7 +570,7 @@ describe('operations-registry', () => {
 
     expect(() => {
       vectorColumn.cosineDistance('not a column builder' as unknown);
-    }).toThrow('Argument 0 must be a ColumnBuilder');
+    }).toThrow('Argument 0 must be an ExpressionSource (ColumnBuilder or ExpressionBuilder)');
   });
 
   it('handles literal arguments', () => {
@@ -625,7 +625,8 @@ describe('operations-registry', () => {
 
     const result = idColumn.add(5);
     expect(result).toBeDefined();
-    expect(result).toHaveProperty('kind', 'column');
+    // Operations now return ExpressionBuilder with kind: 'expression'
+    expect(result).toHaveProperty('kind', 'expression');
   });
 
   it('handles operations with returnTypeId that attach operations recursively', () => {
@@ -695,11 +696,12 @@ describe('operations-registry', () => {
       multiply: (arg: unknown) => unknown;
     };
     expect(result).toBeDefined();
-    expect(result).toHaveProperty('kind', 'column');
+    // Operations now return ExpressionBuilder with kind: 'expression'
+    expect(result).toHaveProperty('kind', 'expression');
     expect(typeof result.multiply).toBe('function');
   });
 
-  it('handles column builder with existing operation expression', () => {
+  it('handles ExpressionBuilder with existing operation expression', () => {
     const firstSignature: SqlOperationSignature = {
       forTypeId: 'pg/int4@1',
       method: 'add',
@@ -752,7 +754,8 @@ describe('operations-registry', () => {
     const firstResult = idColumn.add(idColumn);
     const secondResult = idColumn.add(firstResult);
     expect(secondResult).toBeDefined();
-    expect(secondResult).toHaveProperty('kind', 'column');
+    // Operations now return ExpressionBuilder with kind: 'expression'
+    expect(secondResult).toHaveProperty('kind', 'expression');
   });
 
   it('handles operations with eq, asc, and desc methods on result', () => {
@@ -950,7 +953,8 @@ describe('operations-registry', () => {
 
     const result = idColumn.add(5);
     expect(result).toBeDefined();
-    expect(result).toHaveProperty('kind', 'column');
+    // Operations now return ExpressionBuilder with kind: 'expression'
+    expect(result).toHaveProperty('kind', 'expression');
     expect(result).toHaveProperty('columnMeta');
     // When return type is 'builtin', columnMeta should use original columnMeta (not modified)
     const resultWithMeta = result as unknown as { columnMeta: { codecId: string } };

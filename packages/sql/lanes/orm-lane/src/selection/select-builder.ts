@@ -1,24 +1,24 @@
 import type {
   BinaryExpr,
-  ColumnRef,
   Direction,
   ExistsExpr,
+  Expression,
   IncludeAst,
   IncludeRef,
-  OperationExpr,
   SelectAst,
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
+import { isExpressionBuilder } from '@prisma-next/sql-relational-core/utils/guards';
 import type { IncludeState } from '../relations/include-plan';
-import { createColumnRef, createSelectAst, createTableRef } from '../utils/ast';
+import { createSelectAst, createTableRef } from '../utils/ast';
 import { errorInvalidColumn, errorMissingAlias, errorMissingColumn } from '../utils/errors';
 import type { ProjectionState } from './projection';
 
 export function buildProjectionItems(
   projectionState: ProjectionState,
   includesForMeta: ReadonlyArray<IncludeState>,
-): Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }> {
-  const projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }> = [];
+): Array<{ alias: string; expr: Expression | IncludeRef }> {
+  const projectEntries: Array<{ alias: string; expr: Expression | IncludeRef }> = [];
   for (let i = 0; i < projectionState.aliases.length; i++) {
     const alias = projectionState.aliases[i];
     if (!alias) {
@@ -35,25 +35,23 @@ export function buildProjectionItems(
         alias,
         expr: { kind: 'includeRef', alias },
       });
+    } else if (isExpressionBuilder(column)) {
+      // ExpressionBuilder (operation result) - use its expr
+      projectEntries.push({
+        alias,
+        expr: column.expr,
+      });
     } else {
-      const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-      if (operationExpr) {
-        projectEntries.push({
-          alias,
-          expr: operationExpr,
-        });
-      } else {
-        const col = column as { table: string; column: string };
-        const tableName = col.table;
-        const columnName = col.column;
-        if (!tableName || !columnName) {
-          errorInvalidColumn(alias, i);
-        }
-        projectEntries.push({
-          alias,
-          expr: createColumnRef(tableName, columnName),
-        });
+      // ColumnBuilder - use toExpr() to get ColumnRef
+      const expr = column.toExpr();
+      // Validate the expression has valid table and column values
+      if (expr.kind === 'col' && (!expr.table || !expr.column)) {
+        errorInvalidColumn(alias, i);
       }
+      projectEntries.push({
+        alias,
+        expr,
+      });
     }
   }
   return projectEntries;
@@ -61,11 +59,11 @@ export function buildProjectionItems(
 
 export function buildSelectAst(params: {
   table: TableRef;
-  projectEntries: Array<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
+  projectEntries: Array<{ alias: string; expr: Expression | IncludeRef }>;
   includesAst?: ReadonlyArray<IncludeAst>;
   whereExpr?: BinaryExpr | ExistsExpr;
   orderByClause?: ReadonlyArray<{
-    expr: ColumnRef | OperationExpr;
+    expr: Expression;
     dir: Direction;
   }>;
   limit?: number;

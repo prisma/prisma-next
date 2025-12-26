@@ -1,14 +1,14 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
-  AnyColumnBuilder,
+  AnyExpressionSource,
   AnyOrderBuilder,
   JoinOnPredicate,
 } from '@prisma-next/sql-relational-core/types';
 
 export interface ProjectionState {
   readonly aliases: string[];
-  readonly columns: AnyColumnBuilder[];
+  readonly columns: AnyExpressionSource[];
 }
 
 export interface JoinState {

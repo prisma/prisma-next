@@ -263,7 +263,7 @@ describe('schema', () => {
 
       const method = idColumn[op] as (p: unknown) => unknown;
       expect(() => method.call(idColumn, { kind: 'invalid' })).toThrow(
-        'Parameter placeholder or column builder required for column comparison',
+        'Parameter placeholder or expression source required for column comparison',
       );
     });
   });

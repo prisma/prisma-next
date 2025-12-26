@@ -98,7 +98,7 @@ export function errorMissingParameter(paramName: string): never {
 
 export function errorInvalidProjectionValue(path: string[]): never {
   throw planInvalid(
-    `Invalid projection value at path ${path.join('.')}: expected ColumnBuilder or nested object`,
+    `Invalid projection value at path ${path.join('.')}: expected ExpressionSource (ColumnBuilder or ExpressionBuilder) or nested object`,
   );
 }
 

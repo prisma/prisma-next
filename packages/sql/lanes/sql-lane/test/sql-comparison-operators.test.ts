@@ -63,7 +63,7 @@ describe('sql comparison operators', () => {
 
       expect(() => {
         (id as { eq: (value: unknown) => unknown }).eq({ kind: 'invalid' } as unknown);
-      }).toThrow('Parameter placeholder or column builder required for column comparison');
+      }).toThrow('Parameter placeholder or expression source required for column comparison');
     });
   });
 
@@ -74,7 +74,7 @@ describe('sql comparison operators', () => {
       expect(() => {
         // @ts-expect-error testing invalid input
         id.neq({ kind: 'invalid' });
-      }).toThrow('Parameter placeholder or column builder required for column comparison');
+      }).toThrow('Parameter placeholder or expression source required for column comparison');
     });
   });
 
@@ -166,7 +166,7 @@ describe('sql comparison operators', () => {
 
       expect(() => {
         (id as { eq: (value: unknown) => unknown }).eq({ kind: 'invalid' } as unknown);
-      }).toThrow('Parameter placeholder or column builder required for column comparison');
+      }).toThrow('Parameter placeholder or expression source required for column comparison');
     });
 
     it('throws error when column comparison is called with null', () => {
@@ -174,7 +174,7 @@ describe('sql comparison operators', () => {
 
       expect(() => {
         (id as { eq: (value: unknown) => unknown }).eq(null as unknown);
-      }).toThrow('Parameter placeholder or column builder required for column comparison');
+      }).toThrow('Parameter placeholder or expression source required for column comparison');
     });
 
     it('throws error when column comparison is called with undefined', () => {
@@ -182,7 +182,7 @@ describe('sql comparison operators', () => {
 
       expect(() => {
         (id as { eq: (value: unknown) => unknown }).eq(undefined as unknown);
-      }).toThrow('Parameter placeholder or column builder required for column comparison');
+      }).toThrow('Parameter placeholder or expression source required for column comparison');
     });
   });
 });

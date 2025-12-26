@@ -63,26 +63,12 @@ describe('delete builder', () => {
     Record<string, never>,
     'User'
   > = () => {
-    const columnBuilder = {
-      kind: 'column' as const,
-      table: 'user',
-      column: 'id',
-      columnMeta: int4Column,
-      eq: () => ({
-        kind: 'binary' as const,
-        op: 'eq' as const,
-        left: {} as unknown,
-        right: {} as unknown,
-      }),
-      asc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'asc' as const }),
-      desc: () => ({ kind: 'order' as const, expr: {} as unknown, dir: 'desc' as const }),
-      __jsType: undefined,
-    };
+    const columnRef = { kind: 'col' as const, table: 'user', column: 'id' };
     return {
       id: {
         eq: (p: unknown) => ({
           kind: 'binary' as const,
-          left: columnBuilder,
+          left: columnRef, // BinaryBuilder.left is Expression (ColumnRef), not ColumnBuilder
           right: p,
           op: 'eq' as const,
         }),

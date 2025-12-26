@@ -1,16 +1,27 @@
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
-import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef } from '../ast/types';
-import type { AnyColumnBuilder, ParamPlaceholder } from '../types';
+import type {
+  ColumnRef,
+  Expression,
+  ExpressionSource,
+  LiteralExpr,
+  OperationExpr,
+  ParamRef,
+} from '../ast/types';
+import type {
+  AnyColumnBuilder,
+  AnyExpressionSource,
+  ExpressionBuilder,
+  ParamPlaceholder,
+  ValueSource,
+} from '../types';
 
 /**
- * Helper to extract columnMeta from a ColumnBuilder.
+ * Helper to extract columnMeta from a ColumnBuilder or ExpressionBuilder.
  * Returns StorageColumn if present, undefined otherwise.
- * AnyColumnBuilder is a union that includes types with columnMeta property,
- * so we can safely access it after checking for existence.
+ * Both ColumnBuilder and ExpressionBuilder have columnMeta property.
  */
-export function getColumnMeta(expr: AnyColumnBuilder): StorageColumn | undefined {
-  // AnyColumnBuilder includes AnyColumnBuilderBase which has columnMeta: StorageColumn
-  // and ColumnBuilder which has columnMeta: ColumnMeta extends StorageColumn
+export function getColumnMeta(expr: AnyExpressionSource): StorageColumn | undefined {
+  // Both ColumnBuilder and ExpressionBuilder have columnMeta: StorageColumn
   // TypeScript should narrow the type after the 'in' check
   if ('columnMeta' in expr) {
     return expr.columnMeta;
@@ -66,20 +77,26 @@ export function collectColumnRefs(
 /**
  * Type predicate to check if an expression is an OperationExpr.
  */
-export function isOperationExpr(expr: AnyColumnBuilder | OperationExpr): expr is OperationExpr {
+export function isOperationExpr(
+  expr: AnyExpressionSource | OperationExpr | Expression,
+): expr is OperationExpr {
   return typeof expr === 'object' && expr !== null && 'kind' in expr && expr.kind === 'operation';
 }
 
 /**
- * Helper to extract table and column from a ColumnBuilder or OperationExpr.
- * For OperationExpr, recursively unwraps to find the base ColumnRef.
+ * Helper to extract table and column from a ColumnBuilder, ExpressionBuilder, or OperationExpr.
+ * For ExpressionBuilder or OperationExpr, recursively unwraps to find the base ColumnRef.
  */
-export function getColumnInfo(expr: AnyColumnBuilder | OperationExpr): {
+export function getColumnInfo(expr: AnyExpressionSource | OperationExpr): {
   table: string;
   column: string;
 } {
   if (isOperationExpr(expr)) {
     const baseCol = extractBaseColumnRef(expr);
+    return { table: baseCol.table, column: baseCol.column };
+  }
+  if (isExpressionBuilder(expr)) {
+    const baseCol = extractBaseColumnRef(expr.expr);
     return { table: baseCol.table, column: baseCol.column };
   }
   // expr is ColumnBuilder - TypeScript can't narrow properly
@@ -100,24 +117,55 @@ export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
 }
 
 /**
- * Extracts and returns an OperationExpr from a builder.
- * Returns the OperationExpr if the builder is an OperationExpr or has an _operationExpr property,
- * otherwise returns undefined.
- *
- * @design-note: This function accesses the hidden `_operationExpr` property, which is a code smell.
- * The issue is that `executeOperation()` in relational-core returns a ColumnBuilder-shaped object
- * with a hidden `_operationExpr` property, creating coupling between lanes and relational-core
- * implementation details. A cleaner design would be to have operation results be a separate
- * type (e.g., `OperationResultBuilder`) that properly represents expression nodes rather than
- * pretending to be a ColumnBuilder. This would require refactoring the operation execution
- * system in relational-core to return proper expression types.
+ * Type predicate to check if a value is an ExpressionBuilder.
  */
-export function getOperationExpr(
-  builder: AnyColumnBuilder | OperationExpr,
-): OperationExpr | undefined {
-  if (isOperationExpr(builder)) {
-    return builder;
-  }
-  const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
-  return builderWithExpr._operationExpr;
+export function isExpressionBuilder(value: unknown): value is ExpressionBuilder {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    (value as { kind: unknown }).kind === 'expression'
+  );
+}
+
+/**
+ * Type predicate to check if a value is an ExpressionSource (has toExpr method).
+ */
+export function isExpressionSource(value: unknown): value is ExpressionSource {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'toExpr' in value &&
+    typeof (value as ExpressionSource).toExpr === 'function'
+  );
+}
+
+/**
+ * Converts any ExpressionSource to an Expression.
+ * This is the canonical way to get an AST Expression from a builder.
+ *
+ * @param source - A ColumnBuilder or ExpressionBuilder
+ * @returns The corresponding Expression (ColumnRef or OperationExpr)
+ */
+export function toExpression(source: ExpressionSource): Expression {
+  return source.toExpr();
+}
+
+/**
+ * Converts an AnyExpressionSource to an Expression.
+ * Handles both ColumnBuilder and ExpressionBuilder.
+ *
+ * @param source - A ColumnBuilder or ExpressionBuilder
+ * @returns The corresponding Expression (ColumnRef or OperationExpr)
+ */
+export function expressionFromSource(source: AnyExpressionSource): Expression {
+  return source.toExpr();
+}
+
+/**
+ * Type predicate to check if a value is a ValueSource.
+ * ValueSource is either a ParamPlaceholder or an ExpressionSource.
+ */
+export function isValueSource(value: unknown): value is ValueSource {
+  return isParamPlaceholder(value) || isExpressionSource(value);
 }

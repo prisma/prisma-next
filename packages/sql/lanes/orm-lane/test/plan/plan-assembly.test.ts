@@ -11,6 +11,7 @@ import type {
   AnyColumnBuilder,
   AnyOrderBuilder,
   BinaryBuilder,
+  ExpressionBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
 import { buildMeta, createPlan, createPlanWithExists } from '../../src/plan/plan-assembly';
@@ -69,6 +70,7 @@ describe('plan assembly', () => {
     column: string,
     columnMeta: { codecId: string; nativeType: string; nullable: boolean },
   ): AnyColumnBuilder {
+    const colRef = createColumnRef(table, column);
     return {
       kind: 'column',
       table,
@@ -78,11 +80,70 @@ describe('plan assembly', () => {
         codecId: columnMeta.codecId,
         nullable: columnMeta.nullable,
       },
-      eq: () => ({ kind: 'binary', op: 'eq', left: {} as unknown, right: {} as unknown }),
-      asc: () => ({ kind: 'order', expr: {} as unknown, dir: 'asc' }),
-      desc: () => ({ kind: 'order', expr: {} as unknown, dir: 'desc' }),
+      toExpr: () => colRef,
+      eq: () => ({ kind: 'binary', op: 'eq', left: colRef, right: {} as unknown }),
+      asc: () => ({ kind: 'order', expr: colRef, dir: 'asc' }),
+      desc: () => ({ kind: 'order', expr: colRef, dir: 'desc' }),
       __jsType: undefined,
     } as unknown as AnyColumnBuilder;
+  }
+
+  function createMockExpressionBuilder(operationExpr: OperationExpr): ExpressionBuilder {
+    return {
+      kind: 'expression',
+      expr: operationExpr,
+      columnMeta: {
+        nativeType: 'int4',
+        codecId: operationExpr.returns.kind === 'typeId' ? operationExpr.returns.type : 'pg/int4@1',
+        nullable: false,
+      },
+      toExpr: () => operationExpr,
+      eq: () =>
+        ({
+          kind: 'binary',
+          op: 'eq',
+          left: operationExpr,
+          right: { kind: 'param', index: 0, name: 'p' },
+        }) as never,
+      neq: () =>
+        ({
+          kind: 'binary',
+          op: 'neq',
+          left: operationExpr,
+          right: { kind: 'param', index: 0, name: 'p' },
+        }) as never,
+      gt: () =>
+        ({
+          kind: 'binary',
+          op: 'gt',
+          left: operationExpr,
+          right: { kind: 'param', index: 0, name: 'p' },
+        }) as never,
+      lt: () =>
+        ({
+          kind: 'binary',
+          op: 'lt',
+          left: operationExpr,
+          right: { kind: 'param', index: 0, name: 'p' },
+        }) as never,
+      gte: () =>
+        ({
+          kind: 'binary',
+          op: 'gte',
+          left: operationExpr,
+          right: { kind: 'param', index: 0, name: 'p' },
+        }) as never,
+      lte: () =>
+        ({
+          kind: 'binary',
+          op: 'lte',
+          left: operationExpr,
+          right: { kind: 'param', index: 0, name: 'p' },
+        }) as never,
+      asc: () => ({ kind: 'order', expr: operationExpr, dir: 'asc' }) as never,
+      desc: () => ({ kind: 'order', expr: operationExpr, dir: 'desc' }) as never,
+      __jsType: undefined as unknown,
+    };
   }
 
   describe('buildMeta', () => {
@@ -145,19 +206,7 @@ describe('plan assembly', () => {
 
       const projection: ProjectionState = {
         aliases: ['sum'],
-        columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-            _operationExpr: operationExpr,
-          } as unknown as ProjectionState['columns'][0],
-        ],
+        columns: [createMockExpressionBuilder(operationExpr)],
       };
 
       const args = {
@@ -201,19 +250,7 @@ describe('plan assembly', () => {
 
       const projection: ProjectionState = {
         aliases: ['count'],
-        columns: [
-          {
-            kind: 'column',
-            table: 'user',
-            column: 'id',
-            columnMeta: {
-              nativeType: 'int4',
-              codecId: 'pg/int4@1',
-              nullable: false,
-            },
-            _operationExpr: operationExpr,
-          } as unknown as ProjectionState['columns'][0],
-        ],
+        columns: [createMockExpressionBuilder(operationExpr)],
       };
 
       const args = {
@@ -353,11 +390,10 @@ describe('plan assembly', () => {
         },
       };
 
+      const expressionBuilder = createMockExpressionBuilder(operationExpr);
       const where: BinaryBuilder = {
         kind: 'binary',
-        left: {
-          _operationExpr: operationExpr,
-        } as unknown as BinaryBuilder['left'],
+        left: expressionBuilder.toExpr(),
         right: { kind: 'param-placeholder', name: 'value' },
         op: 'eq',
       };

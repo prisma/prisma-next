@@ -7,11 +7,10 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
-import type { BinaryOp, TableRef } from './ast/types';
+import type { BinaryOp, ColumnRef, ExpressionSource, TableRef } from './ast/types';
 import { attachOperationsToColumnBuilder } from './operations-registry';
 import type { QueryLaneContext } from './query-lane-context';
 import type {
-  AnyColumnBuilderBase,
   BinaryBuilder,
   CodecTypes as CodecTypesType,
   ColumnBuilder,
@@ -21,7 +20,6 @@ import type {
   OrderBuilder,
   ParamPlaceholder,
 } from './types';
-import { isColumnBuilder } from './types';
 
 type TableColumns<Table extends { columns: Record<string, StorageColumn> }> = Table['columns'];
 
@@ -44,7 +42,8 @@ export class ColumnBuilderImpl<
   ColumnName extends string,
   ColumnMeta extends StorageColumn,
   JsType = unknown,
-> {
+> implements ExpressionSource
+{
   readonly kind = 'column' as const;
 
   constructor(
@@ -62,64 +61,76 @@ export class ColumnBuilderImpl<
     return undefined as unknown as JsType;
   }
 
+  /**
+   * Converts this column builder to a ColumnRef expression.
+   * This is the canonical way to get an AST node from a builder.
+   */
+  toExpr(): ColumnRef {
+    return Object.freeze({
+      kind: 'col' as const,
+      table: this.table,
+      column: this.column,
+    });
+  }
+
   private createBinaryBuilder(
     op: BinaryOp,
-    value: ParamPlaceholder | AnyColumnBuilderBase,
+    value: ParamPlaceholder | ExpressionSource,
   ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     if (value == null) {
-      throw planInvalid('Parameter placeholder or column builder required for column comparison');
+      throw planInvalid(
+        'Parameter placeholder or expression source required for column comparison',
+      );
     }
-    if (value.kind === 'param-placeholder' || isColumnBuilder(value)) {
+    // Check for ExpressionSource first (has toExpr method)
+    if ('toExpr' in value && typeof value.toExpr === 'function') {
       return Object.freeze({
         kind: 'binary' as const,
         op,
-        left: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+        left: this.toExpr(),
         right: value,
       }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
     }
-    throw planInvalid('Parameter placeholder or column builder required for column comparison');
+    // Must be a ParamPlaceholder
+    if ('kind' in value && value.kind === 'param-placeholder') {
+      return Object.freeze({
+        kind: 'binary' as const,
+        op,
+        left: this.toExpr(),
+        right: value,
+      }) as BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+    }
+    throw planInvalid('Parameter placeholder or expression source required for column comparison');
   }
 
-  eq(
-    value: ParamPlaceholder | AnyColumnBuilderBase,
-  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  eq(value: ParamPlaceholder | ExpressionSource): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('eq', value);
   }
 
-  neq(
-    value: ParamPlaceholder | AnyColumnBuilderBase,
-  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  neq(value: ParamPlaceholder | ExpressionSource): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('neq', value);
   }
 
-  gt(
-    value: ParamPlaceholder | AnyColumnBuilderBase,
-  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  gt(value: ParamPlaceholder | ExpressionSource): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('gt', value);
   }
 
-  lt(
-    value: ParamPlaceholder | AnyColumnBuilderBase,
-  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  lt(value: ParamPlaceholder | ExpressionSource): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('lt', value);
   }
 
-  gte(
-    value: ParamPlaceholder | AnyColumnBuilderBase,
-  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  gte(value: ParamPlaceholder | ExpressionSource): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('gte', value);
   }
 
-  lte(
-    value: ParamPlaceholder | AnyColumnBuilderBase,
-  ): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
+  lte(value: ParamPlaceholder | ExpressionSource): BinaryBuilder<ColumnName, ColumnMeta, JsType> {
     return this.createBinaryBuilder('lte', value);
   }
 
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType> {
     return Object.freeze({
       kind: 'order' as const,
-      expr: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+      expr: this.toExpr(),
       dir: 'asc' as const,
     }) as OrderBuilder<ColumnName, ColumnMeta, JsType>;
   }
@@ -127,7 +138,7 @@ export class ColumnBuilderImpl<
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType> {
     return Object.freeze({
       kind: 'order' as const,
-      expr: this as unknown as ColumnBuilder<ColumnName, ColumnMeta, JsType>,
+      expr: this.toExpr(),
       dir: 'desc' as const,
     }) as OrderBuilder<ColumnName, ColumnMeta, JsType>;
   }

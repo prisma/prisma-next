@@ -1,5 +1,9 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
-import type { AnyColumnBuilder, NestedProjection } from '@prisma-next/sql-relational-core/types';
+import type {
+  AnyColumnBuilder,
+  AnyExpressionSource,
+  NestedProjection,
+} from '@prisma-next/sql-relational-core/types';
 import type { ProjectionInput } from '../types/internal';
 import {
   errorAliasCollision,
@@ -9,7 +13,7 @@ import {
   errorInvalidProjectionValue,
   errorProjectionEmpty,
 } from '../utils/errors';
-import { isColumnBuilder } from '../utils/guards';
+import { isExpressionSource } from '../utils/guards';
 import type { IncludeState, ProjectionState } from '../utils/state';
 
 export function generateAlias(path: string[]): string {
@@ -47,14 +51,14 @@ export function flattenProjection(
   projection: NestedProjection,
   tracker: AliasTracker,
   currentPath: string[] = [],
-): { aliases: string[]; columns: AnyColumnBuilder[] } {
+): { aliases: string[]; columns: AnyExpressionSource[] } {
   const aliases: string[] = [];
-  const columns: AnyColumnBuilder[] = [];
+  const columns: AnyExpressionSource[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     const path = [...currentPath, key];
 
-    if (isColumnBuilder(value)) {
+    if (isExpressionSource(value)) {
       const alias = tracker.register(path);
       aliases.push(alias);
       columns.push(value);
@@ -77,7 +81,7 @@ export function buildProjectionState(
 ): ProjectionState {
   const tracker = new AliasTracker();
   const aliases: string[] = [];
-  const columns: AnyColumnBuilder[] = [];
+  const columns: AnyExpressionSource[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     if (value === true) {
@@ -96,8 +100,9 @@ export function buildProjectionState(
         table: matchingInclude.table.name,
         column: '',
         columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
-      } as AnyColumnBuilder);
-    } else if (isColumnBuilder(value)) {
+        toExpr: () => ({ kind: 'col', table: matchingInclude.table.name, column: '' }),
+      } as AnyExpressionSource);
+    } else if (isExpressionSource(value)) {
       const alias = tracker.register([key]);
       aliases.push(alias);
       columns.push(value);

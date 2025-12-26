@@ -10,7 +10,10 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import type {
+  AnyExpressionSource,
+  ExpressionBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import type { IncludeState } from '../../src/relations/include-plan';
@@ -76,6 +79,64 @@ function createTestOperationExpr(): OperationExpr {
       // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
       template: '${self} + ${arg0}',
     },
+  };
+}
+
+function createTestExpressionBuilder(operationExpr: OperationExpr): ExpressionBuilder<number> {
+  return {
+    kind: 'expression',
+    expr: operationExpr,
+    columnMeta: {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
+    },
+    toExpr: () => operationExpr,
+    eq: () =>
+      ({
+        kind: 'binary',
+        op: 'eq',
+        left: operationExpr,
+        right: { kind: 'param', index: 0, name: 'p' },
+      }) as never,
+    neq: () =>
+      ({
+        kind: 'binary',
+        op: 'neq',
+        left: operationExpr,
+        right: { kind: 'param', index: 0, name: 'p' },
+      }) as never,
+    gt: () =>
+      ({
+        kind: 'binary',
+        op: 'gt',
+        left: operationExpr,
+        right: { kind: 'param', index: 0, name: 'p' },
+      }) as never,
+    lt: () =>
+      ({
+        kind: 'binary',
+        op: 'lt',
+        left: operationExpr,
+        right: { kind: 'param', index: 0, name: 'p' },
+      }) as never,
+    gte: () =>
+      ({
+        kind: 'binary',
+        op: 'gte',
+        left: operationExpr,
+        right: { kind: 'param', index: 0, name: 'p' },
+      }) as never,
+    lte: () =>
+      ({
+        kind: 'binary',
+        op: 'lte',
+        left: operationExpr,
+        right: { kind: 'param', index: 0, name: 'p' },
+      }) as never,
+    asc: () => ({ kind: 'order', expr: operationExpr, dir: 'asc' }) as never,
+    desc: () => ({ kind: 'order', expr: operationExpr, dir: 'desc' }) as never,
+    __jsType: undefined as unknown as number,
   };
 }
 
@@ -184,13 +245,10 @@ describe('select-builder', () => {
 
     it('builds projection items with operation expression', () => {
       const operationExpr = createTestOperationExpr();
-      const columnWithOperation = {
-        ...tables['user']!.columns['id']!,
-        _operationExpr: operationExpr,
-      } as AnyColumnBuilder & { _operationExpr?: OperationExpr };
+      const expressionBuilder = createTestExpressionBuilder(operationExpr);
       const projectionState: ProjectionState = {
         aliases: ['id_plus_one'],
-        columns: [columnWithOperation],
+        columns: [expressionBuilder],
       };
 
       const result = buildProjectionItems(projectionState, []);
@@ -219,16 +277,13 @@ describe('select-builder', () => {
 
     it('builds projection items with mixed includes and columns', () => {
       const operationExpr = createTestOperationExpr();
-      const columnWithOperation = {
-        ...tables['user']!.columns['id']!,
-        _operationExpr: operationExpr,
-      } as AnyColumnBuilder & { _operationExpr?: OperationExpr };
+      const expressionBuilder = createTestExpressionBuilder(operationExpr);
       const projectionState: ProjectionState = {
         aliases: ['id', 'posts', 'email'],
         columns: [
           tables['user']!.columns['id']!,
           tables['user']!.columns['id']!,
-          columnWithOperation,
+          expressionBuilder,
         ],
       };
       const includesForMeta: IncludeState[] = [
@@ -270,7 +325,7 @@ describe('select-builder', () => {
     it('throws error when column is missing', () => {
       const projectionState: ProjectionState = {
         aliases: ['id'],
-        columns: [undefined as unknown as AnyColumnBuilder],
+        columns: [undefined as unknown as AnyExpressionSource],
       };
 
       expect(() => buildProjectionItems(projectionState, [])).toThrow(
@@ -286,7 +341,13 @@ describe('select-builder', () => {
             ...tables['user']!.columns['id']!,
             table: undefined as unknown as string,
             column: undefined as unknown as string,
-          },
+            // Provide toExpr that returns invalid ColumnRef
+            toExpr: () => ({
+              kind: 'col',
+              table: undefined as unknown as string,
+              column: undefined as unknown as string,
+            }),
+          } as AnyExpressionSource,
         ],
       };
 
