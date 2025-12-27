@@ -10,7 +10,7 @@
 import { execSync } from 'node:child_process';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -69,6 +69,17 @@ function getPackageRoots(files) {
   return Array.from(packageRoots);
 }
 
+function tryReadPackageName(packageRoot) {
+  try {
+    const pkgJsonPath = join(repoRoot, packageRoot, 'package.json');
+    const json = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+    const name = json?.name;
+    return typeof name === 'string' && name.length > 0 ? name : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // Main execution
 const stagedFiles = getStagedFiles();
 
@@ -96,7 +107,15 @@ function escapeRegex(value) {
 // - packages/2-sql/4-lanes/sql-lane
 const includePattern = `^(${packageRoots.map(escapeRegex).join('|')})(/|$)`;
 
-console.log(`Running dependency check on staged packages: ${packageRoots.join(', ')}`);
+const packageNames = packageRoots
+  .map((root) => tryReadPackageName(root))
+  .filter((name) => typeof name === 'string');
+
+console.log(
+  `Running dependency check on staged packages: ${
+    packageNames.length > 0 ? packageNames.join(', ') : packageRoots.join(', ')
+  }`,
+);
 
 try {
   // Run depcruise with --include-only on the affected packages
