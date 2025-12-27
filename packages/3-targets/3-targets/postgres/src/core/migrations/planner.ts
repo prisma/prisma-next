@@ -179,8 +179,7 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
     schema: string,
   ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const tableName of Object.keys(tables).sort()) {
-      const table = tables[tableName] as StorageTable;
+    for (const [tableName, table] of sortedEntries(tables)) {
       const qualified = qualifyTableName(schema, tableName);
       operations.push({
         id: `table.${tableName}`,
@@ -219,11 +218,7 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
     schema: string,
   ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const tableName of Object.keys(tables).sort()) {
-      const table = tables[tableName];
-      if (!table) {
-        continue;
-      }
+    for (const [tableName, table] of sortedEntries(tables)) {
       for (const unique of table.uniques) {
         const constraintName = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
         operations.push({
@@ -266,11 +261,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     schema: string,
   ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const tableName of Object.keys(tables).sort()) {
-      const table = tables[tableName];
-      if (!table) {
-        continue;
-      }
+    for (const [tableName, table] of sortedEntries(tables)) {
       for (const index of table.indexes) {
         const indexName = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
         operations.push({
@@ -314,11 +305,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     schema: string,
   ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const tableName of Object.keys(tables).sort()) {
-      const table = tables[tableName];
-      if (!table) {
-        continue;
-      }
+    for (const [tableName, table] of sortedEntries(tables)) {
       for (const foreignKey of table.foreignKeys) {
         const fkName = foreignKey.name ?? `${tableName}_${foreignKey.columns.join('_')}_fkey`;
         operations.push({
@@ -412,6 +399,10 @@ function quoteIdentifier(identifier: string): string {
 
 function escapeLiteral(value: string): string {
   return value.replace(/'/g, "''");
+}
+
+function sortedEntries<V>(record: Readonly<Record<string, V>>): Array<[string, V]> {
+  return Object.entries(record).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, V]>;
 }
 
 function constraintExistsCheck({
