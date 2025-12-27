@@ -58,13 +58,12 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
 
     const existingTables = Object.keys(options.schema.tables);
     if (existingTables.length > 0) {
-      const firstExistingTable = existingTables[0] ?? '';
+      const tableList = existingTables.sort().join(', ');
       return plannerFailure([
         {
           kind: 'unsupportedOperation',
-          summary: 'The Postgres migration planner currently supports only empty databases',
+          summary: `The Postgres migration planner currently supports only empty databases. Found ${existingTables.length} existing table(s): ${tableList}`,
           why: 'Remove existing tables or use a future planner mode that handles subsets/supersets.',
-          ...(firstExistingTable ? { location: { table: firstExistingTable } } : {}),
         },
       ]);
     }
@@ -110,13 +109,25 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
     schema: string,
   ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const extensions = contract.extensions ?? {};
+    const extensionNames = Object.keys(extensions);
     const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
-    for (const extensionName of Object.keys(extensions)) {
-      const sql = PG_EXTENSION_SQL[extensionName];
-      if (!sql) {
-        continue;
-      }
+    // Check for unsupported extensions and fail fast
+    const unsupportedExtensions = extensionNames.filter(
+      (extensionName) => !PG_EXTENSION_SQL[extensionName],
+    );
+    if (unsupportedExtensions.length > 0) {
+      const supportedExtensions = Object.keys(PG_EXTENSION_SQL).join(', ');
+      const unsupportedList = unsupportedExtensions.join(', ');
+      throw new Error(
+        `Unsupported PostgreSQL extensions in contract: ${unsupportedList}. ` +
+          `The Postgres migration planner currently only supports the following extensions: ${supportedExtensions}. ` +
+          'Extensions are defined in contract.extensions.',
+      );
+    }
+
+    for (const extensionName of extensionNames) {
+      const sql = PG_EXTENSION_SQL[extensionName]!;
       const details = this.buildTargetDetails('extension', extensionName, schema);
       operations.push({
         id: `extension.${extensionName}`,

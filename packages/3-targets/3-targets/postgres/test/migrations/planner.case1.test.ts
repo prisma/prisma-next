@@ -135,8 +135,85 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       conflicts: [
         {
           kind: 'unsupportedOperation',
+          summary: expect.stringContaining('Found 1 existing table(s): existing'),
         },
       ],
     });
+  });
+
+  it('lists all existing tables in error message', () => {
+    const planner = createPostgresMigrationPlanner();
+    const nonEmptySchema: SqlSchemaIR = {
+      tables: {
+        users: {
+          name: 'users',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        posts: {
+          name: 'posts',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        comments: {
+          name: 'comments',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      extensions: [],
+    };
+
+    const result = planner.plan({
+      contract,
+      schema: nonEmptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+    });
+
+    expect(result).toMatchObject({
+      kind: 'failure',
+      conflicts: [
+        {
+          kind: 'unsupportedOperation',
+          summary: expect.stringContaining('Found 3 existing table(s): comments, posts, users'),
+        },
+      ],
+    });
+  });
+
+  it('throws error for unsupported extensions', () => {
+    const planner = createPostgresMigrationPlanner();
+    const contractWithUnsupportedExtension: SqlContract<SqlStorage> = {
+      ...contract,
+      extensions: {
+        unsupportedExtension: {},
+        anotherUnsupported: {},
+      },
+    };
+
+    expect(() => {
+      planner.plan({
+        contract: contractWithUnsupportedExtension,
+        schema: emptySchema,
+        policy: INIT_ADDITIVE_POLICY,
+      });
+    }).toThrow(
+      'Unsupported PostgreSQL extensions in contract: unsupportedExtension, anotherUnsupported',
+    );
   });
 });
