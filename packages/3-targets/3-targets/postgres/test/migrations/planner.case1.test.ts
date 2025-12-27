@@ -1,63 +1,64 @@
-import type { MigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import {
-  createPostgresMigrationPlanner,
-  type PostgresPlanTargetDetails,
-} from '../../src/core/migrations/planner';
+import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 
-const contract: SqlContract<SqlStorage> = {
-  schemaVersion: '1',
-  target: 'postgres',
-  targetFamily: 'sql',
-  coreHash: 'sha256:contract',
-  profileHash: 'sha256:profile',
-  storage: {
-    tables: {
-      user: {
-        columns: {
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          embedding: { nativeType: 'vector', codecId: 'pg/vector@1', nullable: true },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [{ columns: ['email'] }],
-        indexes: [{ columns: ['email'] }],
-        foreignKeys: [],
-      },
-      post: {
-        columns: {
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [
-          {
-            columns: ['userId'],
-            references: { table: 'user', columns: ['id'] },
+function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlContract<SqlStorage> {
+  return {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    coreHash: 'sha256:contract',
+    profileHash: 'sha256:profile',
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            embedding: { nativeType: 'vector', codecId: 'pg/vector@1', nullable: true },
           },
-        ],
+          primaryKey: { columns: ['id'] },
+          uniques: [{ columns: ['email'] }],
+          indexes: [{ columns: ['email'] }],
+          foreignKeys: [],
+        },
+        post: {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              references: { table: 'user', columns: ['id'] },
+            },
+          ],
+        },
       },
     },
-  },
-  models: {},
-  relations: {},
-  mappings: {
-    codecTypes: {},
-    operationTypes: {},
-  },
-  capabilities: {},
-  extensions: {
-    pgvector: {},
-  },
-  meta: {},
-  sources: {},
-};
+    models: {},
+    relations: {},
+    mappings: {
+      codecTypes: {},
+      operationTypes: {},
+    },
+    capabilities: {},
+    extensions: {
+      pgvector: {},
+    },
+    meta: {},
+    sources: {},
+    ...overrides,
+  };
+}
+
+const contract = createTestContract();
 
 const emptySchema: SqlSchemaIR = {
   tables: {},
@@ -79,9 +80,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     }
     const operations = result.plan.operations;
     expect(operations.length).toBeGreaterThan(0);
-    expect(
-      operations.map((op: MigrationPlanOperation<PostgresPlanTargetDetails>) => op.id),
-    ).toEqual([
+    expect(operations.map((op) => op.id)).toEqual([
       'extension.pgvector',
       'table.post',
       'table.user',
@@ -93,11 +92,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       label: 'Enable extension "pgvector"',
       execute: [{ sql: 'CREATE EXTENSION IF NOT EXISTS vector' }],
     });
-    expect(
-      operations.find(
-        (op: MigrationPlanOperation<PostgresPlanTargetDetails>) => op.id === 'table.user',
-      ),
-    ).toMatchObject({
+    expect(operations.find((op) => op.id === 'table.user')).toMatchObject({
       execute: [
         {
           sql: expect.stringContaining('CREATE TABLE "public"."user"'),
@@ -198,13 +193,12 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('throws error for unsupported extensions', () => {
     const planner = createPostgresMigrationPlanner();
-    const contractWithUnsupportedExtension: SqlContract<SqlStorage> = {
-      ...contract,
+    const contractWithUnsupportedExtension = createTestContract({
       extensions: {
         unsupportedExtension: {},
         anotherUnsupported: {},
       },
-    };
+    });
 
     expect(() => {
       planner.plan({
