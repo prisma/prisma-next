@@ -427,7 +427,7 @@ No CLI command calls another CLI command:
 Implementation of the CLI command will follow the existing CLI architecture and style:
 
 - **Command creation**
-  - `createDbInitCommand()` in the CLI package under `packages/framework/tooling/cli`.
+  - `createDbInitCommand()` in the CLI package under `packages/1-framework/3-tooling/cli`.
   - Uses `setCommandDescriptions()` to provide:
     - Short description: e.g. “Bootstrap a database to match the current contract and write the contract marker.”
     - Long description: explaining the init semantics (additive-only, no drops, idempotent with marker).
@@ -464,7 +464,7 @@ We will implement `db init` in the following slices, each individually testable 
   - Emit an in-memory `MigrationPlan` containing only allowed operations.
 
 - **Implementation**
-  - Place planner and in-memory IR in `packages/sql/tooling/migrations` (or similar).
+  - Place planner and in-memory IR in `packages/2-sql/3-tooling/migrations` (or similar).
   - Expose `planMigration()` on `@prisma-next/family-sql/control` by delegating into that module.
 
 - **Testing**

@@ -847,7 +847,7 @@ This package is part of the **framework domain**, **tooling layer**, **migration
 - **Domain**: framework (target-agnostic)
 - **Layer**: tooling
 - **Plane**: migration
-- **Path**: `packages/framework/tooling/cli`
+- **Path**: `packages/1-framework/3-tooling/cli`
 
 ## See Also
 

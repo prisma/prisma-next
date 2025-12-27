@@ -175,7 +175,7 @@ sequenceDiagram
 
 Notes
 - Family vs Target: “Target‑family” (SQL) applies to any SQL dialect; “target” is a concrete dialect (Postgres, MySQL). Family code lives in the SQL domain; dialect code lives in Extensions.
-- Repository layout: concrete targets (dialects), adapters, and drivers live under `packages/targets/**`. Adapters commonly expose multiple entrypoints from a single package — `./adapter` (shared core), `./cli` (migration), `./runtime` (runtime) — mapped to planes via subpath globs in `architecture.config.json`.
+- Repository layout: concrete targets (dialects), adapters, and drivers live under `packages/3-targets/**`. Adapters commonly expose multiple entrypoints from a single package — `./adapter` (shared core), `./control` (migration), `./runtime` (runtime) — mapped to planes via subpath globs in `architecture.config.json`.
 - Plane boundaries: Shared plane hosts type‑only code and validators safe for both planes. Migration and Runtime must not import code across planes; runtime consumes artifacts and shared‑plane types only.
 ## Query Plane — Runtime Assertions
 

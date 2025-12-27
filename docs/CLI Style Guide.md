@@ -38,7 +38,7 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - **Styled Help Output**: Help output uses the same styled format as normal command output for consistency:
   - Root help (`prisma-next --help`): Shows "prisma next" title with subcommands listed
   - Command help (`prisma-next db verify --help`): Shows "next <command> ➜ <description>" with options, subcommands, and docs URLs
-  - Help formatters are in `packages/framework/tooling/cli/src/utils/output.ts` and use `configureHelp()` in `cli.ts`
+  - Help formatters are in `packages/1-framework/3-tooling/cli/src/utils/output.ts` and use `configureHelp()` in `cli.ts`
 - **Fixed-Width Columns**: All two-column output (help, styled headers) uses fixed 20-character left column width for consistent alignment
 - **Text Wrapping**: Right column wraps at 90 characters using `wrap-ansi` for ANSI-aware wrapping that preserves color codes
 - **Default Values**: Options with default values display `default: <value>` on the following line (dimmed)
