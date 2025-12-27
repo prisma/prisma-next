@@ -1,5 +1,6 @@
 import { SqlFamilyDescriptor } from '../core/descriptor';
 
+export type { SqlControlFamilyInstance } from '../core/instance';
 export {
   createMigrationPlan,
   plannerFailure,
@@ -11,6 +12,8 @@ export type {
   MigrationOperationClass,
   MigrationPlan,
   MigrationPlanContractInfo,
+  MigrationPlanner,
+  MigrationPlannerPlanOptions,
   MigrationPlanOperation,
   MigrationPlanOperationStep,
   MigrationPlanOperationTarget,
@@ -21,6 +24,7 @@ export type {
   PlannerFailureResult,
   PlannerResult,
   PlannerSuccessResult,
+  SqlControlTargetDescriptor,
 } from '../core/migrations/types';
 
 /**

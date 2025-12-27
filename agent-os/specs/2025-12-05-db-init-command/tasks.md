@@ -16,6 +16,12 @@ To keep PRs small and reviewable, implement these tasks as a sequence of **self-
 - **Branch 3 — Runner SPI + Postgres runner + marker/ledger wiring**
   - Covers tasks **2.1**, **2.2**, **2.3**, **2.4**.
   - Deliverables: `MigrationRunner` interface, target-driven runner construction, Postgres runner that executes plans with pre/post checks and integrates marker/ledger updates, plus integration tests using the dev database utilities.
+  - **Manual developer test (between Branch 3 and 4)**: After this branch lands, add a small, ad-hoc harness (script or focused test) that:
+    - Loads a real SQL contract (e.g. from `prisma-next-demo`).
+    - Connects to a dev Postgres instance.
+    - Introspects schema IR via the family/target stack.
+    - Calls `planner.plan(...)` and, on success, `runner.execute(...)`.
+    - Verifies manually (e.g. via psql or a separate script) that tables, marker, and ledger match expectations before proceeding to Branch 4.
 
 - **Branch 4 — Schema IR & verification integration**
   - Covers tasks **4.1**, **4.2**, **4.3**.
@@ -58,12 +64,12 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
   - Ensure the IR is target-agnostic at the interface level, but can carry Postgres-specific details via the target implementation.
   - ✅ `MigrationPlan`, `MigrationPlanOperation`, `MigrationPlanOperationStep`, and `createMigrationPlan()` (same path as above) provide the IR plus helpers and tests under `packages/2-sql/3-tooling/family/test/migrations.types.test.ts`.
 
-- **1.4 Establish planner SPI between family and target**
+- [x] **1.4 Establish planner SPI between family and target**
   - Define a `MigrationPlanner` interface in the SQL family/control-plane layer (shared plane).
   - Add a method on the **target control descriptor** (e.g., Postgres) to construct a concrete planner instance given a `ControlFamilyInstance<'sql'>`.
   - Ensure the interface and construction pattern are compatible with future non-Postgres targets.
 
-- **1.5 Implement Postgres-specific planner**
+- [x] **1.5 Implement Postgres-specific planner**
   - Implement a Postgres-aware planner that:
     - Accepts `(contractIr, schemaIr, policy)`.
     - Computes diffs against the contract using existing schema/contract tooling where possible.
@@ -72,7 +78,7 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
       - Records all non-additive-required changes as structured conflicts in a `failure` result.
   - Ensure planner is **non-destructive by construction** under the `init` policy.
 
-- **1.6 Planner tests**
+- [x] **1.6 Planner tests**
   - Add unit/integration tests for the planner covering at least:
     - Empty database schema IR → full additive plan matching the contract.
     - Subset schema IR → plan only missing tables/columns/indexes/constraints.
@@ -234,5 +240,17 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 - **6.3 Richer drift-tolerance configuration**
   - Allow users to configure which forms of extra or non-contract schema objects are tolerated or warned on.
   - Extend conflict taxonomy and CLI reporting accordingly.
+
+## 7. Follow-up Cleanup
+
+- **7.1 Remove pgvector-specific logic from Postgres target**
+  - Strip any hard-coded references to pgvector (extension SQL, naming conventions, etc.) from `@prisma-next/targets-postgres`.
+  - Ensure extension-specific behavior is provided exclusively via extension packs so the target remains neutral.
+
+## 8. Postgres Planner Enhancements
+
+- **8.1 Support additional additive initialization scenarios**
+  - Extend the Postgres migration planner to handle additive “subset” and “superset” database states (e.g., missing columns, indexes, or constraints).
+  - Generate additive operations for partially provisioned schemas and ensure the planner produces full conflict reports when non-additive changes are required.
 
 

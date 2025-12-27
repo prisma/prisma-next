@@ -706,9 +706,6 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../../3-targets/7-drivers/postgres
-      '@prisma-next/target-postgres':
-        specifier: workspace:*
-        version: link:../../../3-targets/3-targets/postgres
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -1015,6 +1012,15 @@ importers:
       '@prisma-next/core-execution-plane':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/runtime/execution-plane
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../../2-sql/3-tooling/family
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../../2-sql/1-core/contract
+      '@prisma-next/sql-schema-ir':
+        specifier: workspace:*
+        version: link:../../../2-sql/1-core/schema-ir
       arktype:
         specifier: ^2.0.0
         version: 2.1.26
