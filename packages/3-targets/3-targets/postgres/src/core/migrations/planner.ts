@@ -234,9 +234,7 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
           precheck: [
             {
               description: `ensure unique constraint "${constraintName}" is missing`,
-              sql: `SELECT NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${escapeLiteral(
-                constraintName,
-              )}')`,
+              sql: constraintExistsCheck({ constraintName, schema, exists: false }),
             },
           ],
           execute: [
@@ -250,9 +248,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
           postcheck: [
             {
               description: `verify unique constraint "${constraintName}" exists`,
-              sql: `SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${escapeLiteral(
-                constraintName,
-              )}')`,
+              sql: constraintExistsCheck({ constraintName, schema }),
             },
           ],
         });
@@ -333,9 +329,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
           precheck: [
             {
               description: `ensure foreign key "${fkName}" is missing`,
-              sql: `SELECT NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${escapeLiteral(
-                fkName,
-              )}')`,
+              sql: constraintExistsCheck({ constraintName: fkName, schema, exists: false }),
             },
           ],
           execute: [
@@ -352,9 +346,7 @@ REFERENCES ${qualifyTableName(schema, foreignKey.references.table)} (${foreignKe
           postcheck: [
             {
               description: `verify foreign key "${fkName}" exists`,
-              sql: `SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${escapeLiteral(
-                fkName,
-              )}')`,
+              sql: constraintExistsCheck({ constraintName: fkName, schema }),
             },
           ],
         });
@@ -416,4 +408,22 @@ function quoteIdentifier(identifier: string): string {
 
 function escapeLiteral(value: string): string {
   return value.replace(/'/g, "''");
+}
+
+function constraintExistsCheck({
+  constraintName,
+  schema,
+  exists = true,
+}: {
+  constraintName: string;
+  schema: string;
+  exists?: boolean;
+}): string {
+  const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
+  return `SELECT ${existsClause} (
+  SELECT 1 FROM pg_constraint c
+  JOIN pg_namespace n ON c.connamespace = n.oid
+  WHERE c.conname = '${escapeLiteral(constraintName)}'
+  AND n.nspname = '${escapeLiteral(schema)}'
+)`;
 }
