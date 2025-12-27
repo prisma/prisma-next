@@ -660,9 +660,6 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../../3-targets/7-drivers/postgres
-      '@prisma-next/target-postgres':
-        specifier: workspace:*
-        version: link:../../../3-targets/3-targets/postgres
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils

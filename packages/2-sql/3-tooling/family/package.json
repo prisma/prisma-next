@@ -32,7 +32,6 @@
   },
   "devDependencies": {
     "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
