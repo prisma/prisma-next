@@ -127,7 +127,11 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
     }
 
     for (const extensionName of extensionNames) {
-      const sql = PG_EXTENSION_SQL[extensionName]!;
+      const sql = PG_EXTENSION_SQL[extensionName];
+      if (!sql) {
+        // This should never happen since we validate extensions above, but TypeScript requires this check
+        throw new Error(`Extension SQL not found for ${extensionName}`);
+      }
       const details = this.buildTargetDetails('extension', extensionName, schema);
       operations.push({
         id: `extension.${extensionName}`,
