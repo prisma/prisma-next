@@ -81,11 +81,11 @@ This package is part of the **framework domain**, **core layer**, **shared plane
 
 ## Related Subsystems
 
-- **[Query Lanes](../../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)**: Uses plan errors during query construction
-- **[Runtime & Plugin Framework](../../../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)**: Uses plan errors for validation
+- **[Query Lanes](../../../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)**: Uses plan errors during query construction
+- **[Runtime & Plugin Framework](../../../../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)**: Uses plan errors for validation
 
 ## Related ADRs
 
-- [ADR 140 - Package Layering & Target-Family Namespacing](../../../../docs/architecture%20docs/adrs/ADR%20140%20-%20Package%20Layering%20&%20Target-Family%20Namespacing.md)
-- [ADR 068 - Error mapping to RuntimeError](../../../../docs/architecture%20docs/adrs/ADR%20068%20-%20Error%20mapping%20to%20RuntimeError.md)
-- [ADR 027 - Error Envelope Stable Codes](../../../../docs/architecture%20docs/adrs/ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md)
+- [ADR 140 - Package Layering & Target-Family Namespacing](../../../../../docs/architecture%20docs/adrs/ADR%20140%20-%20Package%20Layering%20&%20Target-Family%20Namespacing.md)
+- [ADR 068 - Error mapping to RuntimeError](../../../../../docs/architecture%20docs/adrs/ADR%20068%20-%20Error%20mapping%20to%20RuntimeError.md)
+- [ADR 027 - Error Envelope Stable Codes](../../../../../docs/architecture%20docs/adrs/ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md)

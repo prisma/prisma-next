@@ -106,23 +106,29 @@ const schemaIR: SqlSchemaIR = await controlAdapter.introspect(driver, contract);
 
 ### Schema Verification
 
-The core control plane compares contracts against `SqlSchemaIR`:
+Schema verification is performed via the `schemaVerify()` method on the SQL family instance:
 
 ```typescript
-// In core-control-plane
-import { verifyDatabaseSchema } from '@prisma-next/core-control-plane/verify-database-schema';
+// In SQL family instance
+import sql from '@prisma-next/family-sql/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
-const result = await verifyDatabaseSchema({
+// Create family instance
+const familyInstance = sql.create({
+  target: postgresTargetDescriptor,
+  adapter: postgresAdapterDescriptor,
+  driver: postgresDriverDescriptor,
+  extensions: [],
+});
+
+// Schema verification is performed via family instance method
+const result = await familyInstance.schemaVerify({
   driver,
   contractIR,
-  schemaIR, // Produced by family.introspectSchema
-  family,
-  target,
-  adapter,
-  extensions,
   strict: false,
+  contractPath: './contract.json',
 });
+// schemaVerify internally calls adapter.introspect() to get schemaIR
 ```
 
 ## Architecture
@@ -140,6 +146,6 @@ This package sits at the core layer in the shared plane, making it accessible to
 
 - `docs/briefs/11-schema-ir.md` - Schema IR project brief
 - `docs/briefs/SQL Schema IR and Verification.md` - Detailed design document
-- `packages/1-framework/1-core/migration/control-plane/src/verify-database-schema.ts` - Core verification action
+- `packages/2-sql/3-tooling/family/src/core/instance.ts` - SQL family instance with `schemaVerify()` method
 - `packages/3-targets/6-adapters/postgres/src/exports/control.ts` - Postgres introspection entrypoint
 

@@ -45,7 +45,7 @@ Positive
 - Families own typing, assembly, and validation via TargetFamilyHook.
 
 Trade‑offs
-- Requires families to provide helper functions in their `/cli` exports.
+- Requires families to provide helper functions in their `/control` and `/runtime` exports.
 - Slightly more structure in pack publishing (two entrypoints).
 
 ## Implementation Status
