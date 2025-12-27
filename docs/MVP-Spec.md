@@ -5,7 +5,7 @@ This spec defines a single, coherent MVP for the two‑week spike. It reflects t
 ## Goals (two‑week spike)
 - Compatibility import‑swap for a minimal Prisma ORM example app with zero query edits via a compatibility layer
 - Safety and coaching value via the budgets plugin blocking an unbounded read and surfacing a clear fix
-- Extensibility demonstrated by installing and using a true extension pack `@prisma-next/extension-pgvector` (in `packages/extensions/extension-pgvector`) without core changes
+- Extensibility demonstrated by installing and using a true extension pack `@prisma-next/extension-pgvector` (in `packages/3-extensions/pgvector`) without core changes
 
 Supporting goals for developer experience and verification:
 - No manual generate: PSL → contract artifacts on save
@@ -40,7 +40,7 @@ To de‑risk package organization and prove extensibility across planes and fami
 - Acceptance: TS and PSL authoring produce byte‑identical contract.json for non‑trivial schema (relations, indexes, codecs).
 
 4) New Database Target Scaffolding (e.g., MySQL)
-- Scope: scaffold `packages/targets/mysql/{contract-types,operations,emitter}`; minimal lowering templates for CRUD; thin adapter stub if needed.
+- Scope: scaffold `packages/3-targets/3-targets/mysql` and (as needed) `packages/3-targets/6-adapters/mysql`, `packages/3-targets/7-drivers/mysql`; minimal lowering templates for CRUD; thin adapter stub if needed.
 - Acceptance: planner calls MySQL family hooks for DDL diffs; lanes lower a basic Plan to MySQL SQL (execution optional); confirms Domains/Layers/Planes generalize beyond SQL.
 
 5) Views Extension (SQL domain — Targets + Tooling)

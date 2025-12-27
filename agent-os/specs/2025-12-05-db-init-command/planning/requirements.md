@@ -74,7 +74,7 @@ Start testing with real Postgres as soon as possible. For example, begin with ad
 
 **Similar Features Identified:**
 
-- **Marker helper**: Located in postgres adapter (`packages/targets/postgres-adapter`)
+- **Marker helper**: Located in postgres adapter (`packages/3-targets/6-adapters/postgres`)
   - Provides marker table read/write functionality
   - Should be reused for marker updates during `db init`
 
@@ -89,7 +89,7 @@ Start testing with real Postgres as soon as possible. For example, begin with ad
   - Required to obtain live schema IR from database
   - Should be available in SQL family/target packages
 
-- **Extension pack structure**: Reference `packages/extensions/pgvector`
+- **Extension pack structure**: Reference `packages/3-extensions/pgvector`
   - Shows how extension packs provide capabilities
   - Model for how pgvector migration operations should be structured
 
@@ -209,7 +209,7 @@ Not applicable - this is a CLI command implementation without visual UI componen
 - Error taxonomy and structured errors (framework domain)
 
 **Package Structure:**
-- Place planner and IR in `packages/sql/tooling/migrations` (or similar)
+- Place planner and IR in `packages/2-sql/3-tooling/migrations` (or similar)
 - Expose via `@prisma-next/family-sql/control` entrypoint
 - Runner logic can share primitives with future `db update` command
 - Operation definitions reusable across migration commands

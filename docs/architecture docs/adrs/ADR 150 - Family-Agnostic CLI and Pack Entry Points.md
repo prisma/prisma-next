@@ -14,7 +14,7 @@ We want a single, simple way for applications to declare their target family, ta
 
 2. Explicit pack entrypoints
 - Each pack exposes two entrypoints:
-  - `/cli`: default‑exports IR‑only descriptors for tooling and callable helpers; safe for emit.
+  - `/control`: default‑exports IR‑only descriptors for tooling and callable helpers; safe for emit.
   - `/runtime`: exports runtime factories/types; used only by DB‑connected commands or app runtime.
 
 3. Family‑agnostic CLI + family‑provided helpers
@@ -45,15 +45,15 @@ Positive
 - Families own typing, assembly, and validation via TargetFamilyHook.
 
 Trade‑offs
-- Requires families to provide helper functions in their `/cli` exports.
+- Requires families to provide helper functions in their `/control` and `/runtime` exports.
 - Slightly more structure in pack publishing (two entrypoints).
 
 ## Implementation Status
 
 ✅ **Completed** (Briefs 20 & 21, Decouple-Framework-CLI-from-SQL)
 
-1) ✅ Config loader: `packages/framework/tooling/cli/src/load-config.ts` loads TS module and returns config.
-2) ✅ SQL pack assembly moved to `packages/sql/tooling/assembly` and re‑exported from `@prisma-next/family-sql/cli`.
+1) ✅ Config loader: `packages/1-framework/3-tooling/cli/src/config-loader.ts` loads TS module and returns config.
+2) ✅ SQL pack assembly moved to `packages/2-sql/3-tooling/family/src/core/assembly.ts` and is used via `@prisma-next/family-sql/control`.
 3) ✅ Emit command updated to read helpers from `config.family`, assemble inputs, and call emitter with `family.hook`.
 4) ✅ Flags removed: `--adapter` and `--extensions` flags removed; config-only model enforced.
 5) ✅ Pack loading/assembly removed from framework CLI; family-provided helpers handle all assembly logic.

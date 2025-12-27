@@ -21,33 +21,42 @@
     "baseUrl": "."
   },
   "references": [
-    { "path": "./packages/relational-ir" },
-    { "path": "./packages/psl" },
-    { "path": "./packages/targets/postgres-driver" },
-    { "path": "./packages/targets/postgres-adapter" },
-    { "path": "./packages/framework/core-contract" },
-    { "path": "./packages/framework/core-control-plane" },
-    { "path": "./packages/extensions/compat-prisma" },
-    { "path": "./packages/schema-emitter" },
-    { "path": "./packages/framework/tooling/cli" },
-    { "path": "./packages/framework/tooling/eslint-plugin" },
-    { "path": "./packages/framework/core-plan" },
-    { "path": "./packages/framework/core-operations" },
-    { "path": "./packages/framework/core-control-plane" },
-    { "path": "./packages/framework/core-execution-plane" },
-    { "path": "./packages/framework/authoring/contract-authoring" },
-    { "path": "./packages/framework/authoring/contract-ts" },
-    { "path": "./packages/framework/authoring/contract-psl" },
-    { "path": "./packages/sql/contract" },
-    { "path": "./packages/sql/operations" },
-    { "path": "./packages/sql/tooling/emitter" },
-    { "path": "./packages/sql/tooling/cli" },
-    { "path": "./packages/targets/postgres" },
-    { "path": "./packages/sql/lanes/relational-core" },
-    { "path": "./packages/sql/lanes/sql-lane" },
-    { "path": "./packages/sql/lanes/orm-lane" },
-    { "path": "./packages/sql/authoring/sql-contract-ts" },
-    { "path": "./packages/framework/runtime-executor" },
-    { "path": "./packages/sql/sql-runtime" }
+    { "path": "./packages/1-framework/1-core/shared/contract" },
+    { "path": "./packages/1-framework/1-core/shared/operations" },
+    { "path": "./packages/1-framework/1-core/shared/plan" },
+    { "path": "./packages/1-framework/1-core/migration/control-plane" },
+    { "path": "./packages/1-framework/1-core/runtime/execution-plane" },
+
+    { "path": "./packages/1-framework/2-authoring/contract" },
+    { "path": "./packages/1-framework/2-authoring/contract-ts" },
+    { "path": "./packages/1-framework/2-authoring/contract-psl" },
+
+    { "path": "./packages/1-framework/3-tooling/cli" },
+    { "path": "./packages/1-framework/3-tooling/emitter" },
+    { "path": "./packages/1-framework/3-tooling/eslint-plugin" },
+
+    { "path": "./packages/1-framework/4-runtime-executor" },
+
+    { "path": "./packages/2-sql/1-core/contract" },
+    { "path": "./packages/2-sql/1-core/operations" },
+    { "path": "./packages/2-sql/1-core/schema-ir" },
+
+    { "path": "./packages/2-sql/2-authoring/contract-ts" },
+
+    { "path": "./packages/2-sql/3-tooling/emitter" },
+    { "path": "./packages/2-sql/3-tooling/family" },
+
+    { "path": "./packages/2-sql/4-lanes/relational-core" },
+    { "path": "./packages/2-sql/4-lanes/sql-lane" },
+    { "path": "./packages/2-sql/4-lanes/orm-lane" },
+
+    { "path": "./packages/2-sql/5-runtime" },
+
+    { "path": "./packages/3-extensions/compat-prisma" },
+    { "path": "./packages/3-extensions/pgvector" },
+
+    { "path": "./packages/3-targets/3-targets/postgres" },
+    { "path": "./packages/3-targets/6-adapters/postgres" },
+    { "path": "./packages/3-targets/7-drivers/postgres" }
   ]
 }

@@ -278,7 +278,7 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 - Use the published package name as the only import specifier
 - Encode target family in the package name prefix (e.g., `@prisma-next/sql-...`)
 - Collapse nested directories to hyphenated names (no slashes after scope)
-- Keep conventional names for adapters/drivers (e.g., `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`). They are located under `packages/targets/**` as separate packages (target, adapter, driver) to enable mix-and-match.
+- Keep conventional names for adapters/drivers (e.g., `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`). They are located under `packages/3-targets/**` as separate packages (target, adapter, driver) to enable mix-and-match.
 - Layers constrain dependencies but don't appear in package names except when meaningful (e.g., `runtime-executor`)
 
 ### Examples
