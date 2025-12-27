@@ -53,32 +53,36 @@ describe('family instance introspect', () => {
       }); // Connection closed here
     }, timeouts.spinUpPpgDev);
 
-    it('returns schema IR with tables and columns', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns schema IR with tables and columns',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const schemaIR = await familyInstance.introspect({
-          driver,
-        });
+          const schemaIR = await familyInstance.introspect({
+            driver,
+          });
 
-        expect(schemaIR).toBeDefined();
-        expect(schemaIR.tables).toBeDefined();
-        expect(schemaIR.extensions).toBeDefined();
-        expect(Array.isArray(schemaIR.extensions)).toBe(true);
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(schemaIR).toBeDefined();
+          expect(schemaIR.tables).toBeDefined();
+          expect(schemaIR.extensions).toBeDefined();
+          expect(Array.isArray(schemaIR.extensions)).toBe(true);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
 
     it('includes user table with correct columns', async () => {
       if (!connectionString) {
@@ -137,35 +141,39 @@ describe('family instance introspect', () => {
       }
     });
 
-    it('includes primary key for user table', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
-
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
-
-        const schemaIR = await familyInstance.introspect({
-          driver,
-        });
-
-        const userTable = schemaIR.tables['user'];
-        expect(userTable).toBeDefined();
-        if (!userTable) {
-          throw new Error('user table not found');
+    it(
+      'includes primary key for user table',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
         }
-        expect(userTable.primaryKey).toBeDefined();
-        expect(userTable.primaryKey?.columns).toEqual(['id']);
-      } finally {
-        await driver.close();
-      }
-    });
+
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
+
+          const schemaIR = await familyInstance.introspect({
+            driver,
+          });
+
+          const userTable = schemaIR.tables['user'];
+          expect(userTable).toBeDefined();
+          if (!userTable) {
+            throw new Error('user table not found');
+          }
+          expect(userTable.primaryKey).toBeDefined();
+          expect(userTable.primaryKey?.columns).toEqual(['id']);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
 
     it('includes unique constraint for user email', async () => {
       if (!connectionString) {
@@ -200,47 +208,51 @@ describe('family instance introspect', () => {
       }
     });
 
-    it('includes post table with foreign key to user', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
-
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
-
-        const schemaIR = await familyInstance.introspect({
-          driver,
-        });
-
-        const postTable = schemaIR.tables['post'];
-        expect(postTable).toBeDefined();
-        if (!postTable) {
-          throw new Error('post table not found');
+    it(
+      'includes post table with foreign key to user',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
         }
-        expect(postTable.name).toBe('post');
-        expect(postTable.columns['id']).toBeDefined();
-        expect(postTable.columns['userId']).toBeDefined();
-        expect(postTable.columns['title']).toBeDefined();
 
-        expect(postTable.foreignKeys).toBeDefined();
-        expect(postTable.foreignKeys.length).toBe(1);
-        const fk = postTable.foreignKeys[0];
-        if (!fk) {
-          throw new Error('foreign key not found');
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
+
+          const schemaIR = await familyInstance.introspect({
+            driver,
+          });
+
+          const postTable = schemaIR.tables['post'];
+          expect(postTable).toBeDefined();
+          if (!postTable) {
+            throw new Error('post table not found');
+          }
+          expect(postTable.name).toBe('post');
+          expect(postTable.columns['id']).toBeDefined();
+          expect(postTable.columns['userId']).toBeDefined();
+          expect(postTable.columns['title']).toBeDefined();
+
+          expect(postTable.foreignKeys).toBeDefined();
+          expect(postTable.foreignKeys.length).toBe(1);
+          const fk = postTable.foreignKeys[0];
+          if (!fk) {
+            throw new Error('foreign key not found');
+          }
+          expect(fk.columns).toEqual(['userId']);
+          expect(fk.referencedTable).toBe('user');
+          expect(fk.referencedColumns).toEqual(['id']);
+        } finally {
+          await driver.close();
         }
-        expect(fk.columns).toEqual(['userId']);
-        expect(fk.referencedTable).toBe('user');
-        expect(fk.referencedColumns).toEqual(['id']);
-      } finally {
-        await driver.close();
-      }
-    });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
     it('includes indexes for post table', async () => {
       if (!connectionString) {

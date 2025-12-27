@@ -118,54 +118,58 @@ describe('family instance schemaVerify', () => {
       });
     }, timeouts.spinUpPpgDev);
 
-    it('returns ok=false with missing_table issue', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=false with missing_table issue',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .table('post', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('title', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .table('post', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('title', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          contractPath: './contract.json',
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            contractPath: './contract.json',
+          });
 
-        expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some((i) => i.kind === 'missing_table' && i.table === 'post'),
-        ).toBe(true);
-        expect(result.schema.root.status).toBe('fail');
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(result.ok).toBe(false);
+          expect(result.schema.counts.fail).toBeGreaterThan(0);
+          expect(
+            result.schema.issues.some((i) => i.kind === 'missing_table' && i.table === 'post'),
+          ).toBe(true);
+          expect(result.schema.root.status).toBe('fail');
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('missing column', () => {
