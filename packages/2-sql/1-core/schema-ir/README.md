@@ -26,6 +26,7 @@ This package defines the core types for the SQL Schema IR, a target-agnostic rep
 
 **Dependents:**
 - **Migration Plane**:
+  - `@prisma-next/family-sql` - SQL family instance uses SqlSchemaIR for schema verification
   - `@prisma-next/core-control-plane` - Core verification logic
   - `@prisma-next/adapter-postgres` - Postgres introspection
   - `@prisma-next/extension-pgvector` - Extension verification hooks
