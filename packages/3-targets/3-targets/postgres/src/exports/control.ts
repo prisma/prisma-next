@@ -3,7 +3,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { ControlTargetInstance } from '@prisma-next/core-control-plane/types';
-import type { SqlControlTargetDescriptor } from '@prisma-next/family-sql/control';
+import type {
+  SqlControlFamilyInstance,
+  SqlControlTargetDescriptor,
+} from '@prisma-next/family-sql/control';
 import { type } from 'arktype';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
@@ -65,7 +68,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         targetId: 'postgres',
       };
     },
-    createPlanner() {
+    createPlanner(_family: SqlControlFamilyInstance) {
       return createPostgresMigrationPlanner();
     },
   };

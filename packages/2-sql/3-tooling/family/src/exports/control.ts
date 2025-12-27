@@ -1,5 +1,6 @@
 import { SqlFamilyDescriptor } from '../core/descriptor';
 
+export type { SqlControlFamilyInstance } from '../core/instance';
 export {
   createMigrationPlan,
   plannerFailure,
