@@ -47,7 +47,11 @@ const planResult = planner.plan({ contract: sqlContract, schema, policy });
 
 // Targets also provide runners for executing plans
 const runner = postgresTargetDescriptor.createRunner(familyInstance);
-const executeResult = await runner.execute({ plan: planResult.plan, driver, contract: sqlContract });
+const executeResult = await runner.execute({
+  plan: planResult.plan,
+  driver,
+  destinationContract: sqlContract,
+});
 ```
 
 ## Architecture

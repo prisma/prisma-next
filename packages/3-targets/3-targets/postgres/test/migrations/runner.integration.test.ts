@@ -110,7 +110,7 @@ describe.sequential('PostgresMigrationRunner', () => {
         const executeResult = await runner.execute({
           plan: result.plan,
           driver: driver!,
-          contract,
+          destinationContract: contract,
         });
         expect(executeResult).toMatchObject({
           operationsPlanned: result.plan.operations.length,
@@ -161,7 +161,7 @@ describe.sequential('PostgresMigrationRunner', () => {
         await runner.execute({
           plan: initialPlan.plan,
           driver: driver!,
-          contract,
+          destinationContract: contract,
         });
 
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -175,7 +175,7 @@ describe.sequential('PostgresMigrationRunner', () => {
         const result = await runner.execute({
           plan: emptyPlan,
           driver: driver!,
-          contract,
+          destinationContract: contract,
         });
         expect(result).toMatchObject({
           operationsPlanned: 0,
@@ -214,7 +214,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           runner.execute({
             plan: emptyPlan,
             driver: driver!,
-            contract,
+            destinationContract: contract,
           }),
         ).rejects.toThrow(/does not satisfy contract/i);
 
@@ -235,7 +235,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           runner.execute({
             plan: failingPlan,
             driver: driver!,
-            contract,
+            destinationContract: contract,
           }),
         ).rejects.toThrow(/precheck/i);
 
@@ -275,7 +275,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           runner.execute({
             plan: emptyPlan,
             driver: driver!,
-            contract,
+            destinationContract: contract,
           }),
         ).rejects.toThrow(/does not match plan origin/i);
 
@@ -319,7 +319,7 @@ describe.sequential('PostgresMigrationRunner', () => {
         await runner.execute({
           plan: initialPlan.plan,
           driver: driver!,
-          contract,
+          destinationContract: contract,
         });
 
         const planWithFailingStep = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -356,7 +356,7 @@ describe.sequential('PostgresMigrationRunner', () => {
         const result = await runner.execute({
           plan: planWithFailingStep,
           driver: driver!,
-          contract,
+          destinationContract: contract,
         });
         expect(result).toMatchObject({
           operationsPlanned: 1,
@@ -424,7 +424,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           runner.execute({
             plan: invalidPlan,
             driver: driver!,
-            contract,
+            destinationContract: contract,
           }),
         ).rejects.toThrow(/does not satisfy contract/i);
 
@@ -493,7 +493,7 @@ describe.sequential('PostgresMigrationRunner', () => {
         const result = await runner.execute({
           plan: planWithPreSatisfiedPostcheck,
           driver: driver!,
-          contract,
+          destinationContract: contract,
         });
         expect(result).toMatchObject({
           operationsPlanned: 1,

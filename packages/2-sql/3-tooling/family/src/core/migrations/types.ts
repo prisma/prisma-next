@@ -118,7 +118,11 @@ export interface MigrationRunnerExecuteCallbacks<TTargetDetails = Record<string,
 export interface MigrationRunnerExecuteOptions<TTargetDetails = Record<string, never>> {
   readonly plan: MigrationPlan<TTargetDetails>;
   readonly driver: ControlDriverInstance;
-  readonly contract: SqlContract<SqlStorage>;
+  /**
+   * Destination contract IR.
+   * Must correspond to `plan.destination` and is used for schema verification and marker/ledger writes.
+   */
+  readonly destinationContract: SqlContract<SqlStorage>;
   readonly schemaName?: string;
   readonly strictVerification?: boolean;
   readonly callbacks?: MigrationRunnerExecuteCallbacks<TTargetDetails>;

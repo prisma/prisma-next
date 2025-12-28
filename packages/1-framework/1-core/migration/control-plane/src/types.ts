@@ -90,7 +90,7 @@ export interface ControlExtensionInstance<
  *   configPath: './prisma-next.config.ts',
  * };
  *
- * await runner.execute({ plan, driver, contract, context });
+ * await runner.execute({ plan, driver, destinationContract: contract, context });
  * ```
  */
 export interface OperationContext {

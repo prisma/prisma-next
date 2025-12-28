@@ -54,7 +54,10 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       await this.acquireLock(driver, lockKey);
       await this.ensureControlTables(driver);
       const existingMarker = await readMarker(driver);
-      this.ensurePlanMatchesDestinationContract(options.plan.destination, options.contract);
+      this.ensurePlanMatchesDestinationContract(
+        options.plan.destination,
+        options.destinationContract,
+      );
       this.ensureMarkerCompatibility(existingMarker, options.plan);
 
       const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
@@ -64,7 +67,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
       const schemaVerifyOptions: SchemaVerifyOptions = {
         driver,
-        contractIR: options.contract,
+        contractIR: options.destinationContract,
         strict: options.strictVerification ?? true,
         context: options.context ?? {},
       };
@@ -258,7 +261,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
   private ensurePlanMatchesDestinationContract(
     destination: MigrationPlanContractInfo,
-    contract: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['contract'],
+    contract: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['destinationContract'],
   ): void {
     if (destination.coreHash !== contract.coreHash) {
       throw new Error(
@@ -285,9 +288,9 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       coreHash: options.plan.destination.coreHash,
       profileHash:
         options.plan.destination.profileHash ??
-        options.contract.profileHash ??
+        options.destinationContract.profileHash ??
         options.plan.destination.coreHash,
-      contractJson: options.contract,
+      contractJson: options.destinationContract,
       canonicalVersion: null,
       meta: {},
     });
@@ -307,10 +310,10 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       destinationCoreHash: options.plan.destination.coreHash,
       destinationProfileHash:
         options.plan.destination.profileHash ??
-        options.contract.profileHash ??
+        options.destinationContract.profileHash ??
         options.plan.destination.coreHash,
       contractJsonBefore: existingMarker?.contractJson ?? null,
-      contractJsonAfter: options.contract,
+      contractJsonAfter: options.destinationContract,
       operations: executedOperations,
     });
     await this.executeStatement(driver, ledgerStatement);
