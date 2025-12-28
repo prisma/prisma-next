@@ -63,7 +63,10 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         strict: options.strictVerification ?? true,
         context: options.context ?? {},
       };
-      await this.family.schemaVerify(schemaVerifyOptions);
+      const schemaVerifyResult = await this.family.schemaVerify(schemaVerifyOptions);
+      if (!schemaVerifyResult.ok) {
+        throw new Error(schemaVerifyResult.summary);
+      }
 
       await this.upsertMarker(driver, options, existingMarker);
       await this.recordLedgerEntry(driver, options, existingMarker);
