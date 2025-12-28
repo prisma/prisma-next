@@ -46,7 +46,16 @@ export interface MigrationPlanContractInfo {
 export interface MigrationPlan<TTargetDetails = Record<string, never>> {
   readonly targetId: string;
   readonly policy: MigrationPolicy;
-  readonly contract: MigrationPlanContractInfo;
+  /**
+   * Origin contract identity that the plan expects the database to currently be at.
+   * If omitted, the runner treats the origin as "no marker present" (empty database),
+   * and will only proceed if no marker exists (or if the marker already matches destination).
+   */
+  readonly origin?: MigrationPlanContractInfo | null;
+  /**
+   * Destination contract identity that the plan intends to reach.
+   */
+  readonly destination: MigrationPlanContractInfo;
   readonly operations: readonly MigrationPlanOperation<TTargetDetails>[];
   readonly meta?: AnyRecord;
 }
@@ -136,7 +145,8 @@ export interface SqlControlTargetDescriptor<
 export interface CreateMigrationPlanOptions<TTargetDetails> {
   readonly targetId: string;
   readonly policy: MigrationPolicy;
-  readonly contract: MigrationPlanContractInfo;
+  readonly origin?: MigrationPlanContractInfo | null;
+  readonly destination: MigrationPlanContractInfo;
   readonly operations: readonly MigrationPlanOperation<TTargetDetails>[];
   readonly meta?: AnyRecord;
 }

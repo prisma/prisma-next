@@ -32,14 +32,16 @@ describe('createMigrationPlan', () => {
     const plan = createMigrationPlan<TestTargetDetails>({
       targetId: 'postgres',
       policy: INIT_ADDITIVE_POLICY,
-      contract: { coreHash: 'core', profileHash: 'profile' },
+      origin: { coreHash: 'originCore', profileHash: 'originProfile' },
+      destination: { coreHash: 'core', profileHash: 'profile' },
       operations: sourceOperations as readonly MigrationPlanOperation<TestTargetDetails>[],
       meta: { marker: 'none' },
     });
 
     expect(plan).toMatchObject({
       targetId: 'postgres',
-      contract: { coreHash: 'core', profileHash: 'profile' },
+      origin: { coreHash: 'originCore', profileHash: 'originProfile' },
+      destination: { coreHash: 'core', profileHash: 'profile' },
       operations: [
         {
           id: 'operation.table.user',
@@ -64,7 +66,7 @@ describe('planner helpers', () => {
     const plan: MigrationPlan<TestTargetDetails> = createMigrationPlan({
       targetId: 'postgres',
       policy: INIT_ADDITIVE_POLICY,
-      contract: { coreHash: 'abc', profileHash: 'def' },
+      destination: { coreHash: 'abc', profileHash: 'def' },
       operations: [],
     });
     const success = plannerSuccess(plan);

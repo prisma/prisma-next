@@ -54,12 +54,10 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       await this.acquireLock(driver, lockKey);
       await this.ensureControlTables(driver);
       const existingMarker = await readMarker(driver);
-      this.ensureMarkerCompatibility(existingMarker, options.plan.contract);
+      this.ensurePlanMatchesDestinationContract(options.plan.destination, options.contract);
+      this.ensureMarkerCompatibility(existingMarker, options.plan);
 
-      const markerAtDestination = this.markerMatchesDestination(
-        existingMarker,
-        options.plan.contract,
-      );
+      const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
       const { operationsExecuted, executedOperations } = markerAtDestination
         ? { operationsExecuted: 0, executedOperations: [] as const }
         : await this.applyPlan(driver, options);
@@ -212,15 +210,15 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
   private markerMatchesDestination(
     marker: ContractMarkerRecord | null,
-    destination: MigrationPlanContractInfo,
+    plan: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['plan'],
   ): boolean {
     if (!marker) {
       return false;
     }
-    if (marker.coreHash !== destination.coreHash) {
+    if (marker.coreHash !== plan.destination.coreHash) {
       return false;
     }
-    if (destination.profileHash && marker.profileHash !== destination.profileHash) {
+    if (plan.destination.profileHash && marker.profileHash !== plan.destination.profileHash) {
       return false;
     }
     return true;
@@ -228,19 +226,52 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
   private ensureMarkerCompatibility(
     marker: ContractMarkerRecord | null,
-    destination: MigrationPlanContractInfo,
+    plan: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['plan'],
   ): void {
-    if (!marker) {
-      return;
-    }
-    if (marker.coreHash !== destination.coreHash) {
+    const origin = plan.origin ?? null;
+    if (!origin) {
+      if (!marker) {
+        return;
+      }
+      if (this.markerMatchesDestination(marker, plan)) {
+        return;
+      }
       throw new Error(
-        `Existing contract marker (${marker.coreHash}) does not match planned contract (${destination.coreHash}).`,
+        `Existing contract marker (${marker.coreHash}) does not match plan origin (no marker expected).`,
       );
     }
-    if (destination.profileHash && marker.profileHash !== destination.profileHash) {
+
+    if (!marker) {
+      throw new Error(`Missing contract marker: expected origin core hash ${origin.coreHash}.`);
+    }
+    if (marker.coreHash !== origin.coreHash) {
       throw new Error(
-        `Existing contract marker profile hash (${marker.profileHash}) does not match planned contract profile hash (${destination.profileHash}).`,
+        `Existing contract marker (${marker.coreHash}) does not match plan origin (${origin.coreHash}).`,
+      );
+    }
+    if (origin.profileHash && marker.profileHash !== origin.profileHash) {
+      throw new Error(
+        `Existing contract marker profile hash (${marker.profileHash}) does not match plan origin profile hash (${origin.profileHash}).`,
+      );
+    }
+  }
+
+  private ensurePlanMatchesDestinationContract(
+    destination: MigrationPlanContractInfo,
+    contract: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['contract'],
+  ): void {
+    if (destination.coreHash !== contract.coreHash) {
+      throw new Error(
+        `Plan destination core hash (${destination.coreHash}) does not match provided contract core hash (${contract.coreHash}).`,
+      );
+    }
+    if (
+      destination.profileHash &&
+      contract.profileHash &&
+      destination.profileHash !== contract.profileHash
+    ) {
+      throw new Error(
+        `Plan destination profile hash (${destination.profileHash}) does not match provided contract profile hash (${contract.profileHash}).`,
       );
     }
   }
@@ -251,11 +282,11 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
     const writeStatements = buildWriteMarkerStatements({
-      coreHash: options.plan.contract.coreHash,
+      coreHash: options.plan.destination.coreHash,
       profileHash:
-        options.plan.contract.profileHash ??
+        options.plan.destination.profileHash ??
         options.contract.profileHash ??
-        options.plan.contract.coreHash,
+        options.plan.destination.coreHash,
       contractJson: options.contract,
       canonicalVersion: null,
       meta: {},
@@ -273,11 +304,11 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     const ledgerStatement = buildLedgerInsertStatement({
       originCoreHash: existingMarker?.coreHash ?? null,
       originProfileHash: existingMarker?.profileHash ?? null,
-      destinationCoreHash: options.plan.contract.coreHash,
+      destinationCoreHash: options.plan.destination.coreHash,
       destinationProfileHash:
-        options.plan.contract.profileHash ??
+        options.plan.destination.profileHash ??
         options.contract.profileHash ??
-        options.plan.contract.coreHash,
+        options.plan.destination.coreHash,
       contractJsonBefore: existingMarker?.contractJson ?? null,
       contractJsonAfter: options.contract,
       operations: executedOperations,

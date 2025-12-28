@@ -81,7 +81,8 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
     const plan = createMigrationPlan<PostgresPlanTargetDetails>({
       targetId: 'postgres',
       policy: options.policy,
-      contract: {
+      origin: null,
+      destination: {
         coreHash: options.contract.coreHash,
         ...(options.contract.profileHash ? { profileHash: options.contract.profileHash } : {}),
       },

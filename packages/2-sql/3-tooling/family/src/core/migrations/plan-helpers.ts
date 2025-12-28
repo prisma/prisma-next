@@ -83,7 +83,10 @@ export function createMigrationPlan<TTargetDetails = Record<string, never>>(
   return Object.freeze({
     targetId: options.targetId,
     policy: normalizePolicy(options.policy),
-    contract: Object.freeze({ ...options.contract }),
+    ...(options.origin !== undefined
+      ? { origin: options.origin ? Object.freeze({ ...options.origin }) : null }
+      : {}),
+    destination: Object.freeze({ ...options.destination }),
     operations: freezeOperations(options.operations),
     ...(options.meta ? { meta: cloneRecord(options.meta) } : {}),
   });

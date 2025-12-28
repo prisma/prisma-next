@@ -167,7 +167,8 @@ describe.sequential('PostgresMigrationRunner', () => {
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
           policy: INIT_ADDITIVE_POLICY,
-          contract: toPlanContractInfo(contract),
+          origin: null,
+          destination: toPlanContractInfo(contract),
           operations: [],
         });
 
@@ -204,7 +205,8 @@ describe.sequential('PostgresMigrationRunner', () => {
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
           policy: INIT_ADDITIVE_POLICY,
-          contract: toPlanContractInfo(contract),
+          origin: null,
+          destination: toPlanContractInfo(contract),
           operations: [],
         });
 
@@ -242,7 +244,7 @@ describe.sequential('PostgresMigrationRunner', () => {
     );
   });
 
-  describe('when an existing marker does not match the destination contract', () => {
+  describe('when an existing marker does not match the origin contract', () => {
     it(
       'fails with an error before executing the plan and does not modify marker or append ledger',
       { timeout: testTimeout },
@@ -264,7 +266,8 @@ describe.sequential('PostgresMigrationRunner', () => {
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
           policy: INIT_ADDITIVE_POLICY,
-          contract: toPlanContractInfo(contract),
+          origin: { coreHash: 'sha256:expected-origin', profileHash: 'sha256:expected-profile' },
+          destination: toPlanContractInfo(contract),
           operations: [],
         });
 
@@ -274,7 +277,7 @@ describe.sequential('PostgresMigrationRunner', () => {
             driver: driver!,
             contract,
           }),
-        ).rejects.toThrow(/does not match planned contract/i);
+        ).rejects.toThrow(/does not match plan origin/i);
 
         const markerRow = await driver!.query<{ core_hash: string; profile_hash: string }>(
           'select core_hash, profile_hash from prisma_contract.marker where id = $1',
@@ -322,7 +325,8 @@ describe.sequential('PostgresMigrationRunner', () => {
         const planWithFailingStep = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
           policy: INIT_ADDITIVE_POLICY,
-          contract: toPlanContractInfo(contract),
+          origin: null,
+          destination: toPlanContractInfo(contract),
           operations: [
             {
               id: 'noop.explode',
@@ -388,7 +392,8 @@ describe.sequential('PostgresMigrationRunner', () => {
         const invalidPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
           policy: INIT_ADDITIVE_POLICY,
-          contract: toPlanContractInfo(contract),
+          origin: null,
+          destination: toPlanContractInfo(contract),
           operations: [
             {
               id: 'table.user',
@@ -447,7 +452,8 @@ describe.sequential('PostgresMigrationRunner', () => {
         const planWithPreSatisfiedPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
           policy: INIT_ADDITIVE_POLICY,
-          contract: toPlanContractInfo(contract),
+          origin: null,
+          destination: toPlanContractInfo(contract),
           operations: [
             {
               id: 'table.user',
@@ -519,7 +525,8 @@ function createFailingPlan() {
   return createMigrationPlan<PostgresPlanTargetDetails>({
     targetId: 'postgres',
     policy: INIT_ADDITIVE_POLICY,
-    contract: toPlanContractInfo(contract),
+    origin: null,
+    destination: toPlanContractInfo(contract),
     operations: [
       {
         id: 'table.user',
