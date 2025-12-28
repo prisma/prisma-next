@@ -1,3 +1,4 @@
+import type { Result } from '@prisma-next/core-control-plane/result';
 import type {
   ControlDriverInstance,
   ControlTargetDescriptor,
@@ -143,8 +144,9 @@ export type MigrationRunnerErrorCode =
 
 /**
  * Detailed information about a migration runner failure.
+ * This is the failure payload type for `NotOk<MigrationRunnerFailure>`.
  */
-export interface MigrationRunnerError {
+export interface MigrationRunnerFailure {
   readonly code: MigrationRunnerErrorCode;
   readonly summary: string;
   readonly why?: string;
@@ -152,29 +154,18 @@ export interface MigrationRunnerError {
 }
 
 /**
- * Successful migration result.
+ * Success value for migration runner execution.
  */
-export interface MigrationRunnerSuccess {
-  readonly ok: true;
-  readonly value: {
-    readonly operationsPlanned: number;
-    readonly operationsExecuted: number;
-  };
-}
-
-/**
- * Failed migration result.
- */
-export interface MigrationRunnerFailure {
-  readonly ok: false;
-  readonly error: MigrationRunnerError;
+export interface MigrationRunnerSuccessValue {
+  readonly operationsPlanned: number;
+  readonly operationsExecuted: number;
 }
 
 /**
  * Result union for migration runner execution.
  * Either success with operation counts, or failure with error details.
  */
-export type MigrationRunnerResult = MigrationRunnerSuccess | MigrationRunnerFailure;
+export type MigrationRunnerResult = Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>;
 
 export interface MigrationRunner<TTargetDetails = Record<string, never>> {
   execute(options: MigrationRunnerExecuteOptions<TTargetDetails>): Promise<MigrationRunnerResult>;
