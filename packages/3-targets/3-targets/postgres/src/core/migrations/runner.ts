@@ -1,14 +1,17 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
+  MigrationPlan,
   MigrationPlanContractInfo,
   MigrationPlanOperation,
   MigrationPlanOperationStep,
   MigrationRunner,
   MigrationRunnerExecuteOptions,
+  MigrationRunnerFailure,
   MigrationRunnerResult,
   SchemaVerifyOptions,
   SqlControlFamilyInstance,
 } from '@prisma-next/family-sql/control';
+import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { readMarker } from '@prisma-next/family-sql/verify';
 import type { PostgresPlanTargetDetails } from './planner';
 import {
@@ -54,17 +57,50 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       await this.acquireLock(driver, lockKey);
       await this.ensureControlTables(driver);
       const existingMarker = await readMarker(driver);
-      this.ensurePlanMatchesDestinationContract(
+
+      // Validate plan destination matches provided contract
+      const destinationMismatch = this.ensurePlanMatchesDestinationContract(
         options.plan.destination,
         options.destinationContract,
       );
-      this.ensureMarkerCompatibility(existingMarker, options.plan);
+      if (destinationMismatch) {
+        await this.rollbackTransaction(driver);
+        return destinationMismatch;
+      }
 
+      // Validate plan origin matches existing marker
+      const markerMismatch = this.ensureMarkerCompatibility(existingMarker, options.plan);
+      if (markerMismatch) {
+        await this.rollbackTransaction(driver);
+        return markerMismatch;
+      }
+
+      // Enforce policy compatibility
+      const policyViolation = this.enforcePolicyCompatibility(options.plan);
+      if (policyViolation) {
+        await this.rollbackTransaction(driver);
+        return policyViolation;
+      }
+
+      // Apply plan operations or skip if marker already at destination
       const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
-      const { operationsExecuted, executedOperations } = markerAtDestination
-        ? { operationsExecuted: 0, executedOperations: [] as const }
-        : await this.applyPlan(driver, options);
+      let operationsExecuted: number;
+      let executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[];
 
+      if (markerAtDestination) {
+        operationsExecuted = 0;
+        executedOperations = [];
+      } else {
+        const applyResult = await this.applyPlan(driver, options);
+        if (!applyResult.ok) {
+          await this.rollbackTransaction(driver);
+          return applyResult;
+        }
+        operationsExecuted = applyResult.operationsExecuted;
+        executedOperations = applyResult.executedOperations;
+      }
+
+      // Verify resulting schema matches contract
       const schemaVerifyOptions: SchemaVerifyOptions = {
         driver,
         contractIR: options.destinationContract,
@@ -73,23 +109,27 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       };
       const schemaVerifyResult = await this.family.schemaVerify(schemaVerifyOptions);
       if (!schemaVerifyResult.ok) {
-        throw new Error(schemaVerifyResult.summary);
+        await this.rollbackTransaction(driver);
+        return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
+          why: 'The resulting database schema does not satisfy the destination contract.',
+          meta: {
+            issues: schemaVerifyResult.schema.issues,
+          },
+        });
       }
 
+      // Record marker and ledger entries
       await this.upsertMarker(driver, options, existingMarker);
       await this.recordLedgerEntry(driver, options, existingMarker, executedOperations);
 
       await this.commitTransaction(driver);
-      await this.releaseLock(driver, lockKey);
-      return {
+      return runnerSuccess({
         operationsPlanned: options.plan.operations.length,
         operationsExecuted,
-      };
+      });
     } catch (error) {
       await this.rollbackTransaction(driver);
-      await this.releaseLock(driver, lockKey).catch(() => {
-        // ignore unlock errors during rollback
-      });
+      // Re-throw unexpected errors (fail fast)
       throw error;
     }
   }
@@ -97,10 +137,14 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   private async applyPlan(
     driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
-  ): Promise<{
-    readonly operationsExecuted: number;
-    readonly executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[];
-  }> {
+  ): Promise<
+    | {
+        readonly ok: true;
+        readonly operationsExecuted: number;
+        readonly executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[];
+      }
+    | MigrationRunnerFailure
+  > {
     let operationsExecuted = 0;
     const executedOperations: Array<MigrationPlanOperation<PostgresPlanTargetDetails>> = [];
     for (const operation of options.plan.operations) {
@@ -115,9 +159,27 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
           continue;
         }
 
-        await this.runExpectationSteps(driver, operation.precheck, operation, 'precheck');
+        const precheckFailure = await this.runExpectationSteps(
+          driver,
+          operation.precheck,
+          operation,
+          'precheck',
+        );
+        if (precheckFailure) {
+          return precheckFailure;
+        }
+
         await this.runExecuteSteps(driver, operation.execute);
-        await this.runExpectationSteps(driver, operation.postcheck, operation, 'postcheck');
+
+        const postcheckFailure = await this.runExpectationSteps(
+          driver,
+          operation.postcheck,
+          operation,
+          'postcheck',
+        );
+        if (postcheckFailure) {
+          return postcheckFailure;
+        }
 
         executedOperations.push(operation);
         operationsExecuted += 1;
@@ -125,7 +187,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         options.callbacks?.onOperationComplete?.(operation);
       }
     }
-    return { operationsExecuted, executedOperations };
+    return { ok: true, operationsExecuted, executedOperations };
   }
 
   private async ensureControlTables(
@@ -141,13 +203,25 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     steps: readonly MigrationPlanOperationStep[],
     operation: MigrationPlanOperation<PostgresPlanTargetDetails>,
     phase: 'precheck' | 'postcheck',
-  ): Promise<void> {
+  ): Promise<MigrationRunnerFailure | null> {
     for (const step of steps) {
       const result = await driver.query(step.sql);
       if (!this.stepResultIsTrue(result.rows)) {
-        throw new RunnerStepError(operation.id, phase, step.description);
+        const code = phase === 'precheck' ? 'PRECHECK_FAILED' : 'POSTCHECK_FAILED';
+        return runnerFailure(
+          code,
+          `Operation ${operation.id} failed during ${phase}: ${step.description}`,
+          {
+            meta: {
+              operationId: operation.id,
+              phase,
+              stepDescription: step.description,
+            },
+          },
+        );
       }
     }
+    return null;
   }
 
   private async runExecuteSteps(
@@ -227,45 +301,105 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     return true;
   }
 
+  private enforcePolicyCompatibility(
+    plan: MigrationPlan<PostgresPlanTargetDetails>,
+  ): MigrationRunnerFailure | null {
+    const allowedClasses = new Set(plan.policy.allowedOperationClasses);
+    for (const operation of plan.operations) {
+      if (!allowedClasses.has(operation.operationClass)) {
+        return runnerFailure(
+          'POLICY_VIOLATION',
+          `Operation ${operation.id} has class "${operation.operationClass}" which is not allowed by policy.`,
+          {
+            why: `Policy only allows: ${plan.policy.allowedOperationClasses.join(', ')}.`,
+            meta: {
+              operationId: operation.id,
+              operationClass: operation.operationClass,
+              allowedClasses: plan.policy.allowedOperationClasses,
+            },
+          },
+        );
+      }
+    }
+    return null;
+  }
+
   private ensureMarkerCompatibility(
     marker: ContractMarkerRecord | null,
     plan: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['plan'],
-  ): void {
+  ): MigrationRunnerFailure | null {
     const origin = plan.origin ?? null;
     if (!origin) {
       if (!marker) {
-        return;
+        return null;
       }
       if (this.markerMatchesDestination(marker, plan)) {
-        return;
+        return null;
       }
-      throw new Error(
+      return runnerFailure(
+        'MARKER_ORIGIN_MISMATCH',
         `Existing contract marker (${marker.coreHash}) does not match plan origin (no marker expected).`,
+        {
+          meta: {
+            markerCoreHash: marker.coreHash,
+            expectedOrigin: null,
+          },
+        },
       );
     }
 
     if (!marker) {
-      throw new Error(`Missing contract marker: expected origin core hash ${origin.coreHash}.`);
+      return runnerFailure(
+        'MARKER_ORIGIN_MISMATCH',
+        `Missing contract marker: expected origin core hash ${origin.coreHash}.`,
+        {
+          meta: {
+            expectedOriginCoreHash: origin.coreHash,
+          },
+        },
+      );
     }
     if (marker.coreHash !== origin.coreHash) {
-      throw new Error(
+      return runnerFailure(
+        'MARKER_ORIGIN_MISMATCH',
         `Existing contract marker (${marker.coreHash}) does not match plan origin (${origin.coreHash}).`,
+        {
+          meta: {
+            markerCoreHash: marker.coreHash,
+            expectedOriginCoreHash: origin.coreHash,
+          },
+        },
       );
     }
     if (origin.profileHash && marker.profileHash !== origin.profileHash) {
-      throw new Error(
+      return runnerFailure(
+        'MARKER_ORIGIN_MISMATCH',
         `Existing contract marker profile hash (${marker.profileHash}) does not match plan origin profile hash (${origin.profileHash}).`,
+        {
+          meta: {
+            markerProfileHash: marker.profileHash,
+            expectedOriginProfileHash: origin.profileHash,
+          },
+        },
       );
     }
+    return null;
   }
 
   private ensurePlanMatchesDestinationContract(
     destination: MigrationPlanContractInfo,
     contract: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['destinationContract'],
-  ): void {
+  ): MigrationRunnerFailure | null {
     if (destination.coreHash !== contract.coreHash) {
-      throw new Error(
+      return runnerFailure(
+        'DESTINATION_CONTRACT_MISMATCH',
         `Plan destination core hash (${destination.coreHash}) does not match provided contract core hash (${contract.coreHash}).`,
+        {
+          meta: {
+            planCoreHash: destination.coreHash,
+            contractCoreHash: contract.coreHash,
+          },
+        },
       );
     }
     if (
@@ -273,10 +407,18 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       contract.profileHash &&
       destination.profileHash !== contract.profileHash
     ) {
-      throw new Error(
+      return runnerFailure(
+        'DESTINATION_CONTRACT_MISMATCH',
         `Plan destination profile hash (${destination.profileHash}) does not match provided contract profile hash (${contract.profileHash}).`,
+        {
+          meta: {
+            planProfileHash: destination.profileHash,
+            contractProfileHash: contract.profileHash,
+          },
+        },
       );
     }
+    return null;
   }
 
   private async upsertMarker(
@@ -323,14 +465,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     key: string,
   ): Promise<void> {
-    await driver.query('select pg_advisory_lock(hashtext($1))', [key]);
-  }
-
-  private async releaseLock(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    key: string,
-  ): Promise<void> {
-    await driver.query('select pg_advisory_unlock(hashtext($1))', [key]);
+    await driver.query('select pg_advisory_xact_lock(hashtext($1))', [key]);
   }
 
   private async beginTransaction(
@@ -360,12 +495,5 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       return;
     }
     await driver.query(statement.sql);
-  }
-}
-
-class RunnerStepError extends Error {
-  constructor(operationId: string, phase: 'precheck' | 'postcheck', description: string) {
-    super(`Operation ${operationId} failed during ${phase}: ${description}`);
-    this.name = 'RunnerStepError';
   }
 }

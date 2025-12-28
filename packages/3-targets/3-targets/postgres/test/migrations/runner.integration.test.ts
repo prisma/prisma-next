@@ -112,10 +112,13 @@ describe.sequential('PostgresMigrationRunner', () => {
           driver: driver!,
           destinationContract: contract,
         });
-        expect(executeResult).toMatchObject({
-          operationsPlanned: result.plan.operations.length,
-          operationsExecuted: result.plan.operations.length,
-        });
+        expect(executeResult.ok).toBe(true);
+        if (executeResult.ok) {
+          expect(executeResult.value).toMatchObject({
+            operationsPlanned: result.plan.operations.length,
+            operationsExecuted: result.plan.operations.length,
+          });
+        }
 
         const tableRow = await driver!.query<{ exists: boolean }>(
           `select to_regclass('public."user"') is not null as exists`,
@@ -172,15 +175,18 @@ describe.sequential('PostgresMigrationRunner', () => {
           operations: [],
         });
 
-        const result = await runner.execute({
+        const emptyPlanResult = await runner.execute({
           plan: emptyPlan,
           driver: driver!,
           destinationContract: contract,
         });
-        expect(result).toMatchObject({
-          operationsPlanned: 0,
-          operationsExecuted: 0,
-        });
+        expect(emptyPlanResult.ok).toBe(true);
+        if (emptyPlanResult.ok) {
+          expect(emptyPlanResult.value).toMatchObject({
+            operationsPlanned: 0,
+            operationsExecuted: 0,
+          });
+        }
 
         const markerCount = await driver!.query<{ count: string }>(
           'select count(*)::text as count from prisma_contract.marker where id = $1',
@@ -197,7 +203,7 @@ describe.sequential('PostgresMigrationRunner', () => {
 
   describe('when an empty plan is executed but the schema does not satisfy the destination contract', () => {
     it(
-      'fails with an error and leaves no marker or ledger writes',
+      'fails with SCHEMA_VERIFY_FAILED error and leaves no marker or ledger writes',
       { timeout: testTimeout },
       async () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
@@ -210,13 +216,16 @@ describe.sequential('PostgresMigrationRunner', () => {
           operations: [],
         });
 
-        await expect(
-          runner.execute({
-            plan: emptyPlan,
-            driver: driver!,
-            destinationContract: contract,
-          }),
-        ).rejects.toThrow(/does not satisfy contract/i);
+        const result = await runner.execute({
+          plan: emptyPlan,
+          driver: driver!,
+          destinationContract: contract,
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error.code).toBe('SCHEMA_VERIFY_FAILED');
+        }
 
         await expectNoMarkerOrLedgerWrites(driver!);
       },
@@ -225,19 +234,23 @@ describe.sequential('PostgresMigrationRunner', () => {
 
   describe('when an operation precheck fails', () => {
     it(
-      'fails with an error and leaves no marker or ledger writes',
+      'fails with PRECHECK_FAILED error and leaves no marker or ledger writes',
       { timeout: testTimeout },
       async () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const failingPlan = createFailingPlan();
 
-        await expect(
-          runner.execute({
-            plan: failingPlan,
-            driver: driver!,
-            destinationContract: contract,
-          }),
-        ).rejects.toThrow(/precheck/i);
+        const result = await runner.execute({
+          plan: failingPlan,
+          driver: driver!,
+          destinationContract: contract,
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error.code).toBe('PRECHECK_FAILED');
+          expect(result.error.summary).toMatch(/precheck/i);
+        }
 
         await expectNoMarkerOrLedgerWrites(driver!);
       },
@@ -246,7 +259,7 @@ describe.sequential('PostgresMigrationRunner', () => {
 
   describe('when an existing marker does not match the origin contract', () => {
     it(
-      'fails with an error before executing the plan and does not modify marker or append ledger',
+      'fails with MARKER_ORIGIN_MISMATCH error and does not modify marker or append ledger',
       { timeout: testTimeout },
       async () => {
         await executeStatement(driver!, ensurePrismaContractSchemaStatement);
@@ -271,13 +284,17 @@ describe.sequential('PostgresMigrationRunner', () => {
           operations: [],
         });
 
-        await expect(
-          runner.execute({
-            plan: emptyPlan,
-            driver: driver!,
-            destinationContract: contract,
-          }),
-        ).rejects.toThrow(/does not match plan origin/i);
+        const result = await runner.execute({
+          plan: emptyPlan,
+          driver: driver!,
+          destinationContract: contract,
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error.code).toBe('MARKER_ORIGIN_MISMATCH');
+          expect(result.error.summary).toMatch(/does not match plan origin/i);
+        }
 
         const markerRow = await driver!.query<{ core_hash: string; profile_hash: string }>(
           'select core_hash, profile_hash from prisma_contract.marker where id = $1',
@@ -353,15 +370,18 @@ describe.sequential('PostgresMigrationRunner', () => {
           ],
         });
 
-        const result = await runner.execute({
+        const idempotencyResult = await runner.execute({
           plan: planWithFailingStep,
           driver: driver!,
           destinationContract: contract,
         });
-        expect(result).toMatchObject({
-          operationsPlanned: 1,
-          operationsExecuted: 0,
-        });
+        expect(idempotencyResult.ok).toBe(true);
+        if (idempotencyResult.ok) {
+          expect(idempotencyResult.value).toMatchObject({
+            operationsPlanned: 1,
+            operationsExecuted: 0,
+          });
+        }
 
         const markerCount = await driver!.query<{ count: string }>(
           'select count(*)::text as count from prisma_contract.marker where id = $1',
@@ -384,7 +404,7 @@ describe.sequential('PostgresMigrationRunner', () => {
 
   describe('when the plan executes but the resulting schema does not satisfy the contract', () => {
     it(
-      'fails with an error and leaves no marker or ledger writes',
+      'fails with SCHEMA_VERIFY_FAILED error and rolls back all changes',
       { timeout: testTimeout },
       async () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
@@ -420,20 +440,149 @@ describe.sequential('PostgresMigrationRunner', () => {
           ],
         });
 
-        await expect(
-          runner.execute({
-            plan: invalidPlan,
-            driver: driver!,
-            destinationContract: contract,
-          }),
-        ).rejects.toThrow(/does not satisfy contract/i);
+        const result = await runner.execute({
+          plan: invalidPlan,
+          driver: driver!,
+          destinationContract: contract,
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error.code).toBe('SCHEMA_VERIFY_FAILED');
+        }
 
         await expectNoMarkerOrLedgerWrites(driver!);
 
+        // Verify table was rolled back
         const tableRow = await driver!.query<{ exists: boolean }>(
           `select to_regclass('public."user"') is not null as exists`,
         );
         expect(tableRow.rows[0]?.exists).toBe(false);
+      },
+    );
+  });
+
+  describe('when an operation violates the policy (operation class not allowed)', () => {
+    it(
+      'fails with POLICY_VIOLATION error without executing any operations',
+      { timeout: testTimeout },
+      async () => {
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+        const planWithPolicyViolation = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [
+            {
+              id: 'table.drop_something',
+              label: 'Destructive operation',
+              summary: 'This is a destructive operation that should be rejected by policy',
+              operationClass: 'destructive', // Not allowed by INIT_ADDITIVE_POLICY
+              target: {
+                id: 'postgres',
+                details: {
+                  schema: 'public',
+                  objectType: 'table',
+                  name: 'something',
+                },
+              },
+              precheck: [],
+              execute: [
+                {
+                  description: 'drop table',
+                  sql: 'drop table if exists "something"',
+                },
+              ],
+              postcheck: [],
+            },
+          ],
+        });
+
+        const result = await runner.execute({
+          plan: planWithPolicyViolation,
+          driver: driver!,
+          destinationContract: contract,
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error.code).toBe('POLICY_VIOLATION');
+          expect(result.error.summary).toMatch(/destructive/i);
+          expect(result.error.why).toMatch(/additive/i);
+        }
+
+        // Verify no marker/ledger writes
+        await expectNoMarkerOrLedgerWrites(driver!);
+      },
+    );
+  });
+
+  describe('when an operation postcheck fails after execution', () => {
+    it(
+      'fails with POSTCHECK_FAILED error and rolls back all changes',
+      { timeout: testTimeout },
+      async () => {
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+        const planWithFailingPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          policy: INIT_ADDITIVE_POLICY,
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [
+            {
+              id: 'table.test_table',
+              label: 'Create test_table but postcheck fails',
+              summary: 'The execute step runs, but postcheck returns false',
+              operationClass: 'additive',
+              target: {
+                id: 'postgres',
+                details: {
+                  schema: 'public',
+                  objectType: 'table',
+                  name: 'test_table',
+                },
+              },
+              precheck: [],
+              execute: [
+                {
+                  description: 'create test_table',
+                  sql: 'create table "test_table" (id uuid primary key)',
+                },
+              ],
+              postcheck: [
+                {
+                  description: 'always returns false',
+                  sql: 'select false',
+                },
+              ],
+            },
+          ],
+        });
+
+        const result = await runner.execute({
+          plan: planWithFailingPostcheck,
+          driver: driver!,
+          destinationContract: contract,
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error.code).toBe('POSTCHECK_FAILED');
+          expect(result.error.summary).toMatch(/table\.test_table/i);
+          expect(result.error.summary).toMatch(/postcheck/i);
+        }
+
+        // Verify table was rolled back
+        const tableRow = await driver!.query<{ exists: boolean }>(
+          `select to_regclass('public."test_table"') is not null as exists`,
+        );
+        expect(tableRow.rows[0]?.exists).toBe(false);
+
+        // Verify no marker/ledger writes
+        await expectNoMarkerOrLedgerWrites(driver!);
       },
     );
   });
@@ -490,15 +639,18 @@ describe.sequential('PostgresMigrationRunner', () => {
           ],
         });
 
-        const result = await runner.execute({
+        const postcheckPreSatisfiedResult = await runner.execute({
           plan: planWithPreSatisfiedPostcheck,
           driver: driver!,
           destinationContract: contract,
         });
-        expect(result).toMatchObject({
-          operationsPlanned: 1,
-          operationsExecuted: 0,
-        });
+        expect(postcheckPreSatisfiedResult.ok).toBe(true);
+        if (postcheckPreSatisfiedResult.ok) {
+          expect(postcheckPreSatisfiedResult.value).toMatchObject({
+            operationsPlanned: 1,
+            operationsExecuted: 0,
+          });
+        }
 
         const markerCount = await driver!.query<{ count: string }>(
           'select count(*)::text as count from prisma_contract.marker where id = $1',

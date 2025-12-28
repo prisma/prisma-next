@@ -5,6 +5,8 @@ export {
   createMigrationPlan,
   plannerFailure,
   plannerSuccess,
+  runnerFailure,
+  runnerSuccess,
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 export type {
@@ -19,9 +21,13 @@ export type {
   MigrationPlanOperationTarget,
   MigrationPolicy,
   MigrationRunner,
+  MigrationRunnerError,
+  MigrationRunnerErrorCode,
   MigrationRunnerExecuteCallbacks,
   MigrationRunnerExecuteOptions,
+  MigrationRunnerFailure,
   MigrationRunnerResult,
+  MigrationRunnerSuccess,
   PlannerConflict,
   PlannerConflictKind,
   PlannerConflictLocation,

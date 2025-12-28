@@ -52,6 +52,13 @@ const executeResult = await runner.execute({
   driver,
   destinationContract: sqlContract,
 });
+
+// executeResult is a Result union: MigrationRunnerSuccess | MigrationRunnerFailure
+if (executeResult.ok) {
+  console.log(`Executed ${executeResult.value.operationsExecuted} operations`);
+} else {
+  console.error(`Migration failed: ${executeResult.error.code} - ${executeResult.error.summary}`);
+}
 ```
 
 ## Architecture
@@ -81,7 +88,19 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 - **`src/core/assembly.ts`**: Assembly helpers for building operation registries and extracting type imports from descriptors. Test utilities import `convertOperationManifest` from the same package via relative path.
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
 - **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations
-- **`src/core/migrations/`**: Migration IR helpers plus planner and runner SPI types (`MigrationPlanner`, `MigrationRunner`, `SqlControlTargetDescriptor`)
+- **`src/core/migrations/`**: Migration IR helpers plus planner and runner SPI types (`MigrationPlanner`, `MigrationRunner`, `SqlControlTargetDescriptor`). Runners return `MigrationRunnerResult` which is a union of success/failure.
+
+### Migration Runner Error Codes
+
+The runner returns structured errors with the following codes:
+
+- **`DESTINATION_CONTRACT_MISMATCH`**: Plan destination hash doesn't match provided contract hash
+- **`MARKER_ORIGIN_MISMATCH`**: Existing marker doesn't match plan's expected origin
+- **`POLICY_VIOLATION`**: Operation class is not allowed by the plan's policy
+- **`PRECHECK_FAILED`**: Operation precheck returned false
+- **`POSTCHECK_FAILED`**: Operation postcheck returned false after execution
+- **`SCHEMA_VERIFY_FAILED`**: Resulting schema doesn't satisfy the destination contract
+- **`EXECUTION_FAILED`**: SQL execution error during operation execution
 - **`src/exports/control.ts`**: Control plane entry point (exports `SqlFamilyDescriptor` instance)
 - **`src/exports/runtime.ts`**: Runtime entry point (placeholder for future functionality)
 

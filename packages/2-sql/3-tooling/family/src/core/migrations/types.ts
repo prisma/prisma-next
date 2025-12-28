@@ -129,10 +129,52 @@ export interface MigrationRunnerExecuteOptions<TTargetDetails = Record<string, n
   readonly context?: OperationContext;
 }
 
-export interface MigrationRunnerResult {
-  readonly operationsPlanned: number;
-  readonly operationsExecuted: number;
+/**
+ * Error codes for migration runner failures.
+ */
+export type MigrationRunnerErrorCode =
+  | 'DESTINATION_CONTRACT_MISMATCH'
+  | 'MARKER_ORIGIN_MISMATCH'
+  | 'POLICY_VIOLATION'
+  | 'PRECHECK_FAILED'
+  | 'POSTCHECK_FAILED'
+  | 'SCHEMA_VERIFY_FAILED'
+  | 'EXECUTION_FAILED';
+
+/**
+ * Detailed information about a migration runner failure.
+ */
+export interface MigrationRunnerError {
+  readonly code: MigrationRunnerErrorCode;
+  readonly summary: string;
+  readonly why?: string;
+  readonly meta?: AnyRecord;
 }
+
+/**
+ * Successful migration result.
+ */
+export interface MigrationRunnerSuccess {
+  readonly ok: true;
+  readonly value: {
+    readonly operationsPlanned: number;
+    readonly operationsExecuted: number;
+  };
+}
+
+/**
+ * Failed migration result.
+ */
+export interface MigrationRunnerFailure {
+  readonly ok: false;
+  readonly error: MigrationRunnerError;
+}
+
+/**
+ * Result union for migration runner execution.
+ * Either success with operation counts, or failure with error details.
+ */
+export type MigrationRunnerResult = MigrationRunnerSuccess | MigrationRunnerFailure;
 
 export interface MigrationRunner<TTargetDetails = Record<string, never>> {
   execute(options: MigrationRunnerExecuteOptions<TTargetDetails>): Promise<MigrationRunnerResult>;

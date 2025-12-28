@@ -70,11 +70,11 @@ This package provides both CLI and runtime entry points for the Postgres target.
 
 This package ships a mix of fast planner unit tests and slower runner integration tests that require a dev Postgres instance (via `@prisma/dev`). The integration suite is opt-in to keep `pnpm test` fast and sandbox-friendly.
 
-- **Default (`pnpm --filter @prisma-next/targets-postgres test`)**: runs only the fast planner tests. The runner suite is skipped.
+- **Default (`pnpm --filter @prisma-next/target-postgres test`)**: runs only the fast planner tests. The runner suite is skipped.
 - **Full runner coverage**: opt in with an environment flag and run with elevated permissions so the embedded Postgres server can bind to localhost ports.
 
 ```bash
-RUN_POSTGRES_TARGET_TESTS=true pnpm --filter @prisma-next/targets-postgres test
+RUN_POSTGRES_TARGET_TESTS=true pnpm --filter @prisma-next/target-postgres test
 ```
 
 The same flag is required when invoking `vitest` directly (e.g. for watch mode).

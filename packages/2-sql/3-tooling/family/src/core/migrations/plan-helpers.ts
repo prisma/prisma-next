@@ -6,6 +6,10 @@ import type {
   MigrationPlanOperationStep,
   MigrationPlanOperationTarget,
   MigrationPolicy,
+  MigrationRunnerError,
+  MigrationRunnerErrorCode,
+  MigrationRunnerFailure,
+  MigrationRunnerSuccess,
   PlannerConflict,
   PlannerFailureResult,
   PlannerSuccessResult,
@@ -115,5 +119,41 @@ export function plannerFailure(conflicts: readonly PlannerConflict[]): PlannerFa
         }),
       ),
     ),
+  });
+}
+
+/**
+ * Creates a successful migration runner result.
+ */
+export function runnerSuccess(value: {
+  operationsPlanned: number;
+  operationsExecuted: number;
+}): MigrationRunnerSuccess {
+  return Object.freeze({
+    ok: true as const,
+    value: Object.freeze({
+      operationsPlanned: value.operationsPlanned,
+      operationsExecuted: value.operationsExecuted,
+    }),
+  });
+}
+
+/**
+ * Creates a failed migration runner result.
+ */
+export function runnerFailure(
+  code: MigrationRunnerErrorCode,
+  summary: string,
+  options?: { why?: string; meta?: AnyRecord },
+): MigrationRunnerFailure {
+  const error: MigrationRunnerError = Object.freeze({
+    code,
+    summary,
+    ...(options?.why ? { why: options.why } : {}),
+    ...(options?.meta ? { meta: cloneRecord(options.meta) } : {}),
+  });
+  return Object.freeze({
+    ok: false as const,
+    error,
   });
 }
