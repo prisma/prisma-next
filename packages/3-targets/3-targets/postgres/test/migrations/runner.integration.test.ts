@@ -224,7 +224,7 @@ describe.sequential('PostgresMigrationRunner', () => {
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
-          expect(result.error.code).toBe('SCHEMA_VERIFY_FAILED');
+          expect(result.failure.code).toBe('SCHEMA_VERIFY_FAILED');
         }
 
         await expectNoMarkerOrLedgerWrites(driver!);
@@ -248,8 +248,8 @@ describe.sequential('PostgresMigrationRunner', () => {
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
-          expect(result.error.code).toBe('PRECHECK_FAILED');
-          expect(result.error.summary).toMatch(/precheck/i);
+          expect(result.failure.code).toBe('PRECHECK_FAILED');
+          expect(result.failure.summary).toMatch(/precheck/i);
         }
 
         await expectNoMarkerOrLedgerWrites(driver!);
@@ -292,8 +292,8 @@ describe.sequential('PostgresMigrationRunner', () => {
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
-          expect(result.error.code).toBe('MARKER_ORIGIN_MISMATCH');
-          expect(result.error.summary).toMatch(/does not match plan origin/i);
+          expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+          expect(result.failure.summary).toMatch(/does not match plan origin/i);
         }
 
         const markerRow = await driver!.query<{ core_hash: string; profile_hash: string }>(
@@ -448,7 +448,7 @@ describe.sequential('PostgresMigrationRunner', () => {
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
-          expect(result.error.code).toBe('SCHEMA_VERIFY_FAILED');
+          expect(result.failure.code).toBe('SCHEMA_VERIFY_FAILED');
         }
 
         await expectNoMarkerOrLedgerWrites(driver!);
@@ -508,9 +508,9 @@ describe.sequential('PostgresMigrationRunner', () => {
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
-          expect(result.error.code).toBe('POLICY_VIOLATION');
-          expect(result.error.summary).toMatch(/destructive/i);
-          expect(result.error.why).toMatch(/additive/i);
+          expect(result.failure.code).toBe('POLICY_VIOLATION');
+          expect(result.failure.summary).toMatch(/destructive/i);
+          expect(result.failure.why).toMatch(/additive/i);
         }
 
         // Verify no marker/ledger writes
@@ -570,9 +570,9 @@ describe.sequential('PostgresMigrationRunner', () => {
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
-          expect(result.error.code).toBe('POSTCHECK_FAILED');
-          expect(result.error.summary).toMatch(/table\.test_table/i);
-          expect(result.error.summary).toMatch(/postcheck/i);
+          expect(result.failure.code).toBe('POSTCHECK_FAILED');
+          expect(result.failure.summary).toMatch(/table\.test_table/i);
+          expect(result.failure.summary).toMatch(/postcheck/i);
         }
 
         // Verify table was rolled back
