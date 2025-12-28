@@ -1,5 +1,6 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
+  MigrationPlanContractInfo,
   MigrationPlanOperation,
   MigrationPlanOperationStep,
   MigrationRunner,
@@ -53,9 +54,15 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       await this.acquireLock(driver, lockKey);
       await this.ensureControlTables(driver);
       const existingMarker = await readMarker(driver);
-      this.ensureMarkerCompatibility(existingMarker, options.plan.contract.coreHash);
+      this.ensureMarkerCompatibility(existingMarker, options.plan.contract);
 
-      const operationsExecuted = await this.applyPlan(driver, options);
+      const markerAtDestination = this.markerMatchesDestination(
+        existingMarker,
+        options.plan.contract,
+      );
+      const { operationsExecuted, executedOperations } = markerAtDestination
+        ? { operationsExecuted: 0, executedOperations: [] as const }
+        : await this.applyPlan(driver, options);
 
       const schemaVerifyOptions: SchemaVerifyOptions = {
         driver,
@@ -69,7 +76,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       }
 
       await this.upsertMarker(driver, options, existingMarker);
-      await this.recordLedgerEntry(driver, options, existingMarker);
+      await this.recordLedgerEntry(driver, options, existingMarker, executedOperations);
 
       await this.commitTransaction(driver);
       await this.releaseLock(driver, lockKey);
@@ -89,17 +96,35 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   private async applyPlan(
     driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
-  ): Promise<number> {
-    let executed = 0;
+  ): Promise<{
+    readonly operationsExecuted: number;
+    readonly executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[];
+  }> {
+    let operationsExecuted = 0;
+    const executedOperations: Array<MigrationPlanOperation<PostgresPlanTargetDetails>> = [];
     for (const operation of options.plan.operations) {
       options.callbacks?.onOperationStart?.(operation);
-      await this.runExpectationSteps(driver, operation.precheck, operation, 'precheck');
-      await this.runExecuteSteps(driver, operation.execute);
-      await this.runExpectationSteps(driver, operation.postcheck, operation, 'postcheck');
-      options.callbacks?.onOperationComplete?.(operation);
-      executed += 1;
+      try {
+        const postcheckAlreadySatisfied = await this.expectationsAreSatisfied(
+          driver,
+          operation.postcheck,
+        );
+        if (postcheckAlreadySatisfied) {
+          executedOperations.push(this.createPostcheckPreSatisfiedSkipRecord(operation));
+          continue;
+        }
+
+        await this.runExpectationSteps(driver, operation.precheck, operation, 'precheck');
+        await this.runExecuteSteps(driver, operation.execute);
+        await this.runExpectationSteps(driver, operation.postcheck, operation, 'postcheck');
+
+        executedOperations.push(operation);
+        operationsExecuted += 1;
+      } finally {
+        options.callbacks?.onOperationComplete?.(operation);
+      }
     }
-    return executed;
+    return { operationsExecuted, executedOperations };
   }
 
   private async ensureControlTables(
@@ -151,16 +176,71 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     return Boolean(firstValue);
   }
 
+  private async expectationsAreSatisfied(
+    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    steps: readonly MigrationPlanOperationStep[],
+  ): Promise<boolean> {
+    if (steps.length === 0) {
+      return false;
+    }
+    for (const step of steps) {
+      const result = await driver.query(step.sql);
+      if (!this.stepResultIsTrue(result.rows)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private createPostcheckPreSatisfiedSkipRecord(
+    operation: MigrationPlanOperation<PostgresPlanTargetDetails>,
+  ): MigrationPlanOperation<PostgresPlanTargetDetails> {
+    return {
+      ...operation,
+      precheck: [],
+      execute: [],
+      postcheck: operation.postcheck,
+      meta: {
+        ...(operation.meta ?? {}),
+        runner: {
+          skipped: true,
+          reason: 'postcheck_pre_satisfied',
+        },
+      },
+    };
+  }
+
+  private markerMatchesDestination(
+    marker: ContractMarkerRecord | null,
+    destination: MigrationPlanContractInfo,
+  ): boolean {
+    if (!marker) {
+      return false;
+    }
+    if (marker.coreHash !== destination.coreHash) {
+      return false;
+    }
+    if (destination.profileHash && marker.profileHash !== destination.profileHash) {
+      return false;
+    }
+    return true;
+  }
+
   private ensureMarkerCompatibility(
     marker: ContractMarkerRecord | null,
-    planCoreHash: string,
+    destination: MigrationPlanContractInfo,
   ): void {
     if (!marker) {
       return;
     }
-    if (marker.coreHash !== planCoreHash) {
+    if (marker.coreHash !== destination.coreHash) {
       throw new Error(
-        `Existing contract marker (${marker.coreHash}) does not match planned contract (${planCoreHash}).`,
+        `Existing contract marker (${marker.coreHash}) does not match planned contract (${destination.coreHash}).`,
+      );
+    }
+    if (destination.profileHash && marker.profileHash !== destination.profileHash) {
+      throw new Error(
+        `Existing contract marker profile hash (${marker.profileHash}) does not match planned contract profile hash (${destination.profileHash}).`,
       );
     }
   }
@@ -188,6 +268,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
+    executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[],
   ): Promise<void> {
     const ledgerStatement = buildLedgerInsertStatement({
       originCoreHash: existingMarker?.coreHash ?? null,
@@ -199,7 +280,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         options.plan.contract.coreHash,
       contractJsonBefore: existingMarker?.contractJson ?? null,
       contractJsonAfter: options.contract,
-      operations: options.plan.operations,
+      operations: executedOperations,
     });
     await this.executeStatement(driver, ledgerStatement);
   }
