@@ -53,11 +53,11 @@ const executeResult = await runner.execute({
   destinationContract: sqlContract,
 });
 
-// executeResult is a Result union: MigrationRunnerSuccess | MigrationRunnerFailure
+// executeResult is a Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>
 if (executeResult.ok) {
   console.log(`Executed ${executeResult.value.operationsExecuted} operations`);
 } else {
-  console.error(`Migration failed: ${executeResult.error.code} - ${executeResult.error.summary}`);
+  console.error(`Migration failed: ${executeResult.failure.code} - ${executeResult.failure.summary}`);
 }
 ```
 

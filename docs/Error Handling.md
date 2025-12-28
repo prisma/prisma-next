@@ -62,6 +62,58 @@ Recommended handling:
 
 ## Representation in this codebase
 
+### Generic Result type: Ok / NotOk envelopes
+
+We provide a generic `Result<T, F>` type for representing success or failure outcomes at system boundaries. This type is used when a function can return either a success value or a structured failure.
+
+```typescript
+import type { Result, Ok, NotOk } from '@prisma-next/core-control-plane/result';
+import { ok, notOk, okVoid } from '@prisma-next/core-control-plane/result';
+
+// Success with a value
+function divide(a: number, b: number): Result<number, { code: string; message: string }> {
+  if (b === 0) {
+    return notOk({ code: 'DIVISION_BY_ZERO', message: 'Cannot divide by zero' });
+  }
+  return ok(a / b);
+}
+
+// Validation that returns void on success
+function validateInput(input: string): Result<void, { code: string; message: string }> {
+  if (input.length === 0) {
+    return notOk({ code: 'EMPTY_INPUT', message: 'Input cannot be empty' });
+  }
+  return okVoid();
+}
+
+// Usage
+const result = divide(10, 2);
+if (result.ok) {
+  console.log('Result:', result.value);
+} else {
+  console.log('Error:', result.failure.code);
+}
+```
+
+**Naming rationale:**
+- `Ok<T>` / `NotOk<F>` mirror the `ok: true/false` discriminator property
+- `NotOk` avoids collision with domain-specific "Failure" or "Error" types
+- `value` for success, `failure` for unsuccessful—distinct names prevent confusion
+- `failure` (not `error`) distinguishes structured failure data from JS `Error` semantics
+
+**When to use Result:**
+- At system boundaries (CLI commands, migration runner, SDK entrypoints)
+- When a function can fail in expected ways that callers should handle
+- When you want to avoid throwing for expected failures
+
+**When NOT to use Result:**
+- Deep within package internals (prefer ergonomic throws + catch at boundary)
+- For bugs/unexpected errors (throw and fail fast)
+- For streaming APIs (use AsyncIterable that throws on error)
+
+See:
+- `packages/1-framework/1-core/migration/control-plane/src/result.ts`
+
 ### CLI boundary: structured errors + Result conversion
 
 CLI commands use structured errors and convert them to a `Result` at the command boundary. Non-structured errors propagate (fail fast) to preserve stack traces.
@@ -69,7 +121,7 @@ CLI commands use structured errors and convert them to a `Result` at the command
 See:
 - `packages/1-framework/1-core/migration/control-plane/src/errors.ts` (`CliStructuredError`)
 - `packages/1-framework/3-tooling/cli/src/utils/result.ts` (`performAction`)
-- `docs/CLI Style Guide.md` (“Errors”, exit codes)
+- `docs/CLI Style Guide.md` ("Errors", exit codes)
 
 ### Plan/build-time failures: stable RuntimeError codes
 
