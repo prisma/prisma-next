@@ -138,7 +138,7 @@ describe.sequential('PostgresMigrationRunner', () => {
     );
 
     it(
-      're-executes a no-op plan and still upserts the marker and appends a new ledger entry',
+      'executes an empty plan (0 operations) and still upserts the marker and appends a new ledger entry',
       { timeout: testTimeout },
       async () => {
         const planner = postgresTargetDescriptor.createPlanner(familyInstance);
