@@ -1,4 +1,6 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { Result } from '@prisma-next/core-control-plane/result';
+import { okVoid } from '@prisma-next/core-control-plane/result';
 import type {
   MigrationPlan,
   MigrationPlanContractInfo,
@@ -54,17 +56,17 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     const lockKey = `${LOCK_DOMAIN}:${schema}`;
 
     // Static checks - fail fast before transaction
-    const destinationMismatch = this.ensurePlanMatchesDestinationContract(
+    const destinationCheck = this.ensurePlanMatchesDestinationContract(
       options.plan.destination,
       options.destinationContract,
     );
-    if (destinationMismatch) {
-      return destinationMismatch;
+    if (!destinationCheck.ok) {
+      return destinationCheck;
     }
 
-    const policyViolation = this.enforcePolicyCompatibility(options.plan);
-    if (policyViolation) {
-      return policyViolation;
+    const policyCheck = this.enforcePolicyCompatibility(options.plan);
+    if (!policyCheck.ok) {
+      return policyCheck;
     }
 
     // Begin transaction for DB operations
@@ -75,10 +77,10 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       const existingMarker = await readMarker(driver);
 
       // Validate plan origin matches existing marker (needs marker from DB)
-      const markerMismatch = this.ensureMarkerCompatibility(existingMarker, options.plan);
-      if (markerMismatch) {
+      const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
+      if (!markerCheck.ok) {
         await this.rollbackTransaction(driver);
-        return markerMismatch;
+        return markerCheck;
       }
 
       // Apply plan operations or skip if marker already at destination
@@ -95,8 +97,8 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
           await this.rollbackTransaction(driver);
           return applyResult;
         }
-        operationsExecuted = applyResult.operationsExecuted;
-        executedOperations = applyResult.executedOperations;
+        operationsExecuted = applyResult.value.operationsExecuted;
+        executedOperations = applyResult.value.executedOperations;
       }
 
       // Verify resulting schema matches contract
@@ -137,12 +139,13 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
   ): Promise<
-    | {
-        readonly ok: true;
+    Result<
+      {
         readonly operationsExecuted: number;
         readonly executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[];
-      }
-    | MigrationRunnerFailure
+      },
+      MigrationRunnerFailure
+    >
   > {
     let operationsExecuted = 0;
     const executedOperations: Array<MigrationPlanOperation<PostgresPlanTargetDetails>> = [];
@@ -158,26 +161,26 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
           continue;
         }
 
-        const precheckFailure = await this.runExpectationSteps(
+        const precheckResult = await this.runExpectationSteps(
           driver,
           operation.precheck,
           operation,
           'precheck',
         );
-        if (precheckFailure) {
-          return precheckFailure;
+        if (!precheckResult.ok) {
+          return precheckResult;
         }
 
         await this.runExecuteSteps(driver, operation.execute);
 
-        const postcheckFailure = await this.runExpectationSteps(
+        const postcheckResult = await this.runExpectationSteps(
           driver,
           operation.postcheck,
           operation,
           'postcheck',
         );
-        if (postcheckFailure) {
-          return postcheckFailure;
+        if (!postcheckResult.ok) {
+          return postcheckResult;
         }
 
         executedOperations.push(operation);
@@ -186,7 +189,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         options.callbacks?.onOperationComplete?.(operation);
       }
     }
-    return { ok: true, operationsExecuted, executedOperations };
+    return { ok: true, value: { operationsExecuted, executedOperations } };
   }
 
   private async ensureControlTables(
@@ -202,7 +205,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     steps: readonly MigrationPlanOperationStep[],
     operation: MigrationPlanOperation<PostgresPlanTargetDetails>,
     phase: 'precheck' | 'postcheck',
-  ): Promise<MigrationRunnerFailure | null> {
+  ): Promise<Result<void, MigrationRunnerFailure>> {
     for (const step of steps) {
       const result = await driver.query(step.sql);
       if (!this.stepResultIsTrue(result.rows)) {
@@ -220,7 +223,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         );
       }
     }
-    return null;
+    return okVoid();
   }
 
   private async runExecuteSteps(
@@ -302,7 +305,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
   private enforcePolicyCompatibility(
     plan: MigrationPlan<PostgresPlanTargetDetails>,
-  ): MigrationRunnerFailure | null {
+  ): Result<void, MigrationRunnerFailure> {
     const allowedClasses = new Set(plan.policy.allowedOperationClasses);
     for (const operation of plan.operations) {
       if (!allowedClasses.has(operation.operationClass)) {
@@ -320,20 +323,20 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         );
       }
     }
-    return null;
+    return okVoid();
   }
 
   private ensureMarkerCompatibility(
     marker: ContractMarkerRecord | null,
     plan: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['plan'],
-  ): MigrationRunnerFailure | null {
+  ): Result<void, MigrationRunnerFailure> {
     const origin = plan.origin ?? null;
     if (!origin) {
       if (!marker) {
-        return null;
+        return okVoid();
       }
       if (this.markerMatchesDestination(marker, plan)) {
-        return null;
+        return okVoid();
       }
       return runnerFailure(
         'MARKER_ORIGIN_MISMATCH',
@@ -382,13 +385,13 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         },
       );
     }
-    return null;
+    return okVoid();
   }
 
   private ensurePlanMatchesDestinationContract(
     destination: MigrationPlanContractInfo,
     contract: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['destinationContract'],
-  ): MigrationRunnerFailure | null {
+  ): Result<void, MigrationRunnerFailure> {
     if (destination.coreHash !== contract.coreHash) {
       return runnerFailure(
         'DESTINATION_CONTRACT_MISMATCH',
@@ -417,7 +420,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         },
       );
     }
-    return null;
+    return okVoid();
   }
 
   private async upsertMarker(
