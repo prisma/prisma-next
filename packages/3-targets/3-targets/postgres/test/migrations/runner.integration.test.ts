@@ -138,7 +138,7 @@ describe.sequential('PostgresMigrationRunner', () => {
     );
 
     it(
-      'executes an empty plan (0 operations) and still upserts the marker and appends a new ledger entry',
+      'when the database schema already matches the destination contract, executes an empty plan (0 operations) and still upserts the marker and appends a new ledger entry',
       { timeout: testTimeout },
       async () => {
         const planner = postgresTargetDescriptor.createPlanner(familyInstance);
