@@ -254,6 +254,11 @@ describe.sequential('PostgresMigrationRunner', () => {
         ).rejects.toThrow(/does not satisfy contract/i);
 
         await expectNoMarkerOrLedgerWrites(driver!);
+
+        const tableRow = await driver!.query<{ exists: boolean }>(
+          `select to_regclass('public."user"') is not null as exists`,
+        );
+        expect(tableRow.rows[0]?.exists).toBe(false);
       },
     );
   });
