@@ -52,34 +52,33 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
     const schema = options.schemaName ?? this.config.defaultSchema;
     const driver = options.driver;
     const lockKey = `${LOCK_DOMAIN}:${schema}`;
+
+    // Static checks - fail fast before transaction
+    const destinationMismatch = this.ensurePlanMatchesDestinationContract(
+      options.plan.destination,
+      options.destinationContract,
+    );
+    if (destinationMismatch) {
+      return destinationMismatch;
+    }
+
+    const policyViolation = this.enforcePolicyCompatibility(options.plan);
+    if (policyViolation) {
+      return policyViolation;
+    }
+
+    // Begin transaction for DB operations
     await this.beginTransaction(driver);
     try {
       await this.acquireLock(driver, lockKey);
       await this.ensureControlTables(driver);
       const existingMarker = await readMarker(driver);
 
-      // Validate plan destination matches provided contract
-      const destinationMismatch = this.ensurePlanMatchesDestinationContract(
-        options.plan.destination,
-        options.destinationContract,
-      );
-      if (destinationMismatch) {
-        await this.rollbackTransaction(driver);
-        return destinationMismatch;
-      }
-
-      // Validate plan origin matches existing marker
+      // Validate plan origin matches existing marker (needs marker from DB)
       const markerMismatch = this.ensureMarkerCompatibility(existingMarker, options.plan);
       if (markerMismatch) {
         await this.rollbackTransaction(driver);
         return markerMismatch;
-      }
-
-      // Enforce policy compatibility
-      const policyViolation = this.enforcePolicyCompatibility(options.plan);
-      if (policyViolation) {
-        await this.rollbackTransaction(driver);
-        return policyViolation;
       }
 
       // Apply plan operations or skip if marker already at destination
