@@ -57,7 +57,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
     jsonParam(input.contractJson),
     input.canonicalVersion ?? null,
     input.appTag ?? null,
-    JSON.stringify(input.meta ?? {}),
+    jsonParam(input.meta ?? {}),
   ];
 
   return {
