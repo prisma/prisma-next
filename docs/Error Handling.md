@@ -1,0 +1,125 @@
+# Error Handling: Failures, Operational Errors, and Bugs
+
+This document defines shared error concepts for Prisma Next so we can be consistent across packages and planes (CLI, migration planning, query planning, runtime execution).
+
+## Goals
+
+- **Make error handling composable** across modular packages (domain/layer/plane).
+- **Keep failures actionable** (clear “why / fix / docs”) without turning every API into “Result plumbing”.
+- **Preserve stack traces for bugs** and unexpected faults.
+- **Ensure boundaries are predictable** (stable codes, deterministic output, consistent exit codes).
+
+## Taxonomy
+
+### Failure (expected)
+
+An expected, explainable outcome where a logical condition is not met.
+
+Examples:
+- Invalid user input or config shape
+- Plan-builder misuse (e.g., missing `from()` / missing `select()`)
+- Capability gating (feature requires capability but it’s absent/false)
+- Policy/guardrail blocks (e.g., budgets/lints in strict mode)
+
+Properties:
+- **Actionable**: caller can fix something deterministically.
+- **Stable**: should have a stable code and structured metadata when surfaced.
+
+Recommended handling:
+- **Internals may throw** a structured failure error to abort quickly and keep context/stack.
+- **System boundaries convert** structured failures into a returned `Result` / envelope.
+
+### Operational error (expected external fault)
+
+An expected error caused by an external system state, not a bug in Prisma Next.
+
+Examples:
+- Database connection refused / timeout
+- Network interruptions
+- Permission/auth failures (if/when modeled)
+- Driver-level errors (e.g., Postgres errors)
+
+Properties:
+- Often transient and environment-dependent.
+- May be actionable but not always fixable in-process.
+
+Recommended handling:
+- **Throw through lower layers** (drivers/adapters typically throw).
+- **Catch at boundaries** when we can translate to a stable, actionable envelope (while still retaining stack/context where available).
+
+### Bug (unexpected fault)
+
+An invariant break or programming error where the system cannot reliably continue.
+
+Examples:
+- Unexpected `undefined` / impossible branch
+- Internal assertion failure
+- Serialization/type invariants broken after validation
+
+Recommended handling:
+- **Throw and fail fast**.
+- Only catch at the outermost boundary for crash reporting / last-resort formatting, without disguising the issue as an “expected failure”.
+
+## Representation in this codebase
+
+### CLI boundary: structured errors + Result conversion
+
+CLI commands use structured errors and convert them to a `Result` at the command boundary. Non-structured errors propagate (fail fast) to preserve stack traces.
+
+See:
+- `packages/1-framework/1-core/migration/control-plane/src/errors.ts` (`CliStructuredError`)
+- `packages/1-framework/3-tooling/cli/src/utils/result.ts` (`performAction`)
+- `docs/CLI Style Guide.md` (“Errors”, exit codes)
+
+### Plan/build-time failures: stable RuntimeError codes
+
+Plan-building failures are represented as `RuntimeError` with stable codes like `PLAN.INVALID` and `PLAN.UNSUPPORTED`.
+
+See:
+- `packages/1-framework/1-core/shared/plan/src/errors.ts` (`planInvalid`, `planUnsupported`)
+- SQL lane helpers that throw these for invalid builder usage/capability gating.
+
+### Runtime execution: streaming API throws on failure
+
+Runtime execution is modeled as an `AsyncIterable` that throws on error. This is a deliberate shape: it allows early abort and preserves context/stack in async workflows.
+
+Guardrails (budgets/lints) may block execution by throwing a structured runtime error (a failure) in strict mode.
+
+See:
+- `packages/1-framework/4-runtime-executor/src/runtime-core.ts`
+- `packages/1-framework/4-runtime-executor/src/plugins/budgets.ts`
+
+## Guidelines
+
+### 1) “Return Result” is a boundary policy, not a universal implementation rule
+
+- **Within packages**, prefer APIs that are ergonomic for the domain (builders, streams, plugin hooks).
+- **At system boundaries**, prefer returning a `Result`/envelope for *expected failures* so callers (CLI/apps/agents) can handle them deterministically.
+
+Boundaries include:
+- CLI command actions
+- Migration runner entrypoints
+- Public SDK entrypoints that are the “edge” of the system
+
+### 2) Only catch what you intend to handle
+
+- Catch structured failures that you can translate to an actionable `Result`/envelope.
+- Do not broadly catch and wrap unknown errors; let them fail fast.
+
+### 3) Provide stable codes for “expected failures”
+
+- “Failure” surfaces should use stable codes (e.g., `PN-CLI-4xxx`, `PLAN.INVALID`, `BUDGET.*`).
+- Codes are how agents/CI should match and branch—not brittle string matching.
+
+### 4) Preserve stacks where they matter
+
+- Bug paths must retain stacks.
+- For failures, stacks are still useful for debugging, but user-facing surfaces should emphasize `why/fix/docs` and treat stacks as “trace/verbose”.
+
+## Practical heuristics
+
+- If a caller can **reasonably continue** or present an actionable fix → model as a **failure** and return/convert to `Result` at the boundary.
+- If the system is **not in a valid state** or behavior is undefined → it’s a **bug**; throw and fail fast.
+- If it comes from a **driver/network/DB** → it’s usually an **operational error**; throw through, translate at the boundary when helpful.
+
+
