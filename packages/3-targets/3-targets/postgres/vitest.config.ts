@@ -5,5 +5,22 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     environment: 'node',
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx,js,jsx}'],
+      all: true,
+      exclude: [
+        'dist/**',
+        'test/**',
+        '**/*.test.ts',
+        '**/*.test-d.ts',
+        '**/*.spec.ts',
+        '**/*.spec.tsx',
+        '**/*.d.ts',
+        '**/*.config.ts',
+        '**/exports/**',
+      ],
+      reporter: ['text', 'html'],
+    },
   },
 });
