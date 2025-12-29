@@ -7,7 +7,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['test/**/*.integration.test.ts'],
+    include: ['test/**/*.test.ts'],
     testTimeout: timeouts.default,
     hookTimeout: timeouts.default,
     coverage: {
