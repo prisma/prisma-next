@@ -37,6 +37,13 @@ const PG_EXTENSION_SQL: Record<string, string> = {
   pgvector: 'CREATE EXTENSION IF NOT EXISTS vector',
 };
 
+/**
+ * Adapter-level extensions that are NOT PostgreSQL database extensions.
+ * These are metadata namespaces used by adapters for codec IDs (e.g., 'pg/int4@1').
+ * The planner should skip these when validating extensions.
+ */
+const ADAPTER_LEVEL_EXTENSIONS = new Set(['pg', 'postgres']);
+
 export function createPostgresMigrationPlanner(
   config: Partial<PlannerConfig> = {},
 ): MigrationPlanner<PostgresPlanTargetDetails> {
@@ -99,7 +106,12 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
   private validateExtensions(contract: SqlContract<SqlStorage>) {
     const extensions = contract.extensions ?? {};
     const extensionNames = Object.keys(extensions);
-    const unsupportedExtensions = extensionNames.filter(
+    // Filter out adapter-level extensions (like 'pg', 'postgres') which are metadata namespaces
+    // used by adapters for codec IDs, not PostgreSQL database extensions
+    const databaseExtensions = extensionNames.filter(
+      (extensionName) => !ADAPTER_LEVEL_EXTENSIONS.has(extensionName),
+    );
+    const unsupportedExtensions = databaseExtensions.filter(
       (extensionName) => !PG_EXTENSION_SQL[extensionName],
     );
     if (unsupportedExtensions.length > 0) {
@@ -140,6 +152,10 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
 
     // Extensions are validated in validateExtensions() before this method is called
     for (const extensionName of extensionNames) {
+      // Skip adapter-level extensions (metadata namespaces, not database extensions)
+      if (ADAPTER_LEVEL_EXTENSIONS.has(extensionName)) {
+        continue;
+      }
       const sql = PG_EXTENSION_SQL[extensionName];
       if (!sql) {
         // This should never happen since we validate extensions in validateExtensions(), but TypeScript requires this check
