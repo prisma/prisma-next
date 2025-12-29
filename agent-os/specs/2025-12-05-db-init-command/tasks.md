@@ -182,12 +182,14 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 
 ## 4. Schema IR & Verification Integration
 
-- **4.1 Reuse or expose schema-verify primitives**
-  - Identify and reuse the existing **schema vs. contract verification** logic used by the `schema-verify` command.
-  - Ensure the planner has access to:
-    - Contract IR.
-    - Introspected schema IR.
-    - A reusable diff/verification primitive or library for detecting missing vs. conflicting structures.
+- [x] **4.1 Reuse or expose schema-verify primitives**
+  - ✅ Extracted pure `verifySqlSchema()` function in `packages/2-sql/3-tooling/family/src/core/schema-verify/verify-sql-schema.ts` that compares `SqlSchemaIR` against `SqlContract` without requiring a database connection.
+  - ✅ Refactored `schemaVerify()` method to use the pure verifier: it validates the contract, introspects the live schema, and calls the pure function.
+  - ✅ Exposed via new package export `@prisma-next/family-sql/schema-verify`.
+  - ✅ Added `ifDefined()` utility in new `@prisma-next/utils` package for cleaner optional property spreading.
+  - ✅ Moved `Result<T, F>` type to `@prisma-next/utils/result` (shared plane).
+  - ✅ Extended `SchemaIssue.kind` with `extra_*` variants (`extra_table`, `extra_column`, `extra_primary_key`, `extra_foreign_key`, `extra_unique_constraint`, `extra_index`) for semantically correct strict mode detection.
+  - ✅ Split tests into `schema-verify.basic.test.ts`, `schema-verify.constraints.test.ts`, `schema-verify.strict.test.ts` (all under 500 lines).
 
 - **4.2 Contract verification after execution**
   - Implement a helper that, given a connection and contract, re-runs verification after the runner finishes:
