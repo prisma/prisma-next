@@ -241,7 +241,16 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       return firstValue !== 0;
     }
     if (typeof firstValue === 'string') {
-      return firstValue === 't' || firstValue.toLowerCase() === 'true';
+      const lower = firstValue.toLowerCase();
+      // PostgreSQL boolean representations: 't'/'f', 'true'/'false', '1'/'0'
+      if (lower === 't' || lower === 'true' || lower === '1') {
+        return true;
+      }
+      if (lower === 'f' || lower === 'false' || lower === '0') {
+        return false;
+      }
+      // For other strings, non-empty is truthy (though this case shouldn't occur for boolean checks)
+      return firstValue.length > 0;
     }
     return Boolean(firstValue);
   }
