@@ -33,6 +33,16 @@ export interface OrderBuilder<
 }
 
 /**
+ * Creates an OrderBuilder for use in orderBy clauses.
+ */
+export function createOrderBuilder(
+  expr: AnyColumnBuilder | OperationExpr,
+  dir: Direction,
+): AnyOrderBuilder {
+  return { kind: 'order', expr, dir } as AnyOrderBuilder;
+}
+
+/**
  * ColumnBuilder with optional operation methods based on the column's typeId.
  * When Operations is provided and the column's typeId matches, operation methods are included.
  */

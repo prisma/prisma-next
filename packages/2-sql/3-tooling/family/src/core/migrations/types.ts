@@ -1,4 +1,3 @@
-import type { Result } from '@prisma-next/core-control-plane/result';
 import type {
   ControlDriverInstance,
   ControlTargetDescriptor,
@@ -6,6 +5,7 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;

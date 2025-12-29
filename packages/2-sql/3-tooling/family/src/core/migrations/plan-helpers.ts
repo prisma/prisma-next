@@ -1,5 +1,5 @@
-import type { NotOk, Ok } from '@prisma-next/core-control-plane/result';
-import { notOk, ok } from '@prisma-next/core-control-plane/result';
+import type { NotOk, Ok } from '@prisma-next/utils/result';
+import { notOk, ok } from '@prisma-next/utils/result';
 import type {
   AnyRecord,
   CreateMigrationPlanOptions,

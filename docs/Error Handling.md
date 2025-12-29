@@ -67,8 +67,8 @@ Recommended handling:
 We provide a generic `Result<T, F>` type for representing success or failure outcomes at system boundaries. This type is used when a function can return either a success value or a structured failure.
 
 ```typescript
-import type { Result, Ok, NotOk } from '@prisma-next/core-control-plane/result';
-import { ok, notOk, okVoid } from '@prisma-next/core-control-plane/result';
+import type { Result, Ok, NotOk } from '@prisma-next/utils/result';
+import { ok, notOk, okVoid } from '@prisma-next/utils/result';
 
 // Success with a value - both T and F must be specified
 function divide(a: number, b: number): Result<number, { code: string; message: string }> {
@@ -113,7 +113,7 @@ if (result.ok) {
 - For streaming APIs (use AsyncIterable that throws on error)
 
 See:
-- `packages/1-framework/1-core/migration/control-plane/src/result.ts`
+- `packages/1-framework/1-core/shared/utils/src/result.ts`
 
 ### CLI boundary: structured errors + Result conversion
 

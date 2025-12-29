@@ -610,7 +610,7 @@ describe('family instance schemaVerify', () => {
         expect(result.schema.counts.fail).toBeGreaterThan(0);
         expect(
           result.schema.issues.some(
-            (i) => i.kind === 'missing_column' && i.table === 'user' && i.column === 'extraColumn',
+            (i) => i.kind === 'extra_column' && i.table === 'user' && i.column === 'extraColumn',
           ),
         ).toBe(true);
       } finally {

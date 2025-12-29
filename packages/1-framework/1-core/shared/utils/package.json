@@ -1,0 +1,35 @@
+{
+  "name": "@prisma-next/utils",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Shared utility functions for Prisma Next",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --config-path ../../../../../biome.json --error-on-warnings",
+    "clean": "node ../../../../../scripts/clean.mjs"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.1",
+    "tsup": "^8.3.0",
+    "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^2.1.1"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./defined": {
+      "types": "./dist/exports/defined.d.ts",
+      "import": "./dist/exports/defined.js"
+    },
+    "./result": {
+      "types": "./dist/exports/result.d.ts",
+      "import": "./dist/exports/result.js"
+    }
+  }
+}

@@ -6,11 +6,12 @@ import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type {
-  AnyBinaryBuilder,
-  AnyColumnBuilder,
-  AnyOrderBuilder,
-  JoinOnPredicate,
+import {
+  type AnyBinaryBuilder,
+  type AnyColumnBuilder,
+  type AnyOrderBuilder,
+  createOrderBuilder,
+  type JoinOnPredicate,
 } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
@@ -356,11 +357,7 @@ describe('buildMeta', () => {
       },
     };
 
-    const orderByWithOp = {
-      kind: 'order' as const,
-      expr: operationExpr,
-      dir: 'asc' as const,
-    } as unknown as AnyOrderBuilder;
+    const orderByWithOp = createOrderBuilder(operationExpr, 'asc');
 
     const meta = buildMeta({
       contract,
