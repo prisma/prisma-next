@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { createTableRef } from '@prisma-next/sql-relational-core/ast';
+import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import {
+  createBinaryExpr,
+  createColumnRef,
+  createTableRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -138,12 +143,10 @@ describe('select builder edge cases', () => {
       })
       .build();
 
-    expect(plan.ast.kind).toBe('select');
-    expect(plan.ast.where).toBeDefined();
-    expect(plan.ast.where).toMatchObject({
-      kind: 'bin',
-      left: { kind: 'col' },
-      right: { kind: 'col' },
-    });
+    const ast = plan.ast as SelectAst;
+    expect(ast.kind).toBe('select');
+    expect(ast.where).toEqual(
+      createBinaryExpr('eq', createColumnRef('user', 'id'), createColumnRef('user', 'createdAt')),
+    );
   });
 });
