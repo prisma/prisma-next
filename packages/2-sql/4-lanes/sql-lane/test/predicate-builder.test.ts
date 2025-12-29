@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
+import { createBinaryExpr, createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -101,27 +101,12 @@ describe('buildWhereExpr', () => {
   });
 
   it('builds where expression with column-to-column comparison', () => {
-    const binary = {
-      kind: 'binary' as const,
-      op: 'eq' as const,
-      left: userColumns.id,
-      right: userColumns.id,
-    } as unknown;
+    const binary = userColumns.id.eq(userColumns.id);
 
-    const result = buildWhereExpr(
-      contract,
-      binary as unknown as typeof userColumns.id.eq extends (x: unknown) => infer R ? R : never,
-      {},
-      [],
-      [],
-    );
+    const result = buildWhereExpr(contract, binary, {}, [], []);
 
-    expect(result.expr).toMatchObject({
-      kind: 'bin',
-      op: 'eq',
-      left: { kind: 'col', table: 'user', column: 'id' },
-      right: { kind: 'col', table: 'user', column: 'id' },
-    });
+    const userIdCol = createColumnRef('user', 'id');
+    expect(result.expr).toEqual(createBinaryExpr('eq', userIdCol, userIdCol));
     expect(result.paramName).toBe('');
   });
 });
