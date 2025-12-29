@@ -296,10 +296,15 @@ describe('family instance introspect', () => {
         let invalidDriver: Awaited<ReturnType<typeof postgresDriver.create>> | undefined;
         try {
           invalidDriver = await postgresDriver.create('postgresql://invalid:5432/invalid');
-        } catch {
-          // Driver creation might fail immediately, which is fine
-          // We'll skip this test if driver creation fails
-          return;
+        } catch (error) {
+          // Driver creation failing immediately is unexpected - the test expects to create
+          // the driver successfully, then have introspect() fail when using the invalid connection.
+          // If driver creation fails, it may indicate an environment issue or changed behavior.
+          throw new Error(
+            'Expected postgresDriver.create() to succeed with invalid connection string, ' +
+              'but it threw: ' +
+              (error instanceof Error ? error.message : String(error)),
+          );
         }
 
         try {
