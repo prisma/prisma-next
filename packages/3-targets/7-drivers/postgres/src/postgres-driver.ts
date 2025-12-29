@@ -13,6 +13,7 @@ import type {
 } from 'pg';
 import { Pool } from 'pg';
 import Cursor from 'pg-cursor';
+import { callbackToPromise } from './callback-to-promise';
 
 export type QueryResult<T extends QueryResultRow = QueryResultRow> = PgQueryResult<T>;
 
@@ -216,27 +217,11 @@ export function createPostgresDriverFromOptions(options: PostgresDriverOptions):
 }
 
 function readCursor<Row>(cursor: Cursor<Row>, size: number): Promise<Row[]> {
-  return new Promise<Row[]>((resolve, reject) => {
-    cursor.read(size, (err, rows) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      resolve(rows ?? []);
-    });
+  return callbackToPromise<Row[]>((cb) => {
+    cursor.read(size, (err, rows) => cb(err, rows));
   });
 }
 
 function closeCursor(cursor: Cursor<unknown>): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    cursor.close((err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      resolve();
-    });
-  });
+  return callbackToPromise((cb) => cursor.close(cb));
 }
