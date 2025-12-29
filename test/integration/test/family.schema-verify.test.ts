@@ -49,56 +49,60 @@ describe('family instance schemaVerify', () => {
       });
     }, timeouts.spinUpPpgDev);
 
-    it('returns ok=true with all pass nodes', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=true with all pass nodes',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id'])
-            .unique(['email']),
-        )
-        .table('post', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('userId', { type: int4Column, nullable: false })
-            .column('title', { type: textColumn, nullable: false })
-            .primaryKey(['id'])
-            .foreignKey(['userId'], { table: 'user', columns: ['id'] })
-            .index(['userId']),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id'])
+              .unique(['email']),
+          )
+          .table('post', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('userId', { type: int4Column, nullable: false })
+              .column('title', { type: textColumn, nullable: false })
+              .primaryKey(['id'])
+              .foreignKey(['userId'], { table: 'user', columns: ['id'] })
+              .index(['userId']),
+          )
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
 
-        expect(result.ok).toBe(true);
-        expect(result.schema.counts.fail).toBe(0);
-        expect(result.schema.counts.pass).toBeGreaterThan(0);
-        expect(result.schema.root.status).toBe('pass');
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(result.ok).toBe(true);
+          expect(result.schema.counts.fail).toBe(0);
+          expect(result.schema.counts.pass).toBeGreaterThan(0);
+          expect(result.schema.root.status).toBe('pass');
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('missing table', () => {
@@ -187,49 +191,53 @@ describe('family instance schemaVerify', () => {
       });
     }, timeouts.spinUpPpgDev);
 
-    it('returns ok=false with missing_column issue', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=false with missing_column issue',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
 
-        expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some(
-            (i) => i.kind === 'missing_column' && i.table === 'user' && i.column === 'email',
-          ),
-        ).toBe(true);
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(result.ok).toBe(false);
+          expect(result.schema.counts.fail).toBeGreaterThan(0);
+          expect(
+            result.schema.issues.some(
+              (i) => i.kind === 'missing_column' && i.table === 'user' && i.column === 'email',
+            ),
+          ).toBe(true);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('type mismatch', () => {
@@ -248,48 +256,52 @@ describe('family instance schemaVerify', () => {
       });
     }, timeouts.spinUpPpgDev);
 
-    it('returns ok=false with type_mismatch issue', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=false with type_mismatch issue',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
 
-        // Type mismatch may or may not be detected depending on adapter introspection
-        // The adapter may map VARCHAR to pg/text@1, so this test may pass
-        // This is acceptable - the test verifies the verification runs without errors
-        expect(result).toBeDefined();
-        expect(result.schema).toBeDefined();
-        expect(result.schema.root).toBeDefined();
-      } finally {
-        await driver.close();
-      }
-    });
+          // Type mismatch may or may not be detected depending on adapter introspection
+          // The adapter may map VARCHAR to pg/text@1, so this test may pass
+          // This is acceptable - the test verifies the verification runs without errors
+          expect(result).toBeDefined();
+          expect(result.schema).toBeDefined();
+          expect(result.schema.root).toBeDefined();
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('nullability mismatch', () => {
@@ -308,49 +320,54 @@ describe('family instance schemaVerify', () => {
       });
     }, timeouts.spinUpPpgDev);
 
-    it('returns ok=false with nullability_mismatch issue', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=false with nullability_mismatch issue',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
 
-        expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some(
-            (i) => i.kind === 'nullability_mismatch' && i.table === 'user' && i.column === 'email',
-          ),
-        ).toBe(true);
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(result.ok).toBe(false);
+          expect(result.schema.counts.fail).toBeGreaterThan(0);
+          expect(
+            result.schema.issues.some(
+              (i) =>
+                i.kind === 'nullability_mismatch' && i.table === 'user' && i.column === 'email',
+            ),
+          ).toBe(true);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('primary key mismatch', () => {
@@ -370,47 +387,53 @@ describe('family instance schemaVerify', () => {
       });
     }, timeouts.spinUpPpgDev);
 
-    it('returns ok=false with primary_key_mismatch issue', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=false with primary_key_mismatch issue',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
 
-        expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some((i) => i.kind === 'primary_key_mismatch' && i.table === 'user'),
-        ).toBe(true);
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(result.ok).toBe(false);
+          expect(result.schema.counts.fail).toBeGreaterThan(0);
+          expect(
+            result.schema.issues.some(
+              (i) => i.kind === 'primary_key_mismatch' && i.table === 'user',
+            ),
+          ).toBe(true);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('foreign key mismatch', () => {
@@ -439,55 +462,61 @@ describe('family instance schemaVerify', () => {
 
     // TODO: Enable this test once foreignKey() is implemented in contract builder
     // Currently foreignKey() is a no-op that doesn't store foreign keys (see contract-authoring/RECOMMENDATIONS.md)
-    it.skip('returns ok=false with foreign_key_mismatch issue', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it.skip(
+      'returns ok=false with foreign_key_mismatch issue',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .table('post', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('userId', { type: int4Column, nullable: false })
-            .column('title', { type: textColumn, nullable: false })
-            .primaryKey(['id'])
-            .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .table('post', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('userId', { type: int4Column, nullable: false })
+              .column('title', { type: textColumn, nullable: false })
+              .primaryKey(['id'])
+              .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
+          )
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
 
-        expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some((i) => i.kind === 'foreign_key_mismatch' && i.table === 'post'),
-        ).toBe(true);
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(result.ok).toBe(false);
+          expect(result.schema.counts.fail).toBeGreaterThan(0);
+          expect(
+            result.schema.issues.some(
+              (i) => i.kind === 'foreign_key_mismatch' && i.table === 'post',
+            ),
+          ).toBe(true);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('extension missing', () => {
@@ -506,55 +535,60 @@ describe('family instance schemaVerify', () => {
       });
     }, timeouts.spinUpPpgDev);
 
-    it('returns ok=false with extension_missing issue', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=false with extension_missing issue',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-      // Add extensions to contract
-      const contractWithExtensions = {
-        ...contract,
-        extensions: {
-          pgvector: {
-            version: '1.0.0',
+        // Add extensions to contract
+        const contractWithExtensions = {
+          ...contract,
+          extensions: {
+            pgvector: {
+              version: '1.0.0',
+            },
           },
-        },
-      };
+        };
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contractWithExtensions);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-        });
+          const validatedContract =
+            validateContract<SqlContract<SqlStorage>>(contractWithExtensions);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
 
-        expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(result.schema.issues.some((i) => i.kind === 'extension_missing')).toBe(true);
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(result.ok).toBe(false);
+          expect(result.schema.counts.fail).toBeGreaterThan(0);
+          expect(result.schema.issues.some((i) => i.kind === 'extension_missing')).toBe(true);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('strict mode: extra columns', () => {
@@ -574,89 +608,97 @@ describe('family instance schemaVerify', () => {
       });
     }, timeouts.spinUpPpgDev);
 
-    it('returns ok=false in strict mode with extra_column issue', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=false in strict mode with extra_column issue',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: true,
-          context: { contractPath: './contract.json' },
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: true,
+            context: { contractPath: './contract.json' },
+          });
 
-        expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some(
-            (i) => i.kind === 'extra_column' && i.table === 'user' && i.column === 'extraColumn',
-          ),
-        ).toBe(true);
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(result.ok).toBe(false);
+          expect(result.schema.counts.fail).toBeGreaterThan(0);
+          expect(
+            result.schema.issues.some(
+              (i) => i.kind === 'extra_column' && i.table === 'user' && i.column === 'extraColumn',
+            ),
+          ).toBe(true);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-    it('returns ok=true in permissive mode with extra column', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=true in permissive mode with extra column',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
 
-        // In permissive mode, extra columns don't cause failures
-        expect(result.ok).toBe(true);
-        expect(result.schema.counts.fail).toBe(0);
-      } finally {
-        await driver.close();
-      }
-    });
+          // In permissive mode, extra columns don't cause failures
+          expect(result.ok).toBe(true);
+          expect(result.schema.counts.fail).toBe(0);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('type metadata registry', () => {
@@ -708,144 +750,152 @@ describe('family instance schemaVerify', () => {
       expect(vectorMetadata?.targetId).toBe('postgres');
     });
 
-    it('type mismatch with metadata present returns failure', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'type mismatch with metadata present returns failure',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      await withClient(connectionString, async (client) => {
-        await client.query('DROP TABLE IF EXISTS "user"');
-        // Create table with mismatched type: contract expects integer, DB has bigint
-        await client.query(`
+        await withClient(connectionString, async (client) => {
+          await client.query('DROP TABLE IF EXISTS "user"');
+          // Create table with mismatched type: contract expects integer, DB has bigint
+          await client.query(`
           CREATE TABLE "user" (
             id BIGINT PRIMARY KEY,
             email TEXT NOT NULL
           )
         `);
-      });
-
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
-
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
         });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-        });
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-        // Should fail due to type mismatch (integer vs bigint)
-        expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some(
-            (i) => i.kind === 'type_mismatch' && i.table === 'user' && i.column === 'id',
-          ),
-        ).toBe(true);
-      } finally {
-        await driver.close();
-      }
-    });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-    it('type without metadata emits warning, not failure', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
 
-      await withClient(connectionString, async (client) => {
-        await client.query('DROP TABLE IF EXISTS "user"');
-        await client.query(`
+          // Should fail due to type mismatch (integer vs bigint)
+          expect(result.ok).toBe(false);
+          expect(result.schema.counts.fail).toBeGreaterThan(0);
+          expect(
+            result.schema.issues.some(
+              (i) => i.kind === 'type_mismatch' && i.table === 'user' && i.column === 'id',
+            ),
+          ).toBe(true);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'type without metadata emits warning, not failure',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
+
+        await withClient(connectionString, async (client) => {
+          await client.query('DROP TABLE IF EXISTS "user"');
+          await client.query(`
           CREATE TABLE "user" (
             id INTEGER PRIMARY KEY,
             email TEXT NOT NULL
           )
         `);
-      });
+        });
 
-      // Create a contract with a type ID that doesn't exist in the registry
-      // We'll use a fake type ID to simulate missing metadata
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
+        // Create a contract with a type ID that doesn't exist in the registry
+        // We'll use a fake type ID to simulate missing metadata
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-      // Modify contract to use a type ID not in the registry
-      const contractWithUnknownType = {
-        ...contract,
-        storage: {
-          ...contract.storage,
-          tables: {
-            ...contract.storage.tables,
-            user: {
-              ...contract.storage.tables.user,
-              columns: {
-                ...contract.storage.tables.user.columns,
-                email: {
-                  ...contract.storage.tables.user.columns.email,
-                  codecId: 'pg/unknown-type@1' as const, // Type not in registry
+        // Modify contract to use a type ID not in the registry
+        const contractWithUnknownType = {
+          ...contract,
+          storage: {
+            ...contract.storage,
+            tables: {
+              ...contract.storage.tables,
+              user: {
+                ...contract.storage.tables.user,
+                columns: {
+                  ...contract.storage.tables.user.columns,
+                  email: {
+                    ...contract.storage.tables.user.columns.email,
+                    codecId: 'pg/unknown-type@1' as const, // Type not in registry
+                  },
                 },
               },
             },
           },
-        },
-      };
-
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
-
-        const validatedContract =
-          validateContract<SqlContract<SqlStorage>>(contractWithUnknownType);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-        });
-
-        // Should have warnings for missing metadata, but not fail
-        // The verification should still pass (ok=true) because missing metadata is a warning
-        // However, we need to check for warn nodes in the tree
-        const findWarnNode = (node: typeof result.schema.root): boolean => {
-          if (node.status === 'warn' && node.code === 'type_metadata_missing') {
-            return true;
-          }
-          return node.children.some(findWarnNode);
         };
 
-        // Should have at least one warning node for missing metadata
-        expect(findWarnNode(result.schema.root)).toBe(true);
-        expect(result.schema.counts.warn).toBeGreaterThan(0);
-      } finally {
-        await driver.close();
-      }
-    });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
+
+          const validatedContract =
+            validateContract<SqlContract<SqlStorage>>(contractWithUnknownType);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
+
+          // Should have warnings for missing metadata, but not fail
+          // The verification should still pass (ok=true) because missing metadata is a warning
+          // However, we need to check for warn nodes in the tree
+          const findWarnNode = (node: typeof result.schema.root): boolean => {
+            if (node.status === 'warn' && node.code === 'type_metadata_missing') {
+              return true;
+            }
+            return node.children.some(findWarnNode);
+          };
+
+          // Should have at least one warning node for missing metadata
+          expect(findWarnNode(result.schema.root)).toBe(true);
+          expect(result.schema.counts.warn).toBeGreaterThan(0);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 });
