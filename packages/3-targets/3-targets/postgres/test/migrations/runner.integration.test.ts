@@ -111,6 +111,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: result.plan,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
         expect(executeResult.ok).toBe(true);
         if (executeResult.ok) {
@@ -165,11 +166,11 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: initialPlan.plan,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
 
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
-          policy: INIT_ADDITIVE_POLICY,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [],
@@ -179,6 +180,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: emptyPlan,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
         expect(emptyPlanResult.ok).toBe(true);
         if (emptyPlanResult.ok) {
@@ -210,7 +212,6 @@ describe.sequential('PostgresMigrationRunner', () => {
 
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
-          policy: INIT_ADDITIVE_POLICY,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [],
@@ -220,6 +221,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: emptyPlan,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
 
         expect(result.ok).toBe(false);
@@ -244,6 +246,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: failingPlan,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
 
         expect(result.ok).toBe(false);
@@ -278,7 +281,6 @@ describe.sequential('PostgresMigrationRunner', () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
-          policy: INIT_ADDITIVE_POLICY,
           origin: { coreHash: 'sha256:expected-origin', profileHash: 'sha256:expected-profile' },
           destination: toPlanContractInfo(contract),
           operations: [],
@@ -288,6 +290,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: emptyPlan,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
 
         expect(result.ok).toBe(false);
@@ -337,11 +340,11 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: initialPlan.plan,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
 
         const planWithFailingStep = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
-          policy: INIT_ADDITIVE_POLICY,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -374,6 +377,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: planWithFailingStep,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
         expect(idempotencyResult.ok).toBe(true);
         if (idempotencyResult.ok) {
@@ -411,7 +415,6 @@ describe.sequential('PostgresMigrationRunner', () => {
 
         const invalidPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
-          policy: INIT_ADDITIVE_POLICY,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -444,6 +447,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: invalidPlan,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
 
         expect(result.ok).toBe(false);
@@ -471,7 +475,6 @@ describe.sequential('PostgresMigrationRunner', () => {
 
         const planWithPolicyViolation = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
-          policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -504,6 +507,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: planWithPolicyViolation,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
         });
 
         expect(result.ok).toBe(false);
@@ -528,7 +532,6 @@ describe.sequential('PostgresMigrationRunner', () => {
 
         const planWithFailingPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
-          policy: INIT_ADDITIVE_POLICY,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -566,6 +569,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: planWithFailingPostcheck,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
 
         expect(result.ok).toBe(false);
@@ -600,7 +604,6 @@ describe.sequential('PostgresMigrationRunner', () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const planWithPreSatisfiedPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
-          policy: INIT_ADDITIVE_POLICY,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -643,6 +646,7 @@ describe.sequential('PostgresMigrationRunner', () => {
           plan: planWithPreSatisfiedPostcheck,
           driver: driver!,
           destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
         });
         expect(postcheckPreSatisfiedResult.ok).toBe(true);
         if (postcheckPreSatisfiedResult.ok) {
@@ -676,7 +680,6 @@ async function resetDatabase(driver: Awaited<ReturnType<typeof postgresDriverDes
 function createFailingPlan() {
   return createMigrationPlan<PostgresPlanTargetDetails>({
     targetId: 'postgres',
-    policy: INIT_ADDITIVE_POLICY,
     origin: null,
     destination: toPlanContractInfo(contract),
     operations: [

@@ -4,7 +4,6 @@ import {
   plannerFailure,
   plannerSuccess,
 } from '../src/core/migrations/plan-helpers';
-import { INIT_ADDITIVE_POLICY } from '../src/core/migrations/policies';
 import type {
   MigrationPlan,
   MigrationPlanOperation,
@@ -31,7 +30,6 @@ describe('createMigrationPlan', () => {
 
     const plan = createMigrationPlan<TestTargetDetails>({
       targetId: 'postgres',
-      policy: INIT_ADDITIVE_POLICY,
       origin: { coreHash: 'originCore', profileHash: 'originProfile' },
       destination: { coreHash: 'core', profileHash: 'profile' },
       operations: sourceOperations as readonly MigrationPlanOperation<TestTargetDetails>[],
@@ -65,7 +63,6 @@ describe('planner helpers', () => {
   it('produce immutable envelopes that clone conflict metadata', () => {
     const plan: MigrationPlan<TestTargetDetails> = createMigrationPlan({
       targetId: 'postgres',
-      policy: INIT_ADDITIVE_POLICY,
       destination: { coreHash: 'abc', profileHash: 'def' },
       operations: [],
     });
