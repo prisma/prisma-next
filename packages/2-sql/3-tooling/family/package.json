@@ -61,6 +61,10 @@
     "./test-utils": {
       "types": "./dist/exports/test-utils.d.ts",
       "import": "./dist/exports/test-utils.js"
+    },
+    "./schema-verify": {
+      "types": "./dist/exports/schema-verify.d.ts",
+      "import": "./dist/exports/schema-verify.js"
     }
   }
 }

@@ -10,19 +10,13 @@ import type {
   ControlFamilyInstance,
   ControlTargetDescriptor,
   EmitContractResult,
+  OperationContext,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import type { OperationRegistry } from '@prisma-next/operations';
-import type {
-  ForeignKey,
-  Index,
-  PrimaryKey,
-  SqlContract,
-  SqlStorage,
-  UniqueConstraint,
-} from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
@@ -31,7 +25,7 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
@@ -603,7 +597,7 @@ export function createSqlFamilyInstance<
         contract,
         schema: schemaIR,
         strict,
-        context,
+        ...(context ? { context } : {}),
         typeMetadataRegistry,
       });
     },
