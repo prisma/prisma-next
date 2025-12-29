@@ -59,6 +59,10 @@
       "types": "./dist/pack-loading.d.ts",
       "import": "./dist/pack-loading.js"
     },
+    "./commands/db-init": {
+      "types": "./dist/commands/db-init.d.ts",
+      "import": "./dist/commands/db-init.js"
+    },
     "./commands/db-introspect": {
       "types": "./dist/commands/db-introspect.d.ts",
       "import": "./dist/commands/db-introspect.js"
