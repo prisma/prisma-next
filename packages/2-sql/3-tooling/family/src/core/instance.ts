@@ -26,7 +26,7 @@ import {
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
-import { defined } from '@prisma-next/utils';
+import { ifDefined } from '@prisma-next/utils';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
@@ -598,7 +598,7 @@ export function createSqlFamilyInstance<
         contract,
         schema: schemaIR,
         strict,
-        ...defined('context', context),
+        ...ifDefined('context', context),
         typeMetadataRegistry,
       });
     },

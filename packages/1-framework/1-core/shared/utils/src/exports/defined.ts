@@ -1,1 +1,1 @@
-export { defined } from '../defined';
+export { ifDefined } from '../defined';

@@ -16,11 +16,11 @@
  * // Use:
  * const obj = {
  *   required: 'value',
- *   ...defined('optional', optional),
+ *   ...ifDefined('optional', optional),
  * };
  * ```
  */
-export function defined<K extends string, V>(
+export function ifDefined<K extends string, V>(
   key: K,
   value: V | undefined,
 ): Record<never, never> | { [P in K]: V } {
