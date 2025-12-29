@@ -15,6 +15,8 @@ const contractObj = defineContract<CodecTypes>()
 
 export const contract = {
   ...contractObj,
+  // pg extension is needed because codec IDs like 'pg/int4@1' reference the 'pg' namespace
+  // postgres extension provides target-level metadata
   extensions: {
     postgres: {
       version: '15.0.0',
