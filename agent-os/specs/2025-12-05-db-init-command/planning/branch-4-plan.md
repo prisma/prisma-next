@@ -122,34 +122,27 @@ This allows targets (e.g. Postgres planner) to import:
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 ```
 
-### 4.2 Provide a runner-friendly verification helper
+### 4.2 Verification as a runner postcondition (introspect + pure verify)
 
-Create a helper in `@prisma-next/family-sql/control` area (or a new module under migrations) that maps schema verification failures into the runner’s structured `MigrationRunnerFailure` (without throwing).
+The runner must enforce: **never commit unless the post-state schema satisfies the destination contract**. That requirement forces verification to occur *inside* the runner’s transaction boundary, but it does not mean verification logic lives in the runner.
 
-Proposed shape:
+We do **not** introduce a family-level “runner verification helper” whose job is to map schema verification results into `MigrationRunnerFailure`. Error shaping remains in the target runner package.
 
-```ts
-import type { ControlDriverInstance, OperationContext } from '@prisma-next/core-control-plane/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { MigrationRunnerFailure } from './migrations/types';
-import type { Result } from '@prisma-next/utils/result';
+#### Target runner flow
 
-export async function verifyDatabaseSatisfiesContractForRunner(options: {
-  readonly family: SqlControlFamilyInstance;
-  readonly driver: ControlDriverInstance;
-  readonly contract: SqlContract<SqlStorage>;
-  readonly strict: boolean;
-  readonly context?: OperationContext;
-}): Promise<Result<void, MigrationRunnerFailure>>;
-```
+Inside the runner transaction (and lock scope), do:
 
-Implementation detail:
+- Apply plan operations
+- Call `family.introspect({ driver, contractIR: destinationContract })` to obtain a schema snapshot (DB I/O, family-owned orchestration)
+- Call `verifySqlSchema({ contract: destinationContract, schema: schemaIR, strict, ... })` (pure verifier)
+- If verification fails: return `runnerFailure('SCHEMA_VERIFY_FAILED', ...)` and include diagnostics (at least `issues`, optionally the full verification tree) in the failure payload/meta
+- Only commit after verification passes and marker/ledger writes succeed
 
-- Internally calls `family.schemaVerify({ driver, contractIR: contract, strict, context })`
-- If verification fails, return `runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, { meta: { issues: ... } })`
-- Avoid extra defensive branches (the helper is only called with validated `contract`).
+Rationale:
 
-Then refactor the Postgres runner to call this helper rather than duplicating failure mapping logic (behavior should remain the same; this is a small consolidation and makes future runner changes cheaper).
+- Avoids turning `schemaVerify()` (an orchestrated “command”) into a dependency for runners.
+- Keeps runner error shaping in the target package where the runner lives.
+- Keeps the verification logic reusable and pure (`contract + schemaIR -> VerifyDatabaseSchemaResult`).
 
 ### 4.3 Tests (TDD)
 
@@ -189,68 +182,4 @@ Notes:
 
 - Keep tests under 500 lines, split by functionality if needed.
 - Avoid nested DB connections (respect dev DB single connection limitation).
-
-## Commit-by-Commit Execution Plan (TDD + clean history)
-
-### Commit 1 — Add failing unit test skeleton for pure verifier
-
-- Add `schema-verify.basic.test.ts` with failing expectation for `verifySqlSchema` (module does not exist yet).
-
-### Commit 2 — Introduce pure verifier module (minimal passing behavior)
-
-- Add `verifySqlSchema` with minimal table/column comparison to satisfy tests.
-- Keep it pure.
-
-### Commit 3 — Expand verifier to match current behavior (constraints + extensions)
-
-- Add PK/UK/FK/index + extensions comparisons as needed.
-- Extend unit tests correspondingly.
-
-### Commit 4 — Refactor `schemaVerify()` to call pure verifier
-
-- Move comparison logic out of `instance.ts`, keep orchestration and output shape stable.
-- Add a small regression test if needed (unit-level) ensuring schemaVerify still reports same result shape for a mocked schema IR (if possible without mocking driver; otherwise rely on existing consumers + integration tests).
-
-### Commit 5 — Export `./schema-verify` subpath
-
-- Add `src/exports/schema-verify.ts`
-- Update `tsup.config.ts` and `package.json` exports
-- Add a minimal import test if needed.
-
-### Commit 6 — Add runner verification helper + refactor runner to use it
-
-- Add helper returning `Result<void, MigrationRunnerFailure>`
-- Update Postgres runner to use helper (no behavior change expected).
-- Update affected runner tests if necessary (should be minimal).
-
-### Commit 7 — Add/extend integration test (real DB drift detection)
-
-- Add new integration test demonstrating mismatch detection after DB mutation.
-
-### Commit 8 — Docs / README alignment
-
-- Update `@prisma-next/family-sql` README with:
-  - new `verifySqlSchema` export
-  - intended usage by planner/runner
-  - architecture diagram update if needed
-- Update `agent-os/specs/.../tasks.md` checkboxes for 4.1–4.3 when done.
-
-## Implementation Notes / Risks
-
-- `VerifyDatabaseSchemaResult` is a shared core-control-plane type; keep its semantics stable.
-- The current `schemaVerify()` has some defensive checks that are likely unreachable after `validateContract`; when extracting, remove those to avoid coverage dead spots.
-- Keep the verifier free of driver/adapters so it remains usable in planner logic.
-
-## Commands (when executing Branch 4)
-
-From repo root:
-
-- Unit tests (family-sql):
-  - `pnpm --filter @prisma-next/family-sql test`
-- Integration tests (postgres target):
-  - `pnpm --filter @prisma-next/target-postgres test`
-- Typecheck:
-  - `pnpm --filter @prisma-next/family-sql typecheck`
-  - `pnpm --filter @prisma-next/target-postgres typecheck`
-
 

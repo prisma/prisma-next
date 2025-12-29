@@ -8,10 +8,10 @@ import type {
   MigrationRunnerExecuteOptions,
   MigrationRunnerFailure,
   MigrationRunnerResult,
-  SchemaVerifyOptions,
   SqlControlFamilyInstance,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
+import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { readMarker } from '@prisma-next/family-sql/verify';
 import type { Result } from '@prisma-next/utils/result';
 import { ok, okVoid } from '@prisma-next/utils/result';
@@ -126,13 +126,20 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       }
 
       // Verify resulting schema matches contract
-      const schemaVerifyOptions: SchemaVerifyOptions = {
+      // Step 1: Introspect live schema (DB I/O, family-owned)
+      const schemaIR = await this.family.introspect({
         driver,
         contractIR: options.destinationContract,
+      });
+
+      // Step 2: Pure verification (no DB I/O)
+      const schemaVerifyResult = verifySqlSchema({
+        contract: options.destinationContract,
+        schema: schemaIR,
         strict: options.strictVerification ?? true,
         context: options.context ?? {},
-      };
-      const schemaVerifyResult = await this.family.schemaVerify(schemaVerifyOptions);
+        typeMetadataRegistry: this.family.typeMetadataRegistry,
+      });
       if (!schemaVerifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
           why: 'The resulting database schema does not satisfy the destination contract.',
