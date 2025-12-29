@@ -195,10 +195,10 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
   - ✅ Implemented in the Postgres runner (`packages/3-targets/3-targets/postgres/src/core/migrations/runner.ts`): after applying plan operations, the runner introspects the live schema, calls `verifySqlSchema()` (the pure verifier from task 4.1), and returns `runnerFailure('SCHEMA_VERIFY_FAILED', ...)` if verification fails. The transaction only commits after verification passes and marker/ledger writes succeed. This ensures the database never commits unless the post-state schema satisfies the destination contract.
   - The verification logic is integrated directly into the runner's transaction boundary (not a separate helper), keeping error shaping in the target package and avoiding dependencies on orchestrated commands.
 
-- **4.3 Verification tests**
-  - Add tests that:
-    - Intentionally introduce mismatches after running `db init` and ensure verification catches them.
-    - Confirm that a successful `db init` always leaves the database in a verifiable, contract-satisfying state.
+- [x] **4.3 Verification tests**
+  - ✅ Added integration tests in `packages/3-targets/3-targets/postgres/test/migrations/schema-verify.after-runner.integration.test.ts` that:
+    - Intentionally introduce mismatches after running `db init` (e.g., nullability changes, missing columns, extra columns) and ensure verification catches them.
+    - Confirm that a successful `db init` always leaves the database in a verifiable, contract-satisfying state (schema matches contract after migration).
 
 ## 5. Documentation & Standards Alignment
 
