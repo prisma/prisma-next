@@ -28,8 +28,11 @@ export interface MigrationPlanOperationTarget<TTargetDetails> {
 }
 
 export interface MigrationPlanOperation<TTargetDetails = Record<string, never>> {
+  /** Unique identifier for this operation (e.g., "table.users.create"). */
   readonly id: string;
+  /** Human-readable label for display in UI/CLI (e.g., "Create table users"). */
   readonly label: string;
+  /** Optional detailed explanation of what this operation does and why. */
   readonly summary?: string;
   readonly operationClass: MigrationOperationClass;
   readonly target: MigrationPlanOperationTarget<TTargetDetails>;

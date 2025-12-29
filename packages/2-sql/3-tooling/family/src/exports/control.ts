@@ -1,9 +1,5 @@
 import { SqlFamilyDescriptor } from '../core/descriptor';
 
-// Re-export Result types from core-control-plane for convenience
-export type { NotOk, Ok, Result } from '@prisma-next/core-control-plane/result';
-export { notOk, ok, okVoid } from '@prisma-next/core-control-plane/result';
-
 export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/instance';
 export {
   createMigrationPlan,
