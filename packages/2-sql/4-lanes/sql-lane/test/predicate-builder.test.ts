@@ -90,7 +90,7 @@ describe('buildWhereExpr', () => {
     );
 
     expect(result.expr).toMatchObject({
-      kind: 'binary',
+      kind: 'bin',
       op: 'eq',
       left: {
         kind: 'operation',
@@ -116,7 +116,7 @@ describe('buildWhereExpr', () => {
     );
 
     expect(result.expr).toMatchObject({
-      kind: 'binary',
+      kind: 'bin',
       op: 'eq',
       left: { kind: 'col', table: 'user', column: 'id' },
       right: { kind: 'col', table: 'user', column: 'id' },
