@@ -2,10 +2,10 @@ import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { Result } from '@prisma-next/core-control-plane/result';
 import { ok, okVoid } from '@prisma-next/core-control-plane/result';
 import type {
-  MigrationPlan,
   MigrationPlanContractInfo,
   MigrationPlanOperation,
   MigrationPlanOperationStep,
+  MigrationPolicy,
   MigrationRunner,
   MigrationRunnerExecuteOptions,
   MigrationRunnerFailure,
@@ -69,7 +69,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       return destinationCheck;
     }
 
-    const policyCheck = this.enforcePolicyCompatibility(options.plan);
+    const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
     if (!policyCheck.ok) {
       return policyCheck;
     }
@@ -297,20 +297,21 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private enforcePolicyCompatibility(
-    plan: MigrationPlan<PostgresPlanTargetDetails>,
+    policy: MigrationPolicy,
+    operations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[],
   ): Result<void, MigrationRunnerFailure> {
-    const allowedClasses = new Set(plan.policy.allowedOperationClasses);
-    for (const operation of plan.operations) {
+    const allowedClasses = new Set(policy.allowedOperationClasses);
+    for (const operation of operations) {
       if (!allowedClasses.has(operation.operationClass)) {
         return runnerFailure(
           'POLICY_VIOLATION',
           `Operation ${operation.id} has class "${operation.operationClass}" which is not allowed by policy.`,
           {
-            why: `Policy only allows: ${plan.policy.allowedOperationClasses.join(', ')}.`,
+            why: `Policy only allows: ${policy.allowedOperationClasses.join(', ')}.`,
             meta: {
               operationId: operation.id,
               operationClass: operation.operationClass,
-              allowedClasses: plan.policy.allowedOperationClasses,
+              allowedClasses: policy.allowedOperationClasses,
             },
           },
         );
