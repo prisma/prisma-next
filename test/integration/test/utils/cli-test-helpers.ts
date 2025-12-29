@@ -328,6 +328,71 @@ export async function runDbSign(
   }
 }
 
+/**
+ * Sets up a test directory for db-init e2e tests.
+ * Optionally creates a database schema. By default, creates an empty database.
+ * Returns the test setup and config path.
+ */
+export async function setupDbInitFixture(
+  connectionString: string,
+  createTempDir: () => string,
+  fixtureSubdir: string,
+  schemaSql?: string,
+): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
+  const { withClient } = await import('@prisma-next/test-utils');
+
+  // Only set up schema if SQL is provided
+  if (schemaSql) {
+    await withClient(connectionString, async (client) => {
+      await client.query(schemaSql);
+    });
+  }
+
+  const testSetup = setupTestDirectoryFromFixtures(
+    createTempDir,
+    fixtureSubdir,
+    'prisma-next.config.with-db.ts',
+    { '{{DB_URL}}': connectionString },
+  );
+  const configPath = testSetup.configPath;
+
+  // Emit contract first
+  const { createContractEmitCommand } = await import(
+    '../../../../packages/1-framework/3-tooling/cli/src/commands/contract-emit'
+  );
+  const emitCommand = createContractEmitCommand();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(testSetup.testDir);
+    await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+  } finally {
+    process.chdir(originalCwd);
+  }
+
+  return { testSetup, configPath };
+}
+
+/**
+ * Runs the db-init command with the given arguments.
+ * Handles process.chdir and restores the original working directory.
+ */
+export async function runDbInit(
+  testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>,
+  args: string[],
+): Promise<number> {
+  const { createDbInitCommand } = await import(
+    '../../../../packages/1-framework/3-tooling/cli/src/commands/db-init'
+  );
+  const command = createDbInitCommand();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(testSetup.testDir);
+    return await executeCommand(command, args);
+  } finally {
+    process.chdir(originalCwd);
+  }
+}
+
 // Re-export framework-agnostic helpers from CLI package
 // Note: These are imported directly from source since they're not exported from the package
 export {
