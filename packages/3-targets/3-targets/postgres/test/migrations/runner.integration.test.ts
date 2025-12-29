@@ -17,6 +17,7 @@ import {
   ensurePrismaContractSchemaStatement,
 } from '../../src/core/migrations/statement-builders';
 import postgresTargetDescriptor from '../../src/exports/control';
+import { expectNoMarkerOrLedgerWrites } from '../utils/dbAssertions';
 
 const contract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -781,31 +782,6 @@ function toPlanContractInfo(contract: SqlContract<SqlStorage>) {
   return contract.profileHash
     ? { coreHash: contract.coreHash, profileHash: contract.profileHash }
     : { coreHash: contract.coreHash };
-}
-
-async function expectNoMarkerOrLedgerWrites(
-  driver: Awaited<ReturnType<typeof postgresDriverDescriptor.create>>,
-): Promise<void> {
-  const markerTableExists = await driver.query<{ exists: boolean }>(
-    `select to_regclass('prisma_contract.marker') is not null as exists`,
-  );
-  const ledgerTableExists = await driver.query<{ exists: boolean }>(
-    `select to_regclass('prisma_contract.ledger') is not null as exists`,
-  );
-
-  if (markerTableExists.rows[0]?.exists) {
-    const markerCount = await driver.query<{ count: string }>(
-      'select count(*)::text as count from prisma_contract.marker',
-    );
-    expect(markerCount.rows[0]?.count ?? '0').toBe('0');
-  }
-
-  if (ledgerTableExists.rows[0]?.exists) {
-    const ledgerCount = await driver.query<{ count: string }>(
-      'select count(*)::text as count from prisma_contract.ledger',
-    );
-    expect(ledgerCount.rows[0]?.count ?? '0').toBe('0');
-  }
 }
 
 async function executeStatement(
