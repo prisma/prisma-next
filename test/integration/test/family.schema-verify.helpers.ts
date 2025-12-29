@@ -2,6 +2,7 @@
  * Shared helpers for family.schema-verify tests.
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import type { ControlExtensionDescriptor } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -50,12 +51,14 @@ export function useDevDatabase(): { getConnectionString: () => string } {
 /**
  * Creates a family instance for testing.
  */
-export function createFamilyInstance(extensions: readonly unknown[] = []) {
+export function createFamilyInstance(
+  extensions: readonly ControlExtensionDescriptor<'sql', 'postgres'>[] = [],
+) {
   return sql.create({
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensions: extensions as never[],
+    extensions,
   });
 }
 
@@ -80,7 +83,10 @@ export async function withDriver<T>(
 export async function runSchemaVerify(
   connectionString: string,
   contract: unknown,
-  options: { strict?: boolean; extensions?: readonly unknown[] } = {},
+  options: {
+    strict?: boolean;
+    extensions?: readonly ControlExtensionDescriptor<'sql', 'postgres'>[];
+  } = {},
 ) {
   return withDriver(connectionString, async (driver) => {
     const familyInstance = createFamilyInstance(options.extensions);
