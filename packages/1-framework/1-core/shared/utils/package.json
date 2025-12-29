@@ -30,6 +30,10 @@
     "./defined": {
       "types": "./dist/exports/defined.d.ts",
       "import": "./dist/exports/defined.js"
+    },
+    "./result": {
+      "types": "./dist/exports/result.d.ts",
+      "import": "./dist/exports/result.js"
     }
   }
 }

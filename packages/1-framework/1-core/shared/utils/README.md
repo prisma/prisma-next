@@ -35,6 +35,45 @@ const obj = {
 3. **Type-safe**: Returns `{}` or `{ key: V }` (without undefined)
 4. **exactOptionalPropertyTypes compatible**: Properly handles TypeScript's strict optional property checking
 
+### `Result<T, F>`, `ok()`, `notOk()`, `okVoid()`
+
+Generic Result type for representing success or failure outcomes. This is the standard way to return "expected failures" as values rather than throwing exceptions.
+
+```typescript
+import { type Result, ok, notOk, okVoid } from '@prisma-next/utils/result';
+
+// Success result with value
+function divide(a: number, b: number): Result<number, string> {
+  if (b === 0) {
+    return notOk('Division by zero');
+  }
+  return ok(a / b);
+}
+
+// Using the result
+const result = divide(10, 2);
+if (result.ok) {
+  console.log(result.value); // 5
+} else {
+  console.error(result.failure); // error message
+}
+
+// Void success for validation
+function validate(value: unknown): Result<void, string> {
+  if (!value) {
+    return notOk('Value is required');
+  }
+  return okVoid();
+}
+```
+
+**Types:**
+- `Ok<T>` - Success with value: `{ ok: true, value: T }`
+- `NotOk<F>` - Failure with details: `{ ok: false, failure: F }`
+- `Result<T, F>` - Discriminated union of `Ok<T> | NotOk<F>`
+
+See `docs/Error Handling.md` for the full error taxonomy.
+
 ## Package Location
 
 This package is part of the **framework domain**, **core layer**, **shared plane**:
