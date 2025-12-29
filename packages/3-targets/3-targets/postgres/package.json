@@ -22,6 +22,7 @@
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "arktype": "^2.0.0"
   },
   "devDependencies": {
