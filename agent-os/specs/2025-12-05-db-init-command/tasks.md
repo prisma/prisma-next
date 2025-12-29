@@ -254,7 +254,17 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 ## 8. Postgres Planner Enhancements
 
 - **8.1 Support additional additive initialization scenarios**
-  - Extend the Postgres migration planner to handle additive “subset” and “superset” database states (e.g., missing columns, indexes, or constraints).
+  - Extend the Postgres migration planner to handle additive "subset" and "superset" database states (e.g., missing columns, indexes, or constraints).
   - Generate additive operations for partially provisioned schemas and ensure the planner produces full conflict reports when non-additive changes are required.
 
+## 9. Driver Error Normalization
+
+- **9.1 Implement driver-level error normalization**
+  - Add error translation layer to control drivers (starting with Postgres) that normalizes raw database errors into well-typed, distinguishable error types:
+    - `SqlQueryError`: Syntax errors, constraint violations, permission denied
+    - `SqlConnectionError`: Connection lost, timeout
+    - Infrastructure errors (out of memory, disk full) should propagate as exceptions
+  - Update `PostgresMigrationRunner.runExecuteSteps()` to catch normalized `SqlQueryError` and return `EXECUTION_FAILED` failure
+  - Let infrastructure errors propagate (fail-fast for unexpected issues)
+  - Aligns with `RECOMMENDATIONS.md` in postgres driver package
 
