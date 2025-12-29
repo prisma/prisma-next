@@ -113,7 +113,7 @@ if (result.ok) {
 - For streaming APIs (use AsyncIterable that throws on error)
 
 See:
-- `packages/1-framework/1-core/migration/control-plane/src/result.ts`
+- `packages/1-framework/1-core/shared/utils/src/result.ts`
 
 ### CLI boundary: structured errors + Result conversion
 
