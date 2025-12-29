@@ -138,12 +138,12 @@ describe('select builder edge cases', () => {
       })
       .build();
 
-    if (plan.ast.kind === 'select') {
-      expect(plan.ast.where).toBeDefined();
-      if (plan.ast.where && plan.ast.where.kind === 'bin') {
-        expect(plan.ast.where.left.kind).toBe('col');
-        expect(plan.ast.where.right.kind).toBe('col');
-      }
-    }
+    expect(plan.ast.kind).toBe('select');
+    expect(plan.ast.where).toBeDefined();
+    expect(plan.ast.where).toMatchObject({
+      kind: 'bin',
+      left: { kind: 'col' },
+      right: { kind: 'col' },
+    });
   });
 });
