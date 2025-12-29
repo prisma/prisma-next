@@ -402,6 +402,13 @@ The runner primitive:
       - Upsert `{ core_hash = toCoreHash, profile_hash = toProfileHash, contract_json = desiredContractJson, ... }`.
     - Append a ledger entry equivalent to a normal on-disk migration edge apply.
 
+- **Result type and error handling:**
+  - `executeMigration` returns a `Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>` (not throwing).
+  - SQL execution errors are caught and returned as failures with code `EXECUTION_FAILED`.
+  - Marker validation failures return structured `MigrationRunnerFailure` with appropriate error codes (e.g., `MARKER_ORIGIN_MISMATCH`).
+  - Pre/post check failures return failures with codes `PRECHECK_FAILED` or `POSTCHECK_FAILED`.
+  - On success, the returned result contains `MigrationRunnerSuccessValue` with `operationsPlanned` and `operationsExecuted` counts. The marker state is updated atomically with the schema changes (written to the database, not returned in the result).
+
 This keeps the existing **atomicity** guarantee:
 
 - We never change the schema without ensuring the marker and ledger reflect the same state transition.

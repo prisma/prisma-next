@@ -128,8 +128,11 @@ See:
 
 Plan-building failures are represented as `RuntimeError` with stable codes like `PLAN.INVALID` and `PLAN.UNSUPPORTED`.
 
+Migration runner failures use stable `MigrationRunnerErrorCode` values (e.g., `EXECUTION_FAILED`, `SCHEMA_VERIFY_FAILED`, `PRECHECK_FAILED`, `POSTCHECK_FAILED`) returned as part of `Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>`. This follows the pattern described in "Provide stable codes for 'expected failures'" (see Guidelines section below) where stable codes enable deterministic error handling at system boundaries.
+
 See:
 - `packages/1-framework/1-core/shared/plan/src/errors.ts` (`planInvalid`, `planUnsupported`)
+- `packages/2-sql/3-tooling/family/src/core/migrations/types.ts` (`MigrationRunnerErrorCode`, `MigrationRunnerFailure`)
 - SQL lane helpers that throw these for invalid builder usage/capability gating.
 
 ### Runtime execution: streaming API throws on failure
