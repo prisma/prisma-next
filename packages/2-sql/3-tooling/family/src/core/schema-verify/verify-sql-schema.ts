@@ -277,7 +277,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
     // Check for extra columns in strict mode
     if (strict) {
-      for (const [columnName, schemaColumn] of Object.entries(schemaTable.columns)) {
+      for (const [columnName, { nativeType }] of Object.entries(schemaTable.columns)) {
         if (!contractTable.columns[columnName]) {
           issues.push({
             kind: 'extra_column',
@@ -293,7 +293,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
             code: 'extra_column',
             message: `Extra column "${columnName}" found`,
             expected: undefined,
-            actual: schemaColumn.nativeType,
+            actual: nativeType,
             children: [],
           });
         }
