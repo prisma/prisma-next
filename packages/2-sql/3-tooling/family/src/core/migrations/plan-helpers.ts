@@ -41,12 +41,28 @@ function freezeSteps(
   );
 }
 
+function freezeDetailsValue<T>(value: T): T {
+  // Primitives and null/undefined are already immutable, return as-is
+  if (value === null || value === undefined) {
+    return value;
+  }
+  if (typeof value !== 'object') {
+    return value;
+  }
+  // Arrays: shallow clone and freeze
+  if (Array.isArray(value)) {
+    return Object.freeze([...value]) as T;
+  }
+  // Objects: shallow clone and freeze (matching cloneRecord pattern)
+  return Object.freeze({ ...value }) as T;
+}
+
 function freezeTargetDetails<TTargetDetails>(
   target: MigrationPlanOperationTarget<TTargetDetails>,
 ): MigrationPlanOperationTarget<TTargetDetails> {
   return Object.freeze({
     id: target.id,
-    ...(target.details ? { details: target.details } : {}),
+    ...(target.details !== undefined ? { details: freezeDetailsValue(target.details) } : {}),
   });
 }
 
