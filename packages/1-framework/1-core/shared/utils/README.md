@@ -13,7 +13,7 @@ This package provides general-purpose utility functions used across the Prisma N
 Returns an object with the key/value if value is defined, otherwise an empty object. Use with spread to conditionally include optional properties while satisfying `exactOptionalPropertyTypes`.
 
 ```typescript
-import { ifDefined } from '@prisma-next/utils';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 // Instead of:
 const obj = {

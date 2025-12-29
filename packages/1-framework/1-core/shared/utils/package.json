@@ -21,10 +21,6 @@
     "dist"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
     "./defined": {
       "types": "./dist/exports/defined.d.ts",
       "import": "./dist/exports/defined.js"

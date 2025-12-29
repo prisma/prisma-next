@@ -26,7 +26,7 @@ import {
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
-import { ifDefined } from '@prisma-next/utils';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   assembleOperationRegistry,
   extractCodecTypeImports,
