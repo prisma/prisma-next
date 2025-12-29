@@ -163,10 +163,10 @@ describe('emit integration', () => {
         sqlTargetFamilyHook,
       );
 
-      const json1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
-      const json2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
+      // Compare JSON outputs directly - contractJson1 was already parsed above
+      const contractJson2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
 
-      expect(JSON.stringify(json1, null, 2)).toBe(JSON.stringify(json2, null, 2));
+      expect(JSON.stringify(contractJson1, null, 2)).toBe(JSON.stringify(contractJson2, null, 2));
       expect(result1.coreHash).toBe(result2.coreHash);
     },
     timeouts.typeScriptCompilation,
