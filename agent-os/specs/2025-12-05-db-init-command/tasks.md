@@ -248,6 +248,18 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
   - Strip any hard-coded references to pgvector (extension SQL, naming conventions, etc.) from `@prisma-next/targets-postgres`.
   - Ensure extension-specific behavior is provided exclusively via extension packs so the target remains neutral.
 
+- **7.2 Consolidate CLI E2E test infrastructure**
+  - Current state: `test/integration/` contains tests named `*.e2e.test.ts` that run CLI commands in-process (importing command factories directly, mocking `process.exit` and `console.log`), while `test/e2e/framework/` is intended for true subprocess E2E tests.
+  - Issues with in-process approach:
+    - Not truly E2E — doesn't test the CLI entrypoint, shebang, or process lifecycle.
+    - Mocking `process.exit` to throw is fragile and can mask real issues.
+    - Doesn't catch ESM/CJS interop problems that occur in real subprocess execution.
+  - Proposed cleanup:
+    - Rename in-process tests in `test/integration/` to drop the "e2e" suffix (since they're really integration tests).
+    - Move or add true subprocess E2E tests to `test/e2e/` following the pattern in `cli.emit-cli-process.e2e.test.ts`.
+    - Update `test/integration/README.md` and `test/e2e/framework/README.md` to clarify the distinction.
+  - Reference: `cli.emit-cli-process.e2e.test.ts` demonstrates the correct subprocess pattern using `execFileAsync('node', [cliPath, ...])`.
+
 ## 8. Postgres Planner Enhancements
 
 - **8.1 Support additional additive initialization scenarios**
