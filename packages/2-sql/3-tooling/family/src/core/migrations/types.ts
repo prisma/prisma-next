@@ -69,6 +69,7 @@ export type PlannerConflictKind =
   | 'indexIncompatible'
   | 'foreignKeyConflict'
   | 'missingButNonAdditive'
+  | 'unsupportedExtension'
   | 'extensionMissing'
   | 'unsupportedOperation';
 

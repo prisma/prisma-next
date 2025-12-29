@@ -11,7 +11,7 @@ To keep PRs small and reviewable, implement these tasks as a sequence of **self-
 
 - **Branch 2 — Planner SPI + Postgres planner implementation**
   - Covers tasks **1.4**, **1.5**, **1.6**.
-  - Deliverables: `MigrationPlanner` interface, target-driven planner construction, and a Postgres-aware planner that enforces the `init` policy and returns either a valid plan or a structured failure with all conflicts, plus planner tests.
+  - Deliverables: `MigrationPlanner` interface, target-driven planner construction, and a Postgres-aware planner that enforces the `init` policy and returns either a valid plan (for empty DBs) or a structured failure when the schema is non-empty, plus planner tests.
 
 - **Branch 3 — Runner SPI + Postgres runner + marker/ledger wiring**
   - Covers tasks **2.1**, **2.2**, **2.3**, **2.4**.
@@ -72,18 +72,16 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 - [x] **1.5 Implement Postgres-specific planner**
   - Implement a Postgres-aware planner that:
     - Accepts `(contractIr, schemaIr, policy)`.
-    - Computes diffs against the contract using existing schema/contract tooling where possible.
-    - For `mode: 'init'` with additive-only policy:
-      - Emits only additive operations (create table, add column, add index/constraint, etc.).
-      - Records all non-additive-required changes as structured conflicts in a `failure` result.
-  - Ensure planner is **non-destructive by construction** under the `init` policy.
+    - Enforces an additive-only policy for `db init`.
+    - **v1 scope**: supports planning only for empty databases (no existing tables).
+      - For an empty schema IR, emits a full additive plan (extensions, tables, indexes, constraints) to bootstrap the contract.
+      - For a non-empty schema IR, returns a structured `failure` describing that subset/superset handling is not yet supported.
+  - Ensure planner is **non-destructive by construction** under the `init` policy, and makes unsupported states explicit via `failure` results.
 
 - [x] **1.6 Planner tests**
-  - Add unit/integration tests for the planner covering at least:
+  - Add unit tests for the planner covering at least:
     - Empty database schema IR → full additive plan matching the contract.
-    - Subset schema IR → plan only missing tables/columns/indexes/constraints.
-    - Superset schema IR → empty plan when all required structures are compatible.
-    - Conflicting schema IR → planner `failure` with a complete conflict list.
+    - Non-empty schema IR → planner `failure` indicating empty-db-only support and listing existing tables.
   - Use object matchers for asserting plan structure and conflicts, following testing guidelines.
 
 ## 2. Runner Design & Implementation (Postgres Target)
@@ -254,8 +252,11 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 ## 8. Postgres Planner Enhancements
 
 - **8.1 Support additional additive initialization scenarios**
-  - Extend the Postgres migration planner to handle additive "subset" and "superset" database states (e.g., missing columns, indexes, or constraints).
-  - Generate additive operations for partially provisioned schemas and ensure the planner produces full conflict reports when non-additive changes are required.
+  - Extend the Postgres migration planner beyond “empty-db only” to handle additive initialization scenarios:
+    - **Subset** schema IR → plan only missing tables/columns/indexes/constraints.
+    - **Superset** schema IR → empty plan when all required structures are compatible (extras tolerated).
+    - **Conflicting** schema IR → planner `failure` with a complete conflict list for required non-additive changes.
+  - Generate additive operations for partially provisioned schemas and ensure the planner produces structured conflict reports when non-additive changes are required.
 
 ## 9. Driver Error Normalization
 

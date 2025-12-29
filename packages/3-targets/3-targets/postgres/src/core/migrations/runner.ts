@@ -164,7 +164,10 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
           return precheckResult;
         }
 
-        await this.runExecuteSteps(driver, operation.execute);
+        const executeResult = await this.runExecuteSteps(driver, operation.execute, operation);
+        if (!executeResult.ok) {
+          return executeResult;
+        }
 
         const postcheckResult = await this.runExpectationSteps(
           driver,
@@ -222,10 +225,27 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   private async runExecuteSteps(
     driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     steps: readonly MigrationPlanOperationStep[],
-  ): Promise<void> {
+    operation: MigrationPlanOperation<PostgresPlanTargetDetails>,
+  ): Promise<Result<void, MigrationRunnerFailure>> {
     for (const step of steps) {
-      await driver.query(step.sql);
+      try {
+        await driver.query(step.sql);
+      } catch (error) {
+        return runnerFailure(
+          'EXECUTION_FAILED',
+          `Operation ${operation.id} failed during execution: ${step.description}`,
+          {
+            why: error instanceof Error ? error.message : String(error),
+            meta: {
+              operationId: operation.id,
+              stepDescription: step.description,
+              sql: step.sql,
+            },
+          },
+        );
+      }
     }
+    return okVoid();
   }
 
   private stepResultIsTrue(rows: readonly Record<string, unknown>[]): boolean {

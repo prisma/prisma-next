@@ -100,7 +100,7 @@ The runner returns structured errors with the following codes:
 - **`PRECHECK_FAILED`**: Operation precheck returned false
 - **`POSTCHECK_FAILED`**: Operation postcheck returned false after execution
 - **`SCHEMA_VERIFY_FAILED`**: Resulting schema doesn't satisfy the destination contract
-- **`EXECUTION_FAILED`**: SQL execution error during operation execution (defined but not yet implemented - SQL errors currently propagate as exceptions; see task 9.1)
+- **`EXECUTION_FAILED`**: SQL execution error during operation execution
 - **`src/exports/control.ts`**: Control plane entry point (exports `SqlFamilyDescriptor` instance)
 - **`src/exports/runtime.ts`**: Runtime entry point (placeholder for future functionality)
 

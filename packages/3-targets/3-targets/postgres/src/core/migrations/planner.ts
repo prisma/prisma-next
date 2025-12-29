@@ -68,6 +68,11 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
       ]);
     }
 
+    const extensionResult = this.validateExtensions(options.contract);
+    if (extensionResult) {
+      return extensionResult;
+    }
+
     const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
     operations.push(
@@ -91,6 +96,27 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
     return plannerSuccess(plan);
   }
 
+  private validateExtensions(contract: SqlContract<SqlStorage>) {
+    const extensions = contract.extensions ?? {};
+    const extensionNames = Object.keys(extensions);
+    const unsupportedExtensions = extensionNames.filter(
+      (extensionName) => !PG_EXTENSION_SQL[extensionName],
+    );
+    if (unsupportedExtensions.length > 0) {
+      const supportedExtensions = Object.keys(PG_EXTENSION_SQL).join(', ');
+      const unsupportedList = unsupportedExtensions.join(', ');
+      return plannerFailure([
+        {
+          kind: 'unsupportedExtension' as const,
+          summary: `Unsupported PostgreSQL extensions in contract: ${unsupportedList}`,
+          why: `The Postgres migration planner currently only supports: ${supportedExtensions}. Extensions are defined in contract.extensions.`,
+          location: { extension: unsupportedList },
+        },
+      ]);
+    }
+    return null;
+  }
+
   private ensureAdditivePolicy(policy: MigrationOperationPolicy) {
     if (!policy.allowedOperationClasses.includes('additive')) {
       return plannerFailure([
@@ -112,24 +138,11 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
     const extensionNames = Object.keys(extensions);
     const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
-    // Check for unsupported extensions and fail fast
-    const unsupportedExtensions = extensionNames.filter(
-      (extensionName) => !PG_EXTENSION_SQL[extensionName],
-    );
-    if (unsupportedExtensions.length > 0) {
-      const supportedExtensions = Object.keys(PG_EXTENSION_SQL).join(', ');
-      const unsupportedList = unsupportedExtensions.join(', ');
-      throw new Error(
-        `Unsupported PostgreSQL extensions in contract: ${unsupportedList}. ` +
-          `The Postgres migration planner currently only supports the following extensions: ${supportedExtensions}. ` +
-          'Extensions are defined in contract.extensions.',
-      );
-    }
-
+    // Extensions are validated in validateExtensions() before this method is called
     for (const extensionName of extensionNames) {
       const sql = PG_EXTENSION_SQL[extensionName];
       if (!sql) {
-        // This should never happen since we validate extensions above, but TypeScript requires this check
+        // This should never happen since we validate extensions in validateExtensions(), but TypeScript requires this check
         throw new Error(`Extension SQL not found for ${extensionName}`);
       }
       const details = this.buildTargetDetails('extension', extensionName, schema);
