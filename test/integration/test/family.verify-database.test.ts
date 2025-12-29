@@ -187,14 +187,20 @@ describe('family instance verify', () => {
             contractPath,
           });
 
-          expect(result.ok).toBe(true);
-          expect(result.summary).toBe('Database matches contract');
-          expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+          const expectedContract: Record<string, unknown> = {
+            coreHash: contractWithDb.coreHash,
+          };
           if (contractWithDb.profileHash) {
-            expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
+            expectedContract['profileHash'] = contractWithDb.profileHash;
           }
+
+          expect(result).toMatchObject({
+            ok: true,
+            summary: 'Database matches contract',
+            contract: expectedContract,
+            meta: { contractPath: expect.any(String) },
+          });
           expect(result.timings.total).toBeGreaterThanOrEqual(0);
-          expect(result.meta?.contractPath).toBeDefined();
         } finally {
           cleanupWithDb();
         }
