@@ -107,6 +107,12 @@ class PostgresDriverImpl implements SqlDriver {
         await this.pool.end();
       }
     }
+    if (this.directClient) {
+      const client = this.directClient as Client & { _ending?: boolean };
+      if (!client._ending) {
+        await client.end();
+      }
+    }
   }
 
   private async acquireClient(): Promise<PoolClient | Client> {
