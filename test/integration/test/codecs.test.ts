@@ -137,7 +137,6 @@ describe('Codecs Integration Tests', () => {
     expect(row).toMatchObject({
       created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
     });
-    expect(typeof row['created_at']).toBe('string');
   });
 
   it('decodes timestamptz to ISO string', async () => {
