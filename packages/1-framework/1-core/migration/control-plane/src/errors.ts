@@ -210,6 +210,36 @@ export function errorDriverRequired(options?: { readonly why?: string }): CliStr
 }
 
 /**
+ * Migration planning failed due to conflicts.
+ */
+export function errorMigrationPlanningFailed(options: {
+  readonly conflicts: readonly { readonly kind: string; readonly summary: string }[];
+  readonly why?: string;
+}): CliStructuredError {
+  return new CliStructuredError('4020', 'Migration planning failed', {
+    domain: 'CLI',
+    why: options.why ?? 'Database cannot be initialized with additive-only operations',
+    fix: 'Use `db schema-verify` to inspect conflicts, or ensure the database is empty',
+    meta: { conflicts: options.conflicts },
+    docsUrl: 'https://prisma-next.dev/docs/cli/db-init',
+  });
+}
+
+/**
+ * Target does not support migrations (missing createPlanner/createRunner).
+ */
+export function errorTargetMigrationNotSupported(options?: {
+  readonly why?: string;
+}): CliStructuredError {
+  return new CliStructuredError('4021', 'Target does not support migrations', {
+    domain: 'CLI',
+    why: options?.why ?? 'The configured target does not provide migration planner/runner',
+    fix: 'Ensure you are using a target that supports migrations',
+    docsUrl: 'https://prisma-next.dev/docs/cli/db-init',
+  });
+}
+
+/**
  * Config validation error (missing required fields).
  */
 export function errorConfigValidation(

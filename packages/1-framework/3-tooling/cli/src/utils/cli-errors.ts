@@ -15,8 +15,10 @@ export {
   errorFileNotFound,
   errorHashMismatch,
   errorMarkerMissing,
+  errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
   errorRuntime,
+  errorTargetMigrationNotSupported,
   errorTargetMismatch,
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
