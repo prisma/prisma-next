@@ -40,19 +40,14 @@ describe('family instance schemaVerify - modes', () => {
               .column('email', { type: textColumn, nullable: false })
               .primaryKey(['id']),
           )
-          .build();
-
-        // Add extensions to contract
-        const contractWithExtensions = {
-          ...contract,
-          extensions: {
+          .extensions({
             pgvector: {
               version: '1.0.0',
             },
-          },
-        };
+          })
+          .build();
 
-        const result = await runSchemaVerify(getConnectionString(), contractWithExtensions);
+        const result = await runSchemaVerify(getConnectionString(), contract);
 
         expect(result.ok).toBe(false);
         expect(result.schema.counts.fail).toBeGreaterThan(0);
