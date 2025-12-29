@@ -254,122 +254,138 @@ describe('family instance introspect', () => {
       timeouts.spinUpPpgDev,
     );
 
-    it('includes indexes for post table', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
-
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
-
-        const schemaIR = await familyInstance.introspect({
-          driver,
-        });
-
-        const postTable = schemaIR.tables['post'];
-        expect(postTable).toBeDefined();
-        if (!postTable) {
-          throw new Error('post table not found');
+    it(
+      'includes indexes for post table',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
         }
-        expect(postTable.indexes).toBeDefined();
-        expect(postTable.indexes.length).toBeGreaterThan(0);
-        const userIdIndex = postTable.indexes.find((idx) => idx.name === 'post_userId_idx');
-        expect(userIdIndex).toBeDefined();
-        expect(userIdIndex?.columns).toEqual(['userId']);
-      } finally {
-        await driver.close();
-      }
-    });
 
-    it('includes Postgres annotations', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+          const schemaIR = await familyInstance.introspect({
+            driver,
+          });
 
-        const schemaIR = await familyInstance.introspect({
-          driver,
-        });
+          const postTable = schemaIR.tables['post'];
+          expect(postTable).toBeDefined();
+          if (!postTable) {
+            throw new Error('post table not found');
+          }
+          expect(postTable.indexes).toBeDefined();
+          expect(postTable.indexes.length).toBeGreaterThan(0);
+          const userIdIndex = postTable.indexes.find((idx) => idx.name === 'post_userId_idx');
+          expect(userIdIndex).toBeDefined();
+          expect(userIdIndex?.columns).toEqual(['userId']);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-        expect(schemaIR.annotations).toBeDefined();
-        expect(schemaIR.annotations?.['pg']).toBeDefined();
-      } finally {
-        await driver.close();
-      }
-    });
+    it(
+      'includes Postgres annotations',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
+
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
+
+          const schemaIR = await familyInstance.introspect({
+            driver,
+          });
+
+          expect(schemaIR.annotations).toBeDefined();
+          expect(schemaIR.annotations?.['pg']).toBeDefined();
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('for an adapter with invalid create method', () => {
-    it('throws error when create method returns invalid adapter', async () => {
-      const adapterWithInvalidCreate = {
-        ...postgresAdapter,
-        create: () => ({}),
-      } as unknown as typeof postgresAdapter;
+    it(
+      'throws error when create method returns invalid adapter',
+      async () => {
+        const adapterWithInvalidCreate = {
+          ...postgresAdapter,
+          create: () => ({}),
+        } as unknown as typeof postgresAdapter;
 
-      const familyInstance = sql.create({
-        target: postgres,
-        adapter: adapterWithInvalidCreate,
-        driver: postgresDriver,
-        extensions: [],
-      });
-
-      const mockDriver = {
-        query: async () => ({ rows: [] }),
-        close: async () => {},
-      };
-
-      await expect(
-        familyInstance.introspect({
-          driver: mockDriver,
-        }),
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('for an invalid database connection', () => {
-    it('handles connection errors gracefully', async () => {
-      let invalidDriver: Awaited<ReturnType<typeof postgresDriver.create>> | undefined;
-      try {
-        invalidDriver = await postgresDriver.create('postgresql://invalid:5432/invalid');
-      } catch {
-        // Driver creation might fail immediately, which is fine
-        // We'll skip this test if driver creation fails
-        return;
-      }
-
-      try {
         const familyInstance = sql.create({
           target: postgres,
-          adapter: postgresAdapter,
+          adapter: adapterWithInvalidCreate,
           driver: postgresDriver,
           extensions: [],
         });
 
+        const mockDriver = {
+          query: async () => ({ rows: [] }),
+          close: async () => {},
+        };
+
         await expect(
           familyInstance.introspect({
-            driver: invalidDriver,
+            driver: mockDriver,
           }),
         ).rejects.toThrow();
-      } finally {
-        await invalidDriver.close().catch(() => {
-          // Ignore cleanup errors
-        });
-      }
-    });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+
+  describe('for an invalid database connection', () => {
+    it(
+      'handles connection errors gracefully',
+      async () => {
+        let invalidDriver: Awaited<ReturnType<typeof postgresDriver.create>> | undefined;
+        try {
+          invalidDriver = await postgresDriver.create('postgresql://invalid:5432/invalid');
+        } catch {
+          // Driver creation might fail immediately, which is fine
+          // We'll skip this test if driver creation fails
+          return;
+        }
+
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
+
+          await expect(
+            familyInstance.introspect({
+              driver: invalidDriver,
+            }),
+          ).rejects.toThrow();
+        } finally {
+          await invalidDriver.close().catch(() => {
+            // Ignore cleanup errors
+          });
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('for a schema with extensions', () => {
@@ -388,30 +404,34 @@ describe('family instance introspect', () => {
       }); // Connection closed here
     }, timeouts.spinUpPpgDev);
 
-    it('returns extensions array', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns extensions array',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const schemaIR = await familyInstance.introspect({
-          driver,
-        });
+          const schemaIR = await familyInstance.introspect({
+            driver,
+          });
 
-        expect(schemaIR.extensions).toBeDefined();
-        expect(Array.isArray(schemaIR.extensions)).toBe(true);
-        expect(schemaIR.extensions.length).toBeGreaterThanOrEqual(0);
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(schemaIR.extensions).toBeDefined();
+          expect(Array.isArray(schemaIR.extensions)).toBe(true);
+          expect(schemaIR.extensions.length).toBeGreaterThanOrEqual(0);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 });
