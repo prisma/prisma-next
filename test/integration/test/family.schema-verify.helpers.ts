@@ -1,7 +1,6 @@
 /**
  * Shared helpers for family.schema-verify tests.
  */
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
@@ -93,4 +92,46 @@ export async function runSchemaVerify(
       context: { contractPath: './contract.json' },
     });
   });
+}
+
+/**
+ * Verification node structure (matches SchemaVerificationNode from control-plane).
+ */
+export interface VerificationNode {
+  readonly status: 'pass' | 'warn' | 'fail';
+  readonly code: string;
+  readonly children: readonly VerificationNode[];
+}
+
+/**
+ * Recursively searches a verification tree for a node matching a predicate.
+ *
+ * @param node - Root node to search from
+ * @param predicate - Function to test each node
+ * @returns true if any node in the tree matches the predicate
+ */
+export function findNodeByPredicate(
+  node: VerificationNode,
+  predicate: (node: VerificationNode) => boolean,
+): boolean {
+  if (predicate(node)) {
+    return true;
+  }
+  return node.children.some((child) => findNodeByPredicate(child, predicate));
+}
+
+/**
+ * Recursively searches a verification tree for a node with specific status and code.
+ *
+ * @param node - Root node to search from
+ * @param status - Status to match ('pass' | 'warn' | 'fail')
+ * @param code - Code to match
+ * @returns true if a matching node is found
+ */
+export function findNodeByStatusAndCode(
+  node: VerificationNode,
+  status: 'pass' | 'warn' | 'fail',
+  code: string,
+): boolean {
+  return findNodeByPredicate(node, (n) => n.status === status && n.code === code);
 }

@@ -6,11 +6,9 @@ import {
   type CodecTypes,
   createFamilyInstance,
   defineContract,
+  findNodeByStatusAndCode,
   int4Column,
   pgvector,
-  postgres,
-  postgresAdapter,
-  postgresDriver,
   runSchemaVerify,
   type SqlContract,
   type SqlStorage,
@@ -241,15 +239,11 @@ describe('family instance schemaVerify - types', () => {
           // Should have warnings for missing metadata, but not fail
           // The verification should still pass (ok=true) because missing metadata is a warning
           // However, we need to check for warn nodes in the tree
-          const findWarnNode = (node: typeof result.schema.root): boolean => {
-            if (node.status === 'warn' && node.code === 'type_metadata_missing') {
-              return true;
-            }
-            return node.children.some(findWarnNode);
-          };
 
           // Should have at least one warning node for missing metadata
-          expect(findWarnNode(result.schema.root)).toBe(true);
+          expect(findNodeByStatusAndCode(result.schema.root, 'warn', 'type_metadata_missing')).toBe(
+            true,
+          );
           expect(result.schema.counts.warn).toBeGreaterThan(0);
         });
       },
