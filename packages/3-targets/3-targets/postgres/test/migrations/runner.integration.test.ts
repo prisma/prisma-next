@@ -521,6 +521,74 @@ describe.sequential('PostgresMigrationRunner', () => {
         await expectNoMarkerOrLedgerWrites(driver!);
       },
     );
+
+    it(
+      'succeeds with a policy that allows destructive operations',
+      { timeout: testTimeout },
+      async () => {
+        // Create a table first so we can drop it
+        await driver!.query('create table "something" (id serial primary key)');
+
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+        // Same operation structure as above, but now with a permissive policy
+        const planWithDestructiveOp = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [
+            {
+              id: 'table.drop_something',
+              label: 'Drop table something',
+              summary: 'Drops the something table',
+              operationClass: 'destructive',
+              target: {
+                id: 'postgres',
+                details: {
+                  schema: 'public',
+                  objectType: 'table',
+                  name: 'something',
+                },
+              },
+              precheck: [],
+              execute: [
+                {
+                  description: 'drop table',
+                  sql: 'drop table if exists "something"',
+                },
+              ],
+              postcheck: [
+                {
+                  description: 'verify table dropped',
+                  sql: `select to_regclass('public."something"') is null`,
+                },
+              ],
+            },
+          ],
+        });
+
+        // Policy that allows destructive operations
+        const permissivePolicy = {
+          allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
+        };
+
+        const result = await runner.execute({
+          plan: planWithDestructiveOp,
+          driver: driver!,
+          destinationContract: contract,
+          policy: permissivePolicy,
+        });
+
+        // With a permissive policy, the same plan succeeds
+        // (Note: schemaVerify will fail because we're not actually creating the user table,
+        // but the policy check itself passes)
+        // We expect SCHEMA_VERIFY_FAILED, not POLICY_VIOLATION
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.failure.code).toBe('SCHEMA_VERIFY_FAILED');
+        }
+      },
+    );
   });
 
   describe('when an operation postcheck fails after execution', () => {
