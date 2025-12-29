@@ -49,7 +49,6 @@ export interface MigrationPlanContractInfo {
 
 export interface MigrationPlan<TTargetDetails = Record<string, never>> {
   readonly targetId: string;
-  readonly policy: MigrationPolicy;
   /**
    * Origin contract identity that the plan expects the database to currently be at.
    * If omitted, the runner treats the origin as "no marker present" (empty database),
@@ -127,6 +126,11 @@ export interface MigrationRunnerExecuteOptions<TTargetDetails = Record<string, n
    * Must correspond to `plan.destination` and is used for schema verification and marker/ledger writes.
    */
   readonly destinationContract: SqlContract<SqlStorage>;
+  /**
+   * Execution-time policy that defines which operation classes are allowed.
+   * The runner validates each operation against this policy before execution.
+   */
+  readonly policy: MigrationPolicy;
   readonly schemaName?: string;
   readonly strictVerification?: boolean;
   readonly callbacks?: MigrationRunnerExecuteCallbacks<TTargetDetails>;
@@ -184,7 +188,6 @@ export interface SqlControlTargetDescriptor<
 
 export interface CreateMigrationPlanOptions<TTargetDetails> {
   readonly targetId: string;
-  readonly policy: MigrationPolicy;
   readonly origin?: MigrationPlanContractInfo | null;
   readonly destination: MigrationPlanContractInfo;
   readonly operations: readonly MigrationPlanOperation<TTargetDetails>[];
