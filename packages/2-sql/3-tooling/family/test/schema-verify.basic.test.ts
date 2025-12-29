@@ -468,7 +468,7 @@ describe('verifySqlSchema', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
-          kind: 'missing_table',
+          kind: 'extra_table',
           table: 'extra_table',
         }),
       );
@@ -496,7 +496,7 @@ describe('verifySqlSchema', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
-          kind: 'missing_column',
+          kind: 'extra_column',
           table: 'user',
           column: 'extra_column',
         }),

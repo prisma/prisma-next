@@ -280,7 +280,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       for (const [columnName, schemaColumn] of Object.entries(schemaTable.columns)) {
         if (!contractTable.columns[columnName]) {
           issues.push({
-            kind: 'missing_column',
+            kind: 'extra_column',
             table: tableName,
             column: columnName,
             message: `Extra column "${tableName}"."${columnName}" found in database (not in contract)`,
@@ -336,7 +336,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     } else if (schemaTable.primaryKey && strict) {
       // Extra primary key in strict mode
       issues.push({
-        kind: 'primary_key_mismatch',
+        kind: 'extra_primary_key',
         table: tableName,
         message: 'Extra primary key found in database (not in contract)',
       });
@@ -423,7 +423,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     for (const tableName of Object.keys(schemaTables)) {
       if (!contractTables[tableName]) {
         issues.push({
-          kind: 'missing_table',
+          kind: 'extra_table',
           table: tableName,
           message: `Extra table "${tableName}" found in database (not in contract)`,
         });

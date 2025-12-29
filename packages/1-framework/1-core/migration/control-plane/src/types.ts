@@ -358,6 +358,12 @@ export interface SchemaIssue {
   readonly kind:
     | 'missing_table'
     | 'missing_column'
+    | 'extra_table'
+    | 'extra_column'
+    | 'extra_primary_key'
+    | 'extra_foreign_key'
+    | 'extra_unique_constraint'
+    | 'extra_index'
     | 'type_mismatch'
     | 'nullability_mismatch'
     | 'primary_key_mismatch'
