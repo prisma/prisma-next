@@ -64,6 +64,13 @@ if (planResult.kind === 'success') {
     destinationContract: contract,
     policy,
   });
+  if (!executeResult.ok) {
+    // Handle structured failure (e.g., EXECUTION_FAILED, PRECHECK_FAILED)
+    console.error(executeResult.failure.code, executeResult.failure.summary);
+  }
+} else {
+  // Handle planner failure (e.g., unsupportedExtension, unsupportedOperation)
+  console.error(planResult.conflicts);
 }
 ```
 
@@ -77,6 +84,22 @@ import { ... } from '@prisma-next/target-postgres/runtime';
 ## Architecture
 
 This package provides both control and runtime entry points for the Postgres target. The control entry point loads the target manifest from `packs/manifest.json` and exports it as a `SqlControlTargetDescriptor`. The runtime entry point will provide target-specific runtime functionality in the future.
+
+## Error Handling
+
+Both the planner and runner return structured results instead of throwing:
+
+**Planner** returns `PlannerResult` with either:
+- `kind: 'success'` with a `MigrationPlan`
+- `kind: 'failure'` with a list of `PlannerConflict` objects (e.g., `unsupportedExtension`, `unsupportedOperation`)
+
+**Runner** returns `MigrationRunnerResult` (`Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>`) with either:
+- `ok: true` with operation counts
+- `ok: false` with a `MigrationRunnerFailure` containing error code, summary, and metadata
+
+Runner error codes include: `EXECUTION_FAILED`, `PRECHECK_FAILED`, `POSTCHECK_FAILED`, `SCHEMA_VERIFY_FAILED`, `POLICY_VIOLATION`, `MARKER_ORIGIN_MISMATCH`, `DESTINATION_CONTRACT_MISMATCH`.
+
+See `@prisma-next/family-sql/control` README for full error code documentation.
 
 ## Dependencies
 

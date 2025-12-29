@@ -95,7 +95,7 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
   - Add a method on the **target control descriptor** to construct a concrete runner given a `ControlFamilyInstance<'sql'>`.
 
 - [x] **2.2 Marker and ledger integration contract**
-  - ✅ Introduced Postgres-specific helper statements in `packages/targets/postgres/src/core/migrations/statement-builders.ts` to ensure the `prisma_contract` schema/tables exist, upsert marker rows, and append ledger entries with serialized operations.
+  - ✅ Introduced Postgres-specific helper statements in `packages/3-targets/3-targets/postgres/src/core/migrations/statement-builders.ts` to ensure the `prisma_contract` schema/tables exist, upsert marker rows, and append ledger entries with serialized operations.
   - Specify a small internal API for:
     - Ensuring the contract marker table exists (create-if-missing semantics).
     - Reading/writing a single marker row keyed by contract identity.
@@ -106,7 +106,7 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
   - Align this with the existing migration system’s marker and ledger schemas.
 
 - [x] **2.3 Implement Postgres runner**
-  - ✅ Implemented `createPostgresMigrationRunner` in `packages/targets/postgres/src/core/migrations/runner.ts`, wired through the target descriptor. The runner acquires advisory locks, runs pre/execute/post SQL, calls `schemaVerify`, upserts the marker, and records ledger entries.
+  - ✅ Implemented `createPostgresMigrationRunner` in `packages/3-targets/3-targets/postgres/src/core/migrations/runner.ts`, wired through the target descriptor. The runner acquires advisory locks, runs pre/execute/post SQL, calls `schemaVerify`, upserts the marker, and records ledger entries.
   - Implement the runner so that it:
     - Acquires appropriate advisory locks before applying a plan.
     - Runs `precheckSql` for each operation and fails with structured error on violation.
@@ -118,7 +118,7 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
   - Ensure no destructive operations are ever executed under the `init` policy.
 
 - [x] **2.4 Runner tests**
-  - ✅ Added `packages/targets/postgres/test/migrations/runner.integration.test.ts` covering happy-path apply, no-op signing, and precheck failure semantics via the dev database utilities. Documented a manual harness in `agent-os/specs/2025-12-05-db-init-command/verifications/branch-3-runner.md`.
+  - ✅ Added Postgres runner integration coverage under `packages/3-targets/3-targets/postgres/test/migrations/runner.*.integration.test.ts` (split by functionality to stay under the 500-line test file limit).
   - Add integration tests (using `@prisma-next/test-utils` dev database helpers) that:
     - Apply a non-empty `MigrationPlan` to an empty database and assert:
       - Schema matches the contract.
