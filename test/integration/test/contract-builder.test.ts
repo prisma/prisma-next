@@ -193,7 +193,7 @@ describe('builder integration', () => {
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const _plan = sql<typeof contract, CodecTypes>({ context })
+    const _plan = sql<typeof contract>({ context })
       .from(userTable)
       .select({
         id: userTable.columns.id!,
@@ -244,7 +244,7 @@ describe('builder integration', () => {
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const _plan = sql<typeof contract, CodecTypes>({ context })
+    const _plan = sql<typeof contract>({ context })
       .from(userTable)
       .select({
         id: userTable.columns.id!,
