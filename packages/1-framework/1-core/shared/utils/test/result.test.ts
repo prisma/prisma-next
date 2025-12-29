@@ -5,8 +5,7 @@ describe('result', () => {
   describe('ok()', () => {
     it('creates a successful result with a value', () => {
       const result = ok(42);
-      expect(result.ok).toBe(true);
-      expect(result.value).toBe(42);
+      expect(result).toMatchObject({ ok: true, value: 42 });
     });
 
     it('creates a frozen result', () => {
@@ -18,8 +17,10 @@ describe('result', () => {
   describe('notOk()', () => {
     it('creates an unsuccessful result with failure details', () => {
       const result = notOk({ code: 'ERR_TEST', message: 'Test error' });
-      expect(result.ok).toBe(false);
-      expect(result.failure).toEqual({ code: 'ERR_TEST', message: 'Test error' });
+      expect(result).toMatchObject({
+        ok: false,
+        failure: { code: 'ERR_TEST', message: 'Test error' },
+      });
     });
 
     it('creates a frozen result', () => {

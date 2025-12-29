@@ -132,7 +132,7 @@ Proposed shape:
 import type { ControlDriverInstance, OperationContext } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { MigrationRunnerFailure } from './migrations/types';
-import type { Result } from '@prisma-next/core-control-plane/result';
+import type { Result } from '@prisma-next/utils/result';
 
 export async function verifyDatabaseSatisfiesContractForRunner(options: {
   readonly family: SqlControlFamilyInstance;

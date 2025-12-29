@@ -1,6 +1,4 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
-import type { Result } from '@prisma-next/core-control-plane/result';
-import { ok, okVoid } from '@prisma-next/core-control-plane/result';
 import type {
   MigrationOperationPolicy,
   MigrationPlanContractInfo,
@@ -15,6 +13,8 @@ import type {
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { readMarker } from '@prisma-next/family-sql/verify';
+import type { Result } from '@prisma-next/utils/result';
+import { ok, okVoid } from '@prisma-next/utils/result';
 import type { PostgresPlanTargetDetails } from './planner';
 import {
   buildLedgerInsertStatement,
