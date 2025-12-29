@@ -14,6 +14,7 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   computeCounts,
   verifyExtensions,
@@ -488,11 +489,11 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   return {
     ok,
-    ...(code ? { code } : {}),
+    ...ifDefined('code', code),
     summary,
     contract: {
       coreHash: contractCoreHash,
-      ...(contractProfileHash ? { profileHash: contractProfileHash } : {}),
+      ...ifDefined('profileHash', contractProfileHash),
     },
     target: {
       expected: contractTarget,
@@ -505,8 +506,8 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     },
     meta: {
       strict,
-      ...(context?.contractPath ? { contractPath: context.contractPath } : {}),
-      ...(context?.configPath ? { configPath: context.configPath } : {}),
+      ...ifDefined('contractPath', context?.contractPath),
+      ...ifDefined('configPath', context?.configPath),
     },
     timings: {
       total: totalTime,
