@@ -76,6 +76,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
     // Begin transaction for DB operations
     await this.beginTransaction(driver);
+    let committed = false;
     try {
       await this.acquireLock(driver, lockKey);
       await this.ensureControlTables(driver);
@@ -84,7 +85,6 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       // Validate plan origin matches existing marker (needs marker from DB)
       const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
       if (!markerCheck.ok) {
-        await this.rollbackTransaction(driver);
         return markerCheck;
       }
 
@@ -97,7 +97,6 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       } else {
         const applyResult = await this.applyPlan(driver, options);
         if (!applyResult.ok) {
-          await this.rollbackTransaction(driver);
           return applyResult;
         }
         applyValue = applyResult.value;
@@ -112,7 +111,6 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       };
       const schemaVerifyResult = await this.family.schemaVerify(schemaVerifyOptions);
       if (!schemaVerifyResult.ok) {
-        await this.rollbackTransaction(driver);
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
           why: 'The resulting database schema does not satisfy the destination contract.',
           meta: {
@@ -126,14 +124,15 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
       await this.recordLedgerEntry(driver, options, existingMarker, applyValue.executedOperations);
 
       await this.commitTransaction(driver);
+      committed = true;
       return runnerSuccess({
         operationsPlanned: options.plan.operations.length,
         operationsExecuted: applyValue.operationsExecuted,
       });
-    } catch (error) {
-      await this.rollbackTransaction(driver);
-      // Re-throw unexpected errors (fail fast)
-      throw error;
+    } finally {
+      if (!committed) {
+        await this.rollbackTransaction(driver);
+      }
     }
   }
 
