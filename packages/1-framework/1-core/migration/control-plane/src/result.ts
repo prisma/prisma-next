@@ -30,9 +30,9 @@ export interface NotOk<F> {
  * A discriminated union representing either success (Ok) or failure (NotOk).
  *
  * @typeParam T - The success value type
- * @typeParam F - The failure details type (defaults to unknown)
+ * @typeParam F - The failure details type
  */
-export type Result<T, F = unknown> = Ok<T> | NotOk<F>;
+export type Result<T, F> = Ok<T> | NotOk<F>;
 
 /**
  * Creates a successful result.

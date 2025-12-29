@@ -70,7 +70,7 @@ We provide a generic `Result<T, F>` type for representing success or failure out
 import type { Result, Ok, NotOk } from '@prisma-next/core-control-plane/result';
 import { ok, notOk, okVoid } from '@prisma-next/core-control-plane/result';
 
-// Success with a value
+// Success with a value - both T and F must be specified
 function divide(a: number, b: number): Result<number, { code: string; message: string }> {
   if (b === 0) {
     return notOk({ code: 'DIVISION_BY_ZERO', message: 'Cannot divide by zero' });
@@ -95,11 +95,12 @@ if (result.ok) {
 }
 ```
 
-**Naming rationale:**
+**Naming and design rationale:**
 - `Ok<T>` / `NotOk<F>` mirror the `ok: true/false` discriminator property
 - `NotOk` avoids collision with domain-specific "Failure" or "Error" types
 - `value` for success, `failure` for unsuccessful—distinct names prevent confusion
 - `failure` (not `error`) distinguishes structured failure data from JS `Error` semantics
+- **No default for `F`** - Both type parameters are required; the whole point is to strictly type failures, not to propagate JavaScript's untyped error handling
 
 **When to use Result:**
 - At system boundaries (CLI commands, migration runner, SDK entrypoints)
