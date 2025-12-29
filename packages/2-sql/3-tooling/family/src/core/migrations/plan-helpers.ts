@@ -7,7 +7,6 @@ import type {
   MigrationPlanOperation,
   MigrationPlanOperationStep,
   MigrationPlanOperationTarget,
-  MigrationPolicy,
   MigrationRunnerErrorCode,
   MigrationRunnerFailure,
   MigrationRunnerSuccessValue,
@@ -76,18 +75,11 @@ function freezeOperations<TTargetDetails>(
   return Object.freeze(operations.map((operation) => freezeOperation(operation)));
 }
 
-function normalizePolicy(policy: MigrationPolicy): MigrationPolicy {
-  return Object.freeze({
-    allowedOperationClasses: Object.freeze([...policy.allowedOperationClasses]),
-  });
-}
-
 export function createMigrationPlan<TTargetDetails = Record<string, never>>(
   options: CreateMigrationPlanOptions<TTargetDetails>,
 ): MigrationPlan<TTargetDetails> {
   return Object.freeze({
     targetId: options.targetId,
-    policy: normalizePolicy(options.policy),
     ...(options.origin !== undefined
       ? { origin: options.origin ? Object.freeze({ ...options.origin }) : null }
       : {}),
