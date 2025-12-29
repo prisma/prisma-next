@@ -6,22 +6,20 @@ To keep PRs small and reviewable, implement these tasks as a sequence of **self-
 
 - **Branch 1 — Core migration types & IR (no real behavior yet)**
   - Covers tasks **1.1**, **1.2**, **1.3**.
-  - Deliverables: `MigrationPolicy`, `PlannerResult`, in-memory `MigrationPlan` IR, plus unit/type tests for these types.
+  - Deliverables: `MigrationOperationPolicy`, `PlannerResult`, in-memory `MigrationPlan` IR, plus unit/type tests for these types.
   - No real planning logic yet; just the vocabulary and basic construction helpers.
 
 - **Branch 2 — Planner SPI + Postgres planner implementation**
   - Covers tasks **1.4**, **1.5**, **1.6**.
-  - Deliverables: `MigrationPlanner` interface, target-driven planner construction, and a Postgres-aware planner that enforces the `init` policy and returns either a valid plan or a structured failure with all conflicts, plus planner tests.
+  - Deliverables: `MigrationPlanner` interface, target-driven planner construction, and a Postgres-aware planner that enforces the `init` policy and returns either a valid plan (for empty DBs) or a structured failure when the schema is non-empty, plus planner tests.
 
 - **Branch 3 — Runner SPI + Postgres runner + marker/ledger wiring**
   - Covers tasks **2.1**, **2.2**, **2.3**, **2.4**.
   - Deliverables: `MigrationRunner` interface, target-driven runner construction, Postgres runner that executes plans with pre/post checks and integrates marker/ledger updates, plus integration tests using the dev database utilities.
-  - **Manual developer test (between Branch 3 and 4)**: After this branch lands, add a small, ad-hoc harness (script or focused test) that:
-    - Loads a real SQL contract (e.g. from `prisma-next-demo`).
-    - Connects to a dev Postgres instance.
-    - Introspects schema IR via the family/target stack.
-    - Calls `planner.plan(...)` and, on success, `runner.execute(...)`.
-    - Verifies manually (e.g. via psql or a separate script) that tables, marker, and ledger match expectations before proceeding to Branch 4.
+  - **Automated verification (between Branch 3 and 4)**: The runner integration tests serve as the harness for validating end-to-end behavior:
+    - Connect to a dev Postgres instance.
+    - Call `planner.plan(...)` and, on success, `runner.execute(...)`.
+    - Assert the resulting schema, marker, and ledger match expectations before proceeding to Branch 4.
 
 - **Branch 4 — Schema IR & verification integration**
   - Covers tasks **4.1**, **4.2**, **4.3**.
@@ -40,11 +38,11 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 ## 1. Planner & Policy Design (SQL Family / Target-Aware)
 
 - [x] **1.1 Define migration policy model**
-  - Specify a `MigrationPolicy` type that supports at least:
+  - Specify a `MigrationOperationPolicy` type that supports at least:
     - `mode: 'init' | 'update'` (extensible).
     - `allowedOperationClasses: readonly ('additive' | 'widening' | 'destructive')[]`.
   - Document how `db init` uses `mode: 'init'` + `['additive']` and how `db update` will extend this later.
-  - ✅ Implemented via `MigrationPolicy` in `packages/2-sql/3-tooling/family/src/core/migrations/types.ts` plus `INIT_ADDITIVE_POLICY` in `packages/2-sql/3-tooling/family/src/core/migrations/policies.ts`. The CLI now keeps "init vs update" context separately while the shared policy carries only the enforcement set (`allowedOperationClasses`), eliminating the incentive for downstream systems to branch on mode.
+  - ✅ Implemented via `MigrationOperationPolicy` in `packages/2-sql/3-tooling/family/src/core/migrations/types.ts` plus `INIT_ADDITIVE_POLICY` in `packages/2-sql/3-tooling/family/src/core/migrations/policies.ts`. The CLI now keeps "init vs update" context separately while the shared policy carries only the enforcement set (`allowedOperationClasses`), eliminating the incentive for downstream systems to branch on mode.
 
 - [x] **1.2 Define planner result shape**
   - Design a `PlannerResult` type that can represent:
@@ -72,30 +70,30 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 - [x] **1.5 Implement Postgres-specific planner**
   - Implement a Postgres-aware planner that:
     - Accepts `(contractIr, schemaIr, policy)`.
-    - Computes diffs against the contract using existing schema/contract tooling where possible.
-    - For `mode: 'init'` with additive-only policy:
-      - Emits only additive operations (create table, add column, add index/constraint, etc.).
-      - Records all non-additive-required changes as structured conflicts in a `failure` result.
-  - Ensure planner is **non-destructive by construction** under the `init` policy.
+    - Enforces an additive-only policy for `db init`.
+    - **v1 scope**: supports planning only for empty databases (no existing tables).
+      - For an empty schema IR, emits a full additive plan (extensions, tables, indexes, constraints) to bootstrap the contract.
+      - For a non-empty schema IR, returns a structured `failure` describing that subset/superset handling is not yet supported.
+  - Ensure planner is **non-destructive by construction** under the `init` policy, and makes unsupported states explicit via `failure` results.
 
 - [x] **1.6 Planner tests**
-  - Add unit/integration tests for the planner covering at least:
+  - Add unit tests for the planner covering at least:
     - Empty database schema IR → full additive plan matching the contract.
-    - Subset schema IR → plan only missing tables/columns/indexes/constraints.
-    - Superset schema IR → empty plan when all required structures are compatible.
-    - Conflicting schema IR → planner `failure` with a complete conflict list.
+    - Non-empty schema IR → planner `failure` indicating empty-db-only support and listing existing tables.
   - Use object matchers for asserting plan structure and conflicts, following testing guidelines.
 
 ## 2. Runner Design & Implementation (Postgres Target)
 
-- **2.1 Define runner interface**
+- [x] **2.1 Define runner interface**
+  - ✅ Added `MigrationRunner*` types plus `createRunner` hook requirement in `packages/sql/family/src/core/migrations/types.ts`, exported from `@prisma-next/family-sql/control`, and documented the SPI in the SQL family README. Targets now construct runners alongside planners.
   - Design a `MigrationRunner` interface that:
     - Accepts a `MigrationPlan`, a connection/driver abstraction, and contract/marker context as needed.
     - Executes operations in order with pre/post checks.
     - Reports structured errors.
   - Add a method on the **target control descriptor** to construct a concrete runner given a `ControlFamilyInstance<'sql'>`.
 
-- **2.2 Marker and ledger integration contract**
+- [x] **2.2 Marker and ledger integration contract**
+  - ✅ Introduced Postgres-specific helper statements in `packages/3-targets/3-targets/postgres/src/core/migrations/statement-builders.ts` to ensure the `prisma_contract` schema/tables exist, upsert marker rows, and append ledger entries with serialized operations.
   - Specify a small internal API for:
     - Ensuring the contract marker table exists (create-if-missing semantics).
     - Reading/writing a single marker row keyed by contract identity.
@@ -105,7 +103,8 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
       - Full list of executed operations (with precheck/execute/postcheck SQL).
   - Align this with the existing migration system’s marker and ledger schemas.
 
-- **2.3 Implement Postgres runner**
+- [x] **2.3 Implement Postgres runner**
+  - ✅ Implemented `createPostgresMigrationRunner` in `packages/3-targets/3-targets/postgres/src/core/migrations/runner.ts`, wired through the target descriptor. The runner acquires advisory locks, runs pre/execute/post SQL, calls `schemaVerify`, upserts the marker, and records ledger entries.
   - Implement the runner so that it:
     - Acquires appropriate advisory locks before applying a plan.
     - Runs `precheckSql` for each operation and fails with structured error on violation.
@@ -116,7 +115,8 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
       - Appends a migration ledger entry with all required fields.
   - Ensure no destructive operations are ever executed under the `init` policy.
 
-- **2.4 Runner tests**
+- [x] **2.4 Runner tests**
+  - ✅ Added Postgres runner integration coverage under `packages/3-targets/3-targets/postgres/test/migrations/runner.*.integration.test.ts` (split by functionality to stay under the 500-line test file limit).
   - Add integration tests (using `@prisma-next/test-utils` dev database helpers) that:
     - Apply a non-empty `MigrationPlan` to an empty database and assert:
       - Schema matches the contract.
@@ -250,7 +250,20 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 ## 8. Postgres Planner Enhancements
 
 - **8.1 Support additional additive initialization scenarios**
-  - Extend the Postgres migration planner to handle additive “subset” and “superset” database states (e.g., missing columns, indexes, or constraints).
-  - Generate additive operations for partially provisioned schemas and ensure the planner produces full conflict reports when non-additive changes are required.
+  - Extend the Postgres migration planner beyond “empty-db only” to handle additive initialization scenarios:
+    - **Subset** schema IR → plan only missing tables/columns/indexes/constraints.
+    - **Superset** schema IR → empty plan when all required structures are compatible (extras tolerated).
+    - **Conflicting** schema IR → planner `failure` with a complete conflict list for required non-additive changes.
+  - Generate additive operations for partially provisioned schemas and ensure the planner produces structured conflict reports when non-additive changes are required.
 
+## 9. Driver Error Normalization
+
+- **9.1 Implement driver-level error normalization**
+  - Add error translation layer to control drivers (starting with Postgres) that normalizes raw database errors into well-typed, distinguishable error types:
+    - `SqlQueryError`: Syntax errors, constraint violations, permission denied
+    - `SqlConnectionError`: Connection lost, timeout
+    - Infrastructure errors (out of memory, disk full) should propagate as exceptions
+  - Update `PostgresMigrationRunner.runExecuteSteps()` to catch normalized `SqlQueryError` and return `EXECUTION_FAILED` failure
+  - Let infrastructure errors propagate (fail-fast for unexpected issues)
+  - Aligns with `RECOMMENDATIONS.md` in postgres driver package
 

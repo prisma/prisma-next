@@ -87,6 +87,27 @@ describe('mutation builder edge cases', () => {
       expect(plan.meta.annotations?.codecs).toBeDefined();
       expect(plan.meta.annotations?.codecs?.['email']).toBe('pg/text@1');
     });
+
+    it('chains returning multiple times for insert', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .insert(userTable, {
+          email: param('email'),
+        })
+        .returning(userColumns.id)
+        .returning(userColumns.email)
+        .build({ params: { email: 'test@example.com' } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'insert',
+        returning: expect.arrayContaining([
+          createColumnRef('user', 'id'),
+          createColumnRef('user', 'email'),
+        ]),
+      });
+      if (plan.ast.kind === 'insert') {
+        expect(plan.ast.returning).toHaveLength(2);
+      }
+    });
   });
 
   describe('update', () => {
@@ -186,6 +207,28 @@ describe('mutation builder edge cases', () => {
       expect(plan.meta.annotations?.codecs).toBeDefined();
       expect(plan.meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
     });
+
+    it('chains returning multiple times', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .update(userTable, {
+          email: param('email'),
+        })
+        .where(userColumns.id.eq(param('userId')))
+        .returning(userColumns.id)
+        .returning(userColumns.email)
+        .build({ params: { email: 'test@example.com', userId: 1 } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'update',
+        returning: expect.arrayContaining([
+          createColumnRef('user', 'id'),
+          createColumnRef('user', 'email'),
+        ]),
+      });
+      if (plan.ast.kind === 'update') {
+        expect(plan.ast.returning).toHaveLength(2);
+      }
+    });
   });
 
   describe('delete', () => {
@@ -228,6 +271,26 @@ describe('mutation builder edge cases', () => {
           createColumnRef('user', 'email'),
         ]),
       });
+    });
+
+    it('chains returning multiple times for delete', () => {
+      const plan = sql<Contract, CodecTypes>({ context })
+        .delete(userTable)
+        .where(userColumns.id.eq(param('userId')))
+        .returning(userColumns.id)
+        .returning(userColumns.email)
+        .build({ params: { userId: 1 } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'delete',
+        returning: expect.arrayContaining([
+          createColumnRef('user', 'id'),
+          createColumnRef('user', 'email'),
+        ]),
+      });
+      if (plan.ast.kind === 'delete') {
+        expect(plan.ast.returning).toHaveLength(2);
+      }
     });
 
     it('includes paramCodecs in meta.annotations.codecs for DELETE where clause', () => {

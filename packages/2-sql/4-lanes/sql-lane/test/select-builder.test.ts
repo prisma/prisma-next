@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { createTableRef } from '@prisma-next/sql-relational-core/ast';
+import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import {
+  createBinaryExpr,
+  createColumnRef,
+  createTableRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -127,5 +132,21 @@ describe('select builder edge cases', () => {
         })
         .build(),
     ).not.toThrow('Missing column for alias');
+  });
+
+  it('builds query with column-to-column comparison in where', () => {
+    const plan = sql<Contract, CodecTypes>({ context })
+      .from(userTable)
+      .where(userColumns.id.eq(userColumns.createdAt))
+      .select({
+        id: userColumns.id,
+      })
+      .build();
+
+    const ast = plan.ast as SelectAst;
+    expect(ast.kind).toBe('select');
+    expect(ast.where).toEqual(
+      createBinaryExpr('eq', createColumnRef('user', 'id'), createColumnRef('user', 'createdAt')),
+    );
   });
 });

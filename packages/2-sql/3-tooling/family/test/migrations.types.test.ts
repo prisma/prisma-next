@@ -4,7 +4,6 @@ import {
   plannerFailure,
   plannerSuccess,
 } from '../src/core/migrations/plan-helpers';
-import { INIT_ADDITIVE_POLICY } from '../src/core/migrations/policies';
 import type {
   MigrationPlan,
   MigrationPlanOperation,
@@ -31,15 +30,16 @@ describe('createMigrationPlan', () => {
 
     const plan = createMigrationPlan<TestTargetDetails>({
       targetId: 'postgres',
-      policy: INIT_ADDITIVE_POLICY,
-      contract: { coreHash: 'core', profileHash: 'profile' },
+      origin: { coreHash: 'originCore', profileHash: 'originProfile' },
+      destination: { coreHash: 'core', profileHash: 'profile' },
       operations: sourceOperations as readonly MigrationPlanOperation<TestTargetDetails>[],
       meta: { marker: 'none' },
     });
 
     expect(plan).toMatchObject({
       targetId: 'postgres',
-      contract: { coreHash: 'core', profileHash: 'profile' },
+      origin: { coreHash: 'originCore', profileHash: 'originProfile' },
+      destination: { coreHash: 'core', profileHash: 'profile' },
       operations: [
         {
           id: 'operation.table.user',
@@ -57,14 +57,95 @@ describe('createMigrationPlan', () => {
     const firstOperation = plan.operations[0]!;
     expectTypeOf(firstOperation.target.details).toEqualTypeOf<TestTargetDetails | undefined>();
   });
+
+  it('freezes and clones target.details to prevent mutation', () => {
+    const mutableDetails = { schema: 'public', objectType: 'table' as const, name: 'user' };
+    const plan = createMigrationPlan({
+      targetId: 'postgres',
+      destination: { coreHash: 'abc' },
+      operations: [
+        {
+          id: 'op1',
+          label: 'Test',
+          operationClass: 'additive',
+          target: { id: 'postgres', details: mutableDetails },
+          precheck: [],
+          execute: [],
+          postcheck: [],
+        },
+      ],
+    });
+
+    // Mutate original
+    mutableDetails.schema = 'mutated';
+
+    // Assert plan's details unchanged
+    expect(plan.operations[0]!.target.details).toMatchObject({
+      schema: 'public',
+      objectType: 'table',
+      name: 'user',
+    });
+
+    // Assert frozen
+    expect(Object.isFrozen(plan.operations[0]!.target)).toBe(true);
+    expect(Object.isFrozen(plan.operations[0]!.target.details)).toBe(true);
+  });
+
+  it('preserves primitive details without cloning', () => {
+    const plan = createMigrationPlan({
+      targetId: 'postgres',
+      destination: { coreHash: 'abc' },
+      operations: [
+        {
+          id: 'op1',
+          label: 'Test',
+          operationClass: 'additive',
+          target: { id: 'postgres', details: 'primitive-string' as unknown as TestTargetDetails },
+          precheck: [],
+          execute: [],
+          postcheck: [],
+        },
+      ],
+    });
+
+    // Primitive should remain as-is (no cloning needed)
+    expect(plan.operations[0]!.target.details).toBe('primitive-string');
+    expect(Object.isFrozen(plan.operations[0]!.target)).toBe(true);
+  });
+
+  it('freezes and clones array details', () => {
+    const mutableArray = ['item1', 'item2'];
+    const plan = createMigrationPlan({
+      targetId: 'postgres',
+      destination: { coreHash: 'abc' },
+      operations: [
+        {
+          id: 'op1',
+          label: 'Test',
+          operationClass: 'additive',
+          target: { id: 'postgres', details: mutableArray as unknown as TestTargetDetails },
+          precheck: [],
+          execute: [],
+          postcheck: [],
+        },
+      ],
+    });
+
+    // Mutate original array
+    mutableArray.push('item3');
+
+    // Assert plan's array unchanged
+    expect(plan.operations[0]!.target.details).toEqual(['item1', 'item2']);
+    expect(Object.isFrozen(plan.operations[0]!.target)).toBe(true);
+    expect(Object.isFrozen(plan.operations[0]!.target.details)).toBe(true);
+  });
 });
 
 describe('planner helpers', () => {
   it('produce immutable envelopes that clone conflict metadata', () => {
     const plan: MigrationPlan<TestTargetDetails> = createMigrationPlan({
       targetId: 'postgres',
-      policy: INIT_ADDITIVE_POLICY,
-      contract: { coreHash: 'abc', profileHash: 'def' },
+      destination: { coreHash: 'abc', profileHash: 'def' },
       operations: [],
     });
     const success = plannerSuccess(plan);

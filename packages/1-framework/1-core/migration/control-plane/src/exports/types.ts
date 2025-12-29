@@ -13,6 +13,7 @@ export type {
   EmitContractResult,
   FamilyInstance,
   IntrospectSchemaResult,
+  OperationContext,
   SchemaIssue,
   SchemaVerificationNode,
   SignDatabaseResult,

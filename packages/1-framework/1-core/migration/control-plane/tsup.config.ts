@@ -8,6 +8,7 @@ export default defineConfig({
     'exports/types': 'src/exports/types.ts',
     'exports/emission': 'src/exports/emission.ts',
     'exports/schema-view': 'src/exports/schema-view.ts',
+    'exports/result': 'src/exports/result.ts',
   },
   outDir: 'dist',
   format: ['esm'],

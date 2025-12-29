@@ -1,7 +1,7 @@
 import { timeouts } from '@prisma-next/test-utils';
 import type { Client, Pool } from 'pg';
 import { newDb } from 'pg-mem';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createPostgresDriverFromOptions } from '../src/postgres-driver';
 
@@ -219,5 +219,47 @@ describe('@prisma-next/driver-postgres', () => {
 
     // Should get results even if cursor close had issues
     expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it('reuses already connected direct client without invoking connect', async () => {
+    const client = {
+      _connection: {},
+      _ending: false,
+      connect: vi.fn(async () => {
+        throw new Error('connect should not be called');
+      }),
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    } as unknown as Client;
+
+    const driver = createPostgresDriverFromOptions({
+      connect: { client },
+    });
+
+    await driver.query('select 1');
+
+    expect(client.connect).not.toHaveBeenCalled();
+    expect(client.query).toHaveBeenCalled();
+  });
+
+  it('calls client.end when closing direct client', async () => {
+    const mockClient = {
+      _connection: {},
+      _ending: false,
+      connect: vi.fn(async () => {}),
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {
+        mockClient._ending = true;
+      }),
+    };
+    const client = mockClient as unknown as Client;
+
+    const driver = createPostgresDriverFromOptions({
+      connect: { client },
+    });
+
+    await driver.close();
+
+    expect(mockClient.end).toHaveBeenCalled();
   });
 });

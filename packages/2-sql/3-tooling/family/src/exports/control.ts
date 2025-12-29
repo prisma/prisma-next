@@ -1,15 +1,18 @@
 import { SqlFamilyDescriptor } from '../core/descriptor';
 
-export type { SqlControlFamilyInstance } from '../core/instance';
+export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/instance';
 export {
   createMigrationPlan,
   plannerFailure,
   plannerSuccess,
+  runnerFailure,
+  runnerSuccess,
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 export type {
   CreateMigrationPlanOptions,
   MigrationOperationClass,
+  MigrationOperationPolicy,
   MigrationPlan,
   MigrationPlanContractInfo,
   MigrationPlanner,
@@ -17,7 +20,13 @@ export type {
   MigrationPlanOperation,
   MigrationPlanOperationStep,
   MigrationPlanOperationTarget,
-  MigrationPolicy,
+  MigrationRunner,
+  MigrationRunnerErrorCode,
+  MigrationRunnerExecuteCallbacks,
+  MigrationRunnerExecuteOptions,
+  MigrationRunnerFailure,
+  MigrationRunnerResult,
+  MigrationRunnerSuccessValue,
   PlannerConflict,
   PlannerConflictKind,
   PlannerConflictLocation,

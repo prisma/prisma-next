@@ -1,3 +1,5 @@
+import type { NotOk, Ok } from '@prisma-next/core-control-plane/result';
+import { notOk, ok } from '@prisma-next/core-control-plane/result';
 import type {
   AnyRecord,
   CreateMigrationPlanOptions,
@@ -5,7 +7,9 @@ import type {
   MigrationPlanOperation,
   MigrationPlanOperationStep,
   MigrationPlanOperationTarget,
-  MigrationPolicy,
+  MigrationRunnerErrorCode,
+  MigrationRunnerFailure,
+  MigrationRunnerSuccessValue,
   PlannerConflict,
   PlannerFailureResult,
   PlannerSuccessResult,
@@ -37,12 +41,28 @@ function freezeSteps(
   );
 }
 
+function freezeDetailsValue<T>(value: T): T {
+  // Primitives and null/undefined are already immutable, return as-is
+  if (value === null || value === undefined) {
+    return value;
+  }
+  if (typeof value !== 'object') {
+    return value;
+  }
+  // Arrays: shallow clone and freeze
+  if (Array.isArray(value)) {
+    return Object.freeze([...value]) as T;
+  }
+  // Objects: shallow clone and freeze (matching cloneRecord pattern)
+  return Object.freeze({ ...value }) as T;
+}
+
 function freezeTargetDetails<TTargetDetails>(
   target: MigrationPlanOperationTarget<TTargetDetails>,
 ): MigrationPlanOperationTarget<TTargetDetails> {
   return Object.freeze({
     id: target.id,
-    ...(target.details ? { details: target.details } : {}),
+    ...(target.details !== undefined ? { details: freezeDetailsValue(target.details) } : {}),
   });
 }
 
@@ -71,19 +91,15 @@ function freezeOperations<TTargetDetails>(
   return Object.freeze(operations.map((operation) => freezeOperation(operation)));
 }
 
-function normalizePolicy(policy: MigrationPolicy): MigrationPolicy {
-  return Object.freeze({
-    allowedOperationClasses: Object.freeze([...policy.allowedOperationClasses]),
-  });
-}
-
 export function createMigrationPlan<TTargetDetails = Record<string, never>>(
   options: CreateMigrationPlanOptions<TTargetDetails>,
 ): MigrationPlan<TTargetDetails> {
   return Object.freeze({
     targetId: options.targetId,
-    policy: normalizePolicy(options.policy),
-    contract: Object.freeze({ ...options.contract }),
+    ...(options.origin !== undefined
+      ? { origin: options.origin ? Object.freeze({ ...options.origin }) : null }
+      : {}),
+    destination: Object.freeze({ ...options.destination }),
     operations: freezeOperations(options.operations),
     ...(options.meta ? { meta: cloneRecord(options.meta) } : {}),
   });
@@ -113,4 +129,36 @@ export function plannerFailure(conflicts: readonly PlannerConflict[]): PlannerFa
       ),
     ),
   });
+}
+
+/**
+ * Creates a successful migration runner result.
+ */
+export function runnerSuccess(value: {
+  operationsPlanned: number;
+  operationsExecuted: number;
+}): Ok<MigrationRunnerSuccessValue> {
+  return ok(
+    Object.freeze({
+      operationsPlanned: value.operationsPlanned,
+      operationsExecuted: value.operationsExecuted,
+    }),
+  );
+}
+
+/**
+ * Creates a failed migration runner result.
+ */
+export function runnerFailure(
+  code: MigrationRunnerErrorCode,
+  summary: string,
+  options?: { why?: string; meta?: AnyRecord },
+): NotOk<MigrationRunnerFailure> {
+  const failure: MigrationRunnerFailure = Object.freeze({
+    code,
+    summary,
+    ...(options?.why ? { why: options.why } : {}),
+    ...(options?.meta ? { meta: cloneRecord(options.meta) } : {}),
+  });
+  return notOk(failure);
 }

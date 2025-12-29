@@ -1,4 +1,9 @@
-import type { ControlTargetDescriptor } from '@prisma-next/core-control-plane/types';
+import type { Result } from '@prisma-next/core-control-plane/result';
+import type {
+  ControlDriverInstance,
+  ControlTargetDescriptor,
+  OperationContext,
+} from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { SqlControlFamilyInstance } from '../instance';
@@ -7,7 +12,7 @@ export type AnyRecord = Readonly<Record<string, unknown>>;
 
 export type MigrationOperationClass = 'additive' | 'widening' | 'destructive';
 
-export interface MigrationPolicy {
+export interface MigrationOperationPolicy {
   readonly allowedOperationClasses: readonly MigrationOperationClass[];
 }
 
@@ -23,8 +28,11 @@ export interface MigrationPlanOperationTarget<TTargetDetails> {
 }
 
 export interface MigrationPlanOperation<TTargetDetails = Record<string, never>> {
+  /** Unique identifier for this operation (e.g., "table.users.create"). */
   readonly id: string;
+  /** Human-readable label for display in UI/CLI (e.g., "Create table users"). */
   readonly label: string;
+  /** Optional detailed explanation of what this operation does and why. */
   readonly summary?: string;
   readonly operationClass: MigrationOperationClass;
   readonly target: MigrationPlanOperationTarget<TTargetDetails>;
@@ -41,8 +49,16 @@ export interface MigrationPlanContractInfo {
 
 export interface MigrationPlan<TTargetDetails = Record<string, never>> {
   readonly targetId: string;
-  readonly policy: MigrationPolicy;
-  readonly contract: MigrationPlanContractInfo;
+  /**
+   * Origin contract identity that the plan expects the database to currently be at.
+   * If omitted, the runner treats the origin as "no marker present" (empty database),
+   * and will only proceed if no marker exists (or if the marker already matches destination).
+   */
+  readonly origin?: MigrationPlanContractInfo | null;
+  /**
+   * Destination contract identity that the plan intends to reach.
+   */
+  readonly destination: MigrationPlanContractInfo;
   readonly operations: readonly MigrationPlanOperation<TTargetDetails>[];
   readonly meta?: AnyRecord;
 }
@@ -53,6 +69,7 @@ export type PlannerConflictKind =
   | 'indexIncompatible'
   | 'foreignKeyConflict'
   | 'missingButNonAdditive'
+  | 'unsupportedExtension'
   | 'extensionMissing'
   | 'unsupportedOperation';
 
@@ -89,7 +106,7 @@ export type PlannerResult<TTargetDetails = Record<string, never>> =
 export interface MigrationPlannerPlanOptions {
   readonly contract: SqlContract<SqlStorage>;
   readonly schema: SqlSchemaIR;
-  readonly policy: MigrationPolicy;
+  readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
 }
 
@@ -97,17 +114,83 @@ export interface MigrationPlanner<TTargetDetails = Record<string, never>> {
   plan(options: MigrationPlannerPlanOptions): PlannerResult<TTargetDetails>;
 }
 
+export interface MigrationRunnerExecuteCallbacks<TTargetDetails = Record<string, never>> {
+  onOperationStart?(operation: MigrationPlanOperation<TTargetDetails>): void;
+  onOperationComplete?(operation: MigrationPlanOperation<TTargetDetails>): void;
+}
+
+export interface MigrationRunnerExecuteOptions<TTargetDetails = Record<string, never>> {
+  readonly plan: MigrationPlan<TTargetDetails>;
+  readonly driver: ControlDriverInstance;
+  /**
+   * Destination contract IR.
+   * Must correspond to `plan.destination` and is used for schema verification and marker/ledger writes.
+   */
+  readonly destinationContract: SqlContract<SqlStorage>;
+  /**
+   * Execution-time policy that defines which operation classes are allowed.
+   * The runner validates each operation against this policy before execution.
+   */
+  readonly policy: MigrationOperationPolicy;
+  readonly schemaName?: string;
+  readonly strictVerification?: boolean;
+  readonly callbacks?: MigrationRunnerExecuteCallbacks<TTargetDetails>;
+  readonly context?: OperationContext;
+}
+
+/**
+ * Error codes for migration runner failures.
+ */
+export type MigrationRunnerErrorCode =
+  | 'DESTINATION_CONTRACT_MISMATCH'
+  | 'MARKER_ORIGIN_MISMATCH'
+  | 'POLICY_VIOLATION'
+  | 'PRECHECK_FAILED'
+  | 'POSTCHECK_FAILED'
+  | 'SCHEMA_VERIFY_FAILED'
+  | 'EXECUTION_FAILED';
+
+/**
+ * Detailed information about a migration runner failure.
+ * This is the failure payload type for `NotOk<MigrationRunnerFailure>`.
+ */
+export interface MigrationRunnerFailure {
+  readonly code: MigrationRunnerErrorCode;
+  readonly summary: string;
+  readonly why?: string;
+  readonly meta?: AnyRecord;
+}
+
+/**
+ * Success value for migration runner execution.
+ */
+export interface MigrationRunnerSuccessValue {
+  readonly operationsPlanned: number;
+  readonly operationsExecuted: number;
+}
+
+/**
+ * Result union for migration runner execution.
+ * Either success with operation counts, or failure with error details.
+ */
+export type MigrationRunnerResult = Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>;
+
+export interface MigrationRunner<TTargetDetails = Record<string, never>> {
+  execute(options: MigrationRunnerExecuteOptions<TTargetDetails>): Promise<MigrationRunnerResult>;
+}
+
 export interface SqlControlTargetDescriptor<
   TTargetId extends string,
   TTargetDetails = Record<string, never>,
 > extends ControlTargetDescriptor<'sql', TTargetId> {
   createPlanner(family: SqlControlFamilyInstance): MigrationPlanner<TTargetDetails>;
+  createRunner(family: SqlControlFamilyInstance): MigrationRunner<TTargetDetails>;
 }
 
 export interface CreateMigrationPlanOptions<TTargetDetails> {
   readonly targetId: string;
-  readonly policy: MigrationPolicy;
-  readonly contract: MigrationPlanContractInfo;
+  readonly origin?: MigrationPlanContractInfo | null;
+  readonly destination: MigrationPlanContractInfo;
   readonly operations: readonly MigrationPlanOperation<TTargetDetails>[];
   readonly meta?: AnyRecord;
 }

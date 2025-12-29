@@ -13,8 +13,6 @@ import type {
   RawTemplateOptions,
 } from '@prisma-next/sql-relational-core/types';
 
-const POSTGRES_TARGET = 'postgres';
-
 const RAW_OPTIONS_SENTINEL = Symbol('rawOptions');
 
 type TemplateInvocation = {
@@ -32,13 +30,6 @@ interface RawPlanBuildArgs {
 }
 
 export function createRawFactory(contract: SqlContract<SqlStorage>): RawFactory {
-  if (contract.target !== POSTGRES_TARGET) {
-    throw planInvalid('Raw lane currently supports only postgres target', {
-      expectedTarget: POSTGRES_TARGET,
-      actualTarget: contract.target,
-    });
-  }
-
   const factory = ((first: TemplateStringsArray | string, ...rest: unknown[]) => {
     if (isTemplateInvocation(first)) {
       const { values, options } = splitTemplateValues(rest);
@@ -149,8 +140,8 @@ function buildRawMeta(args: RawMetaBuildArgs): PlanMeta {
   const { contract, paramDescriptors, options } = args;
 
   const meta: PlanMeta = {
-    target: POSTGRES_TARGET,
-    ...(contract.targetFamily ? { targetFamily: contract.targetFamily } : {}),
+    target: contract.target,
+    targetFamily: contract.targetFamily,
     coreHash: contract.coreHash,
     ...(contract.profileHash !== undefined ? { profileHash: contract.profileHash } : {}),
     lane: 'raw',

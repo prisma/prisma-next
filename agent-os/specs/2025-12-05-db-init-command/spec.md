@@ -10,7 +10,7 @@
 - Verifies that the resulting schema satisfies the contract.
 - Writes or updates the **contract marker** and appends a **migration ledger entry** describing the transition.
 
-The command is designed to be **failure-tolerant but non-destructive**: it should succeed on empty or partially‑provisioned databases, refuse to perform destructive changes, and clearly report all conflicts when the current schema cannot be reconciled with the contract under an additive‑only policy.
+The command is designed to be **failure-tolerant but non-destructive**. In the current implementation it succeeds on empty databases, refuses to operate on non-empty schemas, and clearly reports unsupported states. Subset/superset planning is a fast-follow enhancement.
 
 ## Problem Statement
 
@@ -45,6 +45,7 @@ We need a first-class, documented command that:
 - Supporting **non-Postgres targets** in v1. The design should remain extensible, but the initial implementation will only use the Postgres adapter and driver.
 - Automatically emitting or regenerating `contract.json`/`contract.d.ts`. v1 assumes the contract artifacts already exist on disk and are valid.
 - Implementing **extension-specific** bootstrap logic (e.g. installing pgvector, creating vector indexes). Extension-aware initialization is a fast-follow on top of this general mechanism.
+- Implementing subset/superset schema diffing and partial provisioning support in v1. The current Postgres planner is “empty-db only”; additive subset/superset planning is a fast-follow enhancement.
 
 ## User Stories
 
@@ -103,21 +104,15 @@ All behavior below assumes a PostgreSQL target and a valid contract.
    - A “subset” database is one where:
      - All existing relevant structures are compatible with the contract (types, nullability, keys, indexes).
      - Some required structures are missing (e.g., missing columns or tables).
-   - Behavior:
-     - Planner returns a plan containing only additive operations to create the missing structures.
-     - Runner executes the plan, verifies the final schema, ensures/updates the marker, and appends a ledger entry from the origin contract (marker’s contract or empty contract) to the destination contract.
+  - **Status**:
+    - Fast-follow enhancement (planner currently supports empty databases only).
 
 3. **Superset database, with or without marker**
    - A “superset” database is one where:
      - All required structures are present and compatible with the contract.
      - Extra tables/columns/indexes may exist beyond what the contract describes.
-   - Behavior:
-     - Planner returns an **empty plan** (no changes required).
-     - Runner:
-       - Executes no DDL.
-       - Ensures the marker table exists and upserts the marker row to match the contract.
-       - Appends a ledger entry capturing an identity or no-op transition from the origin contract to the same destination contract.
-     - Command exits successfully (idempotent verification/registration).
+  - **Status**:
+    - Fast-follow enhancement (planner currently supports empty databases only).
 
 4. **Conflicting database (requires non-allowed operations)**
    - A “conflicting” database is one where at least one required contract element cannot be satisfied under the current policy without a disallowed operation, e.g.:
@@ -125,16 +120,8 @@ All behavior below assumes a PostgreSQL target and a valid contract.
      - Nullability mismatch that would require tightening (e.g. `NULL` → `NOT NULL`).
      - Incompatible primary/foreign key definitions.
      - Index shape or uniqueness constraints that cannot be made compliant additively.
-   - Behavior:
-     - Planner:
-       - Analyzes the schema vs. contract under the additive policy.
-       - Returns a **failure result** that:
-         - Contains a **complete list of conflicts**, not just the first violation.
-         - Classifies each conflict (e.g., `typeMismatch`, `nullabilityConflict`, `missingButNonAdditive`, etc.).
-     - Runner is **not** invoked.
-     - CLI:
-       - Converts the planner’s failure result into a **structured CLI error** (code, summary, why, fix, details).
-       - Leaves the schema and marker unchanged.
+  - **Status**:
+    - Partial in v1. The current Postgres planner reports “non-empty schema” as an unsupported state rather than performing schema-vs-contract conflict analysis.
 
 5. **Existing marker with matching contract**
    - If a contract marker already exists and its contract hash matches the contract being used:

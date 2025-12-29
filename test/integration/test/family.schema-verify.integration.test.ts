@@ -88,7 +88,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(true);
@@ -155,7 +155,7 @@ describe('family instance schemaVerify', () => {
             driver,
             contractIR: validatedContract,
             strict: false,
-            contractPath: './contract.json',
+            context: { contractPath: './contract.json' },
           });
 
           expect(result.ok).toBe(false);
@@ -216,7 +216,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
@@ -277,7 +277,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         // Type mismatch may or may not be detected depending on adapter introspection
@@ -337,7 +337,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
@@ -399,7 +399,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
@@ -476,7 +476,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
@@ -545,7 +545,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
@@ -603,7 +603,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: true,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
@@ -647,7 +647,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         // In permissive mode, extra columns don't cause failures
@@ -748,7 +748,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         // Should fail due to type mismatch (integer vs bigint)
@@ -827,7 +827,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         // Should have warnings for missing metadata, but not fail

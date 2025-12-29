@@ -75,6 +75,44 @@ export interface ControlExtensionInstance<
   readonly targetId: TTargetId;
 }
 
+/**
+ * Operation context for propagating metadata through control-plane operation call chains.
+ * Inspired by OpenTelemetry's Context and Sentry's Scope patterns.
+ *
+ * This context carries informational metadata (like file paths) that can be used for
+ * error reporting, logging, and debugging, but is not required for structural correctness.
+ * It allows subsystems to propagate context without coupling to file I/O concerns.
+ *
+ * @example
+ * ```typescript
+ * const context: OperationContext = {
+ *   contractPath: './contract.json',
+ *   configPath: './prisma-next.config.ts',
+ * };
+ *
+ * await runner.execute({ plan, driver, destinationContract: contract, context });
+ * ```
+ */
+export interface OperationContext {
+  /**
+   * Path to the contract file (if applicable).
+   * Used for error reporting and metadata, not for file I/O.
+   */
+  readonly contractPath?: string;
+
+  /**
+   * Path to the configuration file (if applicable).
+   * Used for error reporting and metadata, not for file I/O.
+   */
+  readonly configPath?: string;
+
+  /**
+   * Additional metadata that can be propagated through the call chain.
+   * Extensible for future needs without breaking changes.
+   */
+  readonly meta?: Readonly<Record<string, unknown>>;
+}
+
 // ============================================================================
 // Control*Descriptor Interfaces (ADR 151)
 // ============================================================================
@@ -378,7 +416,7 @@ export interface VerifyDatabaseSchemaResult {
   };
   readonly meta?: {
     readonly configPath?: string;
-    readonly contractPath: string;
+    readonly contractPath?: string;
     readonly strict: boolean;
   };
   readonly timings: {

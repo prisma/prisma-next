@@ -185,18 +185,6 @@ describe('raw lane', () => {
     expect(plan.meta.annotations).toEqual({ limit: 10 });
   });
 
-  it('throws error when target is not postgres', () => {
-    const invalidContract = {
-      ...contract,
-      target: 'mysql' as 'postgres',
-    };
-    const invalidContext = createTestContext(invalidContract, adapter);
-
-    expect(() => {
-      sql({ context: invalidContext });
-    }).toThrow('Raw lane currently supports only postgres target');
-  });
-
   it('throws error when function form is called without params option', () => {
     expect(() => {
       (root.raw as unknown as (first: string, ...rest: unknown[]) => unknown)(

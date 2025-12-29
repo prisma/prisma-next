@@ -10,6 +10,7 @@ import type {
   ControlFamilyInstance,
   ControlTargetDescriptor,
   EmitContractResult,
+  OperationContext,
   SchemaIssue,
   SchemaVerificationNode,
   SignDatabaseResult,
@@ -772,6 +773,16 @@ interface SqlFamilyInstanceState {
 }
 
 /**
+ * Options for schema verification.
+ */
+export interface SchemaVerifyOptions {
+  readonly driver: ControlDriverInstance;
+  readonly contractIR: unknown;
+  readonly strict: boolean;
+  readonly context?: OperationContext;
+}
+
+/**
  * SQL control family instance interface.
  * Extends ControlFamilyInstance with SQL-specific domain actions.
  */
@@ -800,13 +811,7 @@ export interface SqlControlFamilyInstance
    * Verifies the database schema against the contract.
    * Compares contract requirements against live database schema.
    */
-  schemaVerify(options: {
-    readonly driver: ControlDriverInstance;
-    readonly contractIR: unknown;
-    readonly strict: boolean;
-    readonly contractPath: string;
-    readonly configPath?: string;
-  }): Promise<VerifyDatabaseSchemaResult>;
+  schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult>;
 
   /**
    * Signs the database with the contract marker.
@@ -1118,14 +1123,8 @@ export function createSqlFamilyInstance<
       });
     },
 
-    async schemaVerify(options: {
-      readonly driver: ControlDriverInstance;
-      readonly contractIR: unknown;
-      readonly strict: boolean;
-      readonly contractPath: string;
-      readonly configPath?: string;
-    }): Promise<VerifyDatabaseSchemaResult> {
-      const { driver, contractIR, strict, contractPath, configPath } = options;
+    async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
+      const { driver, contractIR, strict, context } = options;
       const startTime = Date.now();
 
       // Validate contractIR as SqlContract<SqlStorage>
@@ -1636,9 +1635,9 @@ export function createSqlFamilyInstance<
           counts,
         },
         meta: {
-          contractPath,
           strict,
-          ...(configPath ? { configPath } : {}),
+          ...(context?.contractPath ? { contractPath: context.contractPath } : {}),
+          ...(context?.configPath ? { configPath: context.configPath } : {}),
         },
         timings: {
           total: totalTime,

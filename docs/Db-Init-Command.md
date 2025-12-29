@@ -62,7 +62,7 @@ This doc defines the `db init` command behavior, the TS primitives it composes, 
 - **Planner behavior**
   - Implement a **family-owned** planner entrypoint (SQL family) that:
     - Diffs a **from-contract** and **to-contract**.
-    - Respects a `MigrationPolicy` governing allowed operation classes.
+    - Respects a `MigrationOperationPolicy` governing allowed operation classes.
     - Produces a **pure in-memory MigrationPlan IR** (no file I/O).
   - Use the **same operation vocabulary** as the SQL migration system, restricted to:
     - Additive and widening operations.
@@ -330,7 +330,7 @@ This is consistent with:
 
 ### Migration Policy
 
-`planMigration` takes a `MigrationPolicy` to govern what kinds of operations may be emitted. For v1:
+`planMigration` takes a `MigrationOperationPolicy` to govern what kinds of operations may be emitted. For v1:
 
 - **Operation classes**
   - Represented as a list of allowed operation classes:
@@ -401,6 +401,13 @@ The runner primitive:
     - **Update the marker row** via the shared marker helper:
       - Upsert `{ core_hash = toCoreHash, profile_hash = toProfileHash, contract_json = desiredContractJson, ... }`.
     - Append a ledger entry equivalent to a normal on-disk migration edge apply.
+
+- **Result type and error handling:**
+  - `executeMigration` returns a `Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>` (not throwing).
+  - SQL execution errors are caught and returned as failures with code `EXECUTION_FAILED`.
+  - Marker validation failures return structured `MigrationRunnerFailure` with appropriate error codes (e.g., `MARKER_ORIGIN_MISMATCH`).
+  - Pre/post check failures return failures with codes `PRECHECK_FAILED` or `POSTCHECK_FAILED`.
+  - On success, the returned result contains `MigrationRunnerSuccessValue` with `operationsPlanned` and `operationsExecuted` counts. The marker state is updated atomically with the schema changes (written to the database, not returned in the result).
 
 This keeps the existing **atomicity** guarantee:
 
