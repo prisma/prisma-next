@@ -40,6 +40,29 @@ const DEFAULT_CONFIG: RunnerConfig = {
 
 const LOCK_DOMAIN = 'prisma_next.contract.marker';
 
+/**
+ * Deep clones and freezes a record object to prevent mutation.
+ * Recursively clones nested objects and arrays to ensure complete isolation.
+ */
+function cloneAndFreezeRecord<T extends Record<string, unknown>>(value: T): T {
+  const cloned: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(value)) {
+    if (val === null || val === undefined) {
+      cloned[key] = val;
+    } else if (Array.isArray(val)) {
+      // Clone array (shallow clone of array elements)
+      cloned[key] = Object.freeze([...val]);
+    } else if (typeof val === 'object') {
+      // Recursively clone nested objects
+      cloned[key] = cloneAndFreezeRecord(val as Record<string, unknown>);
+    } else {
+      // Primitives are copied as-is
+      cloned[key] = val;
+    }
+  }
+  return Object.freeze(cloned) as T;
+}
+
 export function createPostgresMigrationRunner(
   family: SqlControlFamilyInstance,
   config: Partial<RunnerConfig> = {},
@@ -294,19 +317,35 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   private createPostcheckPreSatisfiedSkipRecord(
     operation: MigrationPlanOperation<PostgresPlanTargetDetails>,
   ): MigrationPlanOperation<PostgresPlanTargetDetails> {
-    return {
-      ...operation,
-      precheck: [],
-      execute: [],
-      postcheck: operation.postcheck,
-      meta: {
-        ...(operation.meta ?? {}),
-        runner: {
-          skipped: true,
-          reason: 'postcheck_pre_satisfied',
-        },
-      },
-    };
+    // Clone and freeze existing meta if present
+    const clonedMeta = operation.meta ? cloneAndFreezeRecord(operation.meta) : undefined;
+
+    // Create frozen runner metadata
+    const runnerMeta = Object.freeze({
+      skipped: true,
+      reason: 'postcheck_pre_satisfied',
+    });
+
+    // Merge and freeze the combined meta
+    const mergedMeta = Object.freeze({
+      ...(clonedMeta ?? {}),
+      runner: runnerMeta,
+    });
+
+    // Clone and freeze arrays to prevent mutation
+    const frozenPostcheck = Object.freeze([...operation.postcheck]);
+
+    return Object.freeze({
+      id: operation.id,
+      label: operation.label,
+      ...(operation.summary ? { summary: operation.summary } : {}),
+      operationClass: operation.operationClass,
+      target: operation.target, // Already frozen from plan creation
+      precheck: Object.freeze([]),
+      execute: Object.freeze([]),
+      postcheck: frozenPostcheck,
+      ...(operation.meta || mergedMeta ? { meta: mergedMeta } : {}),
+    });
   }
 
   private markerMatchesDestination(

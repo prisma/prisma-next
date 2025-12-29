@@ -203,5 +203,113 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         expect(ledgerRow.rows[0]?.operations).toMatchObject([{ id: 'table.user', execute: [] }]);
       },
     );
+
+    it(
+      'isolates skip record from mutable operation references',
+      { timeout: testTimeout },
+      async () => {
+        await driver!.query(
+          'create table "user" (id uuid primary key, email text not null, constraint "user_email_unique" unique (email))',
+        );
+        await driver!.query('create index "user_email_idx" on "user"(email)');
+
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+        // Create mutable meta object with nested structure
+        const mutableMeta = {
+          customField: 'original-value',
+          nested: {
+            data: 'nested-data',
+          },
+        };
+
+        const mutableOperation = {
+          id: 'table.user',
+          label: 'Create user table',
+          summary: 'Skipped because postcheck is already satisfied',
+          operationClass: 'additive' as const,
+          target: {
+            id: 'postgres',
+            details: {
+              schema: 'public',
+              objectType: 'table' as const,
+              name: 'user',
+            },
+          },
+          precheck: [
+            {
+              description: 'would fail if evaluated',
+              sql: 'select false',
+            },
+          ],
+          execute: [
+            {
+              description: 'would fail if executed',
+              sql: 'select 1/0',
+            },
+          ],
+          postcheck: [
+            {
+              description: 'user table exists',
+              sql: `select to_regclass('public."user"') is not null`,
+            },
+          ],
+          meta: mutableMeta,
+        };
+
+        const planWithPreSatisfiedPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [mutableOperation],
+        });
+
+        const postcheckPreSatisfiedResult = await runner.execute({
+          plan: planWithPreSatisfiedPostcheck,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+        });
+        expect(postcheckPreSatisfiedResult.ok).toBe(true);
+
+        // Mutate the original operation and meta after execution
+        mutableMeta.customField = 'mutated-value';
+        mutableMeta.nested.data = 'mutated-nested-data';
+        mutableOperation.id = 'mutated-id';
+        mutableOperation.label = 'mutated-label';
+
+        // Query ledger and verify stored operations JSON did not change
+        const ledgerRow = await driver!.query<{ operations: unknown }>(
+          'select operations from prisma_contract.ledger order by id desc limit 1',
+        );
+        const storedOperations = ledgerRow.rows[0]?.operations as Array<{
+          id: string;
+          label: string;
+          meta?: {
+            customField?: string;
+            nested?: { data?: string };
+            runner?: { skipped?: boolean; reason?: string };
+          };
+          execute: unknown[];
+        }>;
+
+        expect(storedOperations).toHaveLength(1);
+        expect(storedOperations[0]).toMatchObject({
+          id: 'table.user',
+          label: 'Create user table',
+          execute: [],
+          meta: {
+            customField: 'original-value',
+            nested: {
+              data: 'nested-data',
+            },
+            runner: {
+              skipped: true,
+              reason: 'postcheck_pre_satisfied',
+            },
+          },
+        });
+      },
+    );
   });
 });
