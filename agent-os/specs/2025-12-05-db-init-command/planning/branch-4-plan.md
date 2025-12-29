@@ -36,6 +36,31 @@ Planner already has `(contract, schemaIR)` in `MigrationPlannerPlanOptions`, but
 - **TDD + small commits**: each logical change is preceded by failing tests and followed by a git commit.
 - End state includes **real DB integration tests** using `createDevDatabase()` (some exist already for runner; Branch 4 adds/extends coverage for the new primitive).
 
+## Schema IR realism check (avoid backfiring)
+
+This branch assumes `SqlSchemaIR` can remain target-agnostic *and* useful. That is realistic if we treat it as **contract-addressable schema**, not a lossless representation of every dialect’s DDL/catalog.
+
+### Non-goal: lossless, universal DDL model
+
+`SqlSchemaIR` should not attempt to model every possible target feature (partial/functional indexes, computed columns, collations/charsets, engine specifics, etc.). If we try, the IR will bloat and still be incomplete.
+
+### Goal: faithfully represent the contract-expressed subset
+
+The IR must be able to represent the subset of schema facts the contract can express today (tables, columns, native types, nullability, PK/UK/FK, basic indexes, extensions), plus a structured escape hatch for target-specific fidelity via `annotations`.
+
+### Invariant: canonicalization happens at the target boundary
+
+The family-level verifier can be generic only if each target introspector **normalizes** the schema it reads into canonical forms for that target (especially `nativeType` and index/constraint shapes).
+
+If introspection emits raw catalog strings (or inconsistent aliases), verification will devolve into brittle string comparisons and we’ll be forced into target-specific verification.
+
+### Escape hatch: target-specific annotations
+
+When a target needs to capture additional details beyond the contract-expressed subset, it should attach them under namespaced `annotations` (e.g. `annotations.pg.*`, `annotations.mysql.*`) so:
+
+- the generic verifier can ignore them by default
+- future contract features or target-specific verification extensions can read them intentionally
+
 ## Proposed Implementation
 
 ### 4.1 Extract pure verification primitive
