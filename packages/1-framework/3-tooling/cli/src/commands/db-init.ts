@@ -42,12 +42,76 @@ interface DbInitOptions {
   readonly 'no-color'?: boolean;
 }
 
-/**
- * Duck-type check for SqlControlTargetDescriptor with migration support.
- */
+// ---------------------------------------------------------------------------
+// Local migration types (duck-typed)
+//
+// These types capture the structural contracts for migration planner/runner
+// without adding them to the core SPI. This is a partial migration that will
+// be completed in task 7.2 (see agent-os/specs/2025-12-05-db-init-command/tasks.md)
+// which will move these types to @prisma-next/core-control-plane and make
+// migration support an explicit optional target capability.
+// ---------------------------------------------------------------------------
+
+interface MigrationPlanOperation {
+  readonly id: string;
+  readonly label: string;
+  readonly operationClass: string;
+}
+
+interface MigrationPlan {
+  readonly targetId: string;
+  readonly destination: {
+    readonly coreHash: string;
+    readonly profileHash?: string;
+  };
+  readonly operations: readonly MigrationPlanOperation[];
+}
+
+interface PlannerConflict {
+  readonly kind: string;
+  readonly summary: string;
+}
+
+type PlannerResult =
+  | { readonly kind: 'success'; readonly plan: MigrationPlan }
+  | { readonly kind: 'failure'; readonly conflicts: readonly PlannerConflict[] };
+
+interface RunnerSuccess {
+  readonly ok: true;
+  readonly value: { readonly operationsPlanned: number; readonly operationsExecuted: number };
+}
+
+interface RunnerFailure {
+  readonly ok: false;
+  readonly failure: { readonly code: string; readonly summary: string; readonly why?: string };
+}
+
+type RunnerResult = RunnerSuccess | RunnerFailure;
+
+interface MigrationPlanner {
+  plan(options: {
+    readonly contract: unknown;
+    readonly schema: unknown;
+    readonly policy: { readonly allowedOperationClasses: readonly string[] };
+  }): PlannerResult;
+}
+
+interface MigrationRunner {
+  execute(options: {
+    readonly plan: MigrationPlan;
+    readonly driver: ControlDriverInstance;
+    readonly destinationContract: unknown;
+    readonly policy: { readonly allowedOperationClasses: readonly string[] };
+    readonly callbacks?: {
+      onOperationStart?(op: MigrationPlanOperation): void;
+      onOperationComplete?(op: MigrationPlanOperation): void;
+    };
+  }): Promise<RunnerResult>;
+}
+
 interface MigrationSupportTarget {
-  createPlanner: (family: unknown) => unknown;
-  createRunner: (family: unknown) => unknown;
+  createPlanner: (family: unknown) => MigrationPlanner;
+  createRunner: (family: unknown) => MigrationRunner;
 }
 
 function hasMigrationSupport(target: unknown): target is MigrationSupportTarget {
@@ -217,7 +281,7 @@ export function createDbInitCommand(): Command {
           // Validate contract
           const contractIR = typedFamilyInstance.validateContractIR(contractJson) as ContractIR;
 
-          // Create planner and runner from target
+          // Create planner and runner from target (typed via local interfaces)
           const planner = config.target.createPlanner(familyInstance);
           const runner = config.target.createRunner(familyInstance);
 
@@ -227,34 +291,21 @@ export function createDbInitCommand(): Command {
             flags,
           });
 
-          // Import policy from family-sql (duck-typed, family-agnostic)
+          // Policy for init mode (additive only)
           const policy = { allowedOperationClasses: ['additive'] as const };
 
           // Plan migration
-          const plannerResult = (planner as { plan: (opts: unknown) => unknown }).plan({
+          const plannerResult = planner.plan({
             contract: contractIR,
             schema: schemaIR,
             policy,
-          }) as { kind: 'success' | 'failure'; plan?: unknown; conflicts?: unknown[] };
+          });
 
           if (plannerResult.kind === 'failure') {
-            const conflicts = (plannerResult.conflicts ?? []) as Array<{
-              kind: string;
-              summary: string;
-            }>;
-            throw errorMigrationPlanningFailed({ conflicts });
+            throw errorMigrationPlanningFailed({ conflicts: plannerResult.conflicts });
           }
 
-          // TODO: this is an indication that the migration CLI commands are SQL specific. Their types are leaking into the CLI. Will be addressed in 7.3 in agent-os/specs/2025-12-05-db-init-command/tasks.md
-          const migrationPlan = plannerResult.plan as {
-            targetId: string;
-            destination: { coreHash: string; profileHash?: string };
-            operations: readonly {
-              id: string;
-              label: string;
-              operationClass: string;
-            }[];
-          };
+          const migrationPlan = plannerResult.plan;
 
           // Add blank line after spinners
           if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
@@ -283,34 +334,25 @@ export function createDbInitCommand(): Command {
 
           // Apply mode - execute runner
           const callbacks = {
-            onOperationStart: (op: { label: string }) => {
+            onOperationStart: (op: MigrationPlanOperation) => {
               if (!flags.quiet && flags.json !== 'object') {
                 console.log(`  → ${op.label}...`);
               }
             },
-            onOperationComplete: (_op: { label: string }) => {
+            onOperationComplete: (_op: MigrationPlanOperation) => {
               // Could log completion if needed
             },
           };
 
           const runnerResult = await withSpinner(
-            async () => {
-              return (
-                runner as {
-                  execute: (opts: unknown) => Promise<{
-                    ok: boolean;
-                    value?: { operationsPlanned: number; operationsExecuted: number };
-                    failure?: { code: string; summary: string };
-                  }>;
-                }
-              ).execute({
+            () =>
+              runner.execute({
                 plan: migrationPlan,
-                driver: driver as ControlDriverInstance,
+                driver,
                 destinationContract: contractIR,
                 policy,
                 callbacks,
-              });
-            },
+              }),
             {
               message: 'Applying migration plan...',
               flags,
@@ -318,14 +360,14 @@ export function createDbInitCommand(): Command {
           );
 
           if (!runnerResult.ok) {
-            const failure = runnerResult.failure as { code: string; summary: string; why?: string };
-            throw errorRuntime(failure.summary, {
-              why: failure.why ?? `Migration runner failed: ${failure.code}`,
-              meta: { code: failure.code },
+            throw errorRuntime(runnerResult.failure.summary, {
+              why:
+                runnerResult.failure.why ?? 'Migration runner failed: ' + runnerResult.failure.code,
+              meta: { code: runnerResult.failure.code },
             });
           }
 
-          const execution = runnerResult.value!;
+          const execution = runnerResult.value;
 
           const dbInitResult: DbInitResult = {
             ok: true,
