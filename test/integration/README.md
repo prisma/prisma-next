@@ -15,11 +15,21 @@ This package contains integration tests that verify the complete flow from contr
 
 ## Structure
 
-- `test/*.integration.test.ts` - Integration test files
+- `test/*.test.ts` - Integration test files
+- `test/*.e2e.test.ts` - CLI integration tests (run commands in-process, not subprocess)
 - `test/*.test-d.ts` - Type-only test files (for testing TypeScript types)
-- `test/fixtures/` - Test fixtures (contract JSON, type definitions)
+- `test/fixtures/` - Test fixtures (contract JSON, type definitions, CLI fixture apps)
 
-**Note**: Integration tests that depend on multiple packages (e.g., both `sql-contract-ts` and `sql-query`) are placed here to avoid cyclic dependencies. For example, `contract-builder.integration.test.ts` tests the integration between contract authoring and query building.
+**Note**: Integration tests that depend on multiple packages (e.g., both `sql-contract-ts` and `sql-query`) are placed here to avoid cyclic dependencies.
+
+## CLI Integration Tests
+
+The `*.e2e.test.ts` files in this directory are **in-process CLI tests** that:
+- Import command factories directly (e.g., `createDbInitCommand()`)
+- Mock `process.exit` and `console.log` to capture output
+- Run commands via `command.parseAsync()` in the same Node process
+
+**Note**: These are named "e2e" for historical reasons but are really integration tests. True subprocess E2E tests (which spawn the CLI as a separate process) should use the pattern in `cli.emit-cli-process.e2e.test.ts` and ideally live in `test/e2e/framework/`. See task 7.2 in `agent-os/specs/2025-12-05-db-init-command/tasks.md` for cleanup plans.
 
 ## Dependencies
 
