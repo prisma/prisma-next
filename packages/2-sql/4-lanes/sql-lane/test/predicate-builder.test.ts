@@ -65,6 +65,7 @@ describe('buildWhereExpr', () => {
       lowering: {
         targetFamily: 'sql',
         strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: 'normalize(${self})',
       },
     };
