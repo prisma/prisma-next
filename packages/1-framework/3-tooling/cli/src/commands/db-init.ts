@@ -169,7 +169,15 @@ export function createDbInitCommand(): Command {
             why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
           });
         }
-        const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+
+        let contractJson: Record<string, unknown>;
+        try {
+          contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+        } catch (error) {
+          throw errorUnexpected(error instanceof Error ? error.message : String(error), {
+            why: `Failed to parse contract JSON at ${contractPathAbsolute}: ${error instanceof Error ? error.message : String(error)}`,
+          });
+        }
 
         // Resolve database URL
         const dbUrl = options.db ?? config.db?.url;
