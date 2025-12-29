@@ -1,6 +1,6 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { Result } from '@prisma-next/core-control-plane/result';
-import { okVoid } from '@prisma-next/core-control-plane/result';
+import { ok, okVoid } from '@prisma-next/core-control-plane/result';
 import type {
   MigrationPlan,
   MigrationPlanContractInfo,
@@ -27,6 +27,11 @@ import {
 
 interface RunnerConfig {
   readonly defaultSchema: string;
+}
+
+interface ApplyPlanSuccessValue {
+  readonly operationsExecuted: number;
+  readonly executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[];
 }
 
 const DEFAULT_CONFIG: RunnerConfig = {
@@ -85,20 +90,17 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
       // Apply plan operations or skip if marker already at destination
       const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
-      let operationsExecuted: number;
-      let executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[];
+      let applyValue: ApplyPlanSuccessValue;
 
       if (markerAtDestination) {
-        operationsExecuted = 0;
-        executedOperations = [];
+        applyValue = { operationsExecuted: 0, executedOperations: [] };
       } else {
         const applyResult = await this.applyPlan(driver, options);
         if (!applyResult.ok) {
           await this.rollbackTransaction(driver);
           return applyResult;
         }
-        operationsExecuted = applyResult.value.operationsExecuted;
-        executedOperations = applyResult.value.executedOperations;
+        applyValue = applyResult.value;
       }
 
       // Verify resulting schema matches contract
@@ -121,12 +123,12 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
       // Record marker and ledger entries
       await this.upsertMarker(driver, options, existingMarker);
-      await this.recordLedgerEntry(driver, options, existingMarker, executedOperations);
+      await this.recordLedgerEntry(driver, options, existingMarker, applyValue.executedOperations);
 
       await this.commitTransaction(driver);
       return runnerSuccess({
         operationsPlanned: options.plan.operations.length,
-        operationsExecuted,
+        operationsExecuted: applyValue.operationsExecuted,
       });
     } catch (error) {
       await this.rollbackTransaction(driver);
@@ -138,15 +140,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   private async applyPlan(
     driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
-  ): Promise<
-    Result<
-      {
-        readonly operationsExecuted: number;
-        readonly executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[];
-      },
-      MigrationRunnerFailure
-    >
-  > {
+  ): Promise<Result<ApplyPlanSuccessValue, MigrationRunnerFailure>> {
     let operationsExecuted = 0;
     const executedOperations: Array<MigrationPlanOperation<PostgresPlanTargetDetails>> = [];
     for (const operation of options.plan.operations) {
@@ -189,7 +183,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
         options.callbacks?.onOperationComplete?.(operation);
       }
     }
-    return { ok: true, value: { operationsExecuted, executedOperations } };
+    return ok({ operationsExecuted, executedOperations });
   }
 
   private async ensureControlTables(
