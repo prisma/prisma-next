@@ -260,6 +260,12 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
     - Update `test/integration/README.md` and `test/e2e/framework/README.md` to clarify the distinction.
   - Reference: `cli.emit-cli-process.e2e.test.ts` demonstrates the correct subprocess pattern using `execFileAsync('node', [cliPath, ...])`.
 
+- **7.3 Introduce core migration base types for CLI (remove duck typing)**
+  - Current state: `db init` in `@prisma-next/cli` duck-types the planner/runner and casts the plan shape to produce output.
+  - Goal: define a small, family-agnostic `MigrationPlanBase` / `MigrationPlannerResultBase` / `MigrationRunnerResultBase` vocabulary in framework core so CLI can format plans without importing SQL-specific types.
+  - Make migration support an explicit **optional** target capability (e.g., `target.migrations?`) rather than relying on targets to implement migration methods that throw.
+  - Planning doc: `agent-os/specs/2025-12-05-db-init-command/planning/migration-cli-base-types.plan.md`.
+
 ## 8. Postgres Planner Enhancements
 
 - **8.1 Support additional additive initialization scenarios**

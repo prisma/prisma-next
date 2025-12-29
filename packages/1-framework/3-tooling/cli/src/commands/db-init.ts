@@ -245,6 +245,7 @@ export function createDbInitCommand(): Command {
             throw errorMigrationPlanningFailed({ conflicts });
           }
 
+          // TODO: this is an indication that the migration CLI commands are SQL specific. Their types are leaking into the CLI. Will be addressed in 7.3 in agent-os/specs/2025-12-05-db-init-command/tasks.md
           const migrationPlan = plannerResult.plan as {
             targetId: string;
             destination: { coreHash: string; profileHash?: string };
