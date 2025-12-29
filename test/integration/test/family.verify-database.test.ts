@@ -361,7 +361,7 @@ describe('family instance verify', () => {
           const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
           const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
           // Remove profileHash if present
-          if ('profileHash' in contractJson) {
+          if (Object.hasOwn(contractJson, 'profileHash')) {
             const { profileHash: _profileHash, ...contractWithoutProfileHash } = contractJson;
             await writeFile(
               contractJsonPath,
