@@ -142,12 +142,17 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 }
 
 describe('SQL builder includeMany', () => {
-  it('builds a plan with includeMany using default alias', () => {
+  function setupIncludeTest() {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithCapabilities, adapter);
     const tables = schema<ContractWithCapabilities>(context).tables;
     const userColumns = tables.user.columns;
     const postColumns = tables.post.columns;
+    return { adapter, context, tables, userColumns, postColumns };
+  }
+
+  it('builds a plan with includeMany using default alias', () => {
+    const { context, tables, userColumns, postColumns } = setupIncludeTest();
 
     const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
@@ -178,11 +183,7 @@ describe('SQL builder includeMany', () => {
   });
 
   it('builds a plan with includeMany using custom alias', () => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities>(context).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
+    const { context, tables, userColumns, postColumns } = setupIncludeTest();
 
     const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
@@ -208,11 +209,7 @@ describe('SQL builder includeMany', () => {
   });
 
   it('builds a plan with includeMany with child where clause', () => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities>(context).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
+    const { context, tables, userColumns, postColumns } = setupIncludeTest();
 
     const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
@@ -240,11 +237,7 @@ describe('SQL builder includeMany', () => {
   });
 
   it('builds a plan with includeMany with child orderBy clause', () => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities>(context).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
+    const { context, tables, userColumns, postColumns } = setupIncludeTest();
 
     const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
@@ -275,11 +268,7 @@ describe('SQL builder includeMany', () => {
   });
 
   it('builds a plan with includeMany with child limit clause', () => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities>(context).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
+    const { context, tables, userColumns, postColumns } = setupIncludeTest();
 
     const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
@@ -300,11 +289,7 @@ describe('SQL builder includeMany', () => {
   });
 
   it('builds a plan with includeMany with all optional fields (where, orderBy, limit)', () => {
-    const adapter = createStubAdapter();
-    const context = createTestContext(contractWithCapabilities, adapter);
-    const tables = schema<ContractWithCapabilities>(context).tables;
-    const userColumns = tables.user.columns;
-    const postColumns = tables.post.columns;
+    const { context, tables, userColumns, postColumns } = setupIncludeTest();
 
     const plan = sql<ContractWithCapabilities>({ context })
       .from(tables.user)
