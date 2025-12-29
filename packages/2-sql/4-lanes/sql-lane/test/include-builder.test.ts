@@ -5,7 +5,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type { AnyOrderBuilder } from '@prisma-next/sql-relational-core/types';
+import { createOrderBuilder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { buildIncludeAst, IncludeChildBuilderImpl } from '../src/sql/include-builder';
@@ -274,11 +274,7 @@ describe('buildIncludeAst', () => {
     };
 
     // Create an OrderBuilder with an OperationExpr
-    const childOrderBy: AnyOrderBuilder = {
-      kind: 'order' as const,
-      expr: operationExpr,
-      dir: 'asc' as const,
-    } as AnyOrderBuilder;
+    const childOrderBy = createOrderBuilder(operationExpr, 'asc');
 
     const includeState = {
       alias: 'posts',
