@@ -6,7 +6,7 @@ To keep PRs small and reviewable, implement these tasks as a sequence of **self-
 
 - **Branch 1 — Core migration types & IR (no real behavior yet)**
   - Covers tasks **1.1**, **1.2**, **1.3**.
-  - Deliverables: `MigrationPolicy`, `PlannerResult`, in-memory `MigrationPlan` IR, plus unit/type tests for these types.
+  - Deliverables: `MigrationOperationPolicy`, `PlannerResult`, in-memory `MigrationPlan` IR, plus unit/type tests for these types.
   - No real planning logic yet; just the vocabulary and basic construction helpers.
 
 - **Branch 2 — Planner SPI + Postgres planner implementation**
@@ -40,11 +40,11 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 ## 1. Planner & Policy Design (SQL Family / Target-Aware)
 
 - [x] **1.1 Define migration policy model**
-  - Specify a `MigrationPolicy` type that supports at least:
+  - Specify a `MigrationOperationPolicy` type that supports at least:
     - `mode: 'init' | 'update'` (extensible).
     - `allowedOperationClasses: readonly ('additive' | 'widening' | 'destructive')[]`.
   - Document how `db init` uses `mode: 'init'` + `['additive']` and how `db update` will extend this later.
-  - ✅ Implemented via `MigrationPolicy` in `packages/2-sql/3-tooling/family/src/core/migrations/types.ts` plus `INIT_ADDITIVE_POLICY` in `packages/2-sql/3-tooling/family/src/core/migrations/policies.ts`. The CLI now keeps "init vs update" context separately while the shared policy carries only the enforcement set (`allowedOperationClasses`), eliminating the incentive for downstream systems to branch on mode.
+  - ✅ Implemented via `MigrationOperationPolicy` in `packages/2-sql/3-tooling/family/src/core/migrations/types.ts` plus `INIT_ADDITIVE_POLICY` in `packages/2-sql/3-tooling/family/src/core/migrations/policies.ts`. The CLI now keeps "init vs update" context separately while the shared policy carries only the enforcement set (`allowedOperationClasses`), eliminating the incentive for downstream systems to branch on mode.
 
 - [x] **1.2 Define planner result shape**
   - Design a `PlannerResult` type that can represent:

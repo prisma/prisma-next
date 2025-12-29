@@ -12,7 +12,7 @@ export type AnyRecord = Readonly<Record<string, unknown>>;
 
 export type MigrationOperationClass = 'additive' | 'widening' | 'destructive';
 
-export interface MigrationPolicy {
+export interface MigrationOperationPolicy {
   readonly allowedOperationClasses: readonly MigrationOperationClass[];
 }
 
@@ -105,7 +105,7 @@ export type PlannerResult<TTargetDetails = Record<string, never>> =
 export interface MigrationPlannerPlanOptions {
   readonly contract: SqlContract<SqlStorage>;
   readonly schema: SqlSchemaIR;
-  readonly policy: MigrationPolicy;
+  readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
 }
 
@@ -130,7 +130,7 @@ export interface MigrationRunnerExecuteOptions<TTargetDetails = Record<string, n
    * Execution-time policy that defines which operation classes are allowed.
    * The runner validates each operation against this policy before execution.
    */
-  readonly policy: MigrationPolicy;
+  readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   readonly strictVerification?: boolean;
   readonly callbacks?: MigrationRunnerExecuteCallbacks<TTargetDetails>;

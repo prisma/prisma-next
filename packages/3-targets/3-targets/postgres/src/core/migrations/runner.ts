@@ -2,10 +2,10 @@ import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { Result } from '@prisma-next/core-control-plane/result';
 import { ok, okVoid } from '@prisma-next/core-control-plane/result';
 import type {
+  MigrationOperationPolicy,
   MigrationPlanContractInfo,
   MigrationPlanOperation,
   MigrationPlanOperationStep,
-  MigrationPolicy,
   MigrationRunner,
   MigrationRunnerExecuteOptions,
   MigrationRunnerFailure,
@@ -297,7 +297,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private enforcePolicyCompatibility(
-    policy: MigrationPolicy,
+    policy: MigrationOperationPolicy,
     operations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[],
   ): Result<void, MigrationRunnerFailure> {
     const allowedClasses = new Set(policy.allowedOperationClasses);

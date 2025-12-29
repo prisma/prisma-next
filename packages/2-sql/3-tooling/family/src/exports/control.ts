@@ -12,6 +12,7 @@ export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 export type {
   CreateMigrationPlanOptions,
   MigrationOperationClass,
+  MigrationOperationPolicy,
   MigrationPlan,
   MigrationPlanContractInfo,
   MigrationPlanner,
@@ -19,7 +20,6 @@ export type {
   MigrationPlanOperation,
   MigrationPlanOperationStep,
   MigrationPlanOperationTarget,
-  MigrationPolicy,
   MigrationRunner,
   MigrationRunnerErrorCode,
   MigrationRunnerExecuteCallbacks,

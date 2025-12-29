@@ -432,7 +432,7 @@ interface MigrationPlanContractInfo {
 
 interface MigrationPlan<TTargetDetails = Record<string, never>> {
   targetId: string
-  policy: MigrationPolicy
+  policy: MigrationOperationPolicy
   contract: MigrationPlanContractInfo
   operations: MigrationPlanOperation<TTargetDetails>[]
   meta?: Record<string, unknown>
@@ -441,7 +441,7 @@ interface MigrationPlan<TTargetDetails = Record<string, never>> {
 
 **Migration Policy:**
 ```typescript
-interface MigrationPolicy {
+interface MigrationOperationPolicy {
   allowedOperationClasses: ('additive' | 'widening' | 'destructive')[]
 }
 ```

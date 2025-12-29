@@ -62,7 +62,7 @@ This doc defines the `db init` command behavior, the TS primitives it composes, 
 - **Planner behavior**
   - Implement a **family-owned** planner entrypoint (SQL family) that:
     - Diffs a **from-contract** and **to-contract**.
-    - Respects a `MigrationPolicy` governing allowed operation classes.
+    - Respects a `MigrationOperationPolicy` governing allowed operation classes.
     - Produces a **pure in-memory MigrationPlan IR** (no file I/O).
   - Use the **same operation vocabulary** as the SQL migration system, restricted to:
     - Additive and widening operations.
@@ -330,7 +330,7 @@ This is consistent with:
 
 ### Migration Policy
 
-`planMigration` takes a `MigrationPolicy` to govern what kinds of operations may be emitted. For v1:
+`planMigration` takes a `MigrationOperationPolicy` to govern what kinds of operations may be emitted. For v1:
 
 - **Operation classes**
   - Represented as a list of allowed operation classes:

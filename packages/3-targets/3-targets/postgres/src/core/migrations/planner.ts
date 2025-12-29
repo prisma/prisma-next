@@ -1,8 +1,8 @@
 import type {
+  MigrationOperationPolicy,
   MigrationPlanner,
   MigrationPlannerPlanOptions,
   MigrationPlanOperation,
-  MigrationPolicy,
 } from '@prisma-next/family-sql/control';
 import {
   createMigrationPlan,
@@ -91,7 +91,7 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
     return plannerSuccess(plan);
   }
 
-  private ensureAdditivePolicy(policy: MigrationPolicy) {
+  private ensureAdditivePolicy(policy: MigrationOperationPolicy) {
     if (!policy.allowedOperationClasses.includes('additive')) {
       return plannerFailure([
         {
