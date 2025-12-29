@@ -5,6 +5,33 @@ import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+// Type for schemaIR returned by introspect
+type SchemaIR = Awaited<ReturnType<ReturnType<typeof sql.create>['introspect']>>;
+
+/**
+ * Helper to run introspection and pass schemaIR to callback.
+ * Handles driver lifecycle (create + close) automatically.
+ */
+async function withIntrospection<T>(
+  connectionString: string,
+  fn: (schemaIR: SchemaIR) => T | Promise<T>,
+): Promise<T> {
+  const driver = await postgresDriver.create(connectionString);
+  try {
+    const familyInstance = sql.create({
+      target: postgres,
+      adapter: postgresAdapter,
+      driver: postgresDriver,
+      extensions: [],
+    });
+
+    const schemaIR = await familyInstance.introspect({ driver });
+    return await fn(schemaIR);
+  } finally {
+    await driver.close();
+  }
+}
+
 describe('family instance introspect', () => {
   let database: DevDatabase | undefined;
   let connectionString: string | undefined;
@@ -60,26 +87,12 @@ describe('family instance introspect', () => {
           throw new Error('Connection string not set');
         }
 
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensions: [],
-          });
-
-          const schemaIR = await familyInstance.introspect({
-            driver,
-          });
-
+        await withIntrospection(connectionString, (schemaIR) => {
           expect(schemaIR).toBeDefined();
           expect(schemaIR.tables).toBeDefined();
           expect(schemaIR.extensions).toBeDefined();
           expect(Array.isArray(schemaIR.extensions)).toBe(true);
-        } finally {
-          await driver.close();
-        }
+        });
       },
       timeouts.spinUpPpgDev,
     );
@@ -91,19 +104,7 @@ describe('family instance introspect', () => {
           throw new Error('Connection string not set');
         }
 
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensions: [],
-          });
-
-          const schemaIR = await familyInstance.introspect({
-            driver,
-          });
-
+        await withIntrospection(connectionString, (schemaIR) => {
           const userTable = schemaIR.tables['user'];
           expect(userTable).toBeDefined();
           if (!userTable) {
@@ -138,9 +139,7 @@ describe('family instance introspect', () => {
           expect(createdAtColumn.name).toBe('createdAt');
           expect(createdAtColumn.nativeType).toBeDefined();
           expect(createdAtColumn.nullable).toBe(false);
-        } finally {
-          await driver.close();
-        }
+        });
       },
       timeouts.spinUpPpgDev,
     );
@@ -152,19 +151,7 @@ describe('family instance introspect', () => {
           throw new Error('Connection string not set');
         }
 
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensions: [],
-          });
-
-          const schemaIR = await familyInstance.introspect({
-            driver,
-          });
-
+        await withIntrospection(connectionString, (schemaIR) => {
           const userTable = schemaIR.tables['user'];
           expect(userTable).toBeDefined();
           if (!userTable) {
@@ -172,9 +159,7 @@ describe('family instance introspect', () => {
           }
           expect(userTable.primaryKey).toBeDefined();
           expect(userTable.primaryKey?.columns).toEqual(['id']);
-        } finally {
-          await driver.close();
-        }
+        });
       },
       timeouts.spinUpPpgDev,
     );
@@ -186,19 +171,7 @@ describe('family instance introspect', () => {
           throw new Error('Connection string not set');
         }
 
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensions: [],
-          });
-
-          const schemaIR = await familyInstance.introspect({
-            driver,
-          });
-
+        await withIntrospection(connectionString, (schemaIR) => {
           const userTable = schemaIR.tables['user'];
           expect(userTable).toBeDefined();
           if (!userTable) {
@@ -209,9 +182,7 @@ describe('family instance introspect', () => {
           const emailUnique = userTable.uniques.find((uq) => uq.name === 'user_email_unique');
           expect(emailUnique).toBeDefined();
           expect(emailUnique?.columns).toEqual(['email']);
-        } finally {
-          await driver.close();
-        }
+        });
       },
       timeouts.spinUpPpgDev,
     );
@@ -223,19 +194,7 @@ describe('family instance introspect', () => {
           throw new Error('Connection string not set');
         }
 
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensions: [],
-          });
-
-          const schemaIR = await familyInstance.introspect({
-            driver,
-          });
-
+        await withIntrospection(connectionString, (schemaIR) => {
           const postTable = schemaIR.tables['post'];
           expect(postTable).toBeDefined();
           if (!postTable) {
@@ -255,9 +214,7 @@ describe('family instance introspect', () => {
           expect(fk.columns).toEqual(['userId']);
           expect(fk.referencedTable).toBe('user');
           expect(fk.referencedColumns).toEqual(['id']);
-        } finally {
-          await driver.close();
-        }
+        });
       },
       timeouts.spinUpPpgDev,
     );
@@ -269,19 +226,7 @@ describe('family instance introspect', () => {
           throw new Error('Connection string not set');
         }
 
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensions: [],
-          });
-
-          const schemaIR = await familyInstance.introspect({
-            driver,
-          });
-
+        await withIntrospection(connectionString, (schemaIR) => {
           const postTable = schemaIR.tables['post'];
           expect(postTable).toBeDefined();
           if (!postTable) {
@@ -292,9 +237,7 @@ describe('family instance introspect', () => {
           const userIdIndex = postTable.indexes.find((idx) => idx.name === 'post_userId_idx');
           expect(userIdIndex).toBeDefined();
           expect(userIdIndex?.columns).toEqual(['userId']);
-        } finally {
-          await driver.close();
-        }
+        });
       },
       timeouts.spinUpPpgDev,
     );
@@ -306,24 +249,10 @@ describe('family instance introspect', () => {
           throw new Error('Connection string not set');
         }
 
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensions: [],
-          });
-
-          const schemaIR = await familyInstance.introspect({
-            driver,
-          });
-
+        await withIntrospection(connectionString, (schemaIR) => {
           expect(schemaIR.annotations).toBeDefined();
           expect(schemaIR.annotations?.['pg']).toBeDefined();
-        } finally {
-          await driver.close();
-        }
+        });
       },
       timeouts.spinUpPpgDev,
     );
@@ -419,25 +348,11 @@ describe('family instance introspect', () => {
           throw new Error('Connection string not set');
         }
 
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensions: [],
-          });
-
-          const schemaIR = await familyInstance.introspect({
-            driver,
-          });
-
+        await withIntrospection(connectionString, (schemaIR) => {
           expect(schemaIR.extensions).toBeDefined();
           expect(Array.isArray(schemaIR.extensions)).toBe(true);
           expect(schemaIR.extensions.length).toBeGreaterThanOrEqual(0);
-        } finally {
-          await driver.close();
-        }
+        });
       },
       timeouts.spinUpPpgDev,
     );
