@@ -45,17 +45,19 @@ interface DbInitOptions {
 /**
  * Duck-type check for SqlControlTargetDescriptor with migration support.
  */
-function hasMigrationSupport(target: unknown): target is {
+interface MigrationSupportTarget {
   createPlanner: (family: unknown) => unknown;
   createRunner: (family: unknown) => unknown;
-} {
+}
+
+function hasMigrationSupport(target: unknown): target is MigrationSupportTarget {
   return (
     typeof target === 'object' &&
     target !== null &&
     'createPlanner' in target &&
-    typeof (target as Record<string, unknown>).createPlanner === 'function' &&
+    typeof (target as Record<string, unknown>)['createPlanner'] === 'function' &&
     'createRunner' in target &&
-    typeof (target as Record<string, unknown>).createRunner === 'function'
+    typeof (target as Record<string, unknown>)['createRunner'] === 'function'
   );
 }
 
@@ -332,10 +334,12 @@ export function createDbInitCommand(): Command {
               operationsPlanned: execution.operationsPlanned,
               operationsExecuted: execution.operationsExecuted,
             },
-            marker: {
-              coreHash: migrationPlan.destination.coreHash,
-              profileHash: migrationPlan.destination.profileHash,
-            },
+            marker: migrationPlan.destination.profileHash
+              ? {
+                  coreHash: migrationPlan.destination.coreHash,
+                  profileHash: migrationPlan.destination.profileHash,
+                }
+              : { coreHash: migrationPlan.destination.coreHash },
             summary: `Applied ${execution.operationsExecuted} operation(s), marker written`,
             timings: { total: Date.now() - startTime },
           };
