@@ -87,7 +87,7 @@ describe('Codecs Integration Tests', () => {
         )
       `);
     });
-  });
+  }, timeouts.spinUpPpgDev);
 
   afterEach(async () => {
     await teardownTestDatabase(client, ['test_data']);

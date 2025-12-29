@@ -84,62 +84,66 @@ describe('family instance introspect', () => {
       timeouts.spinUpPpgDev,
     );
 
-    it('includes user table with correct columns', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
-
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
-
-        const schemaIR = await familyInstance.introspect({
-          driver,
-        });
-
-        const userTable = schemaIR.tables['user'];
-        expect(userTable).toBeDefined();
-        if (!userTable) {
-          throw new Error('user table not found');
+    it(
+      'includes user table with correct columns',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
         }
-        expect(userTable.name).toBe('user');
-        expect(userTable.columns).toBeDefined();
 
-        const idColumn = userTable.columns['id'];
-        expect(idColumn).toBeDefined();
-        if (!idColumn) {
-          throw new Error('id column not found');
-        }
-        expect(idColumn.name).toBe('id');
-        expect(idColumn.nativeType).toBeDefined();
-        expect(idColumn.nullable).toBe(false);
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const emailColumn = userTable.columns['email'];
-        expect(emailColumn).toBeDefined();
-        if (!emailColumn) {
-          throw new Error('email column not found');
-        }
-        expect(emailColumn.name).toBe('email');
-        expect(emailColumn.nativeType).toBeDefined();
-        expect(emailColumn.nullable).toBe(false);
+          const schemaIR = await familyInstance.introspect({
+            driver,
+          });
 
-        const createdAtColumn = userTable.columns['createdAt'];
-        expect(createdAtColumn).toBeDefined();
-        if (!createdAtColumn) {
-          throw new Error('createdAt column not found');
+          const userTable = schemaIR.tables['user'];
+          expect(userTable).toBeDefined();
+          if (!userTable) {
+            throw new Error('user table not found');
+          }
+          expect(userTable.name).toBe('user');
+          expect(userTable.columns).toBeDefined();
+
+          const idColumn = userTable.columns['id'];
+          expect(idColumn).toBeDefined();
+          if (!idColumn) {
+            throw new Error('id column not found');
+          }
+          expect(idColumn.name).toBe('id');
+          expect(idColumn.nativeType).toBeDefined();
+          expect(idColumn.nullable).toBe(false);
+
+          const emailColumn = userTable.columns['email'];
+          expect(emailColumn).toBeDefined();
+          if (!emailColumn) {
+            throw new Error('email column not found');
+          }
+          expect(emailColumn.name).toBe('email');
+          expect(emailColumn.nativeType).toBeDefined();
+          expect(emailColumn.nullable).toBe(false);
+
+          const createdAtColumn = userTable.columns['createdAt'];
+          expect(createdAtColumn).toBeDefined();
+          if (!createdAtColumn) {
+            throw new Error('createdAt column not found');
+          }
+          expect(createdAtColumn.name).toBe('createdAt');
+          expect(createdAtColumn.nativeType).toBeDefined();
+          expect(createdAtColumn.nullable).toBe(false);
+        } finally {
+          await driver.close();
         }
-        expect(createdAtColumn.name).toBe('createdAt');
-        expect(createdAtColumn.nativeType).toBeDefined();
-        expect(createdAtColumn.nullable).toBe(false);
-      } finally {
-        await driver.close();
-      }
-    });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
     it(
       'includes primary key for user table',
@@ -175,38 +179,42 @@ describe('family instance introspect', () => {
       timeouts.spinUpPpgDev,
     );
 
-    it('includes unique constraint for user email', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
-
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
-
-        const schemaIR = await familyInstance.introspect({
-          driver,
-        });
-
-        const userTable = schemaIR.tables['user'];
-        expect(userTable).toBeDefined();
-        if (!userTable) {
-          throw new Error('user table not found');
+    it(
+      'includes unique constraint for user email',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
         }
-        expect(userTable.uniques).toBeDefined();
-        expect(userTable.uniques.length).toBeGreaterThan(0);
-        const emailUnique = userTable.uniques.find((uq) => uq.name === 'user_email_unique');
-        expect(emailUnique).toBeDefined();
-        expect(emailUnique?.columns).toEqual(['email']);
-      } finally {
-        await driver.close();
-      }
-    });
+
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
+
+          const schemaIR = await familyInstance.introspect({
+            driver,
+          });
+
+          const userTable = schemaIR.tables['user'];
+          expect(userTable).toBeDefined();
+          if (!userTable) {
+            throw new Error('user table not found');
+          }
+          expect(userTable.uniques).toBeDefined();
+          expect(userTable.uniques.length).toBeGreaterThan(0);
+          const emailUnique = userTable.uniques.find((uq) => uq.name === 'user_email_unique');
+          expect(emailUnique).toBeDefined();
+          expect(emailUnique?.columns).toEqual(['email']);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
 
     it(
       'includes post table with foreign key to user',

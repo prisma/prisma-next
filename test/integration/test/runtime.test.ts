@@ -51,11 +51,11 @@ describe('runtime execute integration', () => {
         'mike@example.com',
       ]);
     });
-  });
+  }, timeouts.spinUpPpgDev);
 
   afterEach(async () => {
     await teardownTestDatabase(client, ['user']);
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('executes a plan after onFirstUse verification', async () => {
     const runtime = createTestRuntime(
