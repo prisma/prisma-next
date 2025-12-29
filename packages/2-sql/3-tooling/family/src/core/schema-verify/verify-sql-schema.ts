@@ -130,54 +130,11 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       let columnStatus: 'pass' | 'warn' | 'fail' = 'pass';
 
       // Compare type using nativeType directly
+      // Both contractColumn.nativeType and schemaColumn.nativeType are required by their types
       const contractNativeType = contractColumn.nativeType;
       const schemaNativeType = schemaColumn.nativeType;
 
-      if (!contractNativeType) {
-        // Contract column doesn't have nativeType - this shouldn't happen with new contract format
-        issues.push({
-          kind: 'type_mismatch',
-          table: tableName,
-          column: columnName,
-          expected: 'nativeType required',
-          actual: schemaNativeType || 'unknown',
-          message: `Column "${tableName}"."${columnName}" is missing nativeType in contract`,
-        });
-        columnChildren.push({
-          status: 'fail',
-          kind: 'type',
-          name: 'type',
-          contractPath: `${columnPath}.nativeType`,
-          code: 'type_mismatch',
-          message: 'Contract column is missing nativeType',
-          expected: 'nativeType required',
-          actual: schemaNativeType || 'unknown',
-          children: [],
-        });
-        columnStatus = 'fail';
-      } else if (!schemaNativeType) {
-        // Schema IR doesn't have nativeType - this shouldn't happen
-        issues.push({
-          kind: 'type_mismatch',
-          table: tableName,
-          column: columnName,
-          expected: contractNativeType,
-          actual: 'unknown',
-          message: `Column "${tableName}"."${columnName}" has type mismatch: schema column has no nativeType`,
-        });
-        columnChildren.push({
-          status: 'fail',
-          kind: 'type',
-          name: 'type',
-          contractPath: `${columnPath}.nativeType`,
-          code: 'type_mismatch',
-          message: 'Schema column has no nativeType',
-          expected: contractNativeType,
-          actual: 'unknown',
-          children: [],
-        });
-        columnStatus = 'fail';
-      } else if (contractNativeType !== schemaNativeType) {
+      if (contractNativeType !== schemaNativeType) {
         // Compare native types directly
         issues.push({
           kind: 'type_mismatch',
@@ -280,12 +237,11 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
         finalColumnStatus === 'fail' && failureMessages.length > 0
           ? failureMessages.join('; ')
           : '';
+      // Extract code from first child if status indicates an issue
       const columnCode =
-        finalColumnStatus === 'fail' && columnChildren.length > 0 && columnChildren[0]
+        (finalColumnStatus === 'fail' || finalColumnStatus === 'warn') && columnChildren[0]
           ? columnChildren[0].code
-          : finalColumnStatus === 'warn' && columnChildren.length > 0 && columnChildren[0]
-            ? columnChildren[0].code
-            : '';
+          : '';
       columnNodes.push({
         status: finalColumnStatus,
         kind: 'column',
