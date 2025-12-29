@@ -399,5 +399,60 @@ export {
   executeCommand,
   getExitCode,
   setupCommandMocks,
-  withTempDir,
 } from '../../../../packages/1-framework/3-tooling/cli/test/utils/test-helpers';
+
+import { afterEach, beforeEach } from 'vitest';
+
+/**
+ * Decorator that wraps test suites to automatically manage temporary directory cleanup.
+ * Creates directories within the fixture app directory so jiti can resolve workspace packages.
+ * Sets up `beforeEach` and `afterEach` hooks to track and clean up directories per test.
+ *
+ * @example
+ * ```typescript
+ * withTempDir(({ createTempDir }) => {
+ *   describe('test suite', () => {
+ *     it('test', () => {
+ *       const testDir = createTempDir();
+ *       // ... use testDir
+ *       // Directory is automatically cleaned up after the test
+ *     });
+ *   });
+ * });
+ * ```
+ */
+export function withTempDir(callback: (context: { createTempDir: () => string }) => void): void {
+  const tempDirs = new Set<string>();
+
+  beforeEach(() => {
+    // Reset the set of directories for each test
+    tempDirs.clear();
+  });
+
+  afterEach(() => {
+    // Clean up all directories created during this test
+    for (const dir of tempDirs) {
+      try {
+        if (existsSync(dir)) {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      } catch (_error) {
+        // Ignore cleanup errors
+      }
+    }
+    tempDirs.clear();
+  });
+
+  const createTempDir = (): string => {
+    // Create directories within the fixture app so jiti can resolve workspace packages
+    const testDir = join(
+      fixtureAppDir,
+      `test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    mkdirSync(testDir, { recursive: true });
+    tempDirs.add(testDir);
+    return testDir;
+  };
+
+  callback({ createTempDir });
+}
