@@ -24,6 +24,7 @@
     { "path": "./packages/1-framework/1-core/shared/contract" },
     { "path": "./packages/1-framework/1-core/shared/operations" },
     { "path": "./packages/1-framework/1-core/shared/plan" },
+    { "path": "./packages/1-framework/1-core/shared/utils" },
     { "path": "./packages/1-framework/1-core/migration/control-plane" },
     { "path": "./packages/1-framework/1-core/runtime/execution-plane" },
 
