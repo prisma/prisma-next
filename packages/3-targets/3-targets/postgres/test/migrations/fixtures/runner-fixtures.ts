@@ -95,9 +95,7 @@ export function createFailingPlan() {
 }
 
 export function toPlanContractInfo(c: SqlContract<SqlStorage>) {
-  return c.profileHash
-    ? { coreHash: c.coreHash, profileHash: c.profileHash }
-    : { coreHash: c.coreHash };
+  return { coreHash: c.coreHash, profileHash: c.profileHash! };
 }
 
 export async function executeStatement(
