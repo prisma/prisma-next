@@ -297,4 +297,122 @@ describe('buildMeta', () => {
       }),
     ).toThrow('Missing column for alias id at index 0');
   });
+
+  it('builds meta with operation expression in where clause', () => {
+    const operationExpr: OperationExpr = {
+      kind: 'operation',
+      method: 'normalize',
+      forTypeId: 'pg/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: 'normalize(${self})',
+      },
+    };
+
+    const columnWithOp = {
+      ...userColumns.id,
+      _operationExpr: operationExpr,
+    } as unknown as AnyColumnBuilder;
+
+    const whereWithOp = {
+      kind: 'binary' as const,
+      op: 'eq' as const,
+      left: columnWithOp,
+      right: param('value'),
+    } as unknown as AnyBinaryBuilder;
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      where: whereWithOp,
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
+  });
+
+  it('builds meta with operation expression in orderBy clause', () => {
+    const operationExpr: OperationExpr = {
+      kind: 'operation',
+      method: 'normalize',
+      forTypeId: 'pg/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: 'normalize(${self})',
+      },
+    };
+
+    const orderByWithOp = {
+      kind: 'order' as const,
+      expr: operationExpr,
+      dir: 'asc' as const,
+    } as unknown as AnyOrderBuilder;
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      orderBy: orderByWithOp,
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
+  });
+
+  it('builds meta with includes having childWhere and childOrderBy', () => {
+    const includes = [
+      {
+        alias: 'posts',
+        table: createTableRef('post'),
+        on: {
+          kind: 'join-on' as const,
+          left: userColumns.id,
+          right: userColumns.id,
+        } as unknown as JoinOnPredicate,
+        childProjection: {
+          aliases: ['id'],
+          columns: [userColumns.id],
+        },
+        childWhere: userColumns.id.eq(param('userId')),
+        childOrderBy: userColumns.id.asc(),
+      },
+    ];
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id', 'posts'],
+        columns: [
+          userColumns.id,
+          {
+            kind: 'column' as const,
+            table: 'post',
+            column: '',
+            columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
+          } as AnyColumnBuilder,
+        ],
+      },
+      includes,
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
+    expect(meta.refs?.tables).toContain('post');
+  });
 });

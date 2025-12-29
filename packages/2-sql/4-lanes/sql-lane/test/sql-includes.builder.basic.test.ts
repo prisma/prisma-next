@@ -298,4 +298,44 @@ describe('SQL builder includeMany', () => {
     const ast = plan.ast as SelectAst;
     expect(ast?.includes?.[0]?.child.limit).toBe(10);
   });
+
+  it('builds a plan with includeMany with all optional fields (where, orderBy, limit)', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithCapabilities, adapter);
+    const tables = schema<ContractWithCapabilities>(context).tables;
+    const userColumns = tables.user.columns;
+    const postColumns = tables.post.columns;
+
+    const plan = sql<ContractWithCapabilities>({ context })
+      .from(tables.user)
+      .includeMany(
+        tables.post,
+        (on) => on.eqCol(userColumns.id, postColumns.userId),
+        (child) =>
+          child
+            .select({ id: postColumns.id, title: postColumns.title })
+            .where(postColumns.title.eq(param('title')))
+            .orderBy(postColumns.createdAt.desc())
+            .limit(5),
+        { alias: 'posts' },
+      )
+      .select({
+        id: userColumns.id,
+        posts: true,
+      })
+      .build({ params: { title: 'Test' } });
+
+    const ast = plan.ast as SelectAst;
+    expect(ast.includes?.[0]?.child).toMatchObject({
+      where: {
+        kind: 'bin',
+      },
+      orderBy: [
+        {
+          dir: 'desc',
+        },
+      ],
+      limit: 5,
+    });
+  });
 });

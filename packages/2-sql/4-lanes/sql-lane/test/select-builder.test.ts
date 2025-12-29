@@ -128,4 +128,22 @@ describe('select builder edge cases', () => {
         .build(),
     ).not.toThrow('Missing column for alias');
   });
+
+  it('builds query with column-to-column comparison in where', () => {
+    const plan = sql<Contract, CodecTypes>({ context })
+      .from(userTable)
+      .where(userColumns.id.eq(userColumns.createdAt))
+      .select({
+        id: userColumns.id,
+      })
+      .build();
+
+    if (plan.ast.kind === 'select') {
+      expect(plan.ast.where).toBeDefined();
+      if (plan.ast.where && plan.ast.where.kind === 'bin') {
+        expect(plan.ast.where.left.kind).toBe('col');
+        expect(plan.ast.where.right.kind).toBe('col');
+      }
+    }
+  });
 });

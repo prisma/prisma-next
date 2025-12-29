@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { createTableRef } from '@prisma-next/sql-relational-core/ast';
+import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -254,5 +254,53 @@ describe('buildIncludeAst', () => {
     expect(() => buildIncludeAst(includeState, contract, {}, [], [])).toThrow(
       'Missing column for alias',
     );
+  });
+
+  it('builds include AST with operation expression in childOrderBy', () => {
+    const operationExpr = {
+      kind: 'operation' as const,
+      method: 'normalize',
+      forTypeId: 'pg/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: 'normalize(${self})',
+      },
+    };
+
+    // Create an OrderBuilder with an OperationExpr
+    const childOrderBy = {
+      kind: 'order' as const,
+      expr: operationExpr,
+      dir: 'asc' as const,
+    } as unknown;
+
+    const includeState = {
+      alias: 'posts',
+      table: postTableRef,
+      on: {
+        kind: 'join-on' as const,
+        left: userColumns.id,
+        right: userColumns.id,
+      },
+      childProjection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      childOrderBy: childOrderBy as typeof userColumns.id.asc extends () => infer R ? R : never,
+    };
+
+    const ast = buildIncludeAst(includeState, contract, {}, [], []);
+
+    expect(ast.child.orderBy).toBeDefined();
+    // When orderExpr is an OperationExpr, extractBaseColumnRef extracts the base column
+    expect(ast.child.orderBy?.[0]?.expr).toMatchObject({
+      kind: 'col',
+      table: 'user',
+      column: 'id',
+    });
   });
 });

@@ -191,7 +191,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     });
   });
 
-  it('throws error for unsupported extensions', () => {
+  it('returns failure for unsupported extensions', () => {
     const planner = createPostgresMigrationPlanner();
     const contractWithUnsupportedExtension = createTestContract({
       extensions: {
@@ -200,14 +200,21 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       },
     });
 
-    expect(() => {
-      planner.plan({
-        contract: contractWithUnsupportedExtension,
-        schema: emptySchema,
-        policy: INIT_ADDITIVE_POLICY,
-      });
-    }).toThrow(
-      'Unsupported PostgreSQL extensions in contract: unsupportedExtension, anotherUnsupported',
-    );
+    const result = planner.plan({
+      contract: contractWithUnsupportedExtension,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+    });
+
+    expect(result).toMatchObject({
+      kind: 'failure',
+      conflicts: [
+        {
+          kind: 'unsupportedExtension',
+          summary:
+            'Unsupported PostgreSQL extensions in contract: unsupportedExtension, anotherUnsupported',
+        },
+      ],
+    });
   });
 });

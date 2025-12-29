@@ -252,4 +252,16 @@ describe('raw lane', () => {
       });
     }
   });
+
+  it('handles template literal with values but no options sentinel', () => {
+    const value1 = 'test1';
+    const value2 = 'test2';
+    const plan = root.raw`
+      select * from "user" where id = ${value1} and email = ${value2}
+    `;
+
+    expect(plan.sql).toContain('where id = $1 and email = $2');
+    expect(plan.params).toEqual([value1, value2]);
+    expect(plan.meta.paramDescriptors).toHaveLength(2);
+  });
 });
