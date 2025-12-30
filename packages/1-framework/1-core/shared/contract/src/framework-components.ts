@@ -41,8 +41,8 @@ import type { ExtensionPackManifest } from './types';
  * @example
  * ```ts
  * // All descriptors have these properties
- * descriptor.kind     // 'family' | 'target' | 'adapter' | 'driver' | 'extension'
- * descriptor.id       // 'sql' | 'postgres' | 'pg-adapter' | etc.
+ * descriptor.kind     // The Kind type parameter (e.g., 'family', 'target', or custom kinds)
+ * descriptor.id       // Unique string identifier (e.g., 'sql', 'postgres')
  * descriptor.manifest // Package metadata (version, capabilities, types, etc.)
  * ```
  */
