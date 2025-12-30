@@ -49,9 +49,16 @@ describe('family instance schemaVerify - modes', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result.ok).toBe(false);
+        expect(result).toMatchObject({
+          ok: false,
+          schema: {
+            counts: { fail: expect.any(Number) },
+            issues: expect.arrayContaining([
+              expect.objectContaining({ kind: 'extension_missing' }),
+            ]),
+          },
+        });
         expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(result.schema.issues.some((i) => i.kind === 'extension_missing')).toBe(true);
       },
       timeouts.spinUpPpgDev,
     );
@@ -86,13 +93,20 @@ describe('family instance schemaVerify - modes', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract, { strict: true });
 
-        expect(result.ok).toBe(false);
+        expect(result).toMatchObject({
+          ok: false,
+          schema: {
+            counts: { fail: expect.any(Number) },
+            issues: expect.arrayContaining([
+              expect.objectContaining({
+                kind: 'extra_column',
+                table: 'user',
+                column: 'extraColumn',
+              }),
+            ]),
+          },
+        });
         expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some(
-            (i) => i.kind === 'extra_column' && i.table === 'user' && i.column === 'extraColumn',
-          ),
-        ).toBe(true);
       },
       timeouts.spinUpPpgDev,
     );
@@ -113,8 +127,12 @@ describe('family instance schemaVerify - modes', () => {
         const result = await runSchemaVerify(getConnectionString(), contract, { strict: false });
 
         // In permissive mode, extra columns don't cause failures
-        expect(result.ok).toBe(true);
-        expect(result.schema.counts.fail).toBe(0);
+        expect(result).toMatchObject({
+          ok: true,
+          schema: {
+            counts: { fail: 0 },
+          },
+        });
       },
       timeouts.spinUpPpgDev,
     );
