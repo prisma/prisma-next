@@ -76,11 +76,11 @@ describe('budgets plugin integration', () => {
       }
       await c.query(`insert into "user" (id, email) values ${values.join(', ')}`);
     });
-  });
+  }, timeouts.databaseOperation);
 
   afterEach(async () => {
     await teardownTestDatabase(client, ['user']);
-  });
+  }, timeouts.databaseOperation);
 
   it('blocks unbounded DSL SELECT exceeding budget', async () => {
     const adapter = createPostgresAdapter();

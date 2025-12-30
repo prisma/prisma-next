@@ -91,7 +91,7 @@ describe('Codecs Integration Tests', () => {
 
   afterEach(async () => {
     await teardownTestDatabase(client, ['test_data']);
-  });
+  }, timeouts.databaseOperation);
 
   it('encodes JS Date parameter to ISO string', async () => {
     const runtime = createTestRuntime(

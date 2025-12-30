@@ -54,11 +54,11 @@ describe('comparison operators integration', () => {
         await c.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
       }
     });
-  });
+  }, timeouts.databaseOperation);
 
   afterEach(async () => {
     await teardownTestDatabase(client, ['user']);
-  });
+  }, timeouts.databaseOperation);
 
   it('gt operator returns rows where id > cursor', async () => {
     const runtime = createTestRuntime(
