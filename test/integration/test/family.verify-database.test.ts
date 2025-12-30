@@ -236,11 +236,20 @@ describe('family instance verify', () => {
             contractPath,
           });
 
-          expect(result.ok).toBe(false);
-          expect(result.code).toBe('PN-RTM-3001');
-          expect(result.summary).toBe('Marker missing');
+          const expectedContract: Record<string, unknown> = {
+            coreHash: contractWithDb.coreHash,
+          };
+          if (contractWithDb.profileHash) {
+            expectedContract['profileHash'] = contractWithDb.profileHash;
+          }
+
+          expect(result).toMatchObject({
+            ok: false,
+            code: 'PN-RTM-3001',
+            summary: 'Marker missing',
+            contract: expectedContract,
+          });
           expect(result.marker).toBeUndefined();
-          expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
         } finally {
           cleanupWithDb();
         }
@@ -285,11 +294,20 @@ describe('family instance verify', () => {
             contractPath,
           });
 
-          expect(result.ok).toBe(false);
-          expect(result.code).toBe('PN-RTM-3002');
-          expect(result.summary).toBe('Hash mismatch');
-          expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
-          expect(result.marker?.coreHash).toBe('sha256:different-hash');
+          const expectedContract: Record<string, unknown> = {
+            coreHash: contractWithDb.coreHash,
+          };
+          if (contractWithDb.profileHash) {
+            expectedContract['profileHash'] = contractWithDb.profileHash;
+          }
+
+          expect(result).toMatchObject({
+            ok: false,
+            code: 'PN-RTM-3002',
+            summary: 'Hash mismatch',
+            contract: expectedContract,
+            marker: { coreHash: 'sha256:different-hash' },
+          });
         } finally {
           cleanupWithDb();
         }
@@ -334,13 +352,20 @@ describe('family instance verify', () => {
             contractPath,
           });
 
-          expect(result.ok).toBe(false);
-          expect(result.code).toBe('PN-RTM-3002');
-          expect(result.summary).toBe('Hash mismatch');
+          const expectedContract: Record<string, unknown> = {
+            coreHash: contractWithDb.coreHash,
+          };
           if (contractWithDb.profileHash) {
-            expect(result.contract.profileHash).toBe(contractWithDb.profileHash);
+            expectedContract['profileHash'] = contractWithDb.profileHash;
           }
-          expect(result.marker?.profileHash).toBe('sha256:different-profile-hash');
+
+          expect(result).toMatchObject({
+            ok: false,
+            code: 'PN-RTM-3002',
+            summary: 'Hash mismatch',
+            contract: expectedContract,
+            marker: { profileHash: 'sha256:different-profile-hash' },
+          });
         } finally {
           cleanupWithDb();
         }
@@ -400,8 +425,12 @@ describe('family instance verify', () => {
           });
 
           // Should succeed and contractProfileHash should be undefined
-          expect(result.ok).toBe(true);
-          expect(result.contract.coreHash).toBe(contractWithDb.coreHash);
+          expect(result).toMatchObject({
+            ok: true,
+            summary: 'Database matches contract',
+            contract: { coreHash: contractWithDb.coreHash },
+            meta: { contractPath: expect.any(String) },
+          });
           expect(result.contract.profileHash).toBeUndefined();
         } finally {
           cleanupWithDb();
@@ -486,7 +515,19 @@ describe('family instance verify', () => {
           });
 
           // Should succeed but report missing codecs if contract uses types not in supported list
-          expect(result.ok).toBe(true);
+          const expectedContract: Record<string, unknown> = {
+            coreHash: contractWithDb.coreHash,
+          };
+          if (contractWithDb.profileHash) {
+            expectedContract['profileHash'] = contractWithDb.profileHash;
+          }
+
+          expect(result).toMatchObject({
+            ok: true,
+            summary: 'Database matches contract',
+            contract: expectedContract,
+            meta: { contractPath: expect.any(String) },
+          });
           // If contract uses types not in supported list, missingCodecs should be present
           // Otherwise, missingCodecs should be undefined
           // This test verifies the branch is covered, regardless of whether missingCodecs is set
