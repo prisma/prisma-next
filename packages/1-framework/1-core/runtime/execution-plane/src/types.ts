@@ -1,17 +1,19 @@
 import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import type { FamilyInstance } from '@prisma-next/contract/types';
 
 // ============================================================================
 // Runtime*Instance Base Interfaces (ADR 152)
 // ============================================================================
 
 /**
- * Base interface for execution/runtime-plane family instances.
- * Families extend this with domain-specific methods.
+ * Runtime-plane family instance interface.
+ * Extends the base FamilyInstance for runtime-plane specific methods.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  */
-export interface RuntimeFamilyInstance<TFamilyId extends string = string> {
-  readonly familyId: TFamilyId;
+export interface RuntimeFamilyInstance<TFamilyId extends string = string>
+  extends FamilyInstance<TFamilyId> {
+  // Placeholder for future runtime-plane-specific methods
 }
 
 /**
