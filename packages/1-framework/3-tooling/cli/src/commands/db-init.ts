@@ -120,9 +120,9 @@ function hasMigrationSupport(target: unknown): target is MigrationSupportTarget 
   return (
     typeof target === 'object' &&
     target !== null &&
-    'createPlanner' in target &&
+    Object.hasOwn(target, 'createPlanner') &&
     typeof (target as Record<string, unknown>)['createPlanner'] === 'function' &&
-    'createRunner' in target &&
+    Object.hasOwn(target, 'createRunner') &&
     typeof (target as Record<string, unknown>)['createRunner'] === 'function'
   );
 }
