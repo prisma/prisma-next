@@ -54,9 +54,9 @@ describe('family instance schemaVerify - types', () => {
         // Type mismatch may or may not be detected depending on adapter introspection
         // The adapter may map VARCHAR to pg/text@1, so this test may pass
         // This is acceptable - the test verifies the verification runs without errors
-        expect(result).toBeDefined();
-        expect(result.schema).toBeDefined();
-        expect(result.schema.root).toBeDefined();
+        expect(result).toMatchObject({
+          schema: { root: expect.anything() },
+        });
       },
       timeouts.spinUpPpgDev,
     );
@@ -90,7 +90,7 @@ describe('family instance schemaVerify - types', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result.ok).toBe(false);
+        expect(result).toMatchObject({ ok: false });
         expect(result.schema.counts.fail).toBeGreaterThan(0);
         expect(
           result.schema.issues.some(
@@ -105,40 +105,29 @@ describe('family instance schemaVerify - types', () => {
   describe('type metadata registry', () => {
     it('registry contains known type IDs with expected native types', () => {
       const familyInstance = createFamilyInstance();
-
       const registry = familyInstance.typeMetadataRegistry;
 
-      // Verify known Postgres types are present
-      expect(registry.has('pg/int4@1')).toBe(true);
-      const int4Metadata = registry.get('pg/int4@1');
-      expect(int4Metadata?.nativeType).toBe('int4');
-      expect(int4Metadata?.familyId).toBe('sql');
-      expect(int4Metadata?.targetId).toBe('postgres');
-
-      expect(registry.has('pg/text@1')).toBe(true);
-      const textMetadata = registry.get('pg/text@1');
-      expect(textMetadata?.nativeType).toBe('text');
-
-      expect(registry.has('pg/timestamptz@1')).toBe(true);
-      const timestamptzMetadata = registry.get('pg/timestamptz@1');
-      expect(timestamptzMetadata?.nativeType).toBe('timestamptz');
-
-      expect(registry.has('pg/bool@1')).toBe(true);
-      const boolMetadata = registry.get('pg/bool@1');
-      expect(boolMetadata?.nativeType).toBe('bool');
+      // Verify known Postgres types are present with expected metadata
+      expect(registry.get('pg/int4@1')).toMatchObject({
+        nativeType: 'int4',
+        familyId: 'sql',
+        targetId: 'postgres',
+      });
+      expect(registry.get('pg/text@1')).toMatchObject({ nativeType: 'text' });
+      expect(registry.get('pg/timestamptz@1')).toMatchObject({ nativeType: 'timestamptz' });
+      expect(registry.get('pg/bool@1')).toMatchObject({ nativeType: 'bool' });
     });
 
     it('registry includes extension pack types', () => {
       const familyInstance = createFamilyInstance([pgvector]);
-
       const registry = familyInstance.typeMetadataRegistry;
 
-      // Verify pgvector type is present
-      expect(registry.has('pg/vector@1')).toBe(true);
-      const vectorMetadata = registry.get('pg/vector@1');
-      expect(vectorMetadata?.nativeType).toBe('vector');
-      expect(vectorMetadata?.familyId).toBe('sql');
-      expect(vectorMetadata?.targetId).toBe('postgres');
+      // Verify pgvector type is present with expected metadata
+      expect(registry.get('pg/vector@1')).toMatchObject({
+        nativeType: 'vector',
+        familyId: 'sql',
+        targetId: 'postgres',
+      });
     });
 
     it(
@@ -168,7 +157,7 @@ describe('family instance schemaVerify - types', () => {
         const result = await runSchemaVerify(getConnectionString(), contract);
 
         // Should fail due to type mismatch (integer vs bigint)
-        expect(result.ok).toBe(false);
+        expect(result).toMatchObject({ ok: false });
         expect(result.schema.counts.fail).toBeGreaterThan(0);
         expect(
           result.schema.issues.some(
