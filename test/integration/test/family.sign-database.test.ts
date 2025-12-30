@@ -109,11 +109,17 @@ describe('family instance sign', () => {
             contractPath: './contract.json',
           })) as SignDatabaseResult;
 
-          expect(result.ok).toBe(true);
-          expect(result.summary).toBe('Database signed (marker created)');
-          expect(result.marker.created).toBe(true);
-          expect(result.marker.updated).toBe(false);
-          expect(result.contract.coreHash).toBe(validatedContract.coreHash);
+          expect(result).toMatchObject({
+            ok: true,
+            summary: 'Database signed (marker created)',
+            marker: {
+              created: true,
+              updated: false,
+            },
+            contract: {
+              coreHash: validatedContract.coreHash,
+            },
+          });
           expect(result.timings.total).toBeGreaterThanOrEqual(0);
 
           // Verify marker was written to database
@@ -185,14 +191,21 @@ describe('family instance sign', () => {
             contractPath: './contract.json',
           })) as SignDatabaseResult;
 
-          expect(result.ok).toBe(true);
+          expect(result).toMatchObject({
+            ok: true,
+            marker: {
+              created: false,
+              updated: true,
+              previous: {
+                coreHash: 'sha256:old-hash',
+                profileHash: 'sha256:old-profile-hash',
+              },
+            },
+            contract: {
+              coreHash: validatedContract.coreHash,
+            },
+          });
           expect(result.summary).toContain('Database signed (marker updated from');
-          expect(result.marker.created).toBe(false);
-          expect(result.marker.updated).toBe(true);
-          expect(result.marker.previous).toBeDefined();
-          expect(result.marker.previous?.coreHash).toBe('sha256:old-hash');
-          expect(result.marker.previous?.profileHash).toBe('sha256:old-profile-hash');
-          expect(result.contract.coreHash).toBe(validatedContract.coreHash);
           expect(result.timings.total).toBeGreaterThanOrEqual(0);
 
           // Verify marker was updated in database
@@ -272,12 +285,18 @@ describe('family instance sign', () => {
             contractPath: './contract.json',
           })) as SignDatabaseResult;
 
-          expect(secondResult.ok).toBe(true);
-          expect(secondResult.summary).toBe('Database already signed with this contract');
-          expect(secondResult.marker.created).toBe(false);
-          expect(secondResult.marker.updated).toBe(false);
+          expect(secondResult).toMatchObject({
+            ok: true,
+            summary: 'Database already signed with this contract',
+            marker: {
+              created: false,
+              updated: false,
+            },
+            contract: {
+              coreHash: validatedContract.coreHash,
+            },
+          });
           expect(secondResult.marker.previous).toBeUndefined();
-          expect(secondResult.contract.coreHash).toBe(validatedContract.coreHash);
 
           // Verify marker was not updated (updated_at should be the same)
           const markerAfterSecond = await readMarker(driver);
