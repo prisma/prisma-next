@@ -271,10 +271,8 @@ export interface DbTestFixtureOptions {
   connectionString: string;
   createTempDir: () => string;
   fixtureSubdir: string;
-  /** SQL to run before setting up the test directory. */
+  /** SQL to run before setting up the test directory. If undefined, no SQL is run. */
   schemaSql?: string;
-  /** Default SQL to run if schemaSql is not provided. If undefined, no SQL is run. */
-  defaultSchema?: string;
 }
 
 /**
@@ -284,14 +282,13 @@ export interface DbTestFixtureOptions {
 export async function setupDbTestFixture(
   options: DbTestFixtureOptions,
 ): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
-  const { connectionString, createTempDir, fixtureSubdir, schemaSql, defaultSchema } = options;
+  const { connectionString, createTempDir, fixtureSubdir, schemaSql } = options;
   const { withClient } = await import('@prisma-next/test-utils');
 
-  // Run schema SQL if provided, or use default if specified
-  const sqlToRun = schemaSql ?? defaultSchema;
-  if (sqlToRun) {
+  // Run schema SQL if provided
+  if (schemaSql) {
     await withClient(connectionString, async (client) => {
-      await client.query(sqlToRun);
+      await client.query(schemaSql);
     });
   }
 
@@ -334,8 +331,7 @@ export async function setupDbSignFixture(
     connectionString,
     createTempDir,
     fixtureSubdir,
-    ...(schemaSql !== undefined ? { schemaSql } : {}),
-    defaultSchema: DEFAULT_USER_TABLE_SQL,
+    schemaSql: schemaSql ?? DEFAULT_USER_TABLE_SQL,
   });
 }
 
@@ -377,7 +373,6 @@ export async function setupDbInitFixture(
     createTempDir,
     fixtureSubdir,
     ...(schemaSql !== undefined ? { schemaSql } : {}),
-    // No defaultSchema - only run SQL if explicitly provided
   });
 }
 
