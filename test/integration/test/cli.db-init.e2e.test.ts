@@ -104,7 +104,7 @@ withTempDir(({ createTempDir }) => {
             // Verify table was created
             await withClient(connectionString, async (client) => {
               const result = await client.query(`
-                SELECT table_name FROM information_schema.tables 
+                SELECT table_name FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_name = 'user'
               `);
               expect(result.rows.length).toBe(1);
@@ -188,14 +188,14 @@ withTempDir(({ createTempDir }) => {
             await withClient(connectionString, async (client) => {
               // Table should NOT exist
               const tableResult = await client.query(`
-                SELECT table_name FROM information_schema.tables 
+                SELECT table_name FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_name = 'user'
               `);
               expect(tableResult.rows.length).toBe(0);
 
               // Marker should NOT exist
               const schemaResult = await client.query(`
-                SELECT schema_name FROM information_schema.schemata 
+                SELECT schema_name FROM information_schema.schemata
                 WHERE schema_name = 'prisma_contract'
               `);
               expect(schemaResult.rows.length).toBe(0);
@@ -293,16 +293,9 @@ withTempDir(({ createTempDir }) => {
             const configPath = testSetup.configPath;
 
             // Don't emit contract - it should be missing
-            const command = createDbInitCommand();
-            const originalCwd = process.cwd();
-            try {
-              process.chdir(testSetup.testDir);
-              await expect(
-                executeCommand(command, ['--config', configPath, '--no-color']),
-              ).rejects.toThrow();
-            } finally {
-              process.chdir(originalCwd);
-            }
+            await expect(
+              runDbInit(testSetup, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow();
 
             // Verify error output
             const errorOutput = consoleErrors.join('\n');
