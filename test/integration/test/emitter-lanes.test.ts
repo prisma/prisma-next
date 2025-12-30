@@ -307,6 +307,8 @@ describe('emitter → lanes integration', () => {
     // Cast to ContractIR for the emitter (SqlContract has all required ContractIR fields)
     const ir2 = validatedContract as unknown as ContractIR;
 
+    // Intentionally load extension packs independently a second time to ensure
+    // the emit -> validate -> re-emit flow produces consistent results
     const packs2 = loadExtensionPacks(
       join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
       [],

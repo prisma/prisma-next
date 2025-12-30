@@ -378,6 +378,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../emitter
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-core/shared/utils
       arktype:
         specifier: ^2.0.0
         version: 2.1.26
@@ -1286,6 +1289,9 @@ importers:
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/3-targets/postgres
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/1-core/shared/utils
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

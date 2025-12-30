@@ -193,7 +193,7 @@ describe('builder integration', () => {
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const _plan = sql<typeof contract, CodecTypes>({ context })
+    const _plan = sql<typeof contract>({ context })
       .from(userTable)
       .select({
         id: userTable.columns.id!,
@@ -244,7 +244,7 @@ describe('builder integration', () => {
     const userTable = tables.user;
     if (!userTable) throw new Error('user table not found');
 
-    const _plan = sql<typeof contract, CodecTypes>({ context })
+    const _plan = sql<typeof contract>({ context })
       .from(userTable)
       .select({
         id: userTable.columns.id!,
@@ -296,13 +296,11 @@ describe('builder integration', () => {
     expect(builderContract.schemaVersion).toBe(fixtureContract.schemaVersion);
     expect(builderContract.target).toBe(fixtureContract.target);
     expect(builderContract.targetFamily).toBe(fixtureContract.targetFamily);
-    const builderUserTable = builderContract.storage.tables.user;
-    const fixtureUserTable = fixtureContract.storage.tables.user;
-    expect(builderUserTable?.columns.id?.codecId).toBe(fixtureUserTable?.columns.id?.codecId);
-    expect(builderUserTable?.columns.email?.codecId).toBe(fixtureUserTable?.columns.email?.codecId);
-    expect(builderUserTable?.columns.createdAt?.codecId).toBe(
-      fixtureUserTable?.columns.createdAt?.codecId,
-    );
+    expect(builderContract.storage.tables.user.columns).toMatchObject({
+      id: { codecId: fixtureContract.storage.tables.user.columns.id.codecId },
+      email: { codecId: fixtureContract.storage.tables.user.columns.email.codecId },
+      createdAt: { codecId: fixtureContract.storage.tables.user.columns.createdAt.codecId },
+    });
     const builderUserModel = builderContract.models.User as unknown as ModelDefinition;
     const fixtureUserModel = fixtureContract.models.User as unknown as ModelDefinition;
     expect(builderUserModel.storage.table).toBe(fixtureUserModel.storage.table);
@@ -342,8 +340,10 @@ describe('builder integration', () => {
     expectTypeOf(contract.storage.tables.user.columns.id.codecId).toExtend<string>();
     expectTypeOf(contract.storage.tables.user.columns.email.codecId).toExtend<string>();
     // Runtime check that they match expected values
-    expect(contract.storage.tables.user.columns.id.codecId).toBe('pg/int4@1');
-    expect(contract.storage.tables.user.columns.email.codecId).toBe('pg/text@1');
+    expect(contract.storage.tables.user.columns).toMatchObject({
+      id: { codecId: 'pg/int4@1' },
+      email: { codecId: 'pg/text@1' },
+    });
   });
 
   it('accepts any codecId format in descriptor (validation happens at runtime)', () => {
@@ -512,36 +512,30 @@ describe('builder integration', () => {
         .build();
 
       // Runtime checks
-      const relations = contract.relations as Record<string, Record<string, unknown>>;
-      const userRelations = relations['user'] as Record<string, unknown>;
-      const roleRelations = relations['role'] as Record<string, unknown>;
-      expect(userRelations).toBeDefined();
-      expect(userRelations['roles']).toBeDefined();
-      const userRoles = userRelations['roles'] as {
-        to: string;
-        cardinality: string;
-        through?: { table: string; parentCols: readonly string[]; childCols: readonly string[] };
-      };
-      expect(userRoles.to).toBe('Role');
-      expect(userRoles.cardinality).toBe('N:M');
-      expect(userRoles.through).toBeDefined();
-      expect(userRoles.through?.table).toBe('userRole');
-      expect(userRoles.through?.parentCols).toEqual(['id']);
-      expect(userRoles.through?.childCols).toEqual(['userId']);
-
-      expect(roleRelations).toBeDefined();
-      expect(roleRelations['users']).toBeDefined();
-      const roleUsers = roleRelations['users'] as {
-        to: string;
-        cardinality: string;
-        through?: { table: string; parentCols: readonly string[]; childCols: readonly string[] };
-      };
-      expect(roleUsers.to).toBe('User');
-      expect(roleUsers.cardinality).toBe('N:M');
-      expect(roleUsers.through).toBeDefined();
-      expect(roleUsers.through?.table).toBe('userRole');
-      expect(roleUsers.through?.parentCols).toEqual(['id']);
-      expect(roleUsers.through?.childCols).toEqual(['roleId']);
+      expect(contract.relations).toMatchObject({
+        user: {
+          roles: {
+            to: 'Role',
+            cardinality: 'N:M',
+            through: {
+              table: 'userRole',
+              parentCols: ['id'],
+              childCols: ['userId'],
+            },
+          },
+        },
+        role: {
+          users: {
+            to: 'User',
+            cardinality: 'N:M',
+            through: {
+              table: 'userRole',
+              parentCols: ['id'],
+              childCols: ['roleId'],
+            },
+          },
+        },
+      });
     });
 
     it('validates parentTable matches model table', () => {

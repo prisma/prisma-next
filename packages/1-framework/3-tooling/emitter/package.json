@@ -33,6 +33,10 @@
     ".": {
       "types": "./dist/exports/index.d.ts",
       "import": "./dist/exports/index.js"
+    },
+    "./test/utils": {
+      "types": "./dist/test/utils.d.ts",
+      "import": "./dist/test/utils.js"
     }
   }
 }

@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { afterEach, beforeEach } from 'vitest';
 // Note: executeCommand and other test helpers are re-exported at the bottom of this file
 // They come from the CLI package's test utilities but are not exported from the package
 // We import them directly from the source file
@@ -258,29 +259,30 @@ export function setupTestDirectory(): {
   return { testDir, contractPath, outputDir, configPath, cleanup };
 }
 
+export interface DbTestFixtureOptions {
+  connectionString: string;
+  createTempDir: () => string;
+  fixtureSubdir: string;
+  /** SQL to run before setting up the test directory. If undefined, no SQL is run. */
+  schemaSql?: string;
+}
+
 /**
- * Sets up a database schema and test directory for db-sign e2e tests.
- * Creates a "user" table with id and email columns, sets up the test directory,
- * and emits the contract. Returns the test setup and config path.
+ * Sets up a test directory for database CLI e2e tests.
+ * Optionally creates a database schema and emits the contract.
  */
-export async function setupDbSignFixture(
-  connectionString: string,
-  createTempDir: () => string,
-  fixtureSubdir: string,
-  schemaSql?: string,
+export async function setupDbTestFixture(
+  options: DbTestFixtureOptions,
 ): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
+  const { connectionString, createTempDir, fixtureSubdir, schemaSql } = options;
   const { withClient } = await import('@prisma-next/test-utils');
-  await withClient(connectionString, async (client) => {
-    await client.query(
-      schemaSql ??
-        `
-        CREATE TABLE IF NOT EXISTS "user" (
-          id SERIAL PRIMARY KEY,
-          email TEXT NOT NULL
-        )
-      `,
-    );
-  });
+
+  // Run schema SQL if provided
+  if (schemaSql) {
+    await withClient(connectionString, async (client) => {
+      await client.query(schemaSql);
+    });
+  }
 
   const testSetup = setupTestDirectoryFromFixtures(
     createTempDir,
@@ -290,7 +292,7 @@ export async function setupDbSignFixture(
   );
   const configPath = testSetup.configPath;
 
-  // Emit contract first
+  // Emit contract
   const { createContractEmitCommand } = await import(
     '../../../../packages/1-framework/3-tooling/cli/src/commands/contract-emit'
   );
@@ -306,33 +308,65 @@ export async function setupDbSignFixture(
   return { testSetup, configPath };
 }
 
-/**
- * Runs the db-sign command with the given arguments.
- * Handles process.chdir and restores the original working directory.
- */
-export async function runDbSign(
-  testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>,
-  _configPath: string,
-  args: string[],
-): Promise<number> {
-  const { createDbSignCommand } = await import(
-    '../../../../packages/1-framework/3-tooling/cli/src/commands/db-sign'
-  );
-  const command = createDbSignCommand();
-  const originalCwd = process.cwd();
-  try {
-    process.chdir(testSetup.testDir);
-    return await executeCommand(command, args);
-  } finally {
-    process.chdir(originalCwd);
-  }
-}
-
 // Re-export framework-agnostic helpers from CLI package
 // Note: These are imported directly from source since they're not exported from the package
 export {
   executeCommand,
   getExitCode,
+  resetExitCode,
   setupCommandMocks,
-  withTempDir,
 } from '../../../../packages/1-framework/3-tooling/cli/test/utils/test-helpers';
+
+/**
+ * Decorator that wraps test suites to automatically manage temporary directory cleanup.
+ * Creates directories within the fixture app directory so jiti can resolve workspace packages.
+ * Sets up `beforeEach` and `afterEach` hooks to track and clean up directories per test.
+ *
+ * @example
+ * ```typescript
+ * withTempDir(({ createTempDir }) => {
+ *   describe('test suite', () => {
+ *     it('test', () => {
+ *       const testDir = createTempDir();
+ *       // ... use testDir
+ *       // Directory is automatically cleaned up after the test
+ *     });
+ *   });
+ * });
+ * ```
+ */
+export function withTempDir(callback: (context: { createTempDir: () => string }) => void): void {
+  const tempDirs = new Set<string>();
+
+  beforeEach(() => {
+    // Reset the set of directories for each test
+    tempDirs.clear();
+  });
+
+  afterEach(() => {
+    // Clean up all directories created during this test
+    for (const dir of tempDirs) {
+      try {
+        if (existsSync(dir)) {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      } catch (_error) {
+        // Ignore cleanup errors
+      }
+    }
+    tempDirs.clear();
+  });
+
+  const createTempDir = (): string => {
+    // Create directories within the fixture app so jiti can resolve workspace packages
+    const testDir = join(
+      fixtureAppDir,
+      `test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    mkdirSync(testDir, { recursive: true });
+    tempDirs.add(testDir);
+    return testDir;
+  };
+
+  callback({ createTempDir });
+}

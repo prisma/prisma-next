@@ -606,6 +606,156 @@ interface FamilyInstance {
 
 The SQL family provides this via `@prisma-next/family-sql/control`. The `sign()` method handles ensuring the marker schema/table exist, reading existing markers, comparing hashes, and writing/updating markers internally.
 
+### `prisma-next db init`
+
+Initialize a database schema from the contract. This command generates a migration plan to bring an empty database in sync with the contract and executes it.
+
+**Command:**
+```bash
+prisma-next db init [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+Options:
+- `--db <url>`: Database connection string (optional, falls back to `config.db.url` or `DATABASE_URL` environment variable)
+- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
+- `--plan`: Only show the migration plan, do not apply it
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+- `-vv, --trace`: Trace output (deep internals, stack traces)
+- `--timestamps`: Add timestamps to output
+- `--color/--no-color`: Force/disable color output
+
+Examples:
+```bash
+# Initialize database with config defaults
+prisma-next db init
+
+# Preview migration plan without applying
+prisma-next db init --plan
+
+# Specify database URL
+prisma-next db init --db postgresql://user:pass@localhost/db
+
+# JSON output
+prisma-next db init --json
+```
+
+**Config File Requirements:**
+
+The `db init` command requires a `driver` in the config to connect to the database:
+
+```typescript
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+import postgres from '@prisma-next/target-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+import { contract } from './prisma/contract';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensions: [],
+  contract: {
+    source: contract,
+    output: 'src/prisma/contract.json',
+    types: 'src/prisma/contract.d.ts',
+  },
+  db: {
+    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+  },
+});
+```
+
+**Initialization Process:**
+
+1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
+2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions
+4. **Introspect Schema**: Calls `familyInstance.introspect()` to get the current database schema IR
+5. **Create Planner/Runner**: Asks the target to construct a `MigrationPlanner` and `MigrationRunner`
+6. **Plan Migration**: Calls `planner.plan()` with the contract IR, schema IR, and additive-only policy
+   - On conflict: Returns a structured failure with conflict list
+   - On success: Returns a migration plan with operations
+7. **Apply Migration** (if not `--plan`):
+   - Calls `runner.execute()` to apply the plan
+   - Runner executes pre/post checks for each operation
+   - After execution, verifies schema matches contract
+   - Writes contract marker and ledger entry
+
+**Output Format (TTY - Plan Mode):**
+
+```
+prisma-next db init ➜ Initialize database schema from contract
+  config:          prisma-next.config.ts
+  contract:        src/prisma/contract.json
+  database:        localhost:5432/mydb
+
+Migration Plan (4 operations)
+├─ Create extension "plpgsql"
+├─ Create table "user"
+│   ├─ id: int4 (not null, primary key)
+│   └─ email: text (not null)
+└─ Create unique index "user_email_key"
+
+Run without --plan to apply this migration.
+```
+
+**Output Format (TTY - Apply Mode):**
+
+```
+prisma-next db init ➜ Initialize database schema from contract
+  config:          prisma-next.config.ts
+  contract:        src/prisma/contract.json
+  database:        localhost:5432/mydb
+
+✔ Applied 4 migration operations
+  ├─ Created extension "plpgsql"
+  ├─ Created table "user"
+  └─ Created unique index "user_email_key"
+✔ Contract marker written
+  coreHash: sha256:abc123...
+✔ Ledger entry recorded
+```
+
+**Output Format (JSON):**
+
+```json
+{
+  "ok": true,
+  "mode": "apply",
+  "plan": {
+    "operations": [...],
+    "conflicts": []
+  },
+  "execution": {
+    "operations": [...],
+    "marker": {
+      "coreHash": "sha256:abc123...",
+      "profileHash": "sha256:def456..."
+    },
+    "ledger": {
+      "id": "ledger-entry-uuid",
+      "createdAt": "2025-01-01T00:00:00Z"
+    }
+  }
+}
+```
+
+**Error Codes:**
+- `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
+- `PN-CLI-4011`: Missing database URL — provide `--db` flag or `config.db.url` or `DATABASE_URL` environment variable
+- `PN-CLI-4011`: Migration planning failed due to conflicts (exit code 1)
+- `PN-CLI-4012`: Target does not support migrations
+
+**Current Limitations (v1):**
+- Only supports empty databases (no existing tables)
+- Non-empty databases result in a planning failure with conflict details
+- Future `db update` command will support additive changes to existing schemas
+
 **Config File (`prisma-next.config.ts`):**
 
 The CLI uses a config file to specify the target family, target, adapter, extensions, and contract.
@@ -832,6 +982,7 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli`** (main export): Exports `loadContractFromTs` and `createContractEmitCommand`
 - **`@prisma-next/cli/config-types`**: Exports `defineConfig` and config types
 - **`@prisma-next/cli/pack-loading`**: Exports `loadExtensionPacks` and `loadExtensionPackManifest`
+- **`@prisma-next/cli/commands/db-init`**: Exports `createDbInitCommand`
 - **`@prisma-next/cli/commands/db-introspect`**: Exports `createDbIntrospectCommand`
 - **`@prisma-next/cli/commands/db-schema-verify`**: Exports `createDbSchemaVerifyCommand`
 - **`@prisma-next/cli/commands/db-sign`**: Exports `createDbSignCommand`

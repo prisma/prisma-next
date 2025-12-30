@@ -7,15 +7,59 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
   getExitCode,
-  runDbSign,
   setupCommandMocks,
-  setupDbSignFixture,
+  setupDbTestFixture,
   setupTestDirectoryFromFixtures,
   withTempDir,
 } from './utils/cli-test-helpers';
 
 // Fixture subdirectory for db-sign e2e tests
 const fixtureSubdir = 'db-sign';
+
+// Default schema for db-sign tests
+const DEFAULT_USER_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS "user" (
+    id SERIAL PRIMARY KEY,
+    email TEXT NOT NULL
+  )
+`;
+
+/**
+ * Sets up a database schema and test directory for db-sign e2e tests.
+ * Creates a "user" table with id and email columns by default.
+ */
+async function setupDbSignFixture(
+  connectionString: string,
+  createTempDir: () => string,
+  fixtureSubdir: string,
+  schemaSql?: string,
+): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
+  return setupDbTestFixture({
+    connectionString,
+    createTempDir,
+    fixtureSubdir,
+    schemaSql: schemaSql ?? DEFAULT_USER_TABLE_SQL,
+  });
+}
+
+/**
+ * Runs the db-sign command with the given arguments.
+ * Handles process.chdir and restores the original working directory.
+ */
+async function runDbSign(
+  testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>,
+  _configPath: string,
+  args: string[],
+): Promise<number> {
+  const command = createDbSignCommand();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(testSetup.testDir);
+    return await executeCommand(command, args);
+  } finally {
+    process.chdir(originalCwd);
+  }
+}
 
 withTempDir(({ createTempDir }) => {
   describe('db sign command (e2e)', () => {
