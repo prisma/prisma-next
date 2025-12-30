@@ -41,7 +41,6 @@ async function runTscAndAssertSuccess(
     if (stderr?.trim() && !stderr.includes('Found 0 errors')) {
       throw new Error(`TypeScript compilation failed:\n${stderr}`);
     }
-    // If we get here without throwing, TypeScript compilation succeeded
   } catch (error: unknown) {
     if (error && typeof error === 'object') {
       const errorObj = error as { stderr?: string; stdout?: string; message?: string };
