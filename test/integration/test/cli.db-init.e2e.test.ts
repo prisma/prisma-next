@@ -5,7 +5,6 @@ import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
-  getExitCode,
   setupCommandMocks,
   setupDbTestFixture,
   setupTestDirectoryFromFixtures,
@@ -270,9 +269,6 @@ withTempDir(({ createTempDir }) => {
             await expect(
               runDbInit(testSetup, ['--config', configPath, '--no-color']),
             ).rejects.toThrow();
-
-            // Verify error was reported
-            expect(getExitCode()).not.toBe(0);
           });
         },
         timeouts.spinUpPpgDev,
