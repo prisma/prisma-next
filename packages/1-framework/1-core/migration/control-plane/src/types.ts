@@ -1,7 +1,26 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { TargetFamilyHook } from '@prisma-next/contract/types';
+import type { TargetMigrationsCapability } from './migrations';
 import type { CoreSchemaView } from './schema-view';
+
+// Re-export migration types for convenience
+export type {
+  MigrationOperationClass,
+  MigrationOperationPolicy,
+  MigrationPlan,
+  MigrationPlanner,
+  MigrationPlannerConflict,
+  MigrationPlannerFailureResult,
+  MigrationPlannerResult,
+  MigrationPlannerSuccessResult,
+  MigrationPlanOperation,
+  MigrationRunner,
+  MigrationRunnerFailure,
+  MigrationRunnerResult,
+  MigrationRunnerSuccessValue,
+  TargetMigrationsCapability,
+} from './migrations';
 
 // ============================================================================
 // Control*Instance Base Interfaces (ADR 151)
@@ -161,6 +180,11 @@ export interface ControlTargetDescriptor<
   readonly familyId: TFamilyId;
   readonly targetId: TTargetId;
   readonly manifest: ExtensionPackManifest;
+  /**
+   * Optional migrations capability.
+   * Targets that support migrations expose this property.
+   */
+  readonly migrations?: TargetMigrationsCapability<TFamilyId>;
   create(): TTargetInstance;
 }
 
