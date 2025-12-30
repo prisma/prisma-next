@@ -1,4 +1,10 @@
-import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import type {
+  AdapterDescriptor,
+  DriverDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/contract/framework-components';
 import type { FamilyInstance } from '@prisma-next/contract/types';
 
 // ============================================================================
@@ -82,11 +88,7 @@ export interface RuntimeExtensionInstance<
 export interface RuntimeFamilyDescriptor<
   TFamilyId extends string,
   TFamilyInstance extends RuntimeFamilyInstance<TFamilyId> = RuntimeFamilyInstance<TFamilyId>,
-> {
-  readonly kind: 'family';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly manifest: ExtensionPackManifest;
+> extends FamilyDescriptor<TFamilyId> {
   create<TTargetId extends string>(options: {
     readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
     readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId>;
@@ -109,12 +111,7 @@ export interface RuntimeTargetDescriptor<
     TFamilyId,
     TTargetId
   >,
-> {
-  readonly kind: 'target';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends TargetDescriptor<TFamilyId, TTargetId> {
   create(): TTargetInstance;
 }
 
@@ -132,12 +129,7 @@ export interface RuntimeAdapterDescriptor<
     TFamilyId,
     TTargetId
   >,
-> {
-  readonly kind: 'adapter';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends AdapterDescriptor<TFamilyId, TTargetId> {
   create(): TAdapterInstance;
 }
 
@@ -152,12 +144,7 @@ export interface RuntimeDriverDescriptor<
   TFamilyId extends string,
   TTargetId extends string,
   TDriverInstance extends RuntimeDriverInstance<TTargetId> = RuntimeDriverInstance<TTargetId>,
-> {
-  readonly kind: 'driver';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends DriverDescriptor<TFamilyId, TTargetId> {
   create(options: unknown): TDriverInstance;
 }
 
@@ -175,11 +162,6 @@ export interface RuntimeExtensionDescriptor<
     TFamilyId,
     TTargetId
   > = RuntimeExtensionInstance<TFamilyId, TTargetId>,
-> {
-  readonly kind: 'extension';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends ExtensionDescriptor<TFamilyId, TTargetId> {
   create(): TExtensionInstance;
 }
