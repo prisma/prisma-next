@@ -248,7 +248,7 @@ export interface ControlFamilyDescriptor<
 }
 
 /**
- * Descriptor for a control-plane target pack (e.g., Postgres target).
+ * Descriptor for a control-plane target component (e.g., Postgres target).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -273,7 +273,7 @@ export interface ControlTargetDescriptor<
 }
 
 /**
- * Descriptor for a control-plane adapter pack (e.g., Postgres adapter).
+ * Descriptor for a control-plane adapter component (e.g., Postgres adapter).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -291,7 +291,7 @@ export interface ControlAdapterDescriptor<
 }
 
 /**
- * Descriptor for a control-plane driver pack (e.g., Postgres driver).
+ * Descriptor for a control-plane driver component (e.g., Postgres driver).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -306,7 +306,7 @@ export interface ControlDriverDescriptor<
 }
 
 /**
- * Descriptor for a control-plane extension pack (e.g., pgvector).
+ * Descriptor for a control-plane extension component (e.g., pgvector).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')

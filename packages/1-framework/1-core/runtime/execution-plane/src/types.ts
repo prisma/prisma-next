@@ -98,7 +98,7 @@ export interface RuntimeFamilyDescriptor<
 }
 
 /**
- * Descriptor for an execution/runtime-plane target pack (e.g., Postgres target).
+ * Descriptor for an execution/runtime-plane target component (e.g., Postgres target).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -116,7 +116,7 @@ export interface RuntimeTargetDescriptor<
 }
 
 /**
- * Descriptor for an execution/runtime-plane adapter pack (e.g., Postgres adapter).
+ * Descriptor for an execution/runtime-plane adapter component (e.g., Postgres adapter).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -134,7 +134,7 @@ export interface RuntimeAdapterDescriptor<
 }
 
 /**
- * Descriptor for an execution/runtime-plane driver pack (e.g., Postgres driver).
+ * Descriptor for an execution/runtime-plane driver component (e.g., Postgres driver).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -149,7 +149,7 @@ export interface RuntimeDriverDescriptor<
 }
 
 /**
- * Descriptor for an execution/runtime-plane extension pack (e.g., pgvector).
+ * Descriptor for an execution/runtime-plane extension component (e.g., pgvector).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
