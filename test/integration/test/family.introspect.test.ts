@@ -83,11 +83,7 @@ describe('family instance introspect', () => {
     it(
       'returns schema IR with tables and columns',
       async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        await withIntrospection(connectionString, (schemaIR) => {
+        await withIntrospection(connectionString!, (schemaIR) => {
           expect(schemaIR).toBeDefined();
           expect(schemaIR.tables).toBeDefined();
           expect(schemaIR.extensions).toBeDefined();
@@ -100,42 +96,22 @@ describe('family instance introspect', () => {
     it(
       'includes user table with correct columns',
       async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        await withIntrospection(connectionString, (schemaIR) => {
-          const userTable = schemaIR.tables['user'];
-          expect(userTable).toBeDefined();
-          if (!userTable) {
-            throw new Error('user table not found');
-          }
+        await withIntrospection(connectionString!, (schemaIR) => {
+          const userTable = schemaIR.tables['user']!;
           expect(userTable.name).toBe('user');
           expect(userTable.columns).toBeDefined();
 
-          const idColumn = userTable.columns['id'];
-          expect(idColumn).toBeDefined();
-          if (!idColumn) {
-            throw new Error('id column not found');
-          }
+          const idColumn = userTable.columns['id']!;
           expect(idColumn.name).toBe('id');
           expect(idColumn.nativeType).toBeDefined();
           expect(idColumn.nullable).toBe(false);
 
-          const emailColumn = userTable.columns['email'];
-          expect(emailColumn).toBeDefined();
-          if (!emailColumn) {
-            throw new Error('email column not found');
-          }
+          const emailColumn = userTable.columns['email']!;
           expect(emailColumn.name).toBe('email');
           expect(emailColumn.nativeType).toBeDefined();
           expect(emailColumn.nullable).toBe(false);
 
-          const createdAtColumn = userTable.columns['createdAt'];
-          expect(createdAtColumn).toBeDefined();
-          if (!createdAtColumn) {
-            throw new Error('createdAt column not found');
-          }
+          const createdAtColumn = userTable.columns['createdAt']!;
           expect(createdAtColumn.name).toBe('createdAt');
           expect(createdAtColumn.nativeType).toBeDefined();
           expect(createdAtColumn.nullable).toBe(false);
@@ -147,16 +123,8 @@ describe('family instance introspect', () => {
     it(
       'includes primary key for user table',
       async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        await withIntrospection(connectionString, (schemaIR) => {
-          const userTable = schemaIR.tables['user'];
-          expect(userTable).toBeDefined();
-          if (!userTable) {
-            throw new Error('user table not found');
-          }
+        await withIntrospection(connectionString!, (schemaIR) => {
+          const userTable = schemaIR.tables['user']!;
           expect(userTable.primaryKey).toBeDefined();
           expect(userTable.primaryKey?.columns).toEqual(['id']);
         });
@@ -167,16 +135,8 @@ describe('family instance introspect', () => {
     it(
       'includes unique constraint for user email',
       async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        await withIntrospection(connectionString, (schemaIR) => {
-          const userTable = schemaIR.tables['user'];
-          expect(userTable).toBeDefined();
-          if (!userTable) {
-            throw new Error('user table not found');
-          }
+        await withIntrospection(connectionString!, (schemaIR) => {
+          const userTable = schemaIR.tables['user']!;
           expect(userTable.uniques).toBeDefined();
           expect(userTable.uniques.length).toBeGreaterThan(0);
           const emailUnique = userTable.uniques.find((uq) => uq.name === 'user_email_unique');
@@ -190,16 +150,8 @@ describe('family instance introspect', () => {
     it(
       'includes post table with foreign key to user',
       async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        await withIntrospection(connectionString, (schemaIR) => {
-          const postTable = schemaIR.tables['post'];
-          expect(postTable).toBeDefined();
-          if (!postTable) {
-            throw new Error('post table not found');
-          }
+        await withIntrospection(connectionString!, (schemaIR) => {
+          const postTable = schemaIR.tables['post']!;
           expect(postTable.name).toBe('post');
           expect(postTable.columns['id']).toBeDefined();
           expect(postTable.columns['userId']).toBeDefined();
@@ -207,10 +159,7 @@ describe('family instance introspect', () => {
 
           expect(postTable.foreignKeys).toBeDefined();
           expect(postTable.foreignKeys.length).toBe(1);
-          const fk = postTable.foreignKeys[0];
-          if (!fk) {
-            throw new Error('foreign key not found');
-          }
+          const fk = postTable.foreignKeys[0]!;
           expect(fk.columns).toEqual(['userId']);
           expect(fk.referencedTable).toBe('user');
           expect(fk.referencedColumns).toEqual(['id']);
@@ -222,16 +171,8 @@ describe('family instance introspect', () => {
     it(
       'includes indexes for post table',
       async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        await withIntrospection(connectionString, (schemaIR) => {
-          const postTable = schemaIR.tables['post'];
-          expect(postTable).toBeDefined();
-          if (!postTable) {
-            throw new Error('post table not found');
-          }
+        await withIntrospection(connectionString!, (schemaIR) => {
+          const postTable = schemaIR.tables['post']!;
           expect(postTable.indexes).toBeDefined();
           expect(postTable.indexes.length).toBeGreaterThan(0);
           const userIdIndex = postTable.indexes.find((idx) => idx.name === 'post_userId_idx');
@@ -245,11 +186,7 @@ describe('family instance introspect', () => {
     it(
       'includes Postgres annotations',
       async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        await withIntrospection(connectionString, (schemaIR) => {
+        await withIntrospection(connectionString!, (schemaIR) => {
           expect(schemaIR.annotations).toBeDefined();
           expect(schemaIR.annotations?.['pg']).toBeDefined();
         });
@@ -308,11 +245,7 @@ describe('family instance introspect', () => {
     it(
       'returns extensions array',
       async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        await withIntrospection(connectionString, (schemaIR) => {
+        await withIntrospection(connectionString!, (schemaIR) => {
           expect(schemaIR.extensions).toBeDefined();
           expect(Array.isArray(schemaIR.extensions)).toBe(true);
           expect(schemaIR.extensions.length).toBeGreaterThanOrEqual(0);

@@ -30,7 +30,7 @@ async function runTscAndAssertSuccess(
   contractDtsContent: string,
 ): Promise<void> {
   try {
-    const { stdout, stderr } = await execFileAsync(
+    const { stderr } = await execFileAsync(
       'pnpm',
       ['exec', 'tsc', '--noEmit', '--project', tsconfigPath],
       {
@@ -41,9 +41,7 @@ async function runTscAndAssertSuccess(
     if (stderr?.trim() && !stderr.includes('Found 0 errors')) {
       throw new Error(`TypeScript compilation failed:\n${stderr}`);
     }
-
-    // If we get here, all imports resolved successfully
-    expect(stdout).toBeDefined();
+    // If we get here without throwing, TypeScript compilation succeeded
   } catch (error: unknown) {
     if (error && typeof error === 'object') {
       const errorObj = error as { stderr?: string; stdout?: string; message?: string };
