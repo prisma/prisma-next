@@ -1289,6 +1289,9 @@ importers:
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/3-targets/postgres
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/1-core/shared/utils
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

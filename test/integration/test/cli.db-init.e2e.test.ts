@@ -1,6 +1,6 @@
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { ifDefined } from '@prisma-next/utils';
+import { ifDefined } from '@prisma-next/utils/defined';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
