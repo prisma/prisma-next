@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
-import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
+import type { ControlFamilyInstance } from '@prisma-next/core-control-plane/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers';
@@ -56,7 +56,7 @@ describe('emitContract API', () => {
         adapter: config.adapter,
         driver: config.driver,
         extensions: config.extensions ?? [],
-      }) as FamilyInstance<string>;
+      }) as ControlFamilyInstance<string>;
 
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
@@ -121,7 +121,7 @@ describe('emitContract API', () => {
         adapter: config.adapter,
         driver: config.driver,
         extensions: config.extensions ?? [],
-      }) as FamilyInstance<string>;
+      }) as ControlFamilyInstance<string>;
 
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
@@ -181,7 +181,7 @@ describe('emitContract API', () => {
           adapter: config.adapter,
           driver: config.driver,
           extensions: config.extensions ?? [],
-        }) as FamilyInstance<string>;
+        }) as ControlFamilyInstance<string>;
 
         // emitContract handles stripping mappings and validation internally
         const result = await familyInstance.emitContract({ contractIR: contractRaw });
@@ -233,7 +233,7 @@ describe('emitContract API', () => {
         adapter: config.adapter,
         driver: config.driver,
         extensions: config.extensions ?? [],
-      }) as FamilyInstance<string>;
+      }) as ControlFamilyInstance<string>;
 
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
@@ -275,7 +275,7 @@ describe('emitContract API', () => {
         adapter: config.adapter,
         driver: config.driver,
         extensions: config.extensions ?? [],
-      }) as FamilyInstance<string>;
+      }) as ControlFamilyInstance<string>;
 
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
@@ -317,7 +317,7 @@ describe('emitContract API', () => {
         adapter: config.adapter,
         driver: config.driver,
         extensions: config.extensions ?? [],
-      }) as FamilyInstance<string>;
+      }) as ControlFamilyInstance<string>;
 
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
