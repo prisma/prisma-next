@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { afterEach, beforeEach } from 'vitest';
 // Note: executeCommand and other test helpers are re-exported at the bottom of this file
 // They come from the CLI package's test utilities but are not exported from the package
 // We import them directly from the source file
@@ -408,8 +409,6 @@ export {
   getExitCode,
   setupCommandMocks,
 } from '../../../../packages/1-framework/3-tooling/cli/test/utils/test-helpers';
-
-import { afterEach, beforeEach } from 'vitest';
 
 /**
  * Decorator that wraps test suites to automatically manage temporary directory cleanup.
