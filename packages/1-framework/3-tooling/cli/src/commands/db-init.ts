@@ -280,14 +280,12 @@ export function createDbInitCommand(): Command {
 
           // Plan migration
           const plannerResult = await withSpinner(
-            () =>
-              Promise.resolve(
-                planner.plan({
-                  contract: contractIR,
-                  schema: schemaIR,
-                  policy,
-                }),
-              ),
+            async () =>
+              planner.plan({
+                contract: contractIR,
+                schema: schemaIR,
+                policy,
+              }),
             {
               message: 'Planning migration...',
               flags,
@@ -299,11 +297,6 @@ export function createDbInitCommand(): Command {
           }
 
           const migrationPlan = plannerResult.plan;
-
-          // Add blank line after spinners
-          if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
-            console.log('');
-          }
 
           // Plan mode - don't execute
           if (options.plan) {
