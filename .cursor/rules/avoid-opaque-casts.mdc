@@ -1,0 +1,68 @@
+---
+description: Avoid opaque type casts like `as never[]` or `as unknown[]`
+globs:
+alwaysApply: true
+---
+
+# Avoid Opaque Type Casts
+
+**CRITICAL**: Avoid opaque type casts like `as never[]` or `as unknown[]` that hide the real type. Use explicit generic types instead.
+
+## The Problem
+
+Opaque casts hide the actual expected type, making code harder to understand and maintain:
+
+```typescript
+// ❌ WRONG: What type does extensions actually expect?
+export function createFamilyInstance(extensions: readonly unknown[] = []) {
+  return sql.create({
+    target: postgres,
+    adapter: postgresAdapter,
+    driver: postgresDriver,
+    extensions: extensions as never[],  // Hides the real type
+  });
+}
+```
+
+## The Solution
+
+Import and use the correct type explicitly:
+
+```typescript
+// ✅ CORRECT: Clear what type is expected
+import type { ControlExtensionDescriptor } from '@prisma-next/core-control-plane/types';
+
+export function createFamilyInstance(
+  extensions: readonly ControlExtensionDescriptor<'sql', 'postgres'>[] = [],
+) {
+  return sql.create({
+    target: postgres,
+    adapter: postgresAdapter,
+    driver: postgresDriver,
+    extensions,  // No cast needed - types match
+  });
+}
+```
+
+## When to Use This Pattern
+
+- When passing arrays to functions that expect specific types
+- When wrapping library functions with helper functions
+- When defining function parameters that will be passed to typed APIs
+
+## Benefits
+
+- **Self-documenting**: The type signature shows what's expected
+- **Type-safe**: TypeScript can verify callers pass correct types
+- **Discoverable**: IDE autocomplete works correctly
+- **Maintainable**: Changes to underlying types surface as compile errors
+
+## If Cast Is Unavoidable
+
+If a cast is absolutely necessary (e.g., due to complex generic inference), add a comment explaining why:
+
+```typescript
+// Cast required because TypeScript can't infer the generic from the callback return type.
+// Runtime shape: Array<{ id: string; version: string }>
+const items = result as SpecificType[];
+```
