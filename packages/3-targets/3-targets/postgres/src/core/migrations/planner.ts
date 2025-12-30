@@ -1,8 +1,8 @@
 import type {
   MigrationOperationPolicy,
-  MigrationPlanner,
-  MigrationPlannerPlanOptions,
-  MigrationPlanOperation,
+  SqlMigrationPlanner,
+  SqlMigrationPlannerPlanOptions,
+  SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import {
   createMigrationPlan,
@@ -46,17 +46,17 @@ const ADAPTER_LEVEL_EXTENSIONS = new Set(['pg', 'postgres']);
 
 export function createPostgresMigrationPlanner(
   config: Partial<PlannerConfig> = {},
-): MigrationPlanner<PostgresPlanTargetDetails> {
+): SqlMigrationPlanner<PostgresPlanTargetDetails> {
   return new PostgresMigrationPlanner({
     ...DEFAULT_PLANNER_CONFIG,
     ...config,
   });
 }
 
-class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDetails> {
+class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTargetDetails> {
   constructor(private readonly config: PlannerConfig) {}
 
-  plan(options: MigrationPlannerPlanOptions) {
+  plan(options: SqlMigrationPlannerPlanOptions) {
     const schemaName = options.schemaName ?? this.config.defaultSchema;
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) {
@@ -80,7 +80,7 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
       return extensionResult;
     }
 
-    const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
     operations.push(
       ...this.buildExtensionOperations(options.contract, schemaName),
@@ -145,10 +145,10 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
   private buildExtensionOperations(
     contract: SqlContract<SqlStorage>,
     schema: string,
-  ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
+  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const extensions = contract.extensions ?? {};
     const extensionNames = Object.keys(extensions);
-    const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
     // Extensions are validated in validateExtensions() before this method is called
     for (const extensionName of extensionNames) {
@@ -206,8 +206,8 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
   private buildTableOperations(
     tables: SqlContract<SqlStorage>['storage']['tables'],
     schema: string,
-  ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of sortedEntries(tables)) {
       const qualified = qualifyTableName(schema, tableName);
       operations.push({
@@ -245,8 +245,8 @@ class PostgresMigrationPlanner implements MigrationPlanner<PostgresPlanTargetDet
   private buildUniqueOperations(
     tables: SqlContract<SqlStorage>['storage']['tables'],
     schema: string,
-  ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of sortedEntries(tables)) {
       for (const unique of table.uniques) {
         const constraintName = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
@@ -288,8 +288,8 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   private buildIndexOperations(
     tables: SqlContract<SqlStorage>['storage']['tables'],
     schema: string,
-  ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of sortedEntries(tables)) {
       for (const index of table.indexes) {
         const indexName = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
@@ -332,8 +332,8 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   private buildForeignKeyOperations(
     tables: SqlContract<SqlStorage>['storage']['tables'],
     schema: string,
-  ): readonly MigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: MigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of sortedEntries(tables)) {
       for (const foreignKey of table.foreignKeys) {
         const fkName = foreignKey.name ?? `${tableName}_${foreignKey.columns.join('_')}_fkey`;
