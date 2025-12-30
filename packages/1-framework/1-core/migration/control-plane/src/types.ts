@@ -1,6 +1,6 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
-import type { TargetFamilyHook } from '@prisma-next/contract/types';
+import type { FamilyInstance, TargetFamilyHook } from '@prisma-next/contract/types';
 import type { TargetMigrationsCapability } from './migrations';
 import type { CoreSchemaView } from './schema-view';
 
@@ -27,13 +27,98 @@ export type {
 // ============================================================================
 
 /**
- * Base interface for control-plane family instances.
- * Families extend this with domain-specific methods.
+ * Control-plane family instance interface.
+ * Extends the base FamilyInstance with control-plane domain actions.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TSchemaIR - The schema IR type returned by introspect()
+ * @template TVerifyResult - The result type for verify()
+ * @template TSchemaVerifyResult - The result type for schemaVerify()
+ * @template TSignResult - The result type for sign()
  */
-export interface ControlFamilyInstance<TFamilyId extends string = string> {
-  readonly familyId: TFamilyId;
+export interface ControlFamilyInstance<
+  TFamilyId extends string = string,
+  TSchemaIR = unknown,
+  TVerifyResult = unknown,
+  TSchemaVerifyResult = unknown,
+  TSignResult = unknown,
+> extends FamilyInstance<TFamilyId> {
+  /**
+   * Validates a contract JSON and returns a validated ContractIR (without mappings).
+   * Mappings are runtime-only and should not be part of ContractIR.
+   */
+  validateContractIR(contractJson: unknown): unknown;
+
+  /**
+   * Verifies the database marker against the contract.
+   * Compares target, coreHash, and profileHash.
+   */
+  verify(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR: unknown;
+    readonly expectedTargetId: string;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<TVerifyResult>;
+
+  /**
+   * Verifies the database schema against the contract.
+   * Compares contract requirements against live database schema.
+   */
+  schemaVerify(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR: unknown;
+    readonly strict: boolean;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<TSchemaVerifyResult>;
+
+  /**
+   * Signs the database with the contract marker.
+   * Writes or updates the contract marker if schema verification passes.
+   * This operation is idempotent - if the marker already matches, no changes are made.
+   */
+  sign(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR: unknown;
+    readonly contractPath: string;
+    readonly configPath?: string;
+  }): Promise<TSignResult>;
+
+  /**
+   * Introspects the database schema and returns a family-specific schema IR.
+   *
+   * This is a read-only operation that returns a snapshot of the live database schema.
+   * The method is family-owned and delegates to target/adapter-specific introspectors
+   * to perform the actual schema introspection.
+   *
+   * @param options - Introspection options
+   * @param options.driver - Control plane driver for database connection
+   * @param options.contractIR - Optional contract IR for contract-guided introspection.
+   *   When provided, families may use it for filtering, optimization, or validation
+   *   during introspection. The contract IR does not change the meaning of "what exists"
+   *   in the database - it only guides how introspection is performed.
+   * @returns Promise resolving to the family-specific Schema IR (e.g., `SqlSchemaIR` for SQL).
+   *   The IR represents the complete schema snapshot at the time of introspection.
+   */
+  introspect(options: {
+    readonly driver: ControlDriverInstance;
+    readonly contractIR?: unknown;
+  }): Promise<TSchemaIR>;
+
+  /**
+   * Optionally projects a family-specific Schema IR into a core schema view.
+   * Families that provide this method enable rich tree output for CLI visualization.
+   * Families that do not provide it still support introspection via raw Schema IR.
+   */
+  toSchemaView?(schema: TSchemaIR): CoreSchemaView;
+
+  /**
+   * Emits contract JSON and DTS as strings.
+   * Uses the instance's preassembled state (operation registry, type imports, extension IDs).
+   * Handles stripping mappings and validation internally.
+   */
+  emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
 }
 
 /**
@@ -254,97 +339,6 @@ export interface ControlExtensionDescriptor<
   readonly targetId: TTargetId;
   readonly manifest: ExtensionPackManifest;
   create(): TExtensionInstance;
-}
-
-/**
- * Family instance interface for control-plane domain actions.
- * Each family implements this interface with family-specific types.
- */
-export interface FamilyInstance<
-  TFamilyId extends string,
-  TSchemaIR = unknown,
-  TVerifyResult = unknown,
-  TSchemaVerifyResult = unknown,
-  TSignResult = unknown,
-> {
-  readonly familyId: TFamilyId;
-
-  /**
-   * Validates a contract JSON and returns a validated ContractIR (without mappings).
-   * Mappings are runtime-only and should not be part of ContractIR.
-   */
-  validateContractIR(contractJson: unknown): unknown;
-
-  /**
-   * Verifies the database marker against the contract.
-   * Compares target, coreHash, and profileHash.
-   */
-  verify(options: {
-    readonly driver: ControlDriverInstance;
-    readonly contractIR: unknown;
-    readonly expectedTargetId: string;
-    readonly contractPath: string;
-    readonly configPath?: string;
-  }): Promise<TVerifyResult>;
-
-  /**
-   * Verifies the database schema against the contract.
-   * Compares contract requirements against live database schema.
-   */
-  schemaVerify(options: {
-    readonly driver: ControlDriverInstance;
-    readonly contractIR: unknown;
-    readonly strict: boolean;
-    readonly contractPath: string;
-    readonly configPath?: string;
-  }): Promise<TSchemaVerifyResult>;
-
-  /**
-   * Signs the database with the contract marker.
-   * Writes or updates the contract marker if schema verification passes.
-   * This operation is idempotent - if the marker already matches, no changes are made.
-   */
-  sign(options: {
-    readonly driver: ControlDriverInstance;
-    readonly contractIR: unknown;
-    readonly contractPath: string;
-    readonly configPath?: string;
-  }): Promise<TSignResult>;
-
-  /**
-   * Introspects the database schema and returns a family-specific schema IR.
-   *
-   * This is a read-only operation that returns a snapshot of the live database schema.
-   * The method is family-owned and delegates to target/adapter-specific introspectors
-   * to perform the actual schema introspection.
-   *
-   * @param options - Introspection options
-   * @param options.driver - Control plane driver for database connection
-   * @param options.contractIR - Optional contract IR for contract-guided introspection.
-   *   When provided, families may use it for filtering, optimization, or validation
-   *   during introspection. The contract IR does not change the meaning of "what exists"
-   *   in the database - it only guides how introspection is performed.
-   * @returns Promise resolving to the family-specific Schema IR (e.g., `SqlSchemaIR` for SQL).
-   *   The IR represents the complete schema snapshot at the time of introspection.
-   */
-  introspect(options: {
-    readonly driver: ControlDriverInstance;
-    readonly contractIR?: unknown;
-  }): Promise<TSchemaIR>;
-
-  /**
-   * Optionally projects a family-specific Schema IR into a core schema view.
-   * Families that provide this method enable rich tree output for CLI visualization.
-   * Families that do not provide it still support introspection via raw Schema IR.
-   */
-  toSchemaView?(schema: TSchemaIR): CoreSchemaView;
-
-  /**
-   * Emits contract JSON and DTS as strings.
-   * Uses the instance's preassembled state (operation registry, type imports, extension IDs).
-   * Handles stripping mappings and validation internally.
-   */
-  emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
 }
 
 /**
