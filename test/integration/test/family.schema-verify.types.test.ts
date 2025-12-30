@@ -103,6 +103,13 @@ describe('family instance schemaVerify - types', () => {
   });
 
   describe('type metadata registry', () => {
+    // Clean up user table before each test to avoid flaky tests
+    beforeEach(async () => {
+      await withClient(getConnectionString(), async (client) => {
+        await client.query('DROP TABLE IF EXISTS "user"');
+      });
+    }, timeouts.spinUpPpgDev);
+
     it('registry contains known type IDs with expected native types', () => {
       const familyInstance = createFamilyInstance();
       const registry = familyInstance.typeMetadataRegistry;
