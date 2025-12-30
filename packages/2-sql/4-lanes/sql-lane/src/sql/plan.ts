@@ -198,7 +198,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         return [alias, `include:${alias}`];
       }
 
-      return [alias, `${column.table}.${column.column}`];
+      return [alias, `${col.table}.${col.column}`];
     }),
   );
 

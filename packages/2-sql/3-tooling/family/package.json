@@ -6,12 +6,10 @@
   "description": "SQL family descriptor for Prisma Next",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "test": "vitest run --passWithNoTests",
-    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
-    "lint:fix": "biome check --write . --config-path ../../../biome.json",
-    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../biome.json",
     "clean": "node ../../../../scripts/clean.mjs"
   },
   "dependencies": {
@@ -28,11 +26,11 @@
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "arktype": "^2.0.0"
   },
   "devDependencies": {
     "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
@@ -62,6 +60,10 @@
     "./test-utils": {
       "types": "./dist/exports/test-utils.d.ts",
       "import": "./dist/exports/test-utils.js"
+    },
+    "./schema-verify": {
+      "types": "./dist/exports/schema-verify.d.ts",
+      "import": "./dist/exports/schema-verify.js"
     }
   }
 }

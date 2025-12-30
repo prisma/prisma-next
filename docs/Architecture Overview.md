@@ -110,6 +110,7 @@ Quick links to detailed subsystem specifications:
 - [Migration System](architecture%20docs/subsystems/7.%20Migration%20System.md) — Contract→contract edges, planner/runner, checks, and idempotency
 - [Preflight & CI Integration](architecture%20docs/subsystems/8.%20Preflight%20&%20CI%20Integration.md) — Shadow/EXPLAIN, policy gates, and CI flows
 - [No-Emit Workflow](architecture%20docs/subsystems/9.%20No-Emit%20Workflow.md) — TS-first authoring, watch plugins, and CI trust model
+- [Error Handling](Error%20Handling.md) — Shared taxonomy (failures vs operational errors vs bugs) and boundary conversion patterns
 
 ## Migration Plane — Self-Verifying Change
 
@@ -175,7 +176,7 @@ sequenceDiagram
 
 Notes
 - Family vs Target: “Target‑family” (SQL) applies to any SQL dialect; “target” is a concrete dialect (Postgres, MySQL). Family code lives in the SQL domain; dialect code lives in Extensions.
-- Repository layout: concrete targets (dialects), adapters, and drivers live under `packages/targets/**`. Adapters commonly expose multiple entrypoints from a single package — `./adapter` (shared core), `./cli` (migration), `./runtime` (runtime) — mapped to planes via subpath globs in `architecture.config.json`.
+- Repository layout: concrete targets (dialects), adapters, and drivers live under `packages/3-targets/**`. Adapters commonly expose multiple entrypoints from a single package — `./adapter` (shared core), `./control` (migration), `./runtime` (runtime) — mapped to planes via subpath globs in `architecture.config.json`.
 - Plane boundaries: Shared plane hosts type‑only code and validators safe for both planes. Migration and Runtime must not import code across planes; runtime consumes artifacts and shared‑plane types only.
 ## Query Plane — Runtime Assertions
 

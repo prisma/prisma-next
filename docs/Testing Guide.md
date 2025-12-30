@@ -319,6 +319,16 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 - ✅ Pattern involves package-specific mocks or stubs
 - ✅ Pattern is unlikely to be reused elsewhere
 
+## Behavioral Invariant Testing
+
+Low-level helper tests (for IR builders, planners, CLI glue, etc.) should prove **observable behavior**, not just restate implementation details. Use these patterns when exercising migration helpers and similar utilities:
+
+1. **Test behaviors, not trivia.** Assert what callers rely on (e.g., “plan creation clones and freezes inputs,” “planner helpers don’t leak conflict metadata”), instead of repeatedly checking `Object.isFrozen` on every field.
+2. **Use minimal fixtures.** Build the smallest plan/operation needed to demonstrate the invariant so future refactors don’t drag a wall of mock data along.
+3. **Prove immutability via mutation attempts.** Mutate the original inputs after calling the helper and verify the returned value is unchanged, and that it rejects further mutations (e.g., pushing into a frozen array). This catches accidental reference sharing.
+4. **Keep type assertions targeted.** Use `expectTypeOf` only when it validates a public generic contract (such as `target.details`), not to reassert obvious structural facts.
+5. **Document helper responsibilities.** Each helper-oriented test file should briefly state the behavior it defends so future additions follow the same scenario-driven style.
+
 ---
 
 ## Test Structure

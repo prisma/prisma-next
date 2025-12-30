@@ -15,14 +15,21 @@
     "clean": "node ../../../../scripts/clean.mjs"
   },
   "dependencies": {
+    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "arktype": "^2.0.0"
   },
   "devDependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
+    "vite-tsconfig-paths": "^5.1.4",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.1"

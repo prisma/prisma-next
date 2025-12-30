@@ -14,8 +14,8 @@ Adopt a package layout that encodes Domains → Layers → Planes:
 - **Domains**: Framework (target-agnostic) vs target families (SQL, document, etc.). Framework domain packages can be imported by any target family.
 - **Layers**: Clean Architecture layers (`core/`, `authoring/`, `targets/`, `lanes/`, `runtime/`, `adapters/`). Within a domain, layers may depend laterally (same layer) and downward (toward core), never upward.
 - **Planes**: Migration (authoring, tooling, targets) vs runtime (lanes, runtime, adapters). Migration plane must not import runtime plane code; runtime plane may consume artifacts (JSON/manifests) from migration, but not code imports.
-- Group SQL-specific packages under a dedicated namespace (`packages/sql/**`) for family cohesion (contract types/emitter/ops, lanes, runtime, and adapters).
-- Extract a target-agnostic runtime core (`packages/framework/runtime-core`) that owns plan verification, plugin lifecycle, and the runtime SPI. Family-specific runtimes (e.g., `packages/sql/sql-runtime`) implement the SPI and plug into core via context.
+- Group SQL-specific packages under a dedicated namespace (`packages/2-sql/**`) for family cohesion (contract types/emitter/ops, lanes, runtime, and adapters).
+- Extract a target-agnostic runtime core (`packages/1-framework/4-runtime-executor`) that owns plan verification, plugin lifecycle, and the runtime SPI. Family-specific runtimes (e.g., `packages/2-sql/5-runtime`) implement the SPI and plug into core via context.
 - Keep the emitter core target-agnostic with family hooks; SQL-specific validation and `.d.ts` generation live in the SQL family hook.
 - Avoid transitional shims unless required internally; there are no external consumers.
 
@@ -79,20 +79,20 @@ packages/
 
 ### Runtime Separation
 
-- `packages/framework/runtime-core` exposes a target-agnostic SPI (verification, plugin lifecycle, telemetry), no direct imports from `targets/*`.
-- `packages/sql/sql-runtime` implements the SPI using SQL adapters and codecs from `packages/sql/contract/*`, `packages/sql/operations/*`, and `packages/targets/postgres-adapter/*`.
+- `packages/1-framework/4-runtime-executor` exposes a target-agnostic SPI (verification, plugin lifecycle, telemetry), no direct imports from `targets/*`.
+- `packages/2-sql/5-runtime` implements the SPI using SQL adapters and codecs from `packages/2-sql/1-core/contract/*`, `packages/2-sql/1-core/operations/*`, and `packages/3-targets/6-adapters/postgres/*`.
 - This enables booting the runtime with a non-SQL family by swapping in another family-runtime package that implements the same SPI.
 
 ### Emitter Hooks
 
 - Emitter remains target-agnostic with a hook registry keyed by `targetFamily`.
-- SQL-specific validation and `.d.ts` generation are implemented by the SQL hook under `packages/sql/tooling/emitter`.
+- SQL-specific validation and `.d.ts` generation are implemented by the SQL hook under `packages/2-sql/3-tooling/emitter`.
 
 ### Package Naming Conventions
 
 - Package names use the `@prisma-next/<name>` convention.
 - Target families are encoded via prefixes (e.g., `sql-`), producing names like `@prisma-next/sql-lane`, regardless of nested folders.
-- Adapters/drivers retain conventional names (`@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`) and are located under `packages/targets/**` as separate packages (target, adapter, driver).
+- Adapters/drivers retain conventional names (`@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`) and are located under `packages/3-targets/**` as separate packages (target, adapter, driver).
 - Layers are for dependency direction, not naming; only `runtime-core` carries its layer in the name for clarity.
 - See also: `docs/reference/Package Naming and Path Aliases.md` for concrete path→package mappings and tsconfig alias examples.
 
@@ -114,14 +114,14 @@ packages/
 ## Migration Plan (High-Level)
 
 1) ✅  Scaffold the new folder skeleton and path aliases; add import guardrails and CI checks.
-2) ✅  Extract `contract-authoring` out of `@prisma-next/sql-query` into `packages/framework/authoring/contract-authoring`.
+2) ✅  Extract `contract-authoring` out of `@prisma-next/sql-query` into `packages/1-framework/2-authoring/contract`.
 3) ✅  Stand up `lanes/relational-core` and move schema/column builders and operation attachment there.
 4) ✅  Split lanes into `sql-lane` and `orm-lane`; keep tests with their respective packages.
 5) ✅ Restructure `sql-target` under `sql/tooling` and keep a curated entrypoint for adapters. **Complete**
 6) ✅ Extract `framework/runtime-core` and move SQL-specific execution into `sql/sql-runtime`. **Complete**
 7) ✅ Remove legacy re-exports; no external consumers means we can delete transitional shims once internal callsites are updated. **Complete** - `@prisma-next/sql-query` removed in Slice 7.
-8) ✅ Move pack assembly from framework CLI to family-provided helpers. **Complete** (Briefs 20 & 21, Decouple-Framework-CLI-from-SQL) - Generic assembly logic (looping over descriptors) moved to `packages/framework/tooling/cli/src/pack-assembly.ts`. Family-specific conversion delegated to `family.convertOperationManifest()`. Contract validation also decoupled via `family.validateContractIR()` hook. All CLI→SQL dependency exceptions removed. `@prisma-next/sql-tooling-assembly` package removed.
-9) ✅ Migrate Postgres adapter from SQL domain to Targets domain. **Complete** (Briefs: Separate-Dialect-Adapter-Driver, Migrate-Postgres-Adapter-to-Targets-Domain) - Adapter, target, and driver are now separate packages under `packages/targets/**` with multi-plane entrypoints.
+8) ✅ Move pack assembly from framework CLI to family-provided helpers. **Complete** (Briefs 20 & 21, Decouple-Framework-CLI-from-SQL) - Generic assembly logic (looping over descriptors) moved to `packages/1-framework/3-tooling/cli/src/pack-loading.ts`. Family-specific conversion delegated to `family.convertOperationManifest()`. Contract validation also decoupled via `family.validateContractIR()` hook. All CLI→SQL dependency exceptions removed. `@prisma-next/sql-tooling-assembly` package removed.
+9) ✅ Migrate Postgres adapter from SQL domain to Targets domain. **Complete** (Briefs: Separate-Dialect-Adapter-Driver, Migrate-Postgres-Adapter-to-Targets-Domain) - Adapter, target, and driver are now separate packages under `packages/3-targets/**` with multi-plane entrypoints.
 
 ## Alternatives Considered
 

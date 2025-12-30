@@ -7,6 +7,7 @@ export default defineConfig({
     runtime: 'src/exports/runtime.ts',
     verify: 'src/exports/verify.ts',
     'test-utils': 'src/exports/test-utils.ts',
+    'schema-verify': 'src/exports/schema-verify.ts',
   },
   outDir: 'dist/exports',
   format: ['esm'],

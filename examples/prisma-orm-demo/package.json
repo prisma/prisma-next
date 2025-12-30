@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev --name init",
     "emit": "prisma-next emit",
@@ -10,7 +11,7 @@
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/index.ts",
     "test": "vitest run --config vitest.config.ts",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "pnpm build && tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../biome.json --error-on-warnings"
   },
   "dependencies": {

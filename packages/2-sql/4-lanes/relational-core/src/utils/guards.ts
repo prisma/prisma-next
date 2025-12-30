@@ -169,3 +169,25 @@ export function expressionFromSource(source: AnyExpressionSource): Expression {
 export function isValueSource(value: unknown): value is ValueSource {
   return isParamPlaceholder(value) || isExpressionSource(value);
 }
+
+/**
+ * Extracts and returns an OperationExpr from a builder.
+ * Returns the OperationExpr if the builder is an OperationExpr or has an _operationExpr property,
+ * otherwise returns undefined.
+ *
+ * @deprecated Use isExpressionBuilder() instead. This function exists for backward compatibility
+ * with code that uses the hidden _operationExpr property pattern.
+ *
+ * @design-note: This function accesses the hidden `_operationExpr` property, which is a code smell.
+ * The ExpressionBuilder type (introduced in the operation-expr-refactoring) provides a cleaner
+ * approach by explicitly representing operation results as a distinct type.
+ */
+export function getOperationExpr(
+  builder: AnyColumnBuilder | OperationExpr,
+): OperationExpr | undefined {
+  if (isOperationExpr(builder)) {
+    return builder;
+  }
+  const builderWithExpr = builder as unknown as { _operationExpr?: OperationExpr };
+  return builderWithExpr._operationExpr;
+}

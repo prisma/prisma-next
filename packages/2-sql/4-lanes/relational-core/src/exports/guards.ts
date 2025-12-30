@@ -4,6 +4,7 @@ export {
   extractBaseColumnRef,
   getColumnInfo,
   getColumnMeta,
+  getOperationExpr,
   isColumnBuilder,
   isExpressionBuilder,
   isExpressionSource,

@@ -43,6 +43,16 @@ export interface OrderBuilder<
 }
 
 /**
+ * Creates an OrderBuilder for use in orderBy clauses.
+ */
+export function createOrderBuilder(
+  expr: AnyColumnBuilder | OperationExpr,
+  dir: Direction,
+): AnyOrderBuilder {
+  return { kind: 'order', expr, dir } as AnyOrderBuilder;
+}
+
+/**
  * ColumnBuilder with optional operation methods based on the column's typeId.
  * When Operations is provided and the column's typeId matches, operation methods are included.
  * Implements ExpressionSource to provide type-safe conversion to ColumnRef.
@@ -387,17 +397,18 @@ export type InferProjectionRow<P extends Record<string, AnyColumnBuilder>> = {
 };
 
 /**
- * Nested projection type - allows recursive nesting of ColumnBuilder or nested objects.
+ * Nested projection type - allows recursive nesting of ColumnBuilder, ExpressionBuilder, or nested objects.
  */
 export type NestedProjection = Record<
   string,
-  | AnyColumnBuilder
+  | AnyExpressionSource
   | Record<
       string,
-      | AnyColumnBuilder
+      | AnyExpressionSource
       | Record<
           string,
-          AnyColumnBuilder | Record<string, AnyColumnBuilder | Record<string, AnyColumnBuilder>>
+          | AnyExpressionSource
+          | Record<string, AnyExpressionSource | Record<string, AnyExpressionSource>>
         >
     >
 >;
@@ -420,17 +431,19 @@ type ExtractIncludeType<
  * by looking up the include alias in the Includes type map.
  */
 export type InferNestedProjectionRow<
-  P extends Record<string, AnyColumnBuilder | boolean | NestedProjection>,
+  P extends Record<string, AnyExpressionSource | boolean | NestedProjection>,
   CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Includes extends Record<string, unknown> = Record<string, never>,
 > = {
-  [K in keyof P]: P[K] extends AnyColumnBuilder
-    ? ExtractJsTypeFromColumnBuilder<P[K]>
-    : P[K] extends true
-      ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
-      : P[K] extends NestedProjection
-        ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
-        : never;
+  [K in keyof P]: P[K] extends ExpressionBuilder<infer JsType>
+    ? JsType
+    : P[K] extends AnyColumnBuilder
+      ? ExtractJsTypeFromColumnBuilder<P[K]>
+      : P[K] extends true
+        ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
+        : P[K] extends NestedProjection
+          ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
+          : never;
 };
 
 /**

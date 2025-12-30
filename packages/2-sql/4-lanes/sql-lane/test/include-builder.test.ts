@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { createTableRef } from '@prisma-next/sql-relational-core/ast';
+import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
+import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
+import { createOrderBuilder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { buildIncludeAst, IncludeChildBuilderImpl } from '../src/sql/include-builder';
@@ -254,5 +256,50 @@ describe('buildIncludeAst', () => {
     expect(() => buildIncludeAst(includeState, contract, {}, [], [])).toThrow(
       'Missing column for alias',
     );
+  });
+
+  it('builds include AST with operation expression in childOrderBy', () => {
+    const operationExpr: OperationExpr = {
+      kind: 'operation',
+      method: 'normalize',
+      forTypeId: 'pg/vector@1',
+      self: createColumnRef('user', 'id'),
+      args: [],
+      returns: { kind: 'typeId', type: 'pg/vector@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'normalize(${self})',
+      },
+    };
+
+    // Create an OrderBuilder with an OperationExpr
+    const childOrderBy = createOrderBuilder(operationExpr, 'asc');
+
+    const includeState = {
+      alias: 'posts',
+      table: postTableRef,
+      on: {
+        kind: 'join-on' as const,
+        left: userColumns.id,
+        right: userColumns.id,
+      },
+      childProjection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      childOrderBy,
+    };
+
+    const ast = buildIncludeAst(includeState, contract, {}, [], []);
+
+    expect(ast.child.orderBy).toBeDefined();
+    // When orderExpr is an OperationExpr, extractBaseColumnRef extracts the base column
+    expect(ast.child.orderBy?.[0]?.expr).toMatchObject({
+      kind: 'col',
+      table: 'user',
+      column: 'id',
+    });
   });
 });

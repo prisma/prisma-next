@@ -17,6 +17,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/operations": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "arktype": "^2.1.26",
     "prettier": "^3.3.3"
   },

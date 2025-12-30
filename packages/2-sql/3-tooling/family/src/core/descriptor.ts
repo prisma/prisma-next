@@ -4,10 +4,10 @@ import type {
   ControlDriverDescriptor,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
-  ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './instance';
+import type { SqlControlTargetDescriptor } from './migrations/types';
 
 /**
  * SQL family manifest.
@@ -30,8 +30,8 @@ export class SqlFamilyDescriptor
   readonly manifest = sqlFamilyManifest;
   readonly hook = sqlTargetFamilyHook;
 
-  create<TTargetId extends string>(options: {
-    readonly target: ControlTargetDescriptor<'sql', TTargetId>;
+  create<TTargetId extends string, TTargetDetails = Record<string, never>>(options: {
+    readonly target: SqlControlTargetDescriptor<TTargetId, TTargetDetails>;
     readonly adapter: ControlAdapterDescriptor<'sql', TTargetId>;
     readonly driver: ControlDriverDescriptor<'sql', TTargetId>;
     readonly extensions: readonly ControlExtensionDescriptor<'sql', TTargetId>[];

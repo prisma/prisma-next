@@ -1,5 +1,6 @@
-import { timeouts } from '@prisma-next/test-utils';
+import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import type { Client, Pool } from 'pg';
+import { Pool as PgPool } from 'pg';
 import { newDb } from 'pg-mem';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -241,6 +242,45 @@ describe('@prisma-next/driver-postgres', () => {
     expect(result.rows).toBeDefined();
   });
 
+  it('skips connect when client is already connected', async () => {
+    const db = newDb();
+    const { Client } = db.adapters.createPg();
+    const client = new Client();
+
+    // Connect the client first
+    await client.connect();
+
+    const driver = createPostgresDriverFromOptions({
+      connect: { client: client as unknown as Client },
+    });
+
+    cleanup = async () => {
+      await driver.close();
+    };
+
+    // acquireClient should detect client is already connected and skip connect()
+    await driver.query('create table items(id serial primary key, name text)');
+    const result = await driver.query<{ id: number; name: string }>('select id, name from items');
+
+    expect(result.rows).toBeDefined();
+  });
+
+  it('handles pool already ended when closing', async () => {
+    const db = newDb();
+    const { Pool } = db.adapters.createPg();
+    const pool = new Pool();
+
+    const driver = createPostgresDriverFromOptions({
+      connect: { pool: pool as unknown as Pool },
+    });
+
+    await driver.connect();
+    await driver.close();
+
+    // Closing again should not throw (pool.ended check)
+    await driver.close();
+  });
+
   it(
     'closes pool connection',
     async () => {
@@ -287,6 +327,74 @@ describe('@prisma-next/driver-postgres', () => {
       }
 
       expect(rows).toEqual([]);
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'streams rows via cursor when no errors occur',
+    async () => {
+      const database = await createDevDatabase();
+      const pool = new PgPool({ connectionString: database.connectionString });
+
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as Pool },
+        cursor: { batchSize: 1 },
+      });
+
+      cleanup = async () => {
+        await driver.close();
+        await database.close();
+      };
+
+      await driver.connect();
+      await driver.query('create table cursor_items(id serial primary key, name text)');
+      await driver.query('insert into cursor_items(name) values ($1), ($2), ($3)', ['a', 'b', 'c']);
+
+      const rows: Array<{ id: number; name: string }> = [];
+      for await (const row of driver.execute<{ id: number; name: string }>({
+        sql: 'select id, name from cursor_items order by id asc',
+      })) {
+        rows.push(row);
+      }
+
+      expect(rows).toEqual([
+        { id: 1, name: 'a' },
+        { id: 2, name: 'b' },
+        { id: 3, name: 'c' },
+      ]);
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'executes explain on real postgres',
+    async () => {
+      const database = await createDevDatabase();
+      const pool = new PgPool({ connectionString: database.connectionString });
+
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as Pool },
+      });
+
+      cleanup = async () => {
+        await driver.close();
+        await database.close();
+      };
+
+      await driver.connect();
+      await driver.query('create table explain_items(id serial primary key, name text)');
+      await driver.query('insert into explain_items(name) values ($1)', ['test']);
+
+      const result = await driver.explain!({
+        sql: 'select id, name from explain_items where id = $1',
+        params: [1],
+      });
+
+      expect(result).toBeDefined();
+      expect(result.rows).toBeDefined();
+      expect(Array.isArray(result.rows)).toBe(true);
+      expect(result.rows.length).toBeGreaterThan(0);
     },
     timeouts.spinUpPpgDev,
   );

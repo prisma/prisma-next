@@ -90,7 +90,7 @@ describe('family instance schemaVerify', () => {
             driver,
             contractIR: validatedContract,
             strict: false,
-            contractPath: './contract.json',
+            context: { contractPath: './contract.json' },
           });
 
           expect(result.ok).toBe(true);
@@ -122,54 +122,58 @@ describe('family instance schemaVerify', () => {
       });
     }, timeouts.spinUpPpgDev);
 
-    it('returns ok=false with missing_table issue', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=false with missing_table issue',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target('postgres')
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .table('post', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('title', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target('postgres')
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .table('post', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('title', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          contractPath: './contract.json',
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+          });
 
-        expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some((i) => i.kind === 'missing_table' && i.table === 'post'),
-        ).toBe(true);
-        expect(result.schema.root.status).toBe('fail');
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(result.ok).toBe(false);
+          expect(result.schema.counts.fail).toBeGreaterThan(0);
+          expect(
+            result.schema.issues.some((i) => i.kind === 'missing_table' && i.table === 'post'),
+          ).toBe(true);
+          expect(result.schema.root.status).toBe('fail');
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('missing column', () => {
@@ -216,7 +220,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
@@ -277,7 +281,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         // Type mismatch may or may not be detected depending on adapter introspection
@@ -337,7 +341,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
@@ -401,7 +405,7 @@ describe('family instance schemaVerify', () => {
             driver,
             contractIR: validatedContract,
             strict: false,
-            contractPath: './contract.json',
+            context: { contractPath: './contract.json' },
           });
 
           expect(result.ok).toBe(false);
@@ -482,7 +486,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
@@ -551,7 +555,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
@@ -609,14 +613,14 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: true,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         expect(result.ok).toBe(false);
         expect(result.schema.counts.fail).toBeGreaterThan(0);
         expect(
           result.schema.issues.some(
-            (i) => i.kind === 'missing_column' && i.table === 'user' && i.column === 'extraColumn',
+            (i) => i.kind === 'extra_column' && i.table === 'user' && i.column === 'extraColumn',
           ),
         ).toBe(true);
       } finally {
@@ -653,7 +657,7 @@ describe('family instance schemaVerify', () => {
           driver,
           contractIR: validatedContract,
           strict: false,
-          contractPath: './contract.json',
+          context: { contractPath: './contract.json' },
         });
 
         // In permissive mode, extra columns don't cause failures
@@ -756,7 +760,7 @@ describe('family instance schemaVerify', () => {
             driver,
             contractIR: validatedContract,
             strict: false,
-            contractPath: './contract.json',
+            context: { contractPath: './contract.json' },
           });
 
           // Should fail due to type mismatch (integer vs bigint)
@@ -839,7 +843,7 @@ describe('family instance schemaVerify', () => {
             driver,
             contractIR: validatedContract,
             strict: false,
-            contractPath: './contract.json',
+            context: { contractPath: './contract.json' },
           });
 
           // Should have warnings for missing metadata, but not fail

@@ -14,7 +14,7 @@ This package contains the SQL-specific TypeScript contract authoring surface for
 
 ## Overview
 
-This package is part of the SQL family namespace (`packages/sql/authoring/sql-contract-ts`) and provides:
+This package is part of the SQL family namespace (`packages/2-sql/2-authoring/contract-ts`) and provides:
 - SQL contract builder (`defineContract`) - TypeScript builder for creating SQL contracts programmatically
 - SQL contract validation (`validateContract`) - Structural and logical validation for SQL contracts
 - SQL contract JSON schema - JSON schema for validating contract structure
@@ -38,7 +38,7 @@ This package was created in Phase 1 and refactored in Phase 2. It now composes t
 - **SQL-specific build()**: Implements SQL-specific `build()` method in `SqlContractBuilder` that constructs `SqlContract` instances with SQL-specific structure (uniques, indexes, foreignKeys arrays)
 
 This package is part of the package layering architecture:
-- **Location**: `packages/sql/authoring/sql-contract-ts` (SQL family namespace)
+- **Location**: `packages/2-sql/2-authoring/contract-ts` (SQL family namespace)
 - **Ring**: SQL family namespace (can import from core, authoring, targets, and other SQL family packages)
 
 ## Exports
