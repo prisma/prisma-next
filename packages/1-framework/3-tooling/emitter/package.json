@@ -35,8 +35,8 @@
       "import": "./dist/exports/index.js"
     },
     "./test/utils": {
-      "types": "./test/utils.ts",
-      "import": "./test/utils.ts"
+      "types": "./dist/test/utils.d.ts",
+      "import": "./dist/test/utils.js"
     }
   }
 }
