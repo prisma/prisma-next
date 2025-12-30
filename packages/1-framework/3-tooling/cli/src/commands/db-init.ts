@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ControlDriverInstance, FamilyInstance } from '@prisma-next/core-control-plane/types';
+import type { Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import {
@@ -74,9 +75,7 @@ interface PlannerConflict {
   readonly summary: string;
 }
 
-type PlannerResult =
-  | { readonly kind: 'success'; readonly plan: MigrationPlan }
-  | { readonly kind: 'failure'; readonly conflicts: readonly PlannerConflict[] };
+type PlannerResult = Result<MigrationPlan, readonly PlannerConflict[]>;
 
 interface RunnerSuccess {
   readonly ok: true;
@@ -274,11 +273,11 @@ export function createDbInitCommand(): Command {
             policy,
           });
 
-          if (plannerResult.kind === 'failure') {
-            throw errorMigrationPlanningFailed({ conflicts: plannerResult.conflicts });
+          if (!plannerResult.ok) {
+            throw errorMigrationPlanningFailed({ conflicts: plannerResult.failure });
           }
 
-          const migrationPlan = plannerResult.plan;
+          const migrationPlan = plannerResult.value;
 
           // Add blank line after spinners
           if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {

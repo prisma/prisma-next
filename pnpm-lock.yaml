@@ -378,6 +378,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../emitter
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-core/shared/utils
       arktype:
         specifier: ^2.0.0
         version: 2.1.26
