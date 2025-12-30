@@ -267,7 +267,7 @@ const DEFAULT_USER_TABLE_SQL = `
   )
 `;
 
-interface DbTestFixtureOptions {
+export interface DbTestFixtureOptions {
   connectionString: string;
   createTempDir: () => string;
   fixtureSubdir: string;
