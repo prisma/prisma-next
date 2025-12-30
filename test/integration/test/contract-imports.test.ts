@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
 import {
@@ -17,6 +16,7 @@ import {
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createContractIR } from '../../../packages/1-framework/3-tooling/emitter/test/utils';
 
 const execFileAsync = promisify(execFile);
 
@@ -36,10 +36,7 @@ describe('contract.d.ts imports resolution', () => {
   it(
     'generates contract.d.ts with all imports resolving correctly',
     async () => {
-      const ir: ContractIR = {
-        schemaVersion: '1',
-        targetFamily: 'sql',
-        target: 'postgres',
+      const ir = createContractIR({
         extensions: {
           postgres: { version: '15.0.0' },
           pg: {},
@@ -64,7 +61,6 @@ describe('contract.d.ts imports resolution', () => {
             relations: {},
           },
         },
-        relations: {},
         storage: {
           tables: {
             user: {
@@ -95,10 +91,7 @@ describe('contract.d.ts imports resolution', () => {
             },
           },
         },
-        capabilities: {},
-        meta: {},
-        sources: {},
-      };
+      });
 
       const packs = loadExtensionPacks(
         join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
@@ -236,10 +229,7 @@ type UserIdColumn = UserColumns['id'];
   it(
     'generated contract.d.ts can be imported and used in TypeScript',
     async () => {
-      const ir: ContractIR = {
-        schemaVersion: '1',
-        targetFamily: 'sql',
-        target: 'postgres',
+      const ir = createContractIR({
         extensions: {
           postgres: { version: '15.0.0' },
           pg: {},
@@ -254,7 +244,6 @@ type UserIdColumn = UserColumns['id'];
             relations: {},
           },
         },
-        relations: {},
         storage: {
           tables: {
             user: {
@@ -269,10 +258,7 @@ type UserIdColumn = UserColumns['id'];
             },
           },
         },
-        capabilities: {},
-        meta: {},
-        sources: {},
-      };
+      });
 
       const packs = loadExtensionPacks(
         join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
