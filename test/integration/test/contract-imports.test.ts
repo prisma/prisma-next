@@ -203,7 +203,7 @@ type UserIdColumn = UserColumns['id'];
           },
         );
 
-        if (stderr?.trim()) {
+        if (stderr?.trim() && !stderr.includes('Found 0 errors')) {
           throw new Error(`TypeScript compilation failed:\n${stderr}`);
         }
 
