@@ -1,7 +1,23 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { ContractIR } from './ir';
 
+// ============================================================================
+// Family Instance Base Interface
+// ============================================================================
+
+/**
+ * Base interface for family instances.
+ * Extended by plane-specific interfaces (ControlFamilyInstance, RuntimeFamilyInstance).
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ */
+export interface FamilyInstance<TFamilyId extends string = string> {
+  readonly familyId: TFamilyId;
+}
+
+// ============================================================================
 // Shared header and neutral types
+// ============================================================================
 // Note: Fields like targetFamily accept string to work with JSON imports,
 // which don't preserve literal types. Runtime validation ensures correct values
 export interface ContractBase {
