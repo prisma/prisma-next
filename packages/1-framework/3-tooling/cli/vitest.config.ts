@@ -33,8 +33,13 @@ export default defineConfig({
         'src/utils/output.ts',
         'src/utils/command-helpers.ts',
         'src/utils/global-flags.ts',
-        // Exclude command files - mostly Commander.js setup, tested via e2e tests
+        // Exclude command files - mostly Commander.js setup and delegation to family instance,
+        // tested via e2e tests in @prisma-next/integration-tests (test/integration/test/cli.*.e2e.test.ts)
         'src/commands/contract-emit.ts',
+        'src/commands/db-init.ts',
+        'src/commands/db-introspect.ts',
+        'src/commands/db-schema-verify.ts',
+        'src/commands/db-sign.ts',
         'src/commands/db-verify.ts',
         // Exclude error factory functions - just constructors
         'src/utils/cli-errors.ts',
