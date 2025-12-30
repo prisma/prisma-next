@@ -1,5 +1,11 @@
+import type {
+  AdapterDescriptor,
+  DriverDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { FamilyInstance, TargetFamilyHook } from '@prisma-next/contract/types';
 import type { TargetMigrationsCapability } from './migrations';
 import type { CoreSchemaView } from './schema-view';
@@ -231,11 +237,7 @@ export interface OperationContext {
 export interface ControlFamilyDescriptor<
   TFamilyId extends string,
   TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
-> {
-  readonly kind: 'family';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly manifest: ExtensionPackManifest;
+> extends FamilyDescriptor<TFamilyId> {
   readonly hook: TargetFamilyHook;
   create<TTargetId extends string>(options: {
     readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
@@ -261,12 +263,7 @@ export interface ControlTargetDescriptor<
     TTargetId
   >,
   TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
-> {
-  readonly kind: 'target';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends TargetDescriptor<TFamilyId, TTargetId> {
   /**
    * Optional migrations capability.
    * Targets that support migrations expose this property.
@@ -289,12 +286,7 @@ export interface ControlAdapterDescriptor<
     TFamilyId,
     TTargetId
   >,
-> {
-  readonly kind: 'adapter';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends AdapterDescriptor<TFamilyId, TTargetId> {
   create(): TAdapterInstance;
 }
 
@@ -309,12 +301,7 @@ export interface ControlDriverDescriptor<
   TFamilyId extends string,
   TTargetId extends string,
   TDriverInstance extends ControlDriverInstance<TTargetId> = ControlDriverInstance<TTargetId>,
-> {
-  readonly kind: 'driver';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends DriverDescriptor<TFamilyId, TTargetId> {
   create(url: string): Promise<TDriverInstance>;
 }
 
@@ -332,12 +319,7 @@ export interface ControlExtensionDescriptor<
     TFamilyId,
     TTargetId
   > = ControlExtensionInstance<TFamilyId, TTargetId>,
-> {
-  readonly kind: 'extension';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends ExtensionDescriptor<TFamilyId, TTargetId> {
   create(): TExtensionInstance;
 }
 
