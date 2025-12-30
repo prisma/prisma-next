@@ -53,7 +53,7 @@ This branch is explicitly about **CLI orchestration + reporting**. It must not r
   - Long: explain additive-only semantics, empty-db support (for now), and idempotence.
 - Use `performAction()` / `handleResult()` / `process.exit()`.
 - Add new structured error factory for planning failure (recommended):
-  - `errorDbInitPlanningFailed({ conflicts })` in `@prisma-next/core-control-plane/errors`
+  - `errorMigrationPlanningFailed({ conflicts })` in `@prisma-next/core-control-plane/errors`
   - This avoids overloading `errorRuntime()` with unstructured strings and keeps JSON output predictable.
 
 ### 3.3 Orchestration logic (family-agnostic)
