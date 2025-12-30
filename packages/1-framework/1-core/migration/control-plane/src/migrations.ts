@@ -169,8 +169,12 @@ export interface MigrationRunner {
 /**
  * Optional capability interface for targets that support migrations.
  * Targets that implement migrations expose this via their descriptor.
+ *
+ * @template TFamilyInstance - The family instance type (e.g., SqlControlFamilyInstance)
  */
-export interface TargetMigrationsCapability<TFamilyId extends string = string> {
-  createPlanner(family: ControlFamilyInstance<TFamilyId>): MigrationPlanner;
-  createRunner(family: ControlFamilyInstance<TFamilyId>): MigrationRunner;
+export interface TargetMigrationsCapability<
+  TFamilyInstance extends ControlFamilyInstance<string> = ControlFamilyInstance<string>,
+> {
+  createPlanner(family: TFamilyInstance): MigrationPlanner;
+  createRunner(family: TFamilyInstance): MigrationRunner;
 }

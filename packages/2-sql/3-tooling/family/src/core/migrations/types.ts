@@ -7,6 +7,7 @@
 import type {
   ControlDriverInstance,
   ControlTargetDescriptor,
+  ControlTargetInstance,
   MigrationOperationPolicy,
   MigrationPlan,
   MigrationPlannerConflict,
@@ -274,7 +275,12 @@ export interface SqlMigrationRunner<TTargetDetails = Record<string, never>> {
 export interface SqlControlTargetDescriptor<
   TTargetId extends string,
   TTargetDetails = Record<string, never>,
-> extends ControlTargetDescriptor<'sql', TTargetId> {
+> extends ControlTargetDescriptor<
+    'sql',
+    TTargetId,
+    ControlTargetInstance<'sql', TTargetId>,
+    SqlControlFamilyInstance
+  > {
   /**
    * Creates a SQL migration planner for this target.
    * Direct method for SQL-specific usage.

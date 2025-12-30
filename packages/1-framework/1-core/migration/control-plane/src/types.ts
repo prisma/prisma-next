@@ -166,6 +166,7 @@ export interface ControlFamilyDescriptor<
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  * @template TTargetInstance - The target instance type
+ * @template TFamilyInstance - The family instance type for migrations (optional)
  */
 export interface ControlTargetDescriptor<
   TFamilyId extends string,
@@ -174,6 +175,7 @@ export interface ControlTargetDescriptor<
     TFamilyId,
     TTargetId
   >,
+  TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
 > {
   readonly kind: 'target';
   readonly id: string;
@@ -184,7 +186,7 @@ export interface ControlTargetDescriptor<
    * Optional migrations capability.
    * Targets that support migrations expose this property.
    */
-  readonly migrations?: TargetMigrationsCapability<TFamilyId>;
+  readonly migrations?: TargetMigrationsCapability<TFamilyInstance>;
   create(): TTargetInstance;
 }
 
