@@ -131,19 +131,21 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 
 ## 3. CLI Command Wiring (`prisma-next db init`)
 
-- **3.1 Add command factory**
+- [x] **3.1 Add command factory**
   - Implement `createDbInitCommand()` under the CLI package (e.g., `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`).
   - Register the new command in the CLI command tree so `prisma-next db init` is available.
+  - ✅ Implemented in `packages/1-framework/3-tooling/cli/src/commands/db-init.ts` and registered under `db` in `packages/1-framework/3-tooling/cli/src/cli.ts`.
 
-- **3.2 Use CLI style and error-handling patterns**
+- [x] **3.2 Use CLI style and error-handling patterns**
   - Apply `setCommandDescriptions()` to provide:
     - Short description: “Bootstrap a database to match the current contract and write the contract marker.”
     - Long description explaining additive-only semantics, supported states, and idempotence.
   - Wrap the core logic in `performAction()`/`handleResult()`:
     - Throw `CliStructuredError` for expected failures.
     - Call `process.exit(exitCode)` with the value from `handleResult`.
+  - ✅ Uses `setCommandDescriptions()`, `performAction()`, `handleResult()`, and `process.exit()` in `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`.
 
-- **3.3 Orchestration logic**
+- [x] **3.3 Orchestration logic**
   - In the command action:
     - Load config via the existing config loader (`prisma-next.config.ts`).
     - Load and validate the contract (`contract.json` + `contract.d.ts`).
@@ -162,8 +164,9 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
           - After execution, surface a success summary including:
             - Applied operations count.
             - Marker and ledger confirmation.
+  - ✅ Implemented end-to-end orchestration in `packages/1-framework/3-tooling/cli/src/commands/db-init.ts` (config load, contract read/validate, driver creation, schema introspection, planning, apply mode execution).
 
-- **3.4 CLI output formatting**
+- [x] **3.4 CLI output formatting**
   - Implement human-readable formatting that:
     - Shows a **tree of changes** similar to `schema-verify` (per-table, per-column/index/constraint).
     - Logs each operation as it executes (`creating table ...`, `creating index ...`).
@@ -171,14 +174,16 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
     - Uses the standard result envelope (`status`, `error`, etc.).
     - Embeds `originContract`, `destinationContract`, `plan`, and `marker` before/after snapshots.
     - Includes conflicts list when planning fails.
+  - ✅ Output formatting implemented via `DbInitResult` + formatters in `packages/1-framework/3-tooling/cli/src/utils/output.ts` and wired in `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`.
 
-- **3.5 CLI tests**
+- [x] **3.5 CLI tests**
   - Add CLI-level tests (likely in `test/e2e/framework`) to cover:
     - Empty DB: `db init --plan` and `db init` (apply) behaviors + JSON mode.
     - Subset DB: only missing pieces planned/applied; marker/ledger correct.
     - Superset DB: no-op plan; marker/ledger identity transition.
     - Conflicting DB: failure with conflict list; no schema or marker changes.
   - Use the shared E2E dev database utilities and object matchers for result assertions.
+  - ✅ Added integration coverage in `test/integration/test/cli.db-init.e2e.test.ts` for empty DB (plan/apply + JSON) and non-empty DB failure scenarios.
 
 ## 4. Schema IR & Verification Integration
 
