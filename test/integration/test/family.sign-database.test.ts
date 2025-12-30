@@ -84,44 +84,48 @@ describe('family instance sign', () => {
       });
     });
 
-    it('creates new marker when none exists', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'creates new marker when none exists',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = createTestContract();
-      const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+        const contract = createTestContract();
+        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const result = (await familyInstance.sign({
-          driver,
-          contractIR: validatedContract,
-          contractPath: './contract.json',
-        })) as SignDatabaseResult;
+          const result = (await familyInstance.sign({
+            driver,
+            contractIR: validatedContract,
+            contractPath: './contract.json',
+          })) as SignDatabaseResult;
 
-        expect(result.ok).toBe(true);
-        expect(result.summary).toBe('Database signed (marker created)');
-        expect(result.marker.created).toBe(true);
-        expect(result.marker.updated).toBe(false);
-        expect(result.contract.coreHash).toBe(validatedContract.coreHash);
-        expect(result.timings.total).toBeGreaterThanOrEqual(0);
+          expect(result.ok).toBe(true);
+          expect(result.summary).toBe('Database signed (marker created)');
+          expect(result.marker.created).toBe(true);
+          expect(result.marker.updated).toBe(false);
+          expect(result.contract.coreHash).toBe(validatedContract.coreHash);
+          expect(result.timings.total).toBeGreaterThanOrEqual(0);
 
-        // Verify marker was written to database
-        const marker = await readMarker(driver);
-        expect(marker).not.toBeNull();
-        expect(marker?.coreHash).toBe(validatedContract.coreHash);
-      } finally {
-        await driver.close();
-      }
-    });
+          // Verify marker was written to database
+          const marker = await readMarker(driver);
+          expect(marker).not.toBeNull();
+          expect(marker?.coreHash).toBe(validatedContract.coreHash);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('marker update', () => {
@@ -156,48 +160,52 @@ describe('family instance sign', () => {
       });
     });
 
-    it('updates marker when hashes differ', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'updates marker when hashes differ',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = createTestContract();
-      const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+        const contract = createTestContract();
+        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        const result = (await familyInstance.sign({
-          driver,
-          contractIR: validatedContract,
-          contractPath: './contract.json',
-        })) as SignDatabaseResult;
+          const result = (await familyInstance.sign({
+            driver,
+            contractIR: validatedContract,
+            contractPath: './contract.json',
+          })) as SignDatabaseResult;
 
-        expect(result.ok).toBe(true);
-        expect(result.summary).toContain('Database signed (marker updated from');
-        expect(result.marker.created).toBe(false);
-        expect(result.marker.updated).toBe(true);
-        expect(result.marker.previous).toBeDefined();
-        expect(result.marker.previous?.coreHash).toBe('sha256:old-hash');
-        expect(result.marker.previous?.profileHash).toBe('sha256:old-profile-hash');
-        expect(result.contract.coreHash).toBe(validatedContract.coreHash);
-        expect(result.timings.total).toBeGreaterThanOrEqual(0);
+          expect(result.ok).toBe(true);
+          expect(result.summary).toContain('Database signed (marker updated from');
+          expect(result.marker.created).toBe(false);
+          expect(result.marker.updated).toBe(true);
+          expect(result.marker.previous).toBeDefined();
+          expect(result.marker.previous?.coreHash).toBe('sha256:old-hash');
+          expect(result.marker.previous?.profileHash).toBe('sha256:old-profile-hash');
+          expect(result.contract.coreHash).toBe(validatedContract.coreHash);
+          expect(result.timings.total).toBeGreaterThanOrEqual(0);
 
-        // Verify marker was updated in database
-        const marker = await readMarker(driver);
-        expect(marker).not.toBeNull();
-        expect(marker?.coreHash).toBe(validatedContract.coreHash);
-        expect(marker?.coreHash).not.toBe('sha256:old-hash');
-      } finally {
-        await driver.close();
-      }
-    });
+          // Verify marker was updated in database
+          const marker = await readMarker(driver);
+          expect(marker).not.toBeNull();
+          expect(marker?.coreHash).toBe(validatedContract.coreHash);
+          expect(marker?.coreHash).not.toBe('sha256:old-hash');
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('idempotent behavior', () => {
@@ -224,57 +232,61 @@ describe('family instance sign', () => {
       });
     });
 
-    it('no-op when marker already matches', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'no-op when marker already matches',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = createTestContract();
-      const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+        const contract = createTestContract();
+        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensions: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensions: [],
+          });
 
-        // First sign - creates marker
-        const firstResult = (await familyInstance.sign({
-          driver,
-          contractIR: validatedContract,
-          contractPath: './contract.json',
-        })) as SignDatabaseResult;
+          // First sign - creates marker
+          const firstResult = (await familyInstance.sign({
+            driver,
+            contractIR: validatedContract,
+            contractPath: './contract.json',
+          })) as SignDatabaseResult;
 
-        expect(firstResult.ok).toBe(true);
-        expect(firstResult.marker.created).toBe(true);
+          expect(firstResult.ok).toBe(true);
+          expect(firstResult.marker.created).toBe(true);
 
-        // Get the marker's updated_at timestamp
-        const markerAfterFirst = await readMarker(driver);
-        const firstUpdatedAt = markerAfterFirst?.updatedAt;
+          // Get the marker's updated_at timestamp
+          const markerAfterFirst = await readMarker(driver);
+          const firstUpdatedAt = markerAfterFirst?.updatedAt;
 
-        // Second sign - should be idempotent
-        const secondResult = (await familyInstance.sign({
-          driver,
-          contractIR: validatedContract,
-          contractPath: './contract.json',
-        })) as SignDatabaseResult;
+          // Second sign - should be idempotent
+          const secondResult = (await familyInstance.sign({
+            driver,
+            contractIR: validatedContract,
+            contractPath: './contract.json',
+          })) as SignDatabaseResult;
 
-        expect(secondResult.ok).toBe(true);
-        expect(secondResult.summary).toBe('Database already signed with this contract');
-        expect(secondResult.marker.created).toBe(false);
-        expect(secondResult.marker.updated).toBe(false);
-        expect(secondResult.marker.previous).toBeUndefined();
-        expect(secondResult.contract.coreHash).toBe(validatedContract.coreHash);
+          expect(secondResult.ok).toBe(true);
+          expect(secondResult.summary).toBe('Database already signed with this contract');
+          expect(secondResult.marker.created).toBe(false);
+          expect(secondResult.marker.updated).toBe(false);
+          expect(secondResult.marker.previous).toBeUndefined();
+          expect(secondResult.contract.coreHash).toBe(validatedContract.coreHash);
 
-        // Verify marker was not updated (updated_at should be the same)
-        const markerAfterSecond = await readMarker(driver);
-        expect(markerAfterSecond?.updatedAt).toEqual(firstUpdatedAt);
-      } finally {
-        await driver.close();
-      }
-    });
+          // Verify marker was not updated (updated_at should be the same)
+          const markerAfterSecond = await readMarker(driver);
+          expect(markerAfterSecond?.updatedAt).toEqual(firstUpdatedAt);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 });

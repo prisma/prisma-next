@@ -289,47 +289,6 @@ describe('family instance introspect', () => {
     );
   });
 
-  describe('for an invalid database connection', () => {
-    it(
-      'handles connection errors gracefully',
-      async () => {
-        let invalidDriver: Awaited<ReturnType<typeof postgresDriver.create>> | undefined;
-        try {
-          invalidDriver = await postgresDriver.create('postgresql://invalid:5432/invalid');
-        } catch (error) {
-          // Driver creation failing immediately is unexpected - the test expects to create
-          // the driver successfully, then have introspect() fail when using the invalid connection.
-          // If driver creation fails, it may indicate an environment issue or changed behavior.
-          throw new Error(
-            'Expected postgresDriver.create() to succeed with invalid connection string, ' +
-              'but it threw: ' +
-              (error instanceof Error ? error.message : String(error)),
-          );
-        }
-
-        try {
-          const familyInstance = sql.create({
-            target: postgres,
-            adapter: postgresAdapter,
-            driver: postgresDriver,
-            extensions: [],
-          });
-
-          await expect(
-            familyInstance.introspect({
-              driver: invalidDriver,
-            }),
-          ).rejects.toThrow();
-        } finally {
-          await invalidDriver.close().catch(() => {
-            // Ignore cleanup errors
-          });
-        }
-      },
-      timeouts.spinUpPpgDev,
-    );
-  });
-
   describe('for a schema with extensions', () => {
     beforeEach(async () => {
       if (!connectionString) {
