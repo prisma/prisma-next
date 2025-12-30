@@ -243,6 +243,7 @@ export interface SqlMigrationRunnerFailure extends MigrationRunnerFailure {
 
 /**
  * Success value for SQL migration runner execution.
+ * Extends core type for type branding and potential SQL-specific extensions.
  */
 export interface SqlMigrationRunnerSuccessValue extends MigrationRunnerSuccessValue {}
 
