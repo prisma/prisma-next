@@ -77,17 +77,18 @@ interface PlannerConflict {
 
 type PlannerResult = Result<MigrationPlan, readonly PlannerConflict[]>;
 
-interface RunnerSuccess {
-  readonly ok: true;
-  readonly value: { readonly operationsPlanned: number; readonly operationsExecuted: number };
+interface RunnerSuccessValue {
+  readonly operationsPlanned: number;
+  readonly operationsExecuted: number;
 }
 
-interface RunnerFailure {
-  readonly ok: false;
-  readonly failure: { readonly code: string; readonly summary: string; readonly why?: string };
+interface RunnerFailureDetails {
+  readonly code: string;
+  readonly summary: string;
+  readonly why?: string;
 }
 
-type RunnerResult = RunnerSuccess | RunnerFailure;
+type RunnerResult = Result<RunnerSuccessValue, RunnerFailureDetails>;
 
 interface MigrationPlanner {
   plan(options: {
