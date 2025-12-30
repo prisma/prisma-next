@@ -1,6 +1,5 @@
 ---
 description: Avoid opaque type casts like `as never[]` or `as unknown[]`
-globs:
 alwaysApply: true
 ---
 
