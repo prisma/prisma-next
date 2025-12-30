@@ -45,11 +45,18 @@ describe('family instance schemaVerify - constraints', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result.ok).toBe(false);
+        expect(result).toMatchObject({
+          ok: false,
+          schema: {
+            counts: { fail: expect.any(Number) },
+          },
+        });
         expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some((i) => i.kind === 'primary_key_mismatch' && i.table === 'user'),
-        ).toBe(true);
+        expect(result.schema.issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ kind: 'primary_key_mismatch', table: 'user' }),
+          ]),
+        );
       },
       timeouts.spinUpPpgDev,
     );
@@ -101,11 +108,18 @@ describe('family instance schemaVerify - constraints', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result.ok).toBe(false);
+        expect(result).toMatchObject({
+          ok: false,
+          schema: {
+            counts: { fail: expect.any(Number) },
+          },
+        });
         expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some((i) => i.kind === 'foreign_key_mismatch' && i.table === 'post'),
-        ).toBe(true);
+        expect(result.schema.issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ kind: 'foreign_key_mismatch', table: 'post' }),
+          ]),
+        );
       },
       timeouts.spinUpPpgDev,
     );
