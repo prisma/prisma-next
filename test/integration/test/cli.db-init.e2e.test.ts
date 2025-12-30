@@ -1,5 +1,6 @@
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { ifDefined } from '@prisma-next/utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -28,7 +29,7 @@ async function setupDbInitFixture(
     connectionString,
     createTempDir,
     fixtureSubdir,
-    ...(schemaSql !== undefined ? { schemaSql } : {}),
+    ...ifDefined('schemaSql', schemaSql),
   });
 }
 
