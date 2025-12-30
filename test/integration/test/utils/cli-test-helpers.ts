@@ -258,29 +258,41 @@ export function setupTestDirectory(): {
   return { testDir, contractPath, outputDir, configPath, cleanup };
 }
 
+// Default schema for tests that need a table (e.g., db-sign)
+const DEFAULT_USER_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS "user" (
+    id SERIAL PRIMARY KEY,
+    email TEXT NOT NULL
+  )
+`;
+
+interface DbTestFixtureOptions {
+  connectionString: string;
+  createTempDir: () => string;
+  fixtureSubdir: string;
+  /** SQL to run before setting up the test directory. */
+  schemaSql?: string;
+  /** Default SQL to run if schemaSql is not provided. If undefined, no SQL is run. */
+  defaultSchema?: string;
+}
+
 /**
- * Sets up a database schema and test directory for db-sign e2e tests.
- * Creates a "user" table with id and email columns, sets up the test directory,
- * and emits the contract. Returns the test setup and config path.
+ * Sets up a test directory for database CLI e2e tests.
+ * Optionally creates a database schema and emits the contract.
  */
-export async function setupDbSignFixture(
-  connectionString: string,
-  createTempDir: () => string,
-  fixtureSubdir: string,
-  schemaSql?: string,
+export async function setupDbTestFixture(
+  options: DbTestFixtureOptions,
 ): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
+  const { connectionString, createTempDir, fixtureSubdir, schemaSql, defaultSchema } = options;
   const { withClient } = await import('@prisma-next/test-utils');
-  await withClient(connectionString, async (client) => {
-    await client.query(
-      schemaSql ??
-        `
-        CREATE TABLE IF NOT EXISTS "user" (
-          id SERIAL PRIMARY KEY,
-          email TEXT NOT NULL
-        )
-      `,
-    );
-  });
+
+  // Run schema SQL if provided, or use default if specified
+  const sqlToRun = schemaSql ?? defaultSchema;
+  if (sqlToRun) {
+    await withClient(connectionString, async (client) => {
+      await client.query(sqlToRun);
+    });
+  }
 
   const testSetup = setupTestDirectoryFromFixtures(
     createTempDir,
@@ -290,7 +302,7 @@ export async function setupDbSignFixture(
   );
   const configPath = testSetup.configPath;
 
-  // Emit contract first
+  // Emit contract
   const { createContractEmitCommand } = await import(
     '../../../../packages/1-framework/3-tooling/cli/src/commands/contract-emit'
   );
@@ -304,6 +316,26 @@ export async function setupDbSignFixture(
   }
 
   return { testSetup, configPath };
+}
+
+/**
+ * Sets up a database schema and test directory for db-sign e2e tests.
+ * Creates a "user" table with id and email columns by default, sets up the test directory,
+ * and emits the contract. Returns the test setup and config path.
+ */
+export async function setupDbSignFixture(
+  connectionString: string,
+  createTempDir: () => string,
+  fixtureSubdir: string,
+  schemaSql?: string,
+): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
+  return setupDbTestFixture({
+    connectionString,
+    createTempDir,
+    fixtureSubdir,
+    ...(schemaSql !== undefined ? { schemaSql } : {}),
+    defaultSchema: DEFAULT_USER_TABLE_SQL,
+  });
 }
 
 /**
@@ -339,37 +371,13 @@ export async function setupDbInitFixture(
   fixtureSubdir: string,
   schemaSql?: string,
 ): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
-  const { withClient } = await import('@prisma-next/test-utils');
-
-  // Only set up schema if SQL is provided
-  if (schemaSql) {
-    await withClient(connectionString, async (client) => {
-      await client.query(schemaSql);
-    });
-  }
-
-  const testSetup = setupTestDirectoryFromFixtures(
+  return setupDbTestFixture({
+    connectionString,
     createTempDir,
     fixtureSubdir,
-    'prisma-next.config.with-db.ts',
-    { '{{DB_URL}}': connectionString },
-  );
-  const configPath = testSetup.configPath;
-
-  // Emit contract first
-  const { createContractEmitCommand } = await import(
-    '../../../../packages/1-framework/3-tooling/cli/src/commands/contract-emit'
-  );
-  const emitCommand = createContractEmitCommand();
-  const originalCwd = process.cwd();
-  try {
-    process.chdir(testSetup.testDir);
-    await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
-  } finally {
-    process.chdir(originalCwd);
-  }
-
-  return { testSetup, configPath };
+    ...(schemaSql !== undefined ? { schemaSql } : {}),
+    // No defaultSchema - only run SQL if explicitly provided
+  });
 }
 
 /**
