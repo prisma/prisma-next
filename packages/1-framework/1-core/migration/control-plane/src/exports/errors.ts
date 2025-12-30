@@ -11,8 +11,10 @@ export {
   errorFileNotFound,
   errorHashMismatch,
   errorMarkerMissing,
+  errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
   errorRuntime,
+  errorTargetMigrationNotSupported,
   errorTargetMismatch,
   errorUnexpected,
 } from '../errors';

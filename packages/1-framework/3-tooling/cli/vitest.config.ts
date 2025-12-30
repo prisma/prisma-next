@@ -21,6 +21,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.ts'],
       exclude: [
         'dist/**',
         'test/**',
@@ -33,8 +34,13 @@ export default defineConfig({
         'src/utils/output.ts',
         'src/utils/command-helpers.ts',
         'src/utils/global-flags.ts',
-        // Exclude command files - mostly Commander.js setup, tested via e2e tests
+        // Exclude command files - mostly Commander.js setup and delegation to family instance,
+        // tested via e2e tests in @prisma-next/integration-tests (test/integration/test/cli.*.e2e.test.ts)
         'src/commands/contract-emit.ts',
+        'src/commands/db-init.ts',
+        'src/commands/db-introspect.ts',
+        'src/commands/db-schema-verify.ts',
+        'src/commands/db-sign.ts',
         'src/commands/db-verify.ts',
         // Exclude error factory functions - just constructors
         'src/utils/cli-errors.ts',
@@ -47,13 +53,11 @@ export default defineConfig({
         'src/api/emit-contract.ts', // Non-Error exception handling (lines 104-105)
         'src/load-ts-contract.ts', // Bundle content undefined and non-Error exceptions (lines 170-171, 211)
       ],
-      // CLI is tested with integration and end-to-end tests
-      // Unit test coverage needs to be reevaluated
       thresholds: {
-        lines: 14,
-        branches: 90,
-        functions: 66,
-        statements: 14,
+        lines: 95,
+        branches: 95,
+        functions: 95,
+        statements: 95,
       },
     },
   },

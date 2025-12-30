@@ -131,19 +131,21 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 
 ## 3. CLI Command Wiring (`prisma-next db init`)
 
-- **3.1 Add command factory**
+- [x] **3.1 Add command factory**
   - Implement `createDbInitCommand()` under the CLI package (e.g., `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`).
   - Register the new command in the CLI command tree so `prisma-next db init` is available.
+  - ✅ Implemented in `packages/1-framework/3-tooling/cli/src/commands/db-init.ts` and registered under `db` in `packages/1-framework/3-tooling/cli/src/cli.ts`.
 
-- **3.2 Use CLI style and error-handling patterns**
+- [x] **3.2 Use CLI style and error-handling patterns**
   - Apply `setCommandDescriptions()` to provide:
     - Short description: “Bootstrap a database to match the current contract and write the contract marker.”
     - Long description explaining additive-only semantics, supported states, and idempotence.
   - Wrap the core logic in `performAction()`/`handleResult()`:
     - Throw `CliStructuredError` for expected failures.
     - Call `process.exit(exitCode)` with the value from `handleResult`.
+  - ✅ Uses `setCommandDescriptions()`, `performAction()`, `handleResult()`, and `process.exit()` in `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`.
 
-- **3.3 Orchestration logic**
+- [x] **3.3 Orchestration logic**
   - In the command action:
     - Load config via the existing config loader (`prisma-next.config.ts`).
     - Load and validate the contract (`contract.json` + `contract.d.ts`).
@@ -162,8 +164,9 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
           - After execution, surface a success summary including:
             - Applied operations count.
             - Marker and ledger confirmation.
+  - ✅ Implemented end-to-end orchestration in `packages/1-framework/3-tooling/cli/src/commands/db-init.ts` (config load, contract read/validate, driver creation, schema introspection, planning, apply mode execution).
 
-- **3.4 CLI output formatting**
+- [x] **3.4 CLI output formatting**
   - Implement human-readable formatting that:
     - Shows a **tree of changes** similar to `schema-verify` (per-table, per-column/index/constraint).
     - Logs each operation as it executes (`creating table ...`, `creating index ...`).
@@ -171,33 +174,36 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
     - Uses the standard result envelope (`status`, `error`, etc.).
     - Embeds `originContract`, `destinationContract`, `plan`, and `marker` before/after snapshots.
     - Includes conflicts list when planning fails.
+  - ✅ Output formatting implemented via `DbInitResult` + formatters in `packages/1-framework/3-tooling/cli/src/utils/output.ts` and wired in `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`.
 
-- **3.5 CLI tests**
+- [x] **3.5 CLI tests**
   - Add CLI-level tests (likely in `test/e2e/framework`) to cover:
     - Empty DB: `db init --plan` and `db init` (apply) behaviors + JSON mode.
     - Subset DB: only missing pieces planned/applied; marker/ledger correct.
     - Superset DB: no-op plan; marker/ledger identity transition.
     - Conflicting DB: failure with conflict list; no schema or marker changes.
   - Use the shared E2E dev database utilities and object matchers for result assertions.
+  - ✅ Added integration coverage in `test/integration/test/cli.db-init.e2e.test.ts` for empty DB (plan/apply + JSON) and non-empty DB failure scenarios.
 
 ## 4. Schema IR & Verification Integration
 
-- **4.1 Reuse or expose schema-verify primitives**
-  - Identify and reuse the existing **schema vs. contract verification** logic used by the `schema-verify` command.
-  - Ensure the planner has access to:
-    - Contract IR.
-    - Introspected schema IR.
-    - A reusable diff/verification primitive or library for detecting missing vs. conflicting structures.
+- [x] **4.1 Reuse or expose schema-verify primitives**
+  - ✅ Extracted pure `verifySqlSchema()` function in `packages/2-sql/3-tooling/family/src/core/schema-verify/verify-sql-schema.ts` that compares `SqlSchemaIR` against `SqlContract` without requiring a database connection.
+  - ✅ Refactored `schemaVerify()` method to use the pure verifier: it validates the contract, introspects the live schema, and calls the pure function.
+  - ✅ Exposed via new package export `@prisma-next/family-sql/schema-verify`.
+  - ✅ Added `ifDefined()` utility in new `@prisma-next/utils` package for cleaner optional property spreading.
+  - ✅ Moved `Result<T, F>` type to `@prisma-next/utils/result` (shared plane).
+  - ✅ Extended `SchemaIssue.kind` with `extra_*` variants (`extra_table`, `extra_column`, `extra_primary_key`, `extra_foreign_key`, `extra_unique_constraint`, `extra_index`) for semantically correct strict mode detection.
+  - ✅ Split tests into `schema-verify.basic.test.ts`, `schema-verify.constraints.test.ts`, `schema-verify.strict.test.ts` (all under 500 lines).
 
-- **4.2 Contract verification after execution**
-  - Implement a helper that, given a connection and contract, re-runs verification after the runner finishes:
-    - Fails with a structured error if the final schema does not fully satisfy the contract.
-    - Integrate this helper into the runner or the CLI orchestration layer as appropriate.
+- [x] **4.2 Contract verification after execution**
+  - ✅ Implemented in the Postgres runner (`packages/3-targets/3-targets/postgres/src/core/migrations/runner.ts`): after applying plan operations, the runner introspects the live schema, calls `verifySqlSchema()` (the pure verifier from task 4.1), and returns `runnerFailure('SCHEMA_VERIFY_FAILED', ...)` if verification fails. The transaction only commits after verification passes and marker/ledger writes succeed. This ensures the database never commits unless the post-state schema satisfies the destination contract.
+  - The verification logic is integrated directly into the runner's transaction boundary (not a separate helper), keeping error shaping in the target package and avoiding dependencies on orchestrated commands.
 
-- **4.3 Verification tests**
-  - Add tests that:
-    - Intentionally introduce mismatches after running `db init` and ensure verification catches them.
-    - Confirm that a successful `db init` always leaves the database in a verifiable, contract-satisfying state.
+- [x] **4.3 Verification tests**
+  - ✅ Added integration tests in `packages/3-targets/3-targets/postgres/test/migrations/schema-verify.after-runner.integration.test.ts` that:
+    - Intentionally introduce mismatches after running `db init` (e.g., nullability changes, missing columns, extra columns) and ensure verification catches them.
+    - Confirm that a successful `db init` always leaves the database in a verifiable, contract-satisfying state (schema matches contract after migration).
 
 ## 5. Documentation & Standards Alignment
 
@@ -246,6 +252,33 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
 - **7.1 Remove pgvector-specific logic from Postgres target**
   - Strip any hard-coded references to pgvector (extension SQL, naming conventions, etc.) from `@prisma-next/targets-postgres`.
   - Ensure extension-specific behavior is provided exclusively via extension packs so the target remains neutral.
+
+- **7.2 Consolidate CLI E2E test infrastructure**
+  - Current state: `test/integration/` contains tests named `*.e2e.test.ts` that run CLI commands in-process (importing command factories directly, mocking `process.exit` and `console.log`), while `test/e2e/framework/` is intended for true subprocess E2E tests.
+  - Issues with in-process approach:
+    - Not truly E2E — doesn't test the CLI entrypoint, shebang, or process lifecycle.
+    - Mocking `process.exit` to throw is fragile and can mask real issues.
+    - Doesn't catch ESM/CJS interop problems that occur in real subprocess execution.
+  - Proposed cleanup:
+    - Rename in-process tests in `test/integration/` to drop the "e2e" suffix (since they're really integration tests).
+    - Move or add true subprocess E2E tests to `test/e2e/` following the pattern in `cli.emit-cli-process.e2e.test.ts`.
+    - Update `test/integration/README.md` and `test/e2e/framework/README.md` to clarify the distinction.
+  - Reference: `cli.emit-cli-process.e2e.test.ts` demonstrates the correct subprocess pattern using `execFileAsync('node', [cliPath, ...])`.
+
+- **7.3 Introduce core migration base types for CLI (remove duck typing)**
+  - Current state: `db init` in `@prisma-next/cli` duck-types the planner/runner and casts the plan shape to produce output.
+  - Goal: define a small, family-agnostic `MigrationPlanBase` / `MigrationPlannerResultBase` / `MigrationRunnerResultBase` vocabulary in framework core so CLI can format plans without importing SQL-specific types.
+  - Make migration support an explicit **optional** target capability (e.g., `target.migrations?`) rather than relying on targets to implement migration methods that throw.
+  - Planning doc: `agent-os/specs/2025-12-05-db-init-command/planning/migration-cli-base-types.plan.md`.
+
+- **7.4 Unify FamilyInstance type hierarchy (remove redundant casts)**
+  - Current state: Three disconnected interfaces exist for family instances:
+    - `ControlFamilyInstance<TFamilyId>` — minimal marker with only `familyId`.
+    - `RuntimeFamilyInstance<TFamilyId>` — minimal marker with only `familyId` (identical to control).
+    - `FamilyInstance<TFamilyId, ...>` — rich interface with all domain methods (`validateContractIR`, `verify`, `introspect`, etc.).
+  - Problem: `ControlFamilyDescriptor.create()` defaults to returning `ControlFamilyInstance`, forcing CLI commands to cast to `FamilyInstance` everywhere.
+  - Goal: Establish a proper inheritance hierarchy where `FamilyInstance` is the common ancestor, and `ControlFamilyInstance` / `RuntimeFamilyInstance` extend it with plane-specific methods (if any). This eliminates the casts in CLI command implementations.
+  - Planning doc: `agent-os/specs/2025-12-05-db-init-command/planning/family-instance-type-hierarchy.plan.md`.
 
 ## 8. Postgres Planner Enhancements
 

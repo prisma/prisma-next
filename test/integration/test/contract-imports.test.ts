@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
+import { createContractIR } from '@prisma-next/emitter/test/utils';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
@@ -19,6 +19,43 @@ import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Runs TypeScript compiler on a tsconfig and asserts success.
+ * On failure, includes the generated contract.d.ts content in the error for debugging.
+ */
+async function runTscAndAssertSuccess(
+  tsconfigPath: string,
+  workspaceRoot: string,
+  contractDtsContent: string,
+): Promise<void> {
+  try {
+    const { stderr } = await execFileAsync(
+      'pnpm',
+      ['exec', 'tsc', '--noEmit', '--project', tsconfigPath],
+      {
+        cwd: workspaceRoot,
+      },
+    );
+
+    if (stderr?.trim() && !stderr.includes('Found 0 errors')) {
+      throw new Error(`TypeScript compilation failed:\n${stderr}`);
+    }
+  } catch (error: unknown) {
+    if (error && typeof error === 'object') {
+      const errorObj = error as { stderr?: string; stdout?: string; message?: string };
+      const stderr = errorObj.stderr || '';
+      const stdout = errorObj.stdout || '';
+      const message = errorObj.message || '';
+      const fullError = stderr || stdout || message;
+
+      throw new Error(
+        `TypeScript compilation failed:\n${fullError}\n\nGenerated contract.d.ts:\n${contractDtsContent}`,
+      );
+    }
+    throw error;
+  }
+}
 
 describe('contract.d.ts imports resolution', () => {
   let testDir: string;
@@ -36,10 +73,7 @@ describe('contract.d.ts imports resolution', () => {
   it(
     'generates contract.d.ts with all imports resolving correctly',
     async () => {
-      const ir: ContractIR = {
-        schemaVersion: '1',
-        targetFamily: 'sql',
-        target: 'postgres',
+      const ir = createContractIR({
         extensions: {
           postgres: { version: '15.0.0' },
           pg: {},
@@ -64,7 +98,6 @@ describe('contract.d.ts imports resolution', () => {
             relations: {},
           },
         },
-        relations: {},
         storage: {
           tables: {
             user: {
@@ -95,10 +128,7 @@ describe('contract.d.ts imports resolution', () => {
             },
           },
         },
-        capabilities: {},
-        meta: {},
-        sources: {},
-      };
+      });
 
       const packs = loadExtensionPacks(
         join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
@@ -194,41 +224,7 @@ type UserIdColumn = UserColumns['id'];
 
       // Use TypeScript compiler to verify all imports resolve
       // Use pnpm to run TypeScript from the workspace root so path mappings work
-      try {
-        const { stdout, stderr } = await execFileAsync(
-          'pnpm',
-          ['exec', 'tsc', '--noEmit', '--project', tsconfigPath],
-          {
-            cwd: workspaceRoot,
-          },
-        );
-
-        if (stderr?.trim()) {
-          throw new Error(`TypeScript compilation failed:\n${stderr}`);
-        }
-
-        // If we get here, all imports resolved successfully
-        expect(stdout).toBeDefined();
-      } catch (error: unknown) {
-        if (error && typeof error === 'object') {
-          const errorObj = error as { stderr?: string; stdout?: string; message?: string };
-          const stderr = errorObj.stderr || '';
-          const stdout = errorObj.stdout || '';
-          const message = errorObj.message || '';
-          const fullError = stderr || stdout || message;
-
-          if (
-            fullError.includes('Cannot find module') ||
-            fullError.includes('Cannot resolve') ||
-            fullError.includes('error TS')
-          ) {
-            throw new Error(
-              `Import resolution failed in generated contract.d.ts:\n${fullError}\n\nGenerated contract.d.ts:\n${contractDtsContent}`,
-            );
-          }
-        }
-        throw error;
-      }
+      await runTscAndAssertSuccess(tsconfigPath, workspaceRoot, contractDtsContent);
     },
     timeouts.typeScriptCompilation,
   );
@@ -236,10 +232,7 @@ type UserIdColumn = UserColumns['id'];
   it(
     'generated contract.d.ts can be imported and used in TypeScript',
     async () => {
-      const ir: ContractIR = {
-        schemaVersion: '1',
-        targetFamily: 'sql',
-        target: 'postgres',
+      const ir = createContractIR({
         extensions: {
           postgres: { version: '15.0.0' },
           pg: {},
@@ -254,7 +247,6 @@ type UserIdColumn = UserColumns['id'];
             relations: {},
           },
         },
-        relations: {},
         storage: {
           tables: {
             user: {
@@ -269,10 +261,7 @@ type UserIdColumn = UserColumns['id'];
             },
           },
         },
-        capabilities: {},
-        meta: {},
-        sources: {},
-      };
+      });
 
       const packs = loadExtensionPacks(
         join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
@@ -377,35 +366,7 @@ type CodecIntType = CodecTypes['pg/int4@1'];
 
       // Use TypeScript compiler to verify all imports resolve
       // Use pnpm to run TypeScript from the workspace root so path mappings work
-      try {
-        const { stdout, stderr } = await execFileAsync(
-          'pnpm',
-          ['exec', 'tsc', '--noEmit', '--project', tsconfigPath],
-          {
-            cwd: workspaceRoot,
-          },
-        );
-
-        if (stderr?.trim() && !stderr.includes('Found 0 errors')) {
-          throw new Error(`TypeScript compilation failed:\n${stderr}`);
-        }
-
-        expect(stdout).toBeDefined();
-      } catch (error: unknown) {
-        if (error && typeof error === 'object') {
-          const errorObj = error as { stderr?: string; stdout?: string; message?: string };
-          const stderr = errorObj.stderr || '';
-          const stdout = errorObj.stdout || '';
-          const message = errorObj.message || '';
-          const fullError = stderr || stdout || message;
-
-          // Always show the error for debugging
-          throw new Error(
-            `TypeScript compilation failed:\n${fullError}\n\nGenerated contract.d.ts:\n${contractDtsContent}`,
-          );
-        }
-        throw error;
-      }
+      await runTscAndAssertSuccess(tsconfigPath, workspaceRoot, contractDtsContent);
     },
     timeouts.typeScriptCompilation,
   );

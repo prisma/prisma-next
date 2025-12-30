@@ -149,6 +149,16 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
       : error.where.path;
     lines.push(`${prefix}${formatDimText(`  Where: ${whereLine}`)}`);
   }
+  // Show conflicts list if present and verbose
+  if (isVerbose(flags, 1) && error.meta?.['conflicts']) {
+    const conflicts = error.meta['conflicts'] as readonly { kind: string; summary: string }[];
+    if (conflicts.length > 0) {
+      lines.push(`${prefix}${formatDimText('  Conflicts:')}`);
+      for (const conflict of conflicts) {
+        lines.push(`${prefix}${formatDimText(`    - [${conflict.kind}] ${conflict.summary}`)}`);
+      }
+    }
+  }
   if (error.docsUrl && isVerbose(flags, 1)) {
     lines.push(formatDimText(error.docsUrl));
   }
@@ -762,6 +772,137 @@ export function formatSignOutput(result: SignDatabaseResult, flags: GlobalFlags)
  * Formats JSON output for database sign.
  */
 export function formatSignJson(result: SignDatabaseResult): string {
+  return JSON.stringify(result, null, 2);
+}
+
+// ============================================================================
+// DB Init Output Formatters
+// ============================================================================
+
+/**
+ * Result type for db init command.
+ */
+export interface DbInitResult {
+  readonly ok: boolean;
+  readonly mode: 'plan' | 'apply';
+  readonly plan?: {
+    readonly targetId: string;
+    readonly destination: {
+      readonly coreHash: string;
+      readonly profileHash?: string;
+    };
+    readonly operations: readonly {
+      readonly id: string;
+      readonly label: string;
+      readonly operationClass: string;
+    }[];
+  };
+  readonly execution?: {
+    readonly operationsPlanned: number;
+    readonly operationsExecuted: number;
+  };
+  readonly marker?: {
+    readonly coreHash: string;
+    readonly profileHash?: string;
+  };
+  readonly summary: string;
+  readonly timings: {
+    readonly total: number;
+  };
+}
+
+/**
+ * Formats human-readable output for db init plan mode.
+ */
+export function formatDbInitPlanOutput(result: DbInitResult, flags: GlobalFlags): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const prefix = createPrefix(flags);
+  const useColor = flags.color !== false;
+  const formatGreen = createColorFormatter(useColor, green);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  // Plan summary
+  const operationCount = result.plan?.operations.length ?? 0;
+  lines.push(`${prefix}${formatGreen('✔')} Planned ${operationCount} operation(s)`);
+
+  // Show operations tree
+  if (result.plan?.operations && result.plan.operations.length > 0) {
+    lines.push(`${prefix}${formatDimText('│')}`);
+    for (let i = 0; i < result.plan.operations.length; i++) {
+      const op = result.plan.operations[i];
+      if (!op) continue;
+      const isLast = i === result.plan.operations.length - 1;
+      const treeChar = isLast ? '└' : '├';
+      const opClass = formatDimText(`[${op.operationClass}]`);
+      lines.push(`${prefix}${formatDimText(treeChar)}─ ${op.label} ${opClass}`);
+    }
+  }
+
+  // Destination hash
+  if (result.plan?.destination) {
+    lines.push(`${prefix}`);
+    lines.push(
+      `${prefix}${formatDimText(`Destination hash: ${result.plan.destination.coreHash}`)}`,
+    );
+  }
+
+  // Timings in verbose mode
+  if (isVerbose(flags, 1)) {
+    lines.push(`${prefix}${formatDimText(`Total time: ${result.timings.total}ms`)}`);
+  }
+
+  // Note about dry run
+  lines.push(`${prefix}`);
+  lines.push(`${prefix}${formatDimText('This is a dry run. No changes were applied.')}`);
+  lines.push(`${prefix}${formatDimText('Run without --plan to apply changes.')}`);
+
+  return lines.join('\n');
+}
+
+/**
+ * Formats human-readable output for db init apply mode.
+ */
+export function formatDbInitApplyOutput(result: DbInitResult, flags: GlobalFlags): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  const prefix = createPrefix(flags);
+  const useColor = flags.color !== false;
+  const formatGreen = createColorFormatter(useColor, green);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  if (result.ok) {
+    // Success summary
+    const executed = result.execution?.operationsExecuted ?? 0;
+    lines.push(`${prefix}${formatGreen('✔')} Applied ${executed} operation(s)`);
+
+    // Marker info
+    if (result.marker) {
+      lines.push(`${prefix}${formatDimText(`  Marker written: ${result.marker.coreHash}`)}`);
+      if (result.marker.profileHash) {
+        lines.push(`${prefix}${formatDimText(`  Profile hash: ${result.marker.profileHash}`)}`);
+      }
+    }
+
+    // Timings in verbose mode
+    if (isVerbose(flags, 1)) {
+      lines.push(`${prefix}${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Formats JSON output for db init command.
+ */
+export function formatDbInitJson(result: DbInitResult): string {
   return JSON.stringify(result, null, 2);
 }
 

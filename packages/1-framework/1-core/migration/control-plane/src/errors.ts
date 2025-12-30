@@ -210,6 +210,53 @@ export function errorDriverRequired(options?: { readonly why?: string }): CliStr
 }
 
 /**
+ * Migration planning failed due to conflicts.
+ */
+export function errorMigrationPlanningFailed(options: {
+  readonly conflicts: readonly {
+    readonly kind: string;
+    readonly summary: string;
+    readonly why?: string;
+  }[];
+  readonly why?: string;
+}): CliStructuredError {
+  // Build "why" from conflict summaries - these contain the actual problem description
+  const conflictSummaries = options.conflicts.map((c) => c.summary);
+  const computedWhy = options.why ?? conflictSummaries.join('\n');
+
+  // Build "fix" from conflict "why" fields - these contain actionable advice
+  const conflictFixes = options.conflicts
+    .map((c) => c.why)
+    .filter((why): why is string => typeof why === 'string');
+  const computedFix =
+    conflictFixes.length > 0
+      ? conflictFixes.join('\n')
+      : 'Use `db schema-verify` to inspect conflicts, or ensure the database is empty';
+
+  return new CliStructuredError('4020', 'Migration planning failed', {
+    domain: 'CLI',
+    why: computedWhy,
+    fix: computedFix,
+    meta: { conflicts: options.conflicts },
+    docsUrl: 'https://prisma-next.dev/docs/cli/db-init',
+  });
+}
+
+/**
+ * Target does not support migrations (missing createPlanner/createRunner).
+ */
+export function errorTargetMigrationNotSupported(options?: {
+  readonly why?: string;
+}): CliStructuredError {
+  return new CliStructuredError('4021', 'Target does not support migrations', {
+    domain: 'CLI',
+    why: options?.why ?? 'The configured target does not provide migration planner/runner',
+    fix: 'Ensure you are using a target that supports migrations',
+    docsUrl: 'https://prisma-next.dev/docs/cli/db-init',
+  });
+}
+
+/**
  * Config validation error (missing required fields).
  */
 export function errorConfigValidation(
