@@ -1,8 +1,5 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { Command } from 'commander';
-import { afterEach, beforeEach, vi } from 'vitest';
+import { vi } from 'vitest';
 
 /**
  * Gets the exit code from the process.exit mock.
