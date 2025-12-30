@@ -1,6 +1,9 @@
 import type { Command } from 'commander';
 import { vi } from 'vitest';
 
+// Module-level variable to track exit code (more reliable than vi.fn().mock.calls when mock throws)
+let lastExitCode: number | undefined;
+
 /**
  * Gets the exit code from the process.exit mock.
  * Returns undefined if process.exit hasn't been called yet.
@@ -8,14 +11,14 @@ import { vi } from 'vitest';
  * If you need to check for success (exit code 0), check if executeCommand didn't throw instead.
  */
 export function getExitCode(): number | undefined {
-  const mock = process.exit as unknown as ReturnType<typeof vi.fn>;
-  if (mock.mock.calls.length === 0) {
-    return undefined;
-  }
-  const exitCall = mock.mock.calls[mock.mock.calls.length - 1]; // Get the last call
-  const exitCode = exitCall?.[0];
-  // process.exit() without argument is undefined, but defaults to 0
-  return exitCode === undefined ? 0 : exitCode;
+  return lastExitCode;
+}
+
+/**
+ * Resets the exit code tracking. Called automatically by setupCommandMocks().
+ */
+export function resetExitCode(): void {
+  lastExitCode = undefined;
 }
 
 /**
@@ -65,6 +68,9 @@ export function setupCommandMocks(): {
   const originalConsoleError = console.error;
   const originalExit = process.exit;
 
+  // Reset exit code tracking
+  resetExitCode();
+
   // Mock console first (before process.exit) so errors are captured
   console.log = vi.fn((...args: unknown[]) => {
     consoleOutput.push(args.map(String).join(' '));
@@ -74,8 +80,11 @@ export function setupCommandMocks(): {
     consoleErrors.push(args.map(String).join(' '));
   }) as typeof console.error;
 
-  // Mock process.exit to throw instead of actually exiting (Vitest doesn't allow process.exit)
-  process.exit = vi.fn(() => {
+  // Mock process.exit to record the exit code and throw
+  // We record the exit code BEFORE throwing since vi.fn().mock.calls may not be
+  // reliably accessible when an error is thrown inside the mock implementation
+  process.exit = vi.fn((code?: number) => {
+    lastExitCode = code ?? 0;
     throw new Error('process.exit called');
   }) as unknown as typeof process.exit;
 
@@ -83,6 +92,7 @@ export function setupCommandMocks(): {
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
     process.exit = originalExit;
+    resetExitCode();
   };
 
   return { consoleOutput, consoleErrors, cleanup };

@@ -73,9 +73,20 @@ interface MigrationPlan {
 interface PlannerConflict {
   readonly kind: string;
   readonly summary: string;
+  readonly why?: string;
 }
 
-type PlannerResult = Result<MigrationPlan, readonly PlannerConflict[]>;
+interface PlannerSuccessResult {
+  readonly kind: 'success';
+  readonly plan: MigrationPlan;
+}
+
+interface PlannerFailureResult {
+  readonly kind: 'failure';
+  readonly conflicts: readonly PlannerConflict[];
+}
+
+type PlannerResult = PlannerSuccessResult | PlannerFailureResult;
 
 interface RunnerSuccessValue {
   readonly operationsPlanned: number;
@@ -268,17 +279,26 @@ export function createDbInitCommand(): Command {
           const policy = { allowedOperationClasses: ['additive'] as const };
 
           // Plan migration
-          const plannerResult = planner.plan({
-            contract: contractIR,
-            schema: schemaIR,
-            policy,
-          });
+          const plannerResult = await withSpinner(
+            () =>
+              Promise.resolve(
+                planner.plan({
+                  contract: contractIR,
+                  schema: schemaIR,
+                  policy,
+                }),
+              ),
+            {
+              message: 'Planning migration...',
+              flags,
+            },
+          );
 
-          if (!plannerResult.ok) {
-            throw errorMigrationPlanningFailed({ conflicts: plannerResult.failure });
+          if (plannerResult.kind === 'failure') {
+            throw errorMigrationPlanningFailed({ conflicts: plannerResult.conflicts });
           }
 
-          const migrationPlan = plannerResult.value;
+          const migrationPlan = plannerResult.plan;
 
           // Add blank line after spinners
           if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {

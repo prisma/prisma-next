@@ -149,6 +149,16 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
       : error.where.path;
     lines.push(`${prefix}${formatDimText(`  Where: ${whereLine}`)}`);
   }
+  // Show conflicts list if present and verbose
+  if (isVerbose(flags, 1) && error.meta?.['conflicts']) {
+    const conflicts = error.meta['conflicts'] as readonly { kind: string; summary: string }[];
+    if (conflicts.length > 0) {
+      lines.push(`${prefix}${formatDimText('  Conflicts:')}`);
+      for (const conflict of conflicts) {
+        lines.push(`${prefix}${formatDimText(`    - [${conflict.kind}] ${conflict.summary}`)}`);
+      }
+    }
+  }
   if (error.docsUrl && isVerbose(flags, 1)) {
     lines.push(formatDimText(error.docsUrl));
   }

@@ -407,6 +407,7 @@ export async function runDbInit(
 export {
   executeCommand,
   getExitCode,
+  resetExitCode,
   setupCommandMocks,
 } from '../../../../packages/1-framework/3-tooling/cli/test/utils/test-helpers';
 
