@@ -2,13 +2,13 @@ import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlControlFamilyInstance,
+  SqlMigrationPlanContractInfo,
   SqlMigrationPlanOperation,
+  SqlMigrationPlanOperationStep,
   SqlMigrationRunner,
   SqlMigrationRunnerExecuteOptions,
   SqlMigrationRunnerFailure,
   SqlMigrationRunnerResult,
-  SqlSqlMigrationPlanContractInfo,
-  SqlSqlMigrationPlanOperationStep,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
@@ -31,7 +31,7 @@ interface RunnerConfig {
 
 interface ApplyPlanSuccessValue {
   readonly operationsExecuted: number;
-  readonly executedOperations: readonly SqlSqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+  readonly executedOperations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
 }
 
 const DEFAULT_CONFIG: RunnerConfig = {
@@ -77,7 +77,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   ) {}
 
   async execute(
-    options: SqlSqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
+    options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
   ): Promise<SqlMigrationRunnerResult> {
     const schema = options.schemaName ?? this.config.defaultSchema;
     const driver = options.driver;
