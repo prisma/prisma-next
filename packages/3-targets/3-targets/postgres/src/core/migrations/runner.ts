@@ -1,14 +1,14 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
-  MigrationPlanContractInfo,
-  MigrationPlanOperation,
-  MigrationPlanOperationStep,
-  MigrationRunner,
-  MigrationRunnerExecuteOptions,
-  MigrationRunnerFailure,
-  MigrationRunnerResult,
   SqlControlFamilyInstance,
+  SqlMigrationPlanContractInfo,
+  SqlMigrationPlanOperation,
+  SqlMigrationPlanOperationStep,
+  SqlMigrationRunner,
+  SqlMigrationRunnerExecuteOptions,
+  SqlMigrationRunnerFailure,
+  SqlMigrationRunnerResult,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
@@ -31,7 +31,7 @@ interface RunnerConfig {
 
 interface ApplyPlanSuccessValue {
   readonly operationsExecuted: number;
-  readonly executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[];
+  readonly executedOperations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
 }
 
 const DEFAULT_CONFIG: RunnerConfig = {
@@ -66,19 +66,19 @@ function cloneAndFreezeRecord<T extends Record<string, unknown>>(value: T): T {
 export function createPostgresMigrationRunner(
   family: SqlControlFamilyInstance,
   config: Partial<RunnerConfig> = {},
-): MigrationRunner<PostgresPlanTargetDetails> {
+): SqlMigrationRunner<PostgresPlanTargetDetails> {
   return new PostgresMigrationRunner(family, { ...DEFAULT_CONFIG, ...config });
 }
 
-class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetails> {
+class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDetails> {
   constructor(
     private readonly family: SqlControlFamilyInstance,
     private readonly config: RunnerConfig,
   ) {}
 
   async execute(
-    options: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
-  ): Promise<MigrationRunnerResult> {
+    options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
+  ): Promise<SqlMigrationRunnerResult> {
     const schema = options.schemaName ?? this.config.defaultSchema;
     const driver = options.driver;
     const lockKey = `${LOCK_DOMAIN}:${schema}`;
@@ -167,11 +167,11 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private async applyPlan(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    options: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
-  ): Promise<Result<ApplyPlanSuccessValue, MigrationRunnerFailure>> {
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
+  ): Promise<Result<ApplyPlanSuccessValue, SqlMigrationRunnerFailure>> {
     let operationsExecuted = 0;
-    const executedOperations: Array<MigrationPlanOperation<PostgresPlanTargetDetails>> = [];
+    const executedOperations: Array<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> = [];
     for (const operation of options.plan.operations) {
       options.callbacks?.onOperationStart?.(operation);
       try {
@@ -219,7 +219,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private async ensureControlTables(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
   ): Promise<void> {
     await this.executeStatement(driver, ensurePrismaContractSchemaStatement);
     await this.executeStatement(driver, ensureMarkerTableStatement);
@@ -227,11 +227,11 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private async runExpectationSteps(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    steps: readonly MigrationPlanOperationStep[],
-    operation: MigrationPlanOperation<PostgresPlanTargetDetails>,
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    steps: readonly SqlMigrationPlanOperationStep[],
+    operation: SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
     phase: 'precheck' | 'postcheck',
-  ): Promise<Result<void, MigrationRunnerFailure>> {
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     for (const step of steps) {
       const result = await driver.query(step.sql);
       if (!this.stepResultIsTrue(result.rows)) {
@@ -253,10 +253,10 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private async runExecuteSteps(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    steps: readonly MigrationPlanOperationStep[],
-    operation: MigrationPlanOperation<PostgresPlanTargetDetails>,
-  ): Promise<Result<void, MigrationRunnerFailure>> {
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    steps: readonly SqlMigrationPlanOperationStep[],
+    operation: SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     for (const step of steps) {
       try {
         await driver.query(step.sql);
@@ -306,8 +306,8 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private async expectationsAreSatisfied(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    steps: readonly MigrationPlanOperationStep[],
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    steps: readonly SqlMigrationPlanOperationStep[],
   ): Promise<boolean> {
     if (steps.length === 0) {
       return false;
@@ -322,8 +322,8 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private createPostcheckPreSatisfiedSkipRecord(
-    operation: MigrationPlanOperation<PostgresPlanTargetDetails>,
-  ): MigrationPlanOperation<PostgresPlanTargetDetails> {
+    operation: SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
+  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
     // Clone and freeze existing meta if present
     const clonedMeta = operation.meta ? cloneAndFreezeRecord(operation.meta) : undefined;
 
@@ -357,7 +357,7 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
   private markerMatchesDestination(
     marker: ContractMarkerRecord | null,
-    plan: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['plan'],
+    plan: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['plan'],
   ): boolean {
     if (!marker) {
       return false;
@@ -373,8 +373,8 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
   private enforcePolicyCompatibility(
     policy: MigrationOperationPolicy,
-    operations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[],
-  ): Result<void, MigrationRunnerFailure> {
+    operations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[],
+  ): Result<void, SqlMigrationRunnerFailure> {
     const allowedClasses = new Set(policy.allowedOperationClasses);
     for (const operation of operations) {
       if (!allowedClasses.has(operation.operationClass)) {
@@ -397,8 +397,8 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
 
   private ensureMarkerCompatibility(
     marker: ContractMarkerRecord | null,
-    plan: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['plan'],
-  ): Result<void, MigrationRunnerFailure> {
+    plan: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['plan'],
+  ): Result<void, SqlMigrationRunnerFailure> {
     const origin = plan.origin ?? null;
     if (!origin) {
       if (!marker) {
@@ -458,9 +458,9 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private ensurePlanMatchesDestinationContract(
-    destination: MigrationPlanContractInfo,
-    contract: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['destinationContract'],
-  ): Result<void, MigrationRunnerFailure> {
+    destination: SqlMigrationPlanContractInfo,
+    contract: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['destinationContract'],
+  ): Result<void, SqlMigrationRunnerFailure> {
     if (destination.coreHash !== contract.coreHash) {
       return runnerFailure(
         'DESTINATION_CONTRACT_MISMATCH',
@@ -493,8 +493,8 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private async upsertMarker(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    options: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
     const writeStatements = buildWriteMarkerStatements({
@@ -512,10 +512,10 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private async recordLedgerEntry(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    options: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
-    executedOperations: readonly MigrationPlanOperation<PostgresPlanTargetDetails>[],
+    executedOperations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[],
   ): Promise<void> {
     const ledgerStatement = buildLedgerInsertStatement({
       originCoreHash: existingMarker?.coreHash ?? null,
@@ -533,32 +533,32 @@ class PostgresMigrationRunner implements MigrationRunner<PostgresPlanTargetDetai
   }
 
   private async acquireLock(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     key: string,
   ): Promise<void> {
     await driver.query('select pg_advisory_xact_lock(hashtext($1))', [key]);
   }
 
   private async beginTransaction(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
   ): Promise<void> {
     await driver.query('BEGIN');
   }
 
   private async commitTransaction(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
   ): Promise<void> {
     await driver.query('COMMIT');
   }
 
   private async rollbackTransaction(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
   ): Promise<void> {
     await driver.query('ROLLBACK');
   }
 
   private async executeStatement(
-    driver: MigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     statement: SqlStatement,
   ): Promise<void> {
     if (statement.params.length > 0) {

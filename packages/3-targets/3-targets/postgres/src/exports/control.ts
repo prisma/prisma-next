@@ -63,15 +63,34 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     targetId: 'postgres',
     id: 'postgres',
     manifest: loadTargetManifest(),
+    /**
+     * Migrations capability for CLI to access planner/runner via core types.
+     */
+    migrations: {
+      createPlanner(_family: SqlControlFamilyInstance) {
+        return createPostgresMigrationPlanner();
+      },
+      createRunner(family) {
+        return createPostgresMigrationRunner(family);
+      },
+    },
     create(): ControlTargetInstance<'sql', 'postgres'> {
       return {
         familyId: 'sql',
         targetId: 'postgres',
       };
     },
+    /**
+     * Direct method for SQL-specific usage.
+     * @deprecated Use migrations.createPlanner() for CLI compatibility.
+     */
     createPlanner(_family: SqlControlFamilyInstance) {
       return createPostgresMigrationPlanner();
     },
+    /**
+     * Direct method for SQL-specific usage.
+     * @deprecated Use migrations.createRunner() for CLI compatibility.
+     */
     createRunner(family) {
       return createPostgresMigrationRunner(family);
     },
