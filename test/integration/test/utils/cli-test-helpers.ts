@@ -259,14 +259,6 @@ export function setupTestDirectory(): {
   return { testDir, contractPath, outputDir, configPath, cleanup };
 }
 
-// Default schema for tests that need a table (e.g., db-sign)
-const DEFAULT_USER_TABLE_SQL = `
-  CREATE TABLE IF NOT EXISTS "user" (
-    id SERIAL PRIMARY KEY,
-    email TEXT NOT NULL
-  )
-`;
-
 export interface DbTestFixtureOptions {
   connectionString: string;
   createTempDir: () => string;
@@ -314,87 +306,6 @@ export async function setupDbTestFixture(
   }
 
   return { testSetup, configPath };
-}
-
-/**
- * Sets up a database schema and test directory for db-sign e2e tests.
- * Creates a "user" table with id and email columns by default, sets up the test directory,
- * and emits the contract. Returns the test setup and config path.
- */
-export async function setupDbSignFixture(
-  connectionString: string,
-  createTempDir: () => string,
-  fixtureSubdir: string,
-  schemaSql?: string,
-): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
-  return setupDbTestFixture({
-    connectionString,
-    createTempDir,
-    fixtureSubdir,
-    schemaSql: schemaSql ?? DEFAULT_USER_TABLE_SQL,
-  });
-}
-
-/**
- * Runs the db-sign command with the given arguments.
- * Handles process.chdir and restores the original working directory.
- */
-export async function runDbSign(
-  testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>,
-  _configPath: string,
-  args: string[],
-): Promise<number> {
-  const { createDbSignCommand } = await import(
-    '../../../../packages/1-framework/3-tooling/cli/src/commands/db-sign'
-  );
-  const command = createDbSignCommand();
-  const originalCwd = process.cwd();
-  try {
-    process.chdir(testSetup.testDir);
-    return await executeCommand(command, args);
-  } finally {
-    process.chdir(originalCwd);
-  }
-}
-
-/**
- * Sets up a test directory for db-init e2e tests.
- * Optionally creates a database schema. By default, creates an empty database.
- * Returns the test setup and config path.
- */
-export async function setupDbInitFixture(
-  connectionString: string,
-  createTempDir: () => string,
-  fixtureSubdir: string,
-  schemaSql?: string,
-): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
-  return setupDbTestFixture({
-    connectionString,
-    createTempDir,
-    fixtureSubdir,
-    ...(schemaSql !== undefined ? { schemaSql } : {}),
-  });
-}
-
-/**
- * Runs the db-init command with the given arguments.
- * Handles process.chdir and restores the original working directory.
- */
-export async function runDbInit(
-  testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>,
-  args: string[],
-): Promise<number> {
-  const { createDbInitCommand } = await import(
-    '../../../../packages/1-framework/3-tooling/cli/src/commands/db-init'
-  );
-  const command = createDbInitCommand();
-  const originalCwd = process.cwd();
-  try {
-    process.chdir(testSetup.testDir);
-    return await executeCommand(command, args);
-  } finally {
-    process.chdir(originalCwd);
-  }
 }
 
 // Re-export framework-agnostic helpers from CLI package
