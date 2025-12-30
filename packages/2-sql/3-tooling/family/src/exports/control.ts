@@ -1,5 +1,16 @@
 import { SqlFamilyDescriptor } from '../core/descriptor';
 
+// Re-export core types from canonical source
+export type {
+  MigrationOperationClass,
+  MigrationOperationPolicy,
+  MigrationPlan,
+  MigrationPlanner,
+  MigrationPlannerConflict,
+  MigrationPlannerResult,
+  MigrationPlanOperation,
+  TargetMigrationsCapability,
+} from '@prisma-next/core-control-plane/types';
 export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/instance';
 export {
   createMigrationPlan,
@@ -9,16 +20,9 @@ export {
   runnerSuccess,
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
+// SQL-specific types
 export type {
-  // SQL-specific types (Sql-prefixed)
   CreateSqlMigrationPlanOptions,
-  // Re-exported core types
-  MigrationOperationClass,
-  MigrationOperationPolicy,
-  MigrationPlan,
-  MigrationPlannerConflict,
-  MigrationPlannerResult,
-  MigrationPlanOperation,
   SqlControlTargetDescriptor,
   SqlMigrationPlan,
   SqlMigrationPlanContractInfo,
@@ -40,7 +44,6 @@ export type {
   SqlPlannerFailureResult,
   SqlPlannerResult,
   SqlPlannerSuccessResult,
-  TargetMigrationsCapability,
 } from '../core/migrations/types';
 
 /**

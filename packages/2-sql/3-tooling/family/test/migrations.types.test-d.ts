@@ -7,7 +7,6 @@
  */
 
 import type {
-  MigrationOperationClass,
   MigrationPlan,
   MigrationPlannerConflict,
   MigrationPlanOperation,
@@ -16,7 +15,6 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import { expectTypeOf } from 'vitest';
 import type {
-  MigrationOperationClass as SqlMigrationOperationClass,
   SqlMigrationPlan,
   SqlMigrationPlanOperation,
   SqlMigrationRunnerFailure,
@@ -24,8 +22,7 @@ import type {
   SqlPlannerConflict,
 } from '../src/core/migrations/types';
 
-// Test that SqlMigrationOperationClass is compatible with core MigrationOperationClass
-expectTypeOf<SqlMigrationOperationClass>().toExtend<MigrationOperationClass>();
+// Note: SqlMigrationOperationClass is the same as core MigrationOperationClass (no SQL-specific extension)
 
 // Test that SqlMigrationPlanOperation has the required core fields
 expectTypeOf<SqlMigrationPlanOperation['id']>().toExtend<MigrationPlanOperation['id']>();
