@@ -16,6 +16,7 @@ import {
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
+  type DbInitResult,
   formatCommandHelp,
   formatDbInitApplyOutput,
   formatDbInitJson,
@@ -47,9 +48,10 @@ interface DbInitOptions {
 //
 // These types capture the structural contracts for migration planner/runner
 // without adding them to the core SPI. This is a partial migration that will
-// be completed in task 7.2 (see agent-os/specs/2025-12-05-db-init-command/tasks.md)
+// be completed in task 7.3 (see agent-os/specs/2025-12-05-db-init-command/tasks.md)
 // which will move these types to @prisma-next/core-control-plane and make
 // migration support an explicit optional target capability.
+// See also: agent-os/specs/2025-12-05-db-init-command/planning/migration-cli-base-types.plan.md
 // ---------------------------------------------------------------------------
 
 interface MigrationPlanOperation {
@@ -123,35 +125,6 @@ function hasMigrationSupport(target: unknown): target is MigrationSupportTarget 
     'createRunner' in target &&
     typeof (target as Record<string, unknown>)['createRunner'] === 'function'
   );
-}
-
-export interface DbInitResult {
-  readonly ok: boolean;
-  readonly mode: 'plan' | 'apply';
-  readonly plan?: {
-    readonly targetId: string;
-    readonly destination: {
-      readonly coreHash: string;
-      readonly profileHash?: string;
-    };
-    readonly operations: readonly {
-      readonly id: string;
-      readonly label: string;
-      readonly operationClass: string;
-    }[];
-  };
-  readonly execution?: {
-    readonly operationsPlanned: number;
-    readonly operationsExecuted: number;
-  };
-  readonly marker?: {
-    readonly coreHash: string;
-    readonly profileHash?: string;
-  };
-  readonly summary: string;
-  readonly timings: {
-    readonly total: number;
-  };
 }
 
 export function createDbInitCommand(): Command {
@@ -362,7 +335,7 @@ export function createDbInitCommand(): Command {
           if (!runnerResult.ok) {
             throw errorRuntime(runnerResult.failure.summary, {
               why:
-                runnerResult.failure.why ?? 'Migration runner failed: ' + runnerResult.failure.code,
+                runnerResult.failure.why ?? `Migration runner failed: ${runnerResult.failure.code}`,
               meta: { code: runnerResult.failure.code },
             });
           }
