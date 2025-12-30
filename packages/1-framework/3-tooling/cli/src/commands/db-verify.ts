@@ -11,7 +11,7 @@ import {
   errorTargetMismatch,
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
-import type { FamilyInstance, VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
+import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -144,17 +144,16 @@ export function createDbVerifyCommand(): Command {
             driver: driverDescriptor,
             extensions: config.extensions ?? [],
           });
-          const typedFamilyInstance = familyInstance as FamilyInstance<string>;
 
           // Validate contract using instance validator
-          const contractIR = typedFamilyInstance.validateContractIR(contractJson) as ContractIR;
+          const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
 
           // Call family instance verify method
           let verifyResult: VerifyDatabaseResult;
           try {
             verifyResult = (await withSpinner(
               () =>
-                typedFamilyInstance.verify({
+                familyInstance.verify({
                   driver,
                   contractIR,
                   expectedTargetId: config.target.targetId,

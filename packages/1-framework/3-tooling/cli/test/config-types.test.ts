@@ -35,6 +35,14 @@ describe('defineConfig', () => {
           schema: { issues: [] },
           timings: { total: 0 },
         }),
+        sign: async () => ({
+          ok: true,
+          summary: 'test',
+          contract: { coreHash: 'test' },
+          target: { expected: 'postgres' },
+          marker: { created: true, updated: false },
+          timings: { total: 0 },
+        }),
         introspect: async () => ({ tables: {}, extensions: [] }),
         emitContract: async () => ({
           contractJson: '{}',

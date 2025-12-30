@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
-  FamilyInstance,
   MigrationPlan,
   MigrationPlannerResult,
   MigrationPlanOperation,
@@ -172,17 +171,16 @@ export function createDbInitCommand(): Command {
             driver: driverDescriptor,
             extensions: config.extensions ?? [],
           });
-          const typedFamilyInstance = familyInstance as FamilyInstance<string>;
 
           // Validate contract
-          const contractIR = typedFamilyInstance.validateContractIR(contractJson) as ContractIR;
+          const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
 
           // Create planner and runner from target migrations capability
           const planner = migrations.createPlanner(familyInstance);
           const runner = migrations.createRunner(familyInstance);
 
           // Introspect live schema
-          const schemaIR = await withSpinner(() => typedFamilyInstance.introspect({ driver }), {
+          const schemaIR = await withSpinner(() => familyInstance.introspect({ driver }), {
             message: 'Introspecting database schema...',
             flags,
           });

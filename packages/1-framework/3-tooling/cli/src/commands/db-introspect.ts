@@ -7,7 +7,7 @@ import {
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
-import type { FamilyInstance, IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
+import type { IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -147,11 +147,10 @@ export function createDbIntrospectCommand(): Command {
             driver: driverDescriptor,
             extensions: config.extensions ?? [],
           });
-          const typedFamilyInstance = familyInstance as FamilyInstance<string>;
 
           // Validate contract IR if we loaded it
           if (contractIR) {
-            contractIR = typedFamilyInstance.validateContractIR(contractIR);
+            contractIR = familyInstance.validateContractIR(contractIR);
           }
 
           // Call family instance introspect method
@@ -159,7 +158,7 @@ export function createDbIntrospectCommand(): Command {
           try {
             schemaIR = await withSpinner(
               () =>
-                typedFamilyInstance.introspect({
+                familyInstance.introspect({
                   driver,
                   contractIR,
                 }),
@@ -177,9 +176,9 @@ export function createDbIntrospectCommand(): Command {
 
           // Optionally call toSchemaView if available
           let schemaView: CoreSchemaView | undefined;
-          if (typedFamilyInstance.toSchemaView) {
+          if (familyInstance.toSchemaView) {
             try {
-              schemaView = typedFamilyInstance.toSchemaView(schemaIR);
+              schemaView = familyInstance.toSchemaView(schemaIR);
             } catch (error) {
               // Schema view projection is optional - log but don't fail
               if (flags.verbose) {

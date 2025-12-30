@@ -8,10 +8,7 @@ import {
   errorRuntime,
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
-import type {
-  FamilyInstance,
-  VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
+import type { VerifyDatabaseSchemaResult } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -147,17 +144,16 @@ export function createDbSchemaVerifyCommand(): Command {
             driver: driverDescriptor,
             extensions: config.extensions ?? [],
           });
-          const typedFamilyInstance = familyInstance as FamilyInstance<string>;
 
           // Validate contract using instance validator
-          const contractIR = typedFamilyInstance.validateContractIR(contractJson) as ContractIR;
+          const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
 
           // Call family instance schemaVerify method
           let schemaVerifyResult: VerifyDatabaseSchemaResult;
           try {
             schemaVerifyResult = (await withSpinner(
               () =>
-                typedFamilyInstance.schemaVerify({
+                familyInstance.schemaVerify({
                   driver,
                   contractIR,
                   strict: options.strict ?? false,
