@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
+import { createContractIR } from '@prisma-next/emitter/test/utils';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
@@ -16,7 +17,6 @@ import {
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createContractIR } from '../../../packages/1-framework/3-tooling/emitter/test/utils';
 
 const execFileAsync = promisify(execFile);
 
