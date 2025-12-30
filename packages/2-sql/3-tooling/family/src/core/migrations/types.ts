@@ -7,31 +7,27 @@
 import type {
   ControlDriverInstance,
   ControlTargetDescriptor,
-  MigrationOperationClass,
   MigrationOperationPolicy,
   MigrationPlan,
   MigrationPlannerConflict,
   MigrationPlannerFailureResult,
-  MigrationPlannerResult,
   MigrationPlannerSuccessResult,
   MigrationPlanOperation,
-  MigrationRunner,
   MigrationRunnerFailure,
-  MigrationRunnerResult,
   MigrationRunnerSuccessValue,
   OperationContext,
-  TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../instance';
 
-// Re-export core types for convenience
+// Re-export core types for convenience (direct re-export)
 export type {
   MigrationOperationClass,
   MigrationOperationPolicy,
   MigrationPlan,
+  MigrationPlanner,
   MigrationPlannerConflict,
   MigrationPlannerFailureResult,
   MigrationPlannerResult,
