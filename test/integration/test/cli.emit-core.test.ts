@@ -163,7 +163,6 @@ describe('emit integration', () => {
         sqlTargetFamilyHook,
       );
 
-      // Compare JSON outputs directly - contractJson1 was already parsed above
       const contractJson2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
 
       expect(contractJson1).toEqual(contractJson2);
