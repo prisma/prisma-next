@@ -65,10 +65,14 @@ describe('family instance schemaVerify - basic', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result.ok).toBe(true);
-        expect(result.schema.counts.fail).toBe(0);
+        expect(result).toMatchObject({
+          ok: true,
+          schema: {
+            counts: { fail: 0, pass: expect.any(Number) },
+            root: { status: 'pass' },
+          },
+        });
         expect(result.schema.counts.pass).toBeGreaterThan(0);
-        expect(result.schema.root.status).toBe('pass');
       },
       timeouts.spinUpPpgDev,
     );
@@ -109,12 +113,19 @@ describe('family instance schemaVerify - basic', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result.ok).toBe(false);
+        expect(result).toMatchObject({
+          ok: false,
+          schema: {
+            counts: { fail: expect.any(Number) },
+            root: { status: 'fail' },
+          },
+        });
         expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some((i) => i.kind === 'missing_table' && i.table === 'post'),
-        ).toBe(true);
-        expect(result.schema.root.status).toBe('fail');
+        expect(result.schema.issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ kind: 'missing_table', table: 'post' }),
+          ]),
+        );
       },
       timeouts.spinUpPpgDev,
     );
@@ -147,13 +158,18 @@ describe('family instance schemaVerify - basic', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result.ok).toBe(false);
+        expect(result).toMatchObject({
+          ok: false,
+          schema: {
+            counts: { fail: expect.any(Number) },
+          },
+        });
         expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some(
-            (i) => i.kind === 'missing_column' && i.table === 'user' && i.column === 'email',
-          ),
-        ).toBe(true);
+        expect(result.schema.issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ kind: 'missing_column', table: 'user', column: 'email' }),
+          ]),
+        );
       },
       timeouts.spinUpPpgDev,
     );
