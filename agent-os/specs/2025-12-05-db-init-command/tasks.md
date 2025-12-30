@@ -266,6 +266,15 @@ Tasks in section **6** (“Future-Facing / Fast-Follow Items”) are explicitly 
   - Make migration support an explicit **optional** target capability (e.g., `target.migrations?`) rather than relying on targets to implement migration methods that throw.
   - Planning doc: `agent-os/specs/2025-12-05-db-init-command/planning/migration-cli-base-types.plan.md`.
 
+- **7.4 Unify FamilyInstance type hierarchy (remove redundant casts)**
+  - Current state: Three disconnected interfaces exist for family instances:
+    - `ControlFamilyInstance<TFamilyId>` — minimal marker with only `familyId`.
+    - `RuntimeFamilyInstance<TFamilyId>` — minimal marker with only `familyId` (identical to control).
+    - `FamilyInstance<TFamilyId, ...>` — rich interface with all domain methods (`validateContractIR`, `verify`, `introspect`, etc.).
+  - Problem: `ControlFamilyDescriptor.create()` defaults to returning `ControlFamilyInstance`, forcing CLI commands to cast to `FamilyInstance` everywhere.
+  - Goal: Establish a proper inheritance hierarchy where `FamilyInstance` is the common ancestor, and `ControlFamilyInstance` / `RuntimeFamilyInstance` extend it with plane-specific methods (if any). This eliminates the casts in CLI command implementations.
+  - Planning doc: `agent-os/specs/2025-12-05-db-init-command/planning/family-instance-type-hierarchy.plan.md`.
+
 ## 8. Postgres Planner Enhancements
 
 - **8.1 Support additional additive initialization scenarios**
