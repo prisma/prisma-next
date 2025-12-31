@@ -7,12 +7,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Note: do not change to 'threads', it will cause the failure
+    // `TypeError: process.chdir() is not supported in workers`.
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 1,
+    isolate: false,
     testTimeout: timeouts.default,
     hookTimeout: timeouts.default,
     env: {

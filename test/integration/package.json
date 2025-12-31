@@ -39,7 +39,7 @@
     "pg": "^8.11.5",
     "strip-ansi": "^7.1.0",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^2.1.1",
+    "vitest": "catalog:",
     "typescript": "^5.9.3"
   }
 }

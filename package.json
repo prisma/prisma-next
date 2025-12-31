@@ -41,7 +41,7 @@
     "lint-staged": "^16.2.6",
     "turbo": "^2.6.1",
     "typescript": "^5.9.3",
-    "vitest": "^2.1.1"
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=20"

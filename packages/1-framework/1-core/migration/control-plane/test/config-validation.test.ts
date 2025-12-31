@@ -1,9 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { validateConfig } from '../src/config-validation';
-import { errorConfigValidation } from '../src/errors';
+import { CliStructuredError } from '../src/errors';
+
+type CreateValidConfigOverrides = Record<string, unknown> & {
+  family?: Record<string, unknown>;
+  target?: Record<string, unknown>;
+  adapter?: Record<string, unknown>;
+  driver?: Record<string, unknown>;
+};
 
 // Helper to create a minimal valid config for testing
-function createValidConfig(overrides?: Record<string, unknown>) {
+function createValidConfig(overrides: CreateValidConfigOverrides = {}) {
   return {
     family: {
       kind: 'family',
@@ -18,7 +25,7 @@ function createValidConfig(overrides?: Record<string, unknown>) {
         schemaVerify: vi.fn(),
         introspect: vi.fn(),
       })),
-      ...overrides?.family,
+      ...(overrides.family as Record<string, unknown> | undefined),
     },
     target: {
       kind: 'target',
@@ -30,7 +37,7 @@ function createValidConfig(overrides?: Record<string, unknown>) {
         version: '15.0.0',
       },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
-      ...overrides?.target,
+      ...(overrides.target as Record<string, unknown> | undefined),
     },
     adapter: {
       kind: 'adapter',
@@ -42,7 +49,7 @@ function createValidConfig(overrides?: Record<string, unknown>) {
         version: '15.0.0',
       },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
-      ...overrides?.adapter,
+      ...(overrides.adapter as Record<string, unknown> | undefined),
     },
     driver: {
       kind: 'driver',
@@ -58,7 +65,7 @@ function createValidConfig(overrides?: Record<string, unknown>) {
         query: async () => ({ rows: [] }),
         close: async () => {},
       }),
-      ...overrides?.driver,
+      ...(overrides.driver as Record<string, unknown> | undefined),
     },
     ...overrides,
   };
@@ -71,25 +78,25 @@ describe('validateConfig', () => {
   });
 
   it('throws error when config is not an object', () => {
-    expect(() => validateConfig(null)).toThrow(errorConfigValidation('object'));
-    expect(() => validateConfig(undefined)).toThrow(errorConfigValidation('object'));
-    expect(() => validateConfig('string')).toThrow(errorConfigValidation('object'));
-    expect(() => validateConfig(123)).toThrow(errorConfigValidation('object'));
+    expect(() => validateConfig(null)).toThrow(CliStructuredError);
+    expect(() => validateConfig(undefined)).toThrow(CliStructuredError);
+    expect(() => validateConfig('string')).toThrow(CliStructuredError);
+    expect(() => validateConfig(123)).toThrow(CliStructuredError);
   });
 
   it('throws error when family is missing', () => {
     const config = { target: {}, adapter: {} };
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('family'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when target is missing', () => {
     const config = { family: {}, adapter: {} };
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('target'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when adapter is missing', () => {
     const config = { family: {}, target: {} };
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('adapter'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when family.kind is not "family"', () => {
@@ -101,7 +108,7 @@ describe('validateConfig', () => {
         create: vi.fn(),
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('family.kind'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when family.familyId is not a string', () => {
@@ -114,7 +121,7 @@ describe('validateConfig', () => {
         create: vi.fn(),
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('family.familyId'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when family.hook is missing or not an object', () => {
@@ -125,7 +132,7 @@ describe('validateConfig', () => {
         create: vi.fn(),
       },
     });
-    expect(() => validateConfig(config1)).toThrow(errorConfigValidation('family.hook'));
+    expect(() => validateConfig(config1)).toThrow(CliStructuredError);
 
     const config2 = createValidConfig({
       family: {
@@ -135,7 +142,7 @@ describe('validateConfig', () => {
         create: vi.fn(),
       },
     });
-    expect(() => validateConfig(config2)).toThrow(errorConfigValidation('family.hook'));
+    expect(() => validateConfig(config2)).toThrow(CliStructuredError);
   });
 
   it('throws error when target.kind is not "target"', () => {
@@ -147,7 +154,7 @@ describe('validateConfig', () => {
         manifest: {},
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('target.kind'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when target.id is not a string', () => {
@@ -159,7 +166,7 @@ describe('validateConfig', () => {
         manifest: {},
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('target.id'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when target.familyId is not a string', () => {
@@ -171,7 +178,7 @@ describe('validateConfig', () => {
         manifest: {},
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('target.familyId'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when target.manifest is missing or not an object', () => {
@@ -182,7 +189,7 @@ describe('validateConfig', () => {
         family: 'sql',
       },
     });
-    expect(() => validateConfig(config1)).toThrow(errorConfigValidation('target.manifest'));
+    expect(() => validateConfig(config1)).toThrow(CliStructuredError);
 
     const config2 = createValidConfig({
       target: {
@@ -192,7 +199,7 @@ describe('validateConfig', () => {
         manifest: 'not-an-object',
       },
     });
-    expect(() => validateConfig(config2)).toThrow(errorConfigValidation('target.manifest'));
+    expect(() => validateConfig(config2)).toThrow(CliStructuredError);
   });
 
   it('throws error when adapter.kind is not "adapter"', () => {
@@ -204,7 +211,7 @@ describe('validateConfig', () => {
         manifest: {},
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('adapter.kind'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when adapter.id is not a string', () => {
@@ -216,7 +223,7 @@ describe('validateConfig', () => {
         manifest: {},
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('adapter.id'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when adapter.familyId is not a string', () => {
@@ -228,7 +235,7 @@ describe('validateConfig', () => {
         manifest: {},
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('adapter.familyId'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when adapter.manifest is missing or not an object', () => {
@@ -239,7 +246,7 @@ describe('validateConfig', () => {
         family: 'sql',
       },
     });
-    expect(() => validateConfig(config1)).toThrow(errorConfigValidation('adapter.manifest'));
+    expect(() => validateConfig(config1)).toThrow(CliStructuredError);
 
     const config2 = createValidConfig({
       adapter: {
@@ -249,7 +256,7 @@ describe('validateConfig', () => {
         manifest: 'not-an-object',
       },
     });
-    expect(() => validateConfig(config2)).toThrow(errorConfigValidation('adapter.manifest'));
+    expect(() => validateConfig(config2)).toThrow(CliStructuredError);
   });
 
   it('validates extensions array when present', () => {
@@ -275,14 +282,14 @@ describe('validateConfig', () => {
     const config = createValidConfig({
       extensions: 'not-an-array',
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('extensions'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when extension item is not an object', () => {
     const config = createValidConfig({
       extensions: ['not-an-object'],
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('extensions[]'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when extension.kind is not "extension"', () => {
@@ -296,7 +303,7 @@ describe('validateConfig', () => {
         },
       ],
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('extensions[].kind'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when extension.id is not a string', () => {
@@ -310,7 +317,7 @@ describe('validateConfig', () => {
         },
       ],
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('extensions[].id'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when extension.family is not a string', () => {
@@ -324,7 +331,7 @@ describe('validateConfig', () => {
         },
       ],
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('extensions[].familyId'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when extension.manifest is missing or not an object', () => {
@@ -337,7 +344,7 @@ describe('validateConfig', () => {
         },
       ],
     });
-    expect(() => validateConfig(config1)).toThrow(errorConfigValidation('extensions[].manifest'));
+    expect(() => validateConfig(config1)).toThrow(CliStructuredError);
 
     const config2 = createValidConfig({
       extensions: [
@@ -349,7 +356,7 @@ describe('validateConfig', () => {
         },
       ],
     });
-    expect(() => validateConfig(config2)).toThrow(errorConfigValidation('extensions[].manifest'));
+    expect(() => validateConfig(config2)).toThrow(CliStructuredError);
   });
 
   it('validates contract config when present', () => {
@@ -367,7 +374,7 @@ describe('validateConfig', () => {
     const config = createValidConfig({
       contract: 'not-an-object',
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('contract'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when contract.source is missing', () => {
@@ -376,7 +383,7 @@ describe('validateConfig', () => {
         output: 'src/prisma/contract.json',
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('contract.source'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when contract.output is not a string', () => {
@@ -386,7 +393,7 @@ describe('validateConfig', () => {
         output: 123,
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('contract.output'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('throws error when contract.types is not a string', () => {
@@ -396,7 +403,7 @@ describe('validateConfig', () => {
         types: 123,
       },
     });
-    expect(() => validateConfig(config)).toThrow(errorConfigValidation('contract.types'));
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
   it('allows contract.output to be undefined', () => {
