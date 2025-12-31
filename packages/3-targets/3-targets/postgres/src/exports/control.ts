@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
-import type { ControlTargetInstance } from '@prisma-next/core-control-plane/types';
+import type {
+  ControlTargetInstance,
+  MigrationPlanner,
+  MigrationRunner,
+} from '@prisma-next/core-control-plane/types';
 import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
@@ -70,15 +74,10 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
      */
     migrations: {
       createPlanner(_family: SqlControlFamilyInstance) {
-        return createPostgresMigrationPlanner() as import('@prisma-next/core-control-plane/types').MigrationPlanner<
-          'sql',
-          'postgres'
-        >;
+        return createPostgresMigrationPlanner() as MigrationPlanner<'sql', 'postgres'>;
       },
       createRunner(family) {
-        return createPostgresMigrationRunner(
-          family,
-        ) as import('@prisma-next/core-control-plane/types').MigrationRunner<'sql', 'postgres'>;
+        return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {
