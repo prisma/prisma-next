@@ -216,9 +216,9 @@ describe('verifySqlSchema with databaseDependencies', () => {
     );
   });
 
-  it('does not infer dependencies from contract.extensions (ADR 154)', () => {
-    // Per ADR 154, we do NOT interpret contract.extensions as database prerequisites.
-    // Dependencies are only collected from frameworkComponents.
+  it('throws error when contract extension is not present in frameworkComponents', () => {
+    // Configuration integrity check: all extensions declared in the contract
+    // must be present in frameworkComponents.
     const contract = createTestContract(
       {
         user: createContractTable({
@@ -237,17 +237,62 @@ describe('verifySqlSchema with databaseDependencies', () => {
       [], // No extensions installed
     );
 
-    // Even though contract.extensions contains pgvector, we don't verify it
-    // because frameworkComponents is empty (no pgvector extension descriptor provided)
+    // This should throw because pgvector is in the contract but not in frameworkComponents
+    expect(() =>
+      verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [], // No extensions provided - configuration mismatch!
+      }),
+    ).toThrow(
+      "Extension 'pgvector' is declared in the contract but not found in framework components",
+    );
+  });
+
+  it('does not infer dependencies from contract.extensions (ADR 154)', () => {
+    // Per ADR 154, we do NOT interpret contract.extensions as database prerequisites.
+    // Dependencies are only collected from frameworkComponents.
+    // However, we DO validate that extensions in the contract are present in frameworkComponents.
+    const contract = createTestContract(
+      {
+        user: createContractTable({
+          id: { nativeType: 'int4', nullable: false },
+        }),
+      },
+      { pgvector: {} }, // Extension in contract
+    );
+
+    const schema = createTestSchemaIR(
+      {
+        user: createSchemaTable('user', {
+          id: { nativeType: 'int4', nullable: false },
+        }),
+      },
+      [], // No extensions installed
+    );
+
+    // Provide a pgvector extension descriptor WITHOUT database dependencies
+    const pgvectorExtension = {
+      kind: 'extension' as const,
+      id: 'pgvector',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      // No databaseDependencies declared
+    } as unknown as TargetBoundComponentDescriptor<'sql', 'postgres'>;
+
     const result = verifySqlSchema({
       contract,
       schema,
       strict: false,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
-      frameworkComponents: [], // No extensions provided - ADR 154: do not infer from contract
+      frameworkComponents: [pgvectorExtension], // Extension present but no dependencies
     });
 
-    // Verification should pass because we don't infer dependencies from contract.extensions
+    // Verification should pass because:
+    // 1. The extension is present in frameworkComponents (configuration integrity check passes)
+    // 2. The extension has no database dependencies, so nothing to verify
     expect(result.ok).toBe(true);
   });
 });

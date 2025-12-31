@@ -450,6 +450,23 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     }
   }
 
+  // Validate that all extensions declared in the contract are present in frameworkComponents
+  // This is a configuration integrity check - if the contract was emitted with an extension,
+  // that extension must be provided in the current configuration.
+  const contractExtensions = contract.extensions ?? {};
+  for (const extensionNamespace of Object.keys(contractExtensions)) {
+    const hasExtension = options.frameworkComponents.some(
+      (component) => component.kind === 'extension' && component.id === extensionNamespace,
+    );
+    if (!hasExtension) {
+      throw new Error(
+        `Extension '${extensionNamespace}' is declared in the contract but not found in framework components. ` +
+          'This indicates a configuration mismatch - the contract was emitted with this extension, ' +
+          'but it is not provided in the current configuration.',
+      );
+    }
+  }
+
   // Compare component-owned database dependencies (pure, deterministic)
   // Per ADR 154: We do NOT infer dependencies from contract.extensions.
   // Dependencies are only collected from frameworkComponents provided by the CLI.
