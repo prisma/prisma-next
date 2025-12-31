@@ -171,6 +171,7 @@ export function createDbInitCommand(): Command {
             driver: driverDescriptor,
             extensions: config.extensions ?? [],
           });
+          const dependencyProviders = [config.target, config.adapter, ...(config.extensions ?? [])];
 
           // Validate contract
           const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
@@ -195,6 +196,7 @@ export function createDbInitCommand(): Command {
                 contract: contractIR,
                 schema: schemaIR,
                 policy,
+                dependencyProviders,
               }),
             {
               message: 'Planning migration...',
@@ -248,6 +250,7 @@ export function createDbInitCommand(): Command {
                 destinationContract: contractIR,
                 policy,
                 callbacks,
+                dependencyProviders,
               }),
             {
               message: 'Applying migration plan...',

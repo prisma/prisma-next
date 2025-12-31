@@ -144,6 +144,7 @@ export function createDbSignCommand(): Command {
             driver: driverDescriptor,
             extensions: config.extensions ?? [],
           });
+          const dependencyProviders = [config.target, config.adapter, ...(config.extensions ?? [])];
 
           // Validate contract using instance validator
           const contractIR = familyInstance.validateContractIR(contractJson);
@@ -159,6 +160,7 @@ export function createDbSignCommand(): Command {
                   strict: false,
                   contractPath: contractPathAbsolute,
                   configPath,
+                  dependencyProviders,
                 }),
               {
                 message: 'Verifying database satisfies contract',
