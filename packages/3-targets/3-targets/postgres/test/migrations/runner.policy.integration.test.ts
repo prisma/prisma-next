@@ -8,6 +8,7 @@ import {
   createMigrationPlan,
   createTestDatabase,
   familyInstance,
+  frameworkComponents,
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
@@ -83,6 +84,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);
@@ -152,6 +154,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
           driver: driver!,
           destinationContract: contract,
           policy: permissivePolicy,
+          frameworkComponents,
         });
 
         // With a permissive policy, the same plan succeeds

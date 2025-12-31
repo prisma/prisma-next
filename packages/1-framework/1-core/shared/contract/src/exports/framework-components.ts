@@ -10,6 +10,7 @@ export type {
   ExtensionInstance,
   FamilyDescriptor,
   FamilyInstance,
+  TargetBoundComponentDescriptor,
   TargetDescriptor,
   TargetInstance,
 } from '../framework-components';

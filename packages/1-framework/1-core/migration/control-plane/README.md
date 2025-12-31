@@ -14,9 +14,10 @@ This package provides the core domain logic for control plane operations (contra
 - **Domain Actions**:
   - `verifyDatabase()`: Verifies database contract markers (accepts config object and ContractIR)
 
-Note: Contract emission is implemented on family instances (e.g., `familyInstance.emitContract()`), not as a core domain action.
+Note: Contract emission is implemented on the SQL family instance (e.g., `familyInstance.emitContract()`), not as a core domain action.
 - **Error Factories**: Domain error factories (`CliStructuredError`, config errors, runtime errors)
 - **Pack Manifest Types**: Type definitions for extension pack manifests
+- **Migration SPI**: Generic migration planner/runner interfaces (`MigrationPlanner<TFamilyId, TTargetId>`, `MigrationRunner<TFamilyId, TTargetId>`, `TargetMigrationsCapability<TFamilyId, TTargetId, TFamilyInstance>`) that thread family/target IDs for compile-time component compatibility enforcement
 
 ## Dependencies
 
@@ -100,6 +101,30 @@ import {
 throw errorConfigFileNotFound('prisma-next.config.ts', {
   why: 'Config file not found in current directory',
 });
+```
+
+## Migration SPI Design
+
+The migration planner/runner interfaces are generic over `TFamilyId` and `TTargetId` to enable compile-time enforcement of component compatibility:
+
+- **`MigrationPlanner<TFamilyId, TTargetId>`**: Generic planner interface that accepts `TargetBoundComponentDescriptor<TFamilyId, TTargetId>[]`
+- **`MigrationRunner<TFamilyId, TTargetId>`**: Generic runner interface that accepts `TargetBoundComponentDescriptor<TFamilyId, TTargetId>[]`
+- **`TargetMigrationsCapability<TFamilyId, TTargetId, TFamilyInstance>`**: Generic capability interface for targets that support migrations
+
+The CLI performs runtime validation at the composition boundary using `assertFrameworkComponentsCompatible()` before calling typed planner/runner instances. This validates that all components have matching `familyId` and `targetId`, then returns a typed `TargetBoundComponentDescriptor` array that satisfies the planner/runner interface requirements.
+
+```typescript
+// CLI composition boundary - runtime assertion + type narrowing
+const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+const frameworkComponents = assertFrameworkComponentsCompatible(
+  config.family.familyId,
+  config.target.targetId,
+  rawComponents,
+);
+
+// Now frameworkComponents is typed as TargetBoundComponentDescriptor<TFamilyId, TTargetId>[]
+const planner = target.migrations.createPlanner(sqlFamilyInstance);
+planner.plan({ contract, schema, policy, frameworkComponents });
 ```
 
 ## Package Location

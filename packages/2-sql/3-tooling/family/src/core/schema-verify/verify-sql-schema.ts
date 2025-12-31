@@ -6,6 +6,7 @@
  * by migration planners and other tools that need to compare schema states.
  */
 
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   OperationContext,
   SchemaIssue,
@@ -15,9 +16,10 @@ import type {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { ComponentDatabaseDependency } from '../migrations/types';
 import {
   computeCounts,
-  verifyExtensions,
+  verifyDatabaseDependencies,
   verifyForeignKeys,
   verifyIndexes,
   verifyPrimaryKey,
@@ -38,6 +40,11 @@ export interface VerifySqlSchemaOptions {
   readonly context?: OperationContext;
   /** Type metadata registry for codec consistency warnings */
   readonly typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  /**
+   * Active framework components participating in this composition.
+   * All components must have matching familyId ('sql') and targetId.
+   */
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**
@@ -443,15 +450,31 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     }
   }
 
-  // Compare extensions
-  const extensionStatuses = verifyExtensions(
-    contract.extensions,
-    schema.extensions,
-    contractTarget,
-    issues,
-    strict,
+  // Validate that all extensions declared in the contract are present in frameworkComponents
+  // This is a configuration integrity check - if the contract was emitted with an extension,
+  // that extension must be provided in the current configuration.
+  const contractExtensions = contract.extensions ?? {};
+  for (const extensionNamespace of Object.keys(contractExtensions)) {
+    const hasExtension = options.frameworkComponents.some(
+      (component) => component.kind === 'extension' && component.id === extensionNamespace,
+    );
+    if (!hasExtension) {
+      throw new Error(
+        `Extension '${extensionNamespace}' is declared in the contract but not found in framework components. ` +
+          'This indicates a configuration mismatch - the contract was emitted with this extension, ' +
+          'but it is not provided in the current configuration.',
+      );
+    }
+  }
+
+  // Compare component-owned database dependencies (pure, deterministic)
+  // Per ADR 154: We do NOT infer dependencies from contract.extensions.
+  // Dependencies are only collected from frameworkComponents provided by the CLI.
+  const databaseDependencies = collectDependenciesFromFrameworkComponents(
+    options.frameworkComponents,
   );
-  rootChildren.push(...extensionStatuses);
+  const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
+  rootChildren.push(...dependencyStatuses);
 
   // Build root node
   const rootStatus = rootChildren.some((c) => c.status === 'fail')
@@ -513,4 +536,43 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       total: totalTime,
     },
   };
+}
+
+/**
+ * Type predicate to check if a component has database dependencies with an init array.
+ * The familyId check is redundant since TargetBoundComponentDescriptor<'sql', T> already
+ * guarantees familyId is 'sql' at the type level, so we don't need runtime checks for it.
+ */
+function hasDatabaseDependenciesInit<T extends string>(
+  component: TargetBoundComponentDescriptor<'sql', T>,
+): component is TargetBoundComponentDescriptor<'sql', T> & {
+  readonly databaseDependencies: {
+    readonly init: readonly ComponentDatabaseDependency<T>[];
+  };
+} {
+  if (!('databaseDependencies' in component)) {
+    return false;
+  }
+  const dbDeps = (component as Record<string, unknown>)['databaseDependencies'];
+  if (dbDeps === undefined || dbDeps === null || typeof dbDeps !== 'object') {
+    return false;
+  }
+  const depsRecord = dbDeps as Record<string, unknown>;
+  const init = depsRecord['init'];
+  if (init === undefined || !Array.isArray(init)) {
+    return false;
+  }
+  return true;
+}
+
+function collectDependenciesFromFrameworkComponents<T extends string>(
+  components: ReadonlyArray<TargetBoundComponentDescriptor<'sql', T>>,
+): ReadonlyArray<ComponentDatabaseDependency<T>> {
+  const dependencies: ComponentDatabaseDependency<T>[] = [];
+  for (const component of components) {
+    if (hasDatabaseDependenciesInit(component)) {
+      dependencies.push(...component.databaseDependencies.init);
+    }
+  }
+  return dependencies;
 }

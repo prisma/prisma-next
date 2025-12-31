@@ -6,6 +6,7 @@ import {
   type CodecTypes,
   defineContract,
   int4Column,
+  pgvector,
   runSchemaVerify,
   textColumn,
   timeouts,
@@ -47,7 +48,9 @@ describe('family instance schemaVerify - modes', () => {
           })
           .build();
 
-        const result = await runSchemaVerify(getConnectionString(), contract);
+        const result = await runSchemaVerify(getConnectionString(), contract, {
+          extensions: [pgvector],
+        });
 
         expect(result).toMatchObject({
           ok: false,

@@ -26,6 +26,7 @@ describe('verifySqlSchema - strict mode', () => {
       schema,
       strict: true,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
     });
 
     expect(result.ok).toBe(false);
@@ -54,6 +55,7 @@ describe('verifySqlSchema - strict mode', () => {
       schema,
       strict: true,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
     });
 
     expect(result.ok).toBe(false);
@@ -82,6 +84,7 @@ describe('verifySqlSchema - result structure', () => {
       schema,
       strict: false,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
     });
 
     expect(result.contract.coreHash).toBe('sha256:test');
@@ -102,6 +105,7 @@ describe('verifySqlSchema - result structure', () => {
       schema,
       strict: false,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
     });
 
     expect(result.schema.counts).toMatchObject({

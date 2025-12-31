@@ -12,6 +12,7 @@ This extension pack adds support for the `vector` data type and vector similarit
 - **Vector Operations**: Registers vector similarity operations (e.g., `cosineDistance`) for use in queries
 - **CLI Integration**: Provides extension descriptor for `prisma-next.config.ts` configuration
 - **Runtime Extension**: Registers codecs and operations at runtime for vector column operations
+- **Database Dependencies**: Declares the `vector` Postgres extension as a database dependency, which the migration planner emits as a `CREATE EXTENSION IF NOT EXISTS vector` operation and the verifier checks against the schema IR
 
 ## Dependencies
 
@@ -28,11 +29,15 @@ pnpm add @prisma-next/extension-pgvector
 
 ## Database Setup
 
-Before using this extension, ensure the pgvector extension is installed in your PostgreSQL database:
+The pgvector extension declares its database requirements as component-owned database dependencies. When using the `prisma-next db init` command, the migration planner automatically includes a `CREATE EXTENSION IF NOT EXISTS vector` operation.
+
+For manual database setup, ensure the pgvector extension is installed:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
+
+The verifier will check for the presence of the `vector` extension in your database schema and report an error if it's missing.
 
 ## Configuration
 

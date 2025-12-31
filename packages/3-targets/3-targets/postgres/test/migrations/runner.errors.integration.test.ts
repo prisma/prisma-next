@@ -16,6 +16,7 @@ import {
   createTestDatabase,
   executeStatement,
   familyInstance,
+  frameworkComponents,
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
@@ -68,6 +69,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);
@@ -93,6 +95,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);
@@ -137,6 +140,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);
@@ -209,6 +213,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);
@@ -274,6 +279,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);

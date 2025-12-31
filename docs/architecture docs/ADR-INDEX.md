@@ -60,6 +60,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 041 | Custom operation loading via local packages + preflight bundles | Establishes custom operation loading with security constraints and bundle support | [ADR 041 - Custom operation loading via local packages + preflight bundles.md](adrs/ADR%20041%20-%20Custom%20operation%20loading%20via%20local%20packages%20+%20preflight%20bundles.md) |
 | 043 | Advisory lock domain & key strategy | Defines advisory locking strategy for migration coordination and collision prevention | [ADR 043 - Advisory lock domain & key strategy.md](adrs/ADR%20043%20-%20Advisory%20lock%20domain%20&%20key%20strategy.md) |
 | 044 | Pre & post check vocabulary v1 | Establishes vocabulary and patterns for migration operation pre/post checks | [ADR 044 - Pre & post check vocabulary v1.md](adrs/ADR%20044%20-%20Pre%20&%20post%20check%20vocabulary%20v1.md) |
+| 154 | Component-owned database dependencies | Models database-side prerequisites as component-owned dependencies with pure schema-IR verification hooks (no fuzzy matching) | [ADR 154 - Component-owned database dependencies.md](adrs/ADR%20154%20-%20Component-owned%20database%20dependencies.md) |
 
 ## Preflight & CI
 

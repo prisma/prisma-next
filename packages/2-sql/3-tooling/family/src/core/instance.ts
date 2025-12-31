@@ -1,3 +1,4 @@
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
@@ -237,6 +238,11 @@ export interface SchemaVerifyOptions {
   readonly contractIR: unknown;
   readonly strict: boolean;
   readonly context?: OperationContext;
+  /**
+   * Active framework components participating in this composition.
+   * All components must have matching familyId ('sql') and targetId.
+   */
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**
@@ -582,7 +588,7 @@ export function createSqlFamilyInstance<
     },
 
     async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
-      const { driver, contractIR, strict, context } = options;
+      const { driver, contractIR, strict, context, frameworkComponents } = options;
 
       // Validate contractIR as SqlContract<SqlStorage>
       const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
@@ -598,6 +604,7 @@ export function createSqlFamilyInstance<
         strict,
         ...ifDefined('context', context),
         typeMetadataRegistry,
+        frameworkComponents,
       });
     },
     async sign(options: {

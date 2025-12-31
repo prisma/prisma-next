@@ -38,17 +38,6 @@ function validateCoreStructure(ir: ContractIR): void {
   }
 }
 
-function validateExtensions(ir: ContractIR, extensionIds: ReadonlyArray<string>): void {
-  const extensions = ir.extensions as Record<string, unknown>;
-  for (const extensionId of extensionIds) {
-    if (!extensions[extensionId]) {
-      throw new Error(
-        `Extension "${extensionId}" must appear in contract.extensions.${extensionId}`,
-      );
-    }
-  }
-}
-
 export async function emit(
   ir: ContractIR,
   options: EmitOptions,
@@ -67,10 +56,6 @@ export async function emit(
   targetFamily.validateTypes(ir, ctx);
 
   targetFamily.validateStructure(ir);
-
-  if (extensionIds) {
-    validateExtensions(ir, extensionIds);
-  }
 
   const contractJson = {
     schemaVersion: ir.schemaVersion,

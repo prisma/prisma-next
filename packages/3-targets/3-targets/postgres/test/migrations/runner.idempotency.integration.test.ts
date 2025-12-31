@@ -8,6 +8,7 @@ import {
   createTestDatabase,
   emptySchema,
   familyInstance,
+  frameworkComponents,
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
@@ -52,6 +53,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           contract,
           schema: emptySchema,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
         if (initialPlan.kind !== 'success') {
           throw new Error('expected initial planner success');
@@ -61,6 +63,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         const planWithFailingStep = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -98,6 +101,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
         expect(idempotencyResult.ok).toBe(true);
         if (idempotencyResult.ok) {
@@ -182,6 +186,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
         expect(postcheckPreSatisfiedResult.ok).toBe(true);
         if (postcheckPreSatisfiedResult.ok) {
@@ -269,6 +274,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
         expect(postcheckPreSatisfiedResult.ok).toBe(true);
 

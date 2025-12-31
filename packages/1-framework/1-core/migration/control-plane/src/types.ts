@@ -7,6 +7,7 @@ import type {
   ExtensionInstance,
   FamilyDescriptor,
   FamilyInstance,
+  TargetBoundComponentDescriptor,
   TargetDescriptor,
   TargetInstance,
 } from '@prisma-next/contract/framework-components';
@@ -82,6 +83,11 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
     readonly strict: boolean;
     readonly contractPath: string;
     readonly configPath?: string;
+    /**
+     * Active framework components participating in this composition.
+     * All components must have matching familyId and targetId.
+     */
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, string>>;
   }): Promise<VerifyDatabaseSchemaResult>;
 
   /**
@@ -261,8 +267,10 @@ export interface ControlTargetDescriptor<
   /**
    * Optional migrations capability.
    * Targets that support migrations expose this property.
+   * The capability is parameterized by family and target IDs to ensure type-level
+   * compatibility of framework components.
    */
-  readonly migrations?: TargetMigrationsCapability<TFamilyInstance>;
+  readonly migrations?: TargetMigrationsCapability<TFamilyId, TTargetId, TFamilyInstance>;
   create(): TTargetInstance;
 }
 

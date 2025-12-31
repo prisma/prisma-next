@@ -238,6 +238,36 @@ export interface ExtensionDescriptor<TFamilyId extends string, TTargetId extends
   readonly targetId: TTargetId;
 }
 
+/**
+ * Union type for target-bound component descriptors.
+ *
+ * Target-bound components are those that must be compatible with a specific
+ * family+target combination. This includes targets, adapters, drivers, and
+ * extensions. Families are not target-bound.
+ *
+ * This type is used in migration and verification interfaces to enforce
+ * type-level compatibility between components.
+ *
+ * @template TFamilyId - Literal type for the family identifier
+ * @template TTargetId - Literal type for the target identifier
+ *
+ * @example
+ * ```ts
+ * // All these components must have matching familyId and targetId
+ * const components: TargetBoundComponentDescriptor<'sql', 'postgres'>[] = [
+ *   postgresTarget,
+ *   postgresAdapter,
+ *   postgresDriver,
+ *   pgvectorExtension,
+ * ];
+ * ```
+ */
+export type TargetBoundComponentDescriptor<TFamilyId extends string, TTargetId extends string> =
+  | TargetDescriptor<TFamilyId, TTargetId>
+  | AdapterDescriptor<TFamilyId, TTargetId>
+  | DriverDescriptor<TFamilyId, TTargetId>
+  | ExtensionDescriptor<TFamilyId, TTargetId>;
+
 // ============================================================================
 // Framework Component Instance Base Types
 // ============================================================================

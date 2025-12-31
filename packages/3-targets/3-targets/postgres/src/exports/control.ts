@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
-import type { ControlTargetInstance } from '@prisma-next/core-control-plane/types';
+import type {
+  ControlTargetInstance,
+  MigrationPlanner,
+  MigrationRunner,
+} from '@prisma-next/core-control-plane/types';
 import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
@@ -65,13 +69,15 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     manifest: loadTargetManifest(),
     /**
      * Migrations capability for CLI to access planner/runner via core types.
+     * The SQL-specific planner/runner types are compatible with the generic
+     * MigrationPlanner/MigrationRunner interfaces at runtime.
      */
     migrations: {
       createPlanner(_family: SqlControlFamilyInstance) {
-        return createPostgresMigrationPlanner();
+        return createPostgresMigrationPlanner() as MigrationPlanner<'sql', 'postgres'>;
       },
       createRunner(family) {
-        return createPostgresMigrationRunner(family);
+        return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {

@@ -9,6 +9,8 @@ import {
   findNodeByStatusAndCode,
   int4Column,
   pgvector,
+  postgres,
+  postgresAdapter,
   runSchemaVerify,
   type SqlContract,
   type SqlStorage,
@@ -230,6 +232,7 @@ describe('family instance schemaVerify - types', () => {
             contractIR: validatedContract,
             strict: false,
             context: { contractPath: './contract.json' },
+            frameworkComponents: [postgres, postgresAdapter],
           });
 
           // Should have warnings for missing metadata, but not fail

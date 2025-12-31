@@ -10,7 +10,13 @@ import type {
   PrimaryKey,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import type { SqlForeignKeyIR, SqlIndexIR, SqlUniqueIR } from '@prisma-next/sql-schema-ir/types';
+import type {
+  SqlForeignKeyIR,
+  SqlIndexIR,
+  SqlSchemaIR,
+  SqlUniqueIR,
+} from '@prisma-next/sql-schema-ir/types';
+import type { ComponentDatabaseDependency } from '../migrations/types';
 
 /**
  * Compares two arrays of strings for equality (order-sensitive).
@@ -416,82 +422,46 @@ export function verifyIndexes(
 }
 
 /**
- * Verifies required extensions exist in schema.
- * Extracts extension names from contract.extensions (keys) and compares with schemaIR.extensions.
- * Filters out the target name (e.g., 'postgres') as it's not an extension.
+ * Verifies database dependencies are installed using component-owned verification hooks.
+ * Each dependency provides a pure verifyDatabaseDependencyInstalled function that checks
+ * whether the dependency is satisfied based on the in-memory schema IR (no DB I/O).
+ *
  * Returns verification nodes for the tree.
  */
-export function verifyExtensions(
-  contractExtensions: Record<string, unknown> | undefined,
-  schemaExtensions: readonly string[],
-  contractTarget: string,
+export function verifyDatabaseDependencies(
+  dependencies: ReadonlyArray<ComponentDatabaseDependency<unknown>>,
+  schema: SqlSchemaIR,
   issues: SchemaIssue[],
-  _strict: boolean,
 ): SchemaVerificationNode[] {
   const nodes: SchemaVerificationNode[] = [];
 
-  if (!contractExtensions) {
-    return nodes;
-  }
+  for (const dependency of dependencies) {
+    const depIssues = dependency.verifyDatabaseDependencyInstalled(schema);
+    const depPath = `dependencies.${dependency.id}`;
 
-  // Extract extension names from contract (keys of extensions object)
-  // Filter out the target name - it's not an extension (e.g., 'postgres' is the target, not an extension)
-  const contractExtensionNames = Object.keys(contractExtensions).filter(
-    (name) => name !== contractTarget,
-  );
-
-  // Check each contract extension exists in schema
-  // Extension names in contract may differ from database extension names
-  // (e.g., contract has 'pgvector' but database has 'vector')
-  // We need to match more flexibly - try exact match, then check if either contains the other
-  for (const extName of contractExtensionNames) {
-    const extPath = `extensions.${extName}`;
-    // Normalize extension names for comparison (remove common prefixes like 'pg')
-    const normalizedExtName = extName.toLowerCase().replace(/^pg/, '');
-    const matchingExt = schemaExtensions.find((e) => {
-      const normalizedE = e.toLowerCase();
-      // Exact match
-      if (normalizedE === normalizedExtName || normalizedE === extName.toLowerCase()) {
-        return true;
-      }
-      // Check if one contains the other (e.g., 'pgvector' contains 'vector', 'vector' is in 'pgvector')
-      if (normalizedE.includes(normalizedExtName) || normalizedExtName.includes(normalizedE)) {
-        return true;
-      }
-      return false;
-    });
-
-    // Map extension names to descriptive labels
-    const extensionLabels: Record<string, string> = {
-      pg: 'database is postgres',
-      pgvector: 'vector extension is enabled',
-      vector: 'vector extension is enabled',
-    };
-    const extensionLabel = extensionLabels[extName] ?? `extension "${extName}" is enabled`;
-
-    if (!matchingExt) {
-      issues.push({
-        kind: 'extension_missing',
-        table: '',
-        message: `Extension "${extName}" is missing from database`,
-      });
+    if (depIssues.length > 0) {
+      // Dependency is not satisfied
+      issues.push(...depIssues);
+      const issuesMessage = depIssues.map((i) => i.message).join('; ');
+      const nodeMessage = issuesMessage ? `${dependency.id}: ${issuesMessage}` : dependency.id;
       nodes.push({
         status: 'fail',
-        kind: 'extension',
-        name: extensionLabel,
-        contractPath: extPath,
-        code: 'extension_missing',
-        message: `Extension "${extName}" is missing`,
+        kind: 'databaseDependency',
+        name: dependency.label,
+        contractPath: depPath,
+        code: 'dependency_missing',
+        message: nodeMessage,
         expected: undefined,
         actual: undefined,
         children: [],
       });
     } else {
+      // Dependency is satisfied
       nodes.push({
         status: 'pass',
-        kind: 'extension',
-        name: extensionLabel,
-        contractPath: extPath,
+        kind: 'databaseDependency',
+        name: dependency.label,
+        contractPath: depPath,
         code: '',
         message: '',
         expected: undefined,
@@ -500,9 +470,6 @@ export function verifyExtensions(
       });
     }
   }
-
-  // In strict mode, we don't check for extra extensions (they're allowed)
-  // Extensions are additive - having extra extensions doesn't break the contract
 
   return nodes;
 }

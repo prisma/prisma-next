@@ -52,6 +52,12 @@ export const familyInstance = sqlFamilyDescriptor.create({
   extensions: [],
 });
 
+export const frameworkComponents = [
+  postgresTargetDescriptor,
+  postgresAdapterDescriptor,
+  postgresDriverDescriptor,
+] as const;
+
 export const testTimeout = timeouts.spinUpPpgDev;
 
 export type PostgresControlDriver = Awaited<ReturnType<typeof postgresDriverDescriptor.create>>;

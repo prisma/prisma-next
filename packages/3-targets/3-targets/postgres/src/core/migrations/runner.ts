@@ -139,6 +139,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         strict: options.strictVerification ?? true,
         context: options.context ?? {},
         typeMetadataRegistry: this.family.typeMetadataRegistry,
+        frameworkComponents: options.frameworkComponents,
       });
       if (!schemaVerifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {

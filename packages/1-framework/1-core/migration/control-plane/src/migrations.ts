@@ -8,6 +8,8 @@
  * Family-specific types (e.g., SqlMigrationPlan) extend these base types
  * with additional fields for execution (precheck SQL, execute SQL, etc.).
  */
+
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { Result } from '@prisma-next/utils/result';
 import type { ControlDriverInstance, ControlFamilyInstance } from './types';
 
@@ -136,29 +138,57 @@ export type MigrationRunnerResult = Result<MigrationRunnerSuccessValue, Migratio
 /**
  * Migration planner interface for planning schema changes.
  * This is the minimal interface that CLI commands use.
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface MigrationPlanner {
+export interface MigrationPlanner<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
   plan(options: {
     readonly contract: unknown;
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
+    /**
+     * Active framework components participating in this composition.
+     * Families/targets can interpret this list to derive family-specific metadata.
+     * All components must have matching familyId and targetId.
+     */
+    readonly frameworkComponents: ReadonlyArray<
+      TargetBoundComponentDescriptor<TFamilyId, TTargetId>
+    >;
   }): MigrationPlannerResult;
 }
 
 /**
  * Migration runner interface for executing migration plans.
  * This is the minimal interface that CLI commands use.
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface MigrationRunner {
+export interface MigrationRunner<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
   execute(options: {
     readonly plan: MigrationPlan;
-    readonly driver: ControlDriverInstance<string, string>;
+    readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
     readonly destinationContract: unknown;
     readonly policy: MigrationOperationPolicy;
     readonly callbacks?: {
       onOperationStart?(op: MigrationPlanOperation): void;
       onOperationComplete?(op: MigrationPlanOperation): void;
     };
+    /**
+     * Active framework components participating in this composition.
+     * Families/targets can interpret this list to derive family-specific metadata.
+     * All components must have matching familyId and targetId.
+     */
+    readonly frameworkComponents: ReadonlyArray<
+      TargetBoundComponentDescriptor<TFamilyId, TTargetId>
+    >;
   }): Promise<MigrationRunnerResult>;
 }
 
@@ -170,11 +200,15 @@ export interface MigrationRunner {
  * Optional capability interface for targets that support migrations.
  * Targets that implement migrations expose this via their descriptor.
  *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  * @template TFamilyInstance - The family instance type (e.g., SqlControlFamilyInstance)
  */
 export interface TargetMigrationsCapability<
-  TFamilyInstance extends ControlFamilyInstance<string> = ControlFamilyInstance<string>,
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+  TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
 > {
-  createPlanner(family: TFamilyInstance): MigrationPlanner;
-  createRunner(family: TFamilyInstance): MigrationRunner;
+  createPlanner(family: TFamilyInstance): MigrationPlanner<TFamilyId, TTargetId>;
+  createRunner(family: TFamilyInstance): MigrationRunner<TFamilyId, TTargetId>;
 }

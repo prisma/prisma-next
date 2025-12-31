@@ -2,6 +2,7 @@
  * Shared helpers for family.schema-verify tests.
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ControlExtensionDescriptor } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { type SqlControlFamilyInstance } from '@prisma-next/family-sql/control';
@@ -91,11 +92,17 @@ export async function runSchemaVerify(
   return withDriver(connectionString, async (driver) => {
     const familyInstance = createFamilyInstance(options.extensions);
     const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+    const frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>> = [
+      postgres,
+      postgresAdapter,
+      ...(options.extensions ?? []),
+    ];
     return familyInstance.schemaVerify({
       driver,
       contractIR: validatedContract,
       strict: options.strict ?? false,
       context: { contractPath: './contract.json' },
+      frameworkComponents,
     });
   });
 }
