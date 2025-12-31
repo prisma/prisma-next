@@ -54,10 +54,10 @@ export function createDbInitCommand(): Command {
     command,
     'Bootstrap a database to match the current contract and write the contract marker',
     'Initializes a database to match your emitted contract using additive-only operations.\n' +
-      'Creates tables, columns, indexes, and constraints defined in your contract.\n' +
-      'Writes a contract marker to track the database state. This operation is idempotent.\n' +
-      '\n' +
-      'Currently supports empty databases only. Use --plan to preview changes without applying.',
+      'Creates any missing tables, columns, indexes, and constraints defined in your contract.\n' +
+      'Leaves existing compatible structures in place, surfaces conflicts when destructive changes\n' +
+      'would be required, and writes a contract marker to track the database state. Use --plan to\n' +
+      'preview changes without applying.',
   );
   command
     .configureHelp({
