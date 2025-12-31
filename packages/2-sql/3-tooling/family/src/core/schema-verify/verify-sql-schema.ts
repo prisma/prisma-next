@@ -6,6 +6,7 @@
  * by migration planners and other tools that need to compare schema states.
  */
 
+import type { ComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   OperationContext,
   SchemaIssue,
@@ -15,7 +16,7 @@ import type {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { ComponentDatabaseDependency, DatabaseDependencyProvider } from '../migrations/types';
+import type { ComponentDatabaseDependency } from '../migrations/types';
 import {
   computeCounts,
   verifyDatabaseDependencies,
@@ -40,11 +41,8 @@ export interface VerifySqlSchemaOptions {
   readonly context?: OperationContext;
   /** Type metadata registry for codec consistency warnings */
   readonly typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
-  /**
-   * Components that expose database dependency metadata. When provided,
-   * verifySqlSchema will derive databaseDependencies from these providers.
-   */
-  readonly dependencyProviders?: ReadonlyArray<DatabaseDependencyProvider>;
+  /** Active framework components participating in this composition. */
+  readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
 }
 
 /**
@@ -453,7 +451,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   // Compare extensions/dependencies
   // If dependency providers are provided, use component-owned verification hooks
   // Otherwise, fall back to the deprecated fuzzy matching approach
-  const databaseDependencies = collectDependenciesFromProviders(options.dependencyProviders);
+  const databaseDependencies = collectDependenciesFromFrameworkComponents(
+    options.frameworkComponents,
+  );
   if (databaseDependencies.length > 0) {
     const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
     rootChildren.push(...dependencyStatuses);
@@ -531,18 +531,46 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   };
 }
 
-function collectDependenciesFromProviders(
-  providers: ReadonlyArray<DatabaseDependencyProvider> | undefined,
+function collectDependenciesFromFrameworkComponents(
+  components: ReadonlyArray<ComponentDescriptor<string>>,
 ): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
-  if (!providers || providers.length === 0) {
-    return [];
-  }
   const dependencies: ComponentDatabaseDependency<unknown>[] = [];
-  for (const provider of providers) {
-    const initDeps = provider.databaseDependencies?.init;
-    if (initDeps && initDeps.length > 0) {
-      dependencies.push(...initDeps);
-    }
+  for (const component of components) {
+    const initDeps = getSqlDependencyInit(component);
+    if (!initDeps || initDeps.length === 0) continue;
+    dependencies.push(...initDeps);
   }
   return dependencies;
+}
+
+function getSqlDependencyInit(
+  component: ComponentDescriptor<string>,
+): readonly ComponentDatabaseDependency<unknown>[] | undefined {
+  const record = component as unknown as Record<string, unknown>;
+
+  if (Object.hasOwn(record, 'familyId') && record['familyId'] !== 'sql') {
+    return undefined;
+  }
+
+  if (!Object.hasOwn(record, 'databaseDependencies')) {
+    return undefined;
+  }
+
+  const dbDeps = record['databaseDependencies'];
+  if (dbDeps === undefined) {
+    return undefined;
+  }
+  if (typeof dbDeps !== 'object' || dbDeps === null) {
+    return undefined;
+  }
+
+  const depsRecord = dbDeps as Record<string, unknown>;
+  if (!Object.hasOwn(depsRecord, 'init')) {
+    return undefined;
+  }
+  const init = depsRecord['init'];
+  if (!Array.isArray(init)) {
+    return undefined;
+  }
+  return init as readonly ComponentDatabaseDependency<unknown>[];
 }

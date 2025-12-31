@@ -139,13 +139,16 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   private collectDependencies(
     options: SqlMigrationPlannerPlanOptions,
   ): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
-    const providers = options.dependencyProviders ?? [];
-    if (providers.length === 0) {
+    const components = options.frameworkComponents;
+    if (components.length === 0) {
       return [];
     }
     const deps: ComponentDatabaseDependency<unknown>[] = [];
-    for (const provider of providers) {
-      const initDeps = provider.databaseDependencies?.init;
+    for (const component of components) {
+      if (!isSqlDependencyProvider(component)) {
+        continue;
+      }
+      const initDeps = component.databaseDependencies?.init;
       if (initDeps && initDeps.length > 0) {
         deps.push(...initDeps);
       }
@@ -338,6 +341,28 @@ REFERENCES ${qualifyTableName(schema, foreignKey.references.table)} (${foreignKe
       ...(table ? { table } : {}),
     };
   }
+}
+
+function isSqlDependencyProvider(component: unknown): component is {
+  readonly databaseDependencies?: {
+    readonly init?: readonly ComponentDatabaseDependency<unknown>[];
+  };
+} {
+  if (typeof component !== 'object' || component === null) {
+    return false;
+  }
+  const record = component as Record<string, unknown>;
+
+  // If present, enforce familyId match to avoid mixing families at runtime.
+  if (Object.hasOwn(record, 'familyId') && record['familyId'] !== 'sql') {
+    return false;
+  }
+
+  if (!Object.hasOwn(record, 'databaseDependencies')) {
+    return false;
+  }
+  const deps = record['databaseDependencies'];
+  return deps === undefined || (typeof deps === 'object' && deps !== null);
 }
 
 function sortDependencies(

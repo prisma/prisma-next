@@ -6,6 +6,7 @@ import {
   createTestDatabase,
   emptySchema,
   familyInstance,
+  frameworkComponents,
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
@@ -59,6 +60,7 @@ describe.sequential('Schema verification after runner - integration', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents,
     });
 
     if (result.kind !== 'success') {
@@ -70,6 +72,7 @@ describe.sequential('Schema verification after runner - integration', () => {
       driver: d,
       destinationContract: contract,
       policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents,
     });
 
     if (!executeResult.ok) {
@@ -85,6 +88,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         driver: driver!,
         contractIR: contract,
         strict: false,
+        frameworkComponents,
       });
 
       expect(result.ok).toBe(true);
@@ -103,6 +107,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         driver: driver!,
         contractIR: contract,
         strict: false,
+        frameworkComponents,
       });
 
       expect(result.ok).toBe(false);
@@ -125,6 +130,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         driver: driver!,
         contractIR: contract,
         strict: false,
+        frameworkComponents,
       });
 
       expect(result.ok).toBe(false);
@@ -148,6 +154,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         driver: driver!,
         contractIR: contract,
         strict: false,
+        frameworkComponents,
       });
 
       expect(result.ok).toBe(false);

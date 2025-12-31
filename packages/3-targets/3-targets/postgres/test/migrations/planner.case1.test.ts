@@ -1,7 +1,6 @@
-import type {
-  ComponentDatabaseDependency,
-  DatabaseDependencyProvider,
-} from '@prisma-next/family-sql/control';
+import type { ExtensionDescriptor } from '@prisma-next/contract/framework-components';
+import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import type { ComponentDatabaseDependency } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -58,8 +57,21 @@ function createPgvectorDependency(): ComponentDatabaseDependency<unknown> {
   };
 }
 
-function createDependencyProvider(): DatabaseDependencyProvider {
+function createFrameworkComponent(): ExtensionDescriptor<'sql', 'postgres'> & {
+  readonly databaseDependencies: {
+    readonly init: readonly ComponentDatabaseDependency<unknown>[];
+  };
+} {
+  const manifest: ExtensionPackManifest = {
+    id: 'pgvector',
+    version: '0.0.0',
+  } as ExtensionPackManifest;
   return {
+    kind: 'extension',
+    id: 'pgvector',
+    familyId: 'sql',
+    targetId: 'postgres',
+    manifest,
     databaseDependencies: {
       init: [createPgvectorDependency()],
     },
@@ -130,13 +142,13 @@ const emptySchema: SqlSchemaIR = {
 describe('PostgresMigrationPlanner - when database is empty', () => {
   it('builds additive plan for empty schema with database dependencies', () => {
     const planner = createPostgresMigrationPlanner();
-    const dependencyProviders = [createDependencyProvider()];
+    const frameworkComponents = [createFrameworkComponent()];
 
     const result = planner.plan({
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
-      dependencyProviders,
+      frameworkComponents,
     });
 
     expect(result.kind).toBe('success');
@@ -168,7 +180,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('skips dependency install when dependency already satisfied', () => {
     const planner = createPostgresMigrationPlanner();
-    const dependencyProviders = [createDependencyProvider()];
+    const frameworkComponents = [createFrameworkComponent()];
     const schemaWithExtension: SqlSchemaIR = {
       tables: {},
       extensions: ['vector'],
@@ -178,7 +190,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: schemaWithExtension,
       policy: INIT_ADDITIVE_POLICY,
-      dependencyProviders,
+      frameworkComponents,
     });
 
     expect(result.kind).toBe('success');
@@ -196,6 +208,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
       // No databaseDependencies - planner should work without extensions
+      frameworkComponents: [],
     });
 
     expect(result.kind).toBe('success');
@@ -235,6 +248,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: nonEmptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [],
     });
 
     expect(result).toMatchObject({
@@ -290,6 +304,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: nonEmptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [],
     });
 
     expect(result).toMatchObject({

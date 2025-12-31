@@ -1,3 +1,4 @@
+import type { ComponentDescriptor } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
 import type { ComponentDatabaseDependency } from '../src/core/migrations/types';
 import { verifyDatabaseDependencies } from '../src/core/schema-verify/verify-helpers';
@@ -155,10 +156,15 @@ describe('verifySqlSchema with databaseDependencies', () => {
       schema,
       strict: false,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
-      dependencyProviders: [
+      frameworkComponents: [
         {
+          kind: 'extension',
+          id: 'pgvector',
+          familyId: 'sql',
+          targetId: 'postgres',
+          manifest: { id: 'pgvector', version: '0.0.0' },
           databaseDependencies: { init: dependencies },
-        },
+        } as unknown as ComponentDescriptor<string>,
       ],
     });
 
@@ -189,10 +195,15 @@ describe('verifySqlSchema with databaseDependencies', () => {
       schema,
       strict: false,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
-      dependencyProviders: [
+      frameworkComponents: [
         {
+          kind: 'extension',
+          id: 'pgvector',
+          familyId: 'sql',
+          targetId: 'postgres',
+          manifest: { id: 'pgvector', version: '0.0.0' },
           databaseDependencies: { init: dependencies },
-        },
+        } as unknown as ComponentDescriptor<string>,
       ],
     });
 
@@ -230,6 +241,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
       strict: false,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
       // No databaseDependencies - falls back to deprecated verifyExtensions
+      frameworkComponents: [],
     });
 
     expect(result.ok).toBe(true);

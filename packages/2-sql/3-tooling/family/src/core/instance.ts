@@ -1,3 +1,4 @@
+import type { ComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
@@ -34,7 +35,7 @@ import {
   extractOperationTypeImports,
 } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
-import type { DatabaseDependencyProvider, SqlControlTargetDescriptor } from './migrations/types';
+import type { SqlControlTargetDescriptor } from './migrations/types';
 import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
@@ -227,8 +228,6 @@ interface SqlFamilyInstanceState {
   readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
   readonly typeMetadataRegistry: SqlTypeMetadataRegistry;
-  /** Components that expose database dependency metadata. */
-  readonly dependencyProviders: ReadonlyArray<DatabaseDependencyProvider>;
 }
 
 /**
@@ -239,7 +238,7 @@ export interface SchemaVerifyOptions {
   readonly contractIR: unknown;
   readonly strict: boolean;
   readonly context?: OperationContext;
-  readonly dependencyProviders?: ReadonlyArray<DatabaseDependencyProvider>;
+  readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
 }
 
 /**
@@ -405,12 +404,6 @@ export function createSqlFamilyInstance<
   // Build type metadata registry from manifests
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({ target, adapter, extensions });
 
-  const dependencyProviders: ReadonlyArray<DatabaseDependencyProvider> = [
-    target,
-    adapter,
-    ...extensions,
-  ];
-
   /**
    * Strips mappings from a contract (mappings are runtime-only).
    */
@@ -433,7 +426,6 @@ export function createSqlFamilyInstance<
     operationTypeImports,
     extensionIds,
     typeMetadataRegistry,
-    dependencyProviders,
 
     validateContractIR(contractJson: unknown): ContractIR {
       // Validate the contract (this normalizes and validates structure/logic)
@@ -592,8 +584,7 @@ export function createSqlFamilyInstance<
     },
 
     async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
-      const { driver, contractIR, strict, context } = options;
-      const resolvedDependencyProviders = options.dependencyProviders ?? dependencyProviders;
+      const { driver, contractIR, strict, context, frameworkComponents } = options;
 
       // Validate contractIR as SqlContract<SqlStorage>
       const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
@@ -609,7 +600,7 @@ export function createSqlFamilyInstance<
         strict,
         ...ifDefined('context', context),
         typeMetadataRegistry,
-        dependencyProviders: resolvedDependencyProviders,
+        frameworkComponents,
       });
     },
     async sign(options: {
