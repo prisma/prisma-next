@@ -212,7 +212,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     ]);
   });
 
-  it('fails when schema is not empty', () => {
+  it('still plans additive fixes when schema contains extra tables', () => {
     const planner = createPostgresMigrationPlanner();
     const nonEmptySchema: SqlSchemaIR = {
       tables: {
@@ -237,18 +237,20 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       frameworkComponents: [],
     });
 
-    expect(result).toMatchObject({
-      kind: 'failure',
-      conflicts: [
-        {
-          kind: 'unsupportedOperation',
-          summary: expect.stringContaining('Found 1 existing table(s): existing'),
-        },
-      ],
-    });
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+    expect(result.plan.operations.map((op) => op.id)).toEqual([
+      'table.post',
+      'table.user',
+      'unique.user.user_email_key',
+      'index.user.user_email_idx',
+      'foreignKey.post.post_userId_fkey',
+    ]);
   });
 
-  it('lists all existing tables in error message', () => {
+  it('ignores extra tables when they are unrelated to the contract', () => {
     const planner = createPostgresMigrationPlanner();
     const nonEmptySchema: SqlSchemaIR = {
       tables: {
@@ -293,14 +295,16 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       frameworkComponents: [],
     });
 
-    expect(result).toMatchObject({
-      kind: 'failure',
-      conflicts: [
-        {
-          kind: 'unsupportedOperation',
-          summary: expect.stringContaining('Found 3 existing table(s): comments, posts, users'),
-        },
-      ],
-    });
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+    expect(result.plan.operations.map((op) => op.id)).toEqual([
+      'table.post',
+      'table.user',
+      'unique.user.user_email_key',
+      'index.user.user_email_idx',
+      'foreignKey.post.post_userId_fkey',
+    ]);
   });
 });
