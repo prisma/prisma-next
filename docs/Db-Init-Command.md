@@ -49,11 +49,9 @@ This doc defines the `db init` command behavior, the TS primitives it composes, 
     - Extension-owned indexes (e.g. pgvector indexes) when modeled in the contract.
 
 - **Extension handling**
-  - Honor explicit **extension constraints** in the contract, e.g.:
-    - `contract.extensions.pgvector.enabled === true`.
-  - Use extension packs to:
-    - Provide migration operations for enabling required extensions (e.g. `createExtension('pgvector')`).
-    - Provide operations for creating extension-owned indexes and related objects.
+  - Treat database-side prerequisites as **component-owned database dependencies** declared by configured framework components (target/adapter/extensions).
+  - Planner and verifier consume dependencies from the configured `frameworkComponents` bag and evaluate satisfaction via **pure schema IR hooks** (no DB I/O).
+  - Extension packs may still contribute deterministic data under `contract.extensions.<namespace>` for namespacing/types/codecs, but **schema verification and db init planning do not infer database prerequisites from `contract.extensions`**.
 
 - **Contract marker**
   - Write or update the `prisma_contract.marker` row to reflect the **desired contract** when `db init` succeeds.
@@ -215,7 +213,7 @@ When **no marker row exists** in `prisma_contract.marker`:
     - Treats `fromContract` as the **empty contract** node (`H∅`).
     - Plans all operations needed to realize the desired contract:
       - Create required tables, columns, PK/UK/FK, indexes, extension-owned objects.
-      - For any enabled extension (e.g. `extensions.pgvector.enabled === true`), plan an operation to ensure the extension is installed (e.g. `createExtension('pgvector')`).
+      - For any missing database dependencies declared by configured components (e.g. pgvector declaring `postgres.extension.vector`), plan operations to install them (e.g. `CREATE EXTENSION IF NOT EXISTS vector`).
   - Runner:
     - Applies the full plan.
     - Writes marker with `{ core_hash: hash(desiredContract), profile_hash: profileHash }`.
@@ -313,7 +311,7 @@ For v1, `MigrationPlan` will be:
   - Adding columns (with types, nullability, defaults).
   - Adding PK/UK/FK.
   - Adding indexes.
-  - Executing extension-owned operations (e.g. `createExtension('pgvector')`, create pgvector index).
+  - Executing component-owned database dependency operations (e.g. enabling `vector`) and any extension-owned objects modeled explicitly as operations.
 
 ### Empty Contract Origin
 
@@ -346,32 +344,18 @@ This is consistent with:
     - `mode: 'init'`.
   - Allows us to plug in tighter rules (e.g. never plan drops/renames) and distinct error messages per mode without branching on targets.
 
-- **Extension operations**
+- **Component-owned database dependencies**
 
-  Rather than baking extension policy into the planner, we:
+  Rather than baking ecosystem knowledge into targets (or inferring prerequisites from `contract.extensions`), `db init` treats database-side prerequisites as **component-owned database dependencies**:
 
-  - Aggregate available operations from:
-    - Target.
-    - Adapter.
-    - Extension packs (e.g. `@prisma-next/extensions-pgvector`).
-  - The contract expresses constraints in a **generic extension section**, e.g.:
-
-    ```json
-    {
-      "extensions": {
-        "pgvector": {
-          "enabled": true
-        }
-      }
-    }
-    ```
-
+  - CLI builds a `frameworkComponents` bag in composition order: `[target, adapter, ...extensions]`.
   - Planner:
-    - Reads extension constraints from the contract (e.g. `extensions.pgvector.enabled === true`).
-    - Matches them to extension-provided migration operations (e.g. `createExtension('pgvector')` and pgvector index creation ops).
-    - Emits these ops when:
-      - The DB does not yet satisfy the constraint (extension not installed, index missing, etc.).
-      - Operation class is allowed by policy (`'additive'`).
+    - Collects `databaseDependencies.init` from these components.
+    - Verifies each dependency against the live `SqlSchemaIR` (pure check).
+    - Emits dependency install operations only when the dependency is missing.
+  - Runner:
+    - Applies the plan.
+    - Re-introspects the schema and runs pure verification (including dependency hooks) before writing marker + ledger.
 
 Drift tolerance policies (e.g. whether to ignore non-contract indexes, extra tables, etc.) are kept minimal in v1 and deferred for later slices:
 
@@ -480,7 +464,7 @@ We will implement `db init` in the following slices, each individually testable 
     - Partial schema IR → plan only missing pieces.
     - Superset IR → no-op plan.
     - Conflicting IR → planning errors (no plan).
-  - Include cases with `extensions.pgvector.enabled === true` and vector columns/indexes.
+  - Include cases where pgvector is configured and the database dependency is missing (vector not installed), proving `db init --plan` includes the dependency install op.
 
 ### Slice 2 — Runner Integration & Marker Updates
 
@@ -538,14 +522,10 @@ We will implement `db init` in the following slices, each individually testable 
 ### Slice 4 — Extension Integration (pgvector)
 
 - **Goals**
-  - Ensure pgvector extension is fully integrated into `db init` flows:
-    - Contract expresses `extensions.pgvector.enabled === true`.
-    - Extension pack provides:
-      - Migration op to install/enable the extension.
-      - Ops for creating vector indexes.
-    - Planner and runner can:
-      - Emit and apply these ops.
-      - Use them in both `--plan` and apply modes.
+  - Ensure the pgvector component is fully integrated into `db init` flows:
+    - The pgvector extension descriptor declares a database dependency to enable `vector`.
+    - Planner emits the dependency install op when the dependency is missing.
+    - Runner applies the op, then verifies dependency satisfaction via schema IR before writing marker.
 
 - **Implementation**
   - Update `@prisma-next/extensions-pgvector` pack manifests to:
@@ -556,11 +536,10 @@ We will implement `db init` in the following slices, each individually testable 
 - **Testing**
   - Example app scenario (e.g. similarity search demo):
     - Contract with:
-      - `extensions.pgvector.enabled === true`.
-      - A table with a `vector` column and pgvector index.
+      - a table with a `vector` column and any modeled vector indexes/ops.
     - Run `db init` against a fresh Postgres instance with no pgvector installed:
       - `db init --plan` shows:
-        - `createExtension('pgvector')` (or equivalent op).
+        - an op to enable `vector` (e.g. `CREATE EXTENSION IF NOT EXISTS vector`).
         - Table/column/index creation.
       - `db init` applies the plan, installs pgvector, and writes marker.
     - Run the app’s similarity search query to verify end-to-end behavior.
