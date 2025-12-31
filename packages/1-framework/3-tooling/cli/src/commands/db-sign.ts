@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import {
   errorDatabaseUrlRequired,
   errorDriverRequired,
@@ -147,7 +146,7 @@ export function createDbSignCommand(): Command {
           });
 
           // Validate contract using instance validator
-          const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
+          const contractIR = familyInstance.validateContractIR(contractJson);
 
           // Schema verification precondition with spinner
           let schemaVerifyResult: VerifyDatabaseSchemaResult;

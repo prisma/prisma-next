@@ -49,12 +49,20 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
   /**
    * Validates a contract JSON and returns a validated ContractIR (without mappings).
    * Mappings are runtime-only and should not be part of ContractIR.
+   *
+   * Note: The returned ContractIR may include additional fields from the emitted contract
+   * (like coreHash, profileHash) that are not part of the ContractIR type but are preserved
+   * for use by verify/sign operations.
    */
-  validateContractIR(contractJson: unknown): unknown;
+  validateContractIR(contractJson: unknown): ContractIR;
 
   /**
    * Verifies the database marker against the contract.
    * Compares target, coreHash, and profileHash.
+   *
+   * @param options.contractIR - The validated contract (from validateContractIR). Must have
+   *   coreHash and target fields for verification. These fields are present in emitted
+   *   contracts but not in the ContractIR type definition.
    */
   verify(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
@@ -97,9 +105,9 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
    *
    * @param options - Introspection options
    * @param options.driver - Control plane driver for database connection
-   * @param options.contractIR - Optional contract IR for contract-guided introspection.
+   * @param options.contractIR - Optional contract for contract-guided introspection.
    *   When provided, families may use it for filtering, optimization, or validation
-   *   during introspection. The contract IR does not change the meaning of "what exists"
+   *   during introspection. The contract does not change the meaning of "what exists"
    *   in the database - it only guides how introspection is performed.
    * @returns Promise resolving to the family-specific Schema IR (e.g., `SqlSchemaIR` for SQL).
    *   The IR represents the complete schema snapshot at the time of introspection.

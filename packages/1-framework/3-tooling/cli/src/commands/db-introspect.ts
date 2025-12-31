@@ -81,10 +81,7 @@ export function createDbIntrospectCommand(): Command {
           const contractPath = resolve(config.contract.output);
           try {
             const contractJsonContent = await readFile(contractPath, 'utf-8');
-            const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-            // Validate contract using family instance (will be created later)
-            // For now, we'll pass the raw JSON and let the family instance validate it
-            contractIR = contractJson;
+            contractIR = JSON.parse(contractJsonContent);
           } catch (error) {
             // Contract file is optional for introspection - don't fail if it doesn't exist
             if (error instanceof Error && (error as { code?: string }).code !== 'ENOENT') {

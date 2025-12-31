@@ -250,7 +250,7 @@ export interface SqlControlFamilyInstance
    * Validates a contract JSON and returns a validated ContractIR (without mappings).
    * Mappings are runtime-only and should not be part of ContractIR.
    */
-  validateContractIR(contractJson: unknown): unknown;
+  validateContractIR(contractJson: unknown): ContractIR;
 
   /**
    * Verifies the database marker against the contract.
@@ -425,12 +425,13 @@ export function createSqlFamilyInstance<
     extensionIds,
     typeMetadataRegistry,
 
-    validateContractIR(contractJson: unknown): unknown {
+    validateContractIR(contractJson: unknown): ContractIR {
       // Validate the contract (this normalizes and validates structure/logic)
       const validated = validateContract<SqlContract<SqlStorage>>(contractJson);
       // Strip mappings before returning ContractIR (mappings are runtime-only)
+      // The validated contract has all required ContractIR properties
       const { mappings: _mappings, ...contractIR } = validated;
-      return contractIR;
+      return contractIR as ContractIR;
     },
 
     async verify(verifyOptions: {
@@ -850,7 +851,7 @@ export function createSqlFamilyInstance<
       const contractWithoutMappings = stripMappings(contractIR);
 
       // Validate and normalize the contract
-      const validatedIR = this.validateContractIR(contractWithoutMappings) as ContractIR;
+      const validatedIR = this.validateContractIR(contractWithoutMappings);
 
       const result = await emit(
         validatedIR,
