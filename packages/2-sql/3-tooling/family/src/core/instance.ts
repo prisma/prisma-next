@@ -328,7 +328,7 @@ interface CreateSqlFamilyInstanceOptions<
   TTargetDetails = Record<string, never>,
 > {
   readonly target: SqlControlTargetDescriptor<TTargetId, TTargetDetails>;
-  readonly adapter: ControlAdapterDescriptor<'sql', string>;
+  readonly adapter: ControlAdapterDescriptor<'sql', string, SqlControlAdapter>;
   readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
 }
 
@@ -587,7 +587,7 @@ export function createSqlFamilyInstance<
       const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
 
       // Introspect live schema (DB I/O)
-      const controlAdapter = adapter.create() as SqlControlAdapter;
+      const controlAdapter = adapter.create();
       const schemaIR = await controlAdapter.introspect(driver, contractIR);
 
       // Pure verification (no I/O) - delegates to extracted pure function
@@ -711,8 +711,7 @@ export function createSqlFamilyInstance<
     }): Promise<SqlSchemaIR> {
       const { driver, contractIR } = options;
 
-      // ControlAdapterDescriptor has create() method that returns SqlControlAdapter
-      const controlAdapter = adapter.create() as SqlControlAdapter;
+      const controlAdapter = adapter.create();
       return controlAdapter.introspect(driver, contractIR);
     },
 
