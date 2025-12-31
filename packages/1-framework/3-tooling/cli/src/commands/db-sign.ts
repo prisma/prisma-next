@@ -153,15 +153,14 @@ export function createDbSignCommand(): Command {
           let schemaVerifyResult: VerifyDatabaseSchemaResult;
           try {
             schemaVerifyResult = await withSpinner(
-              async () => {
-                return (await familyInstance.schemaVerify({
+              () =>
+                familyInstance.schemaVerify({
                   driver,
                   contractIR,
                   strict: false,
                   contractPath: contractPathAbsolute,
                   configPath,
-                })) as VerifyDatabaseSchemaResult;
-              },
+                }),
               {
                 message: 'Verifying database satisfies contract',
                 flags,
@@ -183,14 +182,13 @@ export function createDbSignCommand(): Command {
           let signResult: SignDatabaseResult;
           try {
             signResult = await withSpinner(
-              async () => {
-                return (await familyInstance.sign({
+              () =>
+                familyInstance.sign({
                   driver,
                   contractIR,
                   contractPath: contractPathAbsolute,
                   configPath,
-                })) as SignDatabaseResult;
-              },
+                }),
               {
                 message: 'Signing database...',
                 flags,

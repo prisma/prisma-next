@@ -42,18 +42,10 @@ export type {
  * Extends the base FamilyInstance with control-plane domain actions.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
- * @template TSchemaIR - The schema IR type returned by introspect()
- * @template TVerifyResult - The result type for verify()
- * @template TSchemaVerifyResult - The result type for schemaVerify()
- * @template TSignResult - The result type for sign()
+ * @template TSchemaIR - The schema IR type returned by introspect() (family-specific)
  */
-export interface ControlFamilyInstance<
-  TFamilyId extends string,
-  TSchemaIR = unknown,
-  TVerifyResult = unknown,
-  TSchemaVerifyResult = unknown,
-  TSignResult = unknown,
-> extends FamilyInstance<TFamilyId> {
+export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unknown>
+  extends FamilyInstance<TFamilyId> {
   /**
    * Validates a contract JSON and returns a validated ContractIR (without mappings).
    * Mappings are runtime-only and should not be part of ContractIR.
@@ -70,7 +62,7 @@ export interface ControlFamilyInstance<
     readonly expectedTargetId: string;
     readonly contractPath: string;
     readonly configPath?: string;
-  }): Promise<TVerifyResult>;
+  }): Promise<VerifyDatabaseResult>;
 
   /**
    * Verifies the database schema against the contract.
@@ -82,7 +74,7 @@ export interface ControlFamilyInstance<
     readonly strict: boolean;
     readonly contractPath: string;
     readonly configPath?: string;
-  }): Promise<TSchemaVerifyResult>;
+  }): Promise<VerifyDatabaseSchemaResult>;
 
   /**
    * Signs the database with the contract marker.
@@ -94,7 +86,7 @@ export interface ControlFamilyInstance<
     readonly contractIR: unknown;
     readonly contractPath: string;
     readonly configPath?: string;
-  }): Promise<TSignResult>;
+  }): Promise<SignDatabaseResult>;
 
   /**
    * Introspects the database schema and returns a family-specific schema IR.

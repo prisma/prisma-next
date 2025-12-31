@@ -151,7 +151,7 @@ export function createDbSchemaVerifyCommand(): Command {
           // Call family instance schemaVerify method
           let schemaVerifyResult: VerifyDatabaseSchemaResult;
           try {
-            schemaVerifyResult = (await withSpinner(
+            schemaVerifyResult = await withSpinner(
               () =>
                 familyInstance.schemaVerify({
                   driver,
@@ -164,7 +164,7 @@ export function createDbSchemaVerifyCommand(): Command {
                 message: 'Verifying database schema...',
                 flags,
               },
-            )) as VerifyDatabaseSchemaResult;
+            );
           } catch (error) {
             // Wrap errors from schemaVerify() in structured error
             throw errorRuntime(error instanceof Error ? error.message : String(error), {

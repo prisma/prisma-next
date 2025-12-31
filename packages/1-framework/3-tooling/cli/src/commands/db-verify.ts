@@ -151,7 +151,7 @@ export function createDbVerifyCommand(): Command {
           // Call family instance verify method
           let verifyResult: VerifyDatabaseResult;
           try {
-            verifyResult = (await withSpinner(
+            verifyResult = await withSpinner(
               () =>
                 familyInstance.verify({
                   driver,
@@ -164,7 +164,7 @@ export function createDbVerifyCommand(): Command {
                 message: 'Verifying database schema...',
                 flags,
               },
-            )) as VerifyDatabaseResult;
+            );
           } catch (error) {
             // Wrap errors from verify() in structured error
             throw errorUnexpected(error instanceof Error ? error.message : String(error), {
