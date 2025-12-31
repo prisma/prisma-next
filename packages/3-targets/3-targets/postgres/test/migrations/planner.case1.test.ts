@@ -1,8 +1,59 @@
+import type { ComponentDatabaseDependency } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+
+/**
+ * Creates a test database dependency for pgvector.
+ * This mimics what the pgvector extension descriptor provides.
+ */
+function createPgvectorDependency(): ComponentDatabaseDependency<unknown> {
+  return {
+    id: 'postgres.extension.vector',
+    label: 'Enable vector extension',
+    install: [
+      {
+        id: 'extension.pgvector',
+        label: 'Enable extension "pgvector"',
+        summary: 'Ensures the vector extension is available for pgvector operations',
+        operationClass: 'additive',
+        target: { id: 'postgres' },
+        precheck: [
+          {
+            description: 'verify extension "vector" is not already enabled',
+            sql: "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
+          },
+        ],
+        execute: [
+          {
+            description: 'create extension "vector"',
+            sql: 'CREATE EXTENSION IF NOT EXISTS vector',
+          },
+        ],
+        postcheck: [
+          {
+            description: 'confirm extension "vector" is enabled',
+            sql: "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
+          },
+        ],
+      },
+    ],
+    verifyDatabaseDependenciesInstalled: (schema) => {
+      if (!schema.extensions.includes('vector')) {
+        return [
+          {
+            kind: 'extension_missing',
+            table: '',
+            message: 'Extension "vector" is missing from database (required by pgvector)',
+          },
+        ];
+      }
+      return [];
+    },
+  };
+}
 
 function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlContract<SqlStorage> {
   return {
@@ -66,12 +117,15 @@ const emptySchema: SqlSchemaIR = {
 };
 
 describe('PostgresMigrationPlanner - when database is empty', () => {
-  it('builds additive plan for empty schema', () => {
+  it('builds additive plan for empty schema with database dependencies', () => {
     const planner = createPostgresMigrationPlanner();
+    const databaseDependencies = [createPgvectorDependency()];
+
     const result = planner.plan({
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      databaseDependencies,
     });
 
     expect(result.kind).toBe('success');
@@ -99,6 +153,31 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
         },
       ],
     });
+  });
+
+  it('builds additive plan for empty schema without database dependencies', () => {
+    const planner = createPostgresMigrationPlanner();
+
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      // No databaseDependencies - planner should work without extensions
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+    const operations = result.plan.operations;
+    // No extension operations when no dependencies are provided
+    expect(operations.map((op) => op.id)).toEqual([
+      'table.post',
+      'table.user',
+      'unique.user.user_email_key',
+      'index.user.user_email_idx',
+      'foreignKey.post.post_userId_fkey',
+    ]);
   });
 
   it('fails when schema is not empty', () => {
@@ -191,30 +270,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     });
   });
 
-  it('returns failure for unsupported extensions', () => {
-    const planner = createPostgresMigrationPlanner();
-    const contractWithUnsupportedExtension = createTestContract({
-      extensions: {
-        unsupportedExtension: {},
-        anotherUnsupported: {},
-      },
-    });
-
-    const result = planner.plan({
-      contract: contractWithUnsupportedExtension,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-    });
-
-    expect(result).toMatchObject({
-      kind: 'failure',
-      conflicts: [
-        {
-          kind: 'unsupportedExtension',
-          summary:
-            'Unsupported PostgreSQL extensions in contract: unsupportedExtension, anotherUnsupported',
-        },
-      ],
-    });
-  });
+  // NOTE: Extension validation is no longer done by the planner.
+  // Extensions are now validated via component-owned database dependencies.
+  // Each component declares its dependencies and the verifier checks if they're installed.
 });
