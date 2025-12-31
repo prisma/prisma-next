@@ -12,7 +12,7 @@ This package provides the foundational type definitions for Prisma Next, includi
 ## Responsibilities
 
 - **Core Contract Types**: Defines framework-level contract types (`ContractBase`, `Source`, `FamilyInstance`) that are shared across all target families
-- **Framework Component Descriptors**: Provides base descriptor interfaces (`FamilyDescriptor`, `TargetDescriptor`, `AdapterDescriptor`, `DriverDescriptor`, `ExtensionDescriptor`) that plane-specific descriptors extend
+- **Framework Component Model**: Provides base descriptor interfaces (`FamilyDescriptor`, `TargetDescriptor`, `AdapterDescriptor`, `DriverDescriptor`, `ExtensionDescriptor`) and identity instance bases (`FamilyInstance`, `TargetInstance`, `AdapterInstance`, `DriverInstance`, `ExtensionInstance`) that plane-specific types extend
 - **Document Family Types**: Provides TypeScript types for document target family contracts (`DocumentContract`)
 - **JSON Schema Validation**: Provides JSON Schemas for validating contract structure in IDEs and tooling
 - **Type Guards**: Provides runtime type guards for narrowing contract types (`isDocumentContract`)
@@ -73,18 +73,25 @@ const myFamilyHook: TargetFamilyHook = {
 };
 ```
 
-### Framework Component Descriptors
+### Framework Component Model
 
-Import base descriptor interfaces to define or type-check framework components:
+Import base descriptor and instance interfaces to define or type-check framework components:
 
 ```typescript
 import type {
+  // Descriptors
   ComponentDescriptor,
   FamilyDescriptor,
   TargetDescriptor,
   AdapterDescriptor,
   DriverDescriptor,
   ExtensionDescriptor,
+  // Instances
+  FamilyInstance,
+  TargetInstance,
+  AdapterInstance,
+  DriverInstance,
+  ExtensionInstance,
 } from '@prisma-next/contract/framework-components';
 
 // Component descriptors share common properties
@@ -108,6 +115,11 @@ const postgresTarget: TargetDescriptor<'sql', 'postgres'> = {
   targetId: 'postgres',
   manifest: { /* ... */ },
 };
+
+// Identity instance bases are extended by plane-specific instances
+interface MySqlInstance extends FamilyInstance<'sql'> {
+  // Plane-specific methods...
+}
 ```
 
 The component hierarchy is:
@@ -229,7 +241,7 @@ if (isDocumentContract(contract)) {
 ## Exports
 
 - `./types`: Core contract type definitions, type guards, and emitter SPI types
-- `./framework-components`: Framework component descriptor base interfaces
+- `./framework-components`: Framework component model (descriptors + identity instance bases)
 - `./pack-manifest-types`: Extension pack manifest types
 - `./ir`: Contract IR types
 - `./schema-document`: Document family JSON Schema (`schemas/data-contract-document-v1.json`)
