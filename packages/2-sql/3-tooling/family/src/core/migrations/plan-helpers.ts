@@ -2,17 +2,17 @@ import type { NotOk, Ok } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type {
   AnyRecord,
-  CreateMigrationPlanOptions,
-  MigrationPlan,
-  MigrationPlanOperation,
-  MigrationPlanOperationStep,
-  MigrationPlanOperationTarget,
-  MigrationRunnerErrorCode,
-  MigrationRunnerFailure,
-  MigrationRunnerSuccessValue,
-  PlannerConflict,
-  PlannerFailureResult,
-  PlannerSuccessResult,
+  CreateSqlMigrationPlanOptions,
+  SqlMigrationPlan,
+  SqlMigrationPlanOperation,
+  SqlMigrationPlanOperationStep,
+  SqlMigrationPlanOperationTarget,
+  SqlMigrationRunnerErrorCode,
+  SqlMigrationRunnerFailure,
+  SqlMigrationRunnerSuccessValue,
+  SqlPlannerConflict,
+  SqlPlannerFailureResult,
+  SqlPlannerSuccessResult,
 } from './types';
 
 const readOnlyEmptyObject: Record<string, never> = Object.freeze({});
@@ -25,8 +25,8 @@ function cloneRecord<T extends AnyRecord>(value: T): T {
 }
 
 function freezeSteps(
-  steps: readonly MigrationPlanOperationStep[],
-): readonly MigrationPlanOperationStep[] {
+  steps: readonly SqlMigrationPlanOperationStep[],
+): readonly SqlMigrationPlanOperationStep[] {
   if (steps.length === 0) {
     return Object.freeze([]);
   }
@@ -58,8 +58,8 @@ function freezeDetailsValue<T>(value: T): T {
 }
 
 function freezeTargetDetails<TTargetDetails>(
-  target: MigrationPlanOperationTarget<TTargetDetails>,
-): MigrationPlanOperationTarget<TTargetDetails> {
+  target: SqlMigrationPlanOperationTarget<TTargetDetails>,
+): SqlMigrationPlanOperationTarget<TTargetDetails> {
   return Object.freeze({
     id: target.id,
     ...(target.details !== undefined ? { details: freezeDetailsValue(target.details) } : {}),
@@ -67,8 +67,8 @@ function freezeTargetDetails<TTargetDetails>(
 }
 
 function freezeOperation<TTargetDetails>(
-  operation: MigrationPlanOperation<TTargetDetails>,
-): MigrationPlanOperation<TTargetDetails> {
+  operation: SqlMigrationPlanOperation<TTargetDetails>,
+): SqlMigrationPlanOperation<TTargetDetails> {
   return Object.freeze({
     id: operation.id,
     label: operation.label,
@@ -83,8 +83,8 @@ function freezeOperation<TTargetDetails>(
 }
 
 function freezeOperations<TTargetDetails>(
-  operations: readonly MigrationPlanOperation<TTargetDetails>[],
-): readonly MigrationPlanOperation<TTargetDetails>[] {
+  operations: readonly SqlMigrationPlanOperation<TTargetDetails>[],
+): readonly SqlMigrationPlanOperation<TTargetDetails>[] {
   if (operations.length === 0) {
     return Object.freeze([]);
   }
@@ -92,8 +92,8 @@ function freezeOperations<TTargetDetails>(
 }
 
 export function createMigrationPlan<TTargetDetails = Record<string, never>>(
-  options: CreateMigrationPlanOptions<TTargetDetails>,
-): MigrationPlan<TTargetDetails> {
+  options: CreateSqlMigrationPlanOptions<TTargetDetails>,
+): SqlMigrationPlan<TTargetDetails> {
   return Object.freeze({
     targetId: options.targetId,
     ...(options.origin !== undefined
@@ -106,15 +106,15 @@ export function createMigrationPlan<TTargetDetails = Record<string, never>>(
 }
 
 export function plannerSuccess<TTargetDetails>(
-  plan: MigrationPlan<TTargetDetails>,
-): PlannerSuccessResult<TTargetDetails> {
+  plan: SqlMigrationPlan<TTargetDetails>,
+): SqlPlannerSuccessResult<TTargetDetails> {
   return Object.freeze({
     kind: 'success',
     plan,
   });
 }
 
-export function plannerFailure(conflicts: readonly PlannerConflict[]): PlannerFailureResult {
+export function plannerFailure(conflicts: readonly SqlPlannerConflict[]): SqlPlannerFailureResult {
   return Object.freeze({
     kind: 'failure' as const,
     conflicts: Object.freeze(
@@ -137,7 +137,7 @@ export function plannerFailure(conflicts: readonly PlannerConflict[]): PlannerFa
 export function runnerSuccess(value: {
   operationsPlanned: number;
   operationsExecuted: number;
-}): Ok<MigrationRunnerSuccessValue> {
+}): Ok<SqlMigrationRunnerSuccessValue> {
   return ok(
     Object.freeze({
       operationsPlanned: value.operationsPlanned,
@@ -150,11 +150,11 @@ export function runnerSuccess(value: {
  * Creates a failed migration runner result.
  */
 export function runnerFailure(
-  code: MigrationRunnerErrorCode,
+  code: SqlMigrationRunnerErrorCode,
   summary: string,
   options?: { why?: string; meta?: AnyRecord },
-): NotOk<MigrationRunnerFailure> {
-  const failure: MigrationRunnerFailure = Object.freeze({
+): NotOk<SqlMigrationRunnerFailure> {
+  const failure: SqlMigrationRunnerFailure = Object.freeze({
     code,
     summary,
     ...(options?.why ? { why: options.why } : {}),

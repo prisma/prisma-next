@@ -1,4 +1,4 @@
-import type { MigrationOperationPolicy } from './types';
+import type { MigrationOperationPolicy } from '@prisma-next/core-control-plane/types';
 
 /**
  * Policy used by `db init`: additive-only operations, no widening/destructive steps.

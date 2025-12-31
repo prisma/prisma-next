@@ -1,6 +1,21 @@
+/**
+ * SQL-specific migration types.
+ *
+ * These types extend the canonical migration types from the framework control plane
+ * with SQL-specific fields for execution (precheck SQL, execute SQL, etc.).
+ */
 import type {
   ControlDriverInstance,
   ControlTargetDescriptor,
+  ControlTargetInstance,
+  MigrationOperationPolicy,
+  MigrationPlan,
+  MigrationPlannerConflict,
+  MigrationPlannerFailureResult,
+  MigrationPlannerSuccessResult,
+  MigrationPlanOperation,
+  MigrationRunnerFailure,
+  MigrationRunnerSuccessValue,
   OperationContext,
 } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -10,60 +25,77 @@ import type { SqlControlFamilyInstance } from '../instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
 
-export type MigrationOperationClass = 'additive' | 'widening' | 'destructive';
+// ============================================================================
+// SQL-Specific Plan Types
+// ============================================================================
 
-export interface MigrationOperationPolicy {
-  readonly allowedOperationClasses: readonly MigrationOperationClass[];
-}
-
-export interface MigrationPlanOperationStep {
+/**
+ * A single step in a SQL migration operation (precheck, execute, or postcheck).
+ */
+export interface SqlMigrationPlanOperationStep {
   readonly description: string;
   readonly sql: string;
   readonly meta?: AnyRecord;
 }
 
-export interface MigrationPlanOperationTarget<TTargetDetails> {
+/**
+ * Target details for a SQL migration operation (table, column, index, etc.).
+ */
+export interface SqlMigrationPlanOperationTarget<TTargetDetails> {
   readonly id: string;
   readonly details?: TTargetDetails;
 }
 
-export interface MigrationPlanOperation<TTargetDetails = Record<string, never>> {
-  /** Unique identifier for this operation (e.g., "table.users.create"). */
-  readonly id: string;
-  /** Human-readable label for display in UI/CLI (e.g., "Create table users"). */
-  readonly label: string;
+/**
+ * A single SQL migration operation with SQL-specific fields.
+ * Extends the core MigrationPlanOperation with SQL execution details.
+ */
+export interface SqlMigrationPlanOperation<TTargetDetails = Record<string, never>>
+  extends MigrationPlanOperation {
   /** Optional detailed explanation of what this operation does and why. */
   readonly summary?: string;
-  readonly operationClass: MigrationOperationClass;
-  readonly target: MigrationPlanOperationTarget<TTargetDetails>;
-  readonly precheck: readonly MigrationPlanOperationStep[];
-  readonly execute: readonly MigrationPlanOperationStep[];
-  readonly postcheck: readonly MigrationPlanOperationStep[];
+  readonly target: SqlMigrationPlanOperationTarget<TTargetDetails>;
+  readonly precheck: readonly SqlMigrationPlanOperationStep[];
+  readonly execute: readonly SqlMigrationPlanOperationStep[];
+  readonly postcheck: readonly SqlMigrationPlanOperationStep[];
   readonly meta?: AnyRecord;
 }
 
-export interface MigrationPlanContractInfo {
+/**
+ * Contract identity information for SQL migrations.
+ */
+export interface SqlMigrationPlanContractInfo {
   readonly coreHash: string;
   readonly profileHash?: string;
 }
 
-export interface MigrationPlan<TTargetDetails = Record<string, never>> {
-  readonly targetId: string;
+/**
+ * A SQL migration plan with SQL-specific fields.
+ * Extends the core MigrationPlan with origin tracking and metadata.
+ */
+export interface SqlMigrationPlan<TTargetDetails = Record<string, never>> extends MigrationPlan {
   /**
    * Origin contract identity that the plan expects the database to currently be at.
    * If omitted, the runner treats the origin as "no marker present" (empty database),
    * and will only proceed if no marker exists (or if the marker already matches destination).
    */
-  readonly origin?: MigrationPlanContractInfo | null;
+  readonly origin?: SqlMigrationPlanContractInfo | null;
   /**
    * Destination contract identity that the plan intends to reach.
    */
-  readonly destination: MigrationPlanContractInfo;
-  readonly operations: readonly MigrationPlanOperation<TTargetDetails>[];
+  readonly destination: SqlMigrationPlanContractInfo;
+  readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
   readonly meta?: AnyRecord;
 }
 
-export type PlannerConflictKind =
+// ============================================================================
+// SQL-Specific Planner Types
+// ============================================================================
+
+/**
+ * Specific conflict kinds for SQL migrations.
+ */
+export type SqlPlannerConflictKind =
   | 'typeMismatch'
   | 'nullabilityConflict'
   | 'indexIncompatible'
@@ -73,7 +105,10 @@ export type PlannerConflictKind =
   | 'extensionMissing'
   | 'unsupportedOperation';
 
-export interface PlannerConflictLocation {
+/**
+ * Location information for SQL planner conflicts.
+ */
+export interface SqlPlannerConflictLocation {
   readonly table?: string;
   readonly column?: string;
   readonly index?: string;
@@ -81,46 +116,75 @@ export interface PlannerConflictLocation {
   readonly extension?: string;
 }
 
-export interface PlannerConflict {
-  readonly kind: PlannerConflictKind;
-  readonly summary: string;
-  readonly why?: string;
-  readonly location?: PlannerConflictLocation;
+/**
+ * A SQL-specific planner conflict with additional location information.
+ * Extends the core MigrationPlannerConflict.
+ */
+export interface SqlPlannerConflict extends MigrationPlannerConflict {
+  readonly kind: SqlPlannerConflictKind;
+  readonly location?: SqlPlannerConflictLocation;
   readonly meta?: AnyRecord;
 }
 
-export interface PlannerSuccessResult<TTargetDetails> {
+/**
+ * Successful SQL planner result with the migration plan.
+ */
+export interface SqlPlannerSuccessResult<TTargetDetails>
+  extends Omit<MigrationPlannerSuccessResult, 'plan'> {
   readonly kind: 'success';
-  readonly plan: MigrationPlan<TTargetDetails>;
+  readonly plan: SqlMigrationPlan<TTargetDetails>;
 }
 
-export interface PlannerFailureResult {
+/**
+ * Failed SQL planner result with the list of conflicts.
+ */
+export interface SqlPlannerFailureResult extends Omit<MigrationPlannerFailureResult, 'conflicts'> {
   readonly kind: 'failure';
-  readonly conflicts: readonly PlannerConflict[];
+  readonly conflicts: readonly SqlPlannerConflict[];
 }
 
-export type PlannerResult<TTargetDetails = Record<string, never>> =
-  | PlannerSuccessResult<TTargetDetails>
-  | PlannerFailureResult;
+/**
+ * Union type for SQL planner results.
+ */
+export type SqlPlannerResult<TTargetDetails = Record<string, never>> =
+  | SqlPlannerSuccessResult<TTargetDetails>
+  | SqlPlannerFailureResult;
 
-export interface MigrationPlannerPlanOptions {
+/**
+ * Options for SQL migration planner.
+ */
+export interface SqlMigrationPlannerPlanOptions {
   readonly contract: SqlContract<SqlStorage>;
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
 }
 
-export interface MigrationPlanner<TTargetDetails = Record<string, never>> {
-  plan(options: MigrationPlannerPlanOptions): PlannerResult<TTargetDetails>;
+/**
+ * SQL migration planner interface.
+ * Extends the core MigrationPlanner with SQL-specific types.
+ */
+export interface SqlMigrationPlanner<TTargetDetails = Record<string, never>> {
+  plan(options: SqlMigrationPlannerPlanOptions): SqlPlannerResult<TTargetDetails>;
 }
 
-export interface MigrationRunnerExecuteCallbacks<TTargetDetails = Record<string, never>> {
-  onOperationStart?(operation: MigrationPlanOperation<TTargetDetails>): void;
-  onOperationComplete?(operation: MigrationPlanOperation<TTargetDetails>): void;
+// ============================================================================
+// SQL-Specific Runner Types
+// ============================================================================
+
+/**
+ * Callbacks for SQL migration runner execution.
+ */
+export interface SqlMigrationRunnerExecuteCallbacks<TTargetDetails = Record<string, never>> {
+  onOperationStart?(operation: SqlMigrationPlanOperation<TTargetDetails>): void;
+  onOperationComplete?(operation: SqlMigrationPlanOperation<TTargetDetails>): void;
 }
 
-export interface MigrationRunnerExecuteOptions<TTargetDetails = Record<string, never>> {
-  readonly plan: MigrationPlan<TTargetDetails>;
+/**
+ * Options for SQL migration runner execution.
+ */
+export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string, never>> {
+  readonly plan: SqlMigrationPlan<TTargetDetails>;
   readonly driver: ControlDriverInstance;
   /**
    * Destination contract IR.
@@ -134,14 +198,14 @@ export interface MigrationRunnerExecuteOptions<TTargetDetails = Record<string, n
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   readonly strictVerification?: boolean;
-  readonly callbacks?: MigrationRunnerExecuteCallbacks<TTargetDetails>;
+  readonly callbacks?: SqlMigrationRunnerExecuteCallbacks<TTargetDetails>;
   readonly context?: OperationContext;
 }
 
 /**
- * Error codes for migration runner failures.
+ * Error codes for SQL migration runner failures.
  */
-export type MigrationRunnerErrorCode =
+export type SqlMigrationRunnerErrorCode =
   | 'DESTINATION_CONTRACT_MISMATCH'
   | 'MARKER_ORIGIN_MISMATCH'
   | 'POLICY_VIOLATION'
@@ -151,46 +215,78 @@ export type MigrationRunnerErrorCode =
   | 'EXECUTION_FAILED';
 
 /**
- * Detailed information about a migration runner failure.
- * This is the failure payload type for `NotOk<MigrationRunnerFailure>`.
+ * Detailed information about a SQL migration runner failure.
+ * Extends the core MigrationRunnerFailure with SQL-specific error codes.
  */
-export interface MigrationRunnerFailure {
-  readonly code: MigrationRunnerErrorCode;
-  readonly summary: string;
-  readonly why?: string;
+export interface SqlMigrationRunnerFailure extends MigrationRunnerFailure {
+  readonly code: SqlMigrationRunnerErrorCode;
   readonly meta?: AnyRecord;
 }
 
 /**
- * Success value for migration runner execution.
+ * Success value for SQL migration runner execution.
+ * Extends core type for type branding and potential SQL-specific extensions.
  */
-export interface MigrationRunnerSuccessValue {
-  readonly operationsPlanned: number;
-  readonly operationsExecuted: number;
-}
+export interface SqlMigrationRunnerSuccessValue extends MigrationRunnerSuccessValue {}
 
 /**
- * Result union for migration runner execution.
- * Either success with operation counts, or failure with error details.
+ * Result type for SQL migration runner execution.
  */
-export type MigrationRunnerResult = Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>;
+export type SqlMigrationRunnerResult = Result<
+  SqlMigrationRunnerSuccessValue,
+  SqlMigrationRunnerFailure
+>;
 
-export interface MigrationRunner<TTargetDetails = Record<string, never>> {
-  execute(options: MigrationRunnerExecuteOptions<TTargetDetails>): Promise<MigrationRunnerResult>;
+/**
+ * SQL migration runner interface.
+ * Extends the core MigrationRunner with SQL-specific types.
+ */
+export interface SqlMigrationRunner<TTargetDetails = Record<string, never>> {
+  execute(
+    options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
+  ): Promise<SqlMigrationRunnerResult>;
 }
 
+// ============================================================================
+// SQL Control Target Descriptor
+// ============================================================================
+
+/**
+ * SQL control target descriptor with migration support.
+ * Extends the core ControlTargetDescriptor with SQL-specific migration methods.
+ */
 export interface SqlControlTargetDescriptor<
   TTargetId extends string,
   TTargetDetails = Record<string, never>,
-> extends ControlTargetDescriptor<'sql', TTargetId> {
-  createPlanner(family: SqlControlFamilyInstance): MigrationPlanner<TTargetDetails>;
-  createRunner(family: SqlControlFamilyInstance): MigrationRunner<TTargetDetails>;
+> extends ControlTargetDescriptor<
+    'sql',
+    TTargetId,
+    ControlTargetInstance<'sql', TTargetId>,
+    SqlControlFamilyInstance
+  > {
+  /**
+   * Creates a SQL migration planner for this target.
+   * Direct method for SQL-specific usage.
+   */
+  createPlanner(family: SqlControlFamilyInstance): SqlMigrationPlanner<TTargetDetails>;
+  /**
+   * Creates a SQL migration runner for this target.
+   * Direct method for SQL-specific usage.
+   */
+  createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }
 
-export interface CreateMigrationPlanOptions<TTargetDetails> {
+// ============================================================================
+// Helper Types
+// ============================================================================
+
+/**
+ * Options for creating a SQL migration plan.
+ */
+export interface CreateSqlMigrationPlanOptions<TTargetDetails> {
   readonly targetId: string;
-  readonly origin?: MigrationPlanContractInfo | null;
-  readonly destination: MigrationPlanContractInfo;
-  readonly operations: readonly MigrationPlanOperation<TTargetDetails>[];
+  readonly origin?: SqlMigrationPlanContractInfo | null;
+  readonly destination: SqlMigrationPlanContractInfo;
+  readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
   readonly meta?: AnyRecord;
 }

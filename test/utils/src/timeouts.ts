@@ -1,6 +1,7 @@
 const BASE_TIMEOUTS = {
   spinUpPpgDev: 15000,
   typeScriptCompilation: 8000,
+  databaseOperation: 5000,
   default: 100,
 } as const;
 
@@ -56,6 +57,14 @@ export const timeouts = {
    */
   get typeScriptCompilation(): number {
     return Math.round(BASE_TIMEOUTS.typeScriptCompilation * getMultiplier());
+  },
+
+  /**
+   * Timeout for database operations (queries, setup, teardown).
+   * This includes table creation, data insertion, and cleanup.
+   */
+  get databaseOperation(): number {
+    return Math.round(BASE_TIMEOUTS.databaseOperation * getMultiplier());
   },
 
   /**

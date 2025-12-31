@@ -5,9 +5,9 @@ import {
   plannerSuccess,
 } from '../src/core/migrations/plan-helpers';
 import type {
-  MigrationPlan,
-  MigrationPlanOperation,
-  PlannerConflict,
+  SqlMigrationPlan,
+  SqlMigrationPlanOperation,
+  SqlPlannerConflict,
 } from '../src/core/migrations/types';
 
 type TestTargetDetails = { readonly schema: string };
@@ -32,7 +32,7 @@ describe('createMigrationPlan', () => {
       targetId: 'postgres',
       origin: { coreHash: 'originCore', profileHash: 'originProfile' },
       destination: { coreHash: 'core', profileHash: 'profile' },
-      operations: sourceOperations as readonly MigrationPlanOperation<TestTargetDetails>[],
+      operations: sourceOperations as readonly SqlMigrationPlanOperation<TestTargetDetails>[],
       meta: { marker: 'none' },
     });
 
@@ -143,7 +143,7 @@ describe('createMigrationPlan', () => {
 
 describe('planner helpers', () => {
   it('produce immutable envelopes that clone conflict metadata', () => {
-    const plan: MigrationPlan<TestTargetDetails> = createMigrationPlan({
+    const plan: SqlMigrationPlan<TestTargetDetails> = createMigrationPlan({
       targetId: 'postgres',
       destination: { coreHash: 'abc', profileHash: 'def' },
       operations: [],
@@ -157,7 +157,7 @@ describe('planner helpers', () => {
       summary: 'Column "user"."email" has mismatched type',
       location: { table: 'user', column: 'email' },
       meta: { hint: 'only additive operations allowed' },
-    } satisfies PlannerConflict;
+    } satisfies SqlPlannerConflict;
     const failure = plannerFailure([conflict]);
     conflict.location!.table = 'mutated';
 
