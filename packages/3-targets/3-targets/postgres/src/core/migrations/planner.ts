@@ -72,14 +72,13 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   constructor(private readonly config: PlannerConfig) {}
 
   plan(options: SqlMigrationPlannerPlanOptions) {
-    const plannerOptions = options as PlannerOptionsWithComponents;
-    const schemaName = plannerOptions.schemaName ?? this.config.defaultSchema;
-    const policyResult = this.ensureAdditivePolicy(plannerOptions.policy);
+    const schemaName = options.schemaName ?? this.config.defaultSchema;
+    const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) {
       return policyResult;
     }
 
-    const classification = this.classifySchema(plannerOptions);
+    const classification = this.classifySchema(options);
     if (classification.kind === 'conflict') {
       return plannerFailure(classification.conflicts);
     }
@@ -88,35 +87,19 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
 
     // Build extension operations from component-owned database dependencies
     operations.push(
-      ...this.buildDatabaseDependencyOperations(plannerOptions),
-      ...this.buildTableOperations(
-        plannerOptions.contract.storage.tables,
-        plannerOptions.schema,
-        schemaName,
-      ),
-      ...this.buildColumnOperations(
-        plannerOptions.contract.storage.tables,
-        plannerOptions.schema,
-        schemaName,
-      ),
+      ...this.buildDatabaseDependencyOperations(options),
+      ...this.buildTableOperations(options.contract.storage.tables, options.schema, schemaName),
+      ...this.buildColumnOperations(options.contract.storage.tables, options.schema, schemaName),
       ...this.buildPrimaryKeyOperations(
-        plannerOptions.contract.storage.tables,
-        plannerOptions.schema,
+        options.contract.storage.tables,
+        options.schema,
         schemaName,
       ),
-      ...this.buildUniqueOperations(
-        plannerOptions.contract.storage.tables,
-        plannerOptions.schema,
-        schemaName,
-      ),
-      ...this.buildIndexOperations(
-        plannerOptions.contract.storage.tables,
-        plannerOptions.schema,
-        schemaName,
-      ),
+      ...this.buildUniqueOperations(options.contract.storage.tables, options.schema, schemaName),
+      ...this.buildIndexOperations(options.contract.storage.tables, options.schema, schemaName),
       ...this.buildForeignKeyOperations(
-        plannerOptions.contract.storage.tables,
-        plannerOptions.schema,
+        options.contract.storage.tables,
+        options.schema,
         schemaName,
       ),
     );
@@ -125,10 +108,8 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       targetId: 'postgres',
       origin: null,
       destination: {
-        coreHash: plannerOptions.contract.coreHash,
-        ...(plannerOptions.contract.profileHash
-          ? { profileHash: plannerOptions.contract.profileHash }
-          : {}),
+        coreHash: options.contract.coreHash,
+        ...(options.contract.profileHash ? { profileHash: options.contract.profileHash } : {}),
       },
       operations,
     });
