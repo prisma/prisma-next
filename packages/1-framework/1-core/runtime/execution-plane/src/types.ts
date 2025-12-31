@@ -12,7 +12,7 @@ import type {
 } from '@prisma-next/contract/framework-components';
 
 // ============================================================================
-// Runtime*Instance Base Interfaces (ADR 152)
+// Runtime*Instance Base Interfaces
 // ============================================================================
 
 /**

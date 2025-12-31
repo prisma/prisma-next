@@ -1,11 +1,6 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { ContractIR } from './ir';
 
-// ============================================================================
-// Shared header and neutral types
-// ============================================================================
-// Note: Fields like targetFamily accept string to work with JSON imports,
-// which don't preserve literal types. Runtime validation ensures correct values
 export interface ContractBase {
   readonly schemaVersion: string;
   readonly target: string;
