@@ -22,7 +22,10 @@ export {
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 // SQL-specific types
 export type {
+  ComponentDatabaseDependencies,
+  ComponentDatabaseDependency,
   CreateSqlMigrationPlanOptions,
+  SqlControlExtensionDescriptor,
   SqlControlTargetDescriptor,
   SqlMigrationPlan,
   SqlMigrationPlanContractInfo,

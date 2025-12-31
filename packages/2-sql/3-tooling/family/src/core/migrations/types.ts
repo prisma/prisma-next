@@ -6,6 +6,7 @@
  */
 import type {
   ControlDriverInstance,
+  ControlExtensionDescriptor,
   ControlTargetDescriptor,
   ControlTargetInstance,
   MigrationOperationPolicy,
@@ -17,6 +18,7 @@ import type {
   MigrationRunnerFailure,
   MigrationRunnerSuccessValue,
   OperationContext,
+  SchemaIssue,
 } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -24,6 +26,66 @@ import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
+
+// ============================================================================
+// Component Database Dependencies
+// ============================================================================
+
+/**
+ * A single database dependency declared by a framework component.
+ * Uses SqlMigrationPlanOperation so we inherit the existing precheck/execute/postcheck contract.
+ *
+ * Database dependencies allow components (extensions, adapters) to declare what database-side
+ * persistence structures they require (e.g., Postgres extensions, schemas, functions).
+ * The planner emits these as migration operations, and the verifier uses the pure verification
+ * hook to check satisfaction against the schema IR.
+ */
+export interface ComponentDatabaseDependency<TTargetDetails = Record<string, never>> {
+  /** Stable identifier for the dependency (e.g. 'postgres.extension.vector') */
+  readonly id: string;
+  /** Human label for output (e.g. 'Enable vector extension') */
+  readonly label: string;
+  /**
+   * Operations that install/ensure the dependency.
+   * Use SqlMigrationPlanOperation so we inherit the existing precheck/execute/postcheck contract.
+   */
+  readonly install: readonly SqlMigrationPlanOperation<TTargetDetails>[];
+  /**
+   * Pure verification hook: checks whether this dependency is already installed
+   * based on the in-memory schema IR (no DB I/O).
+   *
+   * This must return structured issues suitable for CLI and tree output, not just a boolean.
+   */
+  readonly verifyDatabaseDependenciesInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
+}
+
+/**
+ * Database dependencies declared by a framework component.
+ */
+export interface ComponentDatabaseDependencies<TTargetDetails = Record<string, never>> {
+  /**
+   * Dependencies required for db init.
+   * Future: update dependencies can be added later (e.g. widening/destructive).
+   */
+  readonly init?: readonly ComponentDatabaseDependency<TTargetDetails>[];
+}
+
+// ============================================================================
+// SQL Control Extension Descriptor
+// ============================================================================
+
+/**
+ * SQL-specific extension descriptor with optional database dependencies.
+ * Extends the core ControlExtensionDescriptor with SQL-specific metadata.
+ *
+ * Database dependencies are attached to the descriptor (not the instance) because
+ * they are declarative metadata that planner/verifier need without constructing instances.
+ */
+export interface SqlControlExtensionDescriptor<TTargetId extends string>
+  extends ControlExtensionDescriptor<'sql', TTargetId> {
+  /** Optional database dependencies this extension requires. */
+  readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
+}
 
 // ============================================================================
 // SQL-Specific Plan Types

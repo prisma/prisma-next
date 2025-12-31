@@ -984,6 +984,9 @@ importers:
       '@prisma-next/core-control-plane':
         specifier: workspace:*
         version: link:../../1-framework/1-core/migration/control-plane
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../2-sql/3-tooling/family
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../2-sql/1-core/operations
@@ -993,6 +996,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../2-sql/5-runtime
+      '@prisma-next/sql-schema-ir':
+        specifier: workspace:*
+        version: link:../../2-sql/1-core/schema-ir
       arktype:
         specifier: ^2.0.0
         version: 2.1.26

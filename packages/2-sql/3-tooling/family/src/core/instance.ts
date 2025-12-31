@@ -34,7 +34,11 @@ import {
   extractOperationTypeImports,
 } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
-import type { SqlControlTargetDescriptor } from './migrations/types';
+import type {
+  ComponentDatabaseDependency,
+  SqlControlExtensionDescriptor,
+  SqlControlTargetDescriptor,
+} from './migrations/types';
 import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
@@ -227,6 +231,8 @@ interface SqlFamilyInstanceState {
   readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
   readonly typeMetadataRegistry: SqlTypeMetadataRegistry;
+  /** Collected database dependencies from extension descriptors. */
+  readonly databaseDependencies: ReadonlyArray<ComponentDatabaseDependency<unknown>>;
 }
 
 /**
@@ -333,6 +339,30 @@ interface CreateSqlFamilyInstanceOptions<
 }
 
 /**
+ * Collects database dependencies from SQL extension descriptors.
+ * Reads declarative databaseDependencies from SqlControlExtensionDescriptor
+ * without calling ext.create() - dependencies are descriptor-level metadata.
+ *
+ * @param extensions - Extension descriptors to collect dependencies from
+ * @returns Array of all database dependencies from all extensions
+ */
+function collectDatabaseDependencies(
+  extensions: readonly ControlExtensionDescriptor<'sql', string>[],
+): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
+  const dependencies: ComponentDatabaseDependency<unknown>[] = [];
+
+  for (const ext of extensions) {
+    // Check if extension descriptor has databaseDependencies (SqlControlExtensionDescriptor)
+    const sqlExt = ext as SqlControlExtensionDescriptor<string>;
+    if (sqlExt.databaseDependencies?.init) {
+      dependencies.push(...sqlExt.databaseDependencies.init);
+    }
+  }
+
+  return dependencies;
+}
+
+/**
  * Builds a SQL type metadata registry from extension pack manifests.
  * Collects type metadata from target, adapter, and extension pack manifests.
  *
@@ -402,6 +432,9 @@ export function createSqlFamilyInstance<
   // Build type metadata registry from manifests
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({ target, adapter, extensions });
 
+  // Collect database dependencies from extension descriptors (no ext.create() calls)
+  const databaseDependencies = collectDatabaseDependencies(extensions);
+
   /**
    * Strips mappings from a contract (mappings are runtime-only).
    */
@@ -424,6 +457,7 @@ export function createSqlFamilyInstance<
     operationTypeImports,
     extensionIds,
     typeMetadataRegistry,
+    databaseDependencies,
 
     validateContractIR(contractJson: unknown): ContractIR {
       // Validate the contract (this normalizes and validates structure/logic)
