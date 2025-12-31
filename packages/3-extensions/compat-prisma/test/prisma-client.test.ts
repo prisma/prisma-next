@@ -155,79 +155,99 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
   }, timeouts.spinUpPpgDev);
 
   describe('PN + compatibility layer', () => {
-    it('creates a user and returns the created record', async () => {
-      const result = await createUser(prismaPN, {
-        id: 'test-1',
-        email: 'test@example.com',
-        name: 'Test User',
-      });
+    it(
+      'creates a user and returns the created record',
+      async () => {
+        const result = await createUser(prismaPN, {
+          id: 'test-1',
+          email: 'test@example.com',
+          name: 'Test User',
+        });
 
-      expect(result).toMatchObject({
-        id: 'test-1',
-        email: 'test@example.com',
-        name: 'Test User',
-        createdAt: expect.anything(),
-      });
-    });
+        expect(result).toMatchObject({
+          id: 'test-1',
+          email: 'test@example.com',
+          name: 'Test User',
+          createdAt: expect.anything(),
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-    it('finds a unique user by id', async () => {
-      // Seed data
-      await createUser(prismaPN, {
-        id: 'test-1',
-        email: 'test@example.com',
-        name: 'Test User',
-      });
+    it(
+      'finds a unique user by id',
+      async () => {
+        // Seed data
+        await createUser(prismaPN, {
+          id: 'test-1',
+          email: 'test@example.com',
+          name: 'Test User',
+        });
 
-      const result = await readUserById(prismaPN, 'test-1');
+        const result = await readUserById(prismaPN, 'test-1');
 
-      expect(result).toMatchObject({
-        id: 'test-1',
-        email: 'test@example.com',
-        name: 'Test User',
-      });
-    });
+        expect(result).toMatchObject({
+          id: 'test-1',
+          email: 'test@example.com',
+          name: 'Test User',
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-    it('returns null for findUnique when not found', async () => {
-      const result = await readUserById(prismaPN, 'non-existent');
+    it(
+      'returns null for findUnique when not found',
+      async () => {
+        const result = await readUserById(prismaPN, 'non-existent');
 
-      expect(result).toBeNull();
-    });
+        expect(result).toBeNull();
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-    it('finds many users', async () => {
-      // Create multiple users
-      await createUser(prismaPN, {
-        id: 'test-1',
-        email: 'test1@example.com',
-        name: 'Test User 1',
-      });
-      await createUser(prismaPN, {
-        id: 'test-2',
-        email: 'test2@example.com',
-        name: 'Test User 2',
-      });
+    it(
+      'finds many users',
+      async () => {
+        // Create multiple users
+        await createUser(prismaPN, {
+          id: 'test-1',
+          email: 'test1@example.com',
+          name: 'Test User 1',
+        });
+        await createUser(prismaPN, {
+          id: 'test-2',
+          email: 'test2@example.com',
+          name: 'Test User 2',
+        });
 
-      const results = await prismaPN.user.findMany();
+        const results = await prismaPN.user.findMany();
 
-      expect(results.length).toBe(2);
-      expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-1')).toBe(true);
-      expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-2')).toBe(true);
-    });
+        expect(results.length).toBe(2);
+        expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-1')).toBe(true);
+        expect(results.some((u: Record<string, unknown>) => u['id'] === 'test-2')).toBe(true);
+      },
+      timeouts.spinUpPpgDev,
+    );
 
-    it('finds first user with where clause', async () => {
-      await createUser(prismaPN, {
-        id: 'test-1',
-        email: 'test@example.com',
-        name: 'Test User',
-      });
+    it(
+      'finds first user with where clause',
+      async () => {
+        await createUser(prismaPN, {
+          id: 'test-1',
+          email: 'test@example.com',
+          name: 'Test User',
+        });
 
-      const result = await prismaPN.user.findFirst({
-        where: { email: 'test@example.com' },
-      });
+        const result = await prismaPN.user.findFirst({
+          where: { email: 'test@example.com' },
+        });
 
-      expect(result).toMatchObject({
-        email: 'test@example.com',
-      });
-    });
+        expect(result).toMatchObject({
+          email: 'test@example.com',
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('Guardrail: unbounded findMany should trigger budget error', () => {
@@ -257,13 +277,17 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
   });
 
   describe('Contract drift handling', () => {
-    it('verifies contract marker on first use', async () => {
-      // Runtime is configured with verify.mode: 'onFirstUse'
-      // This should verify the contract on first query execution
-      const result = await readUserById(prismaPN, 'non-existent');
-      expect(result).toBeNull();
-      // If contract mismatch occurred, we would have thrown CONTRACT.MARKER_MISMATCH
-    });
+    it(
+      'verifies contract marker on first use',
+      async () => {
+        // Runtime is configured with verify.mode: 'onFirstUse'
+        // This should verify the contract on first query execution
+        const result = await readUserById(prismaPN, 'non-existent');
+        expect(result).toBeNull();
+        // If contract mismatch occurred, we would have thrown CONTRACT.MARKER_MISMATCH
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('Proxy edge cases', () => {

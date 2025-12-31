@@ -55,36 +55,34 @@ describe('buildWhereExpr', () => {
   });
 
   it('builds where expression with operation expression on left', () => {
+    // Create an OperationExpr directly - the new architecture has this directly on the BinaryBuilder.left
     const operationExpr = {
       kind: 'operation' as const,
       method: 'normalize',
       forTypeId: 'pg/vector@1',
       self: createColumnRef('user', 'id'),
       args: [],
-      returns: { kind: 'typeId', type: 'pg/vector@1' },
+      returns: { kind: 'typeId' as const, type: 'pg/vector@1' },
       lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
+        targetFamily: 'sql' as const,
+        strategy: 'function' as const,
         // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
         template: 'normalize(${self})',
       },
     };
 
-    const columnWithOp = {
-      ...userColumns.id,
-      _operationExpr: operationExpr,
-    } as unknown;
-
+    // Create a BinaryBuilder where left is directly the OperationExpr
+    // This is how ExpressionBuilder.eq() creates the BinaryBuilder (see operations-registry.ts)
     const binary = {
       kind: 'binary' as const,
       op: 'eq' as const,
-      left: columnWithOp,
+      left: operationExpr,
       right: param('value'),
-    } as unknown;
+    };
 
     const result = buildWhereExpr(
       contract,
-      binary as unknown as typeof userColumns.id.eq extends (x: unknown) => infer R ? R : never,
+      binary as typeof userColumns.id.eq extends (x: unknown) => infer R ? R : never,
       { value: 'test' },
       [],
       [],
