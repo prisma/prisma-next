@@ -188,13 +188,23 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('builds additive plan for empty schema without database dependencies', () => {
     const planner = createPostgresMigrationPlanner();
+    // Use extension descriptor but without databaseDependencies
+    const extensionWithoutDeps: SqlControlExtensionDescriptor<'postgres'> = {
+      kind: 'extension',
+      id: 'pgvector',
+      familyId: 'sql',
+      targetId: 'postgres',
+      manifest: { id: 'pgvector', version: '0.0.0-test' },
+      // No databaseDependencies - planner should work without them
+      databaseDependencies: {},
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
+    };
 
     const result = planner.plan({
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
-      // No databaseDependencies - planner should work without extensions
-      frameworkComponents: [],
+      frameworkComponents: [extensionWithoutDeps],
     });
 
     expect(result.kind).toBe('success');
@@ -214,6 +224,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('still plans additive fixes when schema contains extra tables', () => {
     const planner = createPostgresMigrationPlanner();
+    const frameworkComponents = [createFrameworkComponent()];
     const nonEmptySchema: SqlSchemaIR = {
       tables: {
         existing: {
@@ -234,7 +245,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: nonEmptySchema,
       policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
+      frameworkComponents,
     });
 
     expect(result.kind).toBe('success');
@@ -242,6 +253,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       throw new Error(`Expected success but got ${JSON.stringify(result)}`);
     }
     expect(result.plan.operations.map((op) => op.id)).toEqual([
+      'extension.pgvector',
       'table.post',
       'table.user',
       'unique.user.user_email_key',
@@ -252,6 +264,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('ignores extra tables when they are unrelated to the contract', () => {
     const planner = createPostgresMigrationPlanner();
+    const frameworkComponents = [createFrameworkComponent()];
     const nonEmptySchema: SqlSchemaIR = {
       tables: {
         users: {
@@ -292,7 +305,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: nonEmptySchema,
       policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
+      frameworkComponents,
     });
 
     expect(result.kind).toBe('success');
@@ -300,6 +313,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       throw new Error(`Expected success but got ${JSON.stringify(result)}`);
     }
     expect(result.plan.operations.map((op) => op.id)).toEqual([
+      'extension.pgvector',
       'table.post',
       'table.user',
       'unique.user.user_email_key',

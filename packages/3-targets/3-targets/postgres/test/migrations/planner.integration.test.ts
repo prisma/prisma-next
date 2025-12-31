@@ -81,6 +81,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
   });
 
   it('plans additive fixes for subset schemas', { timeout: testTimeout }, async () => {
+    // Create user table with just id - missing email column, unique, and index
     await driver!.query('create table "user" (id uuid primary key)');
     const schema = await introspectSchema(driver!);
     const planner = postgresTargetDescriptor.createPlanner(familyInstance);
@@ -96,12 +97,11 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
     if (subsetResult.kind !== 'success') {
       throw new Error('expected planner success for subset');
     }
+    // Contract only has 'user' table - should plan missing column, unique, and index
     expect(subsetResult.plan.operations.map((op) => op.id)).toEqual([
-      'table.post',
       'column.user.email',
       'unique.user.user_email_key',
       'index.user.user_email_idx',
-      'foreignKey.post.post_userId_fkey',
     ]);
   });
 
