@@ -589,7 +589,7 @@ export function createSqlFamilyInstance<
       // Introspect live schema (DB I/O)
       const controlAdapter = adapter.create() as SqlControlAdapter;
       const schemaIR = await controlAdapter.introspect(
-        driver as ControlDriverInstance<string>,
+        driver as ControlDriverInstance<'sql', string>,
         contractIR,
       );
 
@@ -716,7 +716,7 @@ export function createSqlFamilyInstance<
 
       // ControlAdapterDescriptor has create() method that returns SqlControlAdapter
       const controlAdapter = adapter.create() as SqlControlAdapter;
-      return controlAdapter.introspect(driver as ControlDriverInstance<string>, contractIR);
+      return controlAdapter.introspect(driver as ControlDriverInstance<'sql', string>, contractIR);
     },
 
     toSchemaView(schema: SqlSchemaIR): CoreSchemaView {

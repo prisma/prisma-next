@@ -113,7 +113,7 @@ export function createSqlRuntimeFamilyInstance(options: {
 
       const runtimeOptions_: RuntimeOptions<TContract> = {
         adapter,
-        driver: driverInstance as SqlDriver,
+        driver: driverInstance as unknown as SqlDriver,
         verify: runtimeOptions.verify,
         context,
         ...(runtimeOptions.plugins ? { plugins: runtimeOptions.plugins } : {}),
