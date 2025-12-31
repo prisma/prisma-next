@@ -18,6 +18,7 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
+import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   type DbInitResult,
@@ -170,7 +171,12 @@ export function createDbInitCommand(): Command {
             driver: driverDescriptor,
             extensions: config.extensions ?? [],
           });
-          const frameworkComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+          const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+          const frameworkComponents = assertFrameworkComponentsCompatible(
+            config.family.familyId,
+            config.target.targetId,
+            rawComponents,
+          );
 
           // Validate contract
           const contractIR = familyInstance.validateContractIR(contractJson);

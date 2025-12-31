@@ -14,6 +14,7 @@ import type {
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
+import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -144,7 +145,12 @@ export function createDbSignCommand(): Command {
             driver: driverDescriptor,
             extensions: config.extensions ?? [],
           });
-          const frameworkComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+          const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+          const frameworkComponents = assertFrameworkComponentsCompatible(
+            config.family.familyId,
+            config.target.targetId,
+            rawComponents,
+          );
 
           // Validate contract using instance validator
           const contractIR = familyInstance.validateContractIR(contractJson);

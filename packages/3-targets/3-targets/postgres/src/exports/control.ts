@@ -65,13 +65,20 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     manifest: loadTargetManifest(),
     /**
      * Migrations capability for CLI to access planner/runner via core types.
+     * The SQL-specific planner/runner types are compatible with the generic
+     * MigrationPlanner/MigrationRunner interfaces at runtime.
      */
     migrations: {
       createPlanner(_family: SqlControlFamilyInstance) {
-        return createPostgresMigrationPlanner();
+        return createPostgresMigrationPlanner() as import('@prisma-next/core-control-plane/types').MigrationPlanner<
+          'sql',
+          'postgres'
+        >;
       },
       createRunner(family) {
-        return createPostgresMigrationRunner(family);
+        return createPostgresMigrationRunner(
+          family,
+        ) as import('@prisma-next/core-control-plane/types').MigrationRunner<'sql', 'postgres'>;
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {
