@@ -444,7 +444,7 @@ export function verifyDatabaseDependencies(
       issues.push(...depIssues);
       nodes.push({
         status: 'fail',
-        kind: 'extension',
+        kind: 'databaseDependency',
         name: dependency.label,
         contractPath: depPath,
         code: 'dependency_missing',
@@ -457,7 +457,7 @@ export function verifyDatabaseDependencies(
       // Dependency is satisfied
       nodes.push({
         status: 'pass',
-        kind: 'extension',
+        kind: 'databaseDependency',
         name: dependency.label,
         contractPath: depPath,
         code: '',
