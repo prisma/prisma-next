@@ -1,9 +1,6 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { ContractIR } from './ir';
 
-// Transitional re-export: FamilyInstance now lives in framework-components
-export type { FamilyInstance } from './framework-components';
-
 // ============================================================================
 // Shared header and neutral types
 // ============================================================================

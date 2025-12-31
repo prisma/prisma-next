@@ -11,7 +11,6 @@ export type {
   DocumentStorage,
   ExecutionPlan,
   Expr,
-  FamilyInstance,
   FieldType,
   ParamDescriptor,
   PlanMeta,
