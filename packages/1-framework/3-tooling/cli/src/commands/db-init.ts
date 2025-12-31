@@ -174,7 +174,7 @@ export function createDbInitCommand(): Command {
           const frameworkComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
 
           // Validate contract
-          const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
+          const contractIR = familyInstance.validateContractIR(contractJson);
 
           // Create planner and runner from target migrations capability
           const planner = migrations.createPlanner(familyInstance);

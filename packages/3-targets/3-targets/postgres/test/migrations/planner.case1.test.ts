@@ -65,7 +65,7 @@ function createFrameworkComponent(): ExtensionDescriptor<'sql', 'postgres'> & {
   const manifest: ExtensionPackManifest = {
     id: 'pgvector',
     version: '0.0.0',
-  } as ExtensionPackManifest;
+  } as const;
   return {
     kind: 'extension',
     id: 'pgvector',
