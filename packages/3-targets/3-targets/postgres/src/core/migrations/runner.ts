@@ -35,9 +35,6 @@ function collectRunnerDependencies(
   options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
   family: SqlControlFamilyInstance,
 ): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
-  if (options.databaseDependencies && options.databaseDependencies.length > 0) {
-    return options.databaseDependencies;
-  }
   const providers: ReadonlyArray<DatabaseDependencyProvider> =
     options.dependencyProviders ?? family.dependencyProviders ?? [];
   if (providers.length === 0) {

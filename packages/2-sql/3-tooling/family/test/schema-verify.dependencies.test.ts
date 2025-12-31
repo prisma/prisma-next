@@ -155,7 +155,11 @@ describe('verifySqlSchema with databaseDependencies', () => {
       schema,
       strict: false,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
-      databaseDependencies: dependencies,
+      dependencyProviders: [
+        {
+          databaseDependencies: { init: dependencies },
+        },
+      ],
     });
 
     expect(result.ok).toBe(true);
@@ -185,7 +189,11 @@ describe('verifySqlSchema with databaseDependencies', () => {
       schema,
       strict: false,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
-      databaseDependencies: dependencies,
+      dependencyProviders: [
+        {
+          databaseDependencies: { init: dependencies },
+        },
+      ],
     });
 
     expect(result.ok).toBe(false);

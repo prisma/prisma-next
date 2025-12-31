@@ -139,10 +139,6 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   private collectDependencies(
     options: SqlMigrationPlannerPlanOptions,
   ): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
-    const explicit = options.databaseDependencies;
-    if (explicit && explicit.length > 0) {
-      return sortDependencies(explicit);
-    }
     const providers = options.dependencyProviders ?? [];
     if (providers.length === 0) {
       return [];

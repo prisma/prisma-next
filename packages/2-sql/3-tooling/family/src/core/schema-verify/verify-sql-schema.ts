@@ -40,12 +40,9 @@ export interface VerifySqlSchemaOptions {
   readonly context?: OperationContext;
   /** Type metadata registry for codec consistency warnings */
   readonly typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
-  /** Optional database dependencies collected from extension descriptors */
-  readonly databaseDependencies?: ReadonlyArray<ComponentDatabaseDependency<unknown>>;
   /**
    * Components that expose database dependency metadata. When provided,
-   * verifySqlSchema will derive databaseDependencies from these providers
-   * (unless databaseDependencies are explicitly supplied).
+   * verifySqlSchema will derive databaseDependencies from these providers.
    */
   readonly dependencyProviders?: ReadonlyArray<DatabaseDependencyProvider>;
 }
@@ -454,10 +451,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   }
 
   // Compare extensions/dependencies
-  // If databaseDependencies are provided, use component-owned verification hooks
+  // If dependency providers are provided, use component-owned verification hooks
   // Otherwise, fall back to the deprecated fuzzy matching approach
-  const databaseDependencies =
-    options.databaseDependencies ?? collectDependenciesFromProviders(options.dependencyProviders);
+  const databaseDependencies = collectDependenciesFromProviders(options.dependencyProviders);
   if (databaseDependencies.length > 0) {
     const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
     rootChildren.push(...dependencyStatuses);

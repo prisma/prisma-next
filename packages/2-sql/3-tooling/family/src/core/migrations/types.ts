@@ -230,16 +230,11 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   /**
-   * Descriptors/components that may expose databaseDependencies metadata.
+   * Descriptors/components that may expose database dependency metadata.
    * Planner extracts dependencies from these providers and verifies each one
    * against the schema before adding install operations.
    */
   readonly dependencyProviders?: ReadonlyArray<DatabaseDependencyProvider>;
-  /**
-   * Database dependencies collected from extension descriptors.
-   * @deprecated Prefer dependencyProviders so planner can verify dependencies itself.
-   */
-  readonly databaseDependencies?: ReadonlyArray<ComponentDatabaseDependency<unknown>>;
 }
 
 /**
@@ -287,11 +282,6 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string
    * Runner uses these providers to verify dependencies after execution.
    */
   readonly dependencyProviders?: ReadonlyArray<DatabaseDependencyProvider>;
-  /**
-   * @deprecated Prefer dependencyProviders. This exists for transitional callers
-   * that still materialize dependency arrays themselves.
-   */
-  readonly databaseDependencies?: ReadonlyArray<ComponentDatabaseDependency<unknown>>;
 }
 
 /**
