@@ -14,7 +14,7 @@ const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
   install: [
     {
       id: 'extension.pgvector',
-      label: 'Enable extension "pgvector"',
+      label: 'Enable extension "vector"',
       summary: 'Ensures the pgvector extension is enabled for vector columns',
       operationClass: 'additive',
       target: { id: 'postgres' },
