@@ -6,7 +6,12 @@ import type {
   RuntimeFamilyDescriptor,
   RuntimeTargetDescriptor,
 } from '@prisma-next/core-execution-plane/types';
-import { createSqlRuntimeFamilyInstance, type SqlRuntimeFamilyInstance } from './runtime-instance';
+import {
+  createSqlRuntimeFamilyInstance,
+  type SqlRuntimeAdapterInstance,
+  type SqlRuntimeDriverInstance,
+  type SqlRuntimeFamilyInstance,
+} from './runtime-instance';
 
 /**
  * SQL family manifest for runtime plane.
@@ -30,8 +35,12 @@ export class SqlRuntimeFamilyDescriptor
 
   create<TTargetId extends string>(options: {
     readonly target: RuntimeTargetDescriptor<'sql', TTargetId>;
-    readonly adapter: RuntimeAdapterDescriptor<'sql', TTargetId>;
-    readonly driver: RuntimeDriverDescriptor<'sql', TTargetId>;
+    readonly adapter: RuntimeAdapterDescriptor<
+      'sql',
+      TTargetId,
+      SqlRuntimeAdapterInstance<TTargetId>
+    >;
+    readonly driver: RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>;
     readonly extensions: readonly RuntimeExtensionDescriptor<'sql', TTargetId>[];
   }): SqlRuntimeFamilyInstance {
     return createSqlRuntimeFamilyInstance({
