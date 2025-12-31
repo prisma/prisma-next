@@ -130,6 +130,8 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
           continue;
         }
         seenOperationIds.add(installOp.id);
+        // SQL family components are expected to provide compatible target details. This would be better if
+        // the type system could enforce it but it's not likely to occur in practice.
         operations.push(installOp as SqlMigrationPlanOperation<PostgresPlanTargetDetails>);
       }
     }
