@@ -15,7 +15,7 @@ import type {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { ComponentDatabaseDependency } from '../migrations/types';
+import type { ComponentDatabaseDependency, DatabaseDependencyProvider } from '../migrations/types';
 import {
   computeCounts,
   verifyDatabaseDependencies,
@@ -42,6 +42,12 @@ export interface VerifySqlSchemaOptions {
   readonly typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   /** Optional database dependencies collected from extension descriptors */
   readonly databaseDependencies?: ReadonlyArray<ComponentDatabaseDependency<unknown>>;
+  /**
+   * Components that expose database dependency metadata. When provided,
+   * verifySqlSchema will derive databaseDependencies from these providers
+   * (unless databaseDependencies are explicitly supplied).
+   */
+  readonly dependencyProviders?: ReadonlyArray<DatabaseDependencyProvider>;
 }
 
 /**
@@ -450,7 +456,8 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   // Compare extensions/dependencies
   // If databaseDependencies are provided, use component-owned verification hooks
   // Otherwise, fall back to the deprecated fuzzy matching approach
-  const databaseDependencies = options.databaseDependencies ?? [];
+  const databaseDependencies =
+    options.databaseDependencies ?? collectDependenciesFromProviders(options.dependencyProviders);
   if (databaseDependencies.length > 0) {
     const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
     rootChildren.push(...dependencyStatuses);
@@ -526,4 +533,20 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       total: totalTime,
     },
   };
+}
+
+function collectDependenciesFromProviders(
+  providers: ReadonlyArray<DatabaseDependencyProvider> | undefined,
+): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
+  if (!providers || providers.length === 0) {
+    return [];
+  }
+  const dependencies: ComponentDatabaseDependency<unknown>[] = [];
+  for (const provider of providers) {
+    const initDeps = provider.databaseDependencies?.init;
+    if (initDeps && initDeps.length > 0) {
+      dependencies.push(...initDeps);
+    }
+  }
+  return dependencies;
 }

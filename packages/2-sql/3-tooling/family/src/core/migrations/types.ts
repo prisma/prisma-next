@@ -70,6 +70,15 @@ export interface ComponentDatabaseDependencies<TTargetDetails = Record<string, n
   readonly init?: readonly ComponentDatabaseDependency<TTargetDetails>[];
 }
 
+/**
+ * Minimal structural type implemented by any descriptor that can expose
+ * component-owned database dependencies. Targets/adapters typically omit
+ * the property, while extensions provide dependency metadata.
+ */
+export interface DatabaseDependencyProvider {
+  readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
+}
+
 // ============================================================================
 // SQL Control Extension Descriptor
 // ============================================================================
@@ -221,8 +230,14 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   /**
+   * Descriptors/components that may expose databaseDependencies metadata.
+   * Planner extracts dependencies from these providers and verifies each one
+   * against the schema before adding install operations.
+   */
+  readonly dependencyProviders?: ReadonlyArray<DatabaseDependencyProvider>;
+  /**
    * Database dependencies collected from extension descriptors.
-   * Planner emits install operations from these dependencies.
+   * @deprecated Prefer dependencyProviders so planner can verify dependencies itself.
    */
   readonly databaseDependencies?: ReadonlyArray<ComponentDatabaseDependency<unknown>>;
 }
@@ -267,6 +282,16 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string
   readonly strictVerification?: boolean;
   readonly callbacks?: SqlMigrationRunnerExecuteCallbacks<TTargetDetails>;
   readonly context?: OperationContext;
+  /**
+   * Components that expose databaseDependencies metadata.
+   * Runner uses these providers to verify dependencies after execution.
+   */
+  readonly dependencyProviders?: ReadonlyArray<DatabaseDependencyProvider>;
+  /**
+   * @deprecated Prefer dependencyProviders. This exists for transitional callers
+   * that still materialize dependency arrays themselves.
+   */
+  readonly databaseDependencies?: ReadonlyArray<ComponentDatabaseDependency<unknown>>;
 }
 
 /**
