@@ -1,4 +1,7 @@
-import type { ComponentDatabaseDependency } from '@prisma-next/family-sql/control';
+import type {
+  ComponentDatabaseDependency,
+  DatabaseDependencyProvider,
+} from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -51,6 +54,14 @@ function createPgvectorDependency(): ComponentDatabaseDependency<unknown> {
         ];
       }
       return [];
+    },
+  };
+}
+
+function createDependencyProvider(): DatabaseDependencyProvider {
+  return {
+    databaseDependencies: {
+      init: [createPgvectorDependency()],
     },
   };
 }
@@ -119,13 +130,13 @@ const emptySchema: SqlSchemaIR = {
 describe('PostgresMigrationPlanner - when database is empty', () => {
   it('builds additive plan for empty schema with database dependencies', () => {
     const planner = createPostgresMigrationPlanner();
-    const databaseDependencies = [createPgvectorDependency()];
+    const dependencyProviders = [createDependencyProvider()];
 
     const result = planner.plan({
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
-      databaseDependencies,
+      dependencyProviders,
     });
 
     expect(result.kind).toBe('success');
@@ -153,6 +164,28 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
         },
       ],
     });
+  });
+
+  it('skips dependency install when dependency already satisfied', () => {
+    const planner = createPostgresMigrationPlanner();
+    const dependencyProviders = [createDependencyProvider()];
+    const schemaWithExtension: SqlSchemaIR = {
+      tables: {},
+      extensions: ['vector'],
+    };
+
+    const result = planner.plan({
+      contract,
+      schema: schemaWithExtension,
+      policy: INIT_ADDITIVE_POLICY,
+      dependencyProviders,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+    expect(result.plan.operations.map((op) => op.id)).not.toContain('extension.pgvector');
   });
 
   it('builds additive plan for empty schema without database dependencies', () => {
@@ -269,8 +302,4 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       ],
     });
   });
-
-  // NOTE: Extension validation is no longer done by the planner.
-  // Extensions are now validated via component-owned database dependencies.
-  // Each component declares its dependencies and the verifier checks if they're installed.
 });
