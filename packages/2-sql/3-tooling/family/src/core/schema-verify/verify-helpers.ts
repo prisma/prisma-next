@@ -442,13 +442,15 @@ export function verifyDatabaseDependencies(
     if (depIssues.length > 0) {
       // Dependency is not satisfied
       issues.push(...depIssues);
+      const issuesMessage = depIssues.map((i) => i.message).join('; ');
+      const nodeMessage = issuesMessage ? `${dependency.id}: ${issuesMessage}` : dependency.id;
       nodes.push({
         status: 'fail',
         kind: 'databaseDependency',
         name: dependency.label,
         contractPath: depPath,
         code: 'dependency_missing',
-        message: depIssues.map((i) => i.message).join('; '),
+        message: nodeMessage,
         expected: undefined,
         actual: undefined,
         children: [],
