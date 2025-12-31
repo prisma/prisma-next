@@ -4,25 +4,34 @@ import { describe, expect, it } from 'vitest';
 import { assertFrameworkComponentsCompatible } from '../../src/utils/framework-components';
 
 describe('assertFrameworkComponentsCompatible', () => {
-  const createValidComponent = (
-    kind: 'target' | 'adapter' | 'extension' | 'driver',
-    familyId = 'sql',
-    targetId = 'postgres',
-  ): TargetBoundComponentDescriptor<'sql', 'postgres'> => ({
+  type TestComponent = {
+    readonly kind: 'target' | 'adapter' | 'extension' | 'driver';
+    readonly id: string;
+    readonly familyId?: string;
+    readonly targetId?: string;
+    readonly manifest?: { readonly id: string; readonly version: string };
+    readonly create?: () => unknown;
+  };
+
+  const createComponent = (
+    kind: TestComponent['kind'],
+    overrides: Partial<TestComponent> = {},
+  ): TestComponent => ({
     kind,
     id: `${kind}-id`,
-    familyId,
-    targetId,
+    familyId: 'sql',
+    targetId: 'postgres',
     manifest: { id: `${kind}-id`, version: '1.0.0' },
-    create: () => ({}) as never,
+    create: () => ({}),
+    ...overrides,
   });
 
   it('validates and returns components when all are compatible', () => {
     const components = [
-      createValidComponent('target'),
-      createValidComponent('adapter'),
-      createValidComponent('extension'),
-      createValidComponent('driver'),
+      createComponent('target'),
+      createComponent('adapter'),
+      createComponent('extension'),
+      createComponent('driver'),
     ];
 
     const result = assertFrameworkComponentsCompatible('sql', 'postgres', components);
@@ -71,7 +80,7 @@ describe('assertFrameworkComponentsCompatible', () => {
   });
 
   it('throws CliStructuredError when component has mismatched familyId', () => {
-    const components = [createValidComponent('target', 'document', 'postgres')];
+    const components = [createComponent('target', { familyId: 'document' })];
 
     expect(() => {
       assertFrameworkComponentsCompatible('sql', 'postgres', components);
@@ -87,7 +96,7 @@ describe('assertFrameworkComponentsCompatible', () => {
   });
 
   it('throws CliStructuredError when component has mismatched targetId', () => {
-    const components = [createValidComponent('adapter', 'sql', 'mysql')];
+    const components = [createComponent('adapter', { targetId: 'mysql' })];
 
     expect(() => {
       assertFrameworkComponentsCompatible('sql', 'postgres', components);
@@ -96,8 +105,8 @@ describe('assertFrameworkComponentsCompatible', () => {
 
   it('validates all components in array', () => {
     const components = [
-      createValidComponent('target'),
-      createValidComponent('adapter', 'document', 'postgres'), // Wrong familyId
+      createComponent('target'),
+      createComponent('adapter', { familyId: 'document' }), // Wrong familyId
     ];
 
     expect(() => {
@@ -111,10 +120,10 @@ describe('assertFrameworkComponentsCompatible', () => {
   });
 
   it('validates all component kinds', () => {
-    const target = createValidComponent('target');
-    const adapter = createValidComponent('adapter');
-    const extension = createValidComponent('extension');
-    const driver = createValidComponent('driver');
+    const target = createComponent('target');
+    const adapter = createComponent('adapter');
+    const extension = createComponent('extension');
+    const driver = createComponent('driver');
 
     expect(() => {
       assertFrameworkComponentsCompatible('sql', 'postgres', [target, adapter, extension, driver]);
