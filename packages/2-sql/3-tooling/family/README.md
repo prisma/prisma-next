@@ -15,7 +15,7 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Planner & Runner SPI**: Owns the `MigrationPlanner` / `MigrationRunner` interfaces plus the `SqlControlTargetDescriptor` helper so targets can expose planners and runners (e.g., Postgres init planner/runner)
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlTargetFamilyHook`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
-- **Component Database Dependencies**: Consumes database dependencies declared by framework components (target/adapter/extensions). Callers pass the active `frameworkComponents` bag into planning/execution/verification; SQL layers structurally narrow to components that declare `databaseDependencies` and use their pure verification hooks (no fuzzy matching against `contract.extensions`).
+- **Component Database Dependencies**: Consumes database dependencies declared by framework components (target/adapter/extensions). Callers pass the active `frameworkComponents` list into planning/execution/verification; SQL layers structurally narrow to components that declare `databaseDependencies` and use their pure verification hooks (no fuzzy matching against `contract.extensions`).
 
 ## Usage
 
@@ -44,6 +44,8 @@ const emitResult = await familyInstance.emitContract({ contractIR: rawContract }
 
 // Targets that implement SqlControlTargetDescriptor can build planners
 const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+// frameworkComponents should include the active target, adapter, and any extension descriptors so
+// planner/runner can resolve database dependencies declared by those components.
 const planResult = planner.plan({
   contract: sqlContract,
   schema,
