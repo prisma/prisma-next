@@ -164,7 +164,7 @@ describe('family instance sign', () => {
         });
         await executeStatement(client, write.insert);
       });
-    });
+    }, timeouts.spinUpPpgDev);
 
     it(
       'updates marker when hashes differ',

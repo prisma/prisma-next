@@ -349,47 +349,51 @@ describe('DML Integration Tests', () => {
       expect(selectResult.rows[0].email).toBe('delete2@example.com');
     });
 
-    it('deletes a row without returning clause', async () => {
-      const runtime = createTestRuntime(
-        fixtureContract,
-        {
-          connect: { client },
-          cursor: { disabled: true },
-        },
-        {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        },
-      );
-
-      const context = createTestContext(fixtureContract, adapter);
-      const tables = schema(context).tables;
-      const builder = sql({ context });
-      const userTable = tables['user'];
-      if (!userTable) {
-        throw new Error('user table not found');
-      }
-      const userColumns = userTable.columns;
-      const idCol = userColumns['id'];
-      if (!idCol) {
-        throw new Error('Required column not found');
-      }
-
-      const deletePlan = builder
-        .delete(userTable)
-        .where(idCol.eq(param('userId')))
-        .build({
-          params: {
-            userId: 1,
+    it(
+      'deletes a row without returning clause',
+      async () => {
+        const runtime = createTestRuntime(
+          fixtureContract,
+          {
+            connect: { client },
+            cursor: { disabled: true },
           },
-        });
+          {
+            verify: { mode: 'onFirstUse', requireMarker: true },
+          },
+        );
 
-      const rows = await executePlanAndCollect(runtime, deletePlan);
+        const context = createTestContext(fixtureContract, adapter);
+        const tables = schema(context).tables;
+        const builder = sql({ context });
+        const userTable = tables['user'];
+        if (!userTable) {
+          throw new Error('user table not found');
+        }
+        const userColumns = userTable.columns;
+        const idCol = userColumns['id'];
+        if (!idCol) {
+          throw new Error('Required column not found');
+        }
 
-      expect(rows.length).toBe(0);
+        const deletePlan = builder
+          .delete(userTable)
+          .where(idCol.eq(param('userId')))
+          .build({
+            params: {
+              userId: 1,
+            },
+          });
 
-      const selectResult = await client.query('SELECT * FROM "user"');
-      expect(selectResult.rows.length).toBe(1);
-      expect(selectResult.rows[0].email).toBe('delete2@example.com');
-    });
+        const rows = await executePlanAndCollect(runtime, deletePlan);
+
+        expect(rows.length).toBe(0);
+
+        const selectResult = await client.query('SELECT * FROM "user"');
+        expect(selectResult.rows.length).toBe(1);
+        expect(selectResult.rows[0].email).toBe('delete2@example.com');
+      },
+      timeouts.databaseOperation,
+    );
   });
 });
