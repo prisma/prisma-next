@@ -48,7 +48,9 @@ describe('sql-target-family-hook', () => {
     }).not.toThrow();
   });
 
-  it('throws error for type ID from unreferenced extension', () => {
+  it('validates type ID format regardless of namespace', () => {
+    // Namespace validation removed - codecs can use any namespace
+    // Only format validation remains (ns/name@version)
     const ir = createContractIR({
       storage: {
         tables: {
@@ -65,9 +67,10 @@ describe('sql-target-family-hook', () => {
       extensionIds: ['postgres'],
     };
 
+    // Should not throw - namespace validation removed
     expect(() => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
-    }).toThrow();
+    }).not.toThrow();
   });
 
   it('throws error for invalid type ID format', () => {
@@ -191,6 +194,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('validates types with extensionId that does not match namespace pattern', () => {
+    // Namespace validation removed - codecs can use any namespace
     const ir = createContractIR({
       storage: {
         tables: {
@@ -207,12 +211,10 @@ describe('sql-target-family-hook', () => {
       extensionIds: ['invalid-extension-id-without-slash'],
     };
 
-    // Should not throw because namespaceMatch will be null, so namespaceMatch?.[1] will be undefined
-    // and the namespace won't be added to referencedNamespaces, but the codecId 'pg/int4@1' will still
-    // be validated against ir.extensions (which is empty), so it will throw
+    // Should not throw - namespace validation removed
     expect(() => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
-    }).toThrow('is not referenced in contract.extensions');
+    }).not.toThrow();
   });
 
   it('validates types with undefined extensions', () => {
