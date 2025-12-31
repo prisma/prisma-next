@@ -48,7 +48,7 @@ export type {
  * @template TSignResult - The result type for sign()
  */
 export interface ControlFamilyInstance<
-  TFamilyId extends string = string,
+  TFamilyId extends string,
   TSchemaIR = unknown,
   TVerifyResult = unknown,
   TSchemaVerifyResult = unknown,
@@ -65,7 +65,7 @@ export interface ControlFamilyInstance<
    * Compares target, coreHash, and profileHash.
    */
   verify(options: {
-    readonly driver: ControlDriverInstance;
+    readonly driver: ControlDriverInstance<TFamilyId, string>;
     readonly contractIR: unknown;
     readonly expectedTargetId: string;
     readonly contractPath: string;
@@ -77,7 +77,7 @@ export interface ControlFamilyInstance<
    * Compares contract requirements against live database schema.
    */
   schemaVerify(options: {
-    readonly driver: ControlDriverInstance;
+    readonly driver: ControlDriverInstance<TFamilyId, string>;
     readonly contractIR: unknown;
     readonly strict: boolean;
     readonly contractPath: string;
@@ -90,7 +90,7 @@ export interface ControlFamilyInstance<
    * This operation is idempotent - if the marker already matches, no changes are made.
    */
   sign(options: {
-    readonly driver: ControlDriverInstance;
+    readonly driver: ControlDriverInstance<TFamilyId, string>;
     readonly contractIR: unknown;
     readonly contractPath: string;
     readonly configPath?: string;
@@ -113,7 +113,7 @@ export interface ControlFamilyInstance<
    *   The IR represents the complete schema snapshot at the time of introspection.
    */
   introspect(options: {
-    readonly driver: ControlDriverInstance;
+    readonly driver: ControlDriverInstance<TFamilyId, string>;
     readonly contractIR?: unknown;
   }): Promise<TSchemaIR>;
 
@@ -139,10 +139,8 @@ export interface ControlFamilyInstance<
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface ControlTargetInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> extends TargetInstance<TFamilyId, TTargetId> {}
+export interface ControlTargetInstance<TFamilyId extends string, TTargetId extends string>
+  extends TargetInstance<TFamilyId, TTargetId> {}
 
 /**
  * Control-plane adapter instance interface.
@@ -152,10 +150,8 @@ export interface ControlTargetInstance<
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface ControlAdapterInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> extends AdapterInstance<TFamilyId, TTargetId> {}
+export interface ControlAdapterInstance<TFamilyId extends string, TTargetId extends string>
+  extends AdapterInstance<TFamilyId, TTargetId> {}
 
 /**
  * Control-plane driver instance interface.
@@ -164,10 +160,8 @@ export interface ControlAdapterInstance<
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface ControlDriverInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> extends DriverInstance<TFamilyId, TTargetId> {
+export interface ControlDriverInstance<TFamilyId extends string, TTargetId extends string>
+  extends DriverInstance<TFamilyId, TTargetId> {
   query<Row = Record<string, unknown>>(
     sql: string,
     params?: readonly unknown[],
@@ -182,10 +176,8 @@ export interface ControlDriverInstance<
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface ControlExtensionInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> extends ExtensionInstance<TFamilyId, TTargetId> {}
+export interface ControlExtensionInstance<TFamilyId extends string, TTargetId extends string>
+  extends ExtensionInstance<TFamilyId, TTargetId> {}
 
 /**
  * Operation context for propagating metadata through control-plane operation call chains.
@@ -453,7 +445,7 @@ export interface EmitContractResult {
  *
  * @template TSchemaIR - The family-specific Schema IR type (e.g., `SqlSchemaIR` for SQL)
  */
-export interface IntrospectSchemaResult<TSchemaIR = unknown> {
+export interface IntrospectSchemaResult<TSchemaIR> {
   readonly ok: true;
   readonly summary: string;
   readonly target: {

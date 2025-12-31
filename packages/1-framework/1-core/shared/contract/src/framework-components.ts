@@ -264,7 +264,7 @@ export interface ExtensionDescriptor<TFamilyId extends string, TTargetId extends
  * instance.familyId // 'sql'
  * ```
  */
-export interface FamilyInstance<TFamilyId extends string = string> {
+export interface FamilyInstance<TFamilyId extends string> {
   /** The family identifier (e.g., 'sql', 'document') */
   readonly familyId: TFamilyId;
 }

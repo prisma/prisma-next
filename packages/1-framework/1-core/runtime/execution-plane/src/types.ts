@@ -21,8 +21,7 @@ import type {
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  */
-export interface RuntimeFamilyInstance<TFamilyId extends string = string>
-  extends FamilyInstance<TFamilyId> {
+export interface RuntimeFamilyInstance<TFamilyId extends string> extends FamilyInstance<TFamilyId> {
   // Placeholder for future runtime-plane-specific methods
 }
 
@@ -33,10 +32,8 @@ export interface RuntimeFamilyInstance<TFamilyId extends string = string>
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface RuntimeTargetInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> extends TargetInstance<TFamilyId, TTargetId> {}
+export interface RuntimeTargetInstance<TFamilyId extends string, TTargetId extends string>
+  extends TargetInstance<TFamilyId, TTargetId> {}
 
 /**
  * Runtime-plane adapter instance interface.
@@ -46,10 +43,8 @@ export interface RuntimeTargetInstance<
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface RuntimeAdapterInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> extends AdapterInstance<TFamilyId, TTargetId> {}
+export interface RuntimeAdapterInstance<TFamilyId extends string, TTargetId extends string>
+  extends AdapterInstance<TFamilyId, TTargetId> {}
 
 /**
  * Runtime-plane driver instance interface.
@@ -58,10 +53,8 @@ export interface RuntimeAdapterInstance<
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface RuntimeDriverInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> extends DriverInstance<TFamilyId, TTargetId> {}
+export interface RuntimeDriverInstance<TFamilyId extends string, TTargetId extends string>
+  extends DriverInstance<TFamilyId, TTargetId> {}
 
 /**
  * Runtime-plane extension instance interface.
@@ -70,10 +63,8 @@ export interface RuntimeDriverInstance<
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface RuntimeExtensionInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> extends ExtensionInstance<TFamilyId, TTargetId> {}
+export interface RuntimeExtensionInstance<TFamilyId extends string, TTargetId extends string>
+  extends ExtensionInstance<TFamilyId, TTargetId> {}
 
 // ============================================================================
 // Runtime*Descriptor Interfaces (ADR 152)

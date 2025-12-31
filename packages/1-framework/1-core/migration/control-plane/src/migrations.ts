@@ -152,7 +152,7 @@ export interface MigrationPlanner {
 export interface MigrationRunner {
   execute(options: {
     readonly plan: MigrationPlan;
-    readonly driver: ControlDriverInstance;
+    readonly driver: ControlDriverInstance<string, string>;
     readonly destinationContract: unknown;
     readonly policy: MigrationOperationPolicy;
     readonly callbacks?: {

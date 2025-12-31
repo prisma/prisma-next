@@ -185,7 +185,7 @@ export interface SqlMigrationRunnerExecuteCallbacks<TTargetDetails = Record<stri
  */
 export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string, never>> {
   readonly plan: SqlMigrationPlan<TTargetDetails>;
-  readonly driver: ControlDriverInstance;
+  readonly driver: ControlDriverInstance<'sql', string>;
   /**
    * Destination contract IR.
    * Must correspond to `plan.destination` and is used for schema verification and marker/ledger writes.

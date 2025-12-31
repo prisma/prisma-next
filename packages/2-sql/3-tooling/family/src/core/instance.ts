@@ -233,7 +233,7 @@ interface SqlFamilyInstanceState {
  * Options for schema verification.
  */
 export interface SchemaVerifyOptions {
-  readonly driver: ControlDriverInstance;
+  readonly driver: ControlDriverInstance<'sql', string>;
   readonly contractIR: unknown;
   readonly strict: boolean;
   readonly context?: OperationContext;
@@ -257,7 +257,7 @@ export interface SqlControlFamilyInstance
    * Compares target, coreHash, and profileHash.
    */
   verify(options: {
-    readonly driver: ControlDriverInstance;
+    readonly driver: ControlDriverInstance<'sql', string>;
     readonly contractIR: unknown;
     readonly expectedTargetId: string;
     readonly contractPath: string;
@@ -276,7 +276,7 @@ export interface SqlControlFamilyInstance
    * This operation is idempotent - if the marker already matches, no changes are made.
    */
   sign(options: {
-    readonly driver: ControlDriverInstance;
+    readonly driver: ControlDriverInstance<'sql', string>;
     readonly contractIR: unknown;
     readonly contractPath: string;
     readonly configPath?: string;
@@ -299,7 +299,7 @@ export interface SqlControlFamilyInstance
    *   The IR represents the complete schema snapshot at the time of introspection.
    */
   introspect(options: {
-    readonly driver: ControlDriverInstance;
+    readonly driver: ControlDriverInstance<'sql', string>;
     readonly contractIR?: unknown;
   }): Promise<SqlSchemaIR>;
 
@@ -434,7 +434,7 @@ export function createSqlFamilyInstance<
     },
 
     async verify(verifyOptions: {
-      readonly driver: ControlDriverInstance;
+      readonly driver: ControlDriverInstance<'sql', string>;
       readonly contractIR: unknown;
       readonly expectedTargetId: string;
       readonly contractPath: string;
@@ -603,7 +603,7 @@ export function createSqlFamilyInstance<
       });
     },
     async sign(options: {
-      readonly driver: ControlDriverInstance;
+      readonly driver: ControlDriverInstance<'sql', string>;
       readonly contractIR: unknown;
       readonly contractPath: string;
       readonly configPath?: string;
@@ -709,7 +709,7 @@ export function createSqlFamilyInstance<
       };
     },
     async introspect(options: {
-      readonly driver: ControlDriverInstance;
+      readonly driver: ControlDriverInstance<'sql', string>;
       readonly contractIR?: unknown;
     }): Promise<SqlSchemaIR> {
       const { driver, contractIR } = options;
