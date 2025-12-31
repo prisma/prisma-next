@@ -1,6 +1,8 @@
-import type { ExtensionDescriptor } from '@prisma-next/contract/framework-components';
 import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
-import type { ComponentDatabaseDependency } from '@prisma-next/family-sql/control';
+import type {
+  ComponentDatabaseDependency,
+  SqlControlExtensionDescriptor,
+} from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -57,11 +59,7 @@ function createPgvectorDependency(): ComponentDatabaseDependency<unknown> {
   };
 }
 
-function createFrameworkComponent(): ExtensionDescriptor<'sql', 'postgres'> & {
-  readonly databaseDependencies: {
-    readonly init: readonly ComponentDatabaseDependency<unknown>[];
-  };
-} {
+function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
   const manifest: ExtensionPackManifest = {
     id: 'pgvector',
     version: '0.0.0',
@@ -75,6 +73,10 @@ function createFrameworkComponent(): ExtensionDescriptor<'sql', 'postgres'> & {
     databaseDependencies: {
       init: [createPgvectorDependency()],
     },
+    create: () => ({
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+    }),
   };
 }
 
