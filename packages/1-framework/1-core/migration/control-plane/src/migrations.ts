@@ -8,6 +8,8 @@
  * Family-specific types (e.g., SqlMigrationPlan) extend these base types
  * with additional fields for execution (precheck SQL, execute SQL, etc.).
  */
+
+import type { ComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { Result } from '@prisma-next/utils/result';
 import type { ControlDriverInstance, ControlFamilyInstance } from './types';
 
@@ -142,6 +144,11 @@ export interface MigrationPlanner {
     readonly contract: unknown;
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
+    /**
+     * Active framework components participating in this composition.
+     * Families/targets can interpret this bag to derive family-specific metadata.
+     */
+    readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
   }): MigrationPlannerResult;
 }
 
@@ -159,6 +166,11 @@ export interface MigrationRunner {
       onOperationStart?(op: MigrationPlanOperation): void;
       onOperationComplete?(op: MigrationPlanOperation): void;
     };
+    /**
+     * Active framework components participating in this composition.
+     * Families/targets can interpret this bag to derive family-specific metadata.
+     */
+    readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
   }): Promise<MigrationRunnerResult>;
 }
 

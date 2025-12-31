@@ -4,6 +4,8 @@
  * These types extend the canonical migration types from the framework control plane
  * with SQL-specific fields for execution (precheck SQL, execute SQL, etc.).
  */
+
+import type { ComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   ControlDriverInstance,
   ControlExtensionDescriptor,
@@ -230,11 +232,10 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   /**
-   * Descriptors/components that may expose database dependency metadata.
-   * Planner extracts dependencies from these providers and verifies each one
-   * against the schema before adding install operations.
+   * Active framework components participating in this composition.
+   * SQL targets can interpret this bag to derive database dependencies.
    */
-  readonly dependencyProviders?: ReadonlyArray<DatabaseDependencyProvider>;
+  readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
 }
 
 /**
@@ -278,10 +279,10 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string
   readonly callbacks?: SqlMigrationRunnerExecuteCallbacks<TTargetDetails>;
   readonly context?: OperationContext;
   /**
-   * Components that expose databaseDependencies metadata.
-   * Runner uses these providers to verify dependencies after execution.
+   * Active framework components participating in this composition.
+   * SQL targets can interpret this bag to derive database dependencies.
    */
-  readonly dependencyProviders?: ReadonlyArray<DatabaseDependencyProvider>;
+  readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
 }
 
 /**

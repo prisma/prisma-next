@@ -1,6 +1,7 @@
 import type {
   AdapterDescriptor,
   AdapterInstance,
+  ComponentDescriptor,
   DriverDescriptor,
   DriverInstance,
   ExtensionDescriptor,
@@ -82,6 +83,7 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
     readonly strict: boolean;
     readonly contractPath: string;
     readonly configPath?: string;
+    readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
   }): Promise<VerifyDatabaseSchemaResult>;
 
   /**
