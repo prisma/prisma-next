@@ -19,6 +19,7 @@ Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI c
 - **Multi-Plane Support**: Provides both migration-plane (control) and runtime-plane entry points for the Postgres target
 - **Planner Factory**: Implements `createPlanner()` to create Postgres-specific migration planners
 - **Runner Factory**: Implements `createRunner()` to create Postgres-specific migration runners
+- **Database Dependency Consumption**: The planner consumes database dependencies from extension descriptors (passed via `databaseDependencies` option) and emits their install operations. No hardcoded extension mappings—all database dependencies are component-owned.
 
 This package spans multiple planes:
 - **Migration plane** (`src/exports/control.ts`): Control plane entry point that exports `SqlControlTargetDescriptor` for config files
@@ -91,7 +92,7 @@ Both the planner and runner return structured results instead of throwing:
 
 **Planner** returns `PlannerResult` with either:
 - `kind: 'success'` with a `MigrationPlan`
-- `kind: 'failure'` with a list of `PlannerConflict` objects (e.g., `unsupportedExtension`, `unsupportedOperation`)
+- `kind: 'failure'` with a list of `PlannerConflict` objects (e.g., `unsupportedOperation`, `policyViolation`)
 
 **Runner** returns `MigrationRunnerResult` (`Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>`) with either:
 - `ok: true` with operation counts

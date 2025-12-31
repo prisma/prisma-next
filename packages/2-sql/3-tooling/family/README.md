@@ -15,6 +15,7 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Planner & Runner SPI**: Owns the `MigrationPlanner` / `MigrationRunner` interfaces plus the `SqlControlTargetDescriptor` helper so targets can expose planners and runners (e.g., Postgres init planner/runner)
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlTargetFamilyHook`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
+- **Component Database Dependencies**: Collects database dependencies from `SqlControlExtensionDescriptor`s and passes them to the planner/verifier. Extensions declare their database requirements (e.g., Postgres extensions) which the planner emits as migration operations and the verifier checks against the schema IR.
 
 ## Usage
 
