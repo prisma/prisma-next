@@ -38,17 +38,6 @@ function validateCoreStructure(ir: ContractIR): void {
   }
 }
 
-function validateExtensions(_ir: ContractIR, _extensionIds: ReadonlyArray<string>): void {
-  // Note: extensionIds includes adapter, target, and extensions.
-  // Only actual extensions (kind: 'extension') need to appear in contract.extensions.
-  // Adapters and targets provide codecs/operations but are not in contract.extensions.
-  // We can't distinguish adapter/target from extensions here without additional context,
-  // so we skip validation entirely. The actual validation that matters is:
-  // 1. TypeScript prevents using types you haven't imported
-  // 2. Runtime validates that codecs/operations are actually provided
-  // 3. Schema verification validates that framework components match the contract
-}
-
 export async function emit(
   ir: ContractIR,
   options: EmitOptions,
@@ -67,10 +56,6 @@ export async function emit(
   targetFamily.validateTypes(ir, ctx);
 
   targetFamily.validateStructure(ir);
-
-  if (extensionIds) {
-    validateExtensions(ir, extensionIds);
-  }
 
   const contractJson = {
     schemaVersion: ir.schemaVersion,
