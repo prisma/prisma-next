@@ -1,4 +1,3 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import { CliStructuredError } from '@prisma-next/core-control-plane/errors';
 import { describe, expect, it } from 'vitest';
 import { assertFrameworkComponentsCompatible } from '../../src/utils/framework-components';
