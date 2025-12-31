@@ -10,7 +10,13 @@ import type {
   PrimaryKey,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import type { SqlForeignKeyIR, SqlIndexIR, SqlUniqueIR } from '@prisma-next/sql-schema-ir/types';
+import type {
+  SqlForeignKeyIR,
+  SqlIndexIR,
+  SqlSchemaIR,
+  SqlUniqueIR,
+} from '@prisma-next/sql-schema-ir/types';
+import type { ComponentDatabaseDependency } from '../migrations/types';
 
 /**
  * Compares two arrays of strings for equality (order-sensitive).
@@ -416,6 +422,60 @@ export function verifyIndexes(
 }
 
 /**
+ * Verifies database dependencies are installed using component-owned verification hooks.
+ * Each dependency provides a pure verifyDatabaseDependenciesInstalled function that checks
+ * whether the dependency is satisfied based on the in-memory schema IR (no DB I/O).
+ *
+ * Returns verification nodes for the tree.
+ */
+export function verifyDatabaseDependencies(
+  dependencies: ReadonlyArray<ComponentDatabaseDependency<unknown>>,
+  schema: SqlSchemaIR,
+  issues: SchemaIssue[],
+): SchemaVerificationNode[] {
+  const nodes: SchemaVerificationNode[] = [];
+
+  for (const dependency of dependencies) {
+    const depIssues = dependency.verifyDatabaseDependenciesInstalled(schema);
+    const depPath = `dependencies.${dependency.id}`;
+
+    if (depIssues.length > 0) {
+      // Dependency is not satisfied
+      issues.push(...depIssues);
+      nodes.push({
+        status: 'fail',
+        kind: 'extension',
+        name: dependency.label,
+        contractPath: depPath,
+        code: 'dependency_missing',
+        message: depIssues.map((i) => i.message).join('; '),
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
+    } else {
+      // Dependency is satisfied
+      nodes.push({
+        status: 'pass',
+        kind: 'extension',
+        name: dependency.label,
+        contractPath: depPath,
+        code: '',
+        message: '',
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
+    }
+  }
+
+  return nodes;
+}
+
+/**
+ * @deprecated Use verifyDatabaseDependencies with component-owned verification hooks instead.
+ * This function uses fuzzy matching for extension names which is fragile.
+ *
  * Verifies required extensions exist in schema.
  * Extracts extension names from contract.extensions (keys) and compares with schemaIR.extensions.
  * Filters out the target name (e.g., 'postgres') as it's not an extension.

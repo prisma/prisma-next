@@ -15,8 +15,10 @@ import type {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { ComponentDatabaseDependency } from '../migrations/types';
 import {
   computeCounts,
+  verifyDatabaseDependencies,
   verifyExtensions,
   verifyForeignKeys,
   verifyIndexes,
@@ -38,6 +40,8 @@ export interface VerifySqlSchemaOptions {
   readonly context?: OperationContext;
   /** Type metadata registry for codec consistency warnings */
   readonly typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  /** Optional database dependencies collected from extension descriptors */
+  readonly databaseDependencies?: ReadonlyArray<ComponentDatabaseDependency<unknown>>;
 }
 
 /**
@@ -443,15 +447,24 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     }
   }
 
-  // Compare extensions
-  const extensionStatuses = verifyExtensions(
-    contract.extensions,
-    schema.extensions,
-    contractTarget,
-    issues,
-    strict,
-  );
-  rootChildren.push(...extensionStatuses);
+  // Compare extensions/dependencies
+  // If databaseDependencies are provided, use component-owned verification hooks
+  // Otherwise, fall back to the deprecated fuzzy matching approach
+  const databaseDependencies = options.databaseDependencies ?? [];
+  if (databaseDependencies.length > 0) {
+    const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
+    rootChildren.push(...dependencyStatuses);
+  } else {
+    // Fall back to deprecated verifyExtensions for backwards compatibility
+    const extensionStatuses = verifyExtensions(
+      contract.extensions,
+      schema.extensions,
+      contractTarget,
+      issues,
+      strict,
+    );
+    rootChildren.push(...extensionStatuses);
+  }
 
   // Build root node
   const rootStatus = rootChildren.some((c) => c.status === 'fail')

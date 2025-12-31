@@ -632,6 +632,7 @@ export function createSqlFamilyInstance<
         strict,
         ...ifDefined('context', context),
         typeMetadataRegistry,
+        databaseDependencies,
       });
     },
     async sign(options: {
