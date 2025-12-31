@@ -10,7 +10,7 @@ import { createPostgresMigrationPlanner } from '../../src/core/migrations/planne
 
 const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
   id: 'postgres.extension.pgvector',
-  label: 'Enable extension "pgvector"',
+  label: 'Enable extension "vector"',
   install: [
     {
       id: 'extension.pgvector',
@@ -152,7 +152,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       'foreignKey.post.post_userId_fkey',
     ]);
     expect(operations[0]).toMatchObject({
-      label: 'Enable extension "pgvector"',
+      label: 'Enable extension "vector"',
       execute: [{ sql: 'CREATE EXTENSION IF NOT EXISTS vector' }],
     });
     expect(operations.find((op) => op.id === 'table.user')).toMatchObject({
