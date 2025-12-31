@@ -1,19 +1,8 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { ContractIR } from './ir';
 
-// ============================================================================
-// Family Instance Base Interface
-// ============================================================================
-
-/**
- * Base interface for family instances.
- * Extended by plane-specific interfaces (ControlFamilyInstance, RuntimeFamilyInstance).
- *
- * @template TFamilyId - The family ID (e.g., 'sql', 'document')
- */
-export interface FamilyInstance<TFamilyId extends string = string> {
-  readonly familyId: TFamilyId;
-}
+// Transitional re-export: FamilyInstance now lives in framework-components
+export type { FamilyInstance } from './framework-components';
 
 // ============================================================================
 // Shared header and neutral types

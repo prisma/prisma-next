@@ -237,3 +237,134 @@ export interface ExtensionDescriptor<TFamilyId extends string, TTargetId extends
   /** The target this extension is designed for */
   readonly targetId: TTargetId;
 }
+
+// ============================================================================
+// Framework Component Instance Base Types
+// ============================================================================
+//
+// These are minimal, identity-only interfaces for component instances.
+// They carry the component's identity (familyId, targetId) without any
+// behavior methods. Plane-specific interfaces (ControlFamilyInstance,
+// RuntimeFamilyInstance, etc.) extend these bases and add domain actions.
+//
+// ============================================================================
+
+/**
+ * Base interface for family instances.
+ *
+ * A family instance is created by a family descriptor's `create()` method.
+ * This base interface carries only the identity; plane-specific interfaces
+ * add domain actions (e.g., `emitContract`, `verify` on ControlFamilyInstance).
+ *
+ * @template TFamilyId - Literal type for the family identifier (e.g., 'sql', 'document')
+ *
+ * @example
+ * ```ts
+ * const instance = sql.create({ target, adapter, driver, extensions });
+ * instance.familyId // 'sql'
+ * ```
+ */
+export interface FamilyInstance<TFamilyId extends string = string> {
+  /** The family identifier (e.g., 'sql', 'document') */
+  readonly familyId: TFamilyId;
+}
+
+/**
+ * Base interface for target instances.
+ *
+ * A target instance is created by a target descriptor's `create()` method.
+ * This base interface carries only the identity; plane-specific interfaces
+ * add target-specific behavior.
+ *
+ * @template TFamilyId - Literal type for the family identifier
+ * @template TTargetId - Literal type for the target identifier (e.g., 'postgres', 'mysql')
+ *
+ * @example
+ * ```ts
+ * const instance = postgres.create();
+ * instance.familyId // 'sql'
+ * instance.targetId // 'postgres'
+ * ```
+ */
+export interface TargetInstance<TFamilyId extends string, TTargetId extends string> {
+  /** The family this target belongs to */
+  readonly familyId: TFamilyId;
+
+  /** The target identifier (e.g., 'postgres', 'mysql', 'mongodb') */
+  readonly targetId: TTargetId;
+}
+
+/**
+ * Base interface for adapter instances.
+ *
+ * An adapter instance is created by an adapter descriptor's `create()` method.
+ * This base interface carries only the identity; plane-specific interfaces
+ * add adapter-specific behavior (e.g., codec registration, query lowering).
+ *
+ * @template TFamilyId - Literal type for the family identifier
+ * @template TTargetId - Literal type for the target identifier
+ *
+ * @example
+ * ```ts
+ * const instance = postgresAdapter.create();
+ * instance.familyId // 'sql'
+ * instance.targetId // 'postgres'
+ * ```
+ */
+export interface AdapterInstance<TFamilyId extends string, TTargetId extends string> {
+  /** The family this adapter belongs to */
+  readonly familyId: TFamilyId;
+
+  /** The target this adapter is designed for */
+  readonly targetId: TTargetId;
+}
+
+/**
+ * Base interface for driver instances.
+ *
+ * A driver instance is created by a driver descriptor's `create()` method.
+ * This base interface carries only the identity; plane-specific interfaces
+ * add driver-specific behavior (e.g., `query`, `close` on ControlDriverInstance).
+ *
+ * @template TFamilyId - Literal type for the family identifier
+ * @template TTargetId - Literal type for the target identifier
+ *
+ * @example
+ * ```ts
+ * const instance = postgresDriver.create({ databaseUrl });
+ * instance.familyId // 'sql'
+ * instance.targetId // 'postgres'
+ * ```
+ */
+export interface DriverInstance<TFamilyId extends string, TTargetId extends string> {
+  /** The family this driver belongs to */
+  readonly familyId: TFamilyId;
+
+  /** The target this driver connects to */
+  readonly targetId: TTargetId;
+}
+
+/**
+ * Base interface for extension instances.
+ *
+ * An extension instance is created by an extension descriptor's `create()` method.
+ * This base interface carries only the identity; plane-specific interfaces
+ * add extension-specific behavior.
+ *
+ * @template TFamilyId - Literal type for the family identifier
+ * @template TTargetId - Literal type for the target identifier
+ *
+ * @example
+ * ```ts
+ * const instance = pgvector.create();
+ * instance.familyId // 'sql'
+ * instance.targetId // 'postgres'
+ * ```
+ */
+export interface ExtensionInstance<TFamilyId extends string, TTargetId extends string> {
+  /** The family this extension belongs to */
+  readonly familyId: TFamilyId;
+
+  /** The target this extension is designed for */
+  readonly targetId: TTargetId;
+}
