@@ -41,6 +41,6 @@
     "tsx": "^4.19.2",
     "typescript": "^5.9.3",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^1.6.0"
+    "vitest": "catalog:"
   }
 }

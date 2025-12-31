@@ -13,7 +13,7 @@
     "clean": "node ../../../scripts/clean.mjs"
   },
   "devDependencies": {
-    "vitest": "^2.1.1",
+    "vitest": "catalog:",
     "typescript": "^5.9.3",
     "vite-tsconfig-paths": "^5.1.4",
     "@types/node": "^20.11.30",
