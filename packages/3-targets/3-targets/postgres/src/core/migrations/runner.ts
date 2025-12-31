@@ -1,5 +1,7 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
+  ComponentDatabaseDependency,
+  DatabaseDependencyProvider,
   MigrationOperationPolicy,
   SqlControlFamilyInstance,
   SqlMigrationPlanContractInfo,
@@ -27,6 +29,28 @@ import {
 
 interface RunnerConfig {
   readonly defaultSchema: string;
+}
+
+function collectRunnerDependencies(
+  options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
+  family: SqlControlFamilyInstance,
+): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
+  if (options.databaseDependencies && options.databaseDependencies.length > 0) {
+    return options.databaseDependencies;
+  }
+  const providers: ReadonlyArray<DatabaseDependencyProvider> =
+    options.dependencyProviders ?? family.dependencyProviders ?? [];
+  if (providers.length === 0) {
+    return [];
+  }
+  const dependencies: ComponentDatabaseDependency<unknown>[] = [];
+  for (const provider of providers) {
+    const initDeps = provider.databaseDependencies?.init;
+    if (initDeps && initDeps.length > 0) {
+      dependencies.push(...initDeps);
+    }
+  }
+  return dependencies;
 }
 
 interface ApplyPlanSuccessValue {
@@ -132,6 +156,8 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         contractIR: options.destinationContract,
       });
 
+      const databaseDependencies = collectRunnerDependencies(options, this.family);
+
       // Step 2: Pure verification (no DB I/O)
       const schemaVerifyResult = verifySqlSchema({
         contract: options.destinationContract,
@@ -139,6 +165,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         strict: options.strictVerification ?? true,
         context: options.context ?? {},
         typeMetadataRegistry: this.family.typeMetadataRegistry,
+        databaseDependencies,
       });
       if (!schemaVerifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
