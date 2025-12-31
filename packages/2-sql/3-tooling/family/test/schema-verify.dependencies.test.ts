@@ -1,5 +1,5 @@
-import type { ComponentDatabaseDependency } from '@prisma-next/family-sql/control';
 import { describe, expect, it } from 'vitest';
+import type { ComponentDatabaseDependency } from '../src/core/migrations/types';
 import { verifyDatabaseDependencies } from '../src/core/schema-verify/verify-helpers';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
