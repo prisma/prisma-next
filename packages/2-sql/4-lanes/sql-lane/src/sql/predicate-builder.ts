@@ -33,8 +33,8 @@ export function buildWhereExpr(
   let rightExpr: Expression | ParamRef;
   let paramName: string;
 
-  // Validate where.left is a valid Expression (col, operation, literal, param)
-  const validExpressionKinds = ['col', 'operation', 'literal', 'param'];
+  // Validate where.left is a valid Expression (col or operation)
+  const validExpressionKinds = ['col', 'operation'];
   if (
     !where.left ||
     typeof where.left !== 'object' ||
