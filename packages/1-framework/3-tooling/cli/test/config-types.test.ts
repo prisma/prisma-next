@@ -75,6 +75,7 @@ describe('defineConfig', () => {
       id: 'postgres',
       manifest: { id: 'postgres', version: '1.0.0' },
       create: async () => ({
+        familyId: 'sql',
         targetId: 'postgres',
         query: async () => ({ rows: [] }),
         close: async () => {},

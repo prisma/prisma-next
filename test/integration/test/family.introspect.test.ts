@@ -212,6 +212,8 @@ describe('family instance introspect', () => {
         });
 
         const mockDriver = {
+          familyId: 'sql',
+          targetId: 'postgres',
           query: async () => ({ rows: [] }),
           close: async () => {},
         };
