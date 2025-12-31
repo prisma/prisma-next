@@ -69,7 +69,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
 
     // Build extension operations from component-owned database dependencies
     operations.push(
-      ...this.buildDatabaseDependencyOperations(options.databaseDependencies ?? [], schemaName),
+      ...this.buildDatabaseDependencyOperations(options),
       ...this.buildTableOperations(options.contract.storage.tables, schemaName),
       ...this.buildUniqueOperations(options.contract.storage.tables, schemaName),
       ...this.buildIndexOperations(options.contract.storage.tables, schemaName),
@@ -107,20 +107,54 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
    * These operations install database-side persistence structures declared by components.
    */
   private buildDatabaseDependencyOperations(
-    dependencies: ReadonlyArray<ComponentDatabaseDependency<unknown>>,
-    _schema: string,
+    options: SqlMigrationPlannerPlanOptions,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+    const dependencies = this.collectDependencies(options);
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    const seenDependencyIds = new Set<string>();
+    const seenOperationIds = new Set<string>();
 
     for (const dependency of dependencies) {
-      // Each dependency's install array contains SqlMigrationPlanOperation objects
-      // Add target details for Postgres-specific metadata
+      if (seenDependencyIds.has(dependency.id)) {
+        continue;
+      }
+      seenDependencyIds.add(dependency.id);
+
+      const issues = dependency.verifyDatabaseDependenciesInstalled(options.schema);
+      if (issues.length === 0) {
+        continue;
+      }
+
       for (const installOp of dependency.install) {
+        if (seenOperationIds.has(installOp.id)) {
+          continue;
+        }
+        seenOperationIds.add(installOp.id);
         operations.push(installOp as SqlMigrationPlanOperation<PostgresPlanTargetDetails>);
       }
     }
 
     return operations;
+  }
+  private collectDependencies(
+    options: SqlMigrationPlannerPlanOptions,
+  ): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
+    const explicit = options.databaseDependencies;
+    if (explicit && explicit.length > 0) {
+      return sortDependencies(explicit);
+    }
+    const providers = options.dependencyProviders ?? [];
+    if (providers.length === 0) {
+      return [];
+    }
+    const deps: ComponentDatabaseDependency<unknown>[] = [];
+    for (const provider of providers) {
+      const initDeps = provider.databaseDependencies?.init;
+      if (initDeps && initDeps.length > 0) {
+        deps.push(...initDeps);
+      }
+    }
+    return sortDependencies(deps);
   }
 
   private buildTableOperations(
@@ -308,6 +342,15 @@ REFERENCES ${qualifyTableName(schema, foreignKey.references.table)} (${foreignKe
       ...(table ? { table } : {}),
     };
   }
+}
+
+function sortDependencies(
+  dependencies: ReadonlyArray<ComponentDatabaseDependency<unknown>>,
+): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
+  if (dependencies.length <= 1) {
+    return dependencies;
+  }
+  return [...dependencies].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): string {
