@@ -216,7 +216,9 @@ describe('verifySqlSchema with databaseDependencies', () => {
     );
   });
 
-  it('does not interpret contract.extensions without dependency declarations', () => {
+  it('does not infer dependencies from contract.extensions (ADR 154)', () => {
+    // Per ADR 154, we do NOT interpret contract.extensions as database prerequisites.
+    // Dependencies are only collected from frameworkComponents.
     const contract = createTestContract(
       {
         user: createContractTable({
@@ -232,17 +234,20 @@ describe('verifySqlSchema with databaseDependencies', () => {
           id: { nativeType: 'int4', nullable: false },
         }),
       },
-      [], // No extensions installed (contract.extensions is ignored without dependencies)
+      [], // No extensions installed
     );
 
+    // Even though contract.extensions contains pgvector, we don't verify it
+    // because frameworkComponents is empty (no pgvector extension descriptor provided)
     const result = verifySqlSchema({
       contract,
       schema,
       strict: false,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
-      frameworkComponents: [],
+      frameworkComponents: [], // No extensions provided - ADR 154: do not infer from contract
     });
 
+    // Verification should pass because we don't infer dependencies from contract.extensions
     expect(result.ok).toBe(true);
   });
 });
