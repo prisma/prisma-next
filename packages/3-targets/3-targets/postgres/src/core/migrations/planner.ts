@@ -41,7 +41,7 @@ type PlannerDatabaseDependency = {
   readonly id: string;
   readonly label: string;
   readonly install: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
-  readonly verifyDatabaseDependenciesInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
+  readonly verifyDatabaseDependencyInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
 };
 
 export interface PostgresPlanTargetDetails {
