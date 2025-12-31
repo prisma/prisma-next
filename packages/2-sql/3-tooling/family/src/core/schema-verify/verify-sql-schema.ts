@@ -538,46 +538,41 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   };
 }
 
-function collectDependenciesFromFrameworkComponents(
-  components: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
-): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
-  const dependencies: ComponentDatabaseDependency<unknown>[] = [];
-  for (const component of components) {
-    const initDeps = getSqlDependencyInit(component);
-    if (!initDeps || initDeps.length === 0) continue;
-    dependencies.push(...initDeps);
+/**
+ * Type predicate to check if a component has database dependencies with an init array.
+ * The familyId check is redundant since TargetBoundComponentDescriptor<'sql', T> already
+ * guarantees familyId is 'sql' at the type level, so we don't need runtime checks for it.
+ */
+function hasDatabaseDependenciesInit<T extends string>(
+  component: TargetBoundComponentDescriptor<'sql', T>,
+): component is TargetBoundComponentDescriptor<'sql', T> & {
+  readonly databaseDependencies: {
+    readonly init: readonly ComponentDatabaseDependency<T>[];
+  };
+} {
+  if (!('databaseDependencies' in component)) {
+    return false;
   }
-  return dependencies;
+  const dbDeps = (component as Record<string, unknown>)['databaseDependencies'];
+  if (dbDeps === undefined || dbDeps === null || typeof dbDeps !== 'object') {
+    return false;
+  }
+  const depsRecord = dbDeps as Record<string, unknown>;
+  const init = depsRecord['init'];
+  if (init === undefined || !Array.isArray(init)) {
+    return false;
+  }
+  return true;
 }
 
-function getSqlDependencyInit(
-  component: TargetBoundComponentDescriptor<'sql', string>,
-): readonly ComponentDatabaseDependency<unknown>[] | undefined {
-  const record = component as unknown as Record<string, unknown>;
-
-  if (Object.hasOwn(record, 'familyId') && record['familyId'] !== 'sql') {
-    return undefined;
+function collectDependenciesFromFrameworkComponents<T extends string>(
+  components: ReadonlyArray<TargetBoundComponentDescriptor<'sql', T>>,
+): ReadonlyArray<ComponentDatabaseDependency<T>> {
+  const dependencies: ComponentDatabaseDependency<T>[] = [];
+  for (const component of components) {
+    if (hasDatabaseDependenciesInit(component)) {
+      dependencies.push(...component.databaseDependencies.init);
+    }
   }
-
-  if (!Object.hasOwn(record, 'databaseDependencies')) {
-    return undefined;
-  }
-
-  const dbDeps = record['databaseDependencies'];
-  if (dbDeps === undefined) {
-    return undefined;
-  }
-  if (typeof dbDeps !== 'object' || dbDeps === null) {
-    return undefined;
-  }
-
-  const depsRecord = dbDeps as Record<string, unknown>;
-  if (!Object.hasOwn(depsRecord, 'init')) {
-    return undefined;
-  }
-  const init = depsRecord['init'];
-  if (!Array.isArray(init)) {
-    return undefined;
-  }
-  return init as readonly ComponentDatabaseDependency<unknown>[];
+  return dependencies;
 }
