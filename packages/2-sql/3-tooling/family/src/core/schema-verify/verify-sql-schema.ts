@@ -454,6 +454,16 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
   rootChildren.push(...dependencyStatuses);
 
+  // Verify extensions declared in contract
+  const contractExtensions = contract.extensions ?? {};
+  const extensionStatuses = verifyContractExtensions(
+    contractExtensions,
+    options.frameworkComponents,
+    schema,
+    issues,
+  );
+  rootChildren.push(...extensionStatuses);
+
   // Build root node
   const rootStatus = rootChildren.some((c) => c.status === 'fail')
     ? 'fail'
@@ -526,6 +536,75 @@ function collectDependenciesFromFrameworkComponents(
     dependencies.push(...initDeps);
   }
   return dependencies;
+}
+
+/**
+ * Verifies extensions declared in the contract are present in the database.
+ * For each extension namespace in the contract, finds the corresponding extension
+ * descriptor in framework components and verifies its database dependencies.
+ *
+ * Returns verification nodes for the tree.
+ */
+function verifyContractExtensions(
+  contractExtensions: Record<string, unknown>,
+  frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>,
+  schema: SqlSchemaIR,
+  issues: SchemaIssue[],
+): SchemaVerificationNode[] {
+  const nodes: SchemaVerificationNode[] = [];
+
+  for (const [extensionNamespace, _extensionConfig] of Object.entries(contractExtensions)) {
+    // Find the corresponding extension descriptor in framework components
+    const extensionDescriptor = frameworkComponents.find(
+      (component) => component.kind === 'extension' && component.id === extensionNamespace,
+    );
+
+    if (!extensionDescriptor) {
+      // Extension declared in contract but not found in framework components
+      // We can't verify it without the descriptor, so skip it
+      // (This might be a configuration issue, but we'll let it pass for now)
+      continue;
+    }
+
+    // Get database dependencies from the extension descriptor
+    const initDeps = getSqlDependencyInit(extensionDescriptor);
+    if (!initDeps || initDeps.length === 0) {
+      // Extension has no database dependencies, so nothing to verify
+      continue;
+    }
+
+    // Verify database dependencies for this extension
+    const extensionPath = `extensions.${extensionNamespace}`;
+    const depStatuses = verifyDatabaseDependencies(initDeps, schema, issues);
+
+    // Wrap dependency nodes under an extension node
+    if (depStatuses.length > 0) {
+      const extensionStatus = depStatuses.some((d) => d.status === 'fail')
+        ? 'fail'
+        : depStatuses.some((d) => d.status === 'warn')
+          ? 'warn'
+          : 'pass';
+      nodes.push({
+        status: extensionStatus,
+        kind: 'extension',
+        name: `extension ${extensionNamespace}`,
+        contractPath: extensionPath,
+        code: extensionStatus === 'fail' ? 'extension_missing' : '',
+        message:
+          extensionStatus === 'fail'
+            ? depStatuses
+                .filter((d) => d.status === 'fail')
+                .map((d) => d.message)
+                .join('; ')
+            : '',
+        expected: undefined,
+        actual: undefined,
+        children: depStatuses,
+      });
+    }
+  }
+
+  return nodes;
 }
 
 function getSqlDependencyInit(
