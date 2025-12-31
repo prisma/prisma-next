@@ -193,8 +193,7 @@ describe('sql-target-family-hook', () => {
     }).not.toThrow();
   });
 
-  it('validates types with extensionId that does not match namespace pattern', () => {
-    // Namespace validation removed - codecs can use any namespace
+  it('validates types regardless of extensionIds', () => {
     const ir = createContractIR({
       storage: {
         tables: {
@@ -211,7 +210,7 @@ describe('sql-target-family-hook', () => {
       extensionIds: ['invalid-extension-id-without-slash'],
     };
 
-    // Should not throw - namespace validation removed
+    // Should not throw - extensionIds are not validated here
     expect(() => {
       sqlTargetFamilyHook.validateTypes(ir, ctx);
     }).not.toThrow();
