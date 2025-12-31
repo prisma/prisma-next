@@ -216,7 +216,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
     );
   });
 
-  it('falls back to deprecated verifyExtensions when no databaseDependencies', () => {
+  it('does not interpret contract.extensions without dependency declarations', () => {
     const contract = createTestContract(
       {
         user: createContractTable({
@@ -232,7 +232,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
           id: { nativeType: 'int4', nullable: false },
         }),
       },
-      ['vector'], // vector extension installed (matches pgvector via fuzzy matching)
+      [], // No extensions installed (contract.extensions is ignored without dependencies)
     );
 
     const result = verifySqlSchema({
@@ -240,7 +240,6 @@ describe('verifySqlSchema with databaseDependencies', () => {
       schema,
       strict: false,
       typeMetadataRegistry: emptyTypeMetadataRegistry,
-      // No databaseDependencies - falls back to deprecated verifyExtensions
       frameworkComponents: [],
     });
 

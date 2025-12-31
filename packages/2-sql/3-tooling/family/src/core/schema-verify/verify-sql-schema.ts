@@ -20,7 +20,6 @@ import type { ComponentDatabaseDependency } from '../migrations/types';
 import {
   computeCounts,
   verifyDatabaseDependencies,
-  verifyExtensions,
   verifyForeignKeys,
   verifyIndexes,
   verifyPrimaryKey,
@@ -448,26 +447,12 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     }
   }
 
-  // Compare extensions/dependencies
-  // If dependency providers are provided, use component-owned verification hooks
-  // Otherwise, fall back to the deprecated fuzzy matching approach
+  // Compare component-owned database dependencies (pure, deterministic)
   const databaseDependencies = collectDependenciesFromFrameworkComponents(
     options.frameworkComponents,
   );
-  if (databaseDependencies.length > 0) {
-    const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
-    rootChildren.push(...dependencyStatuses);
-  } else {
-    // Fall back to deprecated verifyExtensions for backwards compatibility
-    const extensionStatuses = verifyExtensions(
-      contract.extensions,
-      schema.extensions,
-      contractTarget,
-      issues,
-      strict,
-    );
-    rootChildren.push(...extensionStatuses);
-  }
+  const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
+  rootChildren.push(...dependencyStatuses);
 
   // Build root node
   const rootStatus = rootChildren.some((c) => c.status === 'fail')
