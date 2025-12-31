@@ -263,8 +263,10 @@ export interface ControlTargetDescriptor<
   /**
    * Optional migrations capability.
    * Targets that support migrations expose this property.
+   * The capability is parameterized by family and target IDs to ensure type-level
+   * compatibility of framework components.
    */
-  readonly migrations?: TargetMigrationsCapability<TFamilyInstance>;
+  readonly migrations?: TargetMigrationsCapability<TFamilyId, TTargetId, TFamilyInstance>;
   create(): TTargetInstance;
 }
 
