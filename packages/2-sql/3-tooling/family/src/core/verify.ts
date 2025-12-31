@@ -111,7 +111,7 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
  * @returns Promise resolving to ContractMarkerRecord or null if marker not found
  */
 export async function readMarker(
-  driver: ControlDriverInstance,
+  driver: ControlDriverInstance<'sql', string>,
 ): Promise<ContractMarkerRecord | null> {
   const markerStatement = readMarkerSql();
   const queryResult = await driver.query<{

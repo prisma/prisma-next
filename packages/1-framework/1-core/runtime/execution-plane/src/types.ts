@@ -1,70 +1,70 @@
-import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import type {
+  AdapterDescriptor,
+  AdapterInstance,
+  DriverDescriptor,
+  DriverInstance,
+  ExtensionDescriptor,
+  ExtensionInstance,
+  FamilyDescriptor,
+  FamilyInstance,
+  TargetDescriptor,
+  TargetInstance,
+} from '@prisma-next/contract/framework-components';
 
 // ============================================================================
-// Runtime*Instance Base Interfaces (ADR 152)
+// Runtime*Instance Base Interfaces
 // ============================================================================
 
 /**
- * Base interface for execution/runtime-plane family instances.
- * Families extend this with domain-specific methods.
+ * Runtime-plane family instance interface.
+ * Extends the base FamilyInstance for runtime-plane specific methods.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  */
-export interface RuntimeFamilyInstance<TFamilyId extends string = string> {
-  readonly familyId: TFamilyId;
+export interface RuntimeFamilyInstance<TFamilyId extends string> extends FamilyInstance<TFamilyId> {
+  // Placeholder for future runtime-plane-specific methods
 }
 
 /**
- * Base interface for execution/runtime-plane target instances.
+ * Runtime-plane target instance interface.
+ * Extends the base TargetInstance with runtime-plane specific behavior.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface RuntimeTargetInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> {
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-}
+export interface RuntimeTargetInstance<TFamilyId extends string, TTargetId extends string>
+  extends TargetInstance<TFamilyId, TTargetId> {}
 
 /**
- * Base interface for execution/runtime-plane adapter instances.
+ * Runtime-plane adapter instance interface.
+ * Extends the base AdapterInstance with runtime-plane specific behavior.
  * Families extend this with family-specific adapter interfaces.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface RuntimeAdapterInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> {
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-}
+export interface RuntimeAdapterInstance<TFamilyId extends string, TTargetId extends string>
+  extends AdapterInstance<TFamilyId, TTargetId> {}
 
 /**
- * Base interface for execution/runtime-plane driver instances.
- *
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- */
-export interface RuntimeDriverInstance<TTargetId extends string = string> {
-  readonly targetId?: TTargetId;
-}
-
-/**
- * Base interface for execution/runtime-plane extension instances.
+ * Runtime-plane driver instance interface.
+ * Extends the base DriverInstance with runtime-plane specific behavior.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface RuntimeExtensionInstance<
-  TFamilyId extends string = string,
-  TTargetId extends string = string,
-> {
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-}
+export interface RuntimeDriverInstance<TFamilyId extends string, TTargetId extends string>
+  extends DriverInstance<TFamilyId, TTargetId> {}
+
+/**
+ * Runtime-plane extension instance interface.
+ * Extends the base ExtensionInstance with runtime-plane specific behavior.
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ */
+export interface RuntimeExtensionInstance<TFamilyId extends string, TTargetId extends string>
+  extends ExtensionInstance<TFamilyId, TTargetId> {}
 
 // ============================================================================
 // Runtime*Descriptor Interfaces (ADR 152)
@@ -80,11 +80,7 @@ export interface RuntimeExtensionInstance<
 export interface RuntimeFamilyDescriptor<
   TFamilyId extends string,
   TFamilyInstance extends RuntimeFamilyInstance<TFamilyId> = RuntimeFamilyInstance<TFamilyId>,
-> {
-  readonly kind: 'family';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly manifest: ExtensionPackManifest;
+> extends FamilyDescriptor<TFamilyId> {
   create<TTargetId extends string>(options: {
     readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
     readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId>;
@@ -94,7 +90,7 @@ export interface RuntimeFamilyDescriptor<
 }
 
 /**
- * Descriptor for an execution/runtime-plane target pack (e.g., Postgres target).
+ * Descriptor for an execution/runtime-plane target component (e.g., Postgres target).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -107,17 +103,12 @@ export interface RuntimeTargetDescriptor<
     TFamilyId,
     TTargetId
   >,
-> {
-  readonly kind: 'target';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends TargetDescriptor<TFamilyId, TTargetId> {
   create(): TTargetInstance;
 }
 
 /**
- * Descriptor for an execution/runtime-plane adapter pack (e.g., Postgres adapter).
+ * Descriptor for an execution/runtime-plane adapter component (e.g., Postgres adapter).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -130,17 +121,12 @@ export interface RuntimeAdapterDescriptor<
     TFamilyId,
     TTargetId
   >,
-> {
-  readonly kind: 'adapter';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends AdapterDescriptor<TFamilyId, TTargetId> {
   create(): TAdapterInstance;
 }
 
 /**
- * Descriptor for an execution/runtime-plane driver pack (e.g., Postgres driver).
+ * Descriptor for an execution/runtime-plane driver component (e.g., Postgres driver).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -149,18 +135,16 @@ export interface RuntimeAdapterDescriptor<
 export interface RuntimeDriverDescriptor<
   TFamilyId extends string,
   TTargetId extends string,
-  TDriverInstance extends RuntimeDriverInstance<TTargetId> = RuntimeDriverInstance<TTargetId>,
-> {
-  readonly kind: 'driver';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+  TDriverInstance extends RuntimeDriverInstance<TFamilyId, TTargetId> = RuntimeDriverInstance<
+    TFamilyId,
+    TTargetId
+  >,
+> extends DriverDescriptor<TFamilyId, TTargetId> {
   create(options: unknown): TDriverInstance;
 }
 
 /**
- * Descriptor for an execution/runtime-plane extension pack (e.g., pgvector).
+ * Descriptor for an execution/runtime-plane extension component (e.g., pgvector).
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -173,11 +157,6 @@ export interface RuntimeExtensionDescriptor<
     TFamilyId,
     TTargetId
   > = RuntimeExtensionInstance<TFamilyId, TTargetId>,
-> {
-  readonly kind: 'extension';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends ExtensionDescriptor<TFamilyId, TTargetId> {
   create(): TExtensionInstance;
 }

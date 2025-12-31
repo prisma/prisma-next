@@ -11,9 +11,10 @@ import { Client } from 'pg';
 
 /**
  * Postgres control driver instance for control-plane operations.
- * Implements ControlDriverInstance<'postgres'> for database queries.
+ * Implements ControlDriverInstance<'sql', 'postgres'> for database queries.
  */
-export class PostgresControlDriver implements ControlDriverInstance<'postgres'> {
+export class PostgresControlDriver implements ControlDriverInstance<'sql', 'postgres'> {
+  readonly familyId = 'sql' as const;
   readonly targetId = 'postgres' as const;
   /**
    * @deprecated Use targetId instead

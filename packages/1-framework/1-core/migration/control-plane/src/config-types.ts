@@ -11,8 +11,9 @@ import type {
 
 /**
  * Type alias for CLI driver instances.
+ * Uses string for both family and target IDs for maximum flexibility.
  */
-export type CliDriver = ControlDriverInstance;
+export type CliDriver = ControlDriverInstance<string, string>;
 
 /**
  * Contract configuration specifying source and artifact locations.

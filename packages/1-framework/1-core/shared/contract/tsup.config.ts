@@ -5,6 +5,7 @@ export default defineConfig({
     types: 'src/exports/types.ts',
     'pack-manifest-types': 'src/exports/pack-manifest-types.ts',
     ir: 'src/exports/ir.ts',
+    'framework-components': 'src/exports/framework-components.ts',
   },
   outDir: 'dist/exports',
   format: ['esm'],

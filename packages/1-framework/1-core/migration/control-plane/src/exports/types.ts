@@ -11,7 +11,6 @@ export type {
   ControlTargetDescriptor,
   ControlTargetInstance,
   EmitContractResult,
-  FamilyInstance,
   IntrospectSchemaResult,
   // Migration types (canonical, family-agnostic)
   MigrationOperationClass,

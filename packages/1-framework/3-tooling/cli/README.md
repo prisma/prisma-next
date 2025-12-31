@@ -221,20 +221,21 @@ Failure:
 
 **Family Requirements:**
 
-The family must provide a `create()` method in the family descriptor that returns a `FamilyInstance` with a `verify()` method:
+The family must provide a `create()` method in the family descriptor that returns a `ControlFamilyInstance` with a `verify()` method:
 
 ```typescript
-interface FamilyDescriptor {
+interface ControlFamilyDescriptor {
   create(options: {
-    target: TargetDescriptor;
-    adapter: AdapterDescriptor;
-    extensions: ExtensionDescriptor[];
-  }): FamilyInstance;
+    target: ControlTargetDescriptor;
+    adapter: ControlAdapterDescriptor;
+    driver: ControlDriverDescriptor;
+    extensions: ControlExtensionDescriptor[];
+  }): ControlFamilyInstance;
 }
 
-interface FamilyInstance {
+interface ControlFamilyInstance {
   verify(options: {
-    driver: ControlPlaneDriver;
+    driver: ControlDriverInstance;
     contractIR: ContractIR;
     expectedTargetId: string;
     contractPath: string;
@@ -377,11 +378,11 @@ sql schema (tables: 2)
 **Family Requirements:**
 
 The family must provide:
-1. A `create()` method in the family descriptor that returns a `FamilyInstance` with an `introspect()` method
-2. An optional `toSchemaView()` method on the `FamilyInstance` to project family-specific schema IR into `CoreSchemaView`
+1. A `create()` method in the family descriptor that returns a `ControlFamilyInstance` with an `introspect()` method
+2. An optional `toSchemaView()` method on the `ControlFamilyInstance` to project family-specific schema IR into `CoreSchemaView`
 
 ```typescript
-interface FamilyInstance {
+interface ControlFamilyInstance {
   introspect(options: {
     driver: ControlDriverInstance;
     contractIR?: ContractIR;
@@ -583,10 +584,10 @@ The `db sign` command is idempotent and safe to run multiple times:
 - Safe to run in CI/deployment pipelines
 
 **Family Requirements:**
-The family must provide a `create()` method in the family descriptor that returns a `FamilyInstance` with `schemaVerify()` and `sign()` methods:
+The family must provide a `create()` method in the family descriptor that returns a `ControlFamilyInstance` with `schemaVerify()` and `sign()` methods:
 
 ```typescript
-interface FamilyInstance {
+interface ControlFamilyInstance {
   schemaVerify(options: {
     driver: ControlDriverInstance;
     contractIR: ContractIR;

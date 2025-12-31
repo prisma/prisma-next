@@ -32,7 +32,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * @returns Promise resolving to SqlSchemaIR representing the live database schema
    */
   introspect(
-    driver: ControlDriverInstance<TTarget>,
+    driver: ControlDriverInstance<'sql', TTarget>,
     contractIR?: unknown,
     schema?: string,
   ): Promise<SqlSchemaIR>;

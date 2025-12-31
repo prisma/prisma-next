@@ -1,7 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
-import type { FamilyInstance } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { setCommandDescriptions } from '../utils/command-helpers';
@@ -118,7 +117,7 @@ export function createContractEmitCommand(): Command {
           adapter: config.adapter,
           driver: config.driver,
           extensions: config.extensions ?? [],
-        }) as FamilyInstance<string>;
+        });
 
         // Resolve contract source from config (user's config handles loading)
         let contractRaw: unknown;

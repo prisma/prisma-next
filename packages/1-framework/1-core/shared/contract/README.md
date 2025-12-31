@@ -1,14 +1,18 @@
 # @prisma-next/contract
 
-Data contract type definitions and JSON schema for Prisma Next.
+Core contract types, framework component descriptors, and JSON schemas for Prisma Next.
 
 ## Overview
 
-This package provides TypeScript type definitions and JSON Schemas for Prisma Next data contracts. The data contract is the canonical description of an application's data model and storage layout, independent of any specific query language or database target.
+This package provides the foundational type definitions for Prisma Next, including:
+- **Data contracts**: The canonical description of an application's data model and storage layout
+- **Framework component descriptors**: Base interfaces for the modular component system (families, targets, adapters, drivers, extensions)
+- **JSON Schemas**: Validation schemas for contract files
 
 ## Responsibilities
 
-- **Core Contract Types**: Defines framework-level contract types (`ContractBase`, `Source`) that are shared across all target families
+- **Core Contract Types**: Defines framework-level contract types (`ContractBase`, `Source`, `FamilyInstance`) that are shared across all target families
+- **Framework Component Model**: Provides base descriptor interfaces (`FamilyDescriptor`, `TargetDescriptor`, `AdapterDescriptor`, `DriverDescriptor`, `ExtensionDescriptor`) and identity instance bases (`FamilyInstance`, `TargetInstance`, `AdapterInstance`, `DriverInstance`, `ExtensionInstance`) that plane-specific types extend
 - **Document Family Types**: Provides TypeScript types for document target family contracts (`DocumentContract`)
 - **JSON Schema Validation**: Provides JSON Schemas for validating contract structure in IDEs and tooling
 - **Type Guards**: Provides runtime type guards for narrowing contract types (`isDocumentContract`)
@@ -68,6 +72,67 @@ const myFamilyHook: TargetFamilyHook = {
   },
 };
 ```
+
+### Framework Component Model
+
+Import base descriptor and instance interfaces to define or type-check framework components:
+
+```typescript
+import type {
+  // Descriptors
+  ComponentDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+  AdapterDescriptor,
+  DriverDescriptor,
+  ExtensionDescriptor,
+  // Instances
+  FamilyInstance,
+  TargetInstance,
+  AdapterInstance,
+  DriverInstance,
+  ExtensionInstance,
+} from '@prisma-next/contract/framework-components';
+
+// Component descriptors share common properties
+interface MyDescriptor extends ComponentDescriptor<'custom'> {
+  readonly customField: string;
+}
+
+// Use FamilyDescriptor for family components
+const sqlFamily: FamilyDescriptor<'sql'> = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  manifest: { /* ... */ },
+};
+
+// Use TargetDescriptor for target components
+const postgresTarget: TargetDescriptor<'sql', 'postgres'> = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  manifest: { /* ... */ },
+};
+
+// Identity instance bases are extended by plane-specific instances
+interface MySqlInstance extends FamilyInstance<'sql'> {
+  // Plane-specific methods...
+}
+```
+
+The component hierarchy is:
+
+```
+Family (e.g., 'sql', 'document')
+  └── Target (e.g., 'postgres', 'mysql', 'mongodb')
+        ├── Adapter (protocol/dialect implementation)
+        ├── Driver (connection/execution layer)
+        └── Extension (optional capabilities like pgvector)
+```
+
+Plane-specific descriptors (`ControlFamilyDescriptor`, `RuntimeTargetDescriptor`, etc.) extend these bases with plane-specific factory methods and capabilities.
 
 ### JSON Schema Validation
 
@@ -175,7 +240,10 @@ if (isDocumentContract(contract)) {
 
 ## Exports
 
-- `./types`: TypeScript type definitions and type guards
+- `./types`: Core contract type definitions, type guards, and emitter SPI types
+- `./framework-components`: Framework component model (descriptors + identity instance bases)
+- `./pack-manifest-types`: Extension pack manifest types
+- `./ir`: Contract IR types
 - `./schema-document`: Document family JSON Schema (`schemas/data-contract-document-v1.json`)
 
 ## Architecture

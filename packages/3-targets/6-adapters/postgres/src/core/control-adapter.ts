@@ -29,13 +29,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * and returns the schema structure without type mapping or contract enrichment.
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
-   * @param driver - ControlDriverInstance<'postgres'> instance for executing queries
+   * @param driver - ControlDriverInstance<'sql', 'postgres'> instance for executing queries
    * @param contractIR - Optional contract IR for contract-guided introspection (filtering, optimization)
    * @param schema - Schema name to introspect (defaults to 'public')
    * @returns Promise resolving to SqlSchemaIR representing the live database schema
    */
   async introspect(
-    driver: ControlDriverInstance<'postgres'>,
+    driver: ControlDriverInstance<'sql', 'postgres'>,
     _contractIR?: unknown,
     schema = 'public',
   ): Promise<SqlSchemaIR> {
@@ -363,7 +363,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   /**
    * Gets the Postgres version from the database.
    */
-  private async getPostgresVersion(driver: ControlDriverInstance<'postgres'>): Promise<string> {
+  private async getPostgresVersion(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+  ): Promise<string> {
     const result = await driver.query<{ version: string }>('SELECT version() AS version', []);
     const versionString = result.rows[0]?.version ?? '';
     // Extract version number from "PostgreSQL 15.1 ..." format

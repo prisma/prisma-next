@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import {
   errorDatabaseUrlRequired,
   errorDriverRequired,
@@ -9,7 +8,6 @@ import {
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
 import type {
-  FamilyInstance,
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
@@ -146,24 +144,22 @@ export function createDbSignCommand(): Command {
             driver: driverDescriptor,
             extensions: config.extensions ?? [],
           });
-          const typedFamilyInstance = familyInstance as FamilyInstance<string>;
 
           // Validate contract using instance validator
-          const contractIR = typedFamilyInstance.validateContractIR(contractJson) as ContractIR;
+          const contractIR = familyInstance.validateContractIR(contractJson);
 
           // Schema verification precondition with spinner
           let schemaVerifyResult: VerifyDatabaseSchemaResult;
           try {
             schemaVerifyResult = await withSpinner(
-              async () => {
-                return (await typedFamilyInstance.schemaVerify({
+              () =>
+                familyInstance.schemaVerify({
                   driver,
                   contractIR,
                   strict: false,
                   contractPath: contractPathAbsolute,
                   configPath,
-                })) as VerifyDatabaseSchemaResult;
-              },
+                }),
               {
                 message: 'Verifying database satisfies contract',
                 flags,
@@ -185,14 +181,13 @@ export function createDbSignCommand(): Command {
           let signResult: SignDatabaseResult;
           try {
             signResult = await withSpinner(
-              async () => {
-                return (await typedFamilyInstance.sign({
+              () =>
+                familyInstance.sign({
                   driver,
                   contractIR,
                   contractPath: contractPathAbsolute,
                   configPath,
-                })) as SignDatabaseResult;
-              },
+                }),
               {
                 message: 'Signing database...',
                 flags,

@@ -1,3 +1,4 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { PrismaNextConfig } from '@prisma-next/core-control-plane/config-types';
 import { defineConfig } from '@prisma-next/core-control-plane/config-types';
 import { describe, expect, it } from 'vitest';
@@ -19,7 +20,7 @@ describe('defineConfig', () => {
       hook: mockHook,
       create: () => ({
         familyId: 'sql',
-        validateContractIR: (contract: unknown) => contract,
+        validateContractIR: (contract: unknown) => contract as ContractIR,
         verify: async () => ({
           ok: true,
           summary: 'test',
@@ -32,7 +33,29 @@ describe('defineConfig', () => {
           summary: 'test',
           contract: { coreHash: 'test' },
           target: { expected: 'postgres' },
-          schema: { issues: [] },
+          schema: {
+            issues: [],
+            root: {
+              status: 'pass' as const,
+              kind: 'root',
+              name: 'root',
+              contractPath: '',
+              code: '',
+              message: '',
+              expected: null,
+              actual: null,
+              children: [],
+            },
+            counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
+          },
+          timings: { total: 0 },
+        }),
+        sign: async () => ({
+          ok: true,
+          summary: 'test',
+          contract: { coreHash: 'test' },
+          target: { expected: 'postgres' },
+          marker: { created: true, updated: false },
           timings: { total: 0 },
         }),
         introspect: async () => ({ tables: {}, extensions: [] }),
@@ -67,6 +90,7 @@ describe('defineConfig', () => {
       id: 'postgres',
       manifest: { id: 'postgres', version: '1.0.0' },
       create: async () => ({
+        familyId: 'sql',
         targetId: 'postgres',
         query: async () => ({ rows: [] }),
         close: async () => {},

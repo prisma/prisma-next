@@ -1,6 +1,8 @@
 import type {
   RuntimeAdapterDescriptor,
+  RuntimeAdapterInstance,
   RuntimeDriverDescriptor,
+  RuntimeDriverInstance,
   RuntimeExtensionDescriptor,
   RuntimeFamilyInstance,
   RuntimeTargetDescriptor,
@@ -15,6 +17,26 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import type { Runtime, RuntimeContext, RuntimeOptions } from '@prisma-next/sql-runtime';
 import { createRuntime, createRuntimeContext, type Extension } from '@prisma-next/sql-runtime';
+
+/**
+ * SQL runtime driver instance type.
+ * Combines identity properties with SQL-specific behavior methods.
+ */
+export type SqlRuntimeDriverInstance<TTargetId extends string = string> = RuntimeDriverInstance<
+  'sql',
+  TTargetId
+> &
+  SqlDriver;
+
+/**
+ * SQL runtime adapter instance type.
+ * Combines identity properties with SQL-specific adapter behavior.
+ */
+export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = RuntimeAdapterInstance<
+  'sql',
+  TTargetId
+> &
+  Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
 
 /**
  * SQL runtime family instance interface.
@@ -54,8 +76,8 @@ export interface SqlRuntimeFamilyInstance extends RuntimeFamilyInstance<'sql'> {
  */
 export function createSqlRuntimeFamilyInstance(options: {
   readonly target: RuntimeTargetDescriptor<'sql', string>;
-  readonly adapter: RuntimeAdapterDescriptor<'sql', string>;
-  readonly driver: RuntimeDriverDescriptor<'sql', string>;
+  readonly adapter: RuntimeAdapterDescriptor<'sql', string, SqlRuntimeAdapterInstance>;
+  readonly driver: RuntimeDriverDescriptor<'sql', string, SqlRuntimeDriverInstance>;
   readonly extensions: readonly RuntimeExtensionDescriptor<'sql', string>[];
 }): SqlRuntimeFamilyInstance {
   const {
@@ -99,21 +121,15 @@ export function createSqlRuntimeFamilyInstance(options: {
 
       const extensions = [...descriptorExtensions, ...(runtimeOptions.extensions ?? [])];
 
-      const adapter = adapterInstance as unknown as Adapter<
-        SelectAst,
-        SqlContract<SqlStorage>,
-        LoweredStatement
-      >;
-
       const context = createRuntimeContext({
         contract: runtimeOptions.contract,
-        adapter,
+        adapter: adapterInstance,
         extensions,
       }) as RuntimeContext<TContract>;
 
       const runtimeOptions_: RuntimeOptions<TContract> = {
-        adapter,
-        driver: driverInstance as SqlDriver,
+        adapter: adapterInstance,
+        driver: driverInstance,
         verify: runtimeOptions.verify,
         context,
         ...(runtimeOptions.plugins ? { plugins: runtimeOptions.plugins } : {}),
