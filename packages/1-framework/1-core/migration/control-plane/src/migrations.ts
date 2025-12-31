@@ -152,7 +152,7 @@ export interface MigrationPlanner<
     readonly policy: MigrationOperationPolicy;
     /**
      * Active framework components participating in this composition.
-     * Families/targets can interpret this bag to derive family-specific metadata.
+     * Families/targets can interpret this list to derive family-specific metadata.
      * All components must have matching familyId and targetId.
      */
     readonly frameworkComponents: ReadonlyArray<
@@ -183,7 +183,7 @@ export interface MigrationRunner<
     };
     /**
      * Active framework components participating in this composition.
-     * Families/targets can interpret this bag to derive family-specific metadata.
+     * Families/targets can interpret this list to derive family-specific metadata.
      * All components must have matching familyId and targetId.
      */
     readonly frameworkComponents: ReadonlyArray<

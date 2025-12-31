@@ -19,7 +19,7 @@ Model database-side prerequisites as **component-owned database dependencies**, 
 - migration execution (runner + post-apply schema verification)
 - pure schema verification over schema IR
 
-The CLI passes a **bag of configured framework components** (`frameworkComponents`) into planning/execution/verification. SQL-family code structurally narrows the components that declare `databaseDependencies` and evaluates their dependency hooks.
+The CLI passes a **list of configured framework components** (`frameworkComponents`) into planning/execution/verification. SQL-family code structurally narrows the components that declare `databaseDependencies` and evaluates their dependency hooks.
 
 ### Key constraints
 
@@ -57,7 +57,7 @@ This ADR distinguishes three concepts:
 
 ### Negative / tradeoffs
 
-- Callers must consistently pass the active `frameworkComponents` bag to planner/runner/verification.
+- Callers must consistently pass the active `frameworkComponents` list to planner/runner/verification.
 - Some schema IR fields may have target-specific vocabulary (e.g., `extensions` for Postgres); this is acceptable as long as the CLI remains family-agnostic and no inference is performed.
 
 ## Related

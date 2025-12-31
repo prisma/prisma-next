@@ -50,7 +50,7 @@ This doc defines the `db init` command behavior, the TS primitives it composes, 
 
 - **Extension handling**
   - Treat database-side prerequisites as **component-owned database dependencies** declared by configured framework components (target/adapter/extensions).
-  - Planner and verifier consume dependencies from the configured `frameworkComponents` bag and evaluate satisfaction via **pure schema IR hooks** (no DB I/O).
+- Planner and verifier consume dependencies from the configured `frameworkComponents` list and evaluate satisfaction via **pure schema IR hooks** (no DB I/O).
   - Extension packs may still contribute deterministic data under `contract.extensions.<namespace>` for namespacing/types/codecs, but **schema verification and db init planning do not infer database prerequisites from `contract.extensions`**.
 
 - **Contract marker**
@@ -348,7 +348,7 @@ This is consistent with:
 
   Rather than baking ecosystem knowledge into targets (or inferring prerequisites from `contract.extensions`), `db init` treats database-side prerequisites as **component-owned database dependencies**:
 
-  - CLI builds a `frameworkComponents` bag in composition order: `[target, adapter, ...extensions]`.
+  - CLI builds a `frameworkComponents` list in composition order: `[target, adapter, ...extensions]`.
   - Planner:
     - Collects `databaseDependencies.init` from these components.
     - Verifies each dependency against the live `SqlSchemaIR` (pure check).

@@ -233,7 +233,7 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly schemaName?: string;
   /**
    * Active framework components participating in this composition.
-   * SQL targets can interpret this bag to derive database dependencies.
+   * SQL targets can interpret this list to derive database dependencies.
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
@@ -281,7 +281,7 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string
   readonly context?: OperationContext;
   /**
    * Active framework components participating in this composition.
-   * SQL targets can interpret this bag to derive database dependencies.
+   * SQL targets can interpret this list to derive database dependencies.
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
