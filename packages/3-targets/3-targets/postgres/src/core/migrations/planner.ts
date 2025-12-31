@@ -120,7 +120,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       }
       seenDependencyIds.add(dependency.id);
 
-      const issues = dependency.verifyDatabaseDependenciesInstalled(options.schema);
+      const issues = dependency.verifyDatabaseDependencyInstalled(options.schema);
       if (issues.length === 0) {
         continue;
       }

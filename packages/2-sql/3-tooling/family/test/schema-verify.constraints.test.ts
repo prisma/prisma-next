@@ -188,7 +188,7 @@ describe('verifySqlSchema - constraints', () => {
                 id: 'postgres.extension.vector',
                 label: 'Enable vector extension',
                 install: [],
-                verifyDatabaseDependenciesInstalled: (s: SqlSchemaIR) => {
+                verifyDatabaseDependencyInstalled: (s: SqlSchemaIR) => {
                   if (!s.extensions.includes('vector')) {
                     return [
                       {

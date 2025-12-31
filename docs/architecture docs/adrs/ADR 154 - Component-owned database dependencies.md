@@ -37,7 +37,7 @@ A component can declare `databaseDependencies.init`, where each dependency provi
 - a stable `id` (e.g., `postgres.extension.vector`)
 - a human `label`
 - `install` operations (`SqlMigrationPlanOperation`) for `db init`
-- `verifyDatabaseDependenciesInstalled(schemaIR)` — pure verification hook producing `SchemaIssue[]`
+- `verifyDatabaseDependencyInstalled(schemaIR)` — pure verification hook producing `SchemaIssue[]`
 
 ### Data sources
 

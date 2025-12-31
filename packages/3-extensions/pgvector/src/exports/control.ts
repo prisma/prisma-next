@@ -104,7 +104,7 @@ const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
           ],
         },
       ],
-      verifyDatabaseDependenciesInstalled: verifyVectorExtensionInstalled,
+      verifyDatabaseDependencyInstalled: verifyVectorExtensionInstalled,
     },
   ],
 };

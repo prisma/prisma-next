@@ -423,7 +423,7 @@ export function verifyIndexes(
 
 /**
  * Verifies database dependencies are installed using component-owned verification hooks.
- * Each dependency provides a pure verifyDatabaseDependenciesInstalled function that checks
+ * Each dependency provides a pure verifyDatabaseDependencyInstalled function that checks
  * whether the dependency is satisfied based on the in-memory schema IR (no DB I/O).
  *
  * Returns verification nodes for the tree.
@@ -436,7 +436,7 @@ export function verifyDatabaseDependencies(
   const nodes: SchemaVerificationNode[] = [];
 
   for (const dependency of dependencies) {
-    const depIssues = dependency.verifyDatabaseDependenciesInstalled(schema);
+    const depIssues = dependency.verifyDatabaseDependencyInstalled(schema);
     const depPath = `dependencies.${dependency.id}`;
 
     if (depIssues.length > 0) {

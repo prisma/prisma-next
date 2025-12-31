@@ -37,7 +37,7 @@ function createExtensionDependency(
         postcheck: [],
       },
     ],
-    verifyDatabaseDependenciesInstalled: (schema) => {
+    verifyDatabaseDependencyInstalled: (schema) => {
       if (!schema.extensions.includes(extensionName)) {
         return [
           {

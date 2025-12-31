@@ -58,7 +58,7 @@ export interface ComponentDatabaseDependency<TTargetDetails = Record<string, nev
    *
    * This must return structured issues suitable for CLI and tree output, not just a boolean.
    */
-  readonly verifyDatabaseDependenciesInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
+  readonly verifyDatabaseDependencyInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
 }
 
 /**
