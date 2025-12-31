@@ -713,6 +713,11 @@ export function createSqlFamilyInstance<
         },
       };
     },
+    async readMarker(options: {
+      readonly driver: ControlDriverInstance<'sql', string>;
+    }): Promise<ContractMarkerRecord | null> {
+      return readMarker(options.driver);
+    },
     async introspect(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
       readonly contractIR?: unknown;

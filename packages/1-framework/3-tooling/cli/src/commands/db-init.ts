@@ -215,6 +215,54 @@ export function createDbInitCommand(): Command {
 
           const migrationPlan: MigrationPlan = plannerResult.plan;
 
+          // Check for existing marker - handle idempotency and mismatch errors
+          const existingMarker = await familyInstance.readMarker({ driver });
+          if (existingMarker) {
+            const markerMatchesDestination =
+              existingMarker.coreHash === migrationPlan.destination.coreHash &&
+              (!migrationPlan.destination.profileHash ||
+                existingMarker.profileHash === migrationPlan.destination.profileHash);
+
+            if (markerMatchesDestination) {
+              // Already at destination - return success with no operations
+              const dbInitResult: DbInitResult = {
+                ok: true,
+                mode: options.plan ? 'plan' : 'apply',
+                plan: {
+                  targetId: migrationPlan.targetId,
+                  destination: migrationPlan.destination,
+                  operations: [],
+                },
+                ...(options.plan
+                  ? {}
+                  : {
+                      execution: { operationsPlanned: 0, operationsExecuted: 0 },
+                      marker: {
+                        coreHash: existingMarker.coreHash,
+                        profileHash: existingMarker.profileHash,
+                      },
+                    }),
+                summary: 'Database already at target contract state',
+                timings: { total: Date.now() - startTime },
+              };
+              return dbInitResult;
+            }
+
+            // Marker exists but doesn't match destination - fail
+            throw errorRuntime(
+              `Existing contract marker (${existingMarker.coreHash}) does not match plan destination (${migrationPlan.destination.coreHash}).`,
+              {
+                why: 'Database has an existing contract marker that does not match the target contract',
+                fix: 'Use `prisma-next db migrate` to migrate from the existing contract, or drop the database and re-run `db init`',
+                meta: {
+                  code: 'MARKER_ORIGIN_MISMATCH',
+                  markerCoreHash: existingMarker.coreHash,
+                  destinationCoreHash: migrationPlan.destination.coreHash,
+                },
+              },
+            );
+          }
+
           // Plan mode - don't execute
           if (options.plan) {
             const dbInitResult: DbInitResult = {

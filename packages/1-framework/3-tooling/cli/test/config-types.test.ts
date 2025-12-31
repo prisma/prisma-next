@@ -58,6 +58,7 @@ describe('defineConfig', () => {
           marker: { created: true, updated: false },
           timings: { total: 0 },
         }),
+        readMarker: async () => null,
         introspect: async () => ({ tables: {}, extensions: [] }),
         emitContract: async () => ({
           contractJson: '{}',
