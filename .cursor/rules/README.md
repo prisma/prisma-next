@@ -58,7 +58,6 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 
 ## Architecture
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
-- `.cursor/rules/no-fuzzy-extension-verification.mdc` — No fuzzy matching of extension requirements; use component-owned database dependencies
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Contract normalization responsibilities
 - `.cursor/rules/adapter-capability-declaration.mdc` — Adapter capability declaration (manifest + code)
 - `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype
