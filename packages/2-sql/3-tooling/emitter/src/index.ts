@@ -10,32 +10,19 @@ import type {
 export const sqlTargetFamilyHook = {
   id: 'sql',
 
-  validateTypes(ir: ContractIR, ctx: ValidationContext): void {
+  validateTypes(ir: ContractIR, _ctx: ValidationContext): void {
     const storage = ir.storage as SqlStorage | undefined;
     if (!storage || !storage.tables) {
       return;
     }
 
-    const referencedNamespaces = new Set<string>();
-
-    // Collect namespaces from ir.extensions
-    const extensions = ir.extensions as Record<string, unknown> | undefined;
-    if (extensions) {
-      for (const namespace of Object.keys(extensions)) {
-        referencedNamespaces.add(namespace);
-      }
-    }
-
-    // Also validate against extensionIds from context for consistency
-    if (ctx.extensionIds) {
-      for (const extensionId of ctx.extensionIds) {
-        // Extract namespace from extension ID (format: namespace/name@version or just namespace)
-        const namespaceMatch = extensionId.match(/^([^/]+)/);
-        if (namespaceMatch?.[1]) {
-          referencedNamespaces.add(namespaceMatch[1]);
-        }
-      }
-    }
+    // Validate that codec IDs have the correct format (ns/name@version)
+    // Note: We do NOT validate that namespaces are in contract.extensions because:
+    // 1. Adapter-provided codecs (e.g., pg/int4@1) are always available and their
+    //    namespace is not in contract.extensions (the adapter is not an extension)
+    // 2. TypeScript types already prevent using codecs you don't have imported
+    // 3. Runtime validates that codecs are actually provided by the adapter/extensions
+    // 4. contract.extensions is for framework extensions, not codec namespaces
 
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
@@ -55,12 +42,7 @@ export const sqlTargetFamilyHook = {
           );
         }
 
-        const namespace = match[1];
-        if (!referencedNamespaces.has(namespace)) {
-          throw new Error(
-            `Column "${colName}" in table "${tableName}" uses codec ID "${codecId}" from namespace "${namespace}" which is not referenced in contract.extensions`,
-          );
-        }
+        // Namespace validation removed - codec namespaces don't need to be in contract.extensions
       }
     }
   },
