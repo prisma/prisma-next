@@ -1,4 +1,4 @@
-import type { ComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
@@ -238,7 +238,11 @@ export interface SchemaVerifyOptions {
   readonly contractIR: unknown;
   readonly strict: boolean;
   readonly context?: OperationContext;
-  readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
+  /**
+   * Active framework components participating in this composition.
+   * All components must have matching familyId ('sql') and targetId.
+   */
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**

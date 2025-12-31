@@ -6,7 +6,7 @@
  * by migration planners and other tools that need to compare schema states.
  */
 
-import type { ComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   OperationContext,
   SchemaIssue,
@@ -40,8 +40,11 @@ export interface VerifySqlSchemaOptions {
   readonly context?: OperationContext;
   /** Type metadata registry for codec consistency warnings */
   readonly typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
-  /** Active framework components participating in this composition. */
-  readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
+  /**
+   * Active framework components participating in this composition.
+   * All components must have matching familyId ('sql') and targetId.
+   */
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**
@@ -527,7 +530,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 }
 
 function collectDependenciesFromFrameworkComponents(
-  components: ReadonlyArray<ComponentDescriptor<string>>,
+  components: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
 ): ReadonlyArray<ComponentDatabaseDependency<unknown>> {
   const dependencies: ComponentDatabaseDependency<unknown>[] = [];
   for (const component of components) {
@@ -547,7 +550,7 @@ function collectDependenciesFromFrameworkComponents(
  */
 function verifyContractExtensions(
   contractExtensions: Record<string, unknown>,
-  frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>,
+  frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
   schema: SqlSchemaIR,
   issues: SchemaIssue[],
 ): SchemaVerificationNode[] {
@@ -608,7 +611,7 @@ function verifyContractExtensions(
 }
 
 function getSqlDependencyInit(
-  component: ComponentDescriptor<string>,
+  component: TargetBoundComponentDescriptor<'sql', string>,
 ): readonly ComponentDatabaseDependency<unknown>[] | undefined {
   const record = component as unknown as Record<string, unknown>;
 

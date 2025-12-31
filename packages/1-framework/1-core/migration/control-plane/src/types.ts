@@ -1,13 +1,13 @@
 import type {
   AdapterDescriptor,
   AdapterInstance,
-  ComponentDescriptor,
   DriverDescriptor,
   DriverInstance,
   ExtensionDescriptor,
   ExtensionInstance,
   FamilyDescriptor,
   FamilyInstance,
+  TargetBoundComponentDescriptor,
   TargetDescriptor,
   TargetInstance,
 } from '@prisma-next/contract/framework-components';
@@ -83,7 +83,11 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
     readonly strict: boolean;
     readonly contractPath: string;
     readonly configPath?: string;
-    readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
+    /**
+     * Active framework components participating in this composition.
+     * All components must have matching familyId and targetId.
+     */
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, string>>;
   }): Promise<VerifyDatabaseSchemaResult>;
 
   /**

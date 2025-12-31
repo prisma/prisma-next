@@ -5,7 +5,7 @@
  * with SQL-specific fields for execution (precheck SQL, execute SQL, etc.).
  */
 
-import type { ComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   ControlDriverInstance,
   ControlExtensionDescriptor,
@@ -234,8 +234,9 @@ export interface SqlMigrationPlannerPlanOptions {
   /**
    * Active framework components participating in this composition.
    * SQL targets can interpret this bag to derive database dependencies.
+   * All components must have matching familyId ('sql') and targetId.
    */
-  readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**
@@ -281,8 +282,9 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string
   /**
    * Active framework components participating in this composition.
    * SQL targets can interpret this bag to derive database dependencies.
+   * All components must have matching familyId ('sql') and targetId.
    */
-  readonly frameworkComponents: ReadonlyArray<ComponentDescriptor<string>>;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**

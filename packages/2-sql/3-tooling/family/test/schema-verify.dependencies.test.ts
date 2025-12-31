@@ -1,4 +1,4 @@
-import type { ComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
 import type { ComponentDatabaseDependency } from '../src/core/migrations/types';
 import { verifyDatabaseDependencies } from '../src/core/schema-verify/verify-helpers';
@@ -164,7 +164,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
           targetId: 'postgres',
           manifest: { id: 'pgvector', version: '0.0.0' },
           databaseDependencies: { init: dependencies },
-        } as unknown as ComponentDescriptor<string>,
+        } as unknown as TargetBoundComponentDescriptor<'sql', 'postgres'>,
       ],
     });
 
@@ -203,7 +203,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
           targetId: 'postgres',
           manifest: { id: 'pgvector', version: '0.0.0' },
           databaseDependencies: { init: dependencies },
-        } as unknown as ComponentDescriptor<string>,
+        } as unknown as TargetBoundComponentDescriptor<'sql', 'postgres'>,
       ],
     });
 

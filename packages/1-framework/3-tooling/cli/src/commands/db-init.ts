@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   MigrationPlan,
   MigrationPlannerResult,
