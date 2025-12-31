@@ -247,6 +247,203 @@ withTempDir(({ createTempDir }) => {
       );
     });
 
+    describe('marker idempotency', () => {
+      it(
+        'succeeds as noop when marker already matches destination contract',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            // First run: apply to empty database
+            const { testSetup, configPath } = await setupDbInitFixture(
+              connectionString,
+              createTempDir,
+              fixtureSubdir,
+            );
+
+            await runDbInit(testSetup, ['--config', configPath, '--no-color']);
+
+            // Clear console output
+            consoleOutput.length = 0;
+
+            // Second run: should succeed as noop (0 operations applied)
+            await runDbInit(testSetup, ['--config', configPath, '--no-color']);
+
+            const output = consoleOutput.join('\n');
+            const stripped = stripAnsi(output);
+
+            // Verify noop - shows "Applied 0 operation(s)" indicating nothing to do
+            expect(stripped).toContain('Applied 0 operation');
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+
+      it(
+        'succeeds as noop in plan mode when marker already matches destination',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            // First run: apply to empty database
+            const { testSetup, configPath } = await setupDbInitFixture(
+              connectionString,
+              createTempDir,
+              fixtureSubdir,
+            );
+
+            await runDbInit(testSetup, ['--config', configPath, '--no-color']);
+
+            // Clear console output
+            consoleOutput.length = 0;
+
+            // Second run in plan mode: should succeed as noop with 0 operations
+            await runDbInit(testSetup, ['--config', configPath, '--plan', '--no-color']);
+
+            const output = consoleOutput.join('\n');
+            const stripped = stripAnsi(output);
+
+            // Verify it shows 0 planned operations (indicating nothing to do)
+            expect(stripped).toContain('Planned 0 operation');
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+
+      it(
+        'outputs correct JSON envelope when marker matches destination',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            // First run: apply to empty database
+            const { testSetup, configPath } = await setupDbInitFixture(
+              connectionString,
+              createTempDir,
+              fixtureSubdir,
+            );
+
+            await runDbInit(testSetup, ['--config', configPath, '--no-color']);
+
+            // Clear console output
+            const outputStartIndex = consoleOutput.length;
+
+            // Second run: should succeed as noop
+            await runDbInit(testSetup, ['--config', configPath, '--json', '--no-color']);
+
+            const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
+            const jsonOutput = JSON.parse(output) as Record<string, unknown>;
+
+            // Verify structure - should be noop with existing marker
+            expect(jsonOutput).toMatchObject({
+              ok: true,
+              mode: 'apply',
+              plan: {
+                targetId: expect.any(String),
+                destination: {
+                  coreHash: expect.any(String),
+                },
+                operations: [], // Empty - no operations needed
+              },
+              execution: {
+                operationsPlanned: 0,
+                operationsExecuted: 0,
+              },
+              marker: {
+                coreHash: expect.any(String),
+                profileHash: expect.any(String),
+              },
+              summary: 'Database already at target contract state',
+            });
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+
+      it(
+        'fails when marker exists but does not match destination contract',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            // First: set up database with marker from a different contract
+            // We'll manually create a marker with a different hash
+            await withClient(connectionString, async (client) => {
+              await client.query('CREATE SCHEMA IF NOT EXISTS prisma_contract');
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS prisma_contract.marker (
+                  id INTEGER PRIMARY KEY DEFAULT 1,
+                  core_hash TEXT NOT NULL,
+                  profile_hash TEXT NOT NULL,
+                  contract_json JSONB,
+                  canonical_version INTEGER,
+                  updated_at TIMESTAMPTZ DEFAULT NOW(),
+                  app_tag TEXT,
+                  meta JSONB DEFAULT '{}'
+                )
+              `);
+              await client.query(`
+                INSERT INTO prisma_contract.marker (id, core_hash, profile_hash, contract_json)
+                VALUES (1, 'sha256:different-hash', 'sha256:different-profile', '{}')
+                ON CONFLICT (id) DO NOTHING
+              `);
+            });
+
+            const { testSetup, configPath } = await setupDbInitFixture(
+              connectionString,
+              createTempDir,
+              fixtureSubdir,
+            );
+
+            // Should fail with MARKER_ORIGIN_MISMATCH
+            await expect(
+              runDbInit(testSetup, ['--config', configPath, '--no-color']),
+            ).rejects.toThrow();
+
+            const errorOutput = consoleErrors.join('\n');
+            expect(errorOutput).toContain('does not match plan destination');
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+
+      it(
+        'fails in plan mode when marker exists but does not match destination',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            // First: set up database with marker from a different contract
+            await withClient(connectionString, async (client) => {
+              await client.query('CREATE SCHEMA IF NOT EXISTS prisma_contract');
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS prisma_contract.marker (
+                  id INTEGER PRIMARY KEY DEFAULT 1,
+                  core_hash TEXT NOT NULL,
+                  profile_hash TEXT NOT NULL,
+                  contract_json JSONB,
+                  canonical_version INTEGER,
+                  updated_at TIMESTAMPTZ DEFAULT NOW(),
+                  app_tag TEXT,
+                  meta JSONB DEFAULT '{}'
+                )
+              `);
+              await client.query(`
+                INSERT INTO prisma_contract.marker (id, core_hash, profile_hash, contract_json)
+                VALUES (1, 'sha256:different-hash', 'sha256:different-profile', '{}')
+                ON CONFLICT (id) DO NOTHING
+              `);
+            });
+
+            const { testSetup, configPath } = await setupDbInitFixture(
+              connectionString,
+              createTempDir,
+              fixtureSubdir,
+            );
+
+            // Should fail with MARKER_ORIGIN_MISMATCH even in plan mode
+            await expect(
+              runDbInit(testSetup, ['--config', configPath, '--plan', '--no-color']),
+            ).rejects.toThrow();
+
+            const errorOutput = consoleErrors.join('\n');
+            expect(errorOutput).toContain('does not match plan destination');
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
+
     describe('non-empty database (conflicts)', () => {
       it(
         'fails when database has existing schema that conflicts',
