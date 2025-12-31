@@ -1,4 +1,5 @@
 import type {
+  ComponentDatabaseDependency,
   MigrationOperationPolicy,
   SqlMigrationPlanner,
   SqlMigrationPlannerPlanOptions,
@@ -33,17 +34,6 @@ const DEFAULT_PLANNER_CONFIG: PlannerConfig = {
   defaultSchema: 'public',
 };
 
-const PG_EXTENSION_SQL: Record<string, string> = {
-  pgvector: 'CREATE EXTENSION IF NOT EXISTS vector',
-};
-
-/**
- * Adapter-level extensions that are NOT PostgreSQL database extensions.
- * These are metadata namespaces used by adapters for codec IDs (e.g., 'pg/int4@1').
- * The planner should skip these when validating extensions.
- */
-const ADAPTER_LEVEL_EXTENSIONS = new Set(['pg', 'postgres']);
-
 export function createPostgresMigrationPlanner(
   config: Partial<PlannerConfig> = {},
 ): SqlMigrationPlanner<PostgresPlanTargetDetails> {
@@ -75,15 +65,11 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       ]);
     }
 
-    const extensionResult = this.validateExtensions(options.contract);
-    if (extensionResult) {
-      return extensionResult;
-    }
-
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
+    // Build extension operations from component-owned database dependencies
     operations.push(
-      ...this.buildExtensionOperations(options.contract, schemaName),
+      ...this.buildDatabaseDependencyOperations(options.databaseDependencies ?? [], schemaName),
       ...this.buildTableOperations(options.contract.storage.tables, schemaName),
       ...this.buildUniqueOperations(options.contract.storage.tables, schemaName),
       ...this.buildIndexOperations(options.contract.storage.tables, schemaName),
@@ -103,32 +89,6 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     return plannerSuccess(plan);
   }
 
-  private validateExtensions(contract: SqlContract<SqlStorage>) {
-    const extensions = contract.extensions ?? {};
-    const extensionNames = Object.keys(extensions);
-    // Filter out adapter-level extensions (like 'pg', 'postgres') which are metadata namespaces
-    // used by adapters for codec IDs, not PostgreSQL database extensions
-    const databaseExtensions = extensionNames.filter(
-      (extensionName) => !ADAPTER_LEVEL_EXTENSIONS.has(extensionName),
-    );
-    const unsupportedExtensions = databaseExtensions.filter(
-      (extensionName) => !PG_EXTENSION_SQL[extensionName],
-    );
-    if (unsupportedExtensions.length > 0) {
-      const supportedExtensions = Object.keys(PG_EXTENSION_SQL).join(', ');
-      const unsupportedList = unsupportedExtensions.join(', ');
-      return plannerFailure([
-        {
-          kind: 'unsupportedExtension' as const,
-          summary: `Unsupported PostgreSQL extensions in contract: ${unsupportedList}`,
-          why: `The Postgres migration planner currently only supports: ${supportedExtensions}. Extensions are defined in contract.extensions.`,
-          location: { extension: unsupportedList },
-        },
-      ]);
-    }
-    return null;
-  }
-
   private ensureAdditivePolicy(policy: MigrationOperationPolicy) {
     if (!policy.allowedOperationClasses.includes('additive')) {
       return plannerFailure([
@@ -142,65 +102,25 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     return null;
   }
 
-  private buildExtensionOperations(
-    contract: SqlContract<SqlStorage>,
-    schema: string,
+  /**
+   * Builds migration operations from component-owned database dependencies.
+   * These operations install database-side persistence structures declared by components.
+   */
+  private buildDatabaseDependencyOperations(
+    dependencies: ReadonlyArray<ComponentDatabaseDependency<unknown>>,
+    _schema: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const extensions = contract.extensions ?? {};
-    const extensionNames = Object.keys(extensions);
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
-    // Extensions are validated in validateExtensions() before this method is called
-    for (const extensionName of extensionNames) {
-      // Skip adapter-level extensions (metadata namespaces, not database extensions)
-      if (ADAPTER_LEVEL_EXTENSIONS.has(extensionName)) {
-        continue;
+    for (const dependency of dependencies) {
+      // Each dependency's install array contains SqlMigrationPlanOperation objects
+      // Add target details for Postgres-specific metadata
+      for (const installOp of dependency.install) {
+        operations.push(installOp as SqlMigrationPlanOperation<PostgresPlanTargetDetails>);
       }
-      const sql = PG_EXTENSION_SQL[extensionName];
-      if (!sql) {
-        // This should never happen since we validate extensions in validateExtensions(), but TypeScript requires this check
-        throw new Error(`Extension SQL not found for ${extensionName}`);
-      }
-      const details = this.buildTargetDetails('extension', extensionName, schema);
-      operations.push({
-        id: `extension.${extensionName}`,
-        label: `Enable extension "${extensionName}"`,
-        summary: `Ensures the ${extensionName} extension is available`,
-        operationClass: 'additive',
-        target: { id: 'postgres', details },
-        precheck: [
-          {
-            description: `verify extension "${extensionName}" is not already enabled`,
-            sql: `SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = '${escapeLiteral(
-              this.extensionDatabaseName(extensionName),
-            )}')`,
-          },
-        ],
-        execute: [
-          {
-            description: `create extension "${extensionName}"`,
-            sql,
-          },
-        ],
-        postcheck: [
-          {
-            description: `confirm extension "${extensionName}" is enabled`,
-            sql: `SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = '${escapeLiteral(
-              this.extensionDatabaseName(extensionName),
-            )}')`,
-          },
-        ],
-      });
     }
 
     return operations;
-  }
-
-  private extensionDatabaseName(extensionName: string): string {
-    if (extensionName === 'pgvector') {
-      return 'vector';
-    }
-    return extensionName;
   }
 
   private buildTableOperations(

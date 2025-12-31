@@ -220,6 +220,11 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
+  /**
+   * Database dependencies collected from extension descriptors.
+   * Planner emits install operations from these dependencies.
+   */
+  readonly databaseDependencies?: ReadonlyArray<ComponentDatabaseDependency<unknown>>;
 }
 
 /**
