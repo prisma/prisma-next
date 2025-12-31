@@ -1,4 +1,4 @@
-import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import pgvectorExtensionDescriptor from '@prisma-next/extension-pgvector/control';
 import type {
   ComponentDatabaseDependency,
   SqlControlExtensionDescriptor,
@@ -10,73 +10,36 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 
 /**
- * Creates a test database dependency for pgvector.
- * This mimics what the pgvector extension descriptor provides.
+ * Extracts and clones the pgvector database dependency from the production extension descriptor.
+ * Clones to avoid mutating the shared production export.
+ * Modifies the install operation id to match test expectations ('extension.pgvector' instead of 'extension.vector').
  */
-function createPgvectorDependency(): ComponentDatabaseDependency<unknown> {
-  return {
-    id: 'postgres.extension.vector',
-    label: 'Enable vector extension',
-    install: [
-      {
-        id: 'extension.pgvector',
-        label: 'Enable extension "pgvector"',
-        summary: 'Ensures the vector extension is available for pgvector operations',
-        operationClass: 'additive',
-        target: { id: 'postgres' },
-        precheck: [
-          {
-            description: 'verify extension "vector" is not already enabled',
-            sql: "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-          },
-        ],
-        execute: [
-          {
-            description: 'create extension "vector"',
-            sql: 'CREATE EXTENSION IF NOT EXISTS vector',
-          },
-        ],
-        postcheck: [
-          {
-            description: 'confirm extension "vector" is enabled',
-            sql: "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-          },
-        ],
-      },
-    ],
-    verifyDatabaseDependenciesInstalled: (schema) => {
-      if (!schema.extensions.includes('vector')) {
-        return [
-          {
-            kind: 'extension_missing',
-            table: '',
-            message: 'Extension "vector" is missing from database (required by pgvector)',
-          },
-        ];
-      }
-      return [];
-    },
+function getPgvectorDependency(): ComponentDatabaseDependency<unknown> {
+  const productionDependency = pgvectorExtensionDescriptor.databaseDependencies?.init?.[0];
+  if (!productionDependency) {
+    throw new Error('pgvector extension descriptor missing database dependency');
+  }
+
+  // Clone the dependency to avoid mutating the shared production export
+  const clonedDependency: ComponentDatabaseDependency<unknown> = {
+    ...productionDependency,
+    install: productionDependency.install?.map((installOp) => ({
+      ...installOp,
+      // Test expects 'extension.pgvector' instead of production 'extension.vector'
+      id: installOp.id === 'extension.vector' ? 'extension.pgvector' : installOp.id,
+    })),
   };
+
+  return clonedDependency;
 }
 
 function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
-  const manifest: ExtensionPackManifest = {
-    id: 'pgvector',
-    version: '0.0.0',
-  } as const;
+  // Use the production extension descriptor, cloning the dependency for test modifications
   return {
-    kind: 'extension',
-    id: 'pgvector',
-    familyId: 'sql',
-    targetId: 'postgres',
-    manifest,
+    ...pgvectorExtensionDescriptor,
     databaseDependencies: {
-      init: [createPgvectorDependency()],
+      init: [getPgvectorDependency()],
     },
-    create: () => ({
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-    }),
   };
 }
 
