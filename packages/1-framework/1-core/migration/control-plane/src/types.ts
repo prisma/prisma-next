@@ -1,12 +1,17 @@
 import type {
   AdapterDescriptor,
+  AdapterInstance,
   DriverDescriptor,
+  DriverInstance,
   ExtensionDescriptor,
+  ExtensionInstance,
   FamilyDescriptor,
+  FamilyInstance,
   TargetDescriptor,
+  TargetInstance,
 } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { FamilyInstance, TargetFamilyHook } from '@prisma-next/contract/types';
+import type { TargetFamilyHook } from '@prisma-next/contract/types';
 import type { TargetMigrationsCapability } from './migrations';
 import type { CoreSchemaView } from './schema-view';
 
@@ -128,7 +133,8 @@ export interface ControlFamilyInstance<
 }
 
 /**
- * Base interface for control-plane target instances.
+ * Control-plane target instance interface.
+ * Extends the base TargetInstance with control-plane specific behavior.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -136,13 +142,11 @@ export interface ControlFamilyInstance<
 export interface ControlTargetInstance<
   TFamilyId extends string = string,
   TTargetId extends string = string,
-> {
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-}
+> extends TargetInstance<TFamilyId, TTargetId> {}
 
 /**
- * Base interface for control-plane adapter instances.
+ * Control-plane adapter instance interface.
+ * Extends the base AdapterInstance with control-plane specific behavior.
  * Families extend this with family-specific adapter interfaces.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
@@ -151,19 +155,19 @@ export interface ControlTargetInstance<
 export interface ControlAdapterInstance<
   TFamilyId extends string = string,
   TTargetId extends string = string,
-> {
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-}
+> extends AdapterInstance<TFamilyId, TTargetId> {}
 
 /**
- * Base interface for control-plane driver instances.
- * Replaces ControlPlaneDriver with plane-first naming.
+ * Control-plane driver instance interface.
+ * Extends the base DriverInstance with control-plane specific behavior.
  *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
-export interface ControlDriverInstance<TTargetId extends string = string> {
-  readonly targetId?: TTargetId;
+export interface ControlDriverInstance<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> extends DriverInstance<TFamilyId, TTargetId> {
   query<Row = Record<string, unknown>>(
     sql: string,
     params?: readonly unknown[],
@@ -172,7 +176,8 @@ export interface ControlDriverInstance<TTargetId extends string = string> {
 }
 
 /**
- * Base interface for control-plane extension instances.
+ * Control-plane extension instance interface.
+ * Extends the base ExtensionInstance with control-plane specific behavior.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
@@ -180,10 +185,7 @@ export interface ControlDriverInstance<TTargetId extends string = string> {
 export interface ControlExtensionInstance<
   TFamilyId extends string = string,
   TTargetId extends string = string,
-> {
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-}
+> extends ExtensionInstance<TFamilyId, TTargetId> {}
 
 /**
  * Operation context for propagating metadata through control-plane operation call chains.
@@ -300,7 +302,10 @@ export interface ControlAdapterDescriptor<
 export interface ControlDriverDescriptor<
   TFamilyId extends string,
   TTargetId extends string,
-  TDriverInstance extends ControlDriverInstance<TTargetId> = ControlDriverInstance<TTargetId>,
+  TDriverInstance extends ControlDriverInstance<TFamilyId, TTargetId> = ControlDriverInstance<
+    TFamilyId,
+    TTargetId
+  >,
 > extends DriverDescriptor<TFamilyId, TTargetId> {
   create(url: string): Promise<TDriverInstance>;
 }
