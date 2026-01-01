@@ -307,6 +307,11 @@ export function createDbInitCommand(): Command {
           }
 
           // Apply mode - execute runner
+          // Log main message once, then show individual operations via callbacks
+          if (!flags.quiet && flags.json !== 'object') {
+            console.log('Applying migration plan and verifying schema...');
+          }
+
           const callbacks = {
             onOperationStart: (op: MigrationPlanOperation) => {
               if (!flags.quiet && flags.json !== 'object') {
@@ -318,21 +323,22 @@ export function createDbInitCommand(): Command {
             },
           };
 
-          const runnerResult: MigrationRunnerResult = await withSpinner(
-            () =>
-              runner.execute({
-                plan: migrationPlan,
-                driver,
-                destinationContract: contractIR,
-                policy,
-                callbacks,
-                frameworkComponents,
-              }),
-            {
-              message: 'Applying migration plan...',
-              flags,
+          const runnerResult: MigrationRunnerResult = await runner.execute({
+            plan: migrationPlan,
+            driver,
+            destinationContract: contractIR,
+            policy,
+            callbacks,
+            // db init plans and applies back-to-back from a fresh introspection, so per-operation
+            // pre/postchecks and the idempotency probe are usually redundant overhead. We still
+            // enforce marker/origin compatibility and a full schema verification after apply.
+            executionChecks: {
+              prechecks: false,
+              postchecks: false,
+              idempotencyChecks: false,
             },
-          );
+            frameworkComponents,
+          });
 
           if (!runnerResult.ok) {
             throw errorRuntime(runnerResult.failure.summary, {

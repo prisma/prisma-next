@@ -172,28 +172,39 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
   ): Promise<Result<ApplyPlanSuccessValue, SqlMigrationRunnerFailure>> {
+    const checks = options.executionChecks;
+    const runPrechecks = checks?.prechecks !== false; // Default true
+    const runPostchecks = checks?.postchecks !== false; // Default true
+    const runIdempotency = checks?.idempotencyChecks !== false; // Default true
+
     let operationsExecuted = 0;
     const executedOperations: Array<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> = [];
     for (const operation of options.plan.operations) {
       options.callbacks?.onOperationStart?.(operation);
       try {
-        const postcheckAlreadySatisfied = await this.expectationsAreSatisfied(
-          driver,
-          operation.postcheck,
-        );
-        if (postcheckAlreadySatisfied) {
-          executedOperations.push(this.createPostcheckPreSatisfiedSkipRecord(operation));
-          continue;
+        // Idempotency probe: only run if both postchecks and idempotency checks are enabled
+        if (runPostchecks && runIdempotency) {
+          const postcheckAlreadySatisfied = await this.expectationsAreSatisfied(
+            driver,
+            operation.postcheck,
+          );
+          if (postcheckAlreadySatisfied) {
+            executedOperations.push(this.createPostcheckPreSatisfiedSkipRecord(operation));
+            continue;
+          }
         }
 
-        const precheckResult = await this.runExpectationSteps(
-          driver,
-          operation.precheck,
-          operation,
-          'precheck',
-        );
-        if (!precheckResult.ok) {
-          return precheckResult;
+        // Prechecks: only run if enabled
+        if (runPrechecks) {
+          const precheckResult = await this.runExpectationSteps(
+            driver,
+            operation.precheck,
+            operation,
+            'precheck',
+          );
+          if (!precheckResult.ok) {
+            return precheckResult;
+          }
         }
 
         const executeResult = await this.runExecuteSteps(driver, operation.execute, operation);
@@ -201,14 +212,17 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
           return executeResult;
         }
 
-        const postcheckResult = await this.runExpectationSteps(
-          driver,
-          operation.postcheck,
-          operation,
-          'postcheck',
-        );
-        if (!postcheckResult.ok) {
-          return postcheckResult;
+        // Postchecks: only run if enabled
+        if (runPostchecks) {
+          const postcheckResult = await this.runExpectationSteps(
+            driver,
+            operation.postcheck,
+            operation,
+            'postcheck',
+          );
+          if (!postcheckResult.ok) {
+            return postcheckResult;
+          }
         }
 
         executedOperations.push(operation);
