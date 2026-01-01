@@ -25,14 +25,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { computeMappings } from './contract';
 
-function resolveTargetId(target: string | TargetPackRef<'sql', string>): string {
-  if (typeof target === 'string') {
-    return target;
-  }
-
-  return target.targetId ?? target.id;
-}
-
 /**
  * Type-level mappings structure for contracts built via `defineContract()`.
  *
@@ -381,10 +373,8 @@ class SqlContractBuilder<
   }
 
   override target<T extends string>(
-    target: T | TargetPackRef<'sql', T>,
+    packRef: TargetPackRef<'sql', T>,
   ): SqlContractBuilder<CodecTypes, T, Tables, Models, CoreHash, Extensions, Capabilities> {
-    const targetId = resolveTargetId(target);
-
     return new SqlContractBuilder<
       CodecTypes,
       T,
@@ -395,16 +385,7 @@ class SqlContractBuilder<
       Capabilities
     >({
       ...this.state,
-      target: targetId,
-    });
-  }
-
-  override extensions<E extends Record<string, unknown>>(
-    extensions: E,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, E, Capabilities> {
-    return new SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, E, Capabilities>({
-      ...this.state,
-      extensions,
+      target: packRef.targetId,
     });
   }
 

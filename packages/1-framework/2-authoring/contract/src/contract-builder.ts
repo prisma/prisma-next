@@ -55,15 +55,6 @@ export class ContractBuilder<
     });
   }
 
-  extensions<E extends Record<string, unknown>>(
-    extensions: E,
-  ): ContractBuilder<Target, Tables, Models, CoreHash, E, Capabilities> {
-    return new ContractBuilder<Target, Tables, Models, CoreHash, E, Capabilities>({
-      ...this.state,
-      extensions,
-    });
-  }
-
   capabilities<C extends Record<string, Record<string, boolean>>>(
     capabilities: C,
   ): ContractBuilder<Target, Tables, Models, CoreHash, Extensions, C> {

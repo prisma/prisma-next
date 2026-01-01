@@ -36,26 +36,15 @@ describe('contract builder methods', () => {
     expect(() => builder.build()).toThrow('target is required');
   });
 
-  it('sets target correctly', () => {
-    const contract = defineContract<CodecTypes>().target('postgres').build();
-    expect(contract.target).toBe('postgres');
-  });
-
-  it('accepts pack refs for target selection', () => {
+  it('sets target correctly from pack ref', () => {
     const contract = defineContract<CodecTypes>().target(postgresTargetPack).build();
     expect(contract.target).toBe('postgres');
-  });
-
-  it('sets extensions correctly', () => {
-    const extensions = { pack: { config: true } };
-    const contract = defineContract<CodecTypes>().target('postgres').extensions(extensions).build();
-    expect(contract.extensions).toEqual(extensions);
   });
 
   it('sets capabilities correctly', () => {
     const capabilities = { feature: { enabled: true } };
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .capabilities(capabilities)
       .build();
     expect(contract.capabilities).toEqual(capabilities);
@@ -63,18 +52,18 @@ describe('contract builder methods', () => {
 
   it('sets coreHash correctly', () => {
     const hash = 'sha256:custom-hash';
-    const contract = defineContract<CodecTypes>().target('postgres').coreHash(hash).build();
+    const contract = defineContract<CodecTypes>().target(postgresTargetPack).coreHash(hash).build();
     expect(contract.coreHash).toBe(hash);
   });
 
   it('uses default coreHash when not provided', () => {
-    const contract = defineContract<CodecTypes>().target('postgres').build();
+    const contract = defineContract<CodecTypes>().target(postgresTargetPack).build();
     expect(contract.coreHash).toBe('sha256:ts-builder-placeholder');
   });
 
   it('table callback can return undefined', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .table('user', () => undefined)
       .build();
     expect(contract.storage.tables.user).toBeDefined();
@@ -82,7 +71,7 @@ describe('contract builder methods', () => {
 
   it('table callback can return different builder', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .table('user', (t) => {
         const builder = t.column('id', { type: int4Column });
         return builder;
@@ -93,7 +82,7 @@ describe('contract builder methods', () => {
 
   it('model callback can return undefined', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', () => undefined)
       .build();
@@ -102,7 +91,7 @@ describe('contract builder methods', () => {
 
   it('model callback can return different builder', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => {
         const builder = m.field('id', 'id');
@@ -114,7 +103,7 @@ describe('contract builder methods', () => {
 
   it('builds table without primary key', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .table('user', (t) => t.column('id', { type: int4Column }))
       .build();
     expect(contract.storage.tables.user.columns.id).toBeDefined();
@@ -123,7 +112,7 @@ describe('contract builder methods', () => {
 
   it('builds model with relations', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .table('post', (t) =>
         t
@@ -156,7 +145,7 @@ describe('contract builder methods', () => {
 
   it('builds contract with multiple tables and models', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .table('post', (t) =>
         t
@@ -184,7 +173,7 @@ describe('contract builder methods', () => {
 
   it('handles empty table state gracefully', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .table('user', () => undefined)
       .build();
     expect(contract.storage.tables).toBeDefined();
@@ -192,7 +181,7 @@ describe('contract builder methods', () => {
 
   it('handles empty model state gracefully', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', () => undefined)
       .build();
@@ -201,15 +190,13 @@ describe('contract builder methods', () => {
 
   it('builds contract with all optional fields', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .coreHash('sha256:custom')
-      .extensions({ pack: { config: true } })
       .capabilities({ feature: { enabled: true } })
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
     expect(contract.coreHash).toBe('sha256:custom');
-    expect(contract.extensions).toEqual({ pack: { config: true } });
     expect(contract.capabilities).toEqual({ feature: { enabled: true } });
   });
 });
@@ -223,7 +210,7 @@ describe('extensionPacks', () => {
 
   it('enables namespace entries for pack refs', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresTargetPack)
       .extensionPacks({ pgvector: pgvectorPack })
       .build();
 
@@ -233,7 +220,9 @@ describe('extensionPacks', () => {
   it('rejects non-extension pack refs', () => {
     const invalidPack = postgresTargetPack as unknown as ExtensionPackRef<'sql', 'postgres'>;
     expect(() =>
-      defineContract<CodecTypes>().target('postgres').extensionPacks({ invalid: invalidPack }),
+      defineContract<CodecTypes>()
+        .target(postgresTargetPack)
+        .extensionPacks({ invalid: invalidPack }),
     ).toThrow('extensionPacks() only accepts extension pack refs');
   });
 
@@ -244,13 +233,17 @@ describe('extensionPacks', () => {
     } as unknown as ExtensionPackRef<'sql', 'postgres'>;
 
     expect(() =>
-      defineContract<CodecTypes>().target('postgres').extensionPacks({ pgvector: wrongFamilyPack }),
+      defineContract<CodecTypes>()
+        .target(postgresTargetPack)
+        .extensionPacks({ pgvector: wrongFamilyPack }),
     ).toThrow('targets family \"document\" but this builder targets \"sql\"');
   });
 
   it('rejects target mismatches', () => {
     expect(() =>
-      defineContract<CodecTypes>().target('postgres').extensionPacks({ pgvector: mysqlTargetPack }),
+      defineContract<CodecTypes>()
+        .target(postgresTargetPack)
+        .extensionPacks({ pgvector: mysqlTargetPack }),
     ).toThrow('builder target is \"postgres\"');
   });
 });
