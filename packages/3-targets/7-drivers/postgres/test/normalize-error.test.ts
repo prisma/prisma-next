@@ -1,6 +1,7 @@
+import { access, readFile } from 'node:fs/promises';
 import { SqlConnectionError, SqlQueryError } from '@prisma-next/sql-errors';
 import { describe, expect, it } from 'vitest';
-import { normalizePgError } from '../src/normalize-error';
+import { isPostgresError, normalizePgError } from '../src/normalize-error';
 
 describe('normalizePgError', () => {
   describe('Postgres SQLSTATE errors', () => {
@@ -182,6 +183,114 @@ describe('normalizePgError', () => {
           expect(error.cause.stack).toBe('Error: Connection failed\n    at connect.js:5:3');
         }
       }
+    });
+  });
+});
+
+describe('isPostgresError', () => {
+  describe('Postgres SQLSTATE errors', () => {
+    it('returns true for errors with SQLSTATE codes', () => {
+      const pgError = new Error('duplicate key value violates unique constraint');
+      (pgError as { code?: string }).code = '23505';
+
+      expect(isPostgresError(pgError)).toBe(true);
+    });
+
+    it('returns true for errors with SQLSTATE codes and pg-specific properties', () => {
+      const pgError = new Error('duplicate key value violates unique constraint');
+      (pgError as { code?: string }).code = '23505';
+      (pgError as { constraint?: string }).constraint = 'user_email_unique';
+      (pgError as { table?: string }).table = 'user';
+
+      expect(isPostgresError(pgError)).toBe(true);
+    });
+  });
+
+  describe('Postgres errors with pg-specific properties', () => {
+    it('returns true for errors with constraint property', () => {
+      const pgError = new Error('constraint violation');
+      (pgError as { constraint?: string }).constraint = 'user_email_unique';
+
+      expect(isPostgresError(pgError)).toBe(true);
+    });
+
+    it('returns true for errors with table property', () => {
+      const pgError = new Error('table error');
+      (pgError as { table?: string }).table = 'user';
+
+      expect(isPostgresError(pgError)).toBe(true);
+    });
+
+    it('returns true for errors with column property', () => {
+      const pgError = new Error('column error');
+      (pgError as { column?: string }).column = 'email';
+
+      expect(isPostgresError(pgError)).toBe(true);
+    });
+
+    it('returns true for errors with detail property', () => {
+      const pgError = new Error('error with detail');
+      (pgError as { detail?: string }).detail = 'Key (email)=(test@example.com) already exists.';
+
+      expect(isPostgresError(pgError)).toBe(true);
+    });
+  });
+
+  describe('Node.js system errors', () => {
+    it('returns false for ENOENT errors', async () => {
+      // File system operation on non-existent file - fast and reliable
+      const nodeError = (await access('/this/file/definitely/does/not/exist-12345').catch(
+        (error) => error,
+      )) as Error & { code: string };
+
+      expect(nodeError.code).toBe('ENOENT');
+      expect(isPostgresError(nodeError)).toBe(false);
+    });
+
+    it('returns false for EACCES errors', async () => {
+      // File system operation on forbidden path - fast and reliable
+      // Try to access root directory on Unix systems
+      const nodeError = (await access('/root').catch((error) => error)) as Error & { code: string };
+
+      // May be EACCES or ENOENT depending on system, but both are system errors
+      expect(['EACCES', 'ENOENT']).toContain(nodeError.code);
+      expect(isPostgresError(nodeError)).toBe(false);
+    });
+
+    it('returns false for EISDIR errors', async () => {
+      // Try to read a directory as a file - fast and reliable
+      // This will fail with EISDIR on Unix systems
+      const nodeError = (await readFile('/').catch((error) => error)) as Error & { code: string };
+
+      // EISDIR is a system error, not a pg error
+      if (nodeError.code === 'EISDIR') {
+        expect(isPostgresError(nodeError)).toBe(false);
+      } else {
+        // On some systems this might be a different error, but still not a pg error
+        expect(isPostgresError(nodeError)).toBe(false);
+      }
+    });
+  });
+
+  describe('Other errors', () => {
+    it('returns false for errors without code or pg-specific properties', () => {
+      const genericError = new Error('Some generic error');
+
+      expect(isPostgresError(genericError)).toBe(false);
+    });
+
+    it('returns false for non-Error values', () => {
+      expect(isPostgresError('string')).toBe(false);
+      expect(isPostgresError(123)).toBe(false);
+      expect(isPostgresError(null)).toBe(false);
+      expect(isPostgresError(undefined)).toBe(false);
+    });
+
+    it('returns false for errors with unknown code format', () => {
+      const unknownError = new Error('Unknown error');
+      (unknownError as { code?: string }).code = 'UNKNOWN_CODE';
+
+      expect(isPostgresError(unknownError)).toBe(false);
     });
   });
 });
