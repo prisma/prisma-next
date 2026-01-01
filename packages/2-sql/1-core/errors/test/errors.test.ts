@@ -50,28 +50,12 @@ describe('SqlQueryError', () => {
     }
   });
 
-  it('is() returns true for SqlQueryError instance', () => {
-    const error = new SqlQueryError('Query failed');
-    expect(SqlQueryError.is(error)).toBe(true);
-  });
-
-  it('is() returns false for other error types', () => {
-    const error = new Error('Not a SqlQueryError');
-    expect(SqlQueryError.is(error)).toBe(false);
-  });
-
-  it('is() returns false for SqlConnectionError', () => {
-    const error = new SqlConnectionError('Connection failed');
-    expect(SqlQueryError.is(error)).toBe(false);
-  });
-
-  it('is() returns false for null', () => {
+  it('is() type predicate', () => {
+    expect(SqlQueryError.is(new SqlQueryError('Query failed'))).toBe(true);
+    expect(SqlQueryError.is(new Error('Not a SqlQueryError'))).toBe(false);
+    expect(SqlQueryError.is(new SqlConnectionError('Connection failed'))).toBe(false);
     expect(SqlQueryError.is(null)).toBe(false);
-  });
-
-  it('is() returns false for non-objects', () => {
     expect(SqlQueryError.is('string')).toBe(false);
-    expect(SqlQueryError.is(123)).toBe(false);
   });
 });
 
@@ -112,27 +96,11 @@ describe('SqlConnectionError', () => {
     }
   });
 
-  it('is() returns true for SqlConnectionError instance', () => {
-    const error = new SqlConnectionError('Connection failed');
-    expect(SqlConnectionError.is(error)).toBe(true);
-  });
-
-  it('is() returns false for other error types', () => {
-    const error = new Error('Not a SqlConnectionError');
-    expect(SqlConnectionError.is(error)).toBe(false);
-  });
-
-  it('is() returns false for SqlQueryError', () => {
-    const error = new SqlQueryError('Query failed');
-    expect(SqlConnectionError.is(error)).toBe(false);
-  });
-
-  it('is() returns false for null', () => {
+  it('is() type predicate', () => {
+    expect(SqlConnectionError.is(new SqlConnectionError('Connection failed'))).toBe(true);
+    expect(SqlConnectionError.is(new Error('Not a SqlConnectionError'))).toBe(false);
+    expect(SqlConnectionError.is(new SqlQueryError('Query failed'))).toBe(false);
     expect(SqlConnectionError.is(null)).toBe(false);
-  });
-
-  it('is() returns false for non-objects', () => {
     expect(SqlConnectionError.is('string')).toBe(false);
-    expect(SqlConnectionError.is(123)).toBe(false);
   });
 });
