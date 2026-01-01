@@ -14,6 +14,7 @@ export {
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
   errorHashMismatch,
+  errorJsonFormatNotSupported,
   errorMarkerMissing,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,

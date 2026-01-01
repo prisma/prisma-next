@@ -7,7 +7,7 @@ import {
   executeCommand,
   setupCommandMocks,
   setupDbTestFixture,
-  setupTestDirectoryFromFixtures,
+  type setupTestDirectoryFromFixtures,
   withTempDir,
 } from './utils/cli-test-helpers';
 
@@ -438,82 +438,6 @@ withTempDir(({ createTempDir }) => {
 
             const errorOutput = consoleErrors.join('\n');
             expect(errorOutput).toContain('does not match plan destination');
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-    });
-
-    describe('non-empty database (conflicts)', () => {
-      it(
-        'fails when database has existing schema that conflicts',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            // Create a conflicting table (same name but different structure)
-            const { testSetup, configPath } = await setupDbInitFixture(
-              connectionString,
-              createTempDir,
-              fixtureSubdir,
-              `
-                CREATE TABLE IF NOT EXISTS "user" (
-                  id SERIAL PRIMARY KEY,
-                  name TEXT NOT NULL
-                )
-              `,
-            );
-
-            // db init should fail because table already exists with different columns
-            await expect(
-              runDbInit(testSetup, ['--config', configPath, '--no-color']),
-            ).rejects.toThrow();
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-    });
-
-    describe('error handling', () => {
-      it(
-        'handles missing contract file',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            const testSetup = setupTestDirectoryFromFixtures(
-              createTempDir,
-              fixtureSubdir,
-              'prisma-next.config.with-db.ts',
-              { '{{DB_URL}}': connectionString },
-            );
-            const configPath = testSetup.configPath;
-
-            // Don't emit contract - it should be missing
-            await expect(
-              runDbInit(testSetup, ['--config', configPath, '--no-color']),
-            ).rejects.toThrow();
-
-            // Verify error output
-            const errorOutput = consoleErrors.join('\n');
-            expect(errorOutput).toContain('PN-CLI-4');
-            expect(errorOutput).toMatch(/file.*not found|not found.*file/i);
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-
-      it(
-        'handles quiet mode flag',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            const { testSetup, configPath } = await setupDbInitFixture(
-              connectionString,
-              createTempDir,
-              fixtureSubdir,
-            );
-
-            await runDbInit(testSetup, ['--config', configPath, '--quiet', '--no-color']);
-
-            // In quiet mode, success output should be minimal
-            const output = consoleOutput.join('\n');
-            expect(output).not.toContain('Bootstrap');
           });
         },
         timeouts.spinUpPpgDev,

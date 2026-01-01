@@ -198,6 +198,26 @@ export function errorFamilyReadMarkerSqlRequired(options?: {
 }
 
 /**
+ * JSON output format not supported.
+ */
+export function errorJsonFormatNotSupported(options: {
+  readonly command: string;
+  readonly format: string;
+  readonly supportedFormats: readonly string[];
+}): CliStructuredError {
+  return new CliStructuredError('4008', 'Unsupported JSON format', {
+    domain: 'CLI',
+    why: `The ${options.command} command does not support --json ${options.format}`,
+    fix: `Use --json ${options.supportedFormats.join(' or ')}, or omit --json for human output`,
+    meta: {
+      command: options.command,
+      format: options.format,
+      supportedFormats: options.supportedFormats,
+    },
+  });
+}
+
+/**
  * Driver is required for DB-connected commands but not provided.
  */
 export function errorDriverRequired(options?: { readonly why?: string }): CliStructuredError {

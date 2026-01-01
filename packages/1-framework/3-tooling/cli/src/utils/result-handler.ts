@@ -29,7 +29,7 @@ export function handleResult<T>(
   const envelope = result.error.toEnvelope();
 
   // Output error based on flags
-  if (flags.json === 'object') {
+  if (flags.json) {
     // JSON error to stderr
     console.error(formatErrorJson(envelope));
   } else {

@@ -12,6 +12,7 @@ import {
   errorDatabaseUrlRequired,
   errorDriverRequired,
   errorFileNotFound,
+  errorJsonFormatNotSupported,
   errorMigrationPlanningFailed,
   errorRuntime,
   errorTargetMigrationNotSupported,
@@ -69,7 +70,7 @@ export function createDbInitCommand(): Command {
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--plan', 'Preview planned operations without applying', false)
-    .option('--json [format]', 'Output as JSON (object or ndjson)', false)
+    .option('--json [format]', 'Output as JSON (object)', false)
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
     .option('-vv, --trace', 'Trace output: deep internals, stack traces')
@@ -81,6 +82,14 @@ export function createDbInitCommand(): Command {
       const startTime = Date.now();
 
       const result = await performAction(async () => {
+        if (flags.json === 'ndjson') {
+          throw errorJsonFormatNotSupported({
+            command: 'db init',
+            format: 'ndjson',
+            supportedFormats: ['object'],
+          });
+        }
+
         // Load config
         const config = await loadConfig(options.config);
         const configPath = options.config
