@@ -76,6 +76,8 @@ class ResultImpl<T, F> {
    * Creates a successful result.
    */
   static ok<T, F = never>(value: T): Ok<T> {
+    // TypeScript cannot express discriminated return types for a single implementation.
+    // Cast is safe: ok=true guarantees this is an Ok<T> at runtime.
     return new ResultImpl<T, F>(true, value) as unknown as Ok<T>;
   }
 
@@ -83,6 +85,8 @@ class ResultImpl<T, F> {
    * Creates an unsuccessful result.
    */
   static notOk<T = never, F = unknown>(failure: F): NotOk<F> {
+    // TypeScript cannot express discriminated return types for a single implementation.
+    // Cast is safe: ok=false guarantees this is a NotOk<F> at runtime.
     return new ResultImpl<T, F>(false, failure) as unknown as NotOk<F>;
   }
 
