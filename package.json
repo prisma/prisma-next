@@ -44,7 +44,7 @@
     "vitest": "catalog:"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,jsonc}": [

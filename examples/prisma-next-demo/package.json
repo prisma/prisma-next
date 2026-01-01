@@ -2,6 +2,9 @@
   "name": "prisma-next-demo",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "emit": "prisma-next contract emit",
     "db:drop": "tsx scripts/drop-db.ts",
