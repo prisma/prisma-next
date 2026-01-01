@@ -12,6 +12,7 @@ export type {
   ExecutionPlan,
   Expr,
   FieldType,
+  OperationManifest,
   ParamDescriptor,
   PlanMeta,
   PlanRefs,

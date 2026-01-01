@@ -8,6 +8,14 @@ import type {
 import { ModelBuilder } from './model-builder';
 import { TableBuilder } from './table-builder';
 
+/**
+ * Minimal pack ref interface for target selection.
+ * Family-specific builders can use more specific pack ref types.
+ */
+export interface TargetPackRefLike<T extends string = string> {
+  readonly targetId: T;
+}
+
 export class ContractBuilder<
   Target extends string | undefined = undefined,
   Tables extends Record<
@@ -47,11 +55,13 @@ export class ContractBuilder<
   }
 
   target<T extends string>(
-    target: T,
+    targetOrPackRef: T | TargetPackRefLike<T>,
   ): ContractBuilder<T, Tables, Models, CoreHash, Extensions, Capabilities> {
+    const targetId =
+      typeof targetOrPackRef === 'string' ? targetOrPackRef : targetOrPackRef.targetId;
     return new ContractBuilder<T, Tables, Models, CoreHash, Extensions, Capabilities>({
       ...this.state,
-      target,
+      target: targetId,
     });
   }
 

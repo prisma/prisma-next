@@ -334,7 +334,7 @@ class SqlContractBuilder<
     } as ContractBuilderMappings<CodecTypes>;
 
     const extensionNamespaces = this.state.extensionNamespaces ?? [];
-    const extensions = { ...(this.state.extensions || {}) };
+    const extensions: Record<string, unknown> = { ...(this.state.extensions || {}) };
     for (const namespace of extensionNamespaces) {
       if (!Object.hasOwn(extensions, namespace)) {
         extensions[namespace] = {};

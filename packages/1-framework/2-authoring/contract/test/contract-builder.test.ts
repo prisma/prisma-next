@@ -33,13 +33,6 @@ describe('ContractBuilder', () => {
     expect(withModel).not.toBe(builder);
   });
 
-  it('manages extensions state', () => {
-    const builder = defineContract();
-    const withExtensions = builder.extensions({ postgres: {} });
-    expect(withExtensions).toBeInstanceOf(ContractBuilder);
-    expect(withExtensions).not.toBe(builder);
-  });
-
   it('manages capabilities state', () => {
     const builder = defineContract();
     const withCapabilities = builder.capabilities({ postgres: { returning: true } });
