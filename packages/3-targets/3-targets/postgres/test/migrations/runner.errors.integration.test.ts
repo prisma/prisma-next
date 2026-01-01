@@ -1,5 +1,4 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import { SqlQueryError } from '@prisma-next/sql-errors';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner';
 import {
@@ -352,15 +351,14 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         if (!result.ok) {
           expect(result.failure.code).toBe('EXECUTION_FAILED');
           expect(result.failure.summary).toMatch(/Operation table\.user failed during execution/i);
-          expect(result.failure.meta).toBeDefined();
-          expect(result.failure.meta?.operationId).toBe('table.user');
-          expect(result.failure.meta?.stepDescription).toBe('create user table with invalid SQL');
-          expect(result.failure.meta?.sql).toBe(
-            'CREATE TABLE "user" (id INVALID_TYPE PRIMARY KEY)',
-          );
+          expect(result.failure.meta).toMatchObject({
+            operationId: 'table.user',
+            stepDescription: 'create user table with invalid SQL',
+            sql: 'CREATE TABLE "user" (id INVALID_TYPE PRIMARY KEY)',
+          });
           // Normalized error metadata should include sqlState
-          expect(result.failure.meta?.sqlState).toBeDefined();
-          expect(typeof result.failure.meta?.sqlState).toBe('string');
+          expect(result.failure.meta?.['sqlState']).toBeDefined();
+          expect(typeof result.failure.meta?.['sqlState']).toBe('string');
         }
 
         await expectNoMarkerOrLedgerWrites(driver!);
@@ -434,14 +432,14 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         expect(result.ok).toBe(false);
         if (!result.ok) {
           expect(result.failure.code).toBe('EXECUTION_FAILED');
-          expect(result.failure.meta).toBeDefined();
-          expect(result.failure.meta?.operationId).toBe('insert.duplicate');
-          expect(result.failure.meta?.stepDescription).toBe('insert duplicate email');
-          // Should include normalized constraint violation metadata
-          expect(result.failure.meta?.sqlState).toBe('23505'); // Unique violation SQLSTATE
-          expect(result.failure.meta?.constraint).toBe('user_email_unique');
-          expect(result.failure.meta?.table).toBe('user');
-          expect(result.failure.meta?.column).toBe('email');
+          expect(result.failure.meta).toMatchObject({
+            operationId: 'insert.duplicate',
+            stepDescription: 'insert duplicate email',
+            sqlState: '23505', // Unique violation SQLSTATE
+            constraint: 'user_email_unique',
+            table: 'user',
+            column: 'email',
+          });
         }
 
         // Verify transaction was rolled back (no rows inserted)
