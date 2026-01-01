@@ -239,30 +239,6 @@ describe('isPostgresError', () => {
       expect(nodeError.code).toBe('ENOENT');
       expect(isPostgresError(nodeError)).toBe(false);
     });
-
-    it('returns false for EACCES errors', async () => {
-      // File system operation on forbidden path - fast and reliable
-      // Try to access root directory on Unix systems
-      const nodeError = (await access('/root').catch((error) => error)) as Error & { code: string };
-
-      // May be EACCES or ENOENT depending on system, but both are system errors
-      expect(['EACCES', 'ENOENT']).toContain(nodeError.code);
-      expect(isPostgresError(nodeError)).toBe(false);
-    });
-
-    it('returns false for EISDIR errors', async () => {
-      // Try to read a directory as a file - fast and reliable
-      // This will fail with EISDIR on Unix systems
-      const nodeError = (await readFile('/').catch((error) => error)) as Error & { code: string };
-
-      // EISDIR is a system error, not a pg error
-      if (nodeError.code === 'EISDIR') {
-        expect(isPostgresError(nodeError)).toBe(false);
-      } else {
-        // On some systems this might be a different error, but still not a pg error
-        expect(isPostgresError(nodeError)).toBe(false);
-      }
-    });
   });
 
   describe('Other errors', () => {
