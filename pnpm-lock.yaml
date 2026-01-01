@@ -230,6 +230,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -252,6 +255,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -293,6 +299,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -305,6 +314,9 @@ importers:
 
   packages/1-framework/1-core/shared/plan:
     devDependencies:
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -436,6 +448,9 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.24
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@20.19.24)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -470,6 +485,9 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.24
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@20.19.24)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -513,6 +531,9 @@ importers:
       '@typescript-eslint/parser':
         specifier: ^8.0.0
         version: 8.50.1(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@20.19.24)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       eslint:
         specifier: ^9.0.0
         version: 9.39.2(jiti@2.6.1)
@@ -612,6 +633,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -665,6 +689,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.15.6
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       pg:
         specifier: ^8.11.5
         version: 8.16.3
@@ -693,6 +720,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -803,6 +833,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -843,6 +876,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -883,6 +919,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.15.6
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       pg:
         specifier: ^8.11.5
         version: 8.16.3
@@ -926,6 +965,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.15.6
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       pg:
         specifier: ^8.11.5
         version: 8.16.3
@@ -975,6 +1017,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.15.6
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       pg:
         specifier: ^8.11.5
         version: 8.16.3
@@ -1042,6 +1087,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -1097,6 +1145,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -1152,6 +1203,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       tsup:
         specifier: ^8.3.0
         version: 8.5.0(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -1204,6 +1258,9 @@ importers:
       '@types/pg-cursor':
         specifier: ^2.4.6
         version: 2.7.2
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       pg-mem:
         specifier: ^3.0.5
         version: 3.0.5
@@ -4966,6 +5023,23 @@ snapshots:
     dependencies:
       '@typescript-eslint/types': 8.50.1
       eslint-visitor-keys: 4.2.1
+
+  '@vitest/coverage-v8@4.0.16(vitest@4.0.16(@types/node@20.19.24)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))':
+    dependencies:
+      '@bcoe/v8-coverage': 1.0.2
+      '@vitest/utils': 4.0.16
+      ast-v8-to-istanbul: 0.3.10
+      istanbul-lib-coverage: 3.2.2
+      istanbul-lib-report: 3.0.1
+      istanbul-lib-source-maps: 5.0.6
+      istanbul-reports: 3.2.0
+      magicast: 0.5.1
+      obug: 2.1.1
+      std-env: 3.10.0
+      tinyrainbow: 3.0.3
+      vitest: 4.0.16(@types/node@20.19.24)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
+    transitivePeerDependencies:
+      - supports-color
 
   '@vitest/coverage-v8@4.0.16(vitest@4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))':
     dependencies:
