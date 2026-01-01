@@ -12,7 +12,7 @@ import type {
   TargetInstance,
 } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TargetFamilyHook } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, TargetFamilyHook } from '@prisma-next/contract/types';
 import type { TargetMigrationsCapability } from './migrations';
 import type { CoreSchemaView } from './schema-view';
 
@@ -101,6 +101,14 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
     readonly contractPath: string;
     readonly configPath?: string;
   }): Promise<SignDatabaseResult>;
+
+  /**
+   * Reads the contract marker from the database.
+   * Returns null if no marker exists.
+   */
+  readMarker(options: {
+    readonly driver: ControlDriverInstance<TFamilyId, string>;
+  }): Promise<ContractMarkerRecord | null>;
 
   /**
    * Introspects the database schema and returns a family-specific schema IR.

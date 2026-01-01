@@ -69,7 +69,6 @@ export const contract = defineContract<AllCodecTypes>()
     postgres: {
       version: '15.0.0',
     },
-    pg: {},
     pgvector: {},
   })
   .capabilities({

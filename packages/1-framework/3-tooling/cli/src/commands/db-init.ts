@@ -54,10 +54,10 @@ export function createDbInitCommand(): Command {
     command,
     'Bootstrap a database to match the current contract and write the contract marker',
     'Initializes a database to match your emitted contract using additive-only operations.\n' +
-      'Creates tables, columns, indexes, and constraints defined in your contract.\n' +
-      'Writes a contract marker to track the database state. This operation is idempotent.\n' +
-      '\n' +
-      'Currently supports empty databases only. Use --plan to preview changes without applying.',
+      'Creates any missing tables, columns, indexes, and constraints defined in your contract.\n' +
+      'Leaves existing compatible structures in place, surfaces conflicts when destructive changes\n' +
+      'would be required, and writes a contract marker to track the database state. Use --plan to\n' +
+      'preview changes without applying.',
   );
   command
     .configureHelp({
@@ -214,6 +214,77 @@ export function createDbInitCommand(): Command {
           }
 
           const migrationPlan: MigrationPlan = plannerResult.plan;
+
+          // Check for existing marker - handle idempotency and mismatch errors
+          const existingMarker = await familyInstance.readMarker({ driver });
+          if (existingMarker) {
+            const markerMatchesDestination =
+              existingMarker.coreHash === migrationPlan.destination.coreHash &&
+              (!migrationPlan.destination.profileHash ||
+                existingMarker.profileHash === migrationPlan.destination.profileHash);
+
+            if (markerMatchesDestination) {
+              // Already at destination - return success with no operations
+              const dbInitResult: DbInitResult = {
+                ok: true,
+                mode: options.plan ? 'plan' : 'apply',
+                plan: {
+                  targetId: migrationPlan.targetId,
+                  destination: migrationPlan.destination,
+                  operations: [],
+                },
+                ...(options.plan
+                  ? {}
+                  : {
+                      execution: { operationsPlanned: 0, operationsExecuted: 0 },
+                      marker: {
+                        coreHash: existingMarker.coreHash,
+                        profileHash: existingMarker.profileHash,
+                      },
+                    }),
+                summary: 'Database already at target contract state',
+                timings: { total: Date.now() - startTime },
+              };
+              return dbInitResult;
+            }
+
+            // Marker exists but doesn't match destination - fail
+            const coreHashMismatch = existingMarker.coreHash !== migrationPlan.destination.coreHash;
+            const profileHashMismatch =
+              migrationPlan.destination.profileHash &&
+              existingMarker.profileHash !== migrationPlan.destination.profileHash;
+
+            const mismatchParts: string[] = [];
+            if (coreHashMismatch) {
+              mismatchParts.push(
+                `coreHash (marker: ${existingMarker.coreHash}, destination: ${migrationPlan.destination.coreHash})`,
+              );
+            }
+            if (profileHashMismatch) {
+              mismatchParts.push(
+                `profileHash (marker: ${existingMarker.profileHash}, destination: ${migrationPlan.destination.profileHash})`,
+              );
+            }
+
+            throw errorRuntime(
+              `Existing contract marker does not match plan destination. Mismatch in ${mismatchParts.join(' and ')}.`,
+              {
+                why: 'Database has an existing contract marker that does not match the target contract',
+                fix: 'Use `prisma-next db migrate` to migrate from the existing contract, or drop the database and re-run `db init`',
+                meta: {
+                  code: 'MARKER_ORIGIN_MISMATCH',
+                  markerCoreHash: existingMarker.coreHash,
+                  destinationCoreHash: migrationPlan.destination.coreHash,
+                  ...(existingMarker.profileHash
+                    ? { markerProfileHash: existingMarker.profileHash }
+                    : {}),
+                  ...(migrationPlan.destination.profileHash
+                    ? { destinationProfileHash: migrationPlan.destination.profileHash }
+                    : {}),
+                },
+              },
+            );
+          }
 
           // Plan mode - don't execute
           if (options.plan) {

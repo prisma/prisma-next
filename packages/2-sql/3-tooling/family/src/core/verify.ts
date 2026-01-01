@@ -114,27 +114,40 @@ export async function readMarker(
   driver: ControlDriverInstance<'sql', string>,
 ): Promise<ContractMarkerRecord | null> {
   const markerStatement = readMarkerSql();
-  const queryResult = await driver.query<{
-    core_hash: string;
-    profile_hash: string;
-    contract_json: unknown | null;
-    canonical_version: number | null;
-    updated_at: Date | string;
-    app_tag: string | null;
-    meta: unknown | null;
-  }>(markerStatement.sql, markerStatement.params);
 
-  if (queryResult.rows.length === 0) {
-    return null;
+  try {
+    const queryResult = await driver.query<{
+      core_hash: string;
+      profile_hash: string;
+      contract_json: unknown | null;
+      canonical_version: number | null;
+      updated_at: Date | string;
+      app_tag: string | null;
+      meta: unknown | null;
+    }>(markerStatement.sql, markerStatement.params);
+
+    if (queryResult.rows.length === 0) {
+      return null;
+    }
+
+    const markerRow = queryResult.rows[0];
+    if (!markerRow) {
+      // If rows array has length > 0 but first element is undefined, this is an unexpected result structure
+      throw new Error('Database query returned unexpected result structure');
+    }
+
+    return parseContractMarkerRow(markerRow);
+  } catch (error) {
+    // Handle case where marker table doesn't exist yet (empty database)
+    // PostgreSQL error code 42P01 = undefined_table
+    if (
+      error instanceof Error &&
+      (error.message.includes('does not exist') || (error as { code?: string }).code === '42P01')
+    ) {
+      return null;
+    }
+    throw error;
   }
-
-  const markerRow = queryResult.rows[0];
-  if (!markerRow) {
-    // If rows array has length > 0 but first element is undefined, this is an unexpected result structure
-    throw new Error('Database query returned unexpected result structure');
-  }
-
-  return parseContractMarkerRow(markerRow);
 }
 
 /**
