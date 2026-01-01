@@ -351,50 +351,54 @@ describe('Codecs Integration Tests', () => {
     expect(row['created_at']).toBeNull();
   });
 
-  it('decodes multiple columns with different types', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      {
-        verify: { mode: 'onFirstUse', requireMarker: false },
-      },
-    );
+  it(
+    'decodes multiple columns with different types',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: false },
+        },
+      );
 
-    await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
-      'Test User',
-      95.5,
-      '2024-01-15T10:30:00.000Z',
-    ]);
+      await client.query('INSERT INTO test_data (name, score, created_at) VALUES ($1, $2, $3)', [
+        'Test User',
+        95.5,
+        '2024-01-15T10:30:00.000Z',
+      ]);
 
-    const context = createTestContext(fixtureContract, adapter);
-    const tables = schema(context).tables;
-    const testDataTable = tables['test_data']!;
-    const testDataColumns = testDataTable.columns;
-    const selectPlan = sql({ context })
-      .from(testDataTable)
-      .select({
-        name: testDataColumns['name']!,
-        score: testDataColumns['score']!,
-        created_at: testDataColumns['created_at']!,
-      })
-      .build();
+      const context = createTestContext(fixtureContract, adapter);
+      const tables = schema(context).tables;
+      const testDataTable = tables['test_data']!;
+      const testDataColumns = testDataTable.columns;
+      const selectPlan = sql({ context })
+        .from(testDataTable)
+        .select({
+          name: testDataColumns['name']!,
+          score: testDataColumns['score']!,
+          created_at: testDataColumns['created_at']!,
+        })
+        .build();
 
-    const rows = await executePlanAndCollect(runtime, selectPlan);
-    expect(rows.length).toBe(1);
+      const rows = await executePlanAndCollect(runtime, selectPlan);
+      expect(rows.length).toBe(1);
 
-    const row = rows[0]!;
-    expect(row).toMatchObject({
-      name: 'Test User',
-      score: 95.5,
-      created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
-    });
-    expect(typeof row['name']).toBe('string');
-    expect(typeof row['score']).toBe('number');
-    expect(typeof row['created_at']).toBe('string');
-  });
+      const row = rows[0]!;
+      expect(row).toMatchObject({
+        name: 'Test User',
+        score: 95.5,
+        created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
+      });
+      expect(typeof row['name']).toBe('string');
+      expect(typeof row['score']).toBe('number');
+      expect(typeof row['created_at']).toBe('string');
+    },
+    timeouts.databaseOperation,
+  );
 
   it('uses codec assignments from contract column types', async () => {
     const runtime = createTestRuntime(
