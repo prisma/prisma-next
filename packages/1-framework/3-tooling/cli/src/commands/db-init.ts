@@ -326,6 +326,11 @@ export function createDbInitCommand(): Command {
                 destinationContract: contractIR,
                 policy,
                 callbacks,
+                executionChecks: {
+                  prechecks: false,
+                  postchecks: false,
+                  idempotencyChecks: false,
+                },
                 frameworkComponents,
               }),
             {
