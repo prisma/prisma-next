@@ -368,7 +368,10 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
       'includes constraint violation metadata when SQL fails with constraint error',
       { timeout: testTimeout },
       async () => {
-        // First create the table successfully
+        // NOTE: This test intentionally creates the table outside the migration plan
+        // to test error handling for DML failures (INSERT/UPDATE/DELETE) during migration
+        // execution, rather than DDL errors (CREATE TABLE/ALTER TABLE). Other tests in
+        // this file focus on DDL errors where the migration creates schema objects.
         await driver!.query(`
           CREATE TABLE "user" (
             id uuid PRIMARY KEY,
