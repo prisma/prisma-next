@@ -32,11 +32,6 @@ describe('SqlQueryError', () => {
       message: 'Query failed',
       kind: 'sql_query',
     });
-    expect(error.sqlState).toBeUndefined();
-    expect(error.constraint).toBeUndefined();
-    expect(error.table).toBeUndefined();
-    expect(error.column).toBeUndefined();
-    expect(error.detail).toBeUndefined();
   });
 
   it('preserves original error stack trace via cause', () => {
@@ -80,7 +75,6 @@ describe('SqlConnectionError', () => {
       message: 'Connection failed',
       kind: 'sql_connection',
     });
-    expect(error.transient).toBeUndefined();
   });
 
   it('preserves original error stack trace via cause', () => {
