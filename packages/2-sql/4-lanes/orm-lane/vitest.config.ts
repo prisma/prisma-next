@@ -23,10 +23,10 @@ export default defineConfig({
         '**/orm-types.ts', // Types-only file
       ],
       thresholds: {
-        lines: 84,
-        branches: 69,
-        functions: 83,
-        statements: 84,
+        lines: 95,
+        branches: 87,
+        functions: 95,
+        statements: 95,
       },
     },
   },

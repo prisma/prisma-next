@@ -23,10 +23,10 @@ export default defineConfig({
         'src/utils/assertions.ts', // Assertion helpers - tested indirectly, impossible states
       ],
       thresholds: {
-        lines: 90,
-        branches: 77,
+        lines: 95,
+        branches: 86,
         functions: 95,
-        statements: 90,
+        statements: 95,
       },
     },
   },

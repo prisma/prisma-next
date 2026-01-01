@@ -25,10 +25,10 @@ export default defineConfig({
         'src/codecs/validation.ts', // TODO(TML-1786): Add tests - currently 50% coverage
       ],
       thresholds: {
-        lines: 70,
+        lines: 84,
         branches: 50,
-        functions: 77,
-        statements: 70,
+        functions: 85,
+        statements: 84,
       },
     },
   },
