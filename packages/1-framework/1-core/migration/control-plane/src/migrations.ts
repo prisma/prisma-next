@@ -132,6 +132,32 @@ export interface MigrationRunnerFailure {
 export type MigrationRunnerResult = Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>;
 
 // ============================================================================
+// Execution Checks Configuration
+// ============================================================================
+
+/**
+ * Execution-time checks configuration for migration runners.
+ * All checks default to `true` (enabled) when omitted.
+ */
+export interface MigrationRunnerExecutionChecks {
+  /**
+   * Whether to run prechecks before executing operations.
+   * Defaults to `true` (prechecks are run).
+   */
+  readonly prechecks?: boolean;
+  /**
+   * Whether to run postchecks after executing operations.
+   * Defaults to `true` (postchecks are run).
+   */
+  readonly postchecks?: boolean;
+  /**
+   * Whether to run idempotency probe (check if postcheck is already satisfied before execution).
+   * Defaults to `true` (idempotency probe is run).
+   */
+  readonly idempotencyChecks?: boolean;
+}
+
+// ============================================================================
 // Planner and Runner Interfaces
 // ============================================================================
 
@@ -181,6 +207,11 @@ export interface MigrationRunner<
       onOperationStart?(op: MigrationPlanOperation): void;
       onOperationComplete?(op: MigrationPlanOperation): void;
     };
+    /**
+     * Execution-time checks configuration.
+     * All checks default to `true` (enabled) when omitted.
+     */
+    readonly executionChecks?: MigrationRunnerExecutionChecks;
     /**
      * Active framework components participating in this composition.
      * Families/targets can interpret this list to derive family-specific metadata.

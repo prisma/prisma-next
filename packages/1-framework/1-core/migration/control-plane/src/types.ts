@@ -28,6 +28,7 @@ export type {
   MigrationPlannerSuccessResult,
   MigrationPlanOperation,
   MigrationRunner,
+  MigrationRunnerExecutionChecks,
   MigrationRunnerFailure,
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
