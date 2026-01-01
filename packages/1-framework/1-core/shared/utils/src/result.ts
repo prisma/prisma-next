@@ -43,17 +43,33 @@ export type Result<T, F> = Ok<T> | NotOk<F>;
  */
 class ResultImpl<T, F> {
   readonly ok: boolean;
-  readonly value!: T;
-  readonly failure!: F;
+  private readonly _value?: T;
+  private readonly _failure?: F;
 
   private constructor(ok: boolean, valueOrFailure: T | F) {
     this.ok = ok;
     if (ok) {
-      this.value = valueOrFailure as T;
+      this._value = valueOrFailure as T;
     } else {
-      this.failure = valueOrFailure as F;
+      this._failure = valueOrFailure as F;
     }
     Object.freeze(this);
+  }
+
+  get value(): T {
+    if (!this.ok) {
+      throw new Error('Cannot access value on NotOk result');
+    }
+    // biome-ignore lint/style/noNonNullAssertion: must be present if ok is true
+    return this._value!;
+  }
+
+  get failure(): F {
+    if (this.ok) {
+      throw new Error('Cannot access failure on Ok result');
+    }
+    // biome-ignore lint/style/noNonNullAssertion: must be present if ok is false
+    return this._failure!;
   }
 
   /**

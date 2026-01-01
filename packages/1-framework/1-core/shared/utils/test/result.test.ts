@@ -66,4 +66,26 @@ describe('result', () => {
       expect(() => result.assertNotOk()).toThrow('Expected NotOk result but got Ok');
     });
   });
+
+  describe('property access', () => {
+    it('allows accessing value on Ok results', () => {
+      const result = ok(42);
+      expect(result.value).toBe(42);
+    });
+
+    it('throws when accessing failure on Ok results', () => {
+      const result = ok(42);
+      expect(() => result.failure).toThrow('Cannot access failure on Ok result');
+    });
+
+    it('allows accessing failure on NotOk results', () => {
+      const result = notOk('error');
+      expect(result.failure).toBe('error');
+    });
+
+    it('throws when accessing value on NotOk results', () => {
+      const result = notOk('error');
+      expect(() => result.value).toThrow('Cannot access value on NotOk result');
+    });
+  });
 });
