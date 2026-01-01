@@ -1,7 +1,4 @@
-import type {
-  ExtensionPackManifest,
-  OperationManifest,
-} from '@prisma-next/contract/pack-manifest-types';
+import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
@@ -10,8 +7,6 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
-// Import private function from same package (test utility needs it)
-import { convertOperationManifest } from './instance';
 
 /**
  * Assembles an operation registry from descriptors (adapter, target, extensions).
@@ -29,7 +24,7 @@ export function assembleOperationRegistry(
   const registry = createOperationRegistry();
 
   for (const descriptor of descriptors) {
-    const operations = descriptor.operations ?? descriptor.manifest.operations ?? [];
+    const operations = descriptor.operations ?? [];
     for (const operationManifest of operations as ReadonlyArray<OperationManifest>) {
       const signature = convertOperationManifest(operationManifest);
       registry.register(signature);
@@ -52,7 +47,7 @@ export function extractCodecTypeImports(
   const imports: TypesImportSpec[] = [];
 
   for (const descriptor of descriptors) {
-    const types = descriptor.types ?? descriptor.manifest.types;
+    const types = descriptor.types;
     const codecTypes = types?.codecTypes;
     if (codecTypes?.import) {
       imports.push(codecTypes.import);
@@ -75,7 +70,7 @@ export function extractOperationTypeImports(
   const imports: TypesImportSpec[] = [];
 
   for (const descriptor of descriptors) {
-    const types = descriptor.types ?? descriptor.manifest.types;
+    const types = descriptor.types;
     const operationTypes = types?.operationTypes;
     if (operationTypes?.import) {
       imports.push(operationTypes.import);
@@ -119,72 +114,4 @@ export function extractExtensionIds(
   }
 
   return ids;
-}
-
-/**
- * Extracts codec type imports from extension packs for contract.d.ts generation.
- * Pack-based version for use in tests.
- */
-export function extractCodecTypeImportsFromPacks(
-  packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-): ReadonlyArray<TypesImportSpec> {
-  const imports: TypesImportSpec[] = [];
-
-  for (const pack of packs) {
-    const codecTypes = pack.manifest.types?.codecTypes;
-    if (codecTypes?.import) {
-      imports.push(codecTypes.import);
-    }
-  }
-
-  return imports;
-}
-
-/**
- * Extracts operation type imports from extension packs for contract.d.ts generation.
- * Pack-based version for use in tests.
- */
-export function extractOperationTypeImportsFromPacks(
-  packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-): ReadonlyArray<TypesImportSpec> {
-  const imports: TypesImportSpec[] = [];
-
-  for (const pack of packs) {
-    const operationTypes = pack.manifest.types?.operationTypes;
-    if (operationTypes?.import) {
-      imports.push(operationTypes.import);
-    }
-  }
-
-  return imports;
-}
-
-/**
- * Assembles an operation registry from extension packs.
- * Pack-based version for use in tests.
- */
-export function assembleOperationRegistryFromPacks(
-  packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-): OperationRegistry {
-  const registry = createOperationRegistry();
-
-  for (const pack of packs) {
-    const operations = pack.manifest.operations ?? [];
-    for (const operationManifest of operations as ReadonlyArray<OperationManifest>) {
-      const signature = convertOperationManifest(operationManifest);
-      registry.register(signature);
-    }
-  }
-
-  return registry;
-}
-
-/**
- * Extracts extension IDs from packs.
- * Pack-based version for use in tests.
- */
-export function extractExtensionIdsFromPacks(
-  packs: ReadonlyArray<{ readonly manifest: ExtensionPackManifest }>,
-): ReadonlyArray<string> {
-  return packs.map((pack) => pack.manifest.id);
 }
