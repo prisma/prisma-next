@@ -39,6 +39,7 @@
     { "path": "./packages/1-framework/4-runtime-executor" },
 
     { "path": "./packages/2-sql/1-core/contract" },
+    { "path": "./packages/2-sql/1-core/errors" },
     { "path": "./packages/2-sql/1-core/operations" },
     { "path": "./packages/2-sql/1-core/schema-ir" },
 
