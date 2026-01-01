@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import { errorRuntime } from '@prisma-next/core-control-plane/errors';
 import type {
   ControlDriverDescriptor,
   ControlDriverInstance,
@@ -94,8 +95,49 @@ const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', Postg
     manifest: loadDriverManifest(),
     async create(url: string): Promise<PostgresControlDriver> {
       const client = new Client({ connectionString: url });
-      await client.connect();
-      return new PostgresControlDriver(client);
+      try {
+        await client.connect();
+        return new PostgresControlDriver(client);
+      } catch (error) {
+        const normalized = normalizePgError(error);
+
+        const redacted: { host?: string; port?: string; database?: string; username?: string } = {};
+        try {
+          const parsed = new URL(url);
+          if (parsed.hostname) {
+            redacted.host = parsed.hostname;
+          }
+          if (parsed.port) {
+            redacted.port = parsed.port;
+          }
+          if (parsed.pathname) {
+            const database = parsed.pathname.replace(/^\//, '');
+            if (database) {
+              redacted.database = database;
+            }
+          }
+          if (parsed.username) {
+            redacted.username = parsed.username;
+          }
+        } catch {
+          // ignore URL parse errors; keep meta minimal
+        }
+
+        try {
+          await client.end();
+        } catch {
+          // ignore
+        }
+
+        throw errorRuntime('Database connection failed', {
+          why: normalized.message,
+          fix: 'Verify the database URL, ensure the database is reachable, and confirm credentials/permissions',
+          meta: {
+            code: (normalized as { code?: unknown }).code,
+            ...redacted,
+          },
+        });
+      }
     },
   };
 

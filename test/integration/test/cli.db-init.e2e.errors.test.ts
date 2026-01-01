@@ -166,5 +166,57 @@ withTempDir(({ createTempDir }) => {
         timeouts.spinUpPpgDev,
       );
     });
+
+    describe('connect failure', () => {
+      it(
+        'returns structured error with --json',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            const { testSetup, configPath } = await setupDbInitFixture(
+              connectionString,
+              createTempDir,
+              fixtureSubdir,
+            );
+
+            const badUrl = (() => {
+              const url = new URL(connectionString);
+              url.port = '1';
+              return url.toString();
+            })();
+
+            consoleOutput.length = 0;
+            consoleErrors.length = 0;
+
+            await expect(
+              runDbInit(testSetup, [
+                '--config',
+                configPath,
+                '--db',
+                badUrl,
+                '--json',
+                '--no-color',
+              ]),
+            ).rejects.toThrow();
+
+            expect(consoleOutput.join('\n').trim()).toBe('');
+
+            const errorText = consoleErrors.join('\n').trim();
+            const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+
+            expect(errorJson).toMatchObject({
+              code: 'PN-RTM-3000',
+              domain: 'RTM',
+              summary: 'Database connection failed',
+              meta: {
+                port: '1',
+              },
+            });
+
+            expect(errorJson).not.toHaveProperty('meta.password');
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
   });
 });

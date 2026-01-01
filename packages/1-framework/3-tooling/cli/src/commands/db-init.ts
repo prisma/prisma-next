@@ -172,10 +172,49 @@ export function createDbInitCommand(): Command {
         const migrations = config.target.migrations;
 
         // Create driver
-        const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
-          message: 'Connecting to database...',
-          flags,
-        });
+        let driver: Awaited<ReturnType<(typeof driverDescriptor)['create']>>;
+        try {
+          driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
+            message: 'Connecting to database...',
+            flags,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+
+          const redacted: { host?: string; port?: string; database?: string; username?: string } =
+            {};
+          try {
+            const parsed = new URL(dbUrl);
+            if (parsed.hostname) {
+              redacted.host = parsed.hostname;
+            }
+            if (parsed.port) {
+              redacted.port = parsed.port;
+            }
+            if (parsed.pathname) {
+              const database = parsed.pathname.replace(/^\//, '');
+              if (database) {
+                redacted.database = database;
+              }
+            }
+            if (parsed.username) {
+              redacted.username = parsed.username;
+            }
+          } catch {
+            // ignore URL parse errors; keep meta minimal
+          }
+
+          throw errorRuntime('Database connection failed', {
+            why: message,
+            fix: 'Verify the database URL, ensure the database is reachable, and confirm credentials/permissions',
+            meta: {
+              ...(typeof (error as { code?: unknown }).code !== 'undefined'
+                ? { code: (error as { code?: unknown }).code }
+                : {}),
+              ...redacted,
+            },
+          });
+        }
 
         try {
           // Create family instance
