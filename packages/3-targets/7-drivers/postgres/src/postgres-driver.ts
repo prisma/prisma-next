@@ -204,7 +204,7 @@ class PostgresDriverImpl implements SqlDriver {
         yield row;
       }
     } catch (error) {
-      normalizePgError(error);
+      throw normalizePgError(error);
     }
   }
 }
