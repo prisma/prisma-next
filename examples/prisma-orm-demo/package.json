@@ -35,7 +35,7 @@
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
     "@prisma/dev": "catalog:",
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.0",
     "@types/pg": "^8.11.10",
     "dotenv": "^16.4.5",
     "prisma": "^6.0.0",
