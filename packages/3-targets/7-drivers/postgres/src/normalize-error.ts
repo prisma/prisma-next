@@ -2,6 +2,14 @@ import { SqlConnectionError, SqlQueryError } from '@prisma-next/sql-errors';
 
 /**
  * Postgres error shape from the pg library.
+ *
+ * Note: The pg library doesn't export a DatabaseError type or interface, but errors
+ * thrown by pg.query() and pg.Client have this shape at runtime. We define this
+ * interface to match the actual runtime structure documented in the pg library
+ * (https://github.com/brianc/node-postgres/blob/master/packages/pg/lib/errors.js).
+ *
+ * The @types/pg package also doesn't provide comprehensive error type definitions,
+ * so we define our own interface based on the runtime error properties.
  */
 interface PostgresError extends Error {
   readonly code?: string;
@@ -78,6 +86,26 @@ function isTransientConnectionError(error: Error): boolean {
 }
 
 /**
+ * Type predicate to check if an error is a Postgres error from the pg library.
+ * Postgres errors have a `code` property that distinguishes them from other errors.
+ */
+export function isPostgresError(error: unknown): error is PostgresError {
+  return error instanceof Error && typeof (error as { code?: unknown }).code === 'string';
+}
+
+/**
+ * Checks if an error is an "already connected" error from pg.Client.connect().
+ * When calling connect() on an already-connected client, pg throws an error that can be safely ignored.
+ */
+export function isAlreadyConnectedError(error: unknown): error is Error {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return message.includes('already') && message.includes('connected');
+}
+
+/**
  * Checks if an error code is a Postgres SQLSTATE (5-character alphanumeric code).
  * SQLSTATE codes are standardized SQL error codes (e.g., '23505' for unique violation).
  */
@@ -113,14 +141,33 @@ export function normalizePgError(error: unknown): never {
 
   // Check for Postgres SQLSTATE (query errors)
   if (isPostgresSqlState(pgError.code)) {
-    throw new SqlQueryError(error.message, {
+    // isPostgresSqlState ensures code is defined and is a valid SQLSTATE
+    // biome-ignore lint/style/noNonNullAssertion: isPostgresSqlState guarantees code is defined
+    const sqlState = pgError.code!;
+    const options: {
+      cause: Error;
+      sqlState: string;
+      constraint?: string;
+      table?: string;
+      column?: string;
+      detail?: string;
+    } = {
       cause: error,
-      sqlState: pgError.code,
-      constraint: pgError.constraint,
-      table: pgError.table,
-      column: pgError.column,
-      detail: pgError.detail,
-    });
+      sqlState,
+    };
+    if (pgError.constraint !== undefined) {
+      options.constraint = pgError.constraint;
+    }
+    if (pgError.table !== undefined) {
+      options.table = pgError.table;
+    }
+    if (pgError.column !== undefined) {
+      options.column = pgError.column;
+    }
+    if (pgError.detail !== undefined) {
+      options.detail = pgError.detail;
+    }
+    throw new SqlQueryError(error.message, options);
   }
 
   // Check for connection errors

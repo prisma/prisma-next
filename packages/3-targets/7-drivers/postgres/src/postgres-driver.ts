@@ -14,7 +14,7 @@ import type {
 import { Pool } from 'pg';
 import Cursor from 'pg-cursor';
 import { callbackToPromise } from './callback-to-promise';
-import { normalizePgError } from './normalize-error';
+import { isAlreadyConnectedError, isPostgresError, normalizePgError } from './normalize-error';
 
 export type QueryResult<T extends QueryResultRow = QueryResultRow> = PgQueryResult<T>;
 
@@ -66,14 +66,12 @@ class PostgresDriverImpl implements SqlDriver {
           if (!(cursorError instanceof Error)) {
             throw cursorError;
           }
-          // Check if this is a pg error (has code property) - if so, normalize and throw
+          // Check if this is a pg error - if so, normalize and throw
           // Otherwise, fall back to buffered mode for cursor-specific errors
-          const pgError = cursorError as { code?: string };
-          if (pgError.code) {
-            // Has a code property - likely a pg error, normalize and throw
+          if (isPostgresError(cursorError)) {
             normalizePgError(cursorError);
           }
-          // No code property - cursor-specific error, fall back to buffered mode
+          // Not a pg error - cursor-specific error, fall back to buffered mode
         }
       }
 
@@ -154,12 +152,7 @@ class PostgresDriverImpl implements SqlDriver {
         } catch (error: unknown) {
           // If already connected, pg throws an error - ignore it and proceed
           // Re-throw other errors (actual connection failures)
-          if (error instanceof Error) {
-            const message = error.message.toLowerCase();
-            if (!message.includes('already') && !message.includes('connected')) {
-              throw error;
-            }
-          } else {
+          if (!isAlreadyConnectedError(error)) {
             throw error;
           }
         }
