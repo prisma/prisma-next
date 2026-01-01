@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { SqlQueryError } from '@prisma-next/sql-errors';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner';
 import {
@@ -297,6 +298,157 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
         // Verify no marker/ledger writes
         await expectNoMarkerOrLedgerWrites(driver!);
+      },
+    );
+  });
+
+  describe('when an operation execute step fails with SQL error', () => {
+    it(
+      'fails with EXECUTION_FAILED error and includes normalized error metadata',
+      { timeout: testTimeout },
+      async () => {
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+        // Create a plan with SQL that will fail (syntax error)
+        const planWithInvalidSql = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [
+            {
+              id: 'table.user',
+              label: 'Create user table with invalid SQL',
+              summary: 'The execute SQL has a syntax error',
+              operationClass: 'additive',
+              target: {
+                id: 'postgres',
+                details: {
+                  schema: 'public',
+                  objectType: 'table',
+                  name: 'user',
+                },
+              },
+              precheck: [],
+              execute: [
+                {
+                  description: 'create user table with invalid SQL',
+                  sql: 'CREATE TABLE "user" (id INVALID_TYPE PRIMARY KEY)',
+                },
+              ],
+              postcheck: [],
+            },
+          ],
+        });
+
+        const result = await runner.execute({
+          plan: planWithInvalidSql,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.failure.code).toBe('EXECUTION_FAILED');
+          expect(result.failure.summary).toMatch(/Operation table\.user failed during execution/i);
+          expect(result.failure.meta).toBeDefined();
+          expect(result.failure.meta?.operationId).toBe('table.user');
+          expect(result.failure.meta?.stepDescription).toBe('create user table with invalid SQL');
+          expect(result.failure.meta?.sql).toBe(
+            'CREATE TABLE "user" (id INVALID_TYPE PRIMARY KEY)',
+          );
+          // Normalized error metadata should include sqlState
+          expect(result.failure.meta?.sqlState).toBeDefined();
+          expect(typeof result.failure.meta?.sqlState).toBe('string');
+        }
+
+        await expectNoMarkerOrLedgerWrites(driver!);
+
+        // Verify table was not created (rolled back)
+        const tableRow = await driver!.query<{ exists: boolean }>(
+          `select to_regclass('public."user"') is not null as exists`,
+        );
+        expect(tableRow.rows[0]?.exists).toBe(false);
+      },
+    );
+
+    it(
+      'includes constraint violation metadata when SQL fails with constraint error',
+      { timeout: testTimeout },
+      async () => {
+        // First create the table successfully
+        await driver!.query(`
+          CREATE TABLE "user" (
+            id uuid PRIMARY KEY,
+            email text NOT NULL,
+            CONSTRAINT user_email_unique UNIQUE (email)
+          )
+        `);
+
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+        // Create a plan that tries to insert duplicate email (will fail with constraint violation)
+        const planWithConstraintViolation = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [
+            {
+              id: 'insert.duplicate',
+              label: 'Insert duplicate email',
+              summary: 'Tries to insert a duplicate email which violates unique constraint',
+              operationClass: 'additive',
+              target: {
+                id: 'postgres',
+                details: {
+                  schema: 'public',
+                  objectType: 'table',
+                  name: 'user',
+                },
+              },
+              precheck: [],
+              execute: [
+                {
+                  description: 'insert first user',
+                  sql: `INSERT INTO "user" (id, email) VALUES ('00000000-0000-0000-0000-000000000001', 'test@example.com')`,
+                },
+                {
+                  description: 'insert duplicate email',
+                  sql: `INSERT INTO "user" (id, email) VALUES ('00000000-0000-0000-0000-000000000002', 'test@example.com')`,
+                },
+              ],
+              postcheck: [],
+            },
+          ],
+        });
+
+        const result = await runner.execute({
+          plan: planWithConstraintViolation,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.failure.code).toBe('EXECUTION_FAILED');
+          expect(result.failure.meta).toBeDefined();
+          expect(result.failure.meta?.operationId).toBe('insert.duplicate');
+          expect(result.failure.meta?.stepDescription).toBe('insert duplicate email');
+          // Should include normalized constraint violation metadata
+          expect(result.failure.meta?.sqlState).toBe('23505'); // Unique violation SQLSTATE
+          expect(result.failure.meta?.constraint).toBe('user_email_unique');
+          expect(result.failure.meta?.table).toBe('user');
+          expect(result.failure.meta?.column).toBe('email');
+        }
+
+        // Verify transaction was rolled back (no rows inserted)
+        const countRow = await driver!.query<{ count: string }>(
+          'SELECT count(*)::text as count FROM "user"',
+        );
+        expect(countRow.rows[0]?.count).toBe('0');
       },
     );
   });
