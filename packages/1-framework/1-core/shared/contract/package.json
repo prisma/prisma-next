@@ -33,6 +33,10 @@
       "types": "./dist/exports/types.d.ts",
       "import": "./dist/exports/types.js"
     },
+    "./pack-ref-types": {
+      "types": "./dist/exports/pack-ref-types.d.ts",
+      "import": "./dist/exports/pack-ref-types.js"
+    },
     "./pack-manifest-types": {
       "types": "./dist/exports/pack-manifest-types.d.ts",
       "import": "./dist/exports/pack-manifest-types.js"

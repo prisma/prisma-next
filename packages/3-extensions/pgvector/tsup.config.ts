@@ -7,6 +7,7 @@ export default defineConfig({
     'codec-types': 'src/exports/codec-types.ts',
     'column-types': 'src/exports/column-types.ts',
     'operation-types': 'src/exports/operation-types.ts',
+    pack: 'src/exports/pack.ts',
   },
   outDir: 'dist/exports',
   format: ['esm'],
