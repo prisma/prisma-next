@@ -8,6 +8,7 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import { type } from 'arktype';
 import { Client } from 'pg';
+import { normalizePgError } from '../normalize-error';
 
 /**
  * Postgres control driver instance for control-plane operations.
@@ -27,8 +28,12 @@ export class PostgresControlDriver implements ControlDriverInstance<'sql', 'post
     sql: string,
     params?: readonly unknown[],
   ): Promise<{ readonly rows: Row[] }> {
-    const result = await this.client.query(sql, params as unknown[] | undefined);
-    return { rows: result.rows as Row[] };
+    try {
+      const result = await this.client.query(sql, params as unknown[] | undefined);
+      return { rows: result.rows as Row[] };
+    } catch (error) {
+      throw normalizePgError(error);
+    }
   }
 
   async close(): Promise<void> {

@@ -14,6 +14,7 @@ import type {
 import { Pool } from 'pg';
 import Cursor from 'pg-cursor';
 import { callbackToPromise } from './callback-to-promise';
+import { isAlreadyConnectedError, isPostgresError, normalizePgError } from './normalize-error';
 
 export type QueryResult<T extends QueryResultRow = QueryResultRow> = PgQueryResult<T>;
 
@@ -65,12 +66,20 @@ class PostgresDriverImpl implements SqlDriver {
           if (!(cursorError instanceof Error)) {
             throw cursorError;
           }
+          // Check if this is a pg error - if so, normalize and throw
+          // Otherwise, fall back to buffered mode for cursor-specific errors
+          if (isPostgresError(cursorError)) {
+            throw normalizePgError(cursorError);
+          }
+          // Not a pg error - cursor-specific error, fall back to buffered mode
         }
       }
 
       for await (const row of this.executeBuffered(client, request.sql, request.params)) {
         yield row as Row;
       }
+    } catch (error) {
+      throw normalizePgError(error);
     } finally {
       await this.releaseClient(client);
     }
@@ -82,6 +91,8 @@ class PostgresDriverImpl implements SqlDriver {
     try {
       const result = await client.query(text, request.params as unknown[] | undefined);
       return { rows: result.rows as ReadonlyArray<Record<string, unknown>> };
+    } catch (error) {
+      throw normalizePgError(error);
     } finally {
       await this.releaseClient(client);
     }
@@ -95,6 +106,8 @@ class PostgresDriverImpl implements SqlDriver {
     try {
       const result = await client.query(sql, params as unknown[] | undefined);
       return result as unknown as SqlQueryResult<Row>;
+    } catch (error) {
+      throw normalizePgError(error);
     } finally {
       await this.releaseClient(client);
     }
@@ -139,12 +152,7 @@ class PostgresDriverImpl implements SqlDriver {
         } catch (error: unknown) {
           // If already connected, pg throws an error - ignore it and proceed
           // Re-throw other errors (actual connection failures)
-          if (error instanceof Error) {
-            const message = error.message.toLowerCase();
-            if (!message.includes('already') && !message.includes('connected')) {
-              throw error;
-            }
-          } else {
+          if (!isAlreadyConnectedError(error)) {
             throw error;
           }
         }

@@ -13,6 +13,7 @@ import type {
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { readMarker } from '@prisma-next/family-sql/verify';
+import { SqlQueryError } from '@prisma-next/sql-errors';
 import type { Result } from '@prisma-next/utils/result';
 import { ok, okVoid } from '@prisma-next/utils/result';
 import type { PostgresPlanTargetDetails } from './planner';
@@ -261,19 +262,29 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     for (const step of steps) {
       try {
         await driver.query(step.sql);
-      } catch (error) {
-        return runnerFailure(
-          'EXECUTION_FAILED',
-          `Operation ${operation.id} failed during execution: ${step.description}`,
-          {
-            why: error instanceof Error ? error.message : String(error),
-            meta: {
-              operationId: operation.id,
-              stepDescription: step.description,
-              sql: step.sql,
+      } catch (error: unknown) {
+        // Catch SqlQueryError and include normalized metadata
+        if (SqlQueryError.is(error)) {
+          return runnerFailure(
+            'EXECUTION_FAILED',
+            `Operation ${operation.id} failed during execution: ${step.description}`,
+            {
+              why: error.message,
+              meta: {
+                operationId: operation.id,
+                stepDescription: step.description,
+                sql: step.sql,
+                sqlState: error.sqlState,
+                constraint: error.constraint,
+                table: error.table,
+                column: error.column,
+                detail: error.detail,
+              },
             },
-          },
-        );
+          );
+        }
+        // Let SqlConnectionError and other errors propagate (fail-fast)
+        throw error;
       }
     }
     return okVoid();
