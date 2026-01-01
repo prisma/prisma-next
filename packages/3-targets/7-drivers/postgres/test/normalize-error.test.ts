@@ -1,4 +1,4 @@
-import { access, readFile } from 'node:fs/promises';
+import { access } from 'node:fs/promises';
 import { SqlConnectionError, SqlQueryError } from '@prisma-next/sql-errors';
 import { describe, expect, it } from 'vitest';
 import { isPostgresError, normalizePgError } from '../src/normalize-error';

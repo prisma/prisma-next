@@ -41,7 +41,7 @@ function describeErrorClass<
       it(`returns true on instances of ${name}`, () => {
         const error = new ErrorClass('Test error');
         expect(ErrorClass.is(error)).toBe(true);
-        expect(ErrorClass.is(new Error('Not a ' + name))).toBe(false);
+        expect(ErrorClass.is(new Error(`Not a ${name}`))).toBe(false);
         expect(ErrorClass.is(new OtherErrorClass('Other error'))).toBe(false);
         expect(ErrorClass.is(null)).toBe(false);
         expect(ErrorClass.is('string')).toBe(false);
