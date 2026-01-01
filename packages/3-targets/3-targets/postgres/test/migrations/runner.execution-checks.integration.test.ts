@@ -6,7 +6,6 @@ import {
   createDriver,
   createMigrationPlan,
   createTestDatabase,
-  emptySchema,
   familyInstance,
   frameworkComponents,
   type PostgresControlDriver,
