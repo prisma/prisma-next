@@ -1,9 +1,34 @@
+import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/pack-ref-types';
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
 import type { CodecTypes } from './fixtures/contract.d';
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const int4Column = columnDescriptor('pg/int4@1');
+
+const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '1.0.0',
+};
+
+const pgvectorPack: ExtensionPackRef<'sql', 'postgres'> = {
+  kind: 'extension',
+  id: 'pgvector',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '1.0.0',
+};
+
+const mysqlTargetPack: ExtensionPackRef<'sql', string> = {
+  kind: 'extension',
+  id: 'pgvector',
+  familyId: 'sql',
+  targetId: 'mysql',
+  version: '1.0.0',
+};
 
 describe('contract builder methods', () => {
   it('throws when building without target', () => {
@@ -13,6 +38,11 @@ describe('contract builder methods', () => {
 
   it('sets target correctly', () => {
     const contract = defineContract<CodecTypes>().target('postgres').build();
+    expect(contract.target).toBe('postgres');
+  });
+
+  it('accepts pack refs for target selection', () => {
+    const contract = defineContract<CodecTypes>().target(postgresTargetPack).build();
     expect(contract.target).toBe('postgres');
   });
 
@@ -181,5 +211,46 @@ describe('contract builder methods', () => {
     expect(contract.coreHash).toBe('sha256:custom');
     expect(contract.extensions).toEqual({ pack: { config: true } });
     expect(contract.capabilities).toEqual({ feature: { enabled: true } });
+  });
+});
+
+describe('extensionPacks', () => {
+  it('requires target selection before enabling packs', () => {
+    expect(() => defineContract<CodecTypes>().extensionPacks({ pgvector: pgvectorPack })).toThrow(
+      'extensionPacks() requires target() to be called first',
+    );
+  });
+
+  it('enables namespace entries for pack refs', () => {
+    const contract = defineContract<CodecTypes>()
+      .target('postgres')
+      .extensionPacks({ pgvector: pgvectorPack })
+      .build();
+
+    expect(contract.extensions.pgvector).toEqual({});
+  });
+
+  it('rejects non-extension pack refs', () => {
+    const invalidPack = postgresTargetPack as unknown as ExtensionPackRef<'sql', 'postgres'>;
+    expect(() =>
+      defineContract<CodecTypes>().target('postgres').extensionPacks({ invalid: invalidPack }),
+    ).toThrow('extensionPacks() only accepts extension pack refs');
+  });
+
+  it('rejects family mismatches', () => {
+    const wrongFamilyPack = {
+      ...pgvectorPack,
+      familyId: 'document',
+    } as unknown as ExtensionPackRef<'sql', 'postgres'>;
+
+    expect(() =>
+      defineContract<CodecTypes>().target('postgres').extensionPacks({ pgvector: wrongFamilyPack }),
+    ).toThrow('targets family \"document\" but this builder targets \"sql\"');
+  });
+
+  it('rejects target mismatches', () => {
+    expect(() =>
+      defineContract<CodecTypes>().target('postgres').extensionPacks({ pgvector: mysqlTargetPack }),
+    ).toThrow('builder target is \"postgres\"');
   });
 });

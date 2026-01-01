@@ -1,3 +1,4 @@
+import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/pack-ref-types';
 import type {
   ColumnBuilderState,
   ModelBuilderState,
@@ -23,6 +24,14 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { computeMappings } from './contract';
+
+function resolveTargetId(target: string | TargetPackRef<'sql', string>): string {
+  if (typeof target === 'string') {
+    return target;
+  }
+
+  return target.targetId ?? target.id;
+}
 
 /**
  * Type-level mappings structure for contracts built via `defineContract()`.
@@ -332,6 +341,14 @@ class SqlContractBuilder<
       operationTypes: {} as Record<string, never>,
     } as ContractBuilderMappings<CodecTypes>;
 
+    const extensionNamespaces = this.state.extensionNamespaces ?? [];
+    const extensions = { ...(this.state.extensions || {}) };
+    for (const namespace of extensionNamespaces) {
+      if (!Object.hasOwn(extensions, namespace)) {
+        extensions[namespace] = {};
+      }
+    }
+
     // Construct contract with explicit type that matches the generic parameters
     // This ensures TypeScript infers literal types from the generics, not runtime values
     // Always include relations, even if empty (normalized to empty object)
@@ -344,7 +361,7 @@ class SqlContractBuilder<
       relations: relationsPartial,
       storage,
       mappings,
-      extensions: this.state.extensions || {},
+      extensions,
       capabilities: this.state.capabilities || {},
       meta: {},
       sources: {},
@@ -364,8 +381,10 @@ class SqlContractBuilder<
   }
 
   override target<T extends string>(
-    target: T,
+    target: T | TargetPackRef<'sql', T>,
   ): SqlContractBuilder<CodecTypes, T, Tables, Models, CoreHash, Extensions, Capabilities> {
+    const targetId = resolveTargetId(target);
+
     return new SqlContractBuilder<
       CodecTypes,
       T,
@@ -376,7 +395,7 @@ class SqlContractBuilder<
       Capabilities
     >({
       ...this.state,
-      target,
+      target: targetId,
     });
   }
 
@@ -386,6 +405,53 @@ class SqlContractBuilder<
     return new SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, E, Capabilities>({
       ...this.state,
       extensions,
+    });
+  }
+
+  extensionPacks(
+    packs: Record<string, ExtensionPackRef<'sql', string>>,
+  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, Extensions, Capabilities> {
+    if (!this.state.target) {
+      throw new Error('extensionPacks() requires target() to be called first');
+    }
+
+    const namespaces = new Set(this.state.extensionNamespaces ?? []);
+
+    for (const packRef of Object.values(packs)) {
+      if (!packRef) continue;
+
+      if (packRef.kind !== 'extension') {
+        throw new Error(
+          `extensionPacks() only accepts extension pack refs. Received kind \"${packRef.kind}\".`,
+        );
+      }
+
+      if (packRef.familyId !== 'sql') {
+        throw new Error(
+          `extension pack \"${packRef.id}\" targets family \"${packRef.familyId}\" but this builder targets \"sql\".`,
+        );
+      }
+
+      if (packRef.targetId && packRef.targetId !== this.state.target) {
+        throw new Error(
+          `extension pack \"${packRef.id}\" targets \"${packRef.targetId}\" but builder target is \"${this.state.target}\".`,
+        );
+      }
+
+      namespaces.add(packRef.id);
+    }
+
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      CoreHash,
+      Extensions,
+      Capabilities
+    >({
+      ...this.state,
+      extensionNamespaces: [...namespaces],
     });
   }
 

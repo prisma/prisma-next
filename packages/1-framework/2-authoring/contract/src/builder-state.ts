@@ -88,6 +88,7 @@ export interface ContractBuilderState<
   readonly coreHash?: CoreHash;
   readonly extensions?: Extensions;
   readonly capabilities?: Capabilities;
+  readonly extensionNamespaces?: readonly string[];
 }
 
 export interface ColumnBuilder<Name extends string, Nullable extends boolean, Type extends string> {
