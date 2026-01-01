@@ -1,3 +1,4 @@
+import { assertManifestMatchesDescriptor } from '@prisma-next/contract/descriptor-manifest';
 import type { ControlAdapterDescriptor } from '@prisma-next/core-control-plane/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { PostgresControlAdapter } from '../core/control-adapter';
@@ -16,9 +17,16 @@ const postgresAdapterDescriptor: ControlAdapterDescriptor<
   targetId: 'postgres',
   id: 'postgres',
   manifest,
+  version: manifest.version,
+  targets: manifest.targets,
+  capabilities: manifest.capabilities,
+  types: manifest.types,
+  operations: manifest.operations,
   create(): SqlControlAdapter<'postgres'> {
     return new PostgresControlAdapter();
   },
 };
 
 export default postgresAdapterDescriptor;
+
+assertManifestMatchesDescriptor(manifest, postgresAdapterDescriptor);

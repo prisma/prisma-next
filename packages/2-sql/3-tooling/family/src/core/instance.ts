@@ -361,8 +361,8 @@ function buildSqlTypeMetadataRegistry(options: {
 
   // Iterate over each descriptor's manifest
   for (const descriptor of descriptors) {
-    const manifest = descriptor.manifest;
-    const storageTypes = manifest.types?.storage;
+    const types = descriptor.types ?? descriptor.manifest.types;
+    const storageTypes = types?.storage;
 
     if (!storageTypes) {
       continue;

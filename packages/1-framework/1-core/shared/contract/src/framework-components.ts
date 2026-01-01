@@ -55,6 +55,21 @@ export interface ComponentDescriptor<Kind extends string> {
 
   /** Package manifest containing version, capabilities, type imports, and operations */
   readonly manifest: ExtensionPackManifest;
+
+  /** Declarative component version (mirrors manifest.version) */
+  readonly version?: string;
+
+  /** Declarative target metadata */
+  readonly targets?: ExtensionPackManifest['targets'];
+
+  /** Declarative capability metadata */
+  readonly capabilities?: ExtensionPackManifest['capabilities'];
+
+  /** Declarative type metadata */
+  readonly types?: ExtensionPackManifest['types'];
+
+  /** Declarative operation manifests */
+  readonly operations?: ExtensionPackManifest['operations'];
 }
 
 /**

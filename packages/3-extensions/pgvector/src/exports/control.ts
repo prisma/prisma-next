@@ -1,3 +1,4 @@
+import { assertManifestMatchesDescriptor } from '@prisma-next/contract/descriptor-manifest';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   ComponentDatabaseDependencies,
@@ -74,6 +75,11 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   targetId: 'postgres', // pgvector is postgres-specific
   id: 'pgvector',
   manifest,
+  version: manifest.version,
+  targets: manifest.targets,
+  capabilities: manifest.capabilities,
+  types: manifest.types,
+  operations: manifest.operations,
   databaseDependencies: pgvectorDatabaseDependencies,
   create: () => ({
     familyId: 'sql' as const,
@@ -82,3 +88,5 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
 };
 
 export default pgvectorExtensionDescriptor;
+
+assertManifestMatchesDescriptor(manifest, pgvectorExtensionDescriptor);

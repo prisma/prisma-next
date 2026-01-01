@@ -1,3 +1,4 @@
+import { assertManifestMatchesDescriptor } from '@prisma-next/contract/descriptor-manifest';
 import type {
   ControlTargetInstance,
   MigrationPlanner,
@@ -22,6 +23,11 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     targetId: 'postgres',
     id: 'postgres',
     manifest,
+    version: manifest.version,
+    targets: manifest.targets,
+    capabilities: manifest.capabilities,
+    types: manifest.types,
+    operations: manifest.operations,
     /**
      * Migrations capability for CLI to access planner/runner via core types.
      * The SQL-specific planner/runner types are compatible with the generic
@@ -58,3 +64,5 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
   };
 
 export default postgresTargetDescriptor;
+
+assertManifestMatchesDescriptor(manifest, postgresTargetDescriptor);

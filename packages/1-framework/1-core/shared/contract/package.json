@@ -37,6 +37,10 @@
       "types": "./dist/exports/pack-ref-types.d.ts",
       "import": "./dist/exports/pack-ref-types.js"
     },
+    "./descriptor-manifest": {
+      "types": "./dist/exports/descriptor-manifest.d.ts",
+      "import": "./dist/exports/descriptor-manifest.js"
+    },
     "./pack-manifest-types": {
       "types": "./dist/exports/pack-manifest-types.d.ts",
       "import": "./dist/exports/pack-manifest-types.js"

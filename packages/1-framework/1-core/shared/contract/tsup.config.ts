@@ -7,6 +7,7 @@ export default defineConfig({
     ir: 'src/exports/ir.ts',
     'framework-components': 'src/exports/framework-components.ts',
     'pack-ref-types': 'src/exports/pack-ref-types.ts',
+    'descriptor-manifest': 'src/exports/descriptor-manifest.ts',
   },
   outDir: 'dist/exports',
   format: ['esm'],

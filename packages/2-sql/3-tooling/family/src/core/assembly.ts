@@ -29,7 +29,7 @@ export function assembleOperationRegistry(
   const registry = createOperationRegistry();
 
   for (const descriptor of descriptors) {
-    const operations = descriptor.manifest.operations ?? [];
+    const operations = descriptor.operations ?? descriptor.manifest.operations ?? [];
     for (const operationManifest of operations as ReadonlyArray<OperationManifest>) {
       const signature = convertOperationManifest(operationManifest);
       registry.register(signature);
@@ -52,7 +52,8 @@ export function extractCodecTypeImports(
   const imports: TypesImportSpec[] = [];
 
   for (const descriptor of descriptors) {
-    const codecTypes = descriptor.manifest.types?.codecTypes;
+    const types = descriptor.types ?? descriptor.manifest.types;
+    const codecTypes = types?.codecTypes;
     if (codecTypes?.import) {
       imports.push(codecTypes.import);
     }
@@ -74,7 +75,8 @@ export function extractOperationTypeImports(
   const imports: TypesImportSpec[] = [];
 
   for (const descriptor of descriptors) {
-    const operationTypes = descriptor.manifest.types?.operationTypes;
+    const types = descriptor.types ?? descriptor.manifest.types;
+    const operationTypes = types?.operationTypes;
     if (operationTypes?.import) {
       imports.push(operationTypes.import);
     }

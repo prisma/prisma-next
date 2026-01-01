@@ -1,3 +1,4 @@
+import { assertManifestMatchesDescriptor } from '@prisma-next/contract/descriptor-manifest';
 import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
@@ -22,6 +23,11 @@ const postgresRuntimeTargetDescriptor: RuntimeTargetDescriptor<
   targetId: 'postgres',
   id: 'postgres',
   manifest,
+  version: manifest.version,
+  targets: manifest.targets,
+  capabilities: manifest.capabilities,
+  types: manifest.types,
+  operations: manifest.operations,
   create(): PostgresRuntimeTargetInstance {
     return {
       familyId: 'sql',
@@ -31,3 +37,5 @@ const postgresRuntimeTargetDescriptor: RuntimeTargetDescriptor<
 };
 
 export default postgresRuntimeTargetDescriptor;
+
+assertManifestMatchesDescriptor(manifest, postgresRuntimeTargetDescriptor);

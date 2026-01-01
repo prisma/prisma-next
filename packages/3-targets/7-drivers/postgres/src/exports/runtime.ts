@@ -1,3 +1,4 @@
+import { assertManifestMatchesDescriptor } from '@prisma-next/contract/descriptor-manifest';
 import type {
   RuntimeDriverDescriptor,
   RuntimeDriverInstance,
@@ -28,6 +29,11 @@ const postgresRuntimeDriverDescriptor: RuntimeDriverDescriptor<
   targetId: 'postgres',
   id: 'postgres',
   manifest,
+  version: manifest.version,
+  targets: manifest.targets,
+  capabilities: manifest.capabilities,
+  types: manifest.types,
+  operations: manifest.operations,
   create(options: PostgresDriverOptions): PostgresRuntimeDriver {
     return createPostgresDriverFromOptions(options) as PostgresRuntimeDriver;
   },
@@ -40,3 +46,5 @@ export type {
   QueryResult,
 } from '../postgres-driver';
 export { createPostgresDriver, createPostgresDriverFromOptions } from '../postgres-driver';
+
+assertManifestMatchesDescriptor(manifest, postgresRuntimeDriverDescriptor);

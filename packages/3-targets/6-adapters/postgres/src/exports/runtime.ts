@@ -1,3 +1,4 @@
+import { assertManifestMatchesDescriptor } from '@prisma-next/contract/descriptor-manifest';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
@@ -28,9 +29,16 @@ const postgresRuntimeAdapterDescriptor: RuntimeAdapterDescriptor<
   targetId: 'postgres',
   id: 'postgres',
   manifest,
+  version: manifest.version,
+  targets: manifest.targets,
+  capabilities: manifest.capabilities,
+  types: manifest.types,
+  operations: manifest.operations,
   create(): SqlRuntimeAdapter {
     return createPostgresAdapter() as unknown as SqlRuntimeAdapter;
   },
 };
 
 export default postgresRuntimeAdapterDescriptor;
+
+assertManifestMatchesDescriptor(manifest, postgresRuntimeAdapterDescriptor);
