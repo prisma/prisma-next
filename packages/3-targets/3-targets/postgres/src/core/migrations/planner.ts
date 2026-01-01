@@ -11,7 +11,7 @@ import {
   plannerFailure,
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
-import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import { arraysEqual, verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type {
   ForeignKey,
   SqlContract,
@@ -790,18 +790,6 @@ function hasForeignKey(table: SqlSchemaIR['tables'][string], fk: ForeignKey): bo
       candidate.referencedTable === fk.references.table &&
       arraysEqual(candidate.referencedColumns, fk.references.columns),
   );
-}
-
-function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function isAdditiveIssue(issue: SchemaIssue): boolean {
