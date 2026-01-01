@@ -50,20 +50,8 @@ class ResultImpl<T, F> {
     this.ok = ok;
     if (ok) {
       this.value = valueOrFailure as T;
-      this.assertOk = function (this: Ok<T>): T {
-        return this.value;
-      };
-      this.assertNotOk = function (this: Ok<T>): never {
-        throw new Error('Expected NotOk result but got Ok');
-      };
     } else {
       this.failure = valueOrFailure as F;
-      this.assertOk = function (this: NotOk<F>): never {
-        throw new Error('Expected Ok result but got NotOk');
-      };
-      this.assertNotOk = function (this: NotOk<F>): F {
-        return this.failure;
-      };
     }
     Object.freeze(this);
   }

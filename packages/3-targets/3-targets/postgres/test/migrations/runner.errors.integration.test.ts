@@ -351,8 +351,8 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           stepDescription: 'create user table with invalid SQL',
           sql: 'CREATE TABLE "user" (id INVALID_TYPE PRIMARY KEY)',
         });
-        // Normalized error metadata should include sqlState for syntax error
-        expect(failure.meta?.['sqlState']).toBe('42601');
+        // Normalized error metadata should include sqlState
+        expect(failure.meta?.['sqlState']).toBe('42704'); // undefined_object
 
         await expectNoMarkerOrLedgerWrites(driver!);
 
