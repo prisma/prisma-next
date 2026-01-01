@@ -42,4 +42,28 @@ describe('result', () => {
       expect(result1).toBe(result2);
     });
   });
+
+  describe('assertOk()', () => {
+    it('returns the value for Ok results', () => {
+      const result = ok(42);
+      expect(result.assertOk()).toBe(42);
+    });
+
+    it('throws for NotOk results', () => {
+      const result = notOk('error');
+      expect(() => result.assertOk()).toThrow('Expected Ok result but got NotOk');
+    });
+  });
+
+  describe('assertNotOk()', () => {
+    it('returns the failure for NotOk results', () => {
+      const result = notOk({ code: 'ERR_TEST' });
+      expect(result.assertNotOk()).toEqual({ code: 'ERR_TEST' });
+    });
+
+    it('throws for Ok results', () => {
+      const result = ok(42);
+      expect(() => result.assertNotOk()).toThrow('Expected NotOk result but got Ok');
+    });
+  });
 });

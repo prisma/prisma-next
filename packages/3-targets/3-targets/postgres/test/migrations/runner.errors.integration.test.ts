@@ -73,9 +73,8 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('SCHEMA_VERIFY_FAILED');
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
 
         await expectNoMarkerOrLedgerWrites(driver!);
       },
@@ -99,10 +98,9 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('PRECHECK_FAILED');
-          expect(result.failure.summary).toMatch(/precheck/i);
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('PRECHECK_FAILED');
+        expect(failure.summary).toMatch(/precheck/i);
 
         await expectNoMarkerOrLedgerWrites(driver!);
       },
@@ -144,10 +142,9 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
-          expect(result.failure.summary).toMatch(/does not match plan origin/i);
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+        expect(failure.summary).toMatch(/does not match plan origin/i);
 
         const markerRow = await driver!.query<{ core_hash: string; profile_hash: string }>(
           'select core_hash, profile_hash from prisma_contract.marker where id = $1',
@@ -217,9 +214,8 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('SCHEMA_VERIFY_FAILED');
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
 
         await expectNoMarkerOrLedgerWrites(driver!);
 
@@ -283,11 +279,10 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('POSTCHECK_FAILED');
-          expect(result.failure.summary).toMatch(/table\.test_table/i);
-          expect(result.failure.summary).toMatch(/postcheck/i);
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('POSTCHECK_FAILED');
+        expect(failure.summary).toMatch(/table\.test_table/i);
+        expect(failure.summary).toMatch(/postcheck/i);
 
         // Verify table was rolled back
         const tableRow = await driver!.query<{ exists: boolean }>(
@@ -348,18 +343,17 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('EXECUTION_FAILED');
-          expect(result.failure.summary).toMatch(/Operation table\.user failed during execution/i);
-          expect(result.failure.meta).toMatchObject({
-            operationId: 'table.user',
-            stepDescription: 'create user table with invalid SQL',
-            sql: 'CREATE TABLE "user" (id INVALID_TYPE PRIMARY KEY)',
-          });
-          // Normalized error metadata should include sqlState
-          expect(result.failure.meta?.['sqlState']).toBeDefined();
-          expect(typeof result.failure.meta?.['sqlState']).toBe('string');
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('EXECUTION_FAILED');
+        expect(failure.summary).toMatch(/Operation table\.user failed during execution/i);
+        expect(failure.meta).toMatchObject({
+          operationId: 'table.user',
+          stepDescription: 'create user table with invalid SQL',
+          sql: 'CREATE TABLE "user" (id INVALID_TYPE PRIMARY KEY)',
+        });
+        // Normalized error metadata should include sqlState
+        expect(failure.meta?.['sqlState']).toBeDefined();
+        expect(typeof failure.meta?.['sqlState']).toBe('string');
 
         await expectNoMarkerOrLedgerWrites(driver!);
 
@@ -430,17 +424,16 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('EXECUTION_FAILED');
-          expect(result.failure.meta).toMatchObject({
-            operationId: 'insert.duplicate',
-            stepDescription: 'insert duplicate email',
-            sqlState: '23505', // Unique violation SQLSTATE
-            constraint: 'user_email_unique',
-            table: 'user',
-            // PostgreSQL does not include column property for unique constraint violations
-          });
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('EXECUTION_FAILED');
+        expect(failure.meta).toMatchObject({
+          operationId: 'insert.duplicate',
+          stepDescription: 'insert duplicate email',
+          sqlState: '23505', // Unique violation SQLSTATE
+          constraint: 'user_email_unique',
+          table: 'user',
+          // PostgreSQL does not include column property for unique constraint violations
+        });
 
         // Verify transaction was rolled back (no rows inserted)
         const countRow = await driver!.query<{ count: string }>(
