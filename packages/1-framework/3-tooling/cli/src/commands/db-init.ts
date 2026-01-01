@@ -249,8 +249,25 @@ export function createDbInitCommand(): Command {
             }
 
             // Marker exists but doesn't match destination - fail
+            const coreHashMismatch = existingMarker.coreHash !== migrationPlan.destination.coreHash;
+            const profileHashMismatch =
+              migrationPlan.destination.profileHash &&
+              existingMarker.profileHash !== migrationPlan.destination.profileHash;
+
+            const mismatchParts: string[] = [];
+            if (coreHashMismatch) {
+              mismatchParts.push(
+                `coreHash (marker: ${existingMarker.coreHash}, destination: ${migrationPlan.destination.coreHash})`,
+              );
+            }
+            if (profileHashMismatch) {
+              mismatchParts.push(
+                `profileHash (marker: ${existingMarker.profileHash}, destination: ${migrationPlan.destination.profileHash})`,
+              );
+            }
+
             throw errorRuntime(
-              `Existing contract marker (${existingMarker.coreHash}) does not match plan destination (${migrationPlan.destination.coreHash}).`,
+              `Existing contract marker does not match plan destination. Mismatch in ${mismatchParts.join(' and ')}.`,
               {
                 why: 'Database has an existing contract marker that does not match the target contract',
                 fix: 'Use `prisma-next db migrate` to migrate from the existing contract, or drop the database and re-run `db init`',
@@ -258,6 +275,12 @@ export function createDbInitCommand(): Command {
                   code: 'MARKER_ORIGIN_MISMATCH',
                   markerCoreHash: existingMarker.coreHash,
                   destinationCoreHash: migrationPlan.destination.coreHash,
+                  ...(existingMarker.profileHash
+                    ? { markerProfileHash: existingMarker.profileHash }
+                    : {}),
+                  ...(migrationPlan.destination.profileHash
+                    ? { destinationProfileHash: migrationPlan.destination.profileHash }
+                    : {}),
                 },
               },
             );
