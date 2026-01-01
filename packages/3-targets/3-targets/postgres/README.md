@@ -10,12 +10,12 @@ Postgres target pack for Prisma Next.
 
 ## Purpose
 
-Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI config. The target descriptor includes the target manifest with capabilities and type information, as well as factories for creating migration planners and runners.
+Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI config. The target descriptor includes capabilities and type information directly as properties, as well as factories for creating migration planners and runners.
 
 ## Responsibilities
 
 - **Target Descriptor Export**: Exports the Postgres `SqlControlTargetDescriptor` for use in CLI configuration files
-- **Manifest Hydration**: Validates the Postgres manifest at build time (`src/core/manifest.ts`) so control/runtime entrypoints and `/pack` stay filesystem-free at runtime
+- **Descriptor-First Design**: All declarative fields (version, capabilities, types, operations) are properties directly on the descriptor, eliminating the need for separate manifest files
 - **Multi-Plane Support**: Provides both migration-plane (control) and runtime-plane entry points for the Postgres target
 - **Planner Factory**: Implements `createPlanner()` to create Postgres-specific migration planners
 - **Runner Factory**: Implements `createRunner()` to create Postgres-specific migration runners
@@ -41,7 +41,8 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 // - familyId: 'sql'
 // - targetId: 'postgres'
 // - id: 'postgres'
-// - manifest: ExtensionPackManifest
+// - version: '15.0.0'
+// - capabilities, types, operations (directly on descriptor)
 // - createPlanner(): creates a Postgres migration planner
 // - createRunner(): creates a Postgres migration runner
 
@@ -89,11 +90,11 @@ export const contract = defineContract()
   .build();
 ```
 
-Pack refs are pure JSON-friendly objects that make TypeScript contract authoring work in both emit and no-emit workflows without reading `packs/manifest.json` at runtime.
+Pack refs are pure JSON-friendly objects that make TypeScript contract authoring work in both emit and no-emit workflows without requiring separate manifest files.
 
 ## Architecture
 
-This package provides both control and runtime entry points for the Postgres target. `src/core/manifest.ts` validates the manifest at build time so the published entry points never touch the filesystem. The `./pack` entry point reuses the same manifest data to offer a pure pack ref for contract authoring. The runtime entry point will provide target-specific runtime functionality in the future.
+This package provides both control and runtime entry points for the Postgres target. All declarative fields (version, capabilities, types, operations) are defined directly on the descriptor, so the published entry points never touch the filesystem. The `./pack` entry point provides a pure pack ref for contract authoring. The runtime entry point will provide target-specific runtime functionality in the future.
 
 ## Error Handling
 
@@ -115,7 +116,7 @@ See `@prisma-next/family-sql/control` README for full error code documentation.
 
 - **`@prisma-next/family-sql`**: SQL family types (`SqlControlTargetDescriptor`, `SqlControlFamilyInstance`)
 - **`@prisma-next/core-control-plane`**: Control plane types (`ControlTargetInstance`)
-- **`@prisma-next/contract`**: Manifest types (`ExtensionPackManifest`)
+- **`@prisma-next/sql-contract`**: Pack types (`TargetPackRef`)
 - **`arktype`**: Runtime validation
 
 **Dependents:**
