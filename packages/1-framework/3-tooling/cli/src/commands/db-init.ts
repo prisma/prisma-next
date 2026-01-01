@@ -337,7 +337,7 @@ export function createDbInitCommand(): Command {
                 frameworkComponents,
               }),
             {
-              message: 'Applying migration plan...',
+              message: 'Applying migration plan and verifying schema...',
               flags,
             },
           );
