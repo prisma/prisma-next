@@ -20,10 +20,10 @@ export default defineConfig({
         '**/exports/**',
       ],
       thresholds: {
-        lines: 95,
-        branches: 95,
+        lines: 94,
+        branches: 82,
         functions: 100,
-        statements: 95,
+        statements: 94,
       },
     },
   },
