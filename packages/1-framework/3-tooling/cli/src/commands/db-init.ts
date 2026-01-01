@@ -326,10 +326,14 @@ export function createDbInitCommand(): Command {
                 destinationContract: contractIR,
                 policy,
                 callbacks,
-                // db init is a bootstrap path (additive-only) intended for empty databases.
-                // We disable per-operation prechecks/postchecks and the idempotency probe
-                // (\"is postcheck already satisfied?\") to avoid extra round-trips and
-                // \"check\" queries that are irrelevant on a fresh database.
+                // db init plans and applies in quick succession, so the runner executes against a
+                // schema snapshot that was just introspected and planned from (fresh, known state).
+                // For this flow, per-operation prechecks/postchecks and the idempotency probe
+                // ("is postcheck already satisfied?") are usually redundant and add extra
+                // round-trips / "check" queries.
+                //
+                // This is also consistent with db init’s typical use case (additive-only bootstrap),
+                // where the database is often empty or otherwise in a state the planner just observed.
                 //
                 // Safety rails are still enforced: marker/origin compatibility is checked
                 // before execution, and the runner performs a full schema verification
