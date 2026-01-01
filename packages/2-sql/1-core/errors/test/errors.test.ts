@@ -13,21 +13,25 @@ describe('SqlQueryError', () => {
       detail: 'Key (email)=(test@example.com) already exists.',
     });
 
-    expect(error.message).toBe('Query failed');
-    expect(error.kind).toBe('sql_query');
-    expect(error.sqlState).toBe('23505');
-    expect(error.constraint).toBe('user_email_unique');
-    expect(error.table).toBe('user');
-    expect(error.column).toBe('email');
-    expect(error.detail).toBe('Key (email)=(test@example.com) already exists.');
-    expect(error.cause).toBe(originalError);
+    expect(error).toMatchObject({
+      message: 'Query failed',
+      kind: 'sql_query',
+      sqlState: '23505',
+      constraint: 'user_email_unique',
+      table: 'user',
+      column: 'email',
+      detail: 'Key (email)=(test@example.com) already exists.',
+      cause: originalError,
+    });
   });
 
   it('creates error with minimal fields', () => {
     const error = new SqlQueryError('Query failed');
 
-    expect(error.message).toBe('Query failed');
-    expect(error.kind).toBe('sql_query');
+    expect(error).toMatchObject({
+      message: 'Query failed',
+      kind: 'sql_query',
+    });
     expect(error.sqlState).toBeUndefined();
     expect(error.constraint).toBeUndefined();
     expect(error.table).toBeUndefined();
@@ -41,7 +45,9 @@ describe('SqlQueryError', () => {
     const error = new SqlQueryError('Query failed', { cause: originalError });
 
     expect(error.cause).toBe(originalError);
-    expect(error.cause?.stack).toBe('Error: Original error\n    at test.js:1:1');
+    if (error.cause instanceof Error) {
+      expect(error.cause.stack).toBe('Error: Original error\n    at test.js:1:1');
+    }
   });
 
   it('is() returns true for SqlQueryError instance', () => {
@@ -77,17 +83,21 @@ describe('SqlConnectionError', () => {
       transient: true,
     });
 
-    expect(error.message).toBe('Connection failed');
-    expect(error.kind).toBe('sql_connection');
-    expect(error.transient).toBe(true);
-    expect(error.cause).toBe(originalError);
+    expect(error).toMatchObject({
+      message: 'Connection failed',
+      kind: 'sql_connection',
+      transient: true,
+      cause: originalError,
+    });
   });
 
   it('creates error with minimal fields', () => {
     const error = new SqlConnectionError('Connection failed');
 
-    expect(error.message).toBe('Connection failed');
-    expect(error.kind).toBe('sql_connection');
+    expect(error).toMatchObject({
+      message: 'Connection failed',
+      kind: 'sql_connection',
+    });
     expect(error.transient).toBeUndefined();
   });
 
@@ -97,7 +107,9 @@ describe('SqlConnectionError', () => {
     const error = new SqlConnectionError('Connection failed', { cause: originalError });
 
     expect(error.cause).toBe(originalError);
-    expect(error.cause?.stack).toBe('Error: Original error\n    at test.js:1:1');
+    if (error.cause instanceof Error) {
+      expect(error.cause.stack).toBe('Error: Original error\n    at test.js:1:1');
+    }
   });
 
   it('is() returns true for SqlConnectionError instance', () => {
