@@ -326,6 +326,12 @@ export function createDbInitCommand(): Command {
                 destinationContract: contractIR,
                 policy,
                 callbacks,
+                // Disable all execution checks for db init performance optimization.
+                // db init is specifically for bootstrapping empty databases from scratch,
+                // so prechecks/postchecks (which verify existing state) and idempotency
+                // probes (which check if postconditions are already satisfied) are
+                // unnecessary overhead. This is a deviation from default runner behavior
+                // (which runs all checks) and is specific to db init's use case.
                 executionChecks: {
                   prechecks: false,
                   postchecks: false,
