@@ -1,5 +1,5 @@
 ---
-description: Adapters must declare capabilities in both manifest and code
+description: Adapters must declare capabilities on both the descriptor and in runtime code
 globs:
 alwaysApply: true
 ---
@@ -8,51 +8,58 @@ alwaysApply: true
 
 ## Overview
 
-Adapters must declare capabilities in **both** the adapter's manifest (`packs/manifest.json`) and the adapter's code (`defaultCapabilities`). The manifest is used during CLI emission to include capabilities in the contract, while the code declaration is used at runtime.
+Adapters must declare capabilities in **two places**:
+1. **Descriptor**: On the adapter descriptor's `capabilities` property (used during CLI emission)
+2. **Runtime code**: In the adapter's `defaultCapabilities` (used at runtime)
 
-## The Rule: Declare Capabilities in Both Places
+Since descriptors are the canonical source of declarative fields, there are no separate manifest files. All declarative data lives directly on the descriptor.
+
+## The Rule: Declare Capabilities on Descriptor and in Runtime Code
 
 **Adapters declare capabilities, not targets.** Targets are just identifiers/descriptors. Adapters implement the features and must declare what they support.
 
-### Manifest Declaration
+### Descriptor Declaration
 
-Capabilities must be declared in the adapter's `packs/manifest.json`:
+Capabilities must be declared on the adapter descriptor:
 
-```json
-{
-  "id": "postgres",
-  "version": "15.0.0",
-  "targets": {
-    "postgres": {
-      "minVersion": "12"
-    }
+```typescript
+// src/exports/control.ts
+const postgresControlAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
+  kind: 'adapter',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '15.0.0',
+  targets: {
+    postgres: { minVersion: '12' },
   },
-  "capabilities": {
-    "postgres": {
-      "orderBy": true,
-      "limit": true,
-      "lateral": true,
-      "jsonAgg": true,
-      "returning": true
-    }
+  capabilities: {
+    postgres: {
+      orderBy: true,
+      limit: true,
+      lateral: true,
+      jsonAgg: true,
+      returning: true,
+    },
   },
-  "types": {
-    "codecTypes": {
-      "import": {
-        "package": "@prisma-next/adapter-postgres/codec-types",
-        "named": "CodecTypes",
-        "alias": "PgTypes"
-      }
-    }
-  }
-}
+  types: {
+    codecTypes: {
+      import: {
+        package: '@prisma-next/adapter-postgres/codec-types',
+        named: 'CodecTypes',
+        alias: 'PgTypes',
+      },
+    },
+  },
+  // ...
+};
 ```
 
-**Why?** The CLI emit process reads capabilities from manifests and includes them in the emitted contract. If capabilities are missing from the manifest, they won't be in the contract, causing runtime capability checks to fail.
+**Why?** The CLI emit process reads capabilities from descriptors and includes them in the emitted contract. If capabilities are missing from the descriptor, they won't be in the contract, causing runtime capability checks to fail.
 
-### Code Declaration
+### Runtime Code Declaration
 
-Capabilities must also be declared in the adapter's code as `defaultCapabilities`:
+Capabilities must also be declared in the adapter's runtime code as `defaultCapabilities`:
 
 ```typescript
 const defaultCapabilities = Object.freeze({
@@ -81,34 +88,36 @@ class PostgresAdapterImpl implements Adapter<...> {
 
 **Why?** The adapter's `profile.capabilities` is used at runtime to validate against contract requirements and to inform lowering decisions.
 
-## Keep Manifest and Code in Sync
+## Keep Descriptor and Runtime Code in Sync
 
-**CRITICAL**: The capabilities in `packs/manifest.json` must match the capabilities in `defaultCapabilities` in code. If they don't match:
+**CRITICAL**: The capabilities on the descriptor must match the capabilities in `defaultCapabilities` in runtime code. If they don't match:
 
-- **Missing in manifest**: Capabilities won't be in the emitted contract, causing runtime checks to fail
-- **Missing in code**: Runtime won't advertise the capability, causing validation failures
+- **Missing on descriptor**: Capabilities won't be in the emitted contract, causing runtime checks to fail
+- **Missing in runtime code**: Runtime won't advertise the capability, causing validation failures
 - **Mismatch**: Contract and runtime will have different capability sets, causing inconsistent behavior
 
-## Target Packages
+## Target Descriptors
 
-Target packages (`@prisma-next/targets-*`) are just identifiers/descriptors. They don't implement features, so they don't declare capabilities. Their manifests can have empty capabilities:
+Target descriptors (`@prisma-next/target-*`) are just identifiers/descriptors. They don't implement features, so they typically don't declare capabilities:
 
-```json
-{
-  "id": "postgres",
-  "version": "15.0.0",
-  "targets": {
-    "postgres": {
-      "minVersion": "12"
-    }
+```typescript
+const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres'> = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '15.0.0',
+  targets: {
+    postgres: { minVersion: '12' },
   },
-  "capabilities": {}
-}
+  // No capabilities here - adapters declare capabilities
+  // ...
+};
 ```
 
 ## Common Mistakes
 
-### ❌ WRONG: Capabilities only in code
+### ❌ WRONG: Capabilities only in runtime code
 
 ```typescript
 // adapter.ts
@@ -117,31 +126,25 @@ const defaultCapabilities = Object.freeze({
     returning: true,
   },
 });
-```
 
-```json
-// packs/manifest.json
-{
-  "capabilities": {}  // ❌ Missing - won't be in contract!
-}
+// descriptor
+const descriptor = {
+  capabilities: {},  // ❌ Missing - won't be in contract!
+};
 ```
 
 **Problem**: Capabilities won't be in the emitted contract, so runtime checks will fail.
 
-### ❌ WRONG: Capabilities only in manifest
-
-```json
-// packs/manifest.json
-{
-  "capabilities": {
-    "postgres": {
-      "returning": true
-    }
-  }
-}
-```
+### ❌ WRONG: Capabilities only on descriptor
 
 ```typescript
+// descriptor
+const descriptor = {
+  capabilities: {
+    postgres: { returning: true },
+  },
+};
+
 // adapter.ts
 const defaultCapabilities = Object.freeze({
   postgres: {
@@ -155,7 +158,21 @@ const defaultCapabilities = Object.freeze({
 ### ✅ CORRECT: Capabilities in both places
 
 ```typescript
-// adapter.ts
+// On descriptor
+const descriptor = {
+  // ...
+  capabilities: {
+    postgres: {
+      orderBy: true,
+      limit: true,
+      lateral: true,
+      jsonAgg: true,
+      returning: true,
+    },
+  },
+};
+
+// In runtime code
 const defaultCapabilities = Object.freeze({
   postgres: {
     orderBy: true,
@@ -165,21 +182,6 @@ const defaultCapabilities = Object.freeze({
     returning: true,
   },
 });
-```
-
-```json
-// packs/manifest.json
-{
-  "capabilities": {
-    "postgres": {
-      "orderBy": true,
-      "limit": true,
-      "lateral": true,
-      "jsonAgg": true,
-      "returning": true
-    }
-  }
-}
 ```
 
 ## Verification
