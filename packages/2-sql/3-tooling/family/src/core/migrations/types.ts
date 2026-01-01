@@ -17,6 +17,7 @@ import type {
   MigrationPlannerFailureResult,
   MigrationPlannerSuccessResult,
   MigrationPlanOperation,
+  MigrationRunnerExecutionChecks,
   MigrationRunnerFailure,
   MigrationRunnerSuccessValue,
   OperationContext,
@@ -279,6 +280,11 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string
   readonly strictVerification?: boolean;
   readonly callbacks?: SqlMigrationRunnerExecuteCallbacks<TTargetDetails>;
   readonly context?: OperationContext;
+  /**
+   * Execution-time checks configuration.
+   * All checks default to `true` (enabled) when omitted.
+   */
+  readonly executionChecks?: MigrationRunnerExecutionChecks;
   /**
    * Active framework components participating in this composition.
    * SQL targets can interpret this list to derive database dependencies.
