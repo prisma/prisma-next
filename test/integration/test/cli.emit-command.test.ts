@@ -41,6 +41,7 @@ describe('emit command', () => {
 
   it(
     'emits contract.json and contract.d.ts with valid contract',
+    { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
       const originalCwd = process.cwd();
@@ -90,11 +91,11 @@ describe('emit command', () => {
         },
       });
     },
-    timeouts.typeScriptCompilation,
   );
 
   it(
     'creates output directory if it does not exist',
+    { timeout: timeouts.typeScriptCompilation },
     async () => {
       const newOutputDir = join(testDir, 'new-output');
       const command = createContractEmitCommand();
@@ -130,7 +131,6 @@ describe('emit command', () => {
         process.chdir(originalCwd);
       }
     },
-    timeouts.typeScriptCompilation,
   );
 
   it(
@@ -242,63 +242,56 @@ describe('emit command', () => {
     },
   );
 
-  it(
-    'handles unsupported target family',
-    async () => {
-      const command = createContractEmitCommand();
-      const testSetup = setupIntegrationTestDirectoryFromFixtures(
-        fixtureSubdir,
-        'prisma-next.config.document-family.ts',
-      );
-      const testDirDocument = testSetup.testDir;
-      const cleanupDocument = testSetup.cleanup;
+  it('handles unsupported target family', { timeout: timeouts.typeScriptCompilation }, async () => {
+    const command = createContractEmitCommand();
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.document-family.ts',
+    );
+    const testDirDocument = testSetup.testDir;
+    const cleanupDocument = testSetup.cleanup;
 
-      try {
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDirDocument);
-          // The command should throw for unsupported family
-          await expect(
-            executeCommand(command, ['--config', 'prisma-next.config.ts']),
-          ).rejects.toThrow();
-        } finally {
-          process.chdir(originalCwd);
-        }
-      } finally {
-        cleanupDocument();
-      }
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
-    'handles extension paths',
-    async () => {
-      const command = createContractEmitCommand();
-      // Extensions are now in config, so we just need a valid config
+    try {
       const originalCwd = process.cwd();
       try {
-        process.chdir(testDir);
-        const exitCode = await executeCommand(command, [
-          'node',
-          'cli.js',
-          'emit',
-          '--config',
-          'prisma-next.config.ts',
-        ]);
-        expect(exitCode).toBe(0);
-
-        const contractJsonPath = join(outputDir, 'contract.json');
-        expect(existsSync(contractJsonPath)).toBe(true);
+        process.chdir(testDirDocument);
+        // The command should throw for unsupported family
+        await expect(
+          executeCommand(command, ['--config', 'prisma-next.config.ts']),
+        ).rejects.toThrow();
       } finally {
         process.chdir(originalCwd);
       }
-    },
-    timeouts.typeScriptCompilation,
-  );
+    } finally {
+      cleanupDocument();
+    }
+  });
+
+  it('handles extension paths', { timeout: timeouts.typeScriptCompilation }, async () => {
+    const command = createContractEmitCommand();
+    // Extensions are now in config, so we just need a valid config
+    const originalCwd = process.cwd();
+    try {
+      process.chdir(testDir);
+      const exitCode = await executeCommand(command, [
+        'node',
+        'cli.js',
+        'emit',
+        '--config',
+        'prisma-next.config.ts',
+      ]);
+      expect(exitCode).toBe(0);
+
+      const contractJsonPath = join(outputDir, 'contract.json');
+      expect(existsSync(contractJsonPath)).toBe(true);
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
 
   it(
     'handles single string extension path',
+    { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
       // Extensions are now in config
@@ -320,80 +313,72 @@ describe('emit command', () => {
         process.chdir(originalCwd);
       }
     },
-    timeouts.typeScriptCompilation,
   );
 
-  it(
-    'handles multiple extension paths',
-    async () => {
-      const command = createContractEmitCommand();
-      // Extensions are now in config
-      const originalCwd = process.cwd();
-      try {
-        process.chdir(testDir);
-        const exitCode = await executeCommand(command, [
-          'node',
-          'cli.js',
-          'emit',
-          '--config',
-          'prisma-next.config.ts',
-        ]);
-        expect(exitCode).toBe(0);
+  it('handles multiple extension paths', { timeout: timeouts.typeScriptCompilation }, async () => {
+    const command = createContractEmitCommand();
+    // Extensions are now in config
+    const originalCwd = process.cwd();
+    try {
+      process.chdir(testDir);
+      const exitCode = await executeCommand(command, [
+        'node',
+        'cli.js',
+        'emit',
+        '--config',
+        'prisma-next.config.ts',
+      ]);
+      expect(exitCode).toBe(0);
 
-        const contractJsonPath = join(outputDir, 'contract.json');
-        expect(existsSync(contractJsonPath)).toBe(true);
-      } finally {
-        process.chdir(originalCwd);
-      }
-    },
-    timeouts.typeScriptCompilation,
-  );
+      const contractJsonPath = join(outputDir, 'contract.json');
+      expect(existsSync(contractJsonPath)).toBe(true);
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
 
-  it(
-    'outputs profileHash when present',
-    async () => {
-      const command = createContractEmitCommand();
-      const originalCwd = process.cwd();
-      try {
-        process.chdir(testDir);
-        // Command should succeed (exit code 0) - executeCommand won't throw
-        const exitCode = await executeCommand(command, [
-          '--config',
-          'prisma-next.config.ts',
-          '--json',
-        ]);
-        expect(exitCode).toBe(0);
+  it('outputs profileHash when present', { timeout: timeouts.typeScriptCompilation }, async () => {
+    const command = createContractEmitCommand();
+    const originalCwd = process.cwd();
+    try {
+      process.chdir(testDir);
+      // Command should succeed (exit code 0) - executeCommand won't throw
+      const exitCode = await executeCommand(command, [
+        '--config',
+        'prisma-next.config.ts',
+        '--json',
+      ]);
+      expect(exitCode).toBe(0);
 
-        const contractJsonPath = join(outputDir, 'contract.json');
-        expect(existsSync(contractJsonPath)).toBe(true);
+      const contractJsonPath = join(outputDir, 'contract.json');
+      expect(existsSync(contractJsonPath)).toBe(true);
 
-        // Parse JSON output and verify structure
-        const jsonOutput = consoleOutput.join('\n');
-        expect(() => JSON.parse(jsonOutput)).not.toThrow();
+      // Parse JSON output and verify structure
+      const jsonOutput = consoleOutput.join('\n');
+      expect(() => JSON.parse(jsonOutput)).not.toThrow();
 
-        const parsed = JSON.parse(jsonOutput);
-        expect(parsed).toMatchObject({
-          ok: true,
-          coreHash: expect.any(String),
-          profileHash: expect.any(String),
-          outDir: expect.any(String),
-          files: {
-            json: expect.any(String),
-            dts: expect.any(String),
-          },
-          timings: {
-            total: expect.any(Number),
-          },
-        });
-      } finally {
-        process.chdir(originalCwd);
-      }
-    },
-    timeouts.typeScriptCompilation,
-  );
+      const parsed = JSON.parse(jsonOutput);
+      expect(parsed).toMatchObject({
+        ok: true,
+        coreHash: expect.any(String),
+        profileHash: expect.any(String),
+        outDir: expect.any(String),
+        files: {
+          json: expect.any(String),
+          dts: expect.any(String),
+        },
+        timings: {
+          total: expect.any(Number),
+        },
+      });
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
 
   it(
     'handles async contract source function',
+    { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
@@ -425,11 +410,11 @@ describe('emit command', () => {
         cleanupAsync();
       }
     },
-    timeouts.typeScriptCompilation,
   );
 
   it(
     'handles sync contract source function',
+    { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
@@ -461,11 +446,11 @@ describe('emit command', () => {
         cleanupSync();
       }
     },
-    timeouts.typeScriptCompilation,
   );
 
   it(
     'throws error when contract config missing output or types',
+    { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
       const testSetup = setupIntegrationTestDirectoryFromFixtures(
@@ -497,6 +482,5 @@ describe('emit command', () => {
         cleanupMissing();
       }
     },
-    timeouts.typeScriptCompilation,
   );
 });
