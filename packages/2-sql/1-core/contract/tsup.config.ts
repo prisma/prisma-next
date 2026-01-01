@@ -5,6 +5,7 @@ export default defineConfig({
     'exports/types': 'src/exports/types.ts',
     'exports/validators': 'src/exports/validators.ts',
     'exports/factories': 'src/exports/factories.ts',
+    'exports/pack-types': 'src/exports/pack-types.ts',
   },
   outDir: 'dist',
   format: ['esm'],

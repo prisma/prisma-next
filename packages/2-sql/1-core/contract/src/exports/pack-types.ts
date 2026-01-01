@@ -3,5 +3,7 @@ export type {
   DriverPackRef,
   ExtensionPackRef,
   PackRefBase,
+  PackRefDeclarativeFields,
+  StorageTypeMetadata,
   TargetPackRef,
-} from '../pack-ref-types';
+} from '../pack-types';

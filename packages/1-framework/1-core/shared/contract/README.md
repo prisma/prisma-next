@@ -17,8 +17,6 @@ This package provides the foundational type definitions for Prisma Next, includi
 - **JSON Schema Validation**: Provides JSON Schemas for validating contract structure in IDEs and tooling
 - **Type Guards**: Provides runtime type guards for narrowing contract types (`isDocumentContract`)
 - **Emitter Types**: Defines emitter SPI types (`TargetFamilyHook`, `ValidationContext`, `TypesImportSpec`) that are shared between emitter and control plane
-- **Pack Ref Types**: Defines pure pack ref shapes (`TargetPackRef`, `ExtensionPackRef`, etc.) used by TypeScript contract authoring surfaces
-- **Descriptor Utilities**: Provides helper functions (`serializeDescriptorToManifest`, `assertManifestMatchesDescriptor`) to keep declarative descriptor fields in sync with manifests
 
 The contract supports document target families:
 - **Document**: For document databases (MongoDB, Firestore, etc.)
@@ -27,8 +25,6 @@ The contract supports document target families:
 
 - **TypeScript Types**: Type definitions for `DocumentContract`, `ContractMarkerRecord`, and related types
 - **Emitter Types**: SPI types for emitter hooks (`TargetFamilyHook`, `ValidationContext`, `TypesImportSpec`)
-- **Pack Ref Types**: Pure pack ref definitions for targets/adapters/drivers/extensions
-- **Descriptor Utilities**: Helpers for projecting descriptors to manifests and asserting equality
 - **JSON Schemas**: Schema definitions for validating `contract.json` files in IDEs and tooling
   - `data-contract-document-v1.json` (Document family)
 
@@ -108,7 +104,7 @@ const sqlFamily: FamilyDescriptor<'sql'> = {
   kind: 'family',
   id: 'sql',
   familyId: 'sql',
-  manifest: { /* ... */ },
+  version: '1.0.0',
 };
 
 // Use TargetDescriptor for target components
@@ -117,7 +113,9 @@ const postgresTarget: TargetDescriptor<'sql', 'postgres'> = {
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  manifest: { /* ... */ },
+  version: '15.0.0',
+  targets: { postgres: { minVersion: '12' } },
+  capabilities: { postgres: { returning: true } },
 };
 
 // Identity instance bases are extended by plane-specific instances
@@ -137,39 +135,6 @@ Family (e.g., 'sql', 'document')
 ```
 
 Plane-specific descriptors (`ControlFamilyDescriptor`, `RuntimeTargetDescriptor`, etc.) extend these bases with plane-specific factory methods and capabilities.
-
-### Pack Ref Types
-
-Import pack ref types to build pure, JSON-friendly references for TypeScript contract authoring:
-
-```typescript
-import type { TargetPackRef } from '@prisma-next/contract/pack-ref-types';
-
-export const postgresPack: TargetPackRef<'sql', 'postgres'> = {
-  kind: 'target',
-  id: 'postgres',
-  familyId: 'sql',
-  targetId: 'postgres',
-  version: '15.0.0',
-};
-```
-
-Pack refs mirror the declarative fields from `ExtensionPackManifest` (version, capabilities, types, operations) without bundling any Node.js APIs, so consumers can safely import them in both emit and no-emit workflows.
-
-### Descriptor Manifest Helpers
-
-Use the descriptor helpers to keep declarative fields and manifests synchronized:
-
-```typescript
-import { assertManifestMatchesDescriptor, serializeDescriptorToManifest } from '@prisma-next/contract/descriptor-manifest';
-
-assertManifestMatchesDescriptor(manifest, descriptor); // throws if fields drift
-
-const projected = serializeDescriptorToManifest(descriptor);
-// projected === manifest (after canonicalization)
-```
-
-These helpers are used by package entry points to validate build-time manifests (`src/core/manifest.ts`) and to derive `/pack` entrypoints without re-reading JSON at runtime.
 
 ### JSON Schema Validation
 

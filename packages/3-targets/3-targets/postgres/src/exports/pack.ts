@@ -1,16 +1,15 @@
-import type { TargetPackRef } from '@prisma-next/contract/pack-ref-types';
-import { manifest } from '../core/manifest';
+import type { TargetPackRef } from '@prisma-next/sql-contract/pack-types';
 
 const postgresPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
-  id: manifest.id,
+  id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  version: manifest.version,
-  targets: manifest.targets,
-  capabilities: manifest.capabilities,
-  types: manifest.types,
-  operations: manifest.operations,
+  version: '15.0.0',
+  targets: {
+    postgres: { minVersion: '12' },
+  },
+  capabilities: {},
 };
 
 export default postgresPack;
