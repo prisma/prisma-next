@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "SQL-normalized driver error types for Prisma Next",
+  "description": "Normalized SQL driver error types for Prisma Next",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run",
