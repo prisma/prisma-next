@@ -45,9 +45,7 @@ describe('SqlQueryError', () => {
     const error = new SqlQueryError('Query failed', { cause: originalError });
 
     expect(error.cause).toBe(originalError);
-    if (error.cause instanceof Error) {
-      expect(error.cause.stack).toBe('Error: Original error\n    at test.js:1:1');
-    }
+    expect((error.cause as Error).stack).toBe('Error: Original error\n    at test.js:1:1');
   });
 
   it('is() type predicate', () => {
@@ -91,9 +89,7 @@ describe('SqlConnectionError', () => {
     const error = new SqlConnectionError('Connection failed', { cause: originalError });
 
     expect(error.cause).toBe(originalError);
-    if (error.cause instanceof Error) {
-      expect(error.cause.stack).toBe('Error: Original error\n    at test.js:1:1');
-    }
+    expect((error.cause as Error).stack).toBe('Error: Original error\n    at test.js:1:1');
   });
 
   it('is() type predicate', () => {
