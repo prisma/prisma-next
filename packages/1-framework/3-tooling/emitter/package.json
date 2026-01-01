@@ -25,6 +25,7 @@
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "catalog:",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
     "vitest": "catalog:"
