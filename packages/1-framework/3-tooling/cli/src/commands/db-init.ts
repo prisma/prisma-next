@@ -326,18 +326,9 @@ export function createDbInitCommand(): Command {
                 destinationContract: contractIR,
                 policy,
                 callbacks,
-                // db init plans and applies in quick succession, so the runner executes against a
-                // schema snapshot that was just introspected and planned from (fresh, known state).
-                // For this flow, per-operation prechecks/postchecks and the idempotency probe
-                // ("is postcheck already satisfied?") are usually redundant and add extra
-                // round-trips / "check" queries.
-                //
-                // This is also consistent with db init’s typical use case (additive-only bootstrap),
-                // where the database is often empty or otherwise in a state the planner just observed.
-                //
-                // Safety rails are still enforced: marker/origin compatibility is checked
-                // before execution, and the runner performs a full schema verification
-                // against the destination contract after applying the plan.
+                // db init plans and applies back-to-back from a fresh introspection, so per-operation
+                // pre/postchecks and the idempotency probe are usually redundant overhead. We still
+                // enforce marker/origin compatibility and a full schema verification after apply.
                 executionChecks: {
                   prechecks: false,
                   postchecks: false,
