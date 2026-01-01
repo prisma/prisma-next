@@ -18,6 +18,7 @@ Note: Contract emission is implemented on the SQL family instance (e.g., `family
 - **Error Factories**: Domain error factories (`CliStructuredError`, config errors, runtime errors)
 - **Pack Manifest Types**: Type definitions for extension pack manifests
 - **Migration SPI**: Generic migration planner/runner interfaces (`MigrationPlanner<TFamilyId, TTargetId>`, `MigrationRunner<TFamilyId, TTargetId>`, `TargetMigrationsCapability<TFamilyId, TTargetId, TFamilyInstance>`) that thread family/target IDs for compile-time component compatibility enforcement
+  - `MigrationRunnerFailure` includes optional `meta` for structured debugging context (e.g., schema issues, SQL state)
 
 ## Dependencies
 

@@ -74,9 +74,16 @@ withTempDir(({ createTempDir }) => {
               `,
             );
 
+            consoleErrors.length = 0;
+
             await expect(
               runDbInit(testSetup, ['--config', configPath, '--no-color']),
             ).rejects.toThrow();
+
+            const errorText = stripAnsi(consoleErrors.join('\n'));
+            expect(errorText).toContain('PN-RTM-3000');
+            expect(errorText).toContain('Issues');
+            expect(errorText).toContain('Extra column "user"."name"');
           });
         },
         timeouts.spinUpPpgDev,

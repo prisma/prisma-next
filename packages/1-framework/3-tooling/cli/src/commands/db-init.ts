@@ -9,6 +9,7 @@ import type {
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import {
+  errorContractValidationFailed,
   errorDatabaseUrlRequired,
   errorDriverRequired,
   errorFileNotFound,
@@ -130,6 +131,7 @@ export function createDbInitCommand(): Command {
           if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
             throw errorFileNotFound(contractPathAbsolute, {
               why: `Contract file not found at ${contractPathAbsolute}`,
+              fix: `Run \`prisma-next contract emit\` to generate ${contractPath}, or update \`config.contract.output\` in ${configPath}`,
             });
           }
           throw errorUnexpected(error instanceof Error ? error.message : String(error), {
@@ -141,15 +143,18 @@ export function createDbInitCommand(): Command {
         try {
           contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
         } catch (error) {
-          throw errorUnexpected(error instanceof Error ? error.message : String(error), {
-            why: `Failed to parse contract JSON at ${contractPathAbsolute}: ${error instanceof Error ? error.message : String(error)}`,
-          });
+          throw errorContractValidationFailed(
+            `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+            { where: { path: contractPathAbsolute } },
+          );
         }
 
         // Resolve database URL
         const dbUrl = options.db ?? config.db?.url;
         if (!dbUrl) {
-          throw errorDatabaseUrlRequired({ why: 'Database URL is required for db init' });
+          throw errorDatabaseUrlRequired({
+            why: `Database URL is required for db init (set db.url in ${configPath}, or pass --db <url>)`,
+          });
         }
 
         // Check for driver
@@ -279,7 +284,7 @@ export function createDbInitCommand(): Command {
               `Existing contract marker does not match plan destination. Mismatch in ${mismatchParts.join(' and ')}.`,
               {
                 why: 'Database has an existing contract marker that does not match the target contract',
-                fix: 'Use `prisma-next db migrate` to migrate from the existing contract, or drop the database and re-run `db init`',
+                fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
                 meta: {
                   code: 'MARKER_ORIGIN_MISMATCH',
                   markerCoreHash: existingMarker.coreHash,
@@ -350,10 +355,20 @@ export function createDbInitCommand(): Command {
           });
 
           if (!runnerResult.ok) {
+            const meta = {
+              code: runnerResult.failure.code,
+              ...(runnerResult.failure.meta ?? {}),
+            };
+            const fix =
+              runnerResult.failure.code === 'SCHEMA_VERIFY_FAILED'
+                ? 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`'
+                : undefined;
+
             throw errorRuntime(runnerResult.failure.summary, {
               why:
                 runnerResult.failure.why ?? `Migration runner failed: ${runnerResult.failure.code}`,
-              meta: { code: runnerResult.failure.code },
+              ...(fix ? { fix } : {}),
+              meta,
             });
           }
 
