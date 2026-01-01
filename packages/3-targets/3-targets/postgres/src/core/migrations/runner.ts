@@ -262,7 +262,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     for (const step of steps) {
       try {
         await driver.query(step.sql);
-      } catch (error) {
+      } catch (error: unknown) {
         // Catch SqlQueryError and include normalized metadata
         if (SqlQueryError.is(error)) {
           return runnerFailure(

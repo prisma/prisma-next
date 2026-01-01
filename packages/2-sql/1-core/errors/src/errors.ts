@@ -1,7 +1,10 @@
+export interface SqlDriverError<Kind extends string> {
+  readonly kind: Kind;
+}
 /**
  * SQL query error for query-related failures (syntax errors, constraint violations, permissions).
  */
-export class SqlQueryError extends Error {
+export class SqlQueryError extends Error implements SqlDriverError<'sql_query'> {
   static readonly ERROR_NAME = 'SqlQueryError' as const;
   readonly kind = 'sql_query' as const;
   readonly sqlState: string | undefined;
@@ -46,7 +49,7 @@ export class SqlQueryError extends Error {
 /**
  * SQL connection error (timeouts, connection resets, etc.).
  */
-export class SqlConnectionError extends Error {
+export class SqlConnectionError extends Error implements SqlDriverError<'sql_connection'> {
   static readonly ERROR_NAME = 'SqlConnectionError' as const;
   readonly kind = 'sql_connection' as const;
   readonly transient: boolean | undefined;
