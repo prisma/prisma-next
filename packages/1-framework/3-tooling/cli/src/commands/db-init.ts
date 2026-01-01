@@ -394,14 +394,17 @@ export function createDbInitCommand(): Command {
           });
 
           if (!runnerResult.ok) {
-            const meta = {
+            const meta: Record<string, unknown> = {
               code: runnerResult.failure.code,
               ...(runnerResult.failure.meta ?? {}),
             };
+            const sqlState = typeof meta['sqlState'] === 'string' ? meta['sqlState'] : undefined;
             const fix =
-              runnerResult.failure.code === 'SCHEMA_VERIFY_FAILED'
-                ? 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`'
-                : undefined;
+              sqlState === '42501'
+                ? 'Grant the database user sufficient privileges (insufficient_privilege), or run db init as a more privileged role'
+                : runnerResult.failure.code === 'SCHEMA_VERIFY_FAILED'
+                  ? 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`'
+                  : undefined;
 
             throw errorRuntime(runnerResult.failure.summary, {
               why:
