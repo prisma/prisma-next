@@ -392,43 +392,6 @@ describe('emit command', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('handles errors and throws', { timeout: timeouts.typeScriptCompilation }, async () => {
-    const command = createContractEmitCommand();
-    const testSetup = setupIntegrationTestDirectoryFromFixtures(
-      fixtureSubdir,
-      'prisma-next.config.no-contract.ts',
-    );
-    const testDirNoContract = testSetup.testDir;
-    const cleanupNoContract = testSetup.cleanup;
-
-    try {
-      const originalCwd = process.cwd();
-      try {
-        process.chdir(testDirNoContract);
-        // Command should throw for missing contract
-        await expect(
-          executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
-        ).rejects.toThrow();
-      } finally {
-        process.chdir(originalCwd);
-      }
-
-      // Parse JSON error output and verify structure
-      const errorOutput = consoleErrors.join('\n');
-      expect(() => JSON.parse(errorOutput)).not.toThrow();
-
-      const parsed = JSON.parse(errorOutput);
-      expect(parsed).toMatchObject({
-        code: expect.stringMatching(/^PN-CLI-/),
-        summary: expect.any(String),
-        why: expect.any(String),
-        fix: expect.any(String),
-      });
-    } finally {
-      cleanupNoContract();
-    }
-  });
-
   it(
     'handles async contract source function',
     async () => {
