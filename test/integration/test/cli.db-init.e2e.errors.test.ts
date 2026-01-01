@@ -1,5 +1,5 @@
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
-import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -104,12 +104,16 @@ withTempDir(({ createTempDir }) => {
             const configPath = testSetup.configPath;
 
             await expect(
-              runDbInit(testSetup, ['--config', configPath, '--no-color']),
+              runDbInit(testSetup, ['--config', configPath, '--json', '--no-color']),
             ).rejects.toThrow();
 
-            const errorOutput = consoleErrors.join('\n');
-            expect(errorOutput).toContain('PN-CLI-4');
-            expect(errorOutput).toMatch(/file.*not found|not found.*file/i);
+            const errorText = consoleErrors.join('\n').trim();
+            const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+            expect(errorJson).toMatchObject({
+              code: 'PN-CLI-4004',
+              domain: 'CLI',
+            });
+            expect(String(errorJson['fix'])).toContain('contract emit');
           });
         },
         timeouts.spinUpPpgDev,
@@ -213,6 +217,61 @@ withTempDir(({ createTempDir }) => {
             });
 
             expect(errorJson).not.toHaveProperty('meta.password');
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
+
+    describe('marker mismatch', () => {
+      it(
+        'does not reference non-existent db migrate command',
+        async () => {
+          await withDevDatabase(async ({ connectionString }) => {
+            await withClient(connectionString, async (client) => {
+              await client.query('CREATE SCHEMA IF NOT EXISTS prisma_contract');
+              await client.query(`
+                CREATE TABLE IF NOT EXISTS prisma_contract.marker (
+                  id INTEGER PRIMARY KEY DEFAULT 1,
+                  core_hash TEXT NOT NULL,
+                  profile_hash TEXT NOT NULL,
+                  contract_json JSONB,
+                  canonical_version INTEGER,
+                  updated_at TIMESTAMPTZ DEFAULT NOW(),
+                  app_tag TEXT,
+                  meta JSONB DEFAULT '{}'
+                )
+              `);
+              await client.query(`
+                INSERT INTO prisma_contract.marker (id, core_hash, profile_hash, contract_json)
+                VALUES (1, 'sha256:different-hash', 'sha256:different-profile', '{}')
+                ON CONFLICT (id) DO NOTHING
+              `);
+            });
+
+            const { testSetup, configPath } = await setupDbInitFixture(
+              connectionString,
+              createTempDir,
+              fixtureSubdir,
+            );
+
+            consoleOutput.length = 0;
+            consoleErrors.length = 0;
+
+            await expect(
+              runDbInit(testSetup, ['--config', configPath, '--json', '--no-color']),
+            ).rejects.toThrow();
+
+            const errorText = consoleErrors.join('\n').trim();
+            const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+
+            expect(errorJson).toMatchObject({
+              code: 'PN-RTM-3000',
+              domain: 'RTM',
+              meta: { code: 'MARKER_ORIGIN_MISMATCH' },
+            });
+
+            expect(String(errorJson['fix'])).not.toContain('db migrate');
           });
         },
         timeouts.spinUpPpgDev,
