@@ -14,6 +14,7 @@ import type {
 import { Pool } from 'pg';
 import Cursor from 'pg-cursor';
 import { callbackToPromise } from './callback-to-promise';
+import { normalizePgError } from './normalize-error';
 
 export type QueryResult<T extends QueryResultRow = QueryResultRow> = PgQueryResult<T>;
 
@@ -65,12 +66,22 @@ class PostgresDriverImpl implements SqlDriver {
           if (!(cursorError instanceof Error)) {
             throw cursorError;
           }
+          // Check if this is a pg error (has code property) - if so, normalize and throw
+          // Otherwise, fall back to buffered mode for cursor-specific errors
+          const pgError = cursorError as { code?: string };
+          if (pgError.code) {
+            // Has a code property - likely a pg error, normalize and throw
+            normalizePgError(cursorError);
+          }
+          // No code property - cursor-specific error, fall back to buffered mode
         }
       }
 
       for await (const row of this.executeBuffered(client, request.sql, request.params)) {
         yield row as Row;
       }
+    } catch (error) {
+      normalizePgError(error);
     } finally {
       await this.releaseClient(client);
     }
@@ -82,6 +93,8 @@ class PostgresDriverImpl implements SqlDriver {
     try {
       const result = await client.query(text, request.params as unknown[] | undefined);
       return { rows: result.rows as ReadonlyArray<Record<string, unknown>> };
+    } catch (error) {
+      normalizePgError(error);
     } finally {
       await this.releaseClient(client);
     }
@@ -95,6 +108,8 @@ class PostgresDriverImpl implements SqlDriver {
     try {
       const result = await client.query(sql, params as unknown[] | undefined);
       return result as unknown as SqlQueryResult<Row>;
+    } catch (error) {
+      normalizePgError(error);
     } finally {
       await this.releaseClient(client);
     }
@@ -178,6 +193,8 @@ class PostgresDriverImpl implements SqlDriver {
           yield row;
         }
       }
+    } catch (error) {
+      normalizePgError(error);
     } finally {
       await closeCursor(cursor);
     }
@@ -188,9 +205,13 @@ class PostgresDriverImpl implements SqlDriver {
     sql: string,
     params: readonly unknown[] | undefined,
   ): AsyncIterable<Record<string, unknown>> {
-    const result = await client.query(sql, params as unknown[] | undefined);
-    for (const row of result.rows as Record<string, unknown>[]) {
-      yield row;
+    try {
+      const result = await client.query(sql, params as unknown[] | undefined);
+      for (const row of result.rows as Record<string, unknown>[]) {
+        yield row;
+      }
+    } catch (error) {
+      normalizePgError(error);
     }
   }
 }
