@@ -6,12 +6,14 @@ import {
 } from '@prisma-next/adapter-postgres/column-types';
 import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
 import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
+import pgvector from '@prisma-next/extension-pgvector/pack';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
 
 type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
 
 export const contract = defineContract<AllCodecTypes>()
-  .target('postgres')
+  .target(postgresPack)
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })
@@ -65,9 +67,7 @@ export const contract = defineContract<AllCodecTypes>()
         },
       }),
   )
-  .extensions({
-    pgvector: {},
-  })
+  .extensionPacks({ pgvector })
   .capabilities({
     postgres: {
       lateral: true,
