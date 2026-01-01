@@ -438,12 +438,8 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
             sqlState: '23505', // Unique violation SQLSTATE
             constraint: 'user_email_unique',
             table: 'user',
-            // column may or may not be present depending on PostgreSQL version/configuration
+            // PostgreSQL does not include column property for unique constraint violations
           });
-          // Verify column if present (PostgreSQL may not always include it for unique constraints)
-          if (result.failure.meta?.column !== undefined) {
-            expect(result.failure.meta.column).toBe('email');
-          }
         }
 
         // Verify transaction was rolled back (no rows inserted)
