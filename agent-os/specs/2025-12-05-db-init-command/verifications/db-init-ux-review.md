@@ -8,7 +8,7 @@ Raw transcripts (stdout, stderr, exit codes, commands) are stored in
 > allows only one connection at a time and rejects repeated attempts to alter role grants in a
 > predictable way. Everything else in the acceptance matrix (human + JSON) was executed.
 
-## Scenario snapshots (current behavior)
+## Scenario snapshots (before changes)
 
 | Scenario | Mode | Command (relative) | Exit | Actionable? | Notes (stdout/stderr summary) |
 |----------|------|--------------------|------|-------------|-------------------------------|
@@ -25,6 +25,14 @@ Raw transcripts (stdout, stderr, exit codes, commands) are stored in
 | Planner conflict | human | `… --no-color` | 1 | ⚠️ | Only summary “Database schema does not satisfy contract (1 failure)” with generic fix, no conflict list unless `--verbose` |
 | Marker mismatch | json | `… --json` | 1 | ⚠️ | Error fix instructs “Use `prisma-next db migrate`…”, command doesn’t exist |
 | `--json ndjson` | ndjson flag | `prisma-next db init --config scenario.config.ts --json ndjson` | 0 | ❌ | Human header + spinner + success text printed; not machine-readable NDJSON |
+
+## Implemented improvements (after)
+
+- **Reject unsupported `--json ndjson`**: `db init` now fails fast with a structured CLI error (no header/spinner), and JSON errors are machine-readable whenever any `--json` mode is set.
+- **Contract file errors are actionable**: missing contract file and invalid JSON point users at `prisma-next contract emit` and include file paths.
+- **Connection failures are structured**: connect errors are caught and converted into a structured RTM error with redacted connection meta (no password) instead of raw stacks.
+- **Schema mismatch failures carry details**: runner failures now preserve `failure.meta` and the human formatter prints a short list of `issues`/`conflicts` without requiring `--verbose`.
+- **Marker mismatch fix copy is corrected**: no longer references a non-existent `prisma-next db migrate`.
 
 ## Punchlist
 
@@ -43,10 +51,9 @@ Raw transcripts (stdout, stderr, exit codes, commands) are stored in
    though `--json [format]` advertises `ndjson`; consumers cannot parse the result.
 7. **`errorUnexpected` is being used for invalid JSON.** Leads to “Unexpected error” summary even
    though the error is user-facing and should provide guidance.
-8. **Permission-denied scenario couldn’t be captured.** Dev DB single-connection limitation makes
-   it impractical to keep a limited role connected while running the command. No guidance currently
-   exists for insufficient privileges, which we still need to handle via `runner.meta` once we add
-   repro steps.
+8. **Permission-denied repro is still missing.** The dev DB environment makes it hard to reliably
+   trigger privilege errors, but the `db init` runner failure wrapper now special-cases
+   `meta.sqlState === '42501'` to provide privilege guidance.
 
 ## Proposed copy & formatting changes (aligned with plan)
 
