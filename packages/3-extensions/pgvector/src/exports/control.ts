@@ -120,4 +120,5 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   }),
 };
 
+export { pgvectorExtensionDescriptor };
 export default pgvectorExtensionDescriptor;

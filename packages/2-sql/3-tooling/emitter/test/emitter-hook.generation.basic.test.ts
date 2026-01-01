@@ -1,11 +1,20 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import type {
+  ControlAdapterDescriptor,
+  ControlExtensionDescriptor,
+  ControlTargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
 import {
-  extractCodecTypeImportsFromPacks,
-  extractOperationTypeImportsFromPacks,
+  extractCodecTypeImports,
+  extractOperationTypeImports,
 } from '../../family/src/core/assembly';
 import { sqlTargetFamilyHook } from '../src/index';
+
+type TestDescriptor =
+  | ControlTargetDescriptor<'sql', string>
+  | ControlAdapterDescriptor<'sql', string>
+  | ControlExtensionDescriptor<'sql', string>;
 
 function createContractIR(overrides: Partial<ContractIR>): ContractIR {
   return {
@@ -89,27 +98,27 @@ describe('sql-target-family-hook', () => {
   });
 
   it('gets types imports', () => {
-    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
+    const descriptors: TestDescriptor[] = [
       {
-        manifest: {
-          id: 'test-adapter',
-          version: '1.0.0',
-          types: {
-            codecTypes: {
-              import: {
-                package: '@test/adapter/codec-types',
-                named: 'CodecTypes',
-                alias: 'TestTypes',
-              },
+        kind: 'adapter',
+        id: 'test-adapter',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '1.0.0',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@test/adapter/codec-types',
+              named: 'CodecTypes',
+              alias: 'TestTypes',
             },
           },
         },
-        path: '/path/to/pack',
-      },
+      } as TestDescriptor,
     ];
 
-    const codecImports = extractCodecTypeImportsFromPacks(packs);
-    const operationImports = extractOperationTypeImportsFromPacks(packs);
+    const codecImports = extractCodecTypeImports(descriptors);
+    const operationImports = extractOperationTypeImports(descriptors);
     expect(codecImports.length).toBe(1);
     expect(codecImports[0]?.package).toBe('@test/adapter/codec-types');
     expect(codecImports[0]?.named).toBe('CodecTypes');
@@ -133,43 +142,43 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
+    const descriptors: TestDescriptor[] = [
       {
-        manifest: {
-          id: 'postgres',
-          version: '15.0.0',
-          types: {
-            codecTypes: {
-              import: {
-                package: '@prisma-next/adapter-postgres/codec-types',
-                named: 'CodecTypes',
-                alias: 'PgTypes',
-              },
+        kind: 'adapter',
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '15.0.0',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@prisma-next/adapter-postgres/codec-types',
+              named: 'CodecTypes',
+              alias: 'PgTypes',
             },
           },
         },
-        path: '/path/to/postgres',
-      },
+      } as TestDescriptor,
       {
-        manifest: {
-          id: 'pgvector',
-          version: '1.0.0',
-          types: {
-            codecTypes: {
-              import: {
-                package: '@prisma-next/pgvector/codec-types',
-                named: 'CodecTypes',
-                alias: 'VectorTypes',
-              },
+        kind: 'extension',
+        id: 'pgvector',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '1.0.0',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@prisma-next/pgvector/codec-types',
+              named: 'CodecTypes',
+              alias: 'VectorTypes',
             },
           },
         },
-        path: '/path/to/pgvector',
-      },
+      } as TestDescriptor,
     ];
 
-    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+    const codecTypeImports = extractCodecTypeImports(descriptors);
+    const operationTypeImports = extractOperationTypeImports(descriptors);
     const types = sqlTargetFamilyHook.generateContractTypes(
       ir,
       codecTypeImports,

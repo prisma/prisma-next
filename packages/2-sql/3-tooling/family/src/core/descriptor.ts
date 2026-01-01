@@ -1,4 +1,3 @@
-import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -11,14 +10,6 @@ import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './instan
 import type { SqlControlTargetDescriptor } from './migrations/types';
 
 /**
- * SQL family manifest.
- */
-const sqlFamilyManifest: ExtensionPackManifest = {
-  id: 'sql',
-  version: '0.0.1',
-};
-
-/**
  * SQL family descriptor implementation.
  * Provides the SQL family hook and factory method.
  */
@@ -28,7 +19,7 @@ export class SqlFamilyDescriptor
   readonly kind = 'family' as const;
   readonly id = 'sql';
   readonly familyId = 'sql' as const;
-  readonly manifest = sqlFamilyManifest;
+  readonly version = '0.0.1';
   readonly hook = sqlTargetFamilyHook;
 
   create<TTargetId extends string, TTargetDetails = Record<string, never>>(options: {

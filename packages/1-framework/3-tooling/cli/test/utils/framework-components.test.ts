@@ -6,9 +6,9 @@ describe('assertFrameworkComponentsCompatible', () => {
   type TestComponent = {
     readonly kind: 'target' | 'adapter' | 'extension' | 'driver';
     readonly id: string;
+    readonly version: string;
     readonly familyId?: string;
     readonly targetId?: string;
-    readonly manifest?: { readonly id: string; readonly version: string };
     readonly create?: () => unknown;
   };
 
@@ -18,9 +18,9 @@ describe('assertFrameworkComponentsCompatible', () => {
   ): TestComponent => ({
     kind,
     id: `${kind}-id`,
+    version: '1.0.0',
     familyId: 'sql',
     targetId: 'postgres',
-    manifest: { id: `${kind}-id`, version: '1.0.0' },
     create: () => ({}),
     ...overrides,
   });
