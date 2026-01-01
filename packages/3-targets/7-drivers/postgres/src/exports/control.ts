@@ -1,5 +1,4 @@
 import { errorRuntime } from '@prisma-next/core-control-plane/errors';
-import { assertManifestMatchesDescriptor } from '@prisma-next/contract/descriptor-manifest';
 import type {
   ControlDriverDescriptor,
   ControlDriverInstance,
@@ -7,7 +6,6 @@ import type {
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { Client } from 'pg';
-import { manifest } from '../core/manifest';
 import { normalizePgError } from '../normalize-error';
 
 /**
@@ -50,12 +48,11 @@ const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', Postg
     id: 'postgres',
     familyId: 'sql',
     targetId: 'postgres',
-    manifest,
-    version: manifest.version,
-    targets: manifest.targets,
-    capabilities: manifest.capabilities,
-    types: manifest.types,
-    operations: manifest.operations,
+    version: '0.0.1',
+    targets: {
+      postgres: { minVersion: '12' },
+    },
+    capabilities: {},
     async create(url: string): Promise<PostgresControlDriver> {
       const client = new Client({ connectionString: url });
       try {
@@ -90,5 +87,3 @@ const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', Postg
   };
 
 export default postgresDriverDescriptor;
-
-assertManifestMatchesDescriptor(manifest, postgresDriverDescriptor);

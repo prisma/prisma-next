@@ -1,9 +1,7 @@
-import { assertManifestMatchesDescriptor } from '@prisma-next/contract/descriptor-manifest';
 import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
 } from '@prisma-next/core-execution-plane/types';
-import { manifest } from '../core/manifest';
 
 /**
  * Postgres runtime target instance interface.
@@ -22,12 +20,11 @@ const postgresRuntimeTargetDescriptor: RuntimeTargetDescriptor<
   familyId: 'sql',
   targetId: 'postgres',
   id: 'postgres',
-  manifest,
-  version: manifest.version,
-  targets: manifest.targets,
-  capabilities: manifest.capabilities,
-  types: manifest.types,
-  operations: manifest.operations,
+  version: '15.0.0',
+  targets: {
+    postgres: { minVersion: '12' },
+  },
+  capabilities: {},
   create(): PostgresRuntimeTargetInstance {
     return {
       familyId: 'sql',
@@ -37,5 +34,3 @@ const postgresRuntimeTargetDescriptor: RuntimeTargetDescriptor<
 };
 
 export default postgresRuntimeTargetDescriptor;
-
-assertManifestMatchesDescriptor(manifest, postgresRuntimeTargetDescriptor);

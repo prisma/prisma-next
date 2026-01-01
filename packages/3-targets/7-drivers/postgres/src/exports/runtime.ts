@@ -1,10 +1,8 @@
-import { assertManifestMatchesDescriptor } from '@prisma-next/contract/descriptor-manifest';
 import type {
   RuntimeDriverDescriptor,
   RuntimeDriverInstance,
 } from '@prisma-next/core-execution-plane/types';
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
-import { manifest } from '../core/manifest';
 import type { PostgresDriverOptions } from '../postgres-driver';
 import { createPostgresDriverFromOptions } from '../postgres-driver';
 
@@ -28,12 +26,11 @@ const postgresRuntimeDriverDescriptor: RuntimeDriverDescriptor<
   familyId: 'sql',
   targetId: 'postgres',
   id: 'postgres',
-  manifest,
-  version: manifest.version,
-  targets: manifest.targets,
-  capabilities: manifest.capabilities,
-  types: manifest.types,
-  operations: manifest.operations,
+  version: '0.0.1',
+  targets: {
+    postgres: { minVersion: '12' },
+  },
+  capabilities: {},
   create(options: PostgresDriverOptions): PostgresRuntimeDriver {
     return createPostgresDriverFromOptions(options) as PostgresRuntimeDriver;
   },
@@ -46,5 +43,3 @@ export type {
   QueryResult,
 } from '../postgres-driver';
 export { createPostgresDriver, createPostgresDriverFromOptions } from '../postgres-driver';
-
-assertManifestMatchesDescriptor(manifest, postgresRuntimeDriverDescriptor);

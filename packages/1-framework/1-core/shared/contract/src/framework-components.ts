@@ -1,4 +1,4 @@
-import type { ExtensionPackManifest } from './types';
+import type { OperationManifest, TypesImportSpec } from './types';
 
 // ============================================================================
 // Framework Component Descriptor Base Types
@@ -24,8 +24,40 @@ import type { ExtensionPackManifest } from './types';
 //   ecosystem authors to define new component kinds
 // - Target-bound descriptors are generic in TFamilyId and TTargetId for type-safe
 //   composition (e.g., TypeScript rejects Postgres adapter with MySQL target)
+// - Descriptors own declarative fields directly (version, types, operations, etc.)
+//   rather than nesting them under a `manifest` property
 //
 // ============================================================================
+
+/**
+ * Declarative fields that describe component metadata.
+ * These fields are owned directly by descriptors (not nested under a manifest).
+ */
+export interface ComponentDeclarativeFields {
+  /** Component version (semver) */
+  readonly version: string;
+
+  /** Target metadata - which targets this component supports */
+  readonly targets?: Record<string, { readonly minVersion?: string }>;
+
+  /** Capabilities this component provides */
+  readonly capabilities?: Record<string, unknown>;
+
+  /** Type imports for contract.d.ts generation */
+  readonly types?: {
+    readonly codecTypes?: { readonly import: TypesImportSpec };
+    readonly operationTypes?: { readonly import: TypesImportSpec };
+    readonly storage?: ReadonlyArray<{
+      readonly typeId: string;
+      readonly familyId: string;
+      readonly targetId: string;
+      readonly nativeType?: string;
+    }>;
+  };
+
+  /** Operation manifests for building operation registries */
+  readonly operations?: ReadonlyArray<OperationManifest>;
+}
 
 /**
  * Base descriptor for any framework component.
@@ -43,33 +75,15 @@ import type { ExtensionPackManifest } from './types';
  * // All descriptors have these properties
  * descriptor.kind     // The Kind type parameter (e.g., 'family', 'target', or custom kinds)
  * descriptor.id       // Unique string identifier (e.g., 'sql', 'postgres')
- * descriptor.manifest // Package metadata (version, capabilities, types, etc.)
+ * descriptor.version  // Component version (semver)
  * ```
  */
-export interface ComponentDescriptor<Kind extends string> {
+export interface ComponentDescriptor<Kind extends string> extends ComponentDeclarativeFields {
   /** Discriminator identifying the component type */
   readonly kind: Kind;
 
   /** Unique identifier for this component (e.g., 'sql', 'postgres', 'pgvector') */
   readonly id: string;
-
-  /** Package manifest containing version, capabilities, type imports, and operations */
-  readonly manifest: ExtensionPackManifest;
-
-  /** Declarative component version (mirrors manifest.version) */
-  readonly version?: string;
-
-  /** Declarative target metadata */
-  readonly targets?: ExtensionPackManifest['targets'];
-
-  /** Declarative capability metadata */
-  readonly capabilities?: ExtensionPackManifest['capabilities'];
-
-  /** Declarative type metadata */
-  readonly types?: ExtensionPackManifest['types'];
-
-  /** Declarative operation manifests */
-  readonly operations?: ExtensionPackManifest['operations'];
 }
 
 /**

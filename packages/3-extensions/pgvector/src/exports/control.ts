@@ -1,11 +1,9 @@
-import { assertManifestMatchesDescriptor } from '@prisma-next/contract/descriptor-manifest';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   ComponentDatabaseDependencies,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { manifest } from '../core/manifest';
 
 /**
  * Pure verification hook: checks whether the 'vector' extension is installed
@@ -74,12 +72,47 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   familyId: 'sql',
   targetId: 'postgres', // pgvector is postgres-specific
   id: 'pgvector',
-  manifest,
-  version: manifest.version,
-  targets: manifest.targets,
-  capabilities: manifest.capabilities,
-  types: manifest.types,
-  operations: manifest.operations,
+  version: '1.0.0',
+  targets: {
+    postgres: { minVersion: '12' },
+  },
+  capabilities: {
+    postgres: {
+      'pgvector/cosine': true,
+    },
+  },
+  types: {
+    codecTypes: {
+      import: {
+        package: '@prisma-next/extension-pgvector/codec-types',
+        named: 'CodecTypes',
+        alias: 'PgVectorTypes',
+      },
+    },
+    operationTypes: {
+      import: {
+        package: '@prisma-next/extension-pgvector/operation-types',
+        named: 'OperationTypes',
+        alias: 'PgVectorOperationTypes',
+      },
+    },
+    storage: [
+      { typeId: 'pg/vector@1', familyId: 'sql', targetId: 'postgres', nativeType: 'vector' },
+    ],
+  },
+  operations: [
+    {
+      for: 'pg/vector@1',
+      method: 'cosineDistance',
+      args: [{ kind: 'param' }],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: '1 - ({{self}} <=> {{arg0}})',
+      },
+    },
+  ],
   databaseDependencies: pgvectorDatabaseDependencies,
   create: () => ({
     familyId: 'sql' as const,
@@ -88,5 +121,3 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
 };
 
 export default pgvectorExtensionDescriptor;
-
-assertManifestMatchesDescriptor(manifest, pgvectorExtensionDescriptor);
