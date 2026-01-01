@@ -660,10 +660,9 @@ function toRegclassLiteral(schema: string, name: string): string {
   return `'${escapeLiteral(regclass)}'`;
 }
 
+/** Escapes and quotes a SQL identifier (table, column, schema name). */
 function quoteIdentifier(identifier: string): string {
-  if (typeof identifier !== 'string') {
-    throw new TypeError(`Identifier must be a string. Received ${String(identifier)}`);
-  }
+  // TypeScript enforces string type - no runtime check needed for internal callers
   return `"${identifier.replace(/"/g, '""')}"`;
 }
 
