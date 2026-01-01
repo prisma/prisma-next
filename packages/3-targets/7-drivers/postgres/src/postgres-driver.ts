@@ -69,7 +69,7 @@ class PostgresDriverImpl implements SqlDriver {
           // Check if this is a pg error - if so, normalize and throw
           // Otherwise, fall back to buffered mode for cursor-specific errors
           if (isPostgresError(cursorError)) {
-            normalizePgError(cursorError);
+            throw normalizePgError(cursorError);
           }
           // Not a pg error - cursor-specific error, fall back to buffered mode
         }
@@ -79,7 +79,7 @@ class PostgresDriverImpl implements SqlDriver {
         yield row as Row;
       }
     } catch (error) {
-      normalizePgError(error);
+      throw normalizePgError(error);
     } finally {
       await this.releaseClient(client);
     }
@@ -92,7 +92,7 @@ class PostgresDriverImpl implements SqlDriver {
       const result = await client.query(text, request.params as unknown[] | undefined);
       return { rows: result.rows as ReadonlyArray<Record<string, unknown>> };
     } catch (error) {
-      normalizePgError(error);
+      throw normalizePgError(error);
     } finally {
       await this.releaseClient(client);
     }
@@ -107,7 +107,7 @@ class PostgresDriverImpl implements SqlDriver {
       const result = await client.query(sql, params as unknown[] | undefined);
       return result as unknown as SqlQueryResult<Row>;
     } catch (error) {
-      normalizePgError(error);
+      throw normalizePgError(error);
     } finally {
       await this.releaseClient(client);
     }
@@ -187,7 +187,7 @@ class PostgresDriverImpl implements SqlDriver {
         }
       }
     } catch (error) {
-      normalizePgError(error);
+      throw normalizePgError(error);
     } finally {
       await closeCursor(cursor);
     }

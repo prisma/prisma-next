@@ -123,18 +123,19 @@ function isPostgresSqlState(code: string | undefined): boolean {
  *
  * - Postgres SQLSTATE errors (5-char codes like '23505') → SqlQueryError
  * - Connection errors (ECONNRESET, ETIMEDOUT, etc.) → SqlConnectionError
- * - Unknown errors → re-thrown as-is
+ * - Unknown errors → returns the original error as-is
  *
  * The original error is preserved via Error.cause to maintain stack traces.
  *
  * @param error - The error to normalize (typically from pg library)
- * @throws SqlQueryError for query-related failures
- * @throws SqlConnectionError for connection-related failures
- * @throws The original error if it cannot be normalized
+ * @returns SqlQueryError for query-related failures
+ * @returns SqlConnectionError for connection-related failures
+ * @returns The original error if it cannot be normalized
  */
-export function normalizePgError(error: unknown): never {
+export function normalizePgError(error: unknown): SqlQueryError | SqlConnectionError | Error {
   if (!(error instanceof Error)) {
-    throw error;
+    // Wrap non-Error values in an Error object
+    return new Error(String(error));
   }
 
   const pgError = error as PostgresError;
@@ -167,17 +168,17 @@ export function normalizePgError(error: unknown): never {
     if (pgError.detail !== undefined) {
       options.detail = pgError.detail;
     }
-    throw new SqlQueryError(error.message, options);
+    return new SqlQueryError(error.message, options);
   }
 
   // Check for connection errors
   if (isConnectionError(error)) {
-    throw new SqlConnectionError(error.message, {
+    return new SqlConnectionError(error.message, {
       cause: error,
       transient: isTransientConnectionError(error),
     });
   }
 
-  // Unknown error - rethrow as-is to preserve original error and stack trace
-  throw error;
+  // Unknown error - return as-is to preserve original error and stack trace
+  return error;
 }

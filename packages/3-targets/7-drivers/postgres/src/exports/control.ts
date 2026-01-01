@@ -32,7 +32,7 @@ export class PostgresControlDriver implements ControlDriverInstance<'sql', 'post
       const result = await this.client.query(sql, params as unknown[] | undefined);
       return { rows: result.rows as Row[] };
     } catch (error) {
-      normalizePgError(error);
+      throw normalizePgError(error);
     }
   }
 
