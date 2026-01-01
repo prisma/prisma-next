@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { notOk, ok, okVoid } from '../src/result';
+import { NotOk, notOk, ok, okVoid } from '../src/result';
 
 describe('result', () => {
   describe('ok()', () => {
@@ -75,7 +75,9 @@ describe('result', () => {
 
     it('throws when accessing failure on Ok results', () => {
       const result = ok(42);
-      expect(() => result.failure).toThrow('Cannot access failure on Ok result');
+      expect(() => (result as unknown as NotOk<number>).failure).toThrow(
+        'Cannot access failure on Ok result',
+      );
     });
 
     it('allows accessing failure on NotOk results', () => {
@@ -85,7 +87,9 @@ describe('result', () => {
 
     it('throws when accessing value on NotOk results', () => {
       const result = notOk('error');
-      expect(() => result.value).toThrow('Cannot access value on NotOk result');
+      expect(() => (result as unknown as Ok<number>).value).toThrow(
+        'Cannot access value on NotOk result',
+      );
     });
   });
 });
