@@ -6,3 +6,4 @@ packages:
 catalog:
   "@prisma/dev": "0.19.1"
   "vitest": "^4.0.16"
+  "@vitest/coverage-v8": "^4.0.0"
