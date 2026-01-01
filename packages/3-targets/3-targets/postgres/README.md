@@ -15,7 +15,7 @@ Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI c
 ## Responsibilities
 
 - **Target Descriptor Export**: Exports the Postgres `SqlControlTargetDescriptor` for use in CLI configuration files
-- **Manifest Loading**: Loads the Postgres target manifest from `packs/manifest.json` with capabilities and type information
+- **Manifest Hydration**: Validates the Postgres manifest at build time (`src/core/manifest.ts`) so control/runtime entrypoints and `/pack` stay filesystem-free at runtime
 - **Multi-Plane Support**: Provides both migration-plane (control) and runtime-plane entry points for the Postgres target
 - **Planner Factory**: Implements `createPlanner()` to create Postgres-specific migration planners
 - **Runner Factory**: Implements `createRunner()` to create Postgres-specific migration runners
@@ -24,6 +24,7 @@ Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI c
 This package spans multiple planes:
 - **Migration plane** (`src/exports/control.ts`): Control plane entry point that exports `SqlControlTargetDescriptor` for config files
 - **Runtime plane** (`src/exports/runtime.ts`): Runtime entry point for target-specific runtime code (future)
+- **Authoring pack ref** (`src/exports/pack.ts`): Pure data surface for contract builder workflows
 
 ## Usage
 
@@ -75,16 +76,24 @@ if (planResult.kind === 'success') {
 }
 ```
 
-### Runtime Plane
+### Pack refs for TypeScript contract authoring
 
 ```typescript
-// Runtime entry point (future)
-import { ... } from '@prisma-next/target-postgres/runtime';
+import postgresPack from '@prisma-next/target-postgres/pack';
+import pgvector from '@prisma-next/extension-pgvector/pack';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+
+export const contract = defineContract()
+  .target(postgresPack)
+  .extensionPacks({ pgvector })
+  .build();
 ```
+
+Pack refs are pure JSON-friendly objects that make TypeScript contract authoring work in both emit and no-emit workflows without reading `packs/manifest.json` at runtime.
 
 ## Architecture
 
-This package provides both control and runtime entry points for the Postgres target. The control entry point loads the target manifest from `packs/manifest.json` and exports it as a `SqlControlTargetDescriptor`. The runtime entry point will provide target-specific runtime functionality in the future.
+This package provides both control and runtime entry points for the Postgres target. `src/core/manifest.ts` validates the manifest at build time so the published entry points never touch the filesystem. The `./pack` entry point reuses the same manifest data to offer a pure pack ref for contract authoring. The runtime entry point will provide target-specific runtime functionality in the future.
 
 ## Error Handling
 
@@ -116,6 +125,7 @@ See `@prisma-next/family-sql/control` README for full error code documentation.
 
 - `./control`: Control plane entry point for `SqlControlTargetDescriptor`
 - `./runtime`: Runtime entry point for target-specific runtime code (future)
+- `./pack`: Pure pack ref for `defineContract().target(postgresPack)`
 
 ## Tests
 
