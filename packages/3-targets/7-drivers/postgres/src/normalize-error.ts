@@ -86,11 +86,28 @@ function isTransientConnectionError(error: Error): boolean {
 }
 
 /**
+ * PostgreSQL-specific error properties that indicate an error originated from pg library.
+ * These properties are not present on Node.js system errors.
+ * Excludes generic properties like 'detail', 'file', 'line', and 'position' that could appear on any error.
+ */
+const PG_ERROR_PROPERTIES = [
+  'constraint',
+  'table',
+  'column',
+  'hint',
+  'internalPosition',
+  'internalQuery',
+  'where',
+  'schema',
+  'routine',
+] as const;
+
+/**
  * Type predicate to check if an error is a Postgres error from the pg library.
  *
  * Distinguishes pg library errors from Node.js system errors by checking for:
  * - SQLSTATE codes (5-character alphanumeric codes like '23505', '42601')
- * - pg-specific properties (constraint, table, column, detail, etc.) that Node.js errors don't have
+ * - pg-specific properties (constraint, table, column, hint, etc.) that Node.js errors don't have
  *
  * Node.js system errors (ECONNREFUSED, ETIMEDOUT, etc.) are excluded to prevent false positives.
  */
@@ -108,21 +125,7 @@ export function isPostgresError(error: unknown): error is PostgresError {
 
   // Check for pg-specific properties that Node.js system errors don't have
   // These properties indicate the error originated from pg library query execution
-  return (
-    pgError.constraint !== undefined ||
-    pgError.table !== undefined ||
-    pgError.column !== undefined ||
-    pgError.detail !== undefined ||
-    pgError.hint !== undefined ||
-    pgError.position !== undefined ||
-    pgError.internalPosition !== undefined ||
-    pgError.internalQuery !== undefined ||
-    pgError.where !== undefined ||
-    pgError.schema !== undefined ||
-    pgError.file !== undefined ||
-    pgError.line !== undefined ||
-    pgError.routine !== undefined
-  );
+  return PG_ERROR_PROPERTIES.some((prop) => pgError[prop] !== undefined);
 }
 
 /**

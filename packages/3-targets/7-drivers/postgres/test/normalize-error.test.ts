@@ -227,13 +227,6 @@ describe('isPostgresError', () => {
 
       expect(isPostgresError(pgError)).toBe(true);
     });
-
-    it('returns true for errors with detail property', () => {
-      const pgError = new Error('error with detail');
-      (pgError as { detail?: string }).detail = 'Key (email)=(test@example.com) already exists.';
-
-      expect(isPostgresError(pgError)).toBe(true);
-    });
   });
 
   describe('Node.js system errors', () => {
