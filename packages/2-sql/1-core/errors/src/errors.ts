@@ -1,14 +1,14 @@
 /**
  * SQL query error for query-related failures (syntax errors, constraint violations, permissions).
- * Normalized from driver-specific errors (e.g., Postgres SQLSTATE errors).
  */
 export class SqlQueryError extends Error {
+  static readonly ERROR_NAME = 'SqlQueryError' as const;
   readonly kind = 'sql_query' as const;
-  readonly sqlState?: string;
-  readonly constraint?: string;
-  readonly table?: string;
-  readonly column?: string;
-  readonly detail?: string;
+  readonly sqlState: string | undefined;
+  readonly constraint: string | undefined;
+  readonly table: string | undefined;
+  readonly column: string | undefined;
+  readonly detail: string | undefined;
 
   constructor(
     message: string,
@@ -22,7 +22,7 @@ export class SqlQueryError extends Error {
     },
   ) {
     super(message, { cause: options?.cause });
-    this.name = 'SqlQueryError';
+    this.name = SqlQueryError.ERROR_NAME;
     this.sqlState = options?.sqlState;
     this.constraint = options?.constraint;
     this.table = options?.table;
@@ -32,7 +32,6 @@ export class SqlQueryError extends Error {
 
   /**
    * Type predicate to check if an error is a SqlQueryError.
-   * Uses shape checking instead of instanceof to avoid issues with bundling/duplication.
    */
   static is(error: unknown): error is SqlQueryError {
     return (
@@ -45,12 +44,12 @@ export class SqlQueryError extends Error {
 }
 
 /**
- * SQL connection error for connection-related failures (timeouts, connection resets, etc.).
- * Normalized from driver-specific connection errors.
+ * SQL connection error (timeouts, connection resets, etc.).
  */
 export class SqlConnectionError extends Error {
+  static readonly ERROR_NAME = 'SqlConnectionError' as const;
   readonly kind = 'sql_connection' as const;
-  readonly transient?: boolean;
+  readonly transient: boolean | undefined;
 
   constructor(
     message: string,
@@ -60,13 +59,12 @@ export class SqlConnectionError extends Error {
     },
   ) {
     super(message, { cause: options?.cause });
-    this.name = 'SqlConnectionError';
+    this.name = SqlConnectionError.ERROR_NAME;
     this.transient = options?.transient;
   }
 
   /**
    * Type predicate to check if an error is a SqlConnectionError.
-   * Uses shape checking instead of instanceof to avoid issues with bundling/duplication.
    */
   static is(error: unknown): error is SqlConnectionError {
     return (
