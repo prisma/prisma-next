@@ -186,8 +186,6 @@ class PostgresDriverImpl implements SqlDriver {
           yield row;
         }
       }
-    } catch (error) {
-      throw normalizePgError(error);
     } finally {
       await closeCursor(cursor);
     }
@@ -198,13 +196,9 @@ class PostgresDriverImpl implements SqlDriver {
     sql: string,
     params: readonly unknown[] | undefined,
   ): AsyncIterable<Record<string, unknown>> {
-    try {
-      const result = await client.query(sql, params as unknown[] | undefined);
-      for (const row of result.rows as Record<string, unknown>[]) {
-        yield row;
-      }
-    } catch (error) {
-      throw normalizePgError(error);
+    const result = await client.query(sql, params as unknown[] | undefined);
+    for (const row of result.rows as Record<string, unknown>[]) {
+      yield row;
     }
   }
 }
