@@ -88,6 +88,13 @@ export interface ContractBuilderState<
   readonly coreHash?: CoreHash;
   readonly extensionPacks?: ExtensionPacks;
   readonly capabilities?: Capabilities;
+  /**
+   * Array of extension pack namespace identifiers (e.g., ['pgvector', 'postgis']).
+   * Populated when extension packs are registered during contract building.
+   * Used to track which extension packs are included in the contract.
+   * Can be undefined or empty if no extension packs are registered.
+   * Namespace format matches the extension pack ID (e.g., 'pgvector', not 'pgvector@1.0.0').
+   */
   readonly extensionNamespaces?: readonly string[];
 }
 
