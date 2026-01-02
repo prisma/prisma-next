@@ -45,7 +45,7 @@ The `*.e2e.test.ts` files in this directory are **in-process CLI tests** that:
 - Mock `process.exit` and `console.log` to capture output
 - Run commands via `command.parseAsync()` in the same Node process
 
-**Note**: These are named "e2e" for historical reasons but are really integration tests. True subprocess E2E tests (which spawn the CLI as a separate process) should use the pattern in `cli.emit-cli-process.e2e.test.ts` and ideally live in `test/e2e/framework/`. See task 7.2 in `agent-os/specs/2025-12-05-db-init-command/tasks.md` for cleanup plans.
+**Note**: These are named "e2e" for historical reasons but are really integration tests. True subprocess E2E tests (which spawn the CLI as a separate process) should use the pattern in `cli.emit-cli-process.e2e.test.ts` and ideally live in `test/e2e/framework/`.
 
 ## Dependencies
 

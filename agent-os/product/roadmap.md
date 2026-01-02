@@ -25,7 +25,7 @@ This roadmap is informational for contributors and agents working in the repo. I
 
 - **Migration IR and planner**
   - Implement family‑owned migration IR (operations + edges) for the SQL family.
-  - Build the **additive‑only planner** and runner for `prisma-next db init` (see `docs/Db-Init-Command.md`).
+  - Build the **additive‑only planner** and runner for `prisma-next db init` (see `packages/1-framework/3-tooling/cli/README.md`).
   - Use `db init` to bootstrap databases from contracts and to support the testing story (spin up fresh DBs from contract).
 - **Zero‑migrations workflow**
   - Prototype `prisma-next db update` and CI/CD flows that treat migrations as **contract graph edges**, not hand‑written scripts (per Contract‑Driven DB Update).
