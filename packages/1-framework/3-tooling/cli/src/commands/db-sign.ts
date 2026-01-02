@@ -162,7 +162,7 @@ export function createDbSignCommand(): Command {
             family: config.family,
             target: config.target,
             adapter: config.adapter,
-            extensions: config.extensions ?? [],
+            extensions: config.extensions,
           });
 
           // Schema verification precondition with spinner
