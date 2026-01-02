@@ -18,7 +18,9 @@ async function loadWarningConfig() {
     const config = JSON.parse(configContent);
     return config.warningOnly || [];
   } catch (error) {
-    console.warn('Warning: Could not load coverage.config.json, no warning-only packages configured.');
+    console.warn(
+      'Warning: Could not load coverage.config.json, no warning-only packages configured.',
+    );
     return [];
   }
 }
@@ -329,8 +331,7 @@ async function formatResults(results, warningConfig) {
     (r) => !r.skipped && !r.testPassed && warningPackages.has(r.package),
   );
   const coverageFailures = results.filter(
-    (r) =>
-      !r.skipped && r.testPassed && !r.coveragePassed && !warningPackages.has(r.package),
+    (r) => !r.skipped && r.testPassed && !r.coveragePassed && !warningPackages.has(r.package),
   );
   const coverageWarnings = results.filter(
     (r) => !r.skipped && r.testPassed && !r.coveragePassed && warningPackages.has(r.package),
@@ -346,9 +347,7 @@ async function formatResults(results, warningConfig) {
   if (testWarnings.length > 0 || coverageWarnings.length > 0) {
     console.log('🚨 TECHNICAL DEBT - COVERAGE WARNINGS');
     console.log('='.repeat(80));
-    console.log(
-      'The following packages have coverage/test failures but are NOT blocking CI.',
-    );
+    console.log('The following packages have coverage/test failures but are NOT blocking CI.');
     console.log('These are time-limited exceptions that MUST be resolved before expiry.\n');
 
     const allWarnings = [...testWarnings, ...coverageWarnings];
@@ -372,9 +371,7 @@ async function formatResults(results, warningConfig) {
         console.log(`    Linear: ${warningEntry.linear}`);
       }
       if (expiry.isExpiringSoon) {
-        console.log(
-          `    🚨 EXPIRING SOON - Must be resolved within ${expiry.daysRemaining} days!`,
-        );
+        console.log(`    🚨 EXPIRING SOON - Must be resolved within ${expiry.daysRemaining} days!`);
       }
 
       // Show failure details
