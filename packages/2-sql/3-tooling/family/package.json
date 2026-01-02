@@ -19,9 +19,9 @@
     "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/runtime-executor": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
-    "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
@@ -33,9 +33,8 @@
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
-    "vite-tsconfig-paths": "^5.1.4",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "files": [

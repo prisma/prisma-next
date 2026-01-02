@@ -17,8 +17,7 @@
     "skipLibCheck": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "baseUrl": "."
+    "sourceMap": true
   },
   "references": [
     { "path": "./packages/1-framework/1-core/shared/contract" },

@@ -463,7 +463,7 @@ When adding a new package:
 4. **Follow naming conventions** - use hyphenated names, encode family in prefix
 5. **Add package mapping** to `architecture.config.json` with domain/layer/plane
    - For multi-plane packages, add separate globs for each plane (e.g., `src/core/**` for shared, `src/exports/cli.ts` for migration, `src/exports/runtime.ts` for runtime)
-6. **Add path aliases** to `tsconfig.base.json` mapping published name to source
+6. **Add project reference** to `tsconfig.base.json`.
 7. **Add workspace pattern** to `pnpm-workspace.yaml` if needed
 8. **Create README.md** documenting purpose, dependencies, and architecture with domain/layer/plane labels
 9. **Run import check** to verify no violations

@@ -953,7 +953,6 @@ await withDevDatabase(async ({ connectionString }) => {
 **See `docs/Testing Guide.md` for comprehensive testing practices and philosophy.**
 
 - **Vitest** for all tests
-- **Vitest Configuration**: Use `vite-tsconfig-paths` plugin to automatically resolve workspace dependencies using tsconfig path mappings. This is cleaner than manual aliases and automatically picks up new path mappings. See `.cursor/rules/test-import-patterns.mdc` for details.
 - **Testing Pyramid**: 70% Unit Tests, 20% Integration Tests, 10% E2E Tests
 - **Testing Philosophy**: Conciseness without obscurity, separation of concerns, maintainability, readability
 - **DRY Patterns**: Extract helpers when patterns appear 3+ times - see `docs/Testing Guide.md` for examples
@@ -1073,7 +1072,7 @@ See `test/utils/README.md` for full documentation of generic helpers, `packages/
 
 **Adding New Packages:**
 1. Add package config to `architecture.config.json` with glob pattern, domain, layer, and plane
-2. Update `tsconfig.base.json` path aliases if needed
+2. Update `tsconfig.base.json` project references if needed.
 3. Run `pnpm lint:deps` to verify no violations
 
 See `.cursor/rules/import-validation.mdc` for detailed guidance on import validation rules.
@@ -1329,13 +1328,9 @@ When moving packages to reflect domain/layer/plane structure (e.g., moving frame
      - test/**
    ```
 
-3. **Update `tsconfig.base.json`**: Update path mappings and project references:
+3. **Update `tsconfig.base.json`**: Update project references:
    ```json
    {
-     "paths": {
-       "@prisma-next/plan": ["packages/1-framework/1-core/shared/plan/src/index.ts"],
-       "@prisma-next/cli": ["packages/1-framework/3-tooling/cli/src/exports/index.ts"]
-     },
      "references": [
        { "path": "./packages/1-framework/1-core/shared/plan" },
        { "path": "./packages/1-framework/3-tooling/cli" }
