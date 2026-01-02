@@ -310,25 +310,34 @@ describe('DML builders', () => {
     });
 
     const adapterWithOps = createStubAdapter();
-    const contextWithOps = createTestContext(contractWithVector, adapterWithOps, {
-      extensionPacks: [
-        {
-          operations: () => [
-            {
-              forTypeId: 'pg/vector@1',
-              method: 'cosineDistance',
-              args: [{ kind: 'param' }],
-              returns: { kind: 'builtin', type: 'number' },
-              lowering: {
-                targetFamily: 'sql',
-                strategy: 'infix',
-                // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-                template: '${self} <=> ${arg0}',
-              },
+    // Create a mock extension descriptor for testing (cast to satisfy type constraints)
+    const mockVectorExtensionDescriptor = {
+      kind: 'extension' as const,
+      id: 'mock-vector-ext',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create: () => ({
+        familyId: 'sql' as const,
+        targetId: 'postgres' as const,
+        operations: () => [
+          {
+            forTypeId: 'pg/vector@1',
+            method: 'cosineDistance',
+            args: [{ kind: 'param' as const }],
+            returns: { kind: 'builtin' as const, type: 'number' },
+            lowering: {
+              targetFamily: 'sql',
+              strategy: 'infix',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+              template: '${self} <=> ${arg0}',
             },
-          ],
-        },
-      ],
+          },
+        ],
+      }),
+    } as import('@prisma-next/sql-runtime').SqlRuntimeExtensionDescriptor<'postgres'>;
+    const contextWithOps = createTestContext(contractWithVector, adapterWithOps, {
+      extensionPacks: [mockVectorExtensionDescriptor],
     });
     const tablesWithOps = schema(contextWithOps).tables;
     const userTableWithOps = tablesWithOps['user'];

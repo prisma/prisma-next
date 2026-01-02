@@ -5,9 +5,9 @@ import { sql } from '@prisma-next/sql-lane/sql';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
-import pgvector from '../src/exports/runtime';
+import pgvectorDescriptor from '../src/exports/runtime';
 import type { CodecTypes } from '../src/types/codec-types';
 
 // Define contract types with vector columns
@@ -114,10 +114,8 @@ test('ResultType correctly infers number[] for vector column', () => {
   });
 
   const adapter = createPostgresAdapter();
-  const context = createRuntimeContext({
-    contract: contractWithVector,
-    adapter,
-    extensionPacks: [pgvector()],
+  const context = createTestContext(contractWithVector, adapter, {
+    extensionPacks: [pgvectorDescriptor],
   });
   const tables = schema(context).tables;
   const postTable = tables['post'];
@@ -180,10 +178,8 @@ test('ResultType correctly infers number[] for non-nullable vector column', () =
   });
 
   const adapter = createPostgresAdapter();
-  const context = createRuntimeContext({
-    contract: contractWithVector,
-    adapter,
-    extensionPacks: [pgvector()],
+  const context = createTestContext(contractWithVector, adapter, {
+    extensionPacks: [pgvectorDescriptor],
   });
   const tables = schema(context).tables;
   const postTable = tables['post'];

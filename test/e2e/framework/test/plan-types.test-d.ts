@@ -1,12 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 
@@ -20,8 +19,8 @@ test('inferred row types are correct', () => {
   ) as Record<string, unknown>;
   const contract = validateContract<Contract>(contractJson);
 
-  const adapter = createPostgresAdapter();
-  const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+  const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
   const tables = schema<Contract>(context).tables;
   const user = tables.user!;
   const plan = sql({ context })

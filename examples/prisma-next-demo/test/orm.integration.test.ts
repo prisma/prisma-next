@@ -1,6 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
@@ -14,7 +13,8 @@ import {
 } from '@prisma-next/family-sql/test-utils';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import { budgets, createRuntime } from '@prisma-next/sql-runtime';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -72,8 +72,8 @@ function createTestRuntime(
   runtime: ReturnType<typeof createRuntime>;
   pool: Pool;
 } {
-  const adapter = createPostgresAdapter();
-  const context = createRuntimeContext({ contract, adapter, extensionPacks: [pgvector()] });
+  const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter, { extensionPacks: [pgvector] });
   const pool = new Pool({ connectionString });
   const driver = createPostgresDriverFromOptions({
     connect: { pool },
@@ -81,7 +81,6 @@ function createTestRuntime(
   });
   const runtime = createRuntime({
     context,
-    adapter,
     driver,
     verify: { mode: 'onFirstUse', requireMarker: false },
     plugins: [

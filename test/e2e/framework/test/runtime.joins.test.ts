@@ -1,6 +1,5 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import {
   createTestRuntimeFromClient,
   setupE2EDatabase,
@@ -9,8 +8,11 @@ import { sql } from '@prisma-next/sql-lane/sql';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
+import {
+  createStubAdapter,
+  createTestContext,
+  executePlanAndCollect,
+} from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
@@ -53,15 +55,12 @@ function createJoinTestRuntime(
   contract: Contract,
 ): {
   runtime: ReturnType<typeof createTestRuntimeFromClient>;
-  context: ReturnType<typeof createRuntimeContext>;
+  context: ReturnType<typeof createTestContext>;
   tables: ReturnType<typeof schema<Contract>>['tables'];
 } {
   const runtime = createTestRuntimeFromClient(contract, client);
-  const context = createRuntimeContext({
-    contract,
-    adapter: createPostgresAdapter(),
-    extensionPacks: [],
-  });
+  const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
   const tables = schema(context).tables;
   return { runtime, context, tables };
 }

@@ -1,14 +1,16 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createTestRuntime, setupTestDatabase } from '@prisma-next/integration-tests/test/utils';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
+import {
+  createStubAdapter,
+  createTestContext,
+  executePlanAndCollect,
+} from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -23,15 +25,15 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let client: Client;
   let contract: Contract;
-  let adapter: ReturnType<typeof createPostgresAdapter>;
-  let context: ReturnType<typeof createRuntimeContext<Contract>>;
+  let adapter: ReturnType<typeof createStubAdapter>;
+  let context: ReturnType<typeof createTestContext<Contract>>;
   let tables: ReturnType<typeof schema<Contract>>['tables'];
   let builder: ReturnType<typeof sql<Contract>>;
 
   beforeAll(async () => {
     contract = await loadContractFromDisk<Contract>(contractJsonPath);
-    adapter = createPostgresAdapter();
-    context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+    adapter = createStubAdapter();
+    context = createTestContext(contract, adapter);
     tables = schema(context).tables;
     builder = sql({ context });
 

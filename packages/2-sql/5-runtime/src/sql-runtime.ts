@@ -29,7 +29,6 @@ import { SqlFamilyAdapter } from './sql-family-adapter';
 export interface RuntimeOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
-  readonly adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
   readonly context: RuntimeContext<TContract>;

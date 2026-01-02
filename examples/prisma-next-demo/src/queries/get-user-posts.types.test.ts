@@ -1,11 +1,10 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../prisma/contract.d';
 import contractJson from '../prisma/contract.json' with { type: 'json' };
@@ -16,12 +15,8 @@ import contractJson from '../prisma/contract.json' with { type: 'json' };
  */
 test('ResultType correctly infers number[] | null for nullable embedding column', () => {
   const contract = validateContract<Contract>(contractJson);
-  const adapter = createPostgresAdapter();
-  const context = createRuntimeContext({
-    contract,
-    adapter,
-    extensionPacks: [pgvector()],
-  });
+  const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter, { extensionPacks: [pgvector] });
 
   const tables = schema(context).tables;
   const postTable = tables.post;

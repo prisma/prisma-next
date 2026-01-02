@@ -3,27 +3,38 @@ import { checkContractComponentRequirements } from '@prisma-next/contract/framew
 import type {
   RuntimeAdapterDescriptor,
   RuntimeExtensionDescriptor,
+  RuntimeFamilyDescriptor,
   RuntimeTargetDescriptor,
 } from './types';
 
+/**
+ * Asserts that runtime component descriptors satisfy contract requirements.
+ *
+ * Routes the same framework composition through validation as control-plane:
+ * family, target, adapter, extensionPacks (all as descriptors with IDs).
+ *
+ * @throws Error if contract target doesn't match the provided target descriptor
+ * @throws Error if contract requires extension packs not provided in descriptors
+ */
 export function assertRuntimeContractRequirementsSatisfied<
   TFamilyId extends string,
   TTargetId extends string,
 >({
   contract,
+  family,
   target,
   adapter,
-  extensions,
-  runtimeExtensionPacksProvided,
+  extensionPacks,
 }: {
   readonly contract: { readonly target: string; readonly extensionPacks?: Record<string, unknown> };
+  readonly family: RuntimeFamilyDescriptor<TFamilyId>;
   readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId>;
-  readonly extensions: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[];
-  readonly runtimeExtensionPacksProvided?: boolean | undefined;
+  readonly extensionPacks: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[];
 }): void {
-  const providedComponentIds = new Set<string>([target.id, adapter.id]);
-  for (const extension of extensions) {
+  // Build set of provided component IDs from descriptors
+  const providedComponentIds = new Set<string>([family.id, target.id, adapter.id]);
+  for (const extension of extensionPacks) {
     providedComponentIds.add(extension.id);
   }
 
@@ -39,18 +50,7 @@ export function assertRuntimeContractRequirementsSatisfied<
     );
   }
 
-  if (runtimeExtensionPacksProvided === true) {
-    // Runtime extension packs don't have IDs - log warning and defer validation to runtime.
-    if (result.missingExtensionPackIds.length > 0) {
-      console.warn(
-        `Contract requires extension pack(s) [${result.missingExtensionPackIds.join(', ')}], ` +
-          `but cannot verify against runtime extensions (they don't have IDs). ` +
-          'Validation will occur at runtime when codecs/operations are used.',
-      );
-    }
-    return;
-  }
-
+  // Strict enforcement: all extension packs required by contract must be provided as descriptors
   for (const packId of result.missingExtensionPackIds) {
     throw new Error(
       `Contract requires extension pack '${packId}', but runtime descriptors do not provide a matching component.`,

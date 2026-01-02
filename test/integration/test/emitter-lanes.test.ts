@@ -20,7 +20,7 @@ import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-rela
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { getSqlDescriptorBundle } from '../utils/framework-components';
@@ -141,7 +141,7 @@ describe('emitter → lanes integration', () => {
       expect(contractDtsContent).toContain('export type Contract');
 
       const adapter = createStubAdapter();
-      const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+      const context = createTestContext(contract, adapter);
       const tables = schema(context).tables;
       const userTable = tables['user'];
       if (!userTable) throw new Error('user table not found');
@@ -235,7 +235,7 @@ describe('emitter → lanes integration', () => {
     const contract = validateContract(contractJson);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+    const context = createTestContext(contract, adapter);
     const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
@@ -356,12 +356,8 @@ describe('emitter → lanes integration', () => {
     expect(result1.coreHash).toBe(result2.coreHash);
 
     const adapter = createStubAdapter();
-    const context1 = createRuntimeContext({
-      contract: validatedContract,
-      adapter,
-      extensionPacks: [],
-    });
-    const context2 = createRuntimeContext({ contract: contract2, adapter, extensionPacks: [] });
+    const context1 = createTestContext(validatedContract, adapter);
+    const context2 = createTestContext(contract2, adapter);
     const tables1 = schema(context1).tables;
     const userTable1 = tables1['user'];
     if (!userTable1) throw new Error('user table not found');

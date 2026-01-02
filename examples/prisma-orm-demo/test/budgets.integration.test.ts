@@ -1,4 +1,3 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane';
@@ -6,11 +5,11 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import {
   budgets,
   createRuntime,
-  createRuntimeContext,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { withDevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
@@ -40,7 +39,7 @@ function getUserIdAndEmailColumns<T extends Record<string, unknown>>(userTable: 
 describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () => {
   it('blocks unbounded SELECT queries', async () => {
     await withDevDatabase(async ({ connectionString }) => {
-      const adapter = createPostgresAdapter();
+      const adapter = createStubAdapter();
       const client = new Client({ connectionString });
       await client.connect();
       const driver = createPostgresDriverFromOptions({
@@ -80,10 +79,9 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         });
         await client.query(write.insert.sql, [...write.insert.params]);
 
-        const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+        const context = createTestContext(contract, adapter);
         const runtime = createRuntime({
           context,
-          adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
@@ -128,7 +126,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
 
   it('allows bounded SELECT queries within budget', async () => {
     await withDevDatabase(async ({ connectionString }) => {
-      const adapter = createPostgresAdapter();
+      const adapter = createStubAdapter();
       const client = new Client({ connectionString });
       await client.connect();
       const driver = createPostgresDriverFromOptions({
@@ -168,10 +166,9 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         });
         await client.query(write.insert.sql, [...write.insert.params]);
 
-        const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+        const context = createTestContext(contract, adapter);
         const runtime = createRuntime({
           context,
-          adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
@@ -214,7 +211,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
 
   it('enforces streaming row budget', async () => {
     await withDevDatabase(async ({ connectionString }) => {
-      const adapter = createPostgresAdapter();
+      const adapter = createStubAdapter();
       const client = new Client({ connectionString });
       await client.connect();
       const driver = createPostgresDriverFromOptions({
@@ -254,10 +251,9 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         });
         await client.query(write.insert.sql, [...write.insert.params]);
 
-        const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+        const context = createTestContext(contract, adapter);
         const runtime = createRuntime({
           context,
-          adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [

@@ -19,8 +19,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import { createStubAdapter } from '@prisma-next/sql-runtime/test/utils';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { getSqlDescriptorBundle } from '../utils/framework-components';
@@ -89,11 +88,7 @@ describe('emit integration', () => {
 
       const adapter = createStubAdapter();
 
-      const context = createRuntimeContext({
-        contract: validatedContract,
-        adapter,
-        extensionPacks: [],
-      });
+      const context = createTestContext(validatedContract, adapter);
       const tables = schema(context).tables;
       const userTable = tables['user'];
       if (!userTable) {

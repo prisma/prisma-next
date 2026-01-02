@@ -27,7 +27,7 @@ export function getRuntime(): Runtime {
 
     pool = new Pool({ connectionString });
 
-    // Create runtime family instance from descriptors
+    // Create runtime family instance from descriptors (extension packs routed through composition)
     const familyInstance = sqlFamily.create({
       target: postgresTarget,
       adapter: postgresAdapter,
@@ -46,7 +46,6 @@ export function getRuntime(): Runtime {
         mode: 'onFirstUse',
         requireMarker: false,
       },
-      extensionPacks: [],
       plugins: [
         budgets({
           maxRows: 10_000,
@@ -57,11 +56,11 @@ export function getRuntime(): Runtime {
       ],
     });
 
-    // Create context for schema/query builders (adapter from descriptor)
-    const adapterInstance = postgresAdapter.create();
+    // Create context for schema/query builders
     context = createRuntimeContext({
       contract,
-      adapter: adapterInstance,
+      target: postgresTarget,
+      adapter: postgresAdapter,
       extensionPacks: [],
     });
   }

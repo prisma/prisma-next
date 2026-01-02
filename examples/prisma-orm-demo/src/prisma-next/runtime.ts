@@ -41,7 +41,6 @@ export function getPrismaNextRuntime(): Runtime {
         mode: 'onFirstUse',
         requireMarker: false,
       },
-      extensionPacks: [],
       plugins: [
         budgets({
           maxRows: 10_000,

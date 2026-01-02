@@ -13,7 +13,13 @@ export {
   validateContractCodecMappings,
 } from '../codecs/validation';
 export { lowerSqlPlan } from '../lower-sql-plan';
-export type { Extension, RuntimeContext } from '../sql-context';
+export type {
+  CreateRuntimeContextOptions,
+  RuntimeContext,
+  SqlRuntimeAdapterInstance,
+  SqlRuntimeExtensionDescriptor,
+  SqlRuntimeExtensionInstance,
+} from '../sql-context';
 export { createRuntimeContext } from '../sql-context';
 export type { SqlStatement } from '../sql-marker';
 export {

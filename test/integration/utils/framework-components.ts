@@ -1,11 +1,14 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresAdapterRuntime from '@prisma-next/adapter-postgres/runtime';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import pgvectorExtension from '@prisma-next/extension-pgvector/control';
+import pgvectorExtensionRuntime from '@prisma-next/extension-pgvector/runtime';
 import postgresTarget from '@prisma-next/target-postgres/control';
+import postgresTargetRuntime from '@prisma-next/target-postgres/runtime';
 
 const targetDescriptor = postgresTarget satisfies ControlTargetDescriptor<'sql', 'postgres'>;
 const adapterDescriptor = postgresAdapter satisfies ControlAdapterDescriptor<'sql', 'postgres'>;
@@ -40,3 +43,8 @@ export function getSqlDescriptorBundle(options?: {
 }
 
 export const pgvectorExtensionDescriptor = pgvectorDescriptor;
+
+// Runtime descriptors for use with createRuntimeContext
+export const postgresTargetRuntimeDescriptor = postgresTargetRuntime;
+export const postgresAdapterRuntimeDescriptor = postgresAdapterRuntime;
+export const pgvectorExtensionRuntimeDescriptor = pgvectorExtensionRuntime;

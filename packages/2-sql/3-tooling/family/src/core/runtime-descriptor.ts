@@ -35,6 +35,7 @@ export class SqlRuntimeFamilyDescriptor
     readonly extensionPacks: readonly RuntimeExtensionDescriptor<'sql', TTargetId>[];
   }): SqlRuntimeFamilyInstance {
     return createSqlRuntimeFamilyInstance({
+      family: this,
       target: options.target,
       adapter: options.adapter,
       driver: options.driver,

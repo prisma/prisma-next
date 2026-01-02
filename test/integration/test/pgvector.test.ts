@@ -70,7 +70,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('runtime extension provides codecs', () => {
-    const extension = pgvector();
+    const extension = pgvector.create();
     const codecs = extension.codecs?.();
     expect(codecs).toBeDefined();
 
@@ -81,7 +81,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('runtime extension provides operations', () => {
-    const extension = pgvector();
+    const extension = pgvector.create();
     const operations = extension.operations?.();
     expect(operations).toBeDefined();
     expect(operations?.length).toBe(1);
@@ -92,7 +92,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('codecs can be registered in registry', () => {
-    const extension = pgvector();
+    const extension = pgvector.create();
     const extensionCodecs = extension.codecs?.();
     expect(extensionCodecs).toBeDefined();
 
@@ -107,7 +107,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('operations can be registered in registry', () => {
-    const extension = pgvector();
+    const extension = pgvector.create();
     const extensionOperations = extension.operations?.();
     expect(extensionOperations).toBeDefined();
 

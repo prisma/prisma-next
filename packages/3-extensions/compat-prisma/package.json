@@ -23,7 +23,8 @@
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
-    "@prisma-next/sql-runtime": "workspace:*"
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*"
   },
   "devDependencies": {
     "@prisma/dev": "catalog:",

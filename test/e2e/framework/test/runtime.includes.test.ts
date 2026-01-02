@@ -1,6 +1,5 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import {
   createTestRuntimeFromClient,
   setupE2EDatabase,
@@ -9,8 +8,11 @@ import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
+import {
+  createStubAdapter,
+  createTestContext,
+  executePlanAndCollect,
+} from '@prisma-next/sql-runtime/test/utils';
 import { type DevDatabase, timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { describe, expect, expectTypeOf, it } from 'vitest';
@@ -58,8 +60,8 @@ describe('end-to-end includeMany and leftJoin queries', () => {
             );
           });
 
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+          const adapter = createStubAdapter();
+          const context = createTestContext(contract, adapter);
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
             const tables = schema<ContractWithCapabilities>(context).tables;
@@ -144,8 +146,8 @@ describe('end-to-end includeMany and leftJoin queries', () => {
             );
           });
 
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+          const adapter = createStubAdapter();
+          const context = createTestContext(contract, adapter);
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
             const tables = schema<ContractWithCapabilities>(context).tables;
@@ -216,8 +218,8 @@ describe('end-to-end includeMany and leftJoin queries', () => {
             );
           });
 
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+          const adapter = createStubAdapter();
+          const context = createTestContext(contract, adapter);
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
             const tables = schema<Contract>(context).tables;
@@ -293,8 +295,8 @@ describe('end-to-end includeMany and leftJoin queries', () => {
             );
           });
 
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+          const adapter = createStubAdapter();
+          const context = createTestContext(contract, adapter);
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
             const tables = schema<Contract>(context).tables;

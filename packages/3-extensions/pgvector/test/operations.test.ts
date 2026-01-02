@@ -1,11 +1,19 @@
 import { createOperationRegistry } from '@prisma-next/operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import pgvector from '../src/exports/runtime';
+import pgvectorDescriptor from '../src/exports/runtime';
 
 describe('pgvector operations', () => {
+  it('descriptor has correct metadata', () => {
+    expect(pgvectorDescriptor.kind).toBe('extension');
+    expect(pgvectorDescriptor.id).toBe('pgvector');
+    expect(pgvectorDescriptor.familyId).toBe('sql');
+    expect(pgvectorDescriptor.targetId).toBe('postgres');
+    expect(pgvectorDescriptor.version).toBe('1.0.0');
+  });
+
   it('provides codec registry with vector codec', () => {
-    const extension = pgvector();
+    const extension = pgvectorDescriptor.create();
     const codecs = extension.codecs?.();
     expect(codecs).toBeDefined();
 
@@ -15,7 +23,7 @@ describe('pgvector operations', () => {
   });
 
   it('provides operation signatures', () => {
-    const extension = pgvector();
+    const extension = pgvectorDescriptor.create();
     const operations = extension.operations?.();
     expect(operations).toBeDefined();
     expect(operations?.length).toBe(1);
@@ -34,7 +42,7 @@ describe('pgvector operations', () => {
   });
 
   it('operations can be registered in operation registry', () => {
-    const extension = pgvector();
+    const extension = pgvectorDescriptor.create();
     const operations = extension.operations?.();
     expect(operations).toBeDefined();
 
@@ -49,7 +57,7 @@ describe('pgvector operations', () => {
   });
 
   it('codecs can be registered in codec registry', () => {
-    const extension = pgvector();
+    const extension = pgvectorDescriptor.create();
     const codecs = extension.codecs?.();
     expect(codecs).toBeDefined();
 
