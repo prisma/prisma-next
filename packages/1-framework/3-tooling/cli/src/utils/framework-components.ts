@@ -112,6 +112,41 @@ export function assertFrameworkComponentsCompatible<
   return frameworkComponents as ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
 }
 
+/**
+ * Validates that a contract is compatible with the configured family, target, adapter,
+ * and extension packs. Throws on family/target mismatches or missing extension packs.
+ *
+ * This check ensures the emitted contract matches the CLI config before running
+ * commands that depend on the contract (e.g., db verify, db sign).
+ *
+ * @param contract - The contract IR to validate (must include targetFamily, target, extensionPacks).
+ * @param family - The configured family descriptor.
+ * @param target - The configured target descriptor.
+ * @param adapter - The configured adapter descriptor.
+ * @param extensionPacks - Optional array of extension descriptors provided by the config.
+ *
+ * @throws {CliStructuredError} errorConfigValidation when contract.targetFamily or contract.target
+ *   doesn't match the configured family/target.
+ * @throws {CliStructuredError} errorContractMissingExtensionPacks when the contract requires
+ *   extension packs that are not provided in the config (includes all missing packs in error.meta).
+ *
+ * @example
+ * ```ts
+ * import { assertContractRequirementsSatisfied } from './framework-components';
+ *
+ * const config = await loadConfig();
+ * const contractIR = await loadContractJson(config.contract.output);
+ *
+ * // Throws if contract is incompatible with config
+ * assertContractRequirementsSatisfied({
+ *   contract: contractIR,
+ *   family: config.family,
+ *   target: config.target,
+ *   adapter: config.adapter,
+ *   extensionPacks: config.extensions,
+ * });
+ * ```
+ */
 export function assertContractRequirementsSatisfied<
   TFamilyId extends string,
   TTargetId extends string,
