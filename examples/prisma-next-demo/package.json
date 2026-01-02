@@ -2,6 +2,9 @@
   "name": "prisma-next-demo",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "emit": "prisma-next contract emit",
     "db:drop": "tsx scripts/drop-db.ts",
@@ -35,7 +38,7 @@
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma/dev": "catalog:",
-    "@types/node": "^20.16.5",
+    "@types/node": "^24.0.0",
     "@types/pg": "^8.11.10",
     "tsup": "^8.3.0",
     "tsx": "^4.19.2",

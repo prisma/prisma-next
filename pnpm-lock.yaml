@@ -109,8 +109,8 @@ importers:
         specifier: 'catalog:'
         version: 0.19.1(typescript@5.9.3)
       '@types/node':
-        specifier: ^20.16.5
-        version: 20.19.24
+        specifier: ^24.0.0
+        version: 24.7.2
       '@types/pg':
         specifier: ^8.11.10
         version: 8.15.6
@@ -125,10 +125,10 @@ importers:
         version: 5.9.3
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@7.3.0(@types/node@20.19.24)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
+        version: 5.1.4(typescript@5.9.3)(vite@7.3.0(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       vitest:
         specifier: 'catalog:'
-        version: 4.0.16(@types/node@20.19.24)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
+        version: 4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
 
   examples/prisma-orm-demo:
     dependencies:
@@ -179,8 +179,8 @@ importers:
         specifier: 'catalog:'
         version: 0.19.1(typescript@5.9.3)
       '@types/node':
-        specifier: ^20.16.5
-        version: 20.19.24
+        specifier: ^24.0.0
+        version: 24.7.2
       '@types/pg':
         specifier: ^8.11.10
         version: 8.15.6
@@ -201,10 +201,10 @@ importers:
         version: 5.9.3
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@7.3.0(@types/node@20.19.24)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
+        version: 5.1.4(typescript@5.9.3)(vite@7.3.0(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       vitest:
         specifier: 'catalog:'
-        version: 4.0.16(@types/node@20.19.24)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
+        version: 4.0.16(@types/node@24.7.2)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
 
   packages/1-framework/1-core/migration/control-plane:
     dependencies:
@@ -4908,7 +4908,7 @@ snapshots:
 
   '@types/pg-cursor@2.7.2':
     dependencies:
-      '@types/node': 20.19.24
+      '@types/node': 24.7.2
       '@types/pg': 8.15.6
 
   '@types/pg@8.15.6':
