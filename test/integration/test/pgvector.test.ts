@@ -16,7 +16,7 @@ describe('pgvector extension pack integration', () => {
     expect(pgvectorExtensionDescriptor.version).toBe('0.0.1');
   });
 
-  it('extracts codec type imports from pack', () => {
+  it('extracts codec type imports from descriptors', () => {
     const { descriptors } = getSqlDescriptorBundle({
       extensions: [pgvectorExtensionDescriptor],
     });
@@ -37,7 +37,7 @@ describe('pgvector extension pack integration', () => {
     });
   });
 
-  it('extracts operation type imports from pack', () => {
+  it('extracts operation type imports from descriptors', () => {
     const { descriptors } = getSqlDescriptorBundle({
       extensions: [pgvectorExtensionDescriptor],
     });
@@ -51,7 +51,7 @@ describe('pgvector extension pack integration', () => {
     });
   });
 
-  it('assembles operation registry from pack', () => {
+  it('assembles operation registry from descriptors', () => {
     const { descriptors } = getSqlDescriptorBundle({
       extensions: [pgvectorExtensionDescriptor],
     });
