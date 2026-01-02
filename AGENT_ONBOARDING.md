@@ -659,7 +659,7 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
   }
   ```
   - `types.codecTypes.import`: Used to generate `contract.d.ts` imports when assembling types
-  - **`capabilities`**: Adapters must declare capabilities in the manifest (for CLI emission) and in code (for runtime). The manifest capabilities are read during emission and included in the contract. See `.cursor/rules/adapter-capability-declaration.mdc` for details.
+  - **`capabilities`**: Adapters must declare capabilities on the adapter descriptor (for contract emission) and in runtime adapter code (for runtime checks); keep these declarations in sync. See `docs/reference/capabilities.md` and the adapter package README (e.g. `packages/3-targets/6-adapters/postgres/README.md#capabilities`).
   - **No `canonicalScalarMap`**: Extension manifests do not include scalar-to-type ID mappings. Type canonicalization happens at authoring time using extension manifests, not via a scalar map in the manifest.
 - Adapter appears first in `contract.extensionPacks` but is otherwise identical to other packs
 

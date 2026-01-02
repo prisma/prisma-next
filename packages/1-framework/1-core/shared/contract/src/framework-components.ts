@@ -37,7 +37,14 @@ export interface DescriptorDeclarativeFields {
   /** Component version (semver) */
   readonly version: string;
 
-  /** Capabilities this component provides */
+  /**
+   * Capabilities this component provides.
+   *
+   * For adapters, capabilities must be declared on the adapter descriptor (so they are emitted into
+   * the contract) and also exposed in runtime adapter code (e.g. `adapter.profile.capabilities`);
+   * keep these declarations in sync. Targets are identifiers/descriptors and typically do not
+   * declare capabilities.
+   */
   readonly capabilities?: Record<string, unknown>;
 
   /** Type imports for contract.d.ts generation */
