@@ -1,19 +1,20 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadContractFromTs } from '@prisma-next/cli';
-import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import { emit } from '@prisma-next/emitter';
 import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
+  assembleOperationRegistry,
+  convertOperationManifest,
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { getSqlDescriptorBundle } from '../utils/framework-components';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = resolve(__dirname, '../../../packages/1-framework/3-tooling/cli/test/fixtures');
@@ -35,18 +36,23 @@ describe('emit command functionality', () => {
     }
   });
 
+  const buildEmitterArtifacts = () => {
+    const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+    return {
+      operationRegistry: assembleOperationRegistry(descriptors, convertOperationManifest),
+      codecTypeImports: extractCodecTypeImports(descriptors),
+      operationTypeImports: extractOperationTypeImports(descriptors),
+      extensionIds: extractExtensionIds(adapter, target, extensions),
+    };
+  };
+
   it(
     'loads TS contract and emits contract.json and contract.d.ts',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
-
       const contract = await loadContractFromTs(contractPath);
-      const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-      const extensionIds = extractExtensionIdsFromPacks(packs);
+      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+        buildEmitterArtifacts();
 
       const result = await emit(
         contract,
@@ -91,14 +97,9 @@ describe('emit command functionality', () => {
     'emits contract with correct coreHash',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
-
       const contract = await loadContractFromTs(contractPath);
-      const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-      const extensionIds = extractExtensionIdsFromPacks(packs);
+      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+        buildEmitterArtifacts();
 
       const result = await emit(
         contract,
@@ -122,14 +123,9 @@ describe('emit command functionality', () => {
     async () => {
       const newOutputDir = join(tmpdir(), `prisma-next-test-new-${Date.now()}`);
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
-
       const contract = await loadContractFromTs(contractPath);
-      const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-      const extensionIds = extractExtensionIdsFromPacks(packs);
+      const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } =
+        buildEmitterArtifacts();
 
       const result = await emit(
         contract,

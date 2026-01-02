@@ -4,14 +4,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadContractFromTs } from '@prisma-next/cli';
-import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { emit } from '@prisma-next/emitter';
 import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
+  assembleOperationRegistry,
+  convertOperationManifest,
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
@@ -22,6 +22,7 @@ import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { createStubAdapter } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts } from '@prisma-next/test-utils';
+import { getSqlDescriptorBundle } from '../utils/framework-components';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -47,16 +48,14 @@ describe('emit integration', () => {
     'loads TS contract, emits artifacts, and uses them with lanes',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
-
       const contract = await loadContractFromTs(contractPath);
-      const packs = loadExtensionPacks(adapterPath, []);
+      const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
 
-      // Assemble operation registry and extract type imports from packs
-      const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-      const extensionIds = extractExtensionIdsFromPacks(packs);
+      // Assemble operation registry and extract type imports from descriptors
+      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const codecTypeImports = extractCodecTypeImports(descriptors);
+      const operationTypeImports = extractOperationTypeImports(descriptors);
+      const extensionIds = extractExtensionIds(adapter, target, extensions);
 
       const result = await emit(
         contract,
@@ -121,14 +120,12 @@ describe('emit integration', () => {
     'round-trip test: TS contract → IR → JSON → IR → JSON (both JSON outputs identical)',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
-      const adapterPath = resolve(__dirname, '../../../packages/3-targets/6-adapters/postgres');
-
       const contract1 = await loadContractFromTs(contractPath);
-      const packs = loadExtensionPacks(adapterPath, []);
-      const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-      const extensionIds = extractExtensionIdsFromPacks(packs);
+      const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const codecTypeImports = extractCodecTypeImports(descriptors);
+      const operationTypeImports = extractOperationTypeImports(descriptors);
+      const extensionIds = extractExtensionIds(adapter, target, extensions);
 
       const result1 = await emit(
         contract1,

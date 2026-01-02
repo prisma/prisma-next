@@ -14,7 +14,7 @@ This package provides TypeScript type definitions for execution/runtime-plane de
 ## Dependencies
 
 - **Depends on**:
-  - `@prisma-next/contract` - Extension pack manifest types (`ExtensionPackManifest`)
+  - `@prisma-next/contract` - Operation manifest types (`OperationManifest`, `ReturnSpecManifest`)
 
 - **Depended on by**:
   - Runtime plane packages (adapters, drivers, targets) - Use descriptor and instance types

@@ -1,36 +1,35 @@
-import { dirname, join } from 'node:path';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractOperationTypeImportsFromPacks,
+  assembleOperationRegistry,
+  convertOperationManifest,
+  extractCodecTypeImports,
+  extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
+import {
+  getSqlDescriptorBundle,
+  pgvectorExtensionDescriptor,
+} from '../utils/framework-components';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('pgvector extension pack integration', () => {
-  it('loads extension pack manifest', () => {
-    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
-    const packs = loadExtensionPacks(undefined, [packPath]);
-
-    expect(packs.length).toBe(1);
-    const pack = packs[0];
-    expect(pack).toBeDefined();
-    expect(pack?.manifest.id).toBe('pgvector');
-    expect(pack?.manifest.version).toBe('1.0.0');
+  it('exposes pgvector descriptor metadata', () => {
+    expect(pgvectorExtensionDescriptor.id).toBe('pgvector');
+    expect(pgvectorExtensionDescriptor.version).toBe('0.0.1');
   });
 
   it('extracts codec type imports from pack', () => {
-    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
-    const packs = loadExtensionPacks(undefined, [packPath]);
+    const { descriptors } = getSqlDescriptorBundle({
+      extensions: [pgvectorExtensionDescriptor],
+    });
 
-    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
+    const codecTypeImports = extractCodecTypeImports(descriptors);
     expect(codecTypeImports.length).toBe(1);
     expect(codecTypeImports[0]).toEqual({
       package: '@prisma-next/extension-pgvector/codec-types',
@@ -40,10 +39,11 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('extracts operation type imports from pack', () => {
-    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
-    const packs = loadExtensionPacks(undefined, [packPath]);
+    const { descriptors } = getSqlDescriptorBundle({
+      extensions: [pgvectorExtensionDescriptor],
+    });
 
-    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+    const operationTypeImports = extractOperationTypeImports(descriptors);
     expect(operationTypeImports.length).toBe(1);
     expect(operationTypeImports[0]).toEqual({
       package: '@prisma-next/extension-pgvector/operation-types',
@@ -53,10 +53,11 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('assembles operation registry from pack', () => {
-    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
-    const packs = loadExtensionPacks(undefined, [packPath]);
+    const { descriptors } = getSqlDescriptorBundle({
+      extensions: [pgvectorExtensionDescriptor],
+    });
 
-    const registry = assembleOperationRegistryFromPacks(packs);
+    const registry = assembleOperationRegistry(descriptors, convertOperationManifest);
 
     const operations = registry.byType('pg/vector@1');
     expect(operations.length).toBe(1);

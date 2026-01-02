@@ -1,0 +1,40 @@
+import type {
+  ControlAdapterDescriptor,
+  ControlExtensionDescriptor,
+  ControlTargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresTarget from '@prisma-next/target-postgres/control';
+import pgvectorExtension from '@prisma-next/extension-pgvector/control';
+
+const targetDescriptor = postgresTarget as ControlTargetDescriptor<'sql', 'postgres'>;
+const adapterDescriptor = postgresAdapter as ControlAdapterDescriptor<'sql', 'postgres'>;
+const pgvectorDescriptor = pgvectorExtension as ControlExtensionDescriptor<'sql', 'postgres'>;
+
+type SqlDescriptor =
+  | ControlTargetDescriptor<'sql', 'postgres'>
+  | ControlAdapterDescriptor<'sql', 'postgres'>
+  | ControlExtensionDescriptor<'sql', 'postgres'>;
+
+export interface SqlDescriptorBundle {
+  readonly target: ControlTargetDescriptor<'sql', 'postgres'>;
+  readonly adapter: ControlAdapterDescriptor<'sql', 'postgres'>;
+  readonly extensions: ReadonlyArray<ControlExtensionDescriptor<'sql', 'postgres'>>;
+  readonly descriptors: ReadonlyArray<SqlDescriptor>;
+}
+
+export function getSqlDescriptorBundle(options?: {
+  readonly extensions?: ReadonlyArray<ControlExtensionDescriptor<'sql', 'postgres'>>;
+}): SqlDescriptorBundle {
+  const extensions = options?.extensions ?? [];
+  const descriptors: SqlDescriptor[] = [targetDescriptor, adapterDescriptor, ...extensions];
+  return {
+    target: targetDescriptor,
+    adapter: adapterDescriptor,
+    extensions,
+    descriptors,
+  };
+}
+
+export const pgvectorExtensionDescriptor = pgvectorDescriptor;
+

@@ -2,15 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
 import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
+  assembleOperationRegistry,
+  convertOperationManifest,
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
@@ -22,6 +22,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
+import { getSqlDescriptorBundle } from '../utils/framework-components';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
@@ -97,14 +98,11 @@ describe('emitter → lanes integration', () => {
         sources: {},
       };
 
-      const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
-        [],
-      );
-      const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-      const extensionIds = extractExtensionIdsFromPacks(packs);
+      const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const codecTypeImports = extractCodecTypeImports(descriptors);
+      const operationTypeImports = extractOperationTypeImports(descriptors);
+      const extensionIds = extractExtensionIds(adapter, target, extensions);
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,
@@ -201,14 +199,11 @@ describe('emitter → lanes integration', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
-      [],
-    );
-    const operationRegistry = assembleOperationRegistryFromPacks(packs);
-    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-    const extensionIds = extractExtensionIdsFromPacks(packs);
+    const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+    const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+    const codecTypeImports = extractCodecTypeImports(descriptors);
+    const operationTypeImports = extractOperationTypeImports(descriptors);
+    const extensionIds = extractExtensionIds(adapter, target, extensions);
     const options: EmitOptions = {
       outputDir: testDir,
       operationRegistry,
@@ -284,14 +279,11 @@ describe('emitter → lanes integration', () => {
       sources: {},
     };
 
-    const packs = loadExtensionPacks(
-      join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
-      [],
-    );
-    const operationRegistry = assembleOperationRegistryFromPacks(packs);
-    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-    const extensionIds = extractExtensionIdsFromPacks(packs);
+    const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+    const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+    const codecTypeImports = extractCodecTypeImports(descriptors);
+    const operationTypeImports = extractOperationTypeImports(descriptors);
+    const extensionIds = extractExtensionIds(adapter, target, extensions);
     const options: EmitOptions = {
       outputDir: testDir,
       operationRegistry,
@@ -309,14 +301,18 @@ describe('emitter → lanes integration', () => {
 
     // Intentionally load extension packs independently a second time to ensure
     // the emit -> validate -> re-emit flow produces consistent results
-    const packs2 = loadExtensionPacks(
-      join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
-      [],
+    const descriptorsBundle2 = getSqlDescriptorBundle();
+    const operationRegistry2 = assembleOperationRegistry(
+      descriptorsBundle2.descriptors,
+      convertOperationManifest,
     );
-    const operationRegistry2 = assembleOperationRegistryFromPacks(packs2);
-    const codecTypeImports2 = extractCodecTypeImportsFromPacks(packs2);
-    const operationTypeImports2 = extractOperationTypeImportsFromPacks(packs2);
-    const extensionIds2 = extractExtensionIdsFromPacks(packs2);
+    const codecTypeImports2 = extractCodecTypeImports(descriptorsBundle2.descriptors);
+    const operationTypeImports2 = extractOperationTypeImports(descriptorsBundle2.descriptors);
+    const extensionIds2 = extractExtensionIds(
+      descriptorsBundle2.adapter,
+      descriptorsBundle2.target,
+      descriptorsBundle2.extensions,
+    );
     const options2: EmitOptions = {
       outputDir: testDir,
       operationRegistry: operationRegistry2,

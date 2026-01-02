@@ -40,9 +40,8 @@ import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
 /**
- * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
- * This is SQL-family-specific conversion logic.
- * Used internally by instance creation and test utilities in the same package.
+ * Converts an OperationManifest (descriptor declarative data) to a SqlOperationSignature.
+ * This is SQL-family-specific conversion logic used by instance creation and test utilities.
  */
 export function convertOperationManifest(manifest: OperationManifest): SqlOperationSignature {
   return {

@@ -622,7 +622,7 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
 - Core emitter: `packages/1-framework/3-tooling/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
 - Target family SPI: The `emit()` function accepts a `targetFamily: TargetFamilyHook` parameter directly. Authoring surfaces (CLI, tests) determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry or auto-registration.
 - SQL family SPI: `packages/2-sql/3-tooling/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
-- Extension pack loading: `packages/1-framework/3-tooling/cli/src/pack-loading.ts` - loads manifests (CLI-only, not exported from emitter)
+- Extension pack descriptor assembly: `packages/2-sql/3-tooling/family/src/core/assembly.ts` - loops over descriptors to collect operations and type imports (CLI-only, not exported from emitter)
 - Manifest types: `packages/1-framework/3-tooling/cli/src/pack-manifest-types.ts` - defines manifest type interfaces (CLI-only, not exported from emitter)
 - Framework CLI assembly: `packages/1-framework/3-tooling/cli/src/pack-assembly.ts` - generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for family-specific conversion
 
@@ -2240,7 +2240,7 @@ const ir2: ContractIR = {
 
 **Type Notes:**
 - `capabilities` in `ContractIR` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`
-- `ExtensionPack` requires both `manifest` and `path` properties
+- `extensionPacks` in `ContractIR` is a simple object map keyed by pack ID (`Record<string, unknown>`). There is no `manifest` or `path` shape in runtime code—descriptor metadata lives directly on component descriptors.
 
 ## Modular Refactoring Patterns
 

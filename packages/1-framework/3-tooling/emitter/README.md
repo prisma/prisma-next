@@ -21,7 +21,7 @@ Provide a deterministic, verifiable representation of the application's data con
 - **Validate**: Core structure validation plus family-specific type and structure validation via hooks
 - **Canonicalize**: Compute `coreHash` (schema meaning) and `profileHash` (capabilities/pins) from canonical JSON
 - **Emit**: Generate `contract.json` and `contract.d.ts` with family-specific type generation
-- **Manifest-Agnostic**: The emitter is completely manifest-agnostic. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds` from the CLI, not extension packs. Manifest parsing and assembly happens in family instances (e.g., `createSqlFamilyInstance` in `@prisma-next/family-sql`).
+- **Descriptor-Agnostic**: The emitter is completely agnostic to how descriptors are produced. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds` from the CLI or family helpers—no pack manifest parsing happens inside the emitter.
 
 **Note**: The emitter does NOT normalize contracts. Normalization must happen in the contract builder when the contract is created. The emitter assumes contracts are already normalized (all required fields present, including `schemaVersion`, `models`, `relations`, `storage`, `extensions`, `capabilities`, `meta`, and `sources`). All fields can be empty objects/arrays, but they must be present.
 
@@ -98,7 +98,7 @@ flowchart TD
 - Excludes `_generated` metadata field from canonicalization to ensure determinism
 - Sorts object keys, omits default values, and orders top-level fields consistently
 
-**Note**: Extension pack loading and manifest parsing are CLI-only responsibilities. The emitter does not export pack loading functions. Import `loadExtensionPacks` from `@prisma-next/cli` or use the CLI's `pack-loading.ts` module directly. Manifest types (`ExtensionPack`, `ExtensionPackManifest`, `OperationManifest`) are defined in `@prisma-next/control-plane/pack-manifest-types`.
+**Note**: Extension pack descriptor wiring happens in the CLI/family layer. The emitter only sees the resulting registry/type import arrays and extension IDs. Operation manifest types (`OperationManifest`) live in `@prisma-next/contract/types`.
 
 **Note**: `TargetFamilyHook`, `ValidationContext`, and `TypesImportSpec` types are defined in `@prisma-next/contract/types` (shared plane) to allow both migration-plane (emitter) and shared-plane (control-plane) packages to import them without violating dependency rules. These types are re-exported from this package for backward compatibility.
 
@@ -187,5 +187,4 @@ This ensures all required fields are present with sensible defaults. See `.curso
 ## Exports
 
 - `.`: Main emitter API (`emit`, types)
-- **Note**: Pack loading functions (`loadExtensionPacks`, `loadExtensionPackManifest`) are CLI-only and not exported from the emitter. Import them from `@prisma-next/cli` or use the CLI's `pack-loading.ts` module directly.
 
