@@ -16,7 +16,7 @@ function createValidConfig(overrides: CreateValidConfigOverrides = {}) {
       kind: 'family',
       id: 'sql',
       familyId: 'sql',
-      manifest: { id: 'sql', version: '0.0.1' },
+      version: '0.0.1',
       hook: {},
       create: vi.fn(() => ({
         familyId: 'sql',
@@ -32,10 +32,7 @@ function createValidConfig(overrides: CreateValidConfigOverrides = {}) {
       familyId: 'sql',
       targetId: 'postgres',
       id: 'postgres',
-      manifest: {
-        id: 'postgres',
-        version: '0.0.1',
-      },
+      version: '0.0.1',
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
       ...(overrides.target as Record<string, unknown> | undefined),
     },
@@ -44,10 +41,7 @@ function createValidConfig(overrides: CreateValidConfigOverrides = {}) {
       familyId: 'sql',
       targetId: 'postgres',
       id: 'postgres',
-      manifest: {
-        id: 'postgres',
-        version: '0.0.1',
-      },
+      version: '0.0.1',
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
       ...(overrides.adapter as Record<string, unknown> | undefined),
     },
@@ -56,10 +50,7 @@ function createValidConfig(overrides: CreateValidConfigOverrides = {}) {
       familyId: 'sql',
       targetId: 'postgres',
       id: 'postgres',
-      manifest: {
-        id: 'postgres',
-        version: '0.0.1',
-      },
+      version: '0.0.1',
       create: async () => ({
         targetId: 'postgres',
         query: async () => ({ rows: [] }),
@@ -116,7 +107,7 @@ describe('validateConfig', () => {
       family: {
         kind: 'family',
         familyId: 123,
-        manifest: { id: 'sql', version: '0.0.1' },
+        version: '0.0.1',
         hook: {},
         create: vi.fn(),
       },
@@ -150,8 +141,9 @@ describe('validateConfig', () => {
       target: {
         kind: 'invalid',
         id: 'postgres',
-        family: 'sql',
-        manifest: {},
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
       },
     });
     expect(() => validateConfig(config)).toThrow(CliStructuredError);
@@ -162,8 +154,9 @@ describe('validateConfig', () => {
       target: {
         kind: 'target',
         id: 123,
-        family: 'sql',
-        manifest: {},
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
       },
     });
     expect(() => validateConfig(config)).toThrow(CliStructuredError);
@@ -174,19 +167,21 @@ describe('validateConfig', () => {
       target: {
         kind: 'target',
         id: 'postgres',
-        family: 123,
-        manifest: {},
+        familyId: 123,
+        targetId: 'postgres',
+        version: '0.0.1',
       },
     });
     expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
-  it('throws error when target.manifest is missing or not an object', () => {
+  it('throws error when target.version is missing', () => {
     const config1 = createValidConfig({
       target: {
         kind: 'target',
         id: 'postgres',
-        family: 'sql',
+        familyId: 'sql',
+        targetId: 'postgres',
       },
     });
     expect(() => validateConfig(config1)).toThrow(CliStructuredError);
@@ -195,8 +190,9 @@ describe('validateConfig', () => {
       target: {
         kind: 'target',
         id: 'postgres',
-        family: 'sql',
-        manifest: 'not-an-object',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: 123,
       },
     });
     expect(() => validateConfig(config2)).toThrow(CliStructuredError);
@@ -207,8 +203,9 @@ describe('validateConfig', () => {
       adapter: {
         kind: 'invalid',
         id: 'postgres',
-        family: 'sql',
-        manifest: {},
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
       },
     });
     expect(() => validateConfig(config)).toThrow(CliStructuredError);
@@ -219,8 +216,9 @@ describe('validateConfig', () => {
       adapter: {
         kind: 'adapter',
         id: 123,
-        family: 'sql',
-        manifest: {},
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
       },
     });
     expect(() => validateConfig(config)).toThrow(CliStructuredError);
@@ -231,19 +229,21 @@ describe('validateConfig', () => {
       adapter: {
         kind: 'adapter',
         id: 'postgres',
-        family: 123,
-        manifest: {},
+        familyId: 123,
+        targetId: 'postgres',
+        version: '0.0.1',
       },
     });
     expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
-  it('throws error when adapter.manifest is missing or not an object', () => {
+  it('throws error when adapter.version is missing', () => {
     const config1 = createValidConfig({
       adapter: {
         kind: 'adapter',
         id: 'postgres',
-        family: 'sql',
+        familyId: 'sql',
+        targetId: 'postgres',
       },
     });
     expect(() => validateConfig(config1)).toThrow(CliStructuredError);
@@ -252,8 +252,9 @@ describe('validateConfig', () => {
       adapter: {
         kind: 'adapter',
         id: 'postgres',
-        family: 'sql',
-        manifest: 'not-an-object',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: 123,
       },
     });
     expect(() => validateConfig(config2)).toThrow(CliStructuredError);
@@ -267,10 +268,7 @@ describe('validateConfig', () => {
           id: 'pg-vector',
           familyId: 'sql',
           targetId: 'postgres',
-          manifest: {
-            id: 'pg-vector',
-            version: '0.0.1',
-          },
+          version: '0.0.1',
           create: () => ({ familyId: 'sql', targetId: 'postgres' }),
         },
       ],
@@ -298,8 +296,9 @@ describe('validateConfig', () => {
         {
           kind: 'invalid',
           id: 'pg-vector',
-          family: 'sql',
-          manifest: {},
+          familyId: 'sql',
+          targetId: 'postgres',
+          version: '0.0.1',
         },
       ],
     });
@@ -312,35 +311,38 @@ describe('validateConfig', () => {
         {
           kind: 'extension',
           id: 123,
-          family: 'sql',
-          manifest: {},
+          familyId: 'sql',
+          targetId: 'postgres',
+          version: '0.0.1',
         },
       ],
     });
     expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
-  it('throws error when extension.family is not a string', () => {
+  it('throws error when extension.familyId is not a string', () => {
     const config = createValidConfig({
       extensions: [
         {
           kind: 'extension',
           id: 'pg-vector',
-          family: 123,
-          manifest: {},
+          familyId: 123,
+          targetId: 'postgres',
+          version: '0.0.1',
         },
       ],
     });
     expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
-  it('throws error when extension.manifest is missing or not an object', () => {
+  it('throws error when extension.version is missing', () => {
     const config1 = createValidConfig({
       extensions: [
         {
           kind: 'extension',
           id: 'pg-vector',
-          family: 'sql',
+          familyId: 'sql',
+          targetId: 'postgres',
         },
       ],
     });
@@ -351,8 +353,9 @@ describe('validateConfig', () => {
         {
           kind: 'extension',
           id: 'pg-vector',
-          family: 'sql',
-          manifest: 'not-an-object',
+          familyId: 'sql',
+          targetId: 'postgres',
+          version: 123,
         },
       ],
     });
@@ -424,7 +427,7 @@ describe('validateConfig', () => {
     expect(() => validateConfig(config)).not.toThrow();
   });
 
-  it('throws error when family.manifest is missing or not an object', () => {
+  it('throws error when family.version is missing', () => {
     const config1 = createValidConfig({
       family: {
         kind: 'family',
@@ -439,7 +442,7 @@ describe('validateConfig', () => {
       family: {
         kind: 'family',
         familyId: 'sql',
-        manifest: 'not-an-object',
+        version: 123,
         hook: {},
         create: vi.fn(),
       },
@@ -452,7 +455,7 @@ describe('validateConfig', () => {
       family: {
         kind: 'family',
         familyId: 'sql',
-        manifest: { id: 'sql', version: '0.0.1' },
+        version: '0.0.1',
         hook: {},
         create: 'not-a-function',
       },
@@ -467,7 +470,7 @@ describe('validateConfig', () => {
         familyId: 'wrong-family',
         targetId: 'postgres',
         id: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
@@ -481,7 +484,7 @@ describe('validateConfig', () => {
         familyId: 'sql',
         targetId: 123,
         id: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
@@ -495,7 +498,7 @@ describe('validateConfig', () => {
         familyId: 'sql',
         targetId: 'postgres',
         id: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: 'not-a-function',
       },
     });
@@ -509,7 +512,7 @@ describe('validateConfig', () => {
         familyId: 'wrong-family',
         targetId: 'postgres',
         id: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
@@ -523,7 +526,7 @@ describe('validateConfig', () => {
         familyId: 'sql',
         targetId: 123,
         id: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
@@ -537,7 +540,7 @@ describe('validateConfig', () => {
         familyId: 'sql',
         targetId: 'wrong-target',
         id: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
@@ -551,7 +554,7 @@ describe('validateConfig', () => {
         familyId: 'sql',
         targetId: 'postgres',
         id: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: 'not-a-function',
       },
     });
@@ -566,7 +569,7 @@ describe('validateConfig', () => {
           id: 'pg-vector',
           familyId: 'wrong-family',
           targetId: 'postgres',
-          manifest: { id: 'pg-vector', version: '1.0.0' },
+          version: '1.0.0',
           create: vi.fn(),
         },
       ],
@@ -582,7 +585,7 @@ describe('validateConfig', () => {
           id: 'pg-vector',
           familyId: 'sql',
           targetId: 123,
-          manifest: { id: 'pg-vector', version: '1.0.0' },
+          version: '1.0.0',
           create: vi.fn(),
         },
       ],
@@ -598,7 +601,7 @@ describe('validateConfig', () => {
           id: 'pg-vector',
           familyId: 'sql',
           targetId: 'wrong-target',
-          manifest: { id: 'pg-vector', version: '1.0.0' },
+          version: '1.0.0',
           create: vi.fn(),
         },
       ],
@@ -614,7 +617,7 @@ describe('validateConfig', () => {
           id: 'pg-vector',
           familyId: 'sql',
           targetId: 'postgres',
-          manifest: { id: 'pg-vector', version: '1.0.0' },
+          version: '1.0.0',
           create: 'not-a-function',
         },
       ],
@@ -634,7 +637,7 @@ describe('validateConfig', () => {
         id: 'postgres',
         familyId: 'sql',
         targetId: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
@@ -648,14 +651,14 @@ describe('validateConfig', () => {
         id: 123,
         familyId: 'sql',
         targetId: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
     expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
-  it('throws error when driver.manifest is missing or not an object', () => {
+  it('throws error when driver.version is missing', () => {
     const config1 = createValidConfig({
       driver: {
         kind: 'driver',
@@ -673,7 +676,7 @@ describe('validateConfig', () => {
         id: 'postgres',
         familyId: 'sql',
         targetId: 'postgres',
-        manifest: 'not-an-object',
+        version: 123,
         create: vi.fn(),
       },
     });
@@ -687,7 +690,7 @@ describe('validateConfig', () => {
         id: 'postgres',
         familyId: 123,
         targetId: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
@@ -701,7 +704,7 @@ describe('validateConfig', () => {
         id: 'postgres',
         familyId: 'wrong-family',
         targetId: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
@@ -715,7 +718,7 @@ describe('validateConfig', () => {
         id: 'postgres',
         familyId: 'sql',
         targetId: 123,
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
@@ -729,7 +732,7 @@ describe('validateConfig', () => {
         id: 'postgres',
         familyId: 'sql',
         targetId: 'wrong-target',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: vi.fn(),
       },
     });
@@ -743,7 +746,7 @@ describe('validateConfig', () => {
         id: 'postgres',
         familyId: 'sql',
         targetId: 'postgres',
-        manifest: { id: 'postgres', version: '15.0.0' },
+        version: '15.0.0',
         create: 'not-a-function',
       },
     });
