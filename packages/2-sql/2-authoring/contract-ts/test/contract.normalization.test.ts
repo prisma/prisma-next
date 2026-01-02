@@ -389,7 +389,7 @@ describe('validateContract normalization', () => {
     expect(contract.relations).toEqual({});
   });
 
-  it('normalizes missing extensions', () => {
+  it('normalizes missing extensionPacks', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',

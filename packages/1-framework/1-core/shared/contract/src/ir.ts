@@ -52,7 +52,7 @@ export function irHeader(opts: {
 
 /**
  * Creates the meta portion of a ContractIR.
- * Contains capabilities, extensions, meta, and sources with empty object defaults.
+ * Contains capabilities, extensionPacks, meta, and sources with empty object defaults.
  * If a field is explicitly `undefined`, it will be omitted (for testing validation).
  */
 export function irMeta(opts?: {
