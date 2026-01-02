@@ -11,10 +11,32 @@ const ROOT = resolve(process.cwd());
 
 const EXCLUDED_PATHS = ['examples/', 'test/'];
 
-// Packages with known issues that should warn but not fail CI
-const WARNING_ONLY_PACKAGES = [
-  '1-framework/3-tooling/eslint-plugin', // Partially implemented
-];
+async function loadWarningConfig() {
+  const configPath = join(ROOT, 'coverage.config.json');
+  try {
+    const configContent = await readFile(configPath, 'utf-8');
+    const config = JSON.parse(configContent);
+    return config.warningOnly || [];
+  } catch (error) {
+    console.warn('Warning: Could not load coverage.config.json, no warning-only packages configured.');
+    return [];
+  }
+}
+
+function checkExpiry(warningEntry) {
+  const addedDate = new Date(warningEntry.addedDate);
+  const expiryDate = new Date(addedDate);
+  expiryDate.setDate(expiryDate.getDate() + warningEntry.expiryDays);
+  const now = new Date();
+  const daysRemaining = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+
+  return {
+    expiryDate: expiryDate.toISOString().split('T')[0],
+    daysRemaining,
+    isExpired: daysRemaining < 0,
+    isExpiringSoon: daysRemaining >= 0 && daysRemaining <= 7,
+  };
+}
 
 async function getPackages() {
   // Use pnpm to get all packages recursively
@@ -294,19 +316,24 @@ async function getThresholds(packagePath) {
   }
 }
 
-async function formatResults(results) {
+async function formatResults(results, warningConfig) {
+  // Create a map of warning-only packages for quick lookup
+  const warningPackages = new Set(warningConfig.map((entry) => entry.package));
+  const warningMap = new Map(warningConfig.map((entry) => [entry.package, entry]));
+
   // Separate warning-only packages from actual failures
   const testFailures = results.filter(
-    (r) => !r.skipped && !r.testPassed && !WARNING_ONLY_PACKAGES.includes(r.package),
+    (r) => !r.skipped && !r.testPassed && !warningPackages.has(r.package),
   );
   const testWarnings = results.filter(
-    (r) => !r.skipped && !r.testPassed && WARNING_ONLY_PACKAGES.includes(r.package),
+    (r) => !r.skipped && !r.testPassed && warningPackages.has(r.package),
   );
   const coverageFailures = results.filter(
-    (r) => !r.skipped && r.testPassed && !r.coveragePassed && !WARNING_ONLY_PACKAGES.includes(r.package),
+    (r) =>
+      !r.skipped && r.testPassed && !r.coveragePassed && !warningPackages.has(r.package),
   );
   const coverageWarnings = results.filter(
-    (r) => !r.skipped && r.testPassed && !r.coveragePassed && WARNING_ONLY_PACKAGES.includes(r.package),
+    (r) => !r.skipped && r.testPassed && !r.coveragePassed && warningPackages.has(r.package),
   );
   const passed = results.filter((r) => !r.skipped && r.testPassed && r.coveragePassed);
   const skipped = results.filter((r) => r.skipped);
@@ -315,39 +342,70 @@ async function formatResults(results) {
   console.log('COVERAGE REPORT SUMMARY');
   console.log(`${'='.repeat(80)}\n`);
 
-  if (testWarnings.length > 0) {
-    console.log('⚠️  PACKAGES WITH TEST FAILURES (WARNING ONLY - NOT BLOCKING CI):');
-    console.log('-'.repeat(80));
-    for (const result of testWarnings) {
-      console.log(`  • ${result.package}`);
-      if (result.error) {
-        console.log(`    Error: ${result.error}`);
+  // Technical Debt Section - Show at the TOP
+  if (testWarnings.length > 0 || coverageWarnings.length > 0) {
+    console.log('🚨 TECHNICAL DEBT - COVERAGE WARNINGS');
+    console.log('='.repeat(80));
+    console.log(
+      'The following packages have coverage/test failures but are NOT blocking CI.',
+    );
+    console.log('These are time-limited exceptions that MUST be resolved before expiry.\n');
+
+    const allWarnings = [...testWarnings, ...coverageWarnings];
+    for (const result of allWarnings) {
+      const warningEntry = warningMap.get(result.package);
+      if (!warningEntry) continue; // Safety check
+
+      const expiry = checkExpiry(warningEntry);
+      const statusIcon = expiry.isExpiringSoon ? '⚠️' : '📋';
+
+      console.log(`${statusIcon}  ${result.package}`);
+      console.log(`    Reason: ${warningEntry.reason}`);
+      console.log(
+        `    Added: ${warningEntry.addedDate} | Expires: ${expiry.expiryDate} (${expiry.daysRemaining} days remaining)`,
+      );
+
+      if (warningEntry.assignee) {
+        console.log(`    Assignee: ${warningEntry.assignee}`);
       }
-    }
-    console.log('');
-  }
+      if (warningEntry.ticket) {
+        console.log(`    Ticket: ${warningEntry.ticket}`);
+      }
+      if (expiry.isExpiringSoon) {
+        console.log(
+          `    🚨 EXPIRING SOON - Must be resolved within ${expiry.daysRemaining} days!`,
+        );
+      }
 
-  if (coverageWarnings.length > 0) {
-    console.log('⚠️  PACKAGES WITH COVERAGE THRESHOLD FAILURES (WARNING ONLY - NOT BLOCKING CI):');
-    console.log('-'.repeat(80));
-    for (const result of coverageWarnings) {
-      console.log(`  • ${result.package}`);
-
-      const thresholds = await getThresholds(result.package);
-      if (thresholds && result.coverageReport) {
-        const fileFailures = checkThresholds(result.coverageReport, thresholds);
-        if (fileFailures.length > 0) {
-          console.log('    Files below thresholds:');
-          for (const failure of fileFailures) {
-            console.log(`      - ${failure.file}`);
-            for (const fail of failure.failures) {
-              console.log(`        ${fail}`);
+      // Show failure details
+      if (!result.testPassed) {
+        console.log(`    ❌ Test failures`);
+        if (result.error) {
+          const errorLines = result.error.split('\n').slice(0, 5);
+          for (const line of errorLines) {
+            console.log(`       ${line}`);
+          }
+          if (result.error.split('\n').length > 5) {
+            console.log('       ...');
+          }
+        }
+      } else if (!result.coveragePassed) {
+        console.log(`    ❌ Coverage threshold failures`);
+        const thresholds = await getThresholds(result.package);
+        if (thresholds && result.coverageReport) {
+          const fileFailures = checkThresholds(result.coverageReport, thresholds);
+          if (fileFailures.length > 0 && fileFailures.length <= 3) {
+            for (const failure of fileFailures) {
+              console.log(`       - ${failure.file}: ${failure.failures.join(', ')}`);
             }
+          } else if (fileFailures.length > 3) {
+            console.log(`       ${fileFailures.length} files below thresholds`);
           }
         }
       }
+      console.log('');
     }
-    console.log('');
+    console.log('='.repeat(80) + '\n');
   }
 
   if (testFailures.length > 0) {
@@ -477,6 +535,42 @@ async function formatResults(results) {
 }
 
 async function main() {
+  const warningConfig = await loadWarningConfig();
+
+  // Check for expired warnings FIRST
+  const expiredWarnings = warningConfig.filter((entry) => {
+    const expiry = checkExpiry(entry);
+    return expiry.isExpired;
+  });
+
+  if (expiredWarnings.length > 0) {
+    console.error('\n' + '='.repeat(80));
+    console.error('❌ EXPIRED COVERAGE WARNINGS - CI BLOCKED');
+    console.error('='.repeat(80));
+    console.error('The following warning-only packages have EXPIRED and must be resolved:\n');
+
+    for (const entry of expiredWarnings) {
+      const expiry = checkExpiry(entry);
+      console.error(`  • ${entry.package}`);
+      console.error(
+        `    Added: ${entry.addedDate} | Expired: ${expiry.expiryDate} (${Math.abs(expiry.daysRemaining)} days ago)`,
+      );
+      console.error(`    Reason: ${entry.reason}`);
+      if (entry.assignee) console.error(`    Assignee: ${entry.assignee}`);
+      if (entry.ticket) console.error(`    Ticket: ${entry.ticket}`);
+      console.error('');
+    }
+
+    console.error('Action required:');
+    console.error('  1. Fix the tests/coverage issues in these packages, OR');
+    console.error(
+      '  2. Update coverage.config.json to extend the expiry date with justification\n',
+    );
+    console.error('='.repeat(80) + '\n');
+
+    process.exit(1);
+  }
+
   const packages = await getPackages();
 
   console.log(`Running coverage for ${packages.length} packages...\n`);
@@ -498,7 +592,7 @@ async function main() {
     }
   }
 
-  const summary = await formatResults(results);
+  const summary = await formatResults(results, warningConfig);
 
   if (summary.testFailures > 0 || summary.coverageFailures > 0) {
     process.exit(1);

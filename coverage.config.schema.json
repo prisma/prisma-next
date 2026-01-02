@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Coverage Warning Configuration",
+  "description": "Configuration for packages with time-limited coverage/test warning exceptions",
+  "type": "object",
+  "properties": {
+    "warningOnly": {
+      "type": "array",
+      "description": "List of packages with coverage warnings that don't block CI (until expiry)",
+      "items": {
+        "type": "object",
+        "required": ["package", "reason", "addedDate", "expiryDays"],
+        "properties": {
+          "package": {
+            "type": "string",
+            "description": "Package path relative to packages/ directory"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why this package is warning-only",
+            "minLength": 10
+          },
+          "addedDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Date when warning was added (YYYY-MM-DD)",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "expiryDays": {
+            "type": "number",
+            "description": "Days until expiry (typically 90)",
+            "minimum": 1,
+            "maximum": 180
+          },
+          "assignee": {
+            "type": ["string", "null"],
+            "description": "Optional assignee username (e.g., @username)"
+          },
+          "ticket": {
+            "type": ["string", "null"],
+            "description": "Optional ticket reference (e.g., TML-1234)"
+          },
+          "notes": {
+            "type": ["string", "null"],
+            "description": "Optional additional context or coordination notes"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["warningOnly"],
+  "additionalProperties": false
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "./coverage.config.schema.json",
+  "_comment": "WARNING-ONLY PACKAGES: Time-limited exceptions for packages with coverage/test failures. Each entry MUST have an expiry date. When expired, CI will fail until issues are resolved or config is updated with justification.",
+  "warningOnly": [
+    {
+      "package": "1-framework/3-tooling/eslint-plugin",
+      "reason": "Partially implemented by another team member",
+      "addedDate": "2026-01-01",
+      "expiryDays": 90,
+      "assignee": null,
+      "ticket": null,
+      "notes": "Coordinate with teammate before making changes"
+    }
+  ]
+}
