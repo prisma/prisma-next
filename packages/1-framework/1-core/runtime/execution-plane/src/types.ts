@@ -85,7 +85,7 @@ export interface RuntimeFamilyDescriptor<
     readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
     readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId>;
     readonly driver: RuntimeDriverDescriptor<TFamilyId, TTargetId>;
-    readonly extensions: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[];
+    readonly extensionPacks: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[];
   }): TFamilyInstance;
 }
 

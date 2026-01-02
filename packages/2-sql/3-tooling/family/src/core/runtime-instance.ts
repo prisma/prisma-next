@@ -79,13 +79,13 @@ export function createSqlRuntimeFamilyInstance(options: {
   readonly target: RuntimeTargetDescriptor<'sql', string>;
   readonly adapter: RuntimeAdapterDescriptor<'sql', string, SqlRuntimeAdapterInstance>;
   readonly driver: RuntimeDriverDescriptor<'sql', string, SqlRuntimeDriverInstance>;
-  readonly extensions: readonly RuntimeExtensionDescriptor<'sql', string>[];
+  readonly extensionPacks: readonly RuntimeExtensionDescriptor<'sql', string>[];
 }): SqlRuntimeFamilyInstance {
   const {
     target: targetDescriptor,
     adapter: adapterDescriptor,
     driver: driverDescriptor,
-    extensions: extensionDescriptors,
+    extensionPacks: extensionDescriptors,
   } = options;
 
   return {
