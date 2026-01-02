@@ -62,9 +62,6 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/shared/contract
-      '@prisma-next/core-control-plane':
-        specifier: workspace:*
-        version: link:../../packages/1-framework/1-core/migration/control-plane
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/7-drivers/postgres
@@ -105,6 +102,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/cli
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/1-core/migration/control-plane
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/emitter
