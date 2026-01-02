@@ -62,7 +62,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver, // Required even though emit doesn't use it
-  extensions: [],
+  extensionPacks: [],
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',
@@ -143,7 +143,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensions: [],
+  extensionPacks: [],
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',
@@ -296,7 +296,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensions: [],
+  extensionPacks: [],
   db: {
     url: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
@@ -448,7 +448,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensions: [],
+  extensionPacks: [],
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',
@@ -659,7 +659,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensions: [],
+  extensionPacks: [],
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',
@@ -779,7 +779,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensions: [],
+  extensionPacks: [],
   contract: {
     source: contract, // Can be a value or a function: () => import('./contract').then(m => m.contract)
     output: 'src/prisma/contract.json', // Optional: defaults to 'src/prisma/contract.json'
