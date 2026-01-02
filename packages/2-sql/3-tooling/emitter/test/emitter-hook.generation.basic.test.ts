@@ -114,7 +114,13 @@ describe('sql-target-family-hook', () => {
             },
           },
         },
-      } as TestDescriptor,
+        create() {
+          return {
+            familyId: 'sql' as const,
+            targetId: 'postgres' as const,
+          };
+        },
+      },
     ];
 
     const codecImports = extractCodecTypeImports(descriptors);
@@ -158,7 +164,13 @@ describe('sql-target-family-hook', () => {
             },
           },
         },
-      } as TestDescriptor,
+        create() {
+          return {
+            familyId: 'sql' as const,
+            targetId: 'postgres' as const,
+          };
+        },
+      },
       {
         kind: 'extension',
         id: 'pgvector',
@@ -174,7 +186,13 @@ describe('sql-target-family-hook', () => {
             },
           },
         },
-      } as TestDescriptor,
+        create() {
+          return {
+            familyId: 'sql' as const,
+            targetId: 'postgres' as const,
+          };
+        },
+      },
     ];
 
     const codecTypeImports = extractCodecTypeImports(descriptors);
