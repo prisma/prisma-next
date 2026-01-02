@@ -154,7 +154,7 @@ export function createDbIntrospectCommand(): Command {
               family: config.family,
               target: config.target,
               adapter: config.adapter,
-              extensions: config.extensions ?? [],
+              extensions: config.extensions,
             });
             contractIR = validatedContract;
           }
