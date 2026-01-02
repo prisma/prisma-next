@@ -1,3 +1,5 @@
+import { ifDefined } from './defined';
+
 /**
  * Minimal metadata extracted from a database URL for logging or error output.
  * Sensitive fields (password, full URL) are never returned.
@@ -16,26 +18,17 @@ export interface RedactedDatabaseUrl {
  * leak raw URLs when the input is malformed.
  */
 export function redactDatabaseUrl(url: string): RedactedDatabaseUrl {
-  const redacted: RedactedDatabaseUrl = {};
   try {
     const parsed = new URL(url);
-    if (parsed.hostname) {
-      redacted.host = parsed.hostname;
-    }
-    if (parsed.port) {
-      redacted.port = parsed.port;
-    }
-    if (parsed.pathname) {
-      const database = parsed.pathname.replace(/^\//, '');
-      if (database) {
-        redacted.database = database;
-      }
-    }
-    if (parsed.username) {
-      redacted.username = parsed.username;
-    }
+    const database = parsed.pathname?.replace(/^\//, '') || undefined;
+    return {
+      ...ifDefined('host', parsed.hostname || undefined),
+      ...ifDefined('port', parsed.port || undefined),
+      ...ifDefined('database', database),
+      ...ifDefined('username', parsed.username || undefined),
+    };
   } catch {
-    // Ignore parsing errors; return whatever metadata we managed to collect
+    // Ignore parsing errors; return empty metadata
+    return {};
   }
-  return redacted;
 }
