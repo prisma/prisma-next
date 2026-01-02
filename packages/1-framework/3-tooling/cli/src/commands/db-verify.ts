@@ -143,7 +143,7 @@ export function createDbVerifyCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensionPacks: config.extensions ?? [],
+            extensionPacks: config.extensionPacks ?? [],
           });
 
           // Validate contract using instance validator
@@ -153,7 +153,7 @@ export function createDbVerifyCommand(): Command {
             family: config.family,
             target: config.target,
             adapter: config.adapter,
-            extensionPacks: config.extensions,
+            extensionPacks: config.extensionPacks,
           });
 
           // Call family instance verify method

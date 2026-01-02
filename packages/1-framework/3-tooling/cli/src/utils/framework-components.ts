@@ -32,7 +32,7 @@ import { errorConfigValidation } from './cli-errors';
  * @example
  * ```ts
  * const config = await loadConfig();
- * const frameworkComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+ * const frameworkComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
  *
  * // Validate and type-narrow components before passing to planner
  * const typedComponents = assertFrameworkComponentsCompatible(

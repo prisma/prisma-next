@@ -59,7 +59,7 @@ describe('defineConfig', () => {
           timings: { total: 0 },
         }),
         readMarker: async () => null,
-        introspect: async () => ({ tables: {}, extensions: [] }),
+        introspect: async () => ({ tables: {}, extensionPacks: [] }),
         emitContract: async () => ({
           contractJson: '{}',
           contractDts: '',
@@ -97,7 +97,7 @@ describe('defineConfig', () => {
         close: async () => {},
       }),
     },
-    extensions: [],
+    extensionPacks: [],
   };
 
   it('returns the config object unchanged when no contract', () => {

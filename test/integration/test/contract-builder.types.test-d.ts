@@ -63,7 +63,7 @@ test('ResultType inference works identically to fixture contract', () => {
   const context = createRuntimeContext({
     contract: validatedBuilderContract,
     adapter,
-    extensions: [],
+    extensionPacks: [],
   });
   const tables = schema(context).tables;
   const userTable = tables['user'];
@@ -84,7 +84,7 @@ test('ResultType inference works identically to fixture contract', () => {
   const fixtureContext = createRuntimeContext({
     contract: _fixtureContract,
     adapter,
-    extensions: [],
+    extensionPacks: [],
   });
   const fixtureTables = schema(fixtureContext).tables;
   const fixtureUserTable = fixtureTables['user'];
@@ -126,7 +126,7 @@ test('codec type inference via type option', () => {
 
   const validated = validateContract<typeof contract>(contract);
   const adapter = createPostgresAdapter();
-  const context = createRuntimeContext({ contract: validated, adapter, extensions: [] });
+  const context = createRuntimeContext({ contract: validated, adapter, extensionPacks: [] });
   const tables = schema(context).tables;
   const userTable = tables['user'];
   if (!userTable) throw new Error('user table not found');

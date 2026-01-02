@@ -146,9 +146,9 @@ export function createDbSignCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensionPacks: config.extensions ?? [],
+            extensionPacks: config.extensionPacks ?? [],
           });
-          const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+          const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
           const frameworkComponents = assertFrameworkComponentsCompatible(
             config.family.familyId,
             config.target.targetId,
@@ -162,7 +162,7 @@ export function createDbSignCommand(): Command {
             family: config.family,
             target: config.target,
             adapter: config.adapter,
-            extensionPacks: config.extensions,
+            extensionPacks: config.extensionPacks,
           });
 
           // Schema verification precondition with spinner

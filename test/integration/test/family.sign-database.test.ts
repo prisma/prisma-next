@@ -101,7 +101,7 @@ describe('family instance sign', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const result = (await familyInstance.sign({
@@ -183,7 +183,7 @@ describe('family instance sign', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const result = (await familyInstance.sign({
@@ -262,7 +262,7 @@ describe('family instance sign', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           // First sign - creates marker

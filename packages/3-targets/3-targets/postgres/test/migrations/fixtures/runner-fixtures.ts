@@ -49,7 +49,7 @@ export const familyInstance = sqlFamilyDescriptor.create({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   driver: postgresDriverDescriptor,
-  extensions: [],
+  extensionPacks: [],
 });
 
 export const frameworkComponents = [

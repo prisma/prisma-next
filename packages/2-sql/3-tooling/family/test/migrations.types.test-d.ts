@@ -25,14 +25,16 @@ import type {
 // Note: SqlMigrationOperationClass is the same as core MigrationOperationClass (no SQL-specific extension)
 
 // Test that SqlMigrationPlanOperation has the required core fields
-expectTypeOf<SqlMigrationPlanOperation['id']>().toExtend<MigrationPlanOperation['id']>();
-expectTypeOf<SqlMigrationPlanOperation['label']>().toExtend<MigrationPlanOperation['label']>();
-expectTypeOf<SqlMigrationPlanOperation['operationClass']>().toExtend<
+expectTypeOf<SqlMigrationPlanOperation<unknown>['id']>().toExtend<MigrationPlanOperation['id']>();
+expectTypeOf<SqlMigrationPlanOperation<unknown>['label']>().toExtend<
+  MigrationPlanOperation['label']
+>();
+expectTypeOf<SqlMigrationPlanOperation<unknown>['operationClass']>().toExtend<
   MigrationPlanOperation['operationClass']
 >();
 
 // Test that SqlMigrationPlan extends core MigrationPlan
-expectTypeOf<SqlMigrationPlan>().toExtend<MigrationPlan>();
+expectTypeOf<SqlMigrationPlan<unknown>>().toExtend<MigrationPlan>();
 
 // Test that SqlPlannerConflict has the required core fields
 expectTypeOf<SqlPlannerConflict['kind']>().toExtend<MigrationPlannerConflict['kind']>();

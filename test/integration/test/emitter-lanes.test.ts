@@ -141,7 +141,7 @@ describe('emitter → lanes integration', () => {
       expect(contractDtsContent).toContain('export type Contract');
 
       const adapter = createStubAdapter();
-      const context = createRuntimeContext({ contract, adapter, extensions: [] });
+      const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
       const tables = schema(context).tables;
       const userTable = tables['user'];
       if (!userTable) throw new Error('user table not found');
@@ -235,7 +235,7 @@ describe('emitter → lanes integration', () => {
     const contract = validateContract(contractJson);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({ contract, adapter, extensions: [] });
+    const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
     const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
@@ -359,9 +359,9 @@ describe('emitter → lanes integration', () => {
     const context1 = createRuntimeContext({
       contract: validatedContract,
       adapter,
-      extensions: [],
+      extensionPacks: [],
     });
-    const context2 = createRuntimeContext({ contract: contract2, adapter, extensions: [] });
+    const context2 = createRuntimeContext({ contract: contract2, adapter, extensionPacks: [] });
     const tables1 = schema(context1).tables;
     const userTable1 = tables1['user'];
     if (!userTable1) throw new Error('user table not found');

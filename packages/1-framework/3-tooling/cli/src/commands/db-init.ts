@@ -202,9 +202,9 @@ export function createDbInitCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensionPacks: config.extensions ?? [],
+            extensionPacks: config.extensionPacks ?? [],
           });
-          const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+          const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
           const frameworkComponents = assertFrameworkComponentsCompatible(
             config.family.familyId,
             config.target.targetId,
@@ -218,7 +218,7 @@ export function createDbInitCommand(): Command {
             family: config.family,
             target: config.target,
             adapter: config.adapter,
-            extensionPacks: config.extensions ?? [],
+            extensionPacks: config.extensionPacks ?? [],
           });
 
           // Create planner and runner from target migrations capability

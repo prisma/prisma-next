@@ -133,7 +133,7 @@ export function createDbSchemaVerifyCommand(): Command {
           target: config.target,
           adapter: config.adapter,
           driver: driverDescriptor,
-          extensionPacks: config.extensions ?? [],
+          extensionPacks: config.extensionPacks ?? [],
         });
 
         // Validate contract using instance validator
@@ -145,7 +145,7 @@ export function createDbSchemaVerifyCommand(): Command {
           family: config.family,
           target: config.target,
           adapter: config.adapter,
-          extensionPacks: config.extensions ?? [],
+          extensionPacks: config.extensionPacks ?? [],
         });
 
         // Resolve database URL
@@ -161,7 +161,7 @@ export function createDbSchemaVerifyCommand(): Command {
         });
 
         try {
-          const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+          const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
           const frameworkComponents = assertFrameworkComponentsCompatible(
             config.family.familyId,
             config.target.targetId,

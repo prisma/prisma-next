@@ -92,7 +92,7 @@ describe('emit integration', () => {
       const context = createRuntimeContext({
         contract: validatedContract,
         adapter,
-        extensions: [],
+        extensionPacks: [],
       });
       const tables = schema(context).tables;
       const userTable = tables['user'];

@@ -116,7 +116,7 @@ export function createContractEmitCommand(): Command {
           target: config.target,
           adapter: config.adapter,
           driver: config.driver,
-          extensionPacks: config.extensions ?? [],
+          extensionPacks: config.extensionPacks ?? [],
         });
 
         // Resolve contract source from config (user's config handles loading)

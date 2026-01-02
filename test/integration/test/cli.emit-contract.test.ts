@@ -54,7 +54,7 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         driver: config.driver,
-        extensions: config.extensions ?? [],
+        extensionPacks: config.extensionPacks ?? [],
       });
 
       // emitContract handles stripping mappings and validation internally
@@ -119,7 +119,7 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         driver: config.driver,
-        extensions: config.extensions ?? [],
+        extensionPacks: config.extensionPacks ?? [],
       });
 
       // emitContract handles stripping mappings and validation internally
@@ -179,7 +179,7 @@ describe('emitContract API', () => {
           target: config.target,
           adapter: config.adapter,
           driver: config.driver,
-          extensions: config.extensions ?? [],
+          extensionPacks: config.extensionPacks ?? [],
         });
 
         // emitContract handles stripping mappings and validation internally
@@ -231,7 +231,7 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         driver: config.driver,
-        extensions: config.extensions ?? [],
+        extensionPacks: config.extensionPacks ?? [],
       });
 
       // emitContract handles stripping mappings and validation internally
@@ -273,7 +273,7 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         driver: config.driver,
-        extensions: config.extensions ?? [],
+        extensionPacks: config.extensionPacks ?? [],
       });
 
       // emitContract handles stripping mappings and validation internally
@@ -315,7 +315,7 @@ describe('emitContract API', () => {
         target: config.target,
         adapter: config.adapter,
         driver: config.driver,
-        extensions: config.extensions ?? [],
+        extensionPacks: config.extensionPacks ?? [],
       });
 
       // emitContract handles stripping mappings and validation internally

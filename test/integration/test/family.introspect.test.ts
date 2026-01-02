@@ -23,7 +23,7 @@ async function withIntrospection<T>(
       target: postgres,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensions: [],
+      extensionPacks: [],
     });
 
     const schemaIR = await familyInstance.introspect({ driver });
@@ -209,7 +209,7 @@ describe('family instance introspect', () => {
           target: postgres,
           adapter: adapterWithInvalidCreate,
           driver: postgresDriver,
-          extensions: [],
+          extensionPacks: [],
         });
 
         const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
