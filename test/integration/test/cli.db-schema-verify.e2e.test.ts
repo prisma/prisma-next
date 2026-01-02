@@ -51,7 +51,7 @@ function createTestContract(
     models: {},
     relations: {},
     mappings: {},
-    extensions: {},
+    extensionPacks: {},
     capabilities: {},
     meta: {},
     sources: {},

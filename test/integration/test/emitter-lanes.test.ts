@@ -64,7 +64,7 @@ describe('emitter → lanes integration', () => {
         schemaVersion: '1',
         targetFamily: 'sql',
         target: 'postgres',
-        extensions: {
+        extensionPacks: {
           postgres: { version: '0.0.1' },
           pg: {},
         },
@@ -172,7 +172,7 @@ describe('emitter → lanes integration', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
+      extensionPacks: {
         postgres: { version: '0.0.1' },
         pg: {},
       },
@@ -263,7 +263,7 @@ describe('emitter → lanes integration', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
+      extensionPacks: {
         postgres: { version: '0.0.1' },
         pg: {},
       },

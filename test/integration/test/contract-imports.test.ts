@@ -75,7 +75,7 @@ describe('contract.d.ts imports resolution', () => {
     'generates contract.d.ts with all imports resolving correctly',
     async () => {
       const ir = createContractIR({
-        extensions: {
+        extensionPacks: {
           postgres: { version: '0.0.1' },
           pg: {},
         },
@@ -231,7 +231,7 @@ type UserIdColumn = UserColumns['id'];
     'generated contract.d.ts can be imported and used in TypeScript',
     async () => {
       const ir = createContractIR({
-        extensions: {
+        extensionPacks: {
           postgres: { version: '0.0.1' },
           pg: {},
         },
