@@ -10,6 +10,7 @@ import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view
 import type { IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
+import { performAction } from '../utils/action';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -18,7 +19,6 @@ import {
   formatIntrospectOutput,
   formatStyledHeader,
 } from '../utils/output';
-import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
 import { withSpinner } from '../utils/spinner';
 

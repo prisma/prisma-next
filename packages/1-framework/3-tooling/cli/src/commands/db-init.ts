@@ -9,6 +9,7 @@ import type {
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
+import { performAction } from '../utils/action';
 import {
   errorContractValidationFailed,
   errorDatabaseUrlRequired,
@@ -31,7 +32,6 @@ import {
   formatDbInitPlanOutput,
   formatStyledHeader,
 } from '../utils/output';
-import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
 import { withSpinner } from '../utils/spinner';
 

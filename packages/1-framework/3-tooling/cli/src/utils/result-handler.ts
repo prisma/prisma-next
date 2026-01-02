@@ -1,6 +1,7 @@
+import type { Result } from '@prisma-next/utils/result';
+import type { CliStructuredError } from './cli-errors';
 import type { GlobalFlags } from './global-flags';
 import { formatErrorJson, formatErrorOutput } from './output';
-import type { Result } from './result';
 
 /**
  * Processes a CLI command result, handling both success and error cases.
@@ -13,7 +14,7 @@ import type { Result } from './result';
  * @returns The exit code that should be used (0 for success, non-zero for errors)
  */
 export function handleResult<T>(
-  result: Result<T>,
+  result: Result<T, CliStructuredError>,
   flags: GlobalFlags,
   onSuccess?: (value: T) => void,
 ): number {
@@ -26,7 +27,7 @@ export function handleResult<T>(
   }
 
   // Error case - convert to CLI envelope
-  const envelope = result.error.toEnvelope();
+  const envelope = result.failure.toEnvelope();
 
   // Output error based on flags
   if (flags.json) {
@@ -38,6 +39,6 @@ export function handleResult<T>(
   }
 
   // Infer exit code from error domain: CLI errors = 2, RTM errors = 1
-  const exitCode = result.error.domain === 'CLI' ? 2 : 1;
+  const exitCode = result.failure.domain === 'CLI' ? 2 : 1;
   return exitCode;
 }

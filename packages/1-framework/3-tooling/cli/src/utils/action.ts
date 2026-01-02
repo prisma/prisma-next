@@ -1,48 +1,22 @@
-/**
- * Result type for CLI command outcomes.
- * Represents either success (Ok) or failure (Err).
- */
-export type Result<T> = Ok<T> | Err;
-
-export interface Ok<T> {
-  readonly ok: true;
-  readonly value: T;
-}
-
+import type { Result } from '@prisma-next/utils/result';
+import { notOk, ok } from '@prisma-next/utils/result';
 import { CliStructuredError } from './cli-errors';
 
-export interface Err {
-  readonly ok: false;
-  readonly error: CliStructuredError;
-}
-
-/**
- * Creates a successful result.
- */
-export function ok<T>(value: T): Ok<T> {
-  return { ok: true, value };
-}
-
-/**
- * Creates an error result.
- */
-export function err(error: CliStructuredError): Err {
-  return { ok: false, error };
-}
+export type CliResult<T> = Result<T, CliStructuredError>;
 
 /**
  * Performs an async action and catches structured errors, returning a Result.
  * Only catches CliStructuredError instances - other errors are allowed to propagate (fail fast).
- * If the function throws a CliStructuredError, it's caught and converted to an Err result.
+ * If the function throws a CliStructuredError, it's caught and converted to a NotOk result.
  */
-export async function performAction<T>(fn: () => Promise<T>): Promise<Result<T>> {
+export async function performAction<T>(fn: () => Promise<T>): Promise<CliResult<T>> {
   try {
     const value = await fn();
     return ok(value);
   } catch (error) {
     // Only catch structured errors - let other errors propagate (fail fast)
     if (error instanceof CliStructuredError) {
-      return err(error);
+      return notOk(error);
     }
     // Re-throw non-structured errors to fail fast
     throw error;
@@ -52,16 +26,16 @@ export async function performAction<T>(fn: () => Promise<T>): Promise<Result<T>>
 /**
  * Wraps a synchronous function to catch structured errors and return a Result.
  * Only catches CliStructuredError instances - other errors are allowed to propagate (fail fast).
- * If the function throws a CliStructuredError, it's caught and converted to an Err result.
+ * If the function throws a CliStructuredError, it's caught and converted to a NotOk result.
  */
-export function wrapSync<T>(fn: () => T): Result<T> {
+export function wrapSync<T>(fn: () => T): CliResult<T> {
   try {
     const value = fn();
     return ok(value);
   } catch (error) {
     // Only catch structured errors - let other errors propagate (fail fast)
     if (error instanceof CliStructuredError) {
-      return err(error);
+      return notOk(error);
     }
     // Re-throw non-structured errors to fail fast
     throw error;
