@@ -5,7 +5,8 @@
   "packageManager": "pnpm@10.22.0",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo watch build --filter='./packages/**' --continue=dependencies-successful --output-logs=new-only",
+    "dev:all": "turbo watch build --continue=dependencies-successful --output-logs=new-only",
     "format": "pnpm biome format --write .",
     "test": "turbo run test --continue",
     "test:all": "pnpm test:packages && pnpm test:examples && pnpm test:integration && pnpm test:e2e",
