@@ -6,6 +6,8 @@ export type {
   AdapterPackRef,
   ComponentDescriptor,
   ComponentMetadata,
+  ContractComponentRequirementsCheckInput,
+  ContractComponentRequirementsCheckResult,
   DriverDescriptor,
   DriverInstance,
   DriverPackRef,
@@ -20,3 +22,5 @@ export type {
   TargetInstance,
   TargetPackRef,
 } from '../framework-components';
+
+export { checkContractComponentRequirements } from '../framework-components';

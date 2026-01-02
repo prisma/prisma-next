@@ -32,13 +32,13 @@ export class SqlRuntimeFamilyDescriptor
       SqlRuntimeAdapterInstance<TTargetId>
     >;
     readonly driver: RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>;
-    readonly extensionPacks: readonly RuntimeExtensionDescriptor<'sql', TTargetId>[];
+    readonly extensions: readonly RuntimeExtensionDescriptor<'sql', TTargetId>[];
   }): SqlRuntimeFamilyInstance {
     return createSqlRuntimeFamilyInstance({
       target: options.target,
       adapter: options.adapter,
       driver: options.driver,
-      extensionPacks: options.extensionPacks,
+      extensions: options.extensions,
     });
   }
 }

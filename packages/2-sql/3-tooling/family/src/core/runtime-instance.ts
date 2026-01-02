@@ -1,3 +1,4 @@
+import { assertRuntimeContractRequirementsSatisfied } from '@prisma-next/core-execution-plane/framework-components';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
@@ -37,47 +38,6 @@ export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = Runti
   TTargetId
 > &
   Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
-
-function assertRuntimeContractRequirements(
-  contract: SqlContract<SqlStorage>,
-  target: RuntimeTargetDescriptor<'sql', string>,
-  adapter: RuntimeAdapterDescriptor<'sql', string, SqlRuntimeAdapterInstance>,
-  extensionPacks: readonly RuntimeExtensionDescriptor<'sql', string>[],
-  runtimeExtensionPacks?: readonly Extension[],
-): void {
-  if (contract.target !== target.targetId) {
-    throw new Error(
-      `Contract target '${contract.target}' does not match runtime target descriptor '${target.targetId}'.`,
-    );
-  }
-
-  const requiredPacks = contract.extensionPacks ? Object.keys(contract.extensionPacks) : [];
-  if (requiredPacks.length === 0) {
-    return;
-  }
-
-  const providedIds = new Set<string>([target.id, adapter.id]);
-  for (const extension of extensionPacks) {
-    providedIds.add(extension.id);
-  }
-
-  // Runtime extension packs don't have IDs, so we can't validate them here.
-  // If runtime extension packs are provided, we assume they satisfy any missing requirements.
-  // Validation will happen at runtime when codecs/operations are registered and used.
-  const hasRuntimeExtensions = runtimeExtensionPacks && runtimeExtensionPacks.length > 0;
-
-  for (const packId of requiredPacks) {
-    if (!providedIds.has(packId)) {
-      if (!hasRuntimeExtensions) {
-        throw new Error(
-          `Contract requires extension pack '${packId}', but runtime descriptors do not provide a matching component.`,
-        );
-      }
-      // If runtime extension packs are provided, we can't validate them here since they don't have IDs.
-      // Skip the check - validation will happen at runtime when codecs/operations are used.
-    }
-  }
-}
 
 /**
  * SQL runtime family instance interface.
@@ -119,13 +79,13 @@ export function createSqlRuntimeFamilyInstance(options: {
   readonly target: RuntimeTargetDescriptor<'sql', string>;
   readonly adapter: RuntimeAdapterDescriptor<'sql', string, SqlRuntimeAdapterInstance>;
   readonly driver: RuntimeDriverDescriptor<'sql', string, SqlRuntimeDriverInstance>;
-  readonly extensionPacks: readonly RuntimeExtensionDescriptor<'sql', string>[];
+  readonly extensions: readonly RuntimeExtensionDescriptor<'sql', string>[];
 }): SqlRuntimeFamilyInstance {
   const {
     target: targetDescriptor,
     adapter: adapterDescriptor,
     driver: driverDescriptor,
-    extensionPacks: extensionDescriptors,
+    extensions: extensionDescriptors,
   } = options;
 
   return {
@@ -143,13 +103,13 @@ export function createSqlRuntimeFamilyInstance(options: {
       readonly mode?: 'strict' | 'permissive';
       readonly log?: Log;
     }): Runtime {
-      assertRuntimeContractRequirements(
-        runtimeOptions.contract,
-        targetDescriptor,
-        adapterDescriptor,
-        extensionDescriptors,
-        runtimeOptions.extensionPacks,
-      );
+      assertRuntimeContractRequirementsSatisfied({
+        contract: runtimeOptions.contract,
+        target: targetDescriptor,
+        adapter: adapterDescriptor,
+        extensions: extensionDescriptors,
+        runtimeExtensionPacksProvided: (runtimeOptions.extensionPacks?.length ?? 0) > 0,
+      });
       const adapterInstance = adapterDescriptor.create();
       const driverInstance = driverDescriptor.create(runtimeOptions.driverOptions);
 

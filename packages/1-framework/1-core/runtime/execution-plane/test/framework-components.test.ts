@@ -102,4 +102,33 @@ describe('assertRuntimeContractRequirementsSatisfied', () => {
       `Contract requires extension pack 'pgvector', but runtime descriptors do not provide a matching component.`,
     );
   });
+
+  it('skips extension pack requirement when runtime extensions are provided', () => {
+    const target: RuntimeTargetDescriptor<'sql', 'postgres'> = {
+      kind: 'target',
+      id: 'postgres',
+      familyId: 'sql',
+      targetId: 'postgres',
+      version: '0.0.1',
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    };
+    const adapter: RuntimeAdapterDescriptor<'sql', 'postgres'> = {
+      kind: 'adapter',
+      id: 'postgres-adapter',
+      familyId: 'sql',
+      targetId: 'postgres',
+      version: '0.0.1',
+      create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    };
+
+    expect(() =>
+      assertRuntimeContractRequirementsSatisfied({
+        contract: { target: 'postgres', extensionPacks: { pgvector: {} } },
+        target,
+        adapter,
+        extensions: [],
+        runtimeExtensionPacksProvided: true,
+      }),
+    ).not.toThrow();
+  });
 });

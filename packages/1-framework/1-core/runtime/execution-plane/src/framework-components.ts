@@ -14,11 +14,13 @@ export function assertRuntimeContractRequirementsSatisfied<
   target,
   adapter,
   extensions,
+  runtimeExtensionPacksProvided,
 }: {
   readonly contract: { readonly target: string; readonly extensionPacks?: Record<string, unknown> };
   readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId>;
   readonly extensions: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[];
+  readonly runtimeExtensionPacksProvided?: boolean | undefined;
 }): void {
   const providedComponentIds = new Set<string>([target.id, adapter.id]);
   for (const extension of extensions) {
@@ -35,6 +37,10 @@ export function assertRuntimeContractRequirementsSatisfied<
     throw new Error(
       `Contract target '${result.targetMismatch.actual}' does not match runtime target descriptor '${result.targetMismatch.expected}'.`,
     );
+  }
+
+  if (runtimeExtensionPacksProvided === true) {
+    return;
   }
 
   for (const packId of result.missingExtensionPackIds) {

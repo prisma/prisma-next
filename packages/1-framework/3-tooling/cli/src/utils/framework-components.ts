@@ -1,4 +1,7 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import {
+  checkContractComponentRequirements,
+  type TargetBoundComponentDescriptor,
+} from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   ControlAdapterDescriptor,
@@ -125,29 +128,33 @@ export function assertContractRequirementsSatisfied<
   readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
   readonly extensions?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[] | undefined;
 }): void {
-  if (contract.targetFamily !== family.familyId) {
-    throw errorConfigValidation('contract.targetFamily', {
-      why: `Contract was emitted for family '${contract.targetFamily}' but CLI config is wired to '${family.familyId}'.`,
-    });
-  }
-
-  if (contract.target !== target.targetId) {
-    throw errorConfigValidation('contract.target', {
-      why: `Contract target '${contract.target}' does not match CLI target '${target.targetId}'.`,
-    });
-  }
-
   const providedComponentIds = new Set<string>([target.id, adapter.id]);
   for (const extension of extensions ?? []) {
     providedComponentIds.add(extension.id);
   }
 
-  const requiredPacks = contract.extensionPacks ? Object.keys(contract.extensionPacks) : [];
-  for (const packId of requiredPacks) {
-    if (!providedComponentIds.has(packId)) {
-      throw errorConfigValidation('contract.extensionPacks', {
-        why: `Contract requires extension pack '${packId}', but CLI config does not provide a matching descriptor.`,
-      });
-    }
+  const result = checkContractComponentRequirements({
+    contract,
+    expectedTargetFamily: family.familyId,
+    expectedTargetId: target.targetId,
+    providedComponentIds,
+  });
+
+  if (result.familyMismatch) {
+    throw errorConfigValidation('contract.targetFamily', {
+      why: `Contract was emitted for family '${result.familyMismatch.actual}' but CLI config is wired to '${result.familyMismatch.expected}'.`,
+    });
+  }
+
+  if (result.targetMismatch) {
+    throw errorConfigValidation('contract.target', {
+      why: `Contract target '${result.targetMismatch.actual}' does not match CLI target '${result.targetMismatch.expected}'.`,
+    });
+  }
+
+  for (const packId of result.missingExtensionPackIds) {
+    throw errorConfigValidation('contract.extensionPacks', {
+      why: `Contract requires extension pack '${packId}', but CLI config does not provide a matching descriptor.`,
+    });
   }
 }

@@ -90,6 +90,59 @@ export interface ComponentDescriptor<Kind extends string> extends ComponentMetad
   readonly id: string;
 }
 
+export interface ContractComponentRequirementsCheckInput {
+  readonly contract: {
+    readonly target: string;
+    readonly targetFamily?: string | undefined;
+    readonly extensionPacks?: Record<string, unknown> | undefined;
+  };
+  readonly expectedTargetFamily?: string | undefined;
+  readonly expectedTargetId?: string | undefined;
+  readonly providedComponentIds: Iterable<string>;
+}
+
+export interface ContractComponentRequirementsCheckResult {
+  readonly familyMismatch?: { readonly expected: string; readonly actual: string } | undefined;
+  readonly targetMismatch?: { readonly expected: string; readonly actual: string } | undefined;
+  readonly missingExtensionPackIds: readonly string[];
+}
+
+export function checkContractComponentRequirements(
+  input: ContractComponentRequirementsCheckInput,
+): ContractComponentRequirementsCheckResult {
+  const providedIds = new Set<string>();
+  for (const id of input.providedComponentIds) {
+    providedIds.add(id);
+  }
+
+  const requiredExtensionPackIds = input.contract.extensionPacks
+    ? Object.keys(input.contract.extensionPacks)
+    : [];
+  const missingExtensionPackIds = requiredExtensionPackIds.filter((id) => !providedIds.has(id));
+
+  const expectedTargetFamily = input.expectedTargetFamily;
+  const contractTargetFamily = input.contract.targetFamily;
+  const familyMismatch =
+    expectedTargetFamily !== undefined &&
+    contractTargetFamily !== undefined &&
+    contractTargetFamily !== expectedTargetFamily
+      ? { expected: expectedTargetFamily, actual: contractTargetFamily }
+      : undefined;
+
+  const expectedTargetId = input.expectedTargetId;
+  const contractTargetId = input.contract.target;
+  const targetMismatch =
+    expectedTargetId !== undefined && contractTargetId !== expectedTargetId
+      ? { expected: expectedTargetId, actual: contractTargetId }
+      : undefined;
+
+  return {
+    ...(familyMismatch ? { familyMismatch } : {}),
+    ...(targetMismatch ? { targetMismatch } : {}),
+    missingExtensionPackIds,
+  };
+}
+
 /**
  * Descriptor for a family component.
  *
