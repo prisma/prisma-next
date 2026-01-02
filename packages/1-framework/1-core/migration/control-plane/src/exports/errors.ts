@@ -1,4 +1,4 @@
-export type { CliErrorEnvelope } from '../errors';
+export type { CliErrorConflict, CliErrorEnvelope } from '../errors';
 export {
   CliStructuredError,
   errorConfigFileNotFound,

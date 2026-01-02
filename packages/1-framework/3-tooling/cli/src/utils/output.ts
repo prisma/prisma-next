@@ -26,7 +26,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import type { CliErrorEnvelope } from './cli-errors';
+import type { CliErrorConflict, CliErrorEnvelope } from './cli-errors';
 import { getLongDescription } from './command-helpers';
 import type { GlobalFlags } from './global-flags';
 
@@ -151,7 +151,7 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
   }
   // Show conflicts list if present (always show a short list; show full list when verbose)
   if (error.meta?.['conflicts']) {
-    const conflicts = error.meta['conflicts'] as readonly { kind: string; summary: string }[];
+    const conflicts = error.meta['conflicts'] as readonly CliErrorConflict[];
     if (conflicts.length > 0) {
       const maxToShow = isVerbose(flags, 1) ? conflicts.length : Math.min(3, conflicts.length);
       const header = isVerbose(flags, 1)

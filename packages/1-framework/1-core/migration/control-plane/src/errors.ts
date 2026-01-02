@@ -20,6 +20,15 @@ export interface CliErrorEnvelope {
 }
 
 /**
+ * Minimal conflict data structure expected by CLI output.
+ */
+export interface CliErrorConflict {
+  readonly kind: string;
+  readonly summary: string;
+  readonly why?: string;
+}
+
+/**
  * Structured CLI error that contains all information needed for error envelopes.
  * Call sites throw these errors with full context.
  */
@@ -236,11 +245,7 @@ export function errorDriverRequired(options?: { readonly why?: string }): CliStr
  * Migration planning failed due to conflicts.
  */
 export function errorMigrationPlanningFailed(options: {
-  readonly conflicts: readonly {
-    readonly kind: string;
-    readonly summary: string;
-    readonly why?: string;
-  }[];
+  readonly conflicts: readonly CliErrorConflict[];
   readonly why?: string;
 }): CliStructuredError {
   // Build "why" from conflict summaries - these contain the actual problem description
