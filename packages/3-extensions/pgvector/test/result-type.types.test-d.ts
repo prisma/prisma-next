@@ -117,7 +117,7 @@ test('ResultType correctly infers number[] for vector column', () => {
   const context = createRuntimeContext({
     contract: contractWithVector,
     adapter,
-    extensions: [pgvector()],
+    extensionPacks: [pgvector()],
   });
   const tables = schema(context).tables;
   const postTable = tables['post'];
@@ -183,7 +183,7 @@ test('ResultType correctly infers number[] for non-nullable vector column', () =
   const context = createRuntimeContext({
     contract: contractWithVector,
     adapter,
-    extensions: [pgvector()],
+    extensionPacks: [pgvector()],
   });
   const tables = schema(context).tables;
   const postTable = tables['post'];

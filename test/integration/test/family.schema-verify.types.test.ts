@@ -3,16 +3,15 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-import postgresPack from '@prisma-next/target-postgres/pack';
   type CodecTypes,
   createFamilyInstance,
   defineContract,
   findNodeByStatusAndCode,
   int4Column,
   pgvector,
-  postgresPack,
   postgres,
   postgresAdapter,
+  postgresPack,
   runSchemaVerify,
   type SqlContract,
   type SqlStorage,

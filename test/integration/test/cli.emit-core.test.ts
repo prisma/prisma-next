@@ -22,8 +22,8 @@ import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { createStubAdapter } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts } from '@prisma-next/test-utils';
-import { getSqlDescriptorBundle } from '../utils/framework-components';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { getSqlDescriptorBundle } from '../utils/framework-components';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = resolve(__dirname, '../../../packages/1-framework/3-tooling/cli/test/fixtures');
@@ -49,13 +49,22 @@ describe('emit integration', () => {
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
       const contract = await loadContractFromTs(contractPath);
-      const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+      const {
+        adapter: adapterDescriptor,
+        target: targetDescriptor,
+        extensions: extensionDescriptors,
+        descriptors,
+      } = getSqlDescriptorBundle();
 
       // Assemble operation registry and extract type imports from descriptors
       const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(adapter, target, extensions);
+      const extensionIds = extractExtensionIds(
+        adapterDescriptor,
+        targetDescriptor,
+        extensionDescriptors,
+      );
 
       const result = await emit(
         contract,
@@ -83,7 +92,7 @@ describe('emit integration', () => {
       const context = createRuntimeContext({
         contract: validatedContract,
         adapter,
-        extensions: [],
+        extensionPacks: [],
       });
       const tables = schema(context).tables;
       const userTable = tables['user'];
@@ -121,11 +130,20 @@ describe('emit integration', () => {
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
       const contract1 = await loadContractFromTs(contractPath);
-      const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+      const {
+        adapter: adapterDescriptor,
+        target: targetDescriptor,
+        extensions: extensionDescriptors,
+        descriptors,
+      } = getSqlDescriptorBundle();
       const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(adapter, target, extensions);
+      const extensionIds = extractExtensionIds(
+        adapterDescriptor,
+        targetDescriptor,
+        extensionDescriptors,
+      );
 
       const result1 = await emit(
         contract1,

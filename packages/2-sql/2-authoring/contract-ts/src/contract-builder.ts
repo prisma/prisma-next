@@ -366,7 +366,7 @@ class SqlContractBuilder<
         Tables,
         Models,
         CoreHash,
-        Extensions,
+        ExtensionPacks,
         Capabilities
       >['build']
     >;
@@ -391,7 +391,15 @@ class SqlContractBuilder<
 
   extensionPacks(
     packs: Record<string, ExtensionPackRef<'sql', string>>,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, Extensions, Capabilities> {
+  ): SqlContractBuilder<
+    CodecTypes,
+    Target,
+    Tables,
+    Models,
+    CoreHash,
+    ExtensionPacks,
+    Capabilities
+  > {
     if (!this.state.target) {
       throw new Error('extensionPacks() requires target() to be called first');
     }
@@ -438,8 +446,8 @@ class SqlContractBuilder<
 
   override capabilities<C extends Record<string, Record<string, boolean>>>(
     capabilities: C,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, Extensions, C> {
-    return new SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, Extensions, C>({
+  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, ExtensionPacks, C> {
+    return new SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, ExtensionPacks, C>({
       ...this.state,
       capabilities,
     });
@@ -447,8 +455,16 @@ class SqlContractBuilder<
 
   override coreHash<H extends string>(
     hash: H,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, H, Extensions, Capabilities> {
-    return new SqlContractBuilder<CodecTypes, Target, Tables, Models, H, Extensions, Capabilities>({
+  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, H, ExtensionPacks, Capabilities> {
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      H,
+      ExtensionPacks,
+      Capabilities
+    >({
       ...this.state,
       coreHash: hash,
     });
@@ -470,7 +486,7 @@ class SqlContractBuilder<
     Tables & Record<TableName, ReturnType<T['build']>>,
     Models,
     CoreHash,
-    Extensions,
+    ExtensionPacks,
     Capabilities
   > {
     const tableBuilder = new TableBuilder<TableName>(name);
@@ -484,7 +500,7 @@ class SqlContractBuilder<
       Tables & Record<TableName, ReturnType<T['build']>>,
       Models,
       CoreHash,
-      Extensions,
+      ExtensionPacks,
       Capabilities
     >({
       ...this.state,
@@ -514,7 +530,7 @@ class SqlContractBuilder<
     Tables,
     Models & Record<ModelName, ReturnType<M['build']>>,
     CoreHash,
-    Extensions,
+    ExtensionPacks,
     Capabilities
   > {
     const modelBuilder = new ModelBuilder<ModelName, TableName>(name, table);
@@ -528,7 +544,7 @@ class SqlContractBuilder<
       Tables,
       Models & Record<ModelName, ReturnType<M['build']>>,
       CoreHash,
-      Extensions,
+      ExtensionPacks,
       Capabilities
     >({
       ...this.state,

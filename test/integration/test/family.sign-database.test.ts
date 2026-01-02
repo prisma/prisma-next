@@ -9,13 +9,13 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
-import postgresPack from '@prisma-next/target-postgres/pack';
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
+import postgresPack from '@prisma-next/target-postgres/pack';
 import type { DevDatabase } from '@prisma-next/test-utils';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -37,7 +37,7 @@ function createTestContract(): SqlContract<SqlStorage> {
 
   return {
     ...contractObj,
-    extensions: {
+    extensionPacks: {
       postgres: {
         version: '0.0.1',
       },

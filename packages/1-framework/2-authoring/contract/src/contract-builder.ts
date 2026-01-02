@@ -1,3 +1,4 @@
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import type {
   ColumnBuilderState,
   ContractBuilderState,
@@ -7,7 +8,6 @@ import type {
 } from './builder-state';
 import { ModelBuilder } from './model-builder';
 import { TableBuilder } from './table-builder';
-import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 
 export class ContractBuilder<
   Target extends string | undefined = undefined,

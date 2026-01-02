@@ -20,7 +20,7 @@ test('ResultType correctly infers number[] | null for nullable embedding column'
   const context = createRuntimeContext({
     contract,
     adapter,
-    extensions: [pgvector()],
+    extensionPacks: [pgvector()],
   });
 
   const tables = schema(context).tables;

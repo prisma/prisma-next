@@ -80,7 +80,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         });
         await client.query(write.insert.sql, [...write.insert.params]);
 
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
         const runtime = createRuntime({
           context,
           adapter,
@@ -168,7 +168,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         });
         await client.query(write.insert.sql, [...write.insert.params]);
 
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
         const runtime = createRuntime({
           context,
           adapter,
@@ -254,7 +254,7 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
         });
         await client.query(write.insert.sql, [...write.insert.params]);
 
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
         const runtime = createRuntime({
           context,
           adapter,

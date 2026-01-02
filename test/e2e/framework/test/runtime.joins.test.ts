@@ -60,7 +60,7 @@ function createJoinTestRuntime(
   const context = createRuntimeContext({
     contract,
     adapter: createPostgresAdapter(),
-    extensions: [],
+    extensionPacks: [],
   });
   const tables = schema(context).tables;
   return { runtime, context, tables };

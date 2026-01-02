@@ -100,13 +100,13 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,
   adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
   options?: {
-    extensions?: ReadonlyArray<Extension>;
+    extensionPacks?: ReadonlyArray<Extension>;
   },
 ): RuntimeContext<TContract> {
   return createRuntimeContext<TContract>({
     contract,
     adapter,
-    extensions: options?.extensions ?? [],
+    extensionPacks: options?.extensionPacks ?? [],
   });
 }
 

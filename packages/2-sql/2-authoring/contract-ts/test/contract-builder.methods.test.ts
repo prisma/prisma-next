@@ -214,7 +214,8 @@ describe('extensionPacks', () => {
       .extensionPacks({ pgvector: pgvectorPack })
       .build();
 
-    expect(contract.extensionPacks.pgvector).toEqual({});
+    expect(contract.extensionPacks).toBeDefined();
+    expect(contract.extensionPacks?.['pgvector']).toEqual({});
   });
 
   it('rejects non-extension pack refs', () => {

@@ -49,7 +49,7 @@ describe('end-to-end basic queries', () => {
           });
 
           const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [] });
+          const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
             const tables = schema<Contract>(context).tables;

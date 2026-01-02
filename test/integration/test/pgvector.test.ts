@@ -1,5 +1,3 @@
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import {
   assembleOperationRegistry,
@@ -10,13 +8,7 @@ import {
 import { createOperationRegistry } from '@prisma-next/operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import {
-  getSqlDescriptorBundle,
-  pgvectorExtensionDescriptor,
-} from '../utils/framework-components';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../utils/framework-components';
 
 describe('pgvector extension pack integration', () => {
   it('exposes pgvector descriptor metadata', () => {

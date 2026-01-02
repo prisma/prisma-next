@@ -33,7 +33,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
         });
 
         const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [] });
+        const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
         const runtime = createTestRuntimeFromClient(contract, client);
         try {
           const tables = schema<Contract>(context).tables;

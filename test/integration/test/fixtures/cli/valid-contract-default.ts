@@ -1,6 +1,6 @@
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 
 const contractObj = defineContract<Record<string, never>>()
   .target(postgresPack)

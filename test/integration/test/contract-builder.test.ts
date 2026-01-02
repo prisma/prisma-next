@@ -1,5 +1,4 @@
 import {
-import postgresPack from '@prisma-next/target-postgres/pack';
   int4Column,
   textColumn,
   timestamptzColumn,
@@ -11,6 +10,7 @@ import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
+import postgresPack from '@prisma-next/target-postgres/pack';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };

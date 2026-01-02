@@ -21,7 +21,7 @@ test('inferred row types are correct', () => {
   const contract = validateContract<Contract>(contractJson);
 
   const adapter = createPostgresAdapter();
-  const context = createRuntimeContext({ contract, adapter, extensions: [] });
+  const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
   const tables = schema<Contract>(context).tables;
   const user = tables.user!;
   const plan = sql({ context })

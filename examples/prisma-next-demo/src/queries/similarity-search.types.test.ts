@@ -20,7 +20,7 @@ test('ResultType correctly infers number for cosineDistance operation result', (
   const context = createRuntimeContext({
     contract,
     adapter,
-    extensions: [pgvector()],
+    extensionPacks: [pgvector()],
   });
 
   const tables = schema(context).tables;

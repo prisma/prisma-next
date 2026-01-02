@@ -31,7 +31,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
   beforeAll(async () => {
     contract = await loadContractFromDisk<Contract>(contractJsonPath);
     adapter = createPostgresAdapter();
-    context = createRuntimeContext({ contract, adapter, extensions: [] });
+    context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
     tables = schema(context).tables;
     builder = sql({ context });
 

@@ -59,7 +59,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
           });
 
           const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [] });
+          const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
             const tables = schema<ContractWithCapabilities>(context).tables;
@@ -145,7 +145,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
           });
 
           const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [] });
+          const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
             const tables = schema<ContractWithCapabilities>(context).tables;
@@ -217,7 +217,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
           });
 
           const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [] });
+          const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
             const tables = schema<Contract>(context).tables;
@@ -294,7 +294,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
           });
 
           const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [] });
+          const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
             const tables = schema<Contract>(context).tables;

@@ -13,7 +13,7 @@ import contractJson from './fixtures/contract-with-relations.json' with { type: 
 test('ResultType extracts Row type from ORM findMany plan', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createStubAdapter();
-  const context = createRuntimeContext({ contract, adapter, extensions: [] });
+  const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
   const o = orm<Contract>({ context });
 
   // Use the actual ORM API (not mocked) to test ResultType extraction
@@ -54,7 +54,7 @@ test('ResultType extracts Row type from ORM findMany plan', () => {
 test('ResultType extracts Row type from ORM findMany plan with includes', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createStubAdapter();
-  const context = createRuntimeContext({ contract, adapter, extensions: [] });
+  const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
   const o = orm<Contract>({ context });
 
   const plan = o
@@ -107,7 +107,7 @@ test('ResultType extracts Row type from ORM findMany plan with includes', () => 
 test('ResultType keeps include result types after filtering and ordering child rows', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createStubAdapter();
-  const context = createRuntimeContext({ contract, adapter, extensions: [] });
+  const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
   const o = orm<Contract>({ context });
 
   const plan = o
@@ -144,7 +144,7 @@ test('ResultType keeps include result types after filtering and ordering child r
 test('ResultType infers nested include element shape', () => {
   const contract = validateContract<Contract>(contractJson);
   const adapter = createStubAdapter();
-  const context = createRuntimeContext({ contract, adapter, extensions: [] });
+  const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
   const o = orm<Contract>({ context });
 
   const plan = o

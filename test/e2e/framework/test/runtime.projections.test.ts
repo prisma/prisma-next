@@ -40,7 +40,7 @@ describe('end-to-end nested projection queries', () => {
           const adapter = createPostgresAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
+            const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
             const tables = schema<Contract>(context).tables;
             const user = tables.user!;
             const plan = sql({ context })
@@ -119,7 +119,7 @@ describe('end-to-end nested projection queries', () => {
           const adapter = createPostgresAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
+            const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
             const tables = schema<Contract>(context).tables;
             const user = tables.user!;
             const plan = sql({ context })
@@ -201,7 +201,7 @@ describe('end-to-end nested projection queries', () => {
           const adapter = createPostgresAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
+            const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
             const tables = schema(context).tables;
             const user = tables.user!;
             const post = tables.post!;
@@ -288,7 +288,7 @@ describe('end-to-end nested projection queries', () => {
           const adapter = createPostgresAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
+            const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
             const tables = schema(context).tables;
             const user = tables.user!;
             const plan = sql({ context })

@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
@@ -19,8 +19,8 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { stampMarker } from '../scripts/stamp-marker';
-import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../../test/utils/framework-components';
 import type { Contract } from '../src/prisma/contract.d';
+import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from './utils/framework-components';
 
 let contract: Contract;
 
@@ -73,7 +73,7 @@ function createTestRuntime(
   pool: Pool;
 } {
   const adapter = createPostgresAdapter();
-  const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
+  const context = createRuntimeContext({ contract, adapter, extensionPacks: [pgvector()] });
   const pool = new Pool({ connectionString });
   const driver = createPostgresDriverFromOptions({
     connect: { pool },

@@ -29,13 +29,13 @@ export interface CreateRuntimeContextOptions<
   readonly adapter:
     | Adapter<QueryAst, TContract, LoweredStatement>
     | Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
-  readonly extensions?: ReadonlyArray<Extension>;
+  readonly extensionPacks?: ReadonlyArray<Extension>;
 }
 
 export function createRuntimeContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 >(options: CreateRuntimeContextOptions<TContract>): RuntimeContext<TContract> {
-  const { contract, adapter, extensions } = options;
+  const { contract, adapter, extensionPacks } = options;
 
   const codecRegistry = createCodecRegistry();
   const operationRegistry = createOperationRegistry();
@@ -44,7 +44,7 @@ export function createRuntimeContext<
     {
       codecs: () => adapter.profile.codecs(),
     },
-    ...(extensions ?? []),
+    ...(extensionPacks ?? []),
   ];
 
   for (const extension of allExtensions) {

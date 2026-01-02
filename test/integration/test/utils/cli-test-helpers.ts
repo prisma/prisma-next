@@ -1,5 +1,4 @@
 import {
-import postgresPack from '@prisma-next/target-postgres/pack';
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -57,6 +56,7 @@ export function createContractFile(testDir: string): string {
     contractPath,
     `import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
 
 type CodecTypes = Record<string, never>;
 

@@ -99,7 +99,7 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
     const context = createRuntimeContext({
       contract: validatedContract,
       adapter,
-      extensions: [],
+      extensionPacks: [],
     });
 
     const runtime = createRuntime({

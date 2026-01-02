@@ -22,8 +22,8 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
-import { getSqlDescriptorBundle } from '../utils/framework-components';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { getSqlDescriptorBundle } from '../utils/framework-components';
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {
@@ -64,7 +64,7 @@ describe('emitter → lanes integration', () => {
         schemaVersion: '1',
         targetFamily: 'sql',
         target: 'postgres',
-        extensions: {
+        extensionPacks: {
           postgres: { version: '0.0.1' },
           pg: {},
         },
@@ -98,11 +98,20 @@ describe('emitter → lanes integration', () => {
         sources: {},
       };
 
-      const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+      const {
+        adapter: adapterDescriptor,
+        target: targetDescriptor,
+        extensions: extensionDescriptors,
+        descriptors,
+      } = getSqlDescriptorBundle();
       const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
-      const extensionIds = extractExtensionIds(adapter, target, extensions);
+      const extensionIds = extractExtensionIds(
+        adapterDescriptor,
+        targetDescriptor,
+        extensionDescriptors,
+      );
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,
@@ -132,7 +141,7 @@ describe('emitter → lanes integration', () => {
       expect(contractDtsContent).toContain('export type Contract');
 
       const adapter = createStubAdapter();
-      const context = createRuntimeContext({ contract, adapter, extensions: [] });
+      const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
       const tables = schema(context).tables;
       const userTable = tables['user'];
       if (!userTable) throw new Error('user table not found');
@@ -163,7 +172,7 @@ describe('emitter → lanes integration', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
+      extensionPacks: {
         postgres: { version: '0.0.1' },
         pg: {},
       },
@@ -199,11 +208,20 @@ describe('emitter → lanes integration', () => {
       sources: {},
     };
 
-    const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+    const {
+      adapter: adapterDescriptor,
+      target: targetDescriptor,
+      extensions: extensionDescriptors,
+      descriptors,
+    } = getSqlDescriptorBundle();
     const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
     const codecTypeImports = extractCodecTypeImports(descriptors);
     const operationTypeImports = extractOperationTypeImports(descriptors);
-    const extensionIds = extractExtensionIds(adapter, target, extensions);
+    const extensionIds = extractExtensionIds(
+      adapterDescriptor,
+      targetDescriptor,
+      extensionDescriptors,
+    );
     const options: EmitOptions = {
       outputDir: testDir,
       operationRegistry,
@@ -217,7 +235,7 @@ describe('emitter → lanes integration', () => {
     const contract = validateContract(contractJson);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({ contract, adapter, extensions: [] });
+    const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
     const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
@@ -245,7 +263,7 @@ describe('emitter → lanes integration', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensions: {
+      extensionPacks: {
         postgres: { version: '0.0.1' },
         pg: {},
       },
@@ -279,11 +297,20 @@ describe('emitter → lanes integration', () => {
       sources: {},
     };
 
-    const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+    const {
+      adapter: adapterDescriptor,
+      target: targetDescriptor,
+      extensions: extensionDescriptors,
+      descriptors,
+    } = getSqlDescriptorBundle();
     const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
     const codecTypeImports = extractCodecTypeImports(descriptors);
     const operationTypeImports = extractOperationTypeImports(descriptors);
-    const extensionIds = extractExtensionIds(adapter, target, extensions);
+    const extensionIds = extractExtensionIds(
+      adapterDescriptor,
+      targetDescriptor,
+      extensionDescriptors,
+    );
     const options: EmitOptions = {
       outputDir: testDir,
       operationRegistry,
@@ -329,8 +356,12 @@ describe('emitter → lanes integration', () => {
     expect(result1.coreHash).toBe(result2.coreHash);
 
     const adapter = createStubAdapter();
-    const context1 = createRuntimeContext({ contract: validatedContract, adapter, extensions: [] });
-    const context2 = createRuntimeContext({ contract: contract2, adapter, extensions: [] });
+    const context1 = createRuntimeContext({
+      contract: validatedContract,
+      adapter,
+      extensionPacks: [],
+    });
+    const context2 = createRuntimeContext({ contract: contract2, adapter, extensionPacks: [] });
     const tables1 = schema(context1).tables;
     const userTable1 = tables1['user'];
     if (!userTable1) throw new Error('user table not found');

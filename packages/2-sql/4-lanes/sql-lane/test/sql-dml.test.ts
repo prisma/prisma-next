@@ -311,7 +311,7 @@ describe('DML builders', () => {
 
     const adapterWithOps = createStubAdapter();
     const contextWithOps = createTestContext(contractWithVector, adapterWithOps, {
-      extensions: [
+      extensionPacks: [
         {
           operations: () => [
             {

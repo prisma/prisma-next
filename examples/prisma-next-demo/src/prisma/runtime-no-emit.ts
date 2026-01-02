@@ -46,7 +46,7 @@ export function getRuntime(): Runtime {
         mode: 'onFirstUse',
         requireMarker: false,
       },
-      extensions: [],
+      extensionPacks: [],
       plugins: [
         budgets({
           maxRows: 10_000,
@@ -62,7 +62,7 @@ export function getRuntime(): Runtime {
     context = createRuntimeContext({
       contract,
       adapter: adapterInstance,
-      extensions: [],
+      extensionPacks: [],
     });
   }
   return runtime;

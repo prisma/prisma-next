@@ -81,7 +81,7 @@ export interface SqlRuntimeFamilyInstance extends RuntimeFamilyInstance<'sql'> {
    * @param options.contract - SQL contract
    * @param options.driverOptions - Driver options (e.g., PostgresDriverOptions)
    * @param options.verify - Runtime verification options
-   * @param options.extensions - Optional extensions (Extension objects, not descriptors)
+   * @param options.extensionPacks - Optional extensions (Extension objects, not descriptors)
    * @param options.plugins - Optional plugins
    * @param options.mode - Optional runtime mode
    * @param options.log - Optional log instance
@@ -91,7 +91,7 @@ export interface SqlRuntimeFamilyInstance extends RuntimeFamilyInstance<'sql'> {
     readonly contract: TContract;
     readonly driverOptions: unknown;
     readonly verify: RuntimeVerifyOptions;
-    readonly extensions?: readonly Extension[];
+    readonly extensionPacks?: readonly Extension[];
     readonly plugins?: readonly Plugin<
       TContract,
       Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
@@ -124,7 +124,7 @@ export function createSqlRuntimeFamilyInstance(options: {
       readonly contract: TContract;
       readonly driverOptions: unknown;
       readonly verify: RuntimeVerifyOptions;
-      readonly extensions?: readonly Extension[];
+      readonly extensionPacks?: readonly Extension[];
       readonly plugins?: readonly Plugin<
         TContract,
         Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
@@ -157,12 +157,12 @@ export function createSqlRuntimeFamilyInstance(options: {
         return extension;
       });
 
-      const extensions = [...descriptorExtensions, ...(runtimeOptions.extensions ?? [])];
+      const extensionPacks = [...descriptorExtensions, ...(runtimeOptions.extensionPacks ?? [])];
 
       const context = createRuntimeContext({
         contract: runtimeOptions.contract,
         adapter: adapterInstance,
-        extensions,
+        extensionPacks,
       }) as RuntimeContext<TContract>;
 
       const runtimeOptions_: RuntimeOptions<TContract> = {

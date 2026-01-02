@@ -372,7 +372,7 @@ class PrismaClientImpl {
     this.context = createRuntimeContext({
       contract: this.contract,
       adapter,
-      extensions: [],
+      extensionPacks: [],
     });
 
     // Initialize runtime if not provided
