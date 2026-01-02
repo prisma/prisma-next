@@ -4,7 +4,7 @@ export type {
   // Instances
   AdapterInstance,
   ComponentDescriptor,
-  DescriptorDeclarativeFields,
+  ComponentMetadata,
   DriverDescriptor,
   DriverInstance,
   ExtensionDescriptor,

@@ -33,7 +33,7 @@ import type { OperationManifest, TypesImportSpec } from './types';
  * Declarative fields that describe component metadata.
  * These fields are owned directly by descriptors (not nested under a manifest).
  */
-export interface DescriptorDeclarativeFields {
+export interface ComponentMetadata {
   /** Component version (semver) */
   readonly version: string;
 
@@ -82,7 +82,7 @@ export interface DescriptorDeclarativeFields {
  * descriptor.version  // Component version (semver)
  * ```
  */
-export interface ComponentDescriptor<Kind extends string> extends DescriptorDeclarativeFields {
+export interface ComponentDescriptor<Kind extends string> extends ComponentMetadata {
   /** Discriminator identifying the component type */
   readonly kind: Kind;
 
@@ -163,7 +163,7 @@ export interface TargetDescriptor<TFamilyId extends string, TTargetId extends st
  * Pack refs are JSON-friendly representations used by authoring flows.
  */
 export interface TargetPackRef<TFamilyId extends string = string, TTargetId extends string = string>
-  extends DescriptorDeclarativeFields {
+  extends ComponentMetadata {
   readonly kind: 'target';
   readonly id: string;
   readonly familyId: TFamilyId;

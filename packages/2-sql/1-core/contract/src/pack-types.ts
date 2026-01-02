@@ -1,4 +1,4 @@
-import type { DescriptorDeclarativeFields } from '@prisma-next/contract/framework-components';
+import type { ComponentMetadata } from '@prisma-next/contract/framework-components';
 
 /**
  * Storage type metadata for pack refs.
@@ -15,7 +15,7 @@ export interface StorageTypeMetadata {
  * Pack refs are pure JSON-friendly objects safe to import in authoring flows.
  */
 export interface PackRefBase<Kind extends string, TFamilyId extends string>
-  extends DescriptorDeclarativeFields {
+  extends ComponentMetadata {
   readonly kind: Kind;
   readonly id: string;
   readonly familyId: TFamilyId;
