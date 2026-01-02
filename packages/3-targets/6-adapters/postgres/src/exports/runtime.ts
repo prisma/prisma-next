@@ -62,7 +62,7 @@ const postgresRuntimeAdapterDescriptor: RuntimeAdapterDescriptor<
     ],
   },
   create(): SqlRuntimeAdapter {
-    return createPostgresAdapter() as unknown as SqlRuntimeAdapter;
+    return createPostgresAdapter();
   },
 };
 
