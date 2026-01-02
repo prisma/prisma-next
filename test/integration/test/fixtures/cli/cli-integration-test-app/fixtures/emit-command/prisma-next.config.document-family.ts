@@ -48,7 +48,7 @@ export default defineConfig({
       close: async () => {},
     }),
   },
-  extensions: [],
+  extensionPacks: [],
   contract: {
     source: contract,
     output: 'output/contract.json',
