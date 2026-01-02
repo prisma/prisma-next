@@ -86,7 +86,7 @@ model Place {
       }
     }
   },
-  "extensions": {
+  "extensionPacks": {
     "pgvector": {
       "version": "1.2.0",
       "columns": {
@@ -110,7 +110,7 @@ model Place {
 
 ### Versioning model
 
-- Versions are pinned in `extensions { <ns> = "<semver>" }`
+- Versions are pinned in `extensionPacks { <ns> = "<semver>" }`
 - Attributes omit version for readability and are validated against the pinned pack version
 - The emitter records the version under `contract.extensionPacks.<ns>.version`
 - Version changes are reflected in the contract hash and capability surface

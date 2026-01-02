@@ -39,7 +39,7 @@ Packs emit view definitions and metadata to `contract.extensionPacks.<namespace>
 
 ```json
 {
-  "extensions": {
+  "extensionPacks": {
     "postgres": {
       "version": "15.0",
       "views": [
@@ -343,7 +343,7 @@ pg.view daily_signups {
 **Emitted contract:**
 ```json
 {
-  "extensions": {
+  "extensionPacks": {
     "postgres": {
       "views": [
         {
