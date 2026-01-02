@@ -13,7 +13,7 @@ import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../utils/fr
 describe('pgvector extension pack integration', () => {
   it('exposes pgvector descriptor metadata', () => {
     expect(pgvectorExtensionDescriptor.id).toBe('pgvector');
-    expect(pgvectorExtensionDescriptor.version).toBe('1.0.0');
+    expect(pgvectorExtensionDescriptor.version).toBe('0.0.1');
   });
 
   it('extracts codec type imports from pack', () => {

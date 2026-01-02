@@ -4,7 +4,7 @@ import { pgvectorExtensionDescriptor } from '../src/exports/control';
 describe('pgvector descriptor', () => {
   it('has correct metadata', () => {
     expect(pgvectorExtensionDescriptor.id).toBe('pgvector');
-    expect(pgvectorExtensionDescriptor.version).toBe('1.0.0');
+    expect(pgvectorExtensionDescriptor.version).toBe('0.0.1');
     expect(pgvectorExtensionDescriptor.familyId).toBe('sql');
     expect(pgvectorExtensionDescriptor.targetId).toBe('postgres');
     const postgresCapabilities = pgvectorExtensionDescriptor.capabilities?.['postgres'] as

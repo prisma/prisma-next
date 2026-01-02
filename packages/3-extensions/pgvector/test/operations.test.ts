@@ -9,7 +9,7 @@ describe('pgvector operations', () => {
     expect(pgvectorDescriptor.id).toBe('pgvector');
     expect(pgvectorDescriptor.familyId).toBe('sql');
     expect(pgvectorDescriptor.targetId).toBe('postgres');
-    expect(pgvectorDescriptor.version).toBe('1.0.0');
+    expect(pgvectorDescriptor.version).toBe('0.0.1');
   });
 
   it('provides codec registry with vector codec', () => {
