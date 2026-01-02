@@ -1,5 +1,11 @@
+import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { CodecRegistry, SelectAst, SqlDriver } from '@prisma-next/sql-relational-core/ast';
+import type {
+  CodecRegistry,
+  SelectAst,
+  SqlDriver,
+  SqlExecuteRequest,
+} from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
 import { createRuntime, type RuntimeContext } from '../src/exports';
@@ -17,7 +23,10 @@ const testContract: SqlContract<SqlStorage> = {
   capabilities: {},
   meta: {},
   sources: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {},
+    operationTypes: {},
+  },
 };
 
 // Create a stub codec registry
@@ -57,14 +66,16 @@ function createStubAdapter() {
   };
 }
 
-// Create a mock driver
+// Create a mock driver that implements SqlDriver interface
 function createMockDriver(): SqlDriver {
-  const execute = vi.fn().mockImplementation(async function* () {
+  const execute = vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
     yield { id: 1 };
   });
 
   return {
+    connect: vi.fn().mockResolvedValue(undefined),
     execute,
+    query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
     close: vi.fn().mockResolvedValue(undefined),
   };
 }
@@ -76,13 +87,7 @@ function createTestContext(contract: SqlContract<SqlStorage>): RuntimeContext<ty
     contract,
     adapter,
     codecs: adapter.profile.codecs(),
-    operations: {
-      register: vi.fn(),
-      has: vi.fn().mockReturnValue(false),
-      byType: vi.fn().mockReturnValue([]),
-      byMethod: vi.fn().mockReturnValue(undefined),
-      all: vi.fn().mockReturnValue([]),
-    },
+    operations: createOperationRegistry(),
   };
 }
 
@@ -94,7 +99,7 @@ describe('createRuntime', () => {
     const runtime = createRuntime({
       context,
       driver,
-      verify: { mode: 'never' },
+      verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
     expect(runtime).toBeDefined();
@@ -111,12 +116,12 @@ describe('createRuntime', () => {
     const runtime = createRuntime({
       context,
       driver,
-      verify: { mode: 'never' },
+      verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
     const ops = runtime.operations();
     expect(ops).toBeDefined();
-    expect(ops.all).toBeDefined();
+    expect(ops.byType).toBeDefined();
   });
 
   it('returns null telemetry when no events', () => {
@@ -126,7 +131,7 @@ describe('createRuntime', () => {
     const runtime = createRuntime({
       context,
       driver,
-      verify: { mode: 'never' },
+      verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
     // Before any execution, telemetry should be null
@@ -140,7 +145,7 @@ describe('createRuntime', () => {
     const runtime = createRuntime({
       context,
       driver,
-      verify: { mode: 'never' },
+      verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
     await runtime.close();

@@ -16,7 +16,10 @@ const testContract: SqlContract<SqlStorage> = {
   capabilities: {},
   meta: {},
   sources: {},
-  mappings: {},
+  mappings: {
+    codecTypes: {},
+    operationTypes: {},
+  },
 };
 
 describe('SqlFamilyAdapter', () => {
@@ -35,13 +38,10 @@ describe('SqlFamilyAdapter', () => {
         target: 'postgres',
         coreHash: 'sha256:test-hash',
         lane: 'sql',
-        loweredBy: 'test',
-        model: 'test',
-        operation: 'select',
+        paramDescriptors: [],
       },
       sql: 'SELECT 1',
       params: [],
-      paramDescriptors: {},
     };
 
     // Should not throw
@@ -55,13 +55,10 @@ describe('SqlFamilyAdapter', () => {
         target: 'mysql', // Wrong target
         coreHash: 'sha256:test-hash',
         lane: 'sql',
-        loweredBy: 'test',
-        model: 'test',
-        operation: 'select',
+        paramDescriptors: [],
       },
       sql: 'SELECT 1',
       params: [],
-      paramDescriptors: {},
     };
 
     expect(() => adapter.validatePlan(plan, testContract)).toThrow(
@@ -76,13 +73,10 @@ describe('SqlFamilyAdapter', () => {
         target: 'postgres',
         coreHash: 'sha256:different-hash', // Wrong hash
         lane: 'sql',
-        loweredBy: 'test',
-        model: 'test',
-        operation: 'select',
+        paramDescriptors: [],
       },
       sql: 'SELECT 1',
       params: [],
-      paramDescriptors: {},
     };
 
     expect(() => adapter.validatePlan(plan, testContract)).toThrow(
