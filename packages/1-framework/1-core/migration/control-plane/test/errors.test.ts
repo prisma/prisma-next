@@ -4,12 +4,14 @@ import {
   errorConfigFileNotFound,
   errorConfigValidation,
   errorContractConfigMissing,
+  errorContractMissingExtensionPacks,
   errorContractValidationFailed,
   errorDatabaseUrlRequired,
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
   errorHashMismatch,
+  errorJsonFormatNotSupported,
   errorMarkerMissing,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
@@ -212,6 +214,50 @@ describe('Config Errors', () => {
   it('errorTargetMigrationNotSupported with custom why', () => {
     const error = errorTargetMigrationNotSupported({ why: 'Custom reason' });
     expect(error.why).toBe('Custom reason');
+  });
+
+  it('errorJsonFormatNotSupported creates correct error', () => {
+    const error = errorJsonFormatNotSupported({
+      command: 'db verify',
+      format: 'unknown',
+      supportedFormats: ['compact', 'detailed'],
+    });
+    expect(error.code).toBe('4008');
+    expect(error.message).toBe('Unsupported JSON format');
+    expect(error.domain).toBe('CLI');
+    expect(error.why).toContain('db verify');
+    expect(error.why).toContain('unknown');
+    expect(error.fix).toContain('compact or detailed');
+    expect(error.meta?.command).toBe('db verify');
+    expect(error.meta?.format).toBe('unknown');
+    expect(error.meta?.supportedFormats).toEqual(['compact', 'detailed']);
+  });
+
+  it('errorContractMissingExtensionPacks with single pack', () => {
+    const error = errorContractMissingExtensionPacks({
+      missingExtensionPacks: ['pgvector'],
+      providedComponentIds: ['postgres', 'postgres-adapter'],
+    });
+    expect(error.code).toBe('4011');
+    expect(error.message).toBe('Missing extension packs in config');
+    expect(error.domain).toBe('CLI');
+    expect(error.why).toContain("'pgvector'");
+    // Single pack uses singular "pack" not plural "packs"
+    expect(error.why).toContain('extension pack');
+    expect(error.meta?.missingExtensionPacks).toEqual(['pgvector']);
+    // providedComponentIds are sorted alphabetically
+    expect(error.meta?.providedComponentIds).toEqual(['postgres', 'postgres-adapter']);
+  });
+
+  it('errorContractMissingExtensionPacks with multiple packs', () => {
+    const error = errorContractMissingExtensionPacks({
+      missingExtensionPacks: ['pgvector', 'uuid-ossp'],
+      providedComponentIds: ['postgres'],
+    });
+    expect(error.code).toBe('4011');
+    expect(error.why).toContain("'pgvector'");
+    expect(error.why).toContain("'uuid-ossp'");
+    expect(error.meta?.missingExtensionPacks).toEqual(['pgvector', 'uuid-ossp']);
   });
 
   it('errorConfigValidation creates correct error', () => {
