@@ -466,8 +466,8 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     );
     if (!hasComponent) {
       throw new Error(
-        `Extension '${extensionNamespace}' is declared in the contract but not found in framework components. ` +
-          'This indicates a configuration mismatch - the contract was emitted with this extension, ' +
+        `Extension pack '${extensionNamespace}' is declared in the contract but not found in framework components. ` +
+          'This indicates a configuration mismatch - the contract was emitted with this extension pack, ' +
           'but it is not provided in the current configuration.',
       );
     }
