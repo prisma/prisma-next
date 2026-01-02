@@ -41,7 +41,7 @@
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
-    "@types/node": "^20.0.0",
+    "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",

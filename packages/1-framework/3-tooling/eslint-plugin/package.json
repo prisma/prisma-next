@@ -40,7 +40,7 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@typescript-eslint/parser": "^8.0.0",
     "@types/eslint": "^9.0.0",
-    "@types/node": "^20.0.0",
+    "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "eslint": "^9.0.0",
     "tsup": "^8.3.0",
