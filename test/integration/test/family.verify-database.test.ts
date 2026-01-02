@@ -81,7 +81,7 @@ async function emitContract(
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensions: [],
+    extensionPacks: [],
   });
 
   // emitContract handles stripping mappings and validation internally
