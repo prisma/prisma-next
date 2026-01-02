@@ -23,6 +23,10 @@
     "dist"
   ],
   "exports": {
+    "./array-equal": {
+      "types": "./dist/exports/array-equal.d.ts",
+      "import": "./dist/exports/array-equal.js"
+    },
     "./defined": {
       "types": "./dist/exports/defined.d.ts",
       "import": "./dist/exports/defined.js"

@@ -1,4 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
+import { isArrayEqual } from '@prisma-next/utils/array-equal';
 
 type NormalizedContract = {
   schemaVersion: string;
@@ -69,32 +70,36 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
     }
 
     if (isDefaultValue(value)) {
-      const isRequiredModels = currentPath.length === 1 && currentPath[0] === 'models';
-      const isRequiredTables =
-        currentPath.length === 2 && currentPath[0] === 'storage' && currentPath[1] === 'tables';
-      const isRequiredRelations = currentPath.length === 1 && currentPath[0] === 'relations';
-      const isRequiredExtensions = currentPath.length === 1 && currentPath[0] === 'extensionPacks';
-      const isRequiredCapabilities = currentPath.length === 1 && currentPath[0] === 'capabilities';
-      const isRequiredMeta = currentPath.length === 1 && currentPath[0] === 'meta';
-      const isRequiredSources = currentPath.length === 1 && currentPath[0] === 'sources';
-      const isExtensionNamespace = currentPath.length === 2 && currentPath[0] === 'extensionPacks';
+      const isRequiredModels = isArrayEqual(currentPath, ['models']);
+      const isRequiredTables = isArrayEqual(currentPath, ['storage', 'tables']);
+      const isRequiredRelations = isArrayEqual(currentPath, ['relations']);
+      const isRequiredExtensions = isArrayEqual(currentPath, ['extensionPacks']);
+      const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
+      const isRequiredMeta = isArrayEqual(currentPath, ['meta']);
+      const isRequiredSources = isArrayEqual(currentPath, ['sources']);
+      const isExtensionNamespace =
+        currentPath.length === 2 && isArrayEqual(currentPath.slice(0, 1), ['extensionPacks']);
       const isModelRelations =
-        currentPath.length === 3 && currentPath[0] === 'models' && currentPath[2] === 'relations';
+        currentPath.length === 3 &&
+        isArrayEqual([currentPath[0], currentPath[2]], ['models', 'relations']);
       const isTableUniques =
         currentPath.length === 4 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'tables' &&
-        currentPath[3] === 'uniques';
+        isArrayEqual(
+          [currentPath[0], currentPath[1], currentPath[3]],
+          ['storage', 'tables', 'uniques'],
+        );
       const isTableIndexes =
         currentPath.length === 4 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'tables' &&
-        currentPath[3] === 'indexes';
+        isArrayEqual(
+          [currentPath[0], currentPath[1], currentPath[3]],
+          ['storage', 'tables', 'indexes'],
+        );
       const isTableForeignKeys =
         currentPath.length === 4 &&
-        currentPath[0] === 'storage' &&
-        currentPath[1] === 'tables' &&
-        currentPath[3] === 'foreignKeys';
+        isArrayEqual(
+          [currentPath[0], currentPath[1], currentPath[3]],
+          ['storage', 'tables', 'foreignKeys'],
+        );
 
       if (
         !isRequiredModels &&
