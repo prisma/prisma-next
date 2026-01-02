@@ -79,14 +79,14 @@ export interface ContractBuilderState<
     ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   >,
   CoreHash extends string | undefined = string | undefined,
-  Extensions extends Record<string, unknown> | undefined = undefined,
+  ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > {
   readonly target?: Target;
   readonly tables: Tables;
   readonly models: Models;
   readonly coreHash?: CoreHash;
-  readonly extensions?: Extensions;
+  readonly extensionPacks?: ExtensionPacks;
   readonly capabilities?: Capabilities;
   readonly extensionNamespaces?: readonly string[];
 }

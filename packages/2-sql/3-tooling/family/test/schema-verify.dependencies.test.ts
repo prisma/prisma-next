@@ -251,8 +251,8 @@ describe('verifySqlSchema with databaseDependencies', () => {
     );
   });
 
-  it('does not infer dependencies from contract.extensions (ADR 154)', () => {
-    // Per ADR 154, we do NOT interpret contract.extensions as database prerequisites.
+  it('does not infer dependencies from contract extension packs (ADR 154)', () => {
+    // Per ADR 154, we do NOT interpret contract extension packs as database prerequisites.
     // Dependencies are only collected from frameworkComponents.
     // However, we DO validate that extensions in the contract are present in frameworkComponents.
     const contract = createTestContract(

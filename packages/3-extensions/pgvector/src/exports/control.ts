@@ -72,10 +72,7 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   familyId: 'sql',
   targetId: 'postgres', // pgvector is postgres-specific
   id: 'pgvector',
-  version: '1.0.0',
-  targets: {
-    postgres: { minVersion: '12' },
-  },
+  version: '0.0.1',
   capabilities: {
     postgres: {
       'pgvector/cosine': true,

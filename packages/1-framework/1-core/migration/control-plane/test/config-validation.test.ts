@@ -34,7 +34,7 @@ function createValidConfig(overrides: CreateValidConfigOverrides = {}) {
       id: 'postgres',
       manifest: {
         id: 'postgres',
-        version: '15.0.0',
+        version: '0.0.1',
       },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
       ...(overrides.target as Record<string, unknown> | undefined),
@@ -46,7 +46,7 @@ function createValidConfig(overrides: CreateValidConfigOverrides = {}) {
       id: 'postgres',
       manifest: {
         id: 'postgres',
-        version: '15.0.0',
+        version: '0.0.1',
       },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
       ...(overrides.adapter as Record<string, unknown> | undefined),
@@ -58,7 +58,7 @@ function createValidConfig(overrides: CreateValidConfigOverrides = {}) {
       id: 'postgres',
       manifest: {
         id: 'postgres',
-        version: '15.0.0',
+        version: '0.0.1',
       },
       create: async () => ({
         targetId: 'postgres',
@@ -269,7 +269,7 @@ describe('validateConfig', () => {
           targetId: 'postgres',
           manifest: {
             id: 'pg-vector',
-            version: '1.0.0',
+            version: '0.0.1',
           },
           create: () => ({ familyId: 'sql', targetId: 'postgres' }),
         },

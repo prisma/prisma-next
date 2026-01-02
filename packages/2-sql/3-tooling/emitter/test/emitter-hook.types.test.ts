@@ -24,7 +24,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContractIR({
       extensions: {
         postgres: {
-          version: '15.0.0',
+          version: '0.0.1',
         },
         pg: {},
       },

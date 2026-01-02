@@ -124,9 +124,9 @@ class SqlContractBuilder<
     ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   > = Record<never, never>,
   CoreHash extends string | undefined = undefined,
-  Extensions extends Record<string, unknown> | undefined = undefined,
+  ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
-> extends ContractBuilder<Target, Tables, Models, CoreHash, Extensions, Capabilities> {
+> extends ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
   /**
    * This method is responsible for normalizing the contract IR by setting default values
    * for all required fields:
@@ -156,8 +156,8 @@ class SqlContractBuilder<
         readonly target: Target;
         readonly targetFamily: 'sql';
         readonly coreHash: CoreHash extends string ? CoreHash : string;
-      } & (Extensions extends Record<string, unknown>
-          ? { readonly extensions: Extensions }
+      } & (ExtensionPacks extends Record<string, unknown>
+          ? { readonly extensionPacks: ExtensionPacks }
           : Record<string, never>) &
         (Capabilities extends Record<string, Record<string, boolean>>
           ? { readonly capabilities: Capabilities }
@@ -175,8 +175,8 @@ class SqlContractBuilder<
           readonly target: Target;
           readonly targetFamily: 'sql';
           readonly coreHash: CoreHash extends string ? CoreHash : string;
-        } & (Extensions extends Record<string, unknown>
-            ? { readonly extensions: Extensions }
+        } & (ExtensionPacks extends Record<string, unknown>
+            ? { readonly extensionPacks: ExtensionPacks }
             : Record<string, never>) &
           (Capabilities extends Record<string, Record<string, boolean>>
             ? { readonly capabilities: Capabilities }
@@ -334,10 +334,10 @@ class SqlContractBuilder<
     } as ContractBuilderMappings<CodecTypes>;
 
     const extensionNamespaces = this.state.extensionNamespaces ?? [];
-    const extensions: Record<string, unknown> = { ...(this.state.extensions || {}) };
+    const extensionPacks: Record<string, unknown> = { ...(this.state.extensionPacks || {}) };
     for (const namespace of extensionNamespaces) {
-      if (!Object.hasOwn(extensions, namespace)) {
-        extensions[namespace] = {};
+      if (!Object.hasOwn(extensionPacks, namespace)) {
+        extensionPacks[namespace] = {};
       }
     }
 
@@ -353,7 +353,7 @@ class SqlContractBuilder<
       relations: relationsPartial,
       storage,
       mappings,
-      extensions,
+      extensionPacks,
       capabilities: this.state.capabilities || {},
       meta: {},
       sources: {},
@@ -374,14 +374,14 @@ class SqlContractBuilder<
 
   override target<T extends string>(
     packRef: TargetPackRef<'sql', T>,
-  ): SqlContractBuilder<CodecTypes, T, Tables, Models, CoreHash, Extensions, Capabilities> {
+  ): SqlContractBuilder<CodecTypes, T, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
     return new SqlContractBuilder<
       CodecTypes,
       T,
       Tables,
       Models,
       CoreHash,
-      Extensions,
+      ExtensionPacks,
       Capabilities
     >({
       ...this.state,
@@ -428,7 +428,7 @@ class SqlContractBuilder<
       Tables,
       Models,
       CoreHash,
-      Extensions,
+      ExtensionPacks,
       Capabilities
     >({
       ...this.state,

@@ -615,7 +615,7 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
   - `operations`: Array of operation manifests that are assembled into `OperationRegistry` by the CLI
 - **Type Canonicalization**: Type canonicalization (shorthand → fully qualified IDs) happens at **authoring time** (PSL parser or TS builder), **not during emission**. The emitter only validates that all type IDs come from referenced extensions.
 - **I/O Decoupling**: The emitter is decoupled from file I/O. `emit()` returns strings (`contractJson`, `contractDts`); the caller handles all file operations.
-- **No Adapter Special Treatment**: The emitter treats all extension packs uniformly. The adapter appears first in `contract.extensions` but is otherwise identical to other packs.
+- **No Adapter Special Treatment**: The emitter treats all extension packs uniformly. The adapter appears first in `contract.extensionPacks` but is otherwise identical to other packs.
 - **CLI Assembly**: The CLI loads only the user’s config module. It reads `family.hook` and calls family-provided helpers (exposed via `config.family`) to assemble the operation registry, extract codec/operation type imports, and derive extension IDs from `{ adapter, target, extensions }`. This keeps assembly logic in the family layer and the CLI family‑agnostic.
 
 **Implementation:**
@@ -661,7 +661,7 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
   - `types.codecTypes.import`: Used to generate `contract.d.ts` imports when assembling types
   - **`capabilities`**: Adapters must declare capabilities in the manifest (for CLI emission) and in code (for runtime). The manifest capabilities are read during emission and included in the contract. See `.cursor/rules/adapter-capability-declaration.mdc` for details.
   - **No `canonicalScalarMap`**: Extension manifests do not include scalar-to-type ID mappings. Type canonicalization happens at authoring time using extension manifests, not via a scalar map in the manifest.
-- Adapter appears first in `contract.extensions` but is otherwise identical to other packs
+- Adapter appears first in `contract.extensionPacks` but is otherwise identical to other packs
 
 **Future Work (Briefs):**
 - TS-only emission: esbuild bundles contract entry with allowlist (`@prisma-next/*`); runner imports bundle, validates purity, canonicalizes, and writes artifacts
@@ -1169,7 +1169,7 @@ test('Type IDs are literal types', () => {
 17. **Test Port Management** - Assign unique port ranges to each test suite to avoid conflicts during parallel test execution.
 18. **Type Tests** - Use Vitest's `expectTypeOf` helpers instead of manual type checks with conditional types. See `.cursor/rules/vitest-expect-typeof.mdc` for details.
 19. **Emitter I/O Decoupling** - The emitter returns strings (`contractJson`, `contractDts`); the caller handles all file I/O. This enables testing without file system dependencies and flexible integration with build systems.
-20. **Adapters as Extension Packs** - Adapters and extension packs use the same manifest structure and are treated identically. The adapter appears first in `contract.extensions` but is otherwise identical to other packs.
+20. **Adapters as Extension Packs** - Adapters and extension packs use the same manifest structure and are treated identically. The adapter appears first in `contract.extensionPacks` but is otherwise identical to other packs.
 21. **Type Canonicalization Timing** - Type canonicalization happens at authoring time (PSL parser or TS builder), not during emission or validation. The emitter only validates that all type IDs come from referenced extensions.
 22. **Package Naming** - The SQL query package was renamed from `@prisma-next/sql` to `@prisma-next/sql-query` to better reflect its purpose.
 23. **No Target Branches** - **CRITICAL**: Never branch on `target` (e.g., `if (target === 'postgres')`) in core packages. Target-specific logic belongs in adapters or extension packs. See `.cursor/rules/no-target-branches.mdc` for details.

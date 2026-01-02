@@ -64,7 +64,7 @@ describe('emitter → lanes integration', () => {
         targetFamily: 'sql',
         target: 'postgres',
         extensions: {
-          postgres: { version: '15.0.0' },
+          postgres: { version: '0.0.1' },
           pg: {},
         },
         models: {
@@ -166,7 +166,7 @@ describe('emitter → lanes integration', () => {
       targetFamily: 'sql',
       target: 'postgres',
       extensions: {
-        postgres: { version: '15.0.0' },
+        postgres: { version: '0.0.1' },
         pg: {},
       },
       models: {
@@ -251,7 +251,7 @@ describe('emitter → lanes integration', () => {
       targetFamily: 'sql',
       target: 'postgres',
       extensions: {
-        postgres: { version: '15.0.0' },
+        postgres: { version: '0.0.1' },
         pg: {},
       },
       models: {

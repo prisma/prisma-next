@@ -150,7 +150,7 @@ export interface LintSPI {
 ### Runtime/Adapter
 
 - On connect, adapter advertises capability flags per ADR 065
-- Runtime inspects `contract.extensions` and ensures matching packs are present for namespaces that require runtime participation (e.g., codecs)
+- Runtime inspects `contract.extensionPacks` and ensures matching packs are present for namespaces that require runtime participation (e.g., codecs)
 - If a required pack is missing or incompatible, runtime fails early with a stable error code
 
 ### CI/Preflight

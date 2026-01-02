@@ -5,10 +5,7 @@ const postgresPack: TargetPackRef<'sql', 'postgres'> = {
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  version: '15.0.0',
-  targets: {
-    postgres: { minVersion: '12' },
-  },
+  version: '0.0.1',
   capabilities: {},
 };
 

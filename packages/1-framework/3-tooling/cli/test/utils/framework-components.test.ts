@@ -18,7 +18,7 @@ describe('assertFrameworkComponentsCompatible', () => {
   ): TestComponent => ({
     kind,
     id: `${kind}-id`,
-    version: '1.0.0',
+    version: '0.0.1',
     familyId: 'sql',
     targetId: 'postgres',
     create: () => ({}),

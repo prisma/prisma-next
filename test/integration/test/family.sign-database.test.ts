@@ -9,6 +9,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
+import postgresPack from '@prisma-next/target-postgres/pack';
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
@@ -24,7 +25,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
  */
 function createTestContract(): SqlContract<SqlStorage> {
   const contractObj = defineContract<CodecTypes>()
-    .target('postgres')
+    .target(postgresPack)
     .table('user', (t) =>
       t
         .column('id', { type: int4Column, nullable: false })
@@ -38,7 +39,7 @@ function createTestContract(): SqlContract<SqlStorage> {
     ...contractObj,
     extensions: {
       postgres: {
-        version: '15.0.0',
+        version: '0.0.1',
       },
       pg: {},
     },

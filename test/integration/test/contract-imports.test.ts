@@ -75,7 +75,7 @@ describe('contract.d.ts imports resolution', () => {
     async () => {
       const ir = createContractIR({
         extensions: {
-          postgres: { version: '15.0.0' },
+          postgres: { version: '0.0.1' },
           pg: {},
         },
         models: {
@@ -234,7 +234,7 @@ type UserIdColumn = UserColumns['id'];
     async () => {
       const ir = createContractIR({
         extensions: {
-          postgres: { version: '15.0.0' },
+          postgres: { version: '0.0.1' },
           pg: {},
         },
         models: {

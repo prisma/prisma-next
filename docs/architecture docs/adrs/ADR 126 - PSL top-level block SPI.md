@@ -20,7 +20,7 @@ Additionally, we need a clear distinction between:
 Introduce a **PSL Extension SPI** that allows packs to register:
 1. New top-level blocks with their own grammar, validation, and deterministic emission
 2. New attributes that can attach to existing blocks (already partially supported via ADR 104 decorators)
-3. A pure transformation from parsed PSL fragments to canonical, deterministic JSON under `contract.extensions.<namespace>.*`
+3. A pure transformation from parsed PSL fragments to canonical, deterministic JSON under `contract.extensionPacks.<namespace>.*`
 
 Top-level blocks remain pack-owned objects and do not enlarge core. Core may reference them indirectly through stable identifiers where necessary (e.g., migrations, read-only sources).
 
@@ -32,7 +32,7 @@ Top-level blocks remain pack-owned objects and do not enlarge core. Core may ref
 - Declared at file root, one per definition
 - Each produces a standalone, addressable object with a stable `id`
 - Examples: `pg.view MyActiveUsers { ... }`, `pg.enumType UserStatus { ... }`
-- Emit canonical JSON under `contract.extensions.<namespace>.<kind>[]`
+- Emit canonical JSON under `contract.extensionPacks.<namespace>.<kind>[]`
 - May project into `contract.sources` (for queries) or contribute to planning/migrations via pack ops
 - Contribute to contract hash per ADR 106 canonicalization rules
 
@@ -40,7 +40,7 @@ Top-level blocks remain pack-owned objects and do not enlarge core. Core may ref
 - Attach to existing core entities: `model`, `table`, `index`, `column`, `@id`, etc.
 - Do not introduce a new top-level identity
 - Example: `@pg.type("user_status")` on a column, `@@pg.predicate("active = true")` on an index
-- Emit augmentations/metadata via the extension encoder (decorations under `contract.extensions.<ns>.decorations`)
+- Emit augmentations/metadata via the extension encoder (decorations under `contract.extensionPacks.<ns>.decorations`)
 - Validated against pack schemas, canonicalized per ADR 106
 
 ### Block Registration API
@@ -55,7 +55,7 @@ interface BlockRegistry {
     parseFn: (tokens: TokenStream) => BlockAST | null
     validateFn: (ast: BlockAST, context: ValidationContext) => Diagnostic[]
     emitFn: (ast: BlockAST, context: EmitContext) => {
-      json: unknown                 // canonical JSON for contract.extensions.<ns>.<kind>[]
+      json: unknown                 // canonical JSON for contract.extensionPacks.<ns>.<kind>[]
       id: string                    // stable id computed from canonical content + name
       sourceProjections?: { [logicalName: string]: SourceProjection }  // optional read-only sources
     }
@@ -95,7 +95,7 @@ function parsePgView(tokens: TokenStream): BlockAST | null {
 
 ### Emission
 
-- Transform validated AST into canonical JSON for `contract.extensions.<ns>.<kind>[]`
+- Transform validated AST into canonical JSON for `contract.extensionPacks.<ns>.<kind>[]`
 - Compute a stable `id` from fully-qualified name and content hash
 - Optionally emit source projections (read-only sources) for DSL consumption
 - All outputs must be JSON-serializable and deterministically canonicalized per ADR 010 and ADR 106

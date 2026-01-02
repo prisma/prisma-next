@@ -104,7 +104,7 @@ const sqlFamily: FamilyDescriptor<'sql'> = {
   kind: 'family',
   id: 'sql',
   familyId: 'sql',
-  version: '1.0.0',
+  version: '0.0.1',
 };
 
 // Use TargetDescriptor for target components
@@ -113,8 +113,7 @@ const postgresTarget: TargetDescriptor<'sql', 'postgres'> = {
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  version: '15.0.0',
-  targets: { postgres: { minVersion: '12' } },
+  version: '0.0.1',
   capabilities: { postgres: { returning: true } },
 };
 

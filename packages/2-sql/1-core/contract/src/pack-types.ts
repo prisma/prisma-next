@@ -1,3 +1,4 @@
+import type { DescriptorDeclarativeFields } from '@prisma-next/contract/framework-components';
 import type { OperationManifest, TypesImportSpec } from '@prisma-next/contract/types';
 
 /**
@@ -11,27 +12,11 @@ export interface StorageTypeMetadata {
 }
 
 /**
- * Declarative fields that pack refs carry.
- * These fields are owned directly by pack refs (not nested under a manifest).
- */
-export interface PackRefDeclarativeFields {
-  readonly version: string;
-  readonly targets?: Record<string, { readonly minVersion?: string }>;
-  readonly capabilities?: Record<string, unknown>;
-  readonly types?: {
-    readonly codecTypes?: { readonly import: TypesImportSpec };
-    readonly operationTypes?: { readonly import: TypesImportSpec };
-    readonly storage?: ReadonlyArray<StorageTypeMetadata>;
-  };
-  readonly operations?: ReadonlyArray<OperationManifest>;
-}
-
-/**
  * Base shape for any pack reference.
  * Pack refs are pure JSON-friendly objects safe to import in authoring flows.
  */
 export interface PackRefBase<Kind extends string, TFamilyId extends string>
-  extends PackRefDeclarativeFields {
+  extends DescriptorDeclarativeFields {
   readonly kind: Kind;
   readonly id: string;
   readonly familyId: TFamilyId;

@@ -104,7 +104,7 @@ describe('sql-target-family-hook', () => {
         id: 'test-adapter',
         familyId: 'sql',
         targetId: 'postgres',
-        version: '1.0.0',
+        version: '0.0.1',
         types: {
           codecTypes: {
             import: {
@@ -148,7 +148,7 @@ describe('sql-target-family-hook', () => {
         id: 'postgres',
         familyId: 'sql',
         targetId: 'postgres',
-        version: '15.0.0',
+        version: '0.0.1',
         types: {
           codecTypes: {
             import: {
@@ -164,7 +164,7 @@ describe('sql-target-family-hook', () => {
         id: 'pgvector',
         familyId: 'sql',
         targetId: 'postgres',
-        version: '1.0.0',
+        version: '0.0.1',
         types: {
           codecTypes: {
             import: {

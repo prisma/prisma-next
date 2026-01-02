@@ -81,10 +81,20 @@ Adapter-agnostic column type descriptors for test fixtures. These match common P
 **Usage:**
 ```typescript
 import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 
+const postgresPack: TargetPackRef<'sql', 'postgres'> = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+  capabilities: {},
+};
+
 const contract = defineContract<Record<string, never>>()
-  .target('postgres')
+  .target(postgresPack)
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })

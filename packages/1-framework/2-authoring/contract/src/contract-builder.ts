@@ -7,14 +7,7 @@ import type {
 } from './builder-state';
 import { ModelBuilder } from './model-builder';
 import { TableBuilder } from './table-builder';
-
-/**
- * Minimal pack ref interface for target selection.
- * Family-specific builders can use more specific pack ref types.
- */
-export interface TargetPackRefLike<T extends string = string> {
-  readonly targetId: T;
-}
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 
 export class ContractBuilder<
   Target extends string | undefined = undefined,
@@ -31,7 +24,7 @@ export class ContractBuilder<
     ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   > = Record<never, never>,
   CoreHash extends string | undefined = undefined,
-  Extensions extends Record<string, unknown> | undefined = undefined,
+  ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > {
   protected readonly state: ContractBuilderState<
@@ -39,36 +32,34 @@ export class ContractBuilder<
     Tables,
     Models,
     CoreHash,
-    Extensions,
+    ExtensionPacks,
     Capabilities
   >;
 
   constructor(
-    state?: ContractBuilderState<Target, Tables, Models, CoreHash, Extensions, Capabilities>,
+    state?: ContractBuilderState<Target, Tables, Models, CoreHash, ExtensionPacks, Capabilities>,
   ) {
     this.state =
       state ??
       ({
         tables: {},
         models: {},
-      } as ContractBuilderState<Target, Tables, Models, CoreHash, Extensions, Capabilities>);
+      } as ContractBuilderState<Target, Tables, Models, CoreHash, ExtensionPacks, Capabilities>);
   }
 
   target<T extends string>(
-    targetOrPackRef: T | TargetPackRefLike<T>,
-  ): ContractBuilder<T, Tables, Models, CoreHash, Extensions, Capabilities> {
-    const targetId =
-      typeof targetOrPackRef === 'string' ? targetOrPackRef : targetOrPackRef.targetId;
-    return new ContractBuilder<T, Tables, Models, CoreHash, Extensions, Capabilities>({
+    packRef: TargetPackRef<string, T>,
+  ): ContractBuilder<T, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
+    return new ContractBuilder<T, Tables, Models, CoreHash, ExtensionPacks, Capabilities>({
       ...this.state,
-      target: targetId,
+      target: packRef.targetId,
     });
   }
 
   capabilities<C extends Record<string, Record<string, boolean>>>(
     capabilities: C,
-  ): ContractBuilder<Target, Tables, Models, CoreHash, Extensions, C> {
-    return new ContractBuilder<Target, Tables, Models, CoreHash, Extensions, C>({
+  ): ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, C> {
+    return new ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, C>({
       ...this.state,
       capabilities,
     });
@@ -89,7 +80,7 @@ export class ContractBuilder<
     Tables & Record<TableName, ReturnType<T['build']>>,
     Models,
     CoreHash,
-    Extensions,
+    ExtensionPacks,
     Capabilities
   > {
     const tableBuilder = new TableBuilder<TableName>(name);
@@ -102,7 +93,7 @@ export class ContractBuilder<
       Tables & Record<TableName, ReturnType<T['build']>>,
       Models,
       CoreHash,
-      Extensions,
+      ExtensionPacks,
       Capabilities
     >({
       ...this.state,
@@ -131,7 +122,7 @@ export class ContractBuilder<
     Tables,
     Models & Record<ModelName, ReturnType<M['build']>>,
     CoreHash,
-    Extensions,
+    ExtensionPacks,
     Capabilities
   > {
     const modelBuilder = new ModelBuilder<ModelName, TableName>(name, table);
@@ -144,7 +135,7 @@ export class ContractBuilder<
       Tables,
       Models & Record<ModelName, ReturnType<M['build']>>,
       CoreHash,
-      Extensions,
+      ExtensionPacks,
       Capabilities
     >({
       ...this.state,
@@ -155,8 +146,8 @@ export class ContractBuilder<
 
   coreHash<H extends string>(
     hash: H,
-  ): ContractBuilder<Target, Tables, Models, H, Extensions, Capabilities> {
-    return new ContractBuilder<Target, Tables, Models, H, Extensions, Capabilities>({
+  ): ContractBuilder<Target, Tables, Models, H, ExtensionPacks, Capabilities> {
+    return new ContractBuilder<Target, Tables, Models, H, ExtensionPacks, Capabilities>({
       ...this.state,
       coreHash: hash,
     });

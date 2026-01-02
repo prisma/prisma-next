@@ -3,6 +3,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+import postgresPack from '@prisma-next/target-postgres/pack';
   type CodecTypes,
   defineContract,
   int4Column,
@@ -44,7 +45,7 @@ describe('family instance schemaVerify - basic', () => {
       'returns ok=true with all pass nodes',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -96,7 +97,7 @@ describe('family instance schemaVerify - basic', () => {
       'returns ok=false with missing_table issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -147,7 +148,7 @@ describe('family instance schemaVerify - basic', () => {
       'returns ok=false with missing_column issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })

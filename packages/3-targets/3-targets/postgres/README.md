@@ -41,7 +41,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 // - familyId: 'sql'
 // - targetId: 'postgres'
 // - id: 'postgres'
-// - version: '15.0.0'
+// - version: '0.0.1'
 // - capabilities, types, operations (directly on descriptor)
 // - createPlanner(): creates a Postgres migration planner
 // - createRunner(): creates a Postgres migration runner

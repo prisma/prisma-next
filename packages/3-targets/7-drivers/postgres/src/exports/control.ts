@@ -49,9 +49,6 @@ const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', Postg
     familyId: 'sql',
     targetId: 'postgres',
     version: '0.0.1',
-    targets: {
-      postgres: { minVersion: '12' },
-    },
     capabilities: {},
     async create(url: string): Promise<PostgresControlDriver> {
       const client = new Client({ connectionString: url });

@@ -3,6 +3,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+import postgresPack from '@prisma-next/target-postgres/pack';
   type CodecTypes,
   defineContract,
   int4Column,
@@ -11,6 +12,7 @@ import {
   textColumn,
   timeouts,
   useDevDatabase,
+  postgresPack,
   withClient,
 } from './family.schema-verify.helpers';
 
@@ -34,18 +36,14 @@ describe('family instance schemaVerify - modes', () => {
       'returns ok=false with extension_missing issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
               .column('email', { type: textColumn, nullable: false })
               .primaryKey(['id']),
           )
-          .extensions({
-            pgvector: {
-              version: '1.0.0',
-            },
-          })
+          .extensionPacks({ pgvector })
           .build();
 
         const result = await runSchemaVerify(getConnectionString(), contract, {
@@ -85,7 +83,7 @@ describe('family instance schemaVerify - modes', () => {
       'returns ok=false in strict mode with extra_column issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -118,7 +116,7 @@ describe('family instance schemaVerify - modes', () => {
       'returns ok=true in permissive mode with extra column',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })

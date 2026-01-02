@@ -27,9 +27,6 @@ const postgresRuntimeDriverDescriptor: RuntimeDriverDescriptor<
   targetId: 'postgres',
   id: 'postgres',
   version: '0.0.1',
-  targets: {
-    postgres: { minVersion: '12' },
-  },
   capabilities: {},
   create(options: PostgresDriverOptions): PostgresRuntimeDriver {
     return createPostgresDriverFromOptions(options) as PostgresRuntimeDriver;

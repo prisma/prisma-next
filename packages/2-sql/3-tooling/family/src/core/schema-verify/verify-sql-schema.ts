@@ -450,13 +450,13 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     }
   }
 
-  // Validate that all extensions declared in the contract are present in frameworkComponents
+  // Validate that all extension packs declared in the contract are present in frameworkComponents
   // This is a configuration integrity check - if the contract was emitted with an extension,
   // that extension must be provided in the current configuration.
-  // Note: contract.extensions includes adapter.id and target.id (from extractExtensionIds),
+  // Note: contract.extensionPacks includes adapter.id and target.id (from extractExtensionIds),
   // so we check for matches as extension, adapter, or target components.
-  const contractExtensions = contract.extensions ?? {};
-  for (const extensionNamespace of Object.keys(contractExtensions)) {
+  const contractExtensionPacks = contract.extensionPacks ?? {};
+  for (const extensionNamespace of Object.keys(contractExtensionPacks)) {
     const hasComponent = options.frameworkComponents.some(
       (component) =>
         component.id === extensionNamespace &&
@@ -474,7 +474,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   }
 
   // Compare component-owned database dependencies (pure, deterministic)
-  // Per ADR 154: We do NOT infer dependencies from contract.extensions.
+  // Per ADR 154: We do NOT infer dependencies from contract extension packs.
   // Dependencies are only collected from frameworkComponents provided by the CLI.
   const databaseDependencies = collectDependenciesFromFrameworkComponents(
     options.frameworkComponents,

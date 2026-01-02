@@ -33,12 +33,9 @@ import type { OperationManifest, TypesImportSpec } from './types';
  * Declarative fields that describe component metadata.
  * These fields are owned directly by descriptors (not nested under a manifest).
  */
-export interface ComponentDeclarativeFields {
+export interface DescriptorDeclarativeFields {
   /** Component version (semver) */
   readonly version: string;
-
-  /** Target metadata - which targets this component supports */
-  readonly targets?: Record<string, { readonly minVersion?: string }>;
 
   /** Capabilities this component provides */
   readonly capabilities?: Record<string, unknown>;
@@ -78,7 +75,7 @@ export interface ComponentDeclarativeFields {
  * descriptor.version  // Component version (semver)
  * ```
  */
-export interface ComponentDescriptor<Kind extends string> extends ComponentDeclarativeFields {
+export interface ComponentDescriptor<Kind extends string> extends DescriptorDeclarativeFields {
   /** Discriminator identifying the component type */
   readonly kind: Kind;
 
@@ -125,7 +122,6 @@ export interface FamilyDescriptor<TFamilyId extends string> extends ComponentDes
  * (e.g., Postgres, MySQL, MongoDB). Targets define:
  * - Native type mappings (e.g., Postgres int4 → TypeScript number)
  * - Target-specific capabilities (e.g., RETURNING, LATERAL joins)
- * - Version constraints and compatibility
  *
  * Targets are bound to a family and provide the target-specific implementation
  * details that adapters and drivers use.
@@ -152,6 +148,18 @@ export interface TargetDescriptor<TFamilyId extends string, TTargetId extends st
   readonly familyId: TFamilyId;
 
   /** The target identifier (e.g., 'postgres', 'mysql', 'mongodb') */
+  readonly targetId: TTargetId;
+}
+
+/**
+ * Base pack reference for target components.
+ * Pack refs are JSON-friendly representations used by authoring flows.
+ */
+export interface TargetPackRef<TFamilyId extends string = string, TTargetId extends string = string>
+  extends DescriptorDeclarativeFields {
+  readonly kind: 'target';
+  readonly id: string;
+  readonly familyId: TFamilyId;
   readonly targetId: TTargetId;
 }
 

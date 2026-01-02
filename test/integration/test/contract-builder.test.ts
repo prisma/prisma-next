@@ -1,4 +1,5 @@
 import {
+import postgresPack from '@prisma-next/target-postgres/pack';
   int4Column,
   textColumn,
   timestamptzColumn,
@@ -17,7 +18,7 @@ import contractJson from './fixtures/contract.json' with { type: 'json' };
 describe('builder integration', () => {
   it('builds a contract matching fixture structure', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresPack)
       .table('user', (t) =>
         t
           .column('id', { type: int4Column, nullable: false } as const)
@@ -120,7 +121,7 @@ describe('builder integration', () => {
 
   it('contract can be validated with validateContract', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresPack)
       .table('user', (t) =>
         t
           .column('id', { type: int4Column, nullable: false })
@@ -140,7 +141,7 @@ describe('builder integration', () => {
 
   it('contract works with schema() function', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresPack)
       .table('user', (t) =>
         t
           .column('id', { type: int4Column, nullable: false })
@@ -171,7 +172,7 @@ describe('builder integration', () => {
 
   it('contract works with sql() function', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresPack)
       .table('user', (t) =>
         t
           .column('id', { type: int4Column, nullable: false })
@@ -224,7 +225,7 @@ describe('builder integration', () => {
 
   it('ResultType inference works with builder contract', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresPack)
       .table('user', (t) =>
         t
           .column('id', { type: int4Column, nullable: false })
@@ -276,7 +277,7 @@ describe('builder integration', () => {
 
   it('contract structure matches fixture contract', () => {
     const builderContract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresPack)
       .table('user', (t) =>
         t
           .column('id', { type: int4Column, nullable: false })
@@ -327,7 +328,7 @@ describe('builder integration', () => {
 
   it('supports type option with dataTypes constants', () => {
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresPack)
       .table('user', (t) =>
         t
           .column('id', { type: int4Column, nullable: false })
@@ -350,7 +351,7 @@ describe('builder integration', () => {
     // Column descriptors accept any codecId format - validation happens at runtime
     // when the contract is used, not at build time
     const contract = defineContract<CodecTypes>()
-      .target('postgres')
+      .target(postgresPack)
       .table('user', (t) =>
         t.column('id', {
           // biome-ignore lint/suspicious/noExplicitAny: Testing invalid type descriptor
@@ -365,7 +366,7 @@ describe('builder integration', () => {
   describe('relation builder', () => {
     it('builds a contract with 1:N relation', () => {
       const contract = defineContract<CodecTypes>()
-        .target('postgres')
+        .target(postgresPack)
         .table('user', (t) =>
           t
             .column('id', { type: int4Column, nullable: false })
@@ -447,7 +448,7 @@ describe('builder integration', () => {
 
     it('builds a contract with N:M relation', () => {
       const contract = defineContract<CodecTypes>()
-        .target('postgres')
+        .target(postgresPack)
         .table('user', (t) =>
           t
             .column('id', { type: int4Column, nullable: false })
@@ -541,7 +542,7 @@ describe('builder integration', () => {
     it('validates parentTable matches model table', () => {
       expect(() => {
         defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) => t.column('id', { type: int4Column, nullable: false }))
           .table('post', (t) => t.column('id', { type: int4Column, nullable: false }))
           .model('User', 'user', (m) =>
@@ -564,7 +565,7 @@ describe('builder integration', () => {
     it('validates childTable matches toTable for non-N:M relations', () => {
       expect(() => {
         defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) => t.column('id', { type: int4Column, nullable: false }))
           .table('post', (t) => t.column('id', { type: int4Column, nullable: false }))
           .model('User', 'user', (m) =>
@@ -587,7 +588,7 @@ describe('builder integration', () => {
     it('validates N:M relations require through field', () => {
       expect(() => {
         defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) => t.column('id', { type: int4Column, nullable: false }))
           .table('role', (t) => t.column('id', { type: int4Column, nullable: false }))
           .model('User', 'user', (m) => {
@@ -615,7 +616,7 @@ describe('builder integration', () => {
     it('validates childTable matches through.table for N:M relations', () => {
       expect(() => {
         defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) => t.column('id', { type: int4Column, nullable: false }))
           .table('role', (t) => t.column('id', { type: int4Column, nullable: false }))
           .table('userRole', (t) => t.column('userId', { type: int4Column, nullable: false }))

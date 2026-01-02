@@ -20,10 +20,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     familyId: 'sql',
     targetId: 'postgres',
     id: 'postgres',
-    version: '15.0.0',
-    targets: {
-      postgres: { minVersion: '12' },
-    },
+    version: '0.0.1',
     capabilities: {},
     /**
      * Migrations capability for CLI to access planner/runner via core types.

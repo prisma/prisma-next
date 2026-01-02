@@ -1,4 +1,5 @@
 import {
+import postgresPack from '@prisma-next/target-postgres/pack';
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -60,7 +61,7 @@ import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 type CodecTypes = Record<string, never>;
 
 const contractObj = defineContract<CodecTypes>()
-  .target('postgres')
+  .target(postgresPack)
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })
@@ -72,7 +73,7 @@ const contractObj = defineContract<CodecTypes>()
 
 export const contract = {
   ...contractObj,
-  extensions: {},
+  extensionPacks: {},
 };
 `,
     'utf-8',

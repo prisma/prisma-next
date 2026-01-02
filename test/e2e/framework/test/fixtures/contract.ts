@@ -2,9 +2,10 @@ import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { boolColumn, int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 // Use relative import to avoid module resolution issues in test context
 import { defineContract } from '../../../../../packages/2-sql/2-authoring/contract-ts/src/exports/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
 
 export const contract = defineContract<CodecTypes>()
-  .target('postgres')
+  .target(postgresPack)
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })
@@ -33,10 +34,6 @@ export const contract = defineContract<CodecTypes>()
   .model('Comment', 'comment', (m) =>
     m.field('id', 'id').field('postId', 'postId').field('content', 'content'),
   )
-  .extensions({
-    postgres: { version: '15.0.0' },
-    pg: {},
-  })
   .capabilities({
     postgres: {
       lateral: true,

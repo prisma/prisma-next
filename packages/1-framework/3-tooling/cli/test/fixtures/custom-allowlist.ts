@@ -1,8 +1,9 @@
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
+import { postgresPack } from '../helpers/postgres-pack';
 
 const contractObj = defineContract<Record<string, never>>()
-  .target('postgres')
+  .target(postgresPack)
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })
@@ -14,9 +15,9 @@ const contractObj = defineContract<Record<string, never>>()
 
 export const contract = {
   ...contractObj,
-  extensions: {
+  extensionPacks: {
     postgres: {
-      version: '15.0.0',
+      version: '0.0.1',
     },
     pg: {},
   },

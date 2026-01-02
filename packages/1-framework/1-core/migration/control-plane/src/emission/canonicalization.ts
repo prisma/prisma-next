@@ -9,7 +9,7 @@ type NormalizedContract = {
   models: Record<string, unknown>;
   relations: Record<string, unknown>;
   storage: Record<string, unknown>;
-  extensions: Record<string, unknown>;
+  extensionPacks: Record<string, unknown>;
   capabilities: Record<string, Record<string, boolean>>;
   meta: Record<string, unknown>;
   sources: Record<string, unknown>;
@@ -25,7 +25,7 @@ const TOP_LEVEL_ORDER = [
   'models',
   'storage',
   'capabilities',
-  'extensions',
+  'extensionPacks',
   'meta',
   'sources',
 ] as const;
@@ -73,11 +73,11 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isRequiredTables =
         currentPath.length === 2 && currentPath[0] === 'storage' && currentPath[1] === 'tables';
       const isRequiredRelations = currentPath.length === 1 && currentPath[0] === 'relations';
-      const isRequiredExtensions = currentPath.length === 1 && currentPath[0] === 'extensions';
+      const isRequiredExtensions = currentPath.length === 1 && currentPath[0] === 'extensionPacks';
       const isRequiredCapabilities = currentPath.length === 1 && currentPath[0] === 'capabilities';
       const isRequiredMeta = currentPath.length === 1 && currentPath[0] === 'meta';
       const isRequiredSources = currentPath.length === 1 && currentPath[0] === 'sources';
-      const isExtensionNamespace = currentPath.length === 2 && currentPath[0] === 'extensions';
+      const isExtensionNamespace = currentPath.length === 2 && currentPath[0] === 'extensionPacks';
       const isModelRelations =
         currentPath.length === 3 && currentPath[0] === 'models' && currentPath[2] === 'relations';
       const isTableUniques =
@@ -225,7 +225,7 @@ export function canonicalizeContract(
     models: ir.models,
     relations: ir.relations,
     storage: ir.storage,
-    extensions: ir.extensions,
+    extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
     meta: ir.meta,
     sources: ir.sources,

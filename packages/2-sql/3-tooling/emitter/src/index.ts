@@ -17,12 +17,12 @@ export const sqlTargetFamilyHook = {
     }
 
     // Validate that codec IDs have the correct format (ns/name@version)
-    // Note: We do NOT validate that namespaces are in contract.extensions because:
+    // Note: We do NOT validate that namespaces are in contract.extensionPacks because:
     // 1. Adapter-provided codecs (e.g., pg/int4@1) are always available and their
-    //    namespace is not in contract.extensions (the adapter is not an extension)
+    //    namespace is not in contract.extensionPacks (the adapter is not an extension)
     // 2. TypeScript types already prevent using codecs you don't have imported
     // 3. Runtime validates that codecs are actually provided by the adapter/extensions
-    // 4. contract.extensions is for framework extensions, not codec namespaces
+    // 4. contract.extensionPacks is for framework extensions, not codec namespaces
 
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
@@ -42,7 +42,7 @@ export const sqlTargetFamilyHook = {
           );
         }
 
-        // Namespace validation removed - codec namespaces don't need to be in contract.extensions
+        // Namespace validation removed - codec namespaces don't need to be in contract.extensionPacks
       }
     }
   },

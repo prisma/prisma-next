@@ -73,7 +73,7 @@ describe('defineConfig', () => {
       familyId: 'sql',
       targetId: 'postgres',
       id: 'postgres',
-      manifest: { id: 'postgres', version: '1.0.0' },
+      manifest: { id: 'postgres', version: '0.0.1' },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     adapter: {
@@ -81,7 +81,7 @@ describe('defineConfig', () => {
       familyId: 'sql',
       targetId: 'postgres',
       id: 'postgres',
-      manifest: { id: 'postgres', version: '1.0.0' },
+      manifest: { id: 'postgres', version: '0.0.1' },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     driver: {
@@ -89,7 +89,7 @@ describe('defineConfig', () => {
       familyId: 'sql',
       targetId: 'postgres',
       id: 'postgres',
-      manifest: { id: 'postgres', version: '1.0.0' },
+      manifest: { id: 'postgres', version: '0.0.1' },
       create: async () => ({
         familyId: 'sql',
         targetId: 'postgres',

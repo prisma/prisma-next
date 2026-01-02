@@ -1,5 +1,6 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import {
+import postgresPack from '@prisma-next/target-postgres/pack';
   int4Column,
   textColumn,
   timestamptzColumn,
@@ -17,7 +18,7 @@ import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 test('builder contract types match fixture contract types', () => {
   const builderContract = defineContract<CodecTypes>()
-    .target('postgres')
+    .target(postgresPack)
     .table('user', (t) =>
       t
         .column('id', { type: int4Column, nullable: false })
@@ -43,7 +44,7 @@ test('builder contract types match fixture contract types', () => {
 
 test('ResultType inference works identically to fixture contract', () => {
   const builderContract = defineContract<CodecTypes>()
-    .target('postgres')
+    .target(postgresPack)
     .table('user', (t) =>
       t
         .column('id', { type: int4Column, nullable: false })
@@ -110,7 +111,7 @@ test('ResultType inference works identically to fixture contract', () => {
 
 test('codec type inference via type option', () => {
   const contract = defineContract<CodecTypes>()
-    .target('postgres')
+    .target(postgresPack)
     .table('user', (t) =>
       t
         .column('id', { type: int4Column, nullable: false })
@@ -156,7 +157,7 @@ test('codec type inference via type option', () => {
 
 test('contract structure type matches SqlContract', () => {
   const contract = defineContract<CodecTypes>()
-    .target('postgres')
+    .target(postgresPack)
     .table('user', (t) =>
       t
         .column('id', { type: int4Column, nullable: false })

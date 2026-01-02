@@ -12,7 +12,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  version: '1.0.0',
+  version: '0.0.1',
 };
 
 describe('contract builder normalization', () => {

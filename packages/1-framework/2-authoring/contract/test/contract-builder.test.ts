@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import type { ColumnTypeDescriptor } from '../src/builder-state';
 import { ContractBuilder, defineContract } from '../src/contract-builder';
 
 const intColumn: ColumnTypeDescriptor = { codecId: 'test/int@1', nativeType: 'int4' };
+const postgresPack: TargetPackRef<'sql', 'postgres'> = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+};
 
 describe('ContractBuilder', () => {
   it('creates builder with defineContract', () => {
@@ -12,7 +20,7 @@ describe('ContractBuilder', () => {
 
   it('manages target state', () => {
     const builder = defineContract();
-    const withTarget = builder.target('postgres');
+    const withTarget = builder.target(postgresPack);
     expect(withTarget).toBeInstanceOf(ContractBuilder);
     expect(withTarget).not.toBe(builder);
   });

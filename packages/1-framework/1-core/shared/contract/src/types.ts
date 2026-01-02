@@ -8,7 +8,7 @@ export interface ContractBase {
   readonly coreHash: string;
   readonly profileHash?: string;
   readonly capabilities?: Record<string, Record<string, boolean>>;
-  readonly extensions?: Record<string, unknown>;
+  readonly extensionPacks?: Record<string, unknown>;
   readonly meta?: Record<string, unknown>;
   readonly sources?: Record<string, Source>;
 }
@@ -193,7 +193,7 @@ export interface TargetFamilyHook {
   readonly id: string;
 
   /**
-   * Validates that all type IDs in the contract come from referenced extensions.
+   * Validates that all type IDs in the contract come from referenced extension packs.
    * @param ir - Contract IR to validate
    * @param ctx - Validation context with operation registry and extension IDs
    */

@@ -14,10 +14,7 @@ const postgresAdapterDescriptor: ControlAdapterDescriptor<
   familyId: 'sql',
   targetId: 'postgres',
   id: 'postgres',
-  version: '15.0.0',
-  targets: {
-    postgres: { minVersion: '12' },
-  },
+  version: '0.0.1',
   capabilities: {
     postgres: {
       orderBy: true,

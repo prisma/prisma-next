@@ -26,7 +26,7 @@ describe('pack-loading', () => {
 
       const manifest = {
         id: 'test-pack',
-        version: '1.0.0',
+        version: '0.0.1',
       };
 
       writeFileSync(join(manifestPath, 'manifest.json'), JSON.stringify(manifest), 'utf-8');
@@ -63,7 +63,7 @@ describe('pack-loading', () => {
 
       const invalidManifest = {
         // Missing required 'id' field
-        version: '1.0.0',
+        version: '0.0.1',
       };
 
       writeFileSync(join(manifestPath, 'manifest.json'), JSON.stringify(invalidManifest), 'utf-8');
@@ -82,7 +82,7 @@ describe('pack-loading', () => {
 
       const adapterManifest = {
         id: 'adapter',
-        version: '1.0.0',
+        version: '0.0.1',
       };
       writeFileSync(
         join(adapterManifestPath, 'manifest.json'),
@@ -96,7 +96,7 @@ describe('pack-loading', () => {
 
       const ext1Manifest = {
         id: 'ext1',
-        version: '1.0.0',
+        version: '0.0.1',
       };
       writeFileSync(join(ext1ManifestPath, 'manifest.json'), JSON.stringify(ext1Manifest), 'utf-8');
 
@@ -106,7 +106,7 @@ describe('pack-loading', () => {
 
       const ext2Manifest = {
         id: 'ext2',
-        version: '1.0.0',
+        version: '0.0.1',
       };
       writeFileSync(join(ext2ManifestPath, 'manifest.json'), JSON.stringify(ext2Manifest), 'utf-8');
 
@@ -127,7 +127,7 @@ describe('pack-loading', () => {
 
       const ext1Manifest = {
         id: 'ext1',
-        version: '1.0.0',
+        version: '0.0.1',
       };
       writeFileSync(join(ext1ManifestPath, 'manifest.json'), JSON.stringify(ext1Manifest), 'utf-8');
 
@@ -176,7 +176,7 @@ describe('pack-loading', () => {
 
       const manifest = {
         id: 'test-pack',
-        version: '1.0.0',
+        version: '0.0.1',
       };
 
       writeFileSync(join(manifestPath, 'manifest.json'), JSON.stringify(manifest), 'utf-8');

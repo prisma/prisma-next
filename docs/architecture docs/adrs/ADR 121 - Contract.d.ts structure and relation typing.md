@@ -510,7 +510,7 @@ import type { Vector } from '@prisma/pack-pgvector/types'
 import type { Geography } from '@prisma/pack-postgis/types'
 ```
 
-The emitter scans `contract.extensions` to determine required imports.
+The emitter scans `contract.extensionPacks` to determine required imports.
 
 ### Determinism
 

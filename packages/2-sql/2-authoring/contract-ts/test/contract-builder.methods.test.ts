@@ -11,7 +11,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  version: '1.0.0',
+  version: '0.0.1',
 };
 
 const pgvectorPack: ExtensionPackRef<'sql', 'postgres'> = {
@@ -19,7 +19,7 @@ const pgvectorPack: ExtensionPackRef<'sql', 'postgres'> = {
   id: 'pgvector',
   familyId: 'sql',
   targetId: 'postgres',
-  version: '1.0.0',
+  version: '0.0.1',
 };
 
 const mysqlTargetPack: ExtensionPackRef<'sql', string> = {
@@ -27,7 +27,7 @@ const mysqlTargetPack: ExtensionPackRef<'sql', string> = {
   id: 'pgvector',
   familyId: 'sql',
   targetId: 'mysql',
-  version: '1.0.0',
+  version: '0.0.1',
 };
 
 describe('contract builder methods', () => {
@@ -214,7 +214,7 @@ describe('extensionPacks', () => {
       .extensionPacks({ pgvector: pgvectorPack })
       .build();
 
-    expect(contract.extensions.pgvector).toEqual({});
+    expect(contract.extensionPacks.pgvector).toEqual({});
   });
 
   it('rejects non-extension pack refs', () => {

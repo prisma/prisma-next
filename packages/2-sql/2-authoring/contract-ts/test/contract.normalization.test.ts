@@ -411,7 +411,7 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.extensions).toEqual({});
+    expect(contract.extensionPacks).toEqual({});
   });
 
   it('normalizes missing capabilities', () => {

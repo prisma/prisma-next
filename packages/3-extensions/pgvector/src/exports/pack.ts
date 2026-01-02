@@ -5,10 +5,7 @@ const pgvectorPack: ExtensionPackRef<'sql', 'postgres'> = {
   id: 'pgvector',
   familyId: 'sql',
   targetId: 'postgres',
-  version: '1.0.0',
-  targets: {
-    postgres: { minVersion: '12' },
-  },
+  version: '0.0.1',
   capabilities: {
     postgres: {
       'pgvector/cosine': true,

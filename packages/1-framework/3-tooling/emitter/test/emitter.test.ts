@@ -87,9 +87,9 @@ describe('emitter', () => {
             },
           },
         },
-        extensions: {
+        extensionPacks: {
           postgres: {
-            version: '15.0.0',
+            version: '0.0.1',
           },
           pg: {},
         },
@@ -244,7 +244,7 @@ describe('emitter', () => {
   });
 
   it('emits contract even when extension pack namespace does not match extensionIds', async () => {
-    // Adapter-provided codecs (pg/int4@1) don't need to be in contract.extensions
+    // Adapter-provided codecs (pg/int4@1) don't need to be in contract.extensionPacks
     const ir = createContractIR({
       storage: {
         tables: {
@@ -269,13 +269,13 @@ describe('emitter', () => {
       extensionIds: [], // No extensions, but codec still works
     };
 
-    // Should succeed - adapter-provided codecs don't need to be in contract.extensions
+    // Should succeed - adapter-provided codecs don't need to be in contract.extensionPacks
     const result = await emit(ir, options, mockSqlHook);
     expect(result.contractJson).toBeDefined();
     expect(result.contractDts).toBeDefined();
   });
 
-  it('handles missing extensions field', async () => {
+  it('handles missing extensionPacks field', async () => {
     // Namespace validation removed - codecs can use any namespace
     const ir = createContractIR({
       storage: {
@@ -460,9 +460,9 @@ describe('emitter', () => {
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have relations');
   });
 
-  it('throws error when extensions is missing', async () => {
+  it('throws error when extension packs are missing', async () => {
     const ir = createContractIR({
-      extensions: undefined as unknown as Record<string, unknown>,
+      extensionPacks: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
     const operationRegistry = createOperationRegistry();
@@ -474,12 +474,14 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have extensions');
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'ContractIR must have extensionPacks',
+    );
   });
 
-  it('throws error when extensions is not an object', async () => {
+  it('throws error when extension packs are not an object', async () => {
     const ir = createContractIR({
-      extensions: 'not-an-object' as unknown as Record<string, unknown>,
+      extensionPacks: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
     const operationRegistry = createOperationRegistry();
@@ -491,7 +493,9 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have extensions');
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'ContractIR must have extensionPacks',
+    );
   });
 
   it('throws error when capabilities is missing', async () => {
@@ -600,8 +604,8 @@ describe('emitter', () => {
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have sources');
   });
 
-  it('emits contract even when extensionIds are not in contract.extensions', async () => {
-    // extensionIds includes adapters/targets which are not in contract.extensions
+  it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {
+    // extensionIds includes adapters/targets which are not in contract.extensionPacks
     const ir = createContractIR({
       storage: {
         tables: {},
