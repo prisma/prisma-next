@@ -232,7 +232,7 @@ describe('sql-target-family-hook', () => {
             },
           },
         },
-      } as TestDescriptor,
+      },
     ];
 
     const ir = createContractIR({
@@ -297,7 +297,7 @@ describe('sql-target-family-hook', () => {
             },
           },
         },
-      } as TestDescriptor,
+      },
     ];
 
     const codecTypeImports = extractCodecTypeImports(descriptors);
