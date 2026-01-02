@@ -13,7 +13,7 @@ export function assertRuntimeContractRequirementsSatisfied<
   contract,
   target,
   adapter,
-  extensions: extensionPacks,
+  extensions,
   runtimeExtensionPacksProvided,
 }: {
   readonly contract: { readonly target: string; readonly extensionPacks?: Record<string, unknown> };
@@ -23,7 +23,7 @@ export function assertRuntimeContractRequirementsSatisfied<
   readonly runtimeExtensionPacksProvided?: boolean | undefined;
 }): void {
   const providedComponentIds = new Set<string>([target.id, adapter.id]);
-  for (const extension of extensionPacks) {
+  for (const extension of extensions) {
     providedComponentIds.add(extension.id);
   }
 
