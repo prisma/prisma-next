@@ -13,7 +13,7 @@ import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../utils/fr
 describe('pgvector extension pack integration', () => {
   it('exposes pgvector descriptor metadata', () => {
     expect(pgvectorExtensionDescriptor.id).toBe('pgvector');
-    expect(pgvectorExtensionDescriptor.version).toBe('0.0.1');
+    expect(pgvectorExtensionDescriptor.version).toBe('1.0.0');
   });
 
   it('extracts codec type imports from pack', () => {
@@ -22,8 +22,15 @@ describe('pgvector extension pack integration', () => {
     });
 
     const codecTypeImports = extractCodecTypeImports(descriptors);
-    expect(codecTypeImports.length).toBe(1);
+    expect(codecTypeImports.length).toBe(2);
+    // Adapter codec types come first
     expect(codecTypeImports[0]).toEqual({
+      package: '@prisma-next/adapter-postgres/codec-types',
+      named: 'CodecTypes',
+      alias: 'PgTypes',
+    });
+    // Extension codec types come after
+    expect(codecTypeImports[1]).toEqual({
       package: '@prisma-next/extension-pgvector/codec-types',
       named: 'CodecTypes',
       alias: 'PgVectorTypes',

@@ -83,7 +83,7 @@ describe('family instance sign', () => {
           )
         `);
       });
-    });
+    }, timeouts.spinUpPpgDev);
 
     it(
       'creates new marker when none exists',
@@ -244,7 +244,7 @@ describe('family instance sign', () => {
           )
         `);
       });
-    });
+    }, timeouts.spinUpPpgDev);
 
     it(
       'no-op when marker already matches',

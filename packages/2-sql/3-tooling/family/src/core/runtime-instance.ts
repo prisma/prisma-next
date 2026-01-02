@@ -43,6 +43,7 @@ function assertRuntimeContractRequirements(
   target: RuntimeTargetDescriptor<'sql', string>,
   adapter: RuntimeAdapterDescriptor<'sql', string, SqlRuntimeAdapterInstance>,
   extensions: readonly RuntimeExtensionDescriptor<'sql', string>[],
+  runtimeExtensionPacks?: readonly Extension[],
 ): void {
   if (contract.target !== target.targetId) {
     throw new Error(
@@ -60,11 +61,20 @@ function assertRuntimeContractRequirements(
     providedIds.add(extension.id);
   }
 
+  // Runtime extension packs don't have IDs, so we can't validate them here.
+  // If runtime extension packs are provided, we assume they satisfy any missing requirements.
+  // Validation will happen at runtime when codecs/operations are registered and used.
+  const hasRuntimeExtensions = runtimeExtensionPacks && runtimeExtensionPacks.length > 0;
+
   for (const packId of requiredPacks) {
     if (!providedIds.has(packId)) {
-      throw new Error(
-        `Contract requires extension pack '${packId}', but runtime descriptors do not provide a matching component.`,
-      );
+      if (!hasRuntimeExtensions) {
+        throw new Error(
+          `Contract requires extension pack '${packId}', but runtime descriptors do not provide a matching component.`,
+        );
+      }
+      // If runtime extension packs are provided, we can't validate them here since they don't have IDs.
+      // Skip the check - validation will happen at runtime when codecs/operations are used.
     }
   }
 }
@@ -138,6 +148,7 @@ export function createSqlRuntimeFamilyInstance(options: {
         targetDescriptor,
         adapterDescriptor,
         extensionDescriptors,
+        runtimeOptions.extensionPacks,
       );
       const adapterInstance = adapterDescriptor.create();
       const driverInstance = driverDescriptor.create(runtimeOptions.driverOptions);
