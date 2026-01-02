@@ -2,12 +2,12 @@
  * Constraint verification tests: primary key, foreign key, unique.
  */
 
-import postgresPack from '@prisma-next/target-postgres/pack';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   type CodecTypes,
   defineContract,
   int4Column,
+  postgresPack,
   runSchemaVerify,
   textColumn,
   timeouts,
