@@ -88,204 +88,232 @@ describe('comparison operators integration', () => {
     timeouts.databaseOperation,
   );
 
-  it('lt operator returns rows where id < cursor', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      { verify: { mode: 'onFirstUse', requireMarker: true } },
-    );
+  it(
+    'lt operator returns rows where id < cursor',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        { verify: { mode: 'onFirstUse', requireMarker: true } },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const { user } = schema(context).tables;
+      const context = createTestContext(fixtureContract, adapter);
+      const { user } = schema(context).tables;
 
-    const plan = sql({ context })
-      .from(user)
-      .select({ id: user.columns.id, email: user.columns.email })
-      .where(user.columns.id.lt(param('cursor')))
-      .orderBy(user.columns.id.asc())
-      .build({ params: { cursor: 6 } });
+      const plan = sql({ context })
+        .from(user)
+        .select({ id: user.columns.id, email: user.columns.email })
+        .where(user.columns.id.lt(param('cursor')))
+        .orderBy(user.columns.id.asc())
+        .build({ params: { cursor: 6 } });
 
-    const rows = await executePlanAndCollect(runtime, plan);
-    expect(rows.map((r) => r.id)).toEqual([1, 2, 3, 4, 5]);
-  });
+      const rows = await executePlanAndCollect(runtime, plan);
+      expect(rows.map((r) => r.id)).toEqual([1, 2, 3, 4, 5]);
+    },
+    timeouts.databaseOperation,
+  );
 
-  it('gte operator returns rows where id >= cursor', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      { verify: { mode: 'onFirstUse', requireMarker: true } },
-    );
+  it(
+    'gte operator returns rows where id >= cursor',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        { verify: { mode: 'onFirstUse', requireMarker: true } },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const { user } = schema(context).tables;
+      const context = createTestContext(fixtureContract, adapter);
+      const { user } = schema(context).tables;
 
-    const plan = sql({ context })
-      .from(user)
-      .select({ id: user.columns.id, email: user.columns.email })
-      .where(user.columns.id.gte(param('cursor')))
-      .orderBy(user.columns.id.asc())
-      .build({ params: { cursor: 6 } });
+      const plan = sql({ context })
+        .from(user)
+        .select({ id: user.columns.id, email: user.columns.email })
+        .where(user.columns.id.gte(param('cursor')))
+        .orderBy(user.columns.id.asc())
+        .build({ params: { cursor: 6 } });
 
-    const rows = await executePlanAndCollect(runtime, plan);
-    expect(rows.map((r) => r.id)).toEqual([6, 7, 8, 9, 10]);
-  });
+      const rows = await executePlanAndCollect(runtime, plan);
+      expect(rows.map((r) => r.id)).toEqual([6, 7, 8, 9, 10]);
+    },
+    timeouts.databaseOperation,
+  );
 
-  it('lte operator returns rows where id <= cursor', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      { verify: { mode: 'onFirstUse', requireMarker: true } },
-    );
+  it(
+    'lte operator returns rows where id <= cursor',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        { verify: { mode: 'onFirstUse', requireMarker: true } },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const { user } = schema(context).tables;
+      const context = createTestContext(fixtureContract, adapter);
+      const { user } = schema(context).tables;
 
-    const plan = sql({ context })
-      .from(user)
-      .select({ id: user.columns.id, email: user.columns.email })
-      .where(user.columns.id.lte(param('cursor')))
-      .orderBy(user.columns.id.asc())
-      .build({ params: { cursor: 5 } });
+      const plan = sql({ context })
+        .from(user)
+        .select({ id: user.columns.id, email: user.columns.email })
+        .where(user.columns.id.lte(param('cursor')))
+        .orderBy(user.columns.id.asc())
+        .build({ params: { cursor: 5 } });
 
-    const rows = await executePlanAndCollect(runtime, plan);
-    expect(rows.map((r) => r.id)).toEqual([1, 2, 3, 4, 5]);
-  });
+      const rows = await executePlanAndCollect(runtime, plan);
+      expect(rows.map((r) => r.id)).toEqual([1, 2, 3, 4, 5]);
+    },
+    timeouts.databaseOperation,
+  );
 
-  it('cursor pagination returns correct pages (forward)', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      { verify: { mode: 'onFirstUse', requireMarker: true } },
-    );
+  it(
+    'cursor pagination returns correct pages (forward)',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        { verify: { mode: 'onFirstUse', requireMarker: true } },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const { user } = schema(context).tables;
+      const context = createTestContext(fixtureContract, adapter);
+      const { user } = schema(context).tables;
 
-    // First page: no cursor, limit 3
-    const firstPagePlan = sql({ context })
-      .from(user)
-      .select({ id: user.columns.id, email: user.columns.email })
-      .orderBy(user.columns.id.asc())
-      .limit(3)
-      .build();
+      // First page: no cursor, limit 3
+      const firstPagePlan = sql({ context })
+        .from(user)
+        .select({ id: user.columns.id, email: user.columns.email })
+        .orderBy(user.columns.id.asc())
+        .limit(3)
+        .build();
 
-    const firstPage = await executePlanAndCollect(runtime, firstPagePlan);
-    expect(firstPage.map((r) => r.id)).toEqual([1, 2, 3]);
+      const firstPage = await executePlanAndCollect(runtime, firstPagePlan);
+      expect(firstPage.map((r) => r.id)).toEqual([1, 2, 3]);
 
-    // Second page: cursor = 3, limit 3
-    const lastIdFromFirstPage = firstPage[firstPage.length - 1]!.id;
-    const secondPagePlan = sql({ context })
-      .from(user)
-      .select({ id: user.columns.id, email: user.columns.email })
-      .where(user.columns.id.gt(param('cursor')))
-      .orderBy(user.columns.id.asc())
-      .limit(3)
-      .build({ params: { cursor: lastIdFromFirstPage } });
+      // Second page: cursor = 3, limit 3
+      const lastIdFromFirstPage = firstPage[firstPage.length - 1]!.id;
+      const secondPagePlan = sql({ context })
+        .from(user)
+        .select({ id: user.columns.id, email: user.columns.email })
+        .where(user.columns.id.gt(param('cursor')))
+        .orderBy(user.columns.id.asc())
+        .limit(3)
+        .build({ params: { cursor: lastIdFromFirstPage } });
 
-    const secondPage = await executePlanAndCollect(runtime, secondPagePlan);
-    expect(secondPage.map((r) => r.id)).toEqual([4, 5, 6]);
+      const secondPage = await executePlanAndCollect(runtime, secondPagePlan);
+      expect(secondPage.map((r) => r.id)).toEqual([4, 5, 6]);
 
-    // Third page: cursor = 6, limit 3
-    const lastIdFromSecondPage = secondPage[secondPage.length - 1]!.id;
-    const thirdPagePlan = sql({ context })
-      .from(user)
-      .select({ id: user.columns.id, email: user.columns.email })
-      .where(user.columns.id.gt(param('cursor')))
-      .orderBy(user.columns.id.asc())
-      .limit(3)
-      .build({ params: { cursor: lastIdFromSecondPage } });
+      // Third page: cursor = 6, limit 3
+      const lastIdFromSecondPage = secondPage[secondPage.length - 1]!.id;
+      const thirdPagePlan = sql({ context })
+        .from(user)
+        .select({ id: user.columns.id, email: user.columns.email })
+        .where(user.columns.id.gt(param('cursor')))
+        .orderBy(user.columns.id.asc())
+        .limit(3)
+        .build({ params: { cursor: lastIdFromSecondPage } });
 
-    const thirdPage = await executePlanAndCollect(runtime, thirdPagePlan);
-    expect(thirdPage.map((r) => r.id)).toEqual([7, 8, 9]);
-  });
+      const thirdPage = await executePlanAndCollect(runtime, thirdPagePlan);
+      expect(thirdPage.map((r) => r.id)).toEqual([7, 8, 9]);
+    },
+    timeouts.databaseOperation,
+  );
 
-  it('cursor pagination returns correct pages (backward)', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      { verify: { mode: 'onFirstUse', requireMarker: true } },
-    );
+  it(
+    'cursor pagination returns correct pages (backward)',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        { verify: { mode: 'onFirstUse', requireMarker: true } },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const { user } = schema(context).tables;
+      const context = createTestContext(fixtureContract, adapter);
+      const { user } = schema(context).tables;
 
-    // Backward pagination: get 3 records before id=8
-    const plan = sql({ context })
-      .from(user)
-      .select({ id: user.columns.id, email: user.columns.email })
-      .where(user.columns.id.lt(param('cursor')))
-      .orderBy(user.columns.id.desc())
-      .limit(3)
-      .build({ params: { cursor: 8 } });
+      // Backward pagination: get 3 records before id=8
+      const plan = sql({ context })
+        .from(user)
+        .select({ id: user.columns.id, email: user.columns.email })
+        .where(user.columns.id.lt(param('cursor')))
+        .orderBy(user.columns.id.desc())
+        .limit(3)
+        .build({ params: { cursor: 8 } });
 
-    const rows = await executePlanAndCollect(runtime, plan);
+      const rows = await executePlanAndCollect(runtime, plan);
 
-    // Ordered descending, so 7, 6, 5
-    expect(rows.map((r) => r.id)).toEqual([7, 6, 5]);
-  });
+      // Ordered descending, so 7, 6, 5
+      expect(rows.map((r) => r.id)).toEqual([7, 6, 5]);
+    },
+    timeouts.databaseOperation,
+  );
 
-  it('gt returns empty result when cursor exceeds all values', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      { verify: { mode: 'onFirstUse', requireMarker: true } },
-    );
+  it(
+    'gt returns empty result when cursor exceeds all values',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        { verify: { mode: 'onFirstUse', requireMarker: true } },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const { user } = schema(context).tables;
+      const context = createTestContext(fixtureContract, adapter);
+      const { user } = schema(context).tables;
 
-    const plan = sql({ context })
-      .from(user)
-      .select({ id: user.columns.id, email: user.columns.email })
-      .where(user.columns.id.gt(param('cursor')))
-      .build({ params: { cursor: 100 } });
+      const plan = sql({ context })
+        .from(user)
+        .select({ id: user.columns.id, email: user.columns.email })
+        .where(user.columns.id.gt(param('cursor')))
+        .build({ params: { cursor: 100 } });
 
-    const rows = await executePlanAndCollect(runtime, plan);
+      const rows = await executePlanAndCollect(runtime, plan);
 
-    expect(rows.length).toBe(0);
-  });
+      expect(rows.length).toBe(0);
+    },
+    timeouts.databaseOperation,
+  );
 
-  it('lt returns empty result when cursor is below all values', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      { verify: { mode: 'onFirstUse', requireMarker: true } },
-    );
+  it(
+    'lt returns empty result when cursor is below all values',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        { verify: { mode: 'onFirstUse', requireMarker: true } },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const { user } = schema(context).tables;
+      const context = createTestContext(fixtureContract, adapter);
+      const { user } = schema(context).tables;
 
-    const plan = sql({ context })
-      .from(user)
-      .select({ id: user.columns.id, email: user.columns.email })
-      .where(user.columns.id.lt(param('cursor')))
-      .build({ params: { cursor: 1 } });
+      const plan = sql({ context })
+        .from(user)
+        .select({ id: user.columns.id, email: user.columns.email })
+        .where(user.columns.id.lt(param('cursor')))
+        .build({ params: { cursor: 1 } });
 
-    const rows = await executePlanAndCollect(runtime, plan);
+      const rows = await executePlanAndCollect(runtime, plan);
 
-    expect(rows.length).toBe(0);
-  });
+      expect(rows.length).toBe(0);
+    },
+    timeouts.databaseOperation,
+  );
 });
 
 function loadContractFixture(): Contract {
