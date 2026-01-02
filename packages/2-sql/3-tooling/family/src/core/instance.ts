@@ -388,7 +388,7 @@ function buildSqlTypeMetadataRegistry(options: {
 export function createSqlFamilyInstance<TTargetId extends string, TTargetDetails>(
   options: CreateSqlFamilyInstanceOptions<TTargetId, TTargetDetails>,
 ): SqlFamilyInstance {
-  const { target, adapter, extensionPacks: extensions } = options;
+  const { target, adapter, extensionPacks: extensions = [] } = options;
 
   // Build descriptors array for assembly
   // Assembly functions only use manifest and id, so we can pass Control*Descriptor types directly
