@@ -1,3 +1,4 @@
+import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import type {
   ColumnBuilderState,
   ModelBuilderState,
@@ -15,7 +16,6 @@ import {
   type Mutable,
   TableBuilder,
 } from '@prisma-next/contract-authoring';
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/sql-contract/pack-types';
 import type {
   ModelDefinition,
   ModelField,

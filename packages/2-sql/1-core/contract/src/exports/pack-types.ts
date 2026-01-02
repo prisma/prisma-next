@@ -1,8 +1,1 @@
-export type {
-  AdapterPackRef,
-  DriverPackRef,
-  ExtensionPackRef,
-  PackRefBase,
-  StorageTypeMetadata,
-  TargetPackRef,
-} from '../pack-types';
+export type { StorageTypeMetadata } from '../pack-types';

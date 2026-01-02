@@ -1,4 +1,4 @@
-import type { TargetPackRef } from '@prisma-next/sql-contract/pack-types';
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
 import type { CodecTypes } from './fixtures/contract.d';

@@ -1,4 +1,4 @@
-import type { ExtensionPackRef } from '@prisma-next/sql-contract/pack-types';
+import type { ExtensionPackRef } from '@prisma-next/contract/framework-components';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 
 const pgvectorTypeId = 'pg/vector@1' as const;

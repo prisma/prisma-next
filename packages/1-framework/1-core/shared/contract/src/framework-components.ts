@@ -159,16 +159,44 @@ export interface TargetDescriptor<TFamilyId extends string, TTargetId extends st
 }
 
 /**
- * Base pack reference for target components.
- * Pack refs are JSON-friendly representations used by authoring flows.
+ * Base shape for any pack reference.
+ * Pack refs are pure JSON-friendly objects safe to import in authoring flows.
  */
-export interface TargetPackRef<TFamilyId extends string = string, TTargetId extends string = string>
+export interface PackRefBase<Kind extends string, TFamilyId extends string>
   extends ComponentMetadata {
-  readonly kind: 'target';
+  readonly kind: Kind;
   readonly id: string;
   readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
+  readonly targetId?: string;
 }
+
+export type TargetPackRef<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> = PackRefBase<'target', TFamilyId> & {
+  readonly targetId: TTargetId;
+};
+
+export type AdapterPackRef<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> = PackRefBase<'adapter', TFamilyId> & {
+  readonly targetId: TTargetId;
+};
+
+export type ExtensionPackRef<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> = PackRefBase<'extension', TFamilyId> & {
+  readonly targetId: TTargetId;
+};
+
+export type DriverPackRef<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> = PackRefBase<'driver', TFamilyId> & {
+  readonly targetId: TTargetId;
+};
 
 /**
  * Descriptor for an adapter component.
