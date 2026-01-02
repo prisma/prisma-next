@@ -26,6 +26,15 @@ This package spans multiple planes:
 - **Runtime plane** (`src/exports/runtime.ts`): Runtime entry point for target-specific runtime code (future)
 - **Authoring pack ref** (`src/exports/pack.ts`): Pure data surface for contract builder workflows
 
+## `db init`
+
+This package provides the Postgres implementation of the SQL migration planner/runner used by `prisma-next db init`:
+
+- **Planner** (`src/core/migrations/planner.ts`): produces an additive-only `MigrationPlan` to bring the database schema in line with a destination contract. Extra unrelated schema is tolerated; non-additive mismatches (type/nullability/constraint incompatibilities) surface as structured conflicts.
+- **Runner** (`src/core/migrations/runner.ts`): executes a plan under an advisory lock, verifies the post-state schema, then writes the contract marker and appends a ledger entry in the `prisma_contract` schema.
+
+For the CLI orchestration, see `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`.
+
 ## Usage
 
 ### Control Plane (CLI)
@@ -134,7 +143,8 @@ This package ships a mix of fast planner unit tests and slower runner integratio
 
 - **Default (`pnpm --filter @prisma-next/target-postgres test`)**: runs all tests including integration tests
 - **Test files**:
-  - `test/migrations/planner.case1.test.ts`: Planner unit tests
+  - `test/migrations/planner.behavior.test.ts`: Planner unit tests (classification, conflicts, dependency ops)
+  - `test/migrations/planner.integration.test.ts`: Planner integration tests
   - `test/migrations/runner.*.integration.test.ts`: Runner integration tests (basic, errors, idempotency, policy)
 
 ```bash
