@@ -145,7 +145,7 @@ export function createDbSchemaVerifyCommand(): Command {
           family: config.family,
           target: config.target,
           adapter: config.adapter,
-          extensionPacks: config.extensionPacks ?? [],
+          extensionPacks: config.extensionPacks,
         });
 
         // Resolve database URL

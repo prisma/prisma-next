@@ -218,7 +218,7 @@ export function createDbInitCommand(): Command {
             family: config.family,
             target: config.target,
             adapter: config.adapter,
-            extensionPacks: config.extensionPacks ?? [],
+            extensionPacks: config.extensionPacks,
           });
 
           // Create planner and runner from target migrations capability
