@@ -11,6 +11,7 @@ import {
 import type { VerifyDatabaseSchemaResult } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
+import { performAction } from '../utils/action';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { parseGlobalFlags } from '../utils/global-flags';
@@ -20,7 +21,6 @@ import {
   formatSchemaVerifyOutput,
   formatStyledHeader,
 } from '../utils/output';
-import { performAction } from '../utils/result';
 import { handleResult } from '../utils/result-handler';
 import { withSpinner } from '../utils/spinner';
 
