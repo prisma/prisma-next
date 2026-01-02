@@ -120,19 +120,39 @@ export function createDbSchemaVerifyCommand(): Command {
         }
         const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
-        // Resolve database URL
-        const dbUrl = options.db ?? config.db?.url;
-        if (!dbUrl) {
-          throw errorDatabaseUrlRequired();
-        }
-
-        // Check for driver
+        // Check for driver (needed for family instance creation)
         if (!config.driver) {
           throw errorDriverRequired();
         }
 
         // Store driver descriptor after null check
         const driverDescriptor = config.driver;
+
+        // Create family instance (needed for contract validation)
+        const familyInstance = config.family.create({
+          target: config.target,
+          adapter: config.adapter,
+          driver: driverDescriptor,
+          extensions: config.extensions ?? [],
+        });
+
+        // Validate contract using instance validator
+        const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
+
+        // Validate contract requirements fail-fast before connecting to database
+        assertContractRequirementsSatisfied({
+          contract: contractIR,
+          family: config.family,
+          target: config.target,
+          adapter: config.adapter,
+          extensions: config.extensions ?? [],
+        });
+
+        // Resolve database URL
+        const dbUrl = options.db ?? config.db?.url;
+        if (!dbUrl) {
+          throw errorDatabaseUrlRequired();
+        }
 
         // Create driver
         const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
@@ -141,29 +161,12 @@ export function createDbSchemaVerifyCommand(): Command {
         });
 
         try {
-          // Create family instance
-          const familyInstance = config.family.create({
-            target: config.target,
-            adapter: config.adapter,
-            driver: driverDescriptor,
-            extensions: config.extensions ?? [],
-          });
           const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
           const frameworkComponents = assertFrameworkComponentsCompatible(
             config.family.familyId,
             config.target.targetId,
             rawComponents,
           );
-
-          // Validate contract using instance validator
-          const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
-          assertContractRequirementsSatisfied({
-            contract: contractIR,
-            family: config.family,
-            target: config.target,
-            adapter: config.adapter,
-            extensions: config.extensions ?? [],
-          });
 
           // Call family instance schemaVerify method
           let schemaVerifyResult: VerifyDatabaseSchemaResult;
