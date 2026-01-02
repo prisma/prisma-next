@@ -19,7 +19,7 @@
     "ts-toolbelt": "^9.6.0"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^2.1.1",
+    "@vitest/coverage-v8": "catalog:",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
     "vitest": "catalog:"

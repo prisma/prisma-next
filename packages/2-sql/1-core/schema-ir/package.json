@@ -18,7 +18,8 @@
     "@prisma-next/contract": "workspace:*"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^2.1.1",
+    "@prisma-next/test-utils": "workspace:*",
+    "@vitest/coverage-v8": "catalog:",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
     "vitest": "catalog:"

@@ -10,6 +10,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.ts'],
       exclude: [
         'dist/**',
         'test/**',
@@ -18,6 +19,12 @@ export default defineConfig({
         '**/*.config.ts',
         '**/exports/**',
       ],
+      thresholds: {
+        lines: 95,
+        branches: 95,
+        functions: 95,
+        statements: 95,
+      },
     },
   },
 });

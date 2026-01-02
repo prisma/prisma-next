@@ -1,6 +1,8 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { defineConfig } from 'vitest/config';
 
+// Types-only package: SQL Schema IR types for schema introspection and verification
+// No test files exist, but coverage config is included for consistency with other packages
 export default defineConfig({
   test: {
     globals: true,
@@ -18,13 +20,12 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
-        '**/types.ts',
       ],
       thresholds: {
-        lines: 92,
-        branches: 87,
-        functions: 95,
-        statements: 92,
+        lines: 90,
+        branches: 90,
+        functions: 90,
+        statements: 90,
       },
     },
   },

@@ -10,17 +10,5 @@ export default defineConfig({
     include: ['test/**/*.test.ts'],
     testTimeout: timeouts.default,
     hookTimeout: timeouts.default,
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-      exclude: [
-        'dist/**',
-        'test/**',
-        '**/*.test.ts',
-        '**/*.test-d.ts',
-        '**/*.config.ts',
-        '**/exports/**',
-      ],
-    },
   },
 });

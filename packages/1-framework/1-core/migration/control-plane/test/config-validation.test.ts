@@ -423,4 +423,330 @@ describe('validateConfig', () => {
     });
     expect(() => validateConfig(config)).not.toThrow();
   });
+
+  it('throws error when family.manifest is missing or not an object', () => {
+    const config1 = createValidConfig({
+      family: {
+        kind: 'family',
+        familyId: 'sql',
+        hook: {},
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config1)).toThrow(CliStructuredError);
+
+    const config2 = createValidConfig({
+      family: {
+        kind: 'family',
+        familyId: 'sql',
+        manifest: 'not-an-object',
+        hook: {},
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config2)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when family.create is not a function', () => {
+    const config = createValidConfig({
+      family: {
+        kind: 'family',
+        familyId: 'sql',
+        manifest: { id: 'sql', version: '0.0.1' },
+        hook: {},
+        create: 'not-a-function',
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when target.familyId does not match family.familyId', () => {
+    const config = createValidConfig({
+      target: {
+        kind: 'target',
+        familyId: 'wrong-family',
+        targetId: 'postgres',
+        id: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when target.targetId is not a string', () => {
+    const config = createValidConfig({
+      target: {
+        kind: 'target',
+        familyId: 'sql',
+        targetId: 123,
+        id: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when target.create is not a function', () => {
+    const config = createValidConfig({
+      target: {
+        kind: 'target',
+        familyId: 'sql',
+        targetId: 'postgres',
+        id: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: 'not-a-function',
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when adapter.familyId does not match family.familyId', () => {
+    const config = createValidConfig({
+      adapter: {
+        kind: 'adapter',
+        familyId: 'wrong-family',
+        targetId: 'postgres',
+        id: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when adapter.targetId is not a string', () => {
+    const config = createValidConfig({
+      adapter: {
+        kind: 'adapter',
+        familyId: 'sql',
+        targetId: 123,
+        id: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when adapter.targetId does not match target.targetId', () => {
+    const config = createValidConfig({
+      adapter: {
+        kind: 'adapter',
+        familyId: 'sql',
+        targetId: 'wrong-target',
+        id: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when adapter.create is not a function', () => {
+    const config = createValidConfig({
+      adapter: {
+        kind: 'adapter',
+        familyId: 'sql',
+        targetId: 'postgres',
+        id: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: 'not-a-function',
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when extension.familyId does not match family.familyId', () => {
+    const config = createValidConfig({
+      extensions: [
+        {
+          kind: 'extension',
+          id: 'pg-vector',
+          familyId: 'wrong-family',
+          targetId: 'postgres',
+          manifest: { id: 'pg-vector', version: '1.0.0' },
+          create: vi.fn(),
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when extension.targetId is not a string', () => {
+    const config = createValidConfig({
+      extensions: [
+        {
+          kind: 'extension',
+          id: 'pg-vector',
+          familyId: 'sql',
+          targetId: 123,
+          manifest: { id: 'pg-vector', version: '1.0.0' },
+          create: vi.fn(),
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when extension.targetId does not match target.targetId', () => {
+    const config = createValidConfig({
+      extensions: [
+        {
+          kind: 'extension',
+          id: 'pg-vector',
+          familyId: 'sql',
+          targetId: 'wrong-target',
+          manifest: { id: 'pg-vector', version: '1.0.0' },
+          create: vi.fn(),
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when extension.create is not a function', () => {
+    const config = createValidConfig({
+      extensions: [
+        {
+          kind: 'extension',
+          id: 'pg-vector',
+          familyId: 'sql',
+          targetId: 'postgres',
+          manifest: { id: 'pg-vector', version: '1.0.0' },
+          create: 'not-a-function',
+        },
+      ],
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('validates driver descriptor when present', () => {
+    const config = createValidConfig();
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('throws error when driver.kind is not "driver"', () => {
+    const config = createValidConfig({
+      driver: {
+        kind: 'invalid',
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when driver.id is not a string', () => {
+    const config = createValidConfig({
+      driver: {
+        kind: 'driver',
+        id: 123,
+        familyId: 'sql',
+        targetId: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when driver.manifest is missing or not an object', () => {
+    const config1 = createValidConfig({
+      driver: {
+        kind: 'driver',
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 'postgres',
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config1)).toThrow(CliStructuredError);
+
+    const config2 = createValidConfig({
+      driver: {
+        kind: 'driver',
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 'postgres',
+        manifest: 'not-an-object',
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config2)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when driver.familyId is not a string', () => {
+    const config = createValidConfig({
+      driver: {
+        kind: 'driver',
+        id: 'postgres',
+        familyId: 123,
+        targetId: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when driver.familyId does not match family.familyId', () => {
+    const config = createValidConfig({
+      driver: {
+        kind: 'driver',
+        id: 'postgres',
+        familyId: 'wrong-family',
+        targetId: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when driver.targetId is not a string', () => {
+    const config = createValidConfig({
+      driver: {
+        kind: 'driver',
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 123,
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when driver.targetId does not match target.targetId', () => {
+    const config = createValidConfig({
+      driver: {
+        kind: 'driver',
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 'wrong-target',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: vi.fn(),
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws error when driver.create is not a function', () => {
+    const config = createValidConfig({
+      driver: {
+        kind: 'driver',
+        id: 'postgres',
+        familyId: 'sql',
+        targetId: 'postgres',
+        manifest: { id: 'postgres', version: '15.0.0' },
+        create: 'not-a-function',
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
 });

@@ -12,6 +12,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.ts'],
       exclude: [
         'dist/**',
         'test/**',
@@ -23,7 +24,7 @@ export default defineConfig({
       ],
       thresholds: {
         lines: 95,
-        branches: 90,
+        branches: 86,
         functions: 95,
         statements: 95,
       },

@@ -15,6 +15,7 @@
     "clean": "node ../../../../../scripts/clean.mjs"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "catalog:",
     "tsup": "^8.3.0",
     "typescript": "^5.9.3",
     "vitest": "catalog:"

@@ -69,9 +69,6 @@ This package is located at `test/integration/` (not in `packages/`) as it is a t
 ```bash
 # Run all integration tests (from test/integration/)
 cd test/integration && pnpm test
-
-# Run tests with coverage
-cd test/integration && pnpm test:coverage
 ```
 
 Tests automatically depend on builds of target packages via Turborepo.

@@ -1295,7 +1295,7 @@ pnpm test:coverage
 
 ### Coverage Configuration
 
-- **Provider**: Vitest with v8 provider (`@vitest/coverage-v8`)
+- **Provider**: Vitest with v8 provider (`@vitest/coverage-v8` v4)
 - **Exclusions**: `dist/**`, `test/**`, `**/*.test.ts`, `**/*.test-d.ts`, `**/*.config.ts`, `**/exports/**`
 - **Reporters**: text, json, html
 - **Configuration**: Per-package `vitest.config.ts` files

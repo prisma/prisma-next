@@ -35,7 +35,7 @@
     "@biomejs/biome": "^2.0.6",
     "@changesets/cli": "^2.27.8",
     "@types/node": "^24.7.2",
-    "@vitest/coverage-v8": "^2.1.1",
+    "@vitest/coverage-v8": "catalog:",
     "dependency-cruiser": "^16.3.3",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
