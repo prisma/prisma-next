@@ -42,7 +42,7 @@ function assertRuntimeContractRequirements(
   contract: SqlContract<SqlStorage>,
   target: RuntimeTargetDescriptor<'sql', string>,
   adapter: RuntimeAdapterDescriptor<'sql', string, SqlRuntimeAdapterInstance>,
-  extensions: readonly RuntimeExtensionDescriptor<'sql', string>[],
+  extensionPacks: readonly RuntimeExtensionDescriptor<'sql', string>[],
   runtimeExtensionPacks?: readonly Extension[],
 ): void {
   if (contract.target !== target.targetId) {
@@ -57,7 +57,7 @@ function assertRuntimeContractRequirements(
   }
 
   const providedIds = new Set<string>([target.id, adapter.id]);
-  for (const extension of extensions) {
+  for (const extension of extensionPacks) {
     providedIds.add(extension.id);
   }
 
