@@ -3,7 +3,7 @@ import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-typ
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-const contractObj = defineContract<CodecTypes>()
+export const contract = defineContract<CodecTypes>()
   .target(postgresPack)
   .table('user', (t) =>
     t
@@ -13,13 +13,3 @@ const contractObj = defineContract<CodecTypes>()
   )
   .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
   .build();
-
-export const contract = {
-  ...contractObj,
-  extensions: {
-    postgres: {
-      version: '0.0.1',
-    },
-    pg: {},
-  },
-};

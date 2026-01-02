@@ -10,6 +10,7 @@ const postgresPack: TargetPackRef<'sql', 'postgres'> = {
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
+  capabilities: {},
 };
 
 describe('ContractBuilder', () => {
