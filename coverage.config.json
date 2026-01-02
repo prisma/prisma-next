@@ -1,6 +1,6 @@
 {
   "$schema": "./coverage.config.schema.json",
-  "_comment": "WARNING-ONLY PACKAGES: Time-limited exceptions for packages with coverage/test failures. Each entry MUST have an expiry date. When expired, CI will fail until issues are resolved or config is updated with justification.",
+  "description": "WARNING-ONLY PACKAGES: Time-limited exceptions for packages with coverage/test failures. Each entry MUST have an expiry date. When expired, CI will fail until issues are resolved or config is updated with justification.",
   "warningOnly": [
     {
       "package": "1-framework/3-tooling/eslint-plugin",
@@ -10,6 +10,15 @@
       "assignee": null,
       "ticket": null,
       "notes": "Coordinate with teammate before making changes"
+    },
+    {
+      "package": "3-extensions/compat-prisma",
+      "reason": "Compatibility layer with legacy Prisma ORM - needs comprehensive test coverage improvements",
+      "addedDate": "2026-01-02",
+      "expiryDays": 29,
+      "assignee": null,
+      "ticket": null,
+      "notes": "Focus on testing core compatibility features and edge cases"
     }
   ]
 }
