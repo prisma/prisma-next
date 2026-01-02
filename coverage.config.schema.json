@@ -4,6 +4,10 @@
   "description": "Configuration for packages with time-limited coverage/test warning exceptions",
   "type": "object",
   "properties": {
+    "description": {
+      "type": "string",
+      "description": "Overall description of the warning-only package system"
+    },
     "warningOnly": {
       "type": "array",
       "description": "List of packages with coverage warnings that don't block CI (until expiry)",
