@@ -17,8 +17,8 @@ Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI c
 - **Target Descriptor Export**: Exports the Postgres `SqlControlTargetDescriptor` for use in CLI configuration files
 - **Descriptor-First Design**: All declarative fields (version, capabilities, types, operations) are properties directly on the descriptor, eliminating the need for separate manifest files
 - **Multi-Plane Support**: Provides both migration-plane (control) and runtime-plane entry points for the Postgres target
-- **Planner Factory**: Implements `createPlanner()` to create Postgres-specific migration planners
-- **Runner Factory**: Implements `createRunner()` to create Postgres-specific migration runners
+- **Planner Factory**: Implements `migrations.createPlanner()` to create Postgres-specific migration planners
+- **Runner Factory**: Implements `migrations.createRunner()` to create Postgres-specific migration runners
 - **Database Dependency Consumption**: The planner extracts database dependencies from the configured framework components (passed as `frameworkComponents`), verifies each dependency against the live schema, and only emits install operations when required. The runner reuses the same metadata for post-apply verification, so there are no hardcoded extension mappings—database dependencies stay component-owned.
 
 This package spans multiple planes:
@@ -52,8 +52,8 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 // - id: 'postgres'
 // - version: '0.0.1'
 // - capabilities, types, operations (directly on descriptor)
-// - createPlanner(): creates a Postgres migration planner
-// - createRunner(): creates a Postgres migration runner
+// - migrations.createPlanner(): creates a Postgres migration planner
+// - migrations.createRunner(): creates a Postgres migration runner
 
 // Create family instance with target, adapter, and driver
 const family = sqlFamilyDescriptor.create({
@@ -64,8 +64,8 @@ const family = sqlFamilyDescriptor.create({
 });
 
 // Create planner and runner from target descriptor
-const planner = postgres.createPlanner(family);
-const runner = postgres.createRunner(family);
+const planner = postgres.migrations.createPlanner(family);
+const runner = postgres.migrations.createRunner(family);
 
 // Plan and execute migrations
 const planResult = planner.plan({ contract, schema, policy });

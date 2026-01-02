@@ -130,6 +130,8 @@ prisma-next db verify -v --timestamps
 
 The `db verify` command requires a `driver` in the config to connect to the database:
 
+If your emitted `contract.json` declares `extensionPacks`, your config must include matching descriptors in `extensions` (by `id`). The CLI validates this wiring before running the command.
+
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
@@ -646,6 +648,8 @@ prisma-next db init --json
 
 The `db init` command requires a `driver` in the config to connect to the database:
 
+If your emitted `contract.json` declares `extensionPacks`, your config must include matching descriptors in `extensions` (by `id`). The CLI validates this wiring before running the command.
+
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
@@ -677,11 +681,15 @@ export default defineConfig({
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
 3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions
 4. **Introspect Schema**: Calls `familyInstance.introspect()` to get the current database schema IR
-5. **Create Planner/Runner**: Asks the target to construct a `MigrationPlanner` and `MigrationRunner`
-6. **Plan Migration**: Calls `planner.plan()` with the contract IR, schema IR, and additive-only policy
+5. **Validate wiring**: Ensures the contract is compatible with the CLI config:
+   - `contract.targetFamily` matches `config.family.familyId`
+   - `contract.target` matches `config.target.targetId`
+   - `contract.extensionPacks` (if present) are provided by `config.extensions` (matched by descriptor `id`)
+6. **Create Planner/Runner**: Uses `config.target.migrations.createPlanner()` and `config.target.migrations.createRunner()`
+7. **Plan Migration**: Calls `planner.plan()` with the contract IR, schema IR, additive-only policy, and `frameworkComponents` (the active target/adapter/extension descriptors)
    - On conflict: Returns a structured failure with conflict list
    - On success: Returns a migration plan with operations
-7. **Apply Migration** (if not `--plan`):
+8. **Apply Migration** (if not `--plan`):
    - Calls `runner.execute()` to apply the plan
    - After execution, verifies schema matches contract
    - Writes contract marker (and records a ledger entry via the target runner)

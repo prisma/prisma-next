@@ -43,7 +43,7 @@ const verifyResult = await familyInstance.verify({ driver, contractIR, ... });
 const emitResult = await familyInstance.emitContract({ contractIR: rawContract }); // Handles stripping mappings and validation internally
 
 // Targets that implement SqlControlTargetDescriptor can build planners
-const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+const planner = postgresTargetDescriptor.migrations.createPlanner(familyInstance);
 // frameworkComponents should include the active target, adapter, and any extension descriptors so
 // planner/runner can resolve database dependencies declared by those components.
 const planResult = planner.plan({
@@ -54,7 +54,7 @@ const planResult = planner.plan({
 });
 
 // Targets also provide runners for executing plans
-const runner = postgresTargetDescriptor.createRunner(familyInstance);
+const runner = postgresTargetDescriptor.migrations.createRunner(familyInstance);
 const executeResult = await runner.execute({
   plan: planResult.plan,
   driver,
