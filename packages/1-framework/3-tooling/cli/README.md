@@ -759,7 +759,7 @@ prisma-next db init ➜ Initialize database schema from contract
 
 **Config File (`prisma-next.config.ts`):**
 
-The CLI uses a config file to specify the target family, target, adapter, extensions, and contract.
+The CLI uses a config file to specify the target family, target, adapter, extensionPacks, and contract.
 
 **Config Discovery:**
 - `--config <path>`: Explicit path (relative or absolute)
@@ -963,7 +963,7 @@ import exampleExtension from '@prisma-next/extension-example/control';
 
 export default defineConfig({
   // family/target/adapter/driver omitted for brevity
-  extensions: [exampleExtension],
+  extensionPacks: [exampleExtension],
 });
 ```
 
