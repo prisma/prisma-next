@@ -72,7 +72,6 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
     ]);
     const context = createTestContext(fixtureContract, adapter);
     const runtime = createRuntime({
-      adapter,
       driver: driver as unknown as Parameters<typeof createRuntime>[0]['driver'],
       context,
       verify: { mode: 'onFirstUse', requireMarker: false },
@@ -106,7 +105,6 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
     driver.setRows([{ id: 1, email: 'test@example.com' }]);
     const context = createTestContext(fixtureContract, adapter);
     const runtime = createRuntime({
-      adapter,
       driver: driver as unknown as Parameters<typeof createRuntime>[0]['driver'],
       context,
       verify: { mode: 'onFirstUse', requireMarker: false },

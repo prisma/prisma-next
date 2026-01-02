@@ -1,11 +1,11 @@
 /**
- * Test utilities for working with extension packs.
- * These functions are pack-based versions of the descriptor-based assembly functions,
- * designed for use in tests and integration tests.
+ * Test utilities for working with component descriptors.
+ * These functions operate on descriptors directly, used in tests and integration tests.
  */
 export {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
+  assembleOperationRegistry,
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractOperationTypeImports,
 } from '../core/assembly';
+export { convertOperationManifest } from '../core/instance';

@@ -15,6 +15,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
+import postgresPack from '@prisma-next/target-postgres/pack';
 import type { DevDatabase } from '@prisma-next/test-utils';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -24,7 +25,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
  */
 function createTestContract(): SqlContract<SqlStorage> {
   const contractObj = defineContract<CodecTypes>()
-    .target('postgres')
+    .target(postgresPack)
     .table('user', (t) =>
       t
         .column('id', { type: int4Column, nullable: false })
@@ -36,9 +37,9 @@ function createTestContract(): SqlContract<SqlStorage> {
 
   return {
     ...contractObj,
-    extensions: {
+    extensionPacks: {
       postgres: {
-        version: '15.0.0',
+        version: '0.0.1',
       },
       pg: {},
     },
@@ -82,7 +83,7 @@ describe('family instance sign', () => {
           )
         `);
       });
-    });
+    }, timeouts.spinUpPpgDev);
 
     it(
       'creates new marker when none exists',
@@ -100,7 +101,7 @@ describe('family instance sign', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const result = (await familyInstance.sign({
@@ -182,7 +183,7 @@ describe('family instance sign', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const result = (await familyInstance.sign({
@@ -243,7 +244,7 @@ describe('family instance sign', () => {
           )
         `);
       });
-    });
+    }, timeouts.spinUpPpgDev);
 
     it(
       'no-op when marker already matches',
@@ -261,7 +262,7 @@ describe('family instance sign', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           // First sign - creates marker

@@ -181,7 +181,7 @@ describe('verifySqlSchema - constraints', () => {
           id: 'pgvector',
           familyId: 'sql',
           targetId: 'postgres',
-          manifest: { id: 'pgvector', version: '0.0.0' },
+          version: '0.0.0',
           databaseDependencies: {
             init: [
               {

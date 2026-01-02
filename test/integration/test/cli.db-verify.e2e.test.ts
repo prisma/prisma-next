@@ -432,7 +432,7 @@ withTempDir(({ createTempDir }) => {
             target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             // driver is missing - this is what we're testing
-            extensions: [],
+            extensionPacks: [],
             contract: {
               source: contract,
               output: 'output/contract.json',

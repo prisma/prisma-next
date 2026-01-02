@@ -1,5 +1,4 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
@@ -18,6 +17,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
+import postgresPack from '@prisma-next/target-postgres/pack';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -26,7 +26,7 @@ import { describe, expect, it } from 'vitest';
  */
 function createTestContract(): SqlContract<SqlStorage> {
   const contractObj = defineContract<CodecTypes>()
-    .target('postgres')
+    .target(postgresPack)
     .table('user', (t) =>
       t
         .column('id', { type: int4Column, nullable: false })
@@ -38,9 +38,9 @@ function createTestContract(): SqlContract<SqlStorage> {
 
   return {
     ...contractObj,
-    extensions: {
+    extensionPacks: {
       postgres: {
-        version: '15.0.0',
+        version: '0.0.1',
       },
       pg: {},
     },
@@ -80,7 +80,7 @@ async function emitContract(
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensions: [],
+    extensionPacks: [],
   });
 
   // emitContract handles stripping mappings and validation internally
@@ -111,7 +111,7 @@ function loadContract(testDir: string): { contractIR: ContractIR; contractPath: 
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensions: [],
+    extensionPacks: [],
   });
   const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
   return { contractIR, contractPath };
@@ -135,7 +135,7 @@ async function verifyDatabase(options: {
       target: postgres,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensions: [],
+      extensionPacks: [],
     });
 
     return await familyInstance.verify({
@@ -150,65 +150,7 @@ async function verifyDatabase(options: {
   }
 }
 
-describe('family instance verify', () => {
-  it(
-    'verifies database with matching marker via driver',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        const testSetup = createTestDir();
-        const testDirWithDb = testSetup.testDir;
-        const cleanupWithDb = testSetup.cleanup;
-
-        try {
-          // Create and emit contract
-          const contract = createTestContract();
-          const contractWithDb = await emitContract(contract, testDirWithDb);
-
-          await withClient(connectionString, async (client) => {
-            // Setup marker schema and table
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
-
-            // Write marker matching contract
-            const write = writeContractMarker({
-              coreHash: contractWithDb.coreHash,
-              profileHash: contractWithDb.profileHash ?? contractWithDb.coreHash,
-              contractJson: contractWithDb,
-              canonicalVersion: 1,
-            });
-            await executeStatement(client, write.insert);
-          });
-
-          // Load contract and verify
-          const { contractIR, contractPath } = loadContract(testDirWithDb);
-          const result = await verifyDatabase({
-            contractIR,
-            dbUrl: connectionString,
-            contractPath,
-          });
-
-          const expectedContract: Record<string, unknown> = {
-            coreHash: contractWithDb.coreHash,
-          };
-          if (contractWithDb.profileHash) {
-            expectedContract['profileHash'] = contractWithDb.profileHash;
-          }
-
-          expect(result).toMatchObject({
-            ok: true,
-            summary: 'Database matches contract',
-            contract: expectedContract,
-            meta: { contractPath: expect.any(String) },
-          });
-          expect(result.timings.total).toBeGreaterThanOrEqual(0);
-        } finally {
-          cleanupWithDb();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
-
+describe('family instance verify - errors', () => {
   it(
     'reports error when marker is missing via driver',
     async () => {
@@ -375,72 +317,6 @@ describe('family instance verify', () => {
   );
 
   it(
-    'handles contract without profileHash',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        const testSetup = createTestDir();
-        const testDirWithDb = testSetup.testDir;
-        const cleanupWithDb = testSetup.cleanup;
-
-        try {
-          // Create and emit contract
-          const contract = createTestContract();
-          const contractWithDb = await emitContract(contract, testDirWithDb);
-
-          // Modify the contract JSON to remove profileHash
-          const contractJsonPath = resolve(testDirWithDb, 'output/contract.json');
-          const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
-          const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-          // Remove profileHash if present
-          if (Object.hasOwn(contractJson, 'profileHash')) {
-            const { profileHash: _profileHash, ...contractWithoutProfileHash } = contractJson;
-            await writeFile(
-              contractJsonPath,
-              JSON.stringify(contractWithoutProfileHash, null, 2),
-              'utf-8',
-            );
-          }
-
-          await withClient(connectionString, async (client) => {
-            // Setup marker schema and table
-            await executeStatement(client, ensureSchemaStatement);
-            await executeStatement(client, ensureTableStatement);
-
-            // Write marker matching contract (using coreHash for profileHash since contract doesn't have it)
-            const write = writeContractMarker({
-              coreHash: contractWithDb.coreHash,
-              profileHash: contractWithDb.coreHash, // Use coreHash since contract doesn't have profileHash
-              contractJson: contractWithDb,
-              canonicalVersion: 1,
-            });
-            await executeStatement(client, write.insert);
-          });
-
-          // Load contract and verify
-          const { contractIR, contractPath } = loadContract(testDirWithDb);
-          const result = await verifyDatabase({
-            contractIR,
-            dbUrl: connectionString,
-            contractPath,
-          });
-
-          // Should succeed and contractProfileHash should be undefined
-          expect(result).toMatchObject({
-            ok: true,
-            summary: 'Database matches contract',
-            contract: { coreHash: contractWithDb.coreHash },
-            meta: { contractPath: expect.any(String) },
-          });
-          expect(result.contract.profileHash).toBeUndefined();
-        } finally {
-          cleanupWithDb();
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
     'handles invalid contract structure (missing coreHash or target)',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
@@ -538,11 +414,4 @@ describe('family instance verify', () => {
     },
     timeouts.spinUpPpgDev,
   );
-
-  // Note: Target mismatch test is difficult to simulate because:
-  // 1. The contract is emitted from the same descriptors, so they always match
-  // 2. Modifying the contract.json changes the hash, making the marker invalid
-  // 3. The target check happens before hash validation, but requires a valid contract structure
-  // This scenario would only occur if someone manually edits contract.json after emission,
-  // which is not a realistic use case. The target mismatch check is covered by the implementation.
 });

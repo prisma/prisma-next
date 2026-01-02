@@ -104,7 +104,7 @@ const sqlFamily: FamilyDescriptor<'sql'> = {
   kind: 'family',
   id: 'sql',
   familyId: 'sql',
-  manifest: { /* ... */ },
+  version: '0.0.1',
 };
 
 // Use TargetDescriptor for target components
@@ -113,7 +113,8 @@ const postgresTarget: TargetDescriptor<'sql', 'postgres'> = {
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  manifest: { /* ... */ },
+  version: '0.0.1',
+  capabilities: { postgres: { returning: true } },
 };
 
 // Identity instance bases are extended by plane-specific instances
@@ -209,7 +210,7 @@ All contracts share these common fields:
 - **`coreHash`** (required): SHA-256 hash of the core schema structure
 - **`profileHash`** (optional): SHA-256 hash of the capability profile
 - **`capabilities`** (optional): Capability flags declared by the contract
-- **`extensions`** (optional): Extension packs and their configuration
+- **`extensionPacks`** (optional): Extension packs and their configuration
 - **`meta`** (optional): Non-semantic metadata (excluded from hashing)
 - **`sources`** (optional): Read-only sources (views, etc.) available for querying
 

@@ -1,3 +1,4 @@
+import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import type {
   ColumnBuilderState,
   ModelBuilderState,
@@ -123,9 +124,9 @@ class SqlContractBuilder<
     ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   > = Record<never, never>,
   CoreHash extends string | undefined = undefined,
-  Extensions extends Record<string, unknown> | undefined = undefined,
+  ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
-> extends ContractBuilder<Target, Tables, Models, CoreHash, Extensions, Capabilities> {
+> extends ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
   /**
    * This method is responsible for normalizing the contract IR by setting default values
    * for all required fields:
@@ -155,8 +156,8 @@ class SqlContractBuilder<
         readonly target: Target;
         readonly targetFamily: 'sql';
         readonly coreHash: CoreHash extends string ? CoreHash : string;
-      } & (Extensions extends Record<string, unknown>
-          ? { readonly extensions: Extensions }
+      } & (ExtensionPacks extends Record<string, unknown>
+          ? { readonly extensionPacks: ExtensionPacks }
           : Record<string, never>) &
         (Capabilities extends Record<string, Record<string, boolean>>
           ? { readonly capabilities: Capabilities }
@@ -174,8 +175,8 @@ class SqlContractBuilder<
           readonly target: Target;
           readonly targetFamily: 'sql';
           readonly coreHash: CoreHash extends string ? CoreHash : string;
-        } & (Extensions extends Record<string, unknown>
-            ? { readonly extensions: Extensions }
+        } & (ExtensionPacks extends Record<string, unknown>
+            ? { readonly extensionPacks: ExtensionPacks }
             : Record<string, never>) &
           (Capabilities extends Record<string, Record<string, boolean>>
             ? { readonly capabilities: Capabilities }
@@ -332,6 +333,14 @@ class SqlContractBuilder<
       operationTypes: {} as Record<string, never>,
     } as ContractBuilderMappings<CodecTypes>;
 
+    const extensionNamespaces = this.state.extensionNamespaces ?? [];
+    const extensionPacks: Record<string, unknown> = { ...(this.state.extensionPacks || {}) };
+    for (const namespace of extensionNamespaces) {
+      if (!Object.hasOwn(extensionPacks, namespace)) {
+        extensionPacks[namespace] = {};
+      }
+    }
+
     // Construct contract with explicit type that matches the generic parameters
     // This ensures TypeScript infers literal types from the generics, not runtime values
     // Always include relations, even if empty (normalized to empty object)
@@ -344,7 +353,7 @@ class SqlContractBuilder<
       relations: relationsPartial,
       storage,
       mappings,
-      extensions: this.state.extensions || {},
+      extensionPacks,
       capabilities: this.state.capabilities || {},
       meta: {},
       sources: {},
@@ -357,42 +366,88 @@ class SqlContractBuilder<
         Tables,
         Models,
         CoreHash,
-        Extensions,
+        ExtensionPacks,
         Capabilities
       >['build']
     >;
   }
 
   override target<T extends string>(
-    target: T,
-  ): SqlContractBuilder<CodecTypes, T, Tables, Models, CoreHash, Extensions, Capabilities> {
+    packRef: TargetPackRef<'sql', T>,
+  ): SqlContractBuilder<CodecTypes, T, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
     return new SqlContractBuilder<
       CodecTypes,
       T,
       Tables,
       Models,
       CoreHash,
-      Extensions,
+      ExtensionPacks,
       Capabilities
     >({
       ...this.state,
-      target,
+      target: packRef.targetId,
     });
   }
 
-  override extensions<E extends Record<string, unknown>>(
-    extensions: E,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, E, Capabilities> {
-    return new SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, E, Capabilities>({
+  extensionPacks(
+    packs: Record<string, ExtensionPackRef<'sql', string>>,
+  ): SqlContractBuilder<
+    CodecTypes,
+    Target,
+    Tables,
+    Models,
+    CoreHash,
+    ExtensionPacks,
+    Capabilities
+  > {
+    if (!this.state.target) {
+      throw new Error('extensionPacks() requires target() to be called first');
+    }
+
+    const namespaces = new Set(this.state.extensionNamespaces ?? []);
+
+    for (const packRef of Object.values(packs)) {
+      if (!packRef) continue;
+
+      if (packRef.kind !== 'extension') {
+        throw new Error(
+          `extensionPacks() only accepts extension pack refs. Received kind \"${packRef.kind}\".`,
+        );
+      }
+
+      if (packRef.familyId !== 'sql') {
+        throw new Error(
+          `extension pack \"${packRef.id}\" targets family \"${packRef.familyId}\" but this builder targets \"sql\".`,
+        );
+      }
+
+      if (packRef.targetId && packRef.targetId !== this.state.target) {
+        throw new Error(
+          `extension pack \"${packRef.id}\" targets \"${packRef.targetId}\" but builder target is \"${this.state.target}\".`,
+        );
+      }
+
+      namespaces.add(packRef.id);
+    }
+
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      CoreHash,
+      ExtensionPacks,
+      Capabilities
+    >({
       ...this.state,
-      extensions,
+      extensionNamespaces: [...namespaces],
     });
   }
 
   override capabilities<C extends Record<string, Record<string, boolean>>>(
     capabilities: C,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, Extensions, C> {
-    return new SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, Extensions, C>({
+  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, ExtensionPacks, C> {
+    return new SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, ExtensionPacks, C>({
       ...this.state,
       capabilities,
     });
@@ -400,8 +455,16 @@ class SqlContractBuilder<
 
   override coreHash<H extends string>(
     hash: H,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, H, Extensions, Capabilities> {
-    return new SqlContractBuilder<CodecTypes, Target, Tables, Models, H, Extensions, Capabilities>({
+  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, H, ExtensionPacks, Capabilities> {
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      H,
+      ExtensionPacks,
+      Capabilities
+    >({
       ...this.state,
       coreHash: hash,
     });
@@ -423,7 +486,7 @@ class SqlContractBuilder<
     Tables & Record<TableName, ReturnType<T['build']>>,
     Models,
     CoreHash,
-    Extensions,
+    ExtensionPacks,
     Capabilities
   > {
     const tableBuilder = new TableBuilder<TableName>(name);
@@ -437,7 +500,7 @@ class SqlContractBuilder<
       Tables & Record<TableName, ReturnType<T['build']>>,
       Models,
       CoreHash,
-      Extensions,
+      ExtensionPacks,
       Capabilities
     >({
       ...this.state,
@@ -467,7 +530,7 @@ class SqlContractBuilder<
     Tables,
     Models & Record<ModelName, ReturnType<M['build']>>,
     CoreHash,
-    Extensions,
+    ExtensionPacks,
     Capabilities
   > {
     const modelBuilder = new ModelBuilder<ModelName, TableName>(name, table);
@@ -481,7 +544,7 @@ class SqlContractBuilder<
       Tables,
       Models & Record<ModelName, ReturnType<M['build']>>,
       CoreHash,
-      Extensions,
+      ExtensionPacks,
       Capabilities
     >({
       ...this.state,

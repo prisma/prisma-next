@@ -119,7 +119,7 @@ describe('sql DSL builder', () => {
     it('encodes codec assignments from extension decorations for projections', () => {
       const contractWithCodecs = {
         ...contract,
-        extensions: {
+        extensionPacks: {
           postgres: {
             decorations: {
               columns: [
@@ -177,7 +177,7 @@ describe('sql DSL builder', () => {
     it('merges projection and parameter codec assignments', () => {
       const contractWithCodecs = {
         ...contract,
-        extensions: {
+        extensionPacks: {
           postgres: {
             decorations: {
               columns: [

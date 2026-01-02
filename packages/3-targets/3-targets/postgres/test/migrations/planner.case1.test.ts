@@ -58,7 +58,7 @@ function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
     id: 'pgvector',
     familyId: 'sql',
     targetId: 'postgres',
-    manifest: { id: 'pgvector', version: '0.0.0-test' },
+    version: '0.0.0-test',
     databaseDependencies: { init: [pgvectorDependency] },
     create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
   };
@@ -109,7 +109,7 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
       operationTypes: {},
     },
     capabilities: {},
-    extensions: {
+    extensionPacks: {
       pgvector: {},
     },
     meta: {},
@@ -194,7 +194,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       id: 'pgvector',
       familyId: 'sql',
       targetId: 'postgres',
-      manifest: { id: 'pgvector', version: '0.0.0-test' },
+      version: '0.0.0-test',
       // No databaseDependencies - planner should work without them
       databaseDependencies: {},
       create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,

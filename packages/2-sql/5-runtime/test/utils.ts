@@ -13,7 +13,11 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '../src/exports';
-import type { Extension, RuntimeContext } from '../src/sql-context';
+import type {
+  RuntimeContext,
+  SqlRuntimeAdapterInstance,
+  SqlRuntimeExtensionDescriptor,
+} from '../src/sql-context';
 
 /**
  * Executes a plan and collects all results into an array.
@@ -93,20 +97,82 @@ export async function writeTestContractMarker(
 }
 
 /**
+ * Creates a test adapter descriptor from a raw adapter.
+ * This wraps the adapter in a descriptor for descriptor-first context creation in tests.
+ * The adapter instance IS an Adapter (via intersection), with identity properties added.
+ */
+function createTestAdapterDescriptor(
+  adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+): {
+  readonly kind: 'adapter';
+  readonly id: string;
+  readonly version: string;
+  readonly familyId: 'sql';
+  readonly targetId: 'postgres';
+  create(): SqlRuntimeAdapterInstance<'postgres'>;
+} {
+  return {
+    kind: 'adapter' as const,
+    id: 'test-adapter',
+    version: '0.0.1',
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    create(): SqlRuntimeAdapterInstance<'postgres'> {
+      // Return an object that combines identity properties with the adapter's methods
+      return Object.assign(
+        {
+          familyId: 'sql' as const,
+          targetId: 'postgres' as const,
+        },
+        adapter,
+      );
+    },
+  };
+}
+
+/**
+ * Creates a test target descriptor.
+ * This is a minimal descriptor for descriptor-first context creation in tests.
+ */
+function createTestTargetDescriptor(): {
+  readonly kind: 'target';
+  readonly id: string;
+  readonly version: string;
+  readonly familyId: 'sql';
+  readonly targetId: 'postgres';
+  create(): { readonly familyId: 'sql'; readonly targetId: 'postgres' };
+} {
+  return {
+    kind: 'target' as const,
+    id: 'postgres',
+    version: '0.0.1',
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    create() {
+      return { familyId: 'sql' as const, targetId: 'postgres' as const };
+    },
+  };
+}
+
+/**
  * Creates a runtime context with standard test configuration.
  * This helper DRYs up the common pattern of context creation in tests.
+ *
+ * Accepts a raw adapter and optional extension descriptors, wrapping the
+ * adapter in a descriptor internally for descriptor-first context creation.
  */
 export function createTestContext<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,
   adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
   options?: {
-    extensions?: ReadonlyArray<Extension>;
+    extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   },
 ): RuntimeContext<TContract> {
-  return createRuntimeContext<TContract>({
+  return createRuntimeContext<TContract, 'postgres'>({
     contract,
-    adapter,
-    extensions: options?.extensions ?? [],
+    target: createTestTargetDescriptor(),
+    adapter: createTestAdapterDescriptor(adapter),
+    extensionPacks: options?.extensionPacks ?? [],
   });
 }
 

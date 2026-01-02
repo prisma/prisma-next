@@ -40,9 +40,8 @@ import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
 /**
- * Converts an OperationManifest (from ExtensionPackManifest) to a SqlOperationSignature.
- * This is SQL-family-specific conversion logic.
- * Used internally by instance creation and test utilities in the same package.
+ * Converts an OperationManifest (descriptor declarative data) to a SqlOperationSignature.
+ * This is SQL-family-specific conversion logic used by instance creation and test utilities.
  */
 export function convertOperationManifest(manifest: OperationManifest): SqlOperationSignature {
   return {
@@ -329,13 +328,10 @@ export interface SqlControlFamilyInstance
  */
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
-interface CreateSqlFamilyInstanceOptions<
-  TTargetId extends string = string,
-  TTargetDetails = Record<string, never>,
-> {
+interface CreateSqlFamilyInstanceOptions<TTargetId extends string, TTargetDetails> {
   readonly target: SqlControlTargetDescriptor<TTargetId, TTargetDetails>;
   readonly adapter: ControlAdapterDescriptor<'sql', string, SqlControlAdapter>;
-  readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
+  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', string>[];
 }
 
 /**
@@ -348,9 +344,9 @@ interface CreateSqlFamilyInstanceOptions<
 function buildSqlTypeMetadataRegistry(options: {
   readonly target: ControlTargetDescriptor<'sql', string>;
   readonly adapter: ControlAdapterDescriptor<'sql', string>;
-  readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
+  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', string>[];
 }): SqlTypeMetadataRegistry {
-  const { target, adapter, extensions } = options;
+  const { target, adapter, extensionPacks: extensions } = options;
   const registry = new Map<string, SqlTypeMetadata>();
 
   // Get targetId from adapter (they should match)
@@ -359,10 +355,10 @@ function buildSqlTypeMetadataRegistry(options: {
   // Collect descriptors to iterate over
   const descriptors = [target, adapter, ...extensions];
 
-  // Iterate over each descriptor's manifest
+  // Iterate over each descriptor's types
   for (const descriptor of descriptors) {
-    const manifest = descriptor.manifest;
-    const storageTypes = manifest.types?.storage;
+    const types = descriptor.types;
+    const storageTypes = types?.storage;
 
     if (!storageTypes) {
       continue;
@@ -389,11 +385,10 @@ function buildSqlTypeMetadataRegistry(options: {
 /**
  * Creates a SQL family instance for control-plane operations.
  */
-export function createSqlFamilyInstance<
-  TTargetId extends string = string,
-  TTargetDetails = Record<string, never>,
->(options: CreateSqlFamilyInstanceOptions<TTargetId, TTargetDetails>): SqlFamilyInstance {
-  const { target, adapter, extensions } = options;
+export function createSqlFamilyInstance<TTargetId extends string, TTargetDetails>(
+  options: CreateSqlFamilyInstanceOptions<TTargetId, TTargetDetails>,
+): SqlFamilyInstance {
+  const { target, adapter, extensionPacks: extensions = [] } = options;
 
   // Build descriptors array for assembly
   // Assembly functions only use manifest and id, so we can pass Control*Descriptor types directly
@@ -406,7 +401,11 @@ export function createSqlFamilyInstance<
   const extensionIds = extractExtensionIds(adapter, target, extensions);
 
   // Build type metadata registry from manifests
-  const typeMetadataRegistry = buildSqlTypeMetadataRegistry({ target, adapter, extensions });
+  const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
+    target,
+    adapter,
+    extensionPacks: extensions,
+  });
 
   /**
    * Strips mappings from a contract (mappings are runtime-only).

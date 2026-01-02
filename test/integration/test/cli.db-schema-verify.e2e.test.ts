@@ -51,7 +51,7 @@ function createTestContract(
     models: {},
     relations: {},
     mappings: {},
-    extensions: {},
+    extensionPacks: {},
     capabilities: {},
     meta: {},
     sources: {},
@@ -404,7 +404,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensions: [],
+  extensionPacks: [],
   contract: {
     source: './contract.ts',
     output: './src/prisma/contract.json',

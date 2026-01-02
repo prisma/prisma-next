@@ -6,7 +6,7 @@ Prisma Next supports target extensions like pgvector and PostGIS. Schema evoluti
 
 ## Update (v1 implementation)
 
-For v1, database-side prerequisites required by components (for example enabling `CREATE EXTENSION …`) are modeled as **component-owned database dependencies** declared on framework component descriptors and verified via pure schema-IR hooks. This avoids hardcoding ecosystem knowledge in targets and avoids inferring prerequisites from `contract.extensions`.
+For v1, database-side prerequisites required by components (for example enabling `CREATE EXTENSION …`) are modeled as **component-owned database dependencies** declared on framework component descriptors and verified via pure schema-IR hooks. This avoids hardcoding ecosystem knowledge in targets and avoids inferring prerequisites from `contract.extensionPacks`.
 
 See [ADR 154 — Component-owned database dependencies](ADR%20154%20-%20Component-owned%20database%20dependencies.md).
 

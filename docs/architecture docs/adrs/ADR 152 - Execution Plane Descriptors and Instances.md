@@ -68,11 +68,7 @@ Descriptors:
 export interface RuntimeFamilyDescriptor<
   TFamilyId extends string,
   TFamilyInstance extends RuntimeFamilyInstance<TFamilyId> = RuntimeFamilyInstance<TFamilyId>,
-> {
-  readonly kind: 'family';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly manifest: ExtensionPackManifest;
+> extends FamilyDescriptor<TFamilyId> {
   create<TTargetId extends string>(options: {
     readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
     readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId>;
@@ -88,12 +84,7 @@ export interface RuntimeTargetDescriptor<
     TFamilyId,
     TTargetId
   >,
-> {
-  readonly kind: 'target';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends TargetDescriptor<TFamilyId, TTargetId> {
   create(): TTargetInstance;
 }
 
@@ -104,12 +95,7 @@ export interface RuntimeAdapterDescriptor<
     TFamilyId,
     TTargetId
   >,
-> {
-  readonly kind: 'adapter';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends TargetBoundComponentDescriptor<'adapter', TFamilyId, TTargetId> {
   create(): TAdapterInstance;
 }
 
@@ -117,12 +103,7 @@ export interface RuntimeDriverDescriptor<
   TFamilyId extends string,
   TTargetId extends string,
   TDriverInstance extends RuntimeDriverInstance<TTargetId> = RuntimeDriverInstance<TTargetId>,
-> {
-  readonly kind: 'driver';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends TargetBoundComponentDescriptor<'driver', TFamilyId, TTargetId> {
   create(options: unknown): Promise<TDriverInstance> | TDriverInstance;
 }
 
@@ -133,15 +114,19 @@ export interface RuntimeExtensionDescriptor<
     TFamilyId,
     TTargetId
   > = RuntimeExtensionInstance<TFamilyId, TTargetId>,
-> {
-  readonly kind: 'extension';
-  readonly id: string;
-  readonly familyId: TFamilyId;
-  readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
+> extends TargetBoundComponentDescriptor<'extension', TFamilyId, TTargetId> {
   create(): TExtensionInstance;
 }
 ```
+
+Note: All runtime-plane descriptors extend base descriptor interfaces from `@prisma-next/contract/framework-components` which provide:
+- `kind`: Discriminator literal
+- `id`: Unique identifier
+- `version`: Component version (semver)
+- `targets?`: Target compatibility metadata
+- `capabilities?`: Capability declarations
+- `types?`: Type import specifications for contract.d.ts
+- `operations?`: Operation manifests for building registries
 
 Notes:
 

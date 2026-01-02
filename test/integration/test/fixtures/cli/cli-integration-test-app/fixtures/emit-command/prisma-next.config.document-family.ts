@@ -25,7 +25,7 @@ export default defineConfig({
     id: 'mongodb',
     familyId: 'document',
     targetId: 'mongodb',
-    manifest: { id: 'mongodb', version: '1.0.0' },
+    manifest: { id: 'mongodb', version: '0.0.1' },
     create: () => ({ familyId: 'document', targetId: 'mongodb' }),
   },
   adapter: {
@@ -33,7 +33,7 @@ export default defineConfig({
     id: 'mongodb',
     familyId: 'document',
     targetId: 'mongodb',
-    manifest: { id: 'mongodb', version: '1.0.0' },
+    manifest: { id: 'mongodb', version: '0.0.1' },
     create: () => ({ familyId: 'document', targetId: 'mongodb' }),
   },
   driver: {
@@ -41,7 +41,7 @@ export default defineConfig({
     id: 'mongodb',
     familyId: 'document',
     targetId: 'mongodb',
-    manifest: { id: 'mongodb', version: '1.0.0' },
+    manifest: { id: 'mongodb', version: '0.0.1' },
     create: async () => ({
       targetId: 'mongodb',
       query: async () => ({ rows: [] }),

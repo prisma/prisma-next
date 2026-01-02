@@ -10,12 +10,12 @@ Postgres target pack for Prisma Next.
 
 ## Purpose
 
-Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI config. The target descriptor includes the target manifest with capabilities and type information, as well as factories for creating migration planners and runners.
+Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI config. The target descriptor includes capabilities and type information directly as properties, as well as factories for creating migration planners and runners.
 
 ## Responsibilities
 
 - **Target Descriptor Export**: Exports the Postgres `SqlControlTargetDescriptor` for use in CLI configuration files
-- **Manifest Loading**: Loads the Postgres target manifest from `packs/manifest.json` with capabilities and type information
+- **Descriptor-First Design**: All declarative fields (version, capabilities, types, operations) are properties directly on the descriptor, eliminating the need for separate manifest files
 - **Multi-Plane Support**: Provides both migration-plane (control) and runtime-plane entry points for the Postgres target
 - **Planner Factory**: Implements `createPlanner()` to create Postgres-specific migration planners
 - **Runner Factory**: Implements `createRunner()` to create Postgres-specific migration runners
@@ -24,6 +24,7 @@ Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI c
 This package spans multiple planes:
 - **Migration plane** (`src/exports/control.ts`): Control plane entry point that exports `SqlControlTargetDescriptor` for config files
 - **Runtime plane** (`src/exports/runtime.ts`): Runtime entry point for target-specific runtime code (future)
+- **Authoring pack ref** (`src/exports/pack.ts`): Pure data surface for contract builder workflows
 
 ## Usage
 
@@ -40,7 +41,8 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 // - familyId: 'sql'
 // - targetId: 'postgres'
 // - id: 'postgres'
-// - manifest: ExtensionPackManifest
+// - version: '0.0.1'
+// - capabilities, types, operations (directly on descriptor)
 // - createPlanner(): creates a Postgres migration planner
 // - createRunner(): creates a Postgres migration runner
 
@@ -75,16 +77,24 @@ if (planResult.kind === 'success') {
 }
 ```
 
-### Runtime Plane
+### Pack refs for TypeScript contract authoring
 
 ```typescript
-// Runtime entry point (future)
-import { ... } from '@prisma-next/target-postgres/runtime';
+import postgresPack from '@prisma-next/target-postgres/pack';
+import pgvector from '@prisma-next/extension-pgvector/pack';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+
+export const contract = defineContract()
+  .target(postgresPack)
+  .extensionPacks({ pgvector })
+  .build();
 ```
+
+Pack refs are pure JSON-friendly objects that make TypeScript contract authoring work in both emit and no-emit workflows without requiring separate manifest files.
 
 ## Architecture
 
-This package provides both control and runtime entry points for the Postgres target. The control entry point loads the target manifest from `packs/manifest.json` and exports it as a `SqlControlTargetDescriptor`. The runtime entry point will provide target-specific runtime functionality in the future.
+This package provides both control and runtime entry points for the Postgres target. All declarative fields (version, capabilities, types, operations) are defined directly on the descriptor, so the published entry points never touch the filesystem. The `./pack` entry point provides a pure pack ref for contract authoring. The runtime entry point will provide target-specific runtime functionality in the future.
 
 ## Error Handling
 
@@ -106,7 +116,7 @@ See `@prisma-next/family-sql/control` README for full error code documentation.
 
 - **`@prisma-next/family-sql`**: SQL family types (`SqlControlTargetDescriptor`, `SqlControlFamilyInstance`)
 - **`@prisma-next/core-control-plane`**: Control plane types (`ControlTargetInstance`)
-- **`@prisma-next/contract`**: Manifest types (`ExtensionPackManifest`)
+- **`@prisma-next/sql-contract`**: Pack types (`TargetPackRef`)
 - **`arktype`**: Runtime validation
 
 **Dependents:**
@@ -116,6 +126,7 @@ See `@prisma-next/family-sql/control` README for full error code documentation.
 
 - `./control`: Control plane entry point for `SqlControlTargetDescriptor`
 - `./runtime`: Runtime entry point for target-specific runtime code (future)
+- `./pack`: Pure pack ref for `defineContract().target(postgresPack)`
 
 ## Tests
 

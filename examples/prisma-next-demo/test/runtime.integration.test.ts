@@ -1,17 +1,14 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { join, resolve } from 'node:path';
 import { loadContractFromTs } from '@prisma-next/cli';
-import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
-import pgvector from '@prisma-next/extension-pgvector/runtime';
 import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
+  assembleOperationRegistry,
+  convertOperationManifest,
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -25,25 +22,30 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
+import {
+  getSqlDescriptorBundle,
+  pgvectorExtensionDescriptor,
+  pgvectorExtensionRuntimeDescriptor,
+  postgresAdapterRuntimeDescriptor,
+  postgresTargetRuntimeDescriptor,
+} from '../../../test/integration/utils/framework-components';
 import { stampMarker } from '../scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
 
 let contract: ReturnType<typeof validateContract>;
 
 beforeAll(async () => {
-  const require = createRequire(import.meta.url);
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
-  // Dynamically resolve package directories
-  const adapterPath = dirname(require.resolve('@prisma-next/adapter-postgres/package.json'));
-  const pgvectorPath = dirname(require.resolve('@prisma-next/extension-pgvector/package.json'));
 
   const contractIR = await loadContractFromTs(contractPath);
-  const packs = loadExtensionPacks(adapterPath, [pgvectorPath]);
-  const operationRegistry = assembleOperationRegistryFromPacks(packs);
-  const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-  const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-  const extensionIds = extractExtensionIdsFromPacks(packs);
+  const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle({
+    extensions: [pgvectorExtensionDescriptor],
+  });
+  const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+  const codecTypeImports = extractCodecTypeImports(descriptors);
+  const operationTypeImports = extractOperationTypeImports(descriptors);
+  const extensionIds = extractExtensionIds(adapter, target, extensions);
 
   const result = await emit(
     contractIR,
@@ -72,8 +74,12 @@ describe('runtime execute integration', () => {
     'streams rows and enforces marker verification',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
+        const context = createRuntimeContext({
+          contract,
+          target: postgresTargetRuntimeDescriptor,
+          adapter: postgresAdapterRuntimeDescriptor,
+          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
+        });
         const tables = schema(context).tables;
         const userTable = tables['user']!;
         const root = sql({ context });
@@ -122,7 +128,6 @@ describe('runtime execute integration', () => {
           });
           return createRuntime({
             context,
-            adapter,
             driver,
             verify: { mode: 'always', requireMarker: true },
             plugins: [
@@ -193,16 +198,19 @@ describe('runtime execute integration', () => {
     'infers correct types from query plans',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
           cursor: { disabled: true },
         });
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
+        const context = createRuntimeContext({
+          contract,
+          target: postgresTargetRuntimeDescriptor,
+          adapter: postgresAdapterRuntimeDescriptor,
+          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
+        });
         const runtime = createRuntime({
           context,
-          adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
@@ -293,16 +301,19 @@ describe('runtime execute integration', () => {
     'enforces row budget on unbounded queries',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
           cursor: { disabled: true },
         });
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
+        const context = createRuntimeContext({
+          contract,
+          target: postgresTargetRuntimeDescriptor,
+          adapter: postgresAdapterRuntimeDescriptor,
+          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
+        });
         const runtime = createRuntime({
           context,
-          adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
@@ -379,16 +390,19 @@ describe('runtime execute integration', () => {
     'enforces streaming row budget',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        const adapter = createPostgresAdapter();
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
           cursor: { disabled: true },
         });
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
+        const context = createRuntimeContext({
+          contract,
+          target: postgresTargetRuntimeDescriptor,
+          adapter: postgresAdapterRuntimeDescriptor,
+          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
+        });
         const runtime = createRuntime({
           context,
-          adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
@@ -450,16 +464,19 @@ describe('runtime execute integration', () => {
     'includeMany returns users with nested posts array',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        const adapter = createPostgresAdapter();
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
           cursor: { disabled: true },
         });
-        const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
+        const context = createRuntimeContext({
+          contract,
+          target: postgresTargetRuntimeDescriptor,
+          adapter: postgresAdapterRuntimeDescriptor,
+          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
+        });
         const runtime = createRuntime({
           context,
-          adapter,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [

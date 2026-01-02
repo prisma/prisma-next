@@ -14,7 +14,7 @@ export const emptyTypeMetadataRegistry = new Map<string, { nativeType?: string }
  */
 export function createTestContract(
   tables: Record<string, StorageTable>,
-  extensions: Record<string, unknown> = {},
+  extensionPacks: Record<string, unknown> = {},
 ): SqlContract<SqlStorage> {
   return {
     schemaVersion: '1',
@@ -28,7 +28,7 @@ export function createTestContract(
       codecTypes: {},
       operationTypes: {},
     },
-    extensions,
+    extensionPacks,
   } as SqlContract<SqlStorage>;
 }
 

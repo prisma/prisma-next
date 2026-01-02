@@ -24,8 +24,8 @@ function validateCoreStructure(ir: ContractIR): void {
   if (!ir.relations || typeof ir.relations !== 'object') {
     throw new Error('ContractIR must have relations');
   }
-  if (!ir.extensions || typeof ir.extensions !== 'object') {
-    throw new Error('ContractIR must have extensions');
+  if (!ir.extensionPacks || typeof ir.extensionPacks !== 'object') {
+    throw new Error('ContractIR must have extensionPacks');
   }
   if (!ir.capabilities || typeof ir.capabilities !== 'object') {
     throw new Error('ContractIR must have capabilities');
@@ -64,7 +64,7 @@ export async function emit(
     models: ir.models,
     relations: ir.relations,
     storage: ir.storage,
-    extensions: ir.extensions,
+    extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
     meta: ir.meta,
     sources: ir.sources,

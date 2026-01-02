@@ -247,12 +247,12 @@ describe('verifySqlSchema with databaseDependencies', () => {
         frameworkComponents: [], // No extensions provided - configuration mismatch!
       }),
     ).toThrow(
-      "Extension 'pgvector' is declared in the contract but not found in framework components",
+      "Extension pack 'pgvector' is declared in the contract but not found in framework components",
     );
   });
 
-  it('does not infer dependencies from contract.extensions (ADR 154)', () => {
-    // Per ADR 154, we do NOT interpret contract.extensions as database prerequisites.
+  it('does not infer dependencies from contract extension packs (ADR 154)', () => {
+    // Per ADR 154, we do NOT interpret contract extension packs as database prerequisites.
     // Dependencies are only collected from frameworkComponents.
     // However, we DO validate that extensions in the contract are present in frameworkComponents.
     const contract = createTestContract(

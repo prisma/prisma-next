@@ -33,36 +33,15 @@ Introduce Target Extension Packs as versioned, installable modules that declare 
 - Not a vehicle for arbitrary execution in CI or hosted services
 - Not required to ship migration operations or node tasks (those live in the migration ops ecosystem and may be packaged separately)
 
-## Pack Manifest
+## Pack Descriptor Metadata
 
-Each pack must export a JSON manifest at `package.json["prismaExtensionPack"]`:
+Each pack exports ESM descriptors (target, adapter, driver, extensions) that include:
 
-```json
-{
-  "prismaExtensionPack": {
-    "namespace": "pgvector",
-    "version": "1.2.0",
-    "targets": [
-      { "profile": "postgres@15", "minAdapter": "1.0.0" }
-    ],
-    "capabilities": {
-      "ivfflat": { "kind": "flag" },
-      "hnsw": { "kind": "flag" },
-      "vector": { "kind": "type", "params": ["dim", "distance"] }
-    },
-    "entrypoints": {
-      "contract": "./dist/contract.js",
-      "psl": "./dist/psl.js",
-      "ts": "./dist/ts.js",
-      "adapter": "./dist/adapter.js",
-      "codecs": "./dist/codecs.js",
-      "lint": "./dist/lint.js"
-    },
-    "engines": { "node": ">=18.17" },
-    "integrity": "sha256-…"
-  }
-}
-```
+- `id`, `familyId`, `targetId`, `version`
+- Declarative metadata (`capabilities`, `types`, `operations`)
+- Plane-specific factories (`create()`, `migrations`, runtime hooks)
+
+These descriptors are the single source of truth for pack metadata. The CLI and emitter import descriptor modules directly rather than parsing JSON manifests. Contract authoring surfaces use pack refs (JSON-safe snapshots) derived from these descriptors when wiring targets, adapters, and extensions.
 
 ## SPIs
 
@@ -150,7 +129,7 @@ export interface LintSPI {
 ### Runtime/Adapter
 
 - On connect, adapter advertises capability flags per ADR 065
-- Runtime inspects `contract.extensions` and ensures matching packs are present for namespaces that require runtime participation (e.g., codecs)
+- Runtime inspects `contract.extensionPacks` and ensures matching packs are present for namespaces that require runtime participation (e.g., codecs)
 - If a required pack is missing or incompatible, runtime fails early with a stable error code
 
 ### CI/Preflight

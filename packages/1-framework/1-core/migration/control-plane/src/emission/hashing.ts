@@ -9,7 +9,7 @@ type ContractInput = {
   models: Record<string, unknown>;
   relations: Record<string, unknown>;
   storage: Record<string, unknown>;
-  extensions: Record<string, unknown>;
+  extensionPacks: Record<string, unknown>;
   sources: Record<string, unknown>;
   capabilities: Record<string, Record<string, boolean>>;
   meta: Record<string, unknown>;
@@ -30,7 +30,7 @@ export function computeCoreHash(contract: ContractInput): string {
     models: contract.models,
     relations: contract.relations,
     storage: contract.storage,
-    extensions: contract.extensions,
+    extensionPacks: contract.extensionPacks,
     sources: contract.sources,
     capabilities: contract.capabilities,
     meta: contract.meta,
@@ -47,7 +47,7 @@ export function computeProfileHash(contract: ContractInput): string {
     models: {},
     relations: {},
     storage: {},
-    extensions: {},
+    extensionPacks: {},
     capabilities: contract.capabilities,
     meta: {},
     sources: {},

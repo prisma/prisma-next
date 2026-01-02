@@ -79,15 +79,23 @@ export interface ContractBuilderState<
     ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   >,
   CoreHash extends string | undefined = string | undefined,
-  Extensions extends Record<string, unknown> | undefined = undefined,
+  ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > {
   readonly target?: Target;
   readonly tables: Tables;
   readonly models: Models;
   readonly coreHash?: CoreHash;
-  readonly extensions?: Extensions;
+  readonly extensionPacks?: ExtensionPacks;
   readonly capabilities?: Capabilities;
+  /**
+   * Array of extension pack namespace identifiers (e.g., ['pgvector', 'postgis']).
+   * Populated when extension packs are registered during contract building.
+   * Used to track which extension packs are included in the contract.
+   * Can be undefined or empty if no extension packs are registered.
+   * Namespace format matches the extension pack ID (e.g., 'pgvector', not 'pgvector@1.0.0').
+   */
+  readonly extensionNamespaces?: readonly string[];
 }
 
 export interface ColumnBuilder<Name extends string, Nullable extends boolean, Type extends string> {

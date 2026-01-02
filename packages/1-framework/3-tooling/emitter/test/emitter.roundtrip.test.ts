@@ -22,9 +22,9 @@ const mockSqlHook: TargetFamilyHook = {
     }
 
     const referencedNamespaces = new Set<string>();
-    const extensions = ir.extensions as Record<string, unknown> | undefined;
-    if (extensions) {
-      for (const namespace of Object.keys(extensions)) {
+    const extensionPacks = ir.extensionPacks as Record<string, unknown> | undefined;
+    if (extensionPacks) {
+      for (const namespace of Object.keys(extensionPacks)) {
         referencedNamespaces.add(namespace);
       }
     }
@@ -53,7 +53,7 @@ const mockSqlHook: TargetFamilyHook = {
               continue;
             }
             throw new Error(
-              `Column "${colName}" in table "${tableName}" uses codecId "${column.codecId}" from namespace "${namespace}" which is not referenced in contract.extensions`,
+              `Column "${colName}" in table "${tableName}" uses codecId "${column.codecId}" from namespace "${namespace}" which is not referenced in contract.extensionPacks`,
             );
           }
         }
@@ -94,8 +94,8 @@ describe('emitter round-trip', () => {
             },
           },
         },
-        extensions: {
-          postgres: { version: '15.0.0' },
+        extensionPacks: {
+          postgres: { version: '0.0.1' },
           pg: {},
         },
       });
@@ -123,7 +123,7 @@ describe('emitter round-trip', () => {
         models: contractJson1['models'] as Record<string, unknown>,
         relations: (contractJson1['relations'] as Record<string, unknown>) || {},
         storage: contractJson1['storage'] as Record<string, unknown>,
-        extensions: contractJson1['extensions'] as Record<string, unknown>,
+        extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
         capabilities:
           (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
         meta: (contractJson1['meta'] as Record<string, unknown>) || {},
@@ -192,8 +192,8 @@ describe('emitter round-trip', () => {
           },
         },
       },
-      extensions: {
-        postgres: { version: '15.0.0' },
+      extensionPacks: {
+        postgres: { version: '0.0.1' },
       },
     });
 
@@ -220,7 +220,7 @@ describe('emitter round-trip', () => {
       models: contractJson1['models'] as Record<string, unknown>,
       relations: (contractJson1['relations'] as Record<string, unknown>) || {},
       storage: contractJson1['storage'] as Record<string, unknown>,
-      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
       capabilities:
         (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: (contractJson1['meta'] as Record<string, unknown>) || {},
@@ -250,8 +250,8 @@ describe('emitter round-trip', () => {
           },
         },
       },
-      extensions: {
-        postgres: { version: '15.0.0' },
+      extensionPacks: {
+        postgres: { version: '0.0.1' },
         pg: {},
       },
     });
@@ -279,7 +279,7 @@ describe('emitter round-trip', () => {
       models: contractJson1['models'] as Record<string, unknown>,
       relations: (contractJson1['relations'] as Record<string, unknown>) || {},
       storage: contractJson1['storage'] as Record<string, unknown>,
-      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
       capabilities:
         (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: (contractJson1['meta'] as Record<string, unknown>) || {},
@@ -319,8 +319,8 @@ describe('emitter round-trip', () => {
           },
         },
       },
-      extensions: {
-        postgres: { version: '15.0.0' },
+      extensionPacks: {
+        postgres: { version: '0.0.1' },
         pg: {},
       },
       capabilities: {
@@ -354,7 +354,7 @@ describe('emitter round-trip', () => {
       models: contractJson1['models'] as Record<string, unknown>,
       relations: (contractJson1['relations'] as Record<string, unknown>) || {},
       storage: contractJson1['storage'] as Record<string, unknown>,
-      extensions: contractJson1['extensions'] as Record<string, unknown>,
+      extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
       capabilities:
         (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: (contractJson1['meta'] as Record<string, unknown>) || {},

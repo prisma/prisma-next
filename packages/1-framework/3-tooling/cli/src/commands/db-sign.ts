@@ -15,7 +15,10 @@ import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { performAction } from '../utils/action';
 import { setCommandDescriptions } from '../utils/command-helpers';
-import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
+import {
+  assertContractRequirementsSatisfied,
+  assertFrameworkComponentsCompatible,
+} from '../utils/framework-components';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -134,27 +137,35 @@ export function createDbSignCommand(): Command {
         // Store driver descriptor after null check
         const driverDescriptor = config.driver;
 
-        // Create driver
+        // Create family instance (needed for contract validation - no DB connection required)
+        const familyInstance = config.family.create({
+          target: config.target,
+          adapter: config.adapter,
+          driver: driverDescriptor,
+          extensionPacks: config.extensionPacks ?? [],
+        });
+
+        // Validate contract using instance validator (fail-fast before DB connection)
+        const contractIR = familyInstance.validateContractIR(contractJson);
+        assertContractRequirementsSatisfied({
+          contract: contractIR,
+          family: config.family,
+          target: config.target,
+          adapter: config.adapter,
+          extensionPacks: config.extensionPacks,
+        });
+
+        const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
+        const frameworkComponents = assertFrameworkComponentsCompatible(
+          config.family.familyId,
+          config.target.targetId,
+          rawComponents,
+        );
+
+        // Create driver (expensive operation - done after validation)
         const driver = await driverDescriptor.create(dbUrl);
 
         try {
-          // Create family instance
-          const familyInstance = config.family.create({
-            target: config.target,
-            adapter: config.adapter,
-            driver: driverDescriptor,
-            extensions: config.extensions ?? [],
-          });
-          const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
-          const frameworkComponents = assertFrameworkComponentsCompatible(
-            config.family.familyId,
-            config.target.targetId,
-            rawComponents,
-          );
-
-          // Validate contract using instance validator
-          const contractIR = familyInstance.validateContractIR(contractJson);
-
           // Schema verification precondition with spinner
           let schemaVerifyResult: VerifyDatabaseSchemaResult;
           try {

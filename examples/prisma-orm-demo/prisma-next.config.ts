@@ -8,7 +8,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensions: [],
+  extensionPacks: [],
   contract: {
     source: contract,
     output: 'src/prisma-next/contract.json',

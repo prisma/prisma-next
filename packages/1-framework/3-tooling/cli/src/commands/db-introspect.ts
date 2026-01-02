@@ -12,6 +12,7 @@ import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { performAction } from '../utils/action';
 import { setCommandDescriptions } from '../utils/command-helpers';
+import { assertContractRequirementsSatisfied } from '../utils/framework-components';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -142,12 +143,20 @@ export function createDbIntrospectCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensions: config.extensions ?? [],
+            extensionPacks: config.extensionPacks ?? [],
           });
 
           // Validate contract IR if we loaded it
           if (contractIR) {
-            contractIR = familyInstance.validateContractIR(contractIR);
+            const validatedContract = familyInstance.validateContractIR(contractIR);
+            assertContractRequirementsSatisfied({
+              contract: validatedContract,
+              family: config.family,
+              target: config.target,
+              adapter: config.adapter,
+              extensionPacks: config.extensionPacks,
+            });
+            contractIR = validatedContract;
           }
 
           // Call family instance introspect method

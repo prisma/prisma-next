@@ -35,11 +35,11 @@ This separation allows:
 
 **Extension objects** (pack-owned, deterministic)
 
-Packs emit view definitions and metadata to `contract.extensions.<namespace>.views[]`:
+Packs emit view definitions and metadata to `contract.extensionPacks.<namespace>.views[]`:
 
 ```json
 {
-  "extensions": {
+  "extensionPacks": {
     "postgres": {
       "version": "15.0",
       "views": [
@@ -343,7 +343,7 @@ pg.view daily_signups {
 **Emitted contract:**
 ```json
 {
-  "extensions": {
+  "extensionPacks": {
     "postgres": {
       "views": [
         {

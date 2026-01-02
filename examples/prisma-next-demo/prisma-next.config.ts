@@ -12,7 +12,7 @@ export default defineConfig({
   target: postgres,
   driver: postgresDriver,
   adapter: postgresAdapter,
-  extensions: [pgvector],
+  extensionPacks: [pgvector],
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',

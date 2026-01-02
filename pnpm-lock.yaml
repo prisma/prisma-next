@@ -102,6 +102,9 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/cli
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/1-core/migration/control-plane
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/emitter
@@ -955,6 +958,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/contract
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/runtime/execution-plane
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/operations
@@ -1016,6 +1022,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../2-sql/5-runtime
+      '@prisma-next/target-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/3-targets/postgres
     devDependencies:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*

@@ -1,6 +1,5 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import {
   createTestRuntimeFromClient,
   setupE2EDatabase,
@@ -8,8 +7,11 @@ import {
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
+import {
+  createStubAdapter,
+  createTestContext,
+  executePlanAndCollect,
+} from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
@@ -37,10 +39,10 @@ describe('end-to-end nested projection queries', () => {
             ]);
           });
 
-          const adapter = createPostgresAdapter();
+          const adapter = createStubAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
+            const context = createTestContext(contract, adapter);
             const tables = schema<Contract>(context).tables;
             const user = tables.user!;
             const plan = sql({ context })
@@ -116,10 +118,10 @@ describe('end-to-end nested projection queries', () => {
             ]);
           });
 
-          const adapter = createPostgresAdapter();
+          const adapter = createStubAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
+            const context = createTestContext(contract, adapter);
             const tables = schema<Contract>(context).tables;
             const user = tables.user!;
             const plan = sql({ context })
@@ -198,10 +200,10 @@ describe('end-to-end nested projection queries', () => {
             ]);
           });
 
-          const adapter = createPostgresAdapter();
+          const adapter = createStubAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
+            const context = createTestContext(contract, adapter);
             const tables = schema(context).tables;
             const user = tables.user!;
             const post = tables.post!;
@@ -285,10 +287,10 @@ describe('end-to-end nested projection queries', () => {
             ]);
           });
 
-          const adapter = createPostgresAdapter();
+          const adapter = createStubAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
-            const context = createRuntimeContext({ contract, adapter, extensions: [] });
+            const context = createTestContext(contract, adapter);
             const tables = schema(context).tables;
             const user = tables.user!;
             const plan = sql({ context })

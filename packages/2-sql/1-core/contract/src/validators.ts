@@ -79,7 +79,7 @@ const SqlContractSchema = type({
   coreHash: 'string',
   'profileHash?': 'string',
   'capabilities?': 'Record<string, Record<string, boolean>>',
-  'extensions?': 'Record<string, unknown>',
+  'extensionPacks?': 'Record<string, unknown>',
   'meta?': 'Record<string, unknown>',
   'sources?': 'Record<string, unknown>',
   models: type({ '[string]': ModelSchema }),

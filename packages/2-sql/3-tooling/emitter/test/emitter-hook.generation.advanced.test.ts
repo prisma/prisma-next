@@ -1,11 +1,20 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import type {
+  ControlAdapterDescriptor,
+  ControlExtensionDescriptor,
+  ControlTargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
 import {
-  extractCodecTypeImportsFromPacks,
-  extractOperationTypeImportsFromPacks,
+  extractCodecTypeImports,
+  extractOperationTypeImports,
 } from '../../family/src/core/assembly';
 import { sqlTargetFamilyHook } from '../src/index';
+
+type TestDescriptor =
+  | ControlTargetDescriptor<'sql', string>
+  | ControlAdapterDescriptor<'sql', string>
+  | ControlExtensionDescriptor<'sql', string>;
 
 function createContractIR(overrides: Partial<ContractIR>): ContractIR {
   return {
@@ -207,22 +216,22 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates mappings type with explicitly empty models and codecTypes', () => {
-    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
+    const descriptors: TestDescriptor[] = [
       {
-        manifest: {
-          id: 'test-adapter',
-          version: '1.0.0',
-          types: {
-            codecTypes: {
-              import: {
-                package: '@test/adapter/codec-types',
-                named: 'CodecTypes',
-                alias: 'TestTypes',
-              },
+        kind: 'adapter',
+        id: 'test-adapter',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@test/adapter/codec-types',
+              named: 'CodecTypes',
+              alias: 'TestTypes',
             },
           },
         },
-        path: '/path/to/pack',
       },
     ];
 
@@ -243,8 +252,8 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+    const codecTypeImports = extractCodecTypeImports(descriptors);
+    const operationTypeImports = extractOperationTypeImports(descriptors);
     const types = sqlTargetFamilyHook.generateContractTypes(
       ir,
       codecTypeImports,
@@ -255,7 +264,7 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('operationTypes: Record<string, never>');
   });
 
-  it('generates mappings type with default models and codecTypes from packs', () => {
+  it('generates mappings type with default models and codecTypes from descriptors', () => {
     const ir = createContractIR({
       storage: {
         tables: {
@@ -272,27 +281,27 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
+    const descriptors: TestDescriptor[] = [
       {
-        manifest: {
-          id: 'test-adapter',
-          version: '1.0.0',
-          types: {
-            codecTypes: {
-              import: {
-                package: '@test/adapter/codec-types',
-                named: 'CodecTypes',
-                alias: 'TestTypes',
-              },
+        kind: 'adapter',
+        id: 'test-adapter',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@test/adapter/codec-types',
+              named: 'CodecTypes',
+              alias: 'TestTypes',
             },
           },
         },
-        path: '/path/to/pack',
       },
     ];
 
-    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+    const codecTypeImports = extractCodecTypeImports(descriptors);
+    const operationTypeImports = extractOperationTypeImports(descriptors);
     const types = sqlTargetFamilyHook.generateContractTypes(
       ir,
       codecTypeImports,
@@ -605,98 +614,100 @@ describe('sql-target-family-hook', () => {
   });
 
   it('gets types imports with multiple extensions', () => {
-    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
+    const descriptors: TestDescriptor[] = [
       {
-        manifest: {
-          id: 'test-adapter',
-          version: '1.0.0',
-          types: {
-            codecTypes: {
-              import: {
-                package: '@test/adapter/codec-types',
-                named: 'CodecTypes',
-                alias: 'TestTypes',
-              },
+        kind: 'adapter',
+        id: 'test-adapter',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@test/adapter/codec-types',
+              named: 'CodecTypes',
+              alias: 'TestTypes',
             },
           },
         },
-        path: '/path/to/pack',
       },
       {
-        manifest: {
-          id: 'test-extension',
-          version: '1.0.0',
-          types: {
-            codecTypes: {
-              import: {
-                package: '@test/extension/codec-types',
-                named: 'CodecTypes',
-                alias: 'ExtensionTypes',
-              },
+        kind: 'extension',
+        id: 'test-extension',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@test/extension/codec-types',
+              named: 'CodecTypes',
+              alias: 'ExtensionTypes',
             },
           },
         },
-        path: '/path/to/extension',
       },
     ];
 
-    const codecImports = extractCodecTypeImportsFromPacks(packs);
-    const operationImports = extractOperationTypeImportsFromPacks(packs);
+    const codecImports = extractCodecTypeImports(descriptors);
+    const operationImports = extractOperationTypeImports(descriptors);
     expect(codecImports.length).toBe(2);
     expect(codecImports[0]?.package).toBe('@test/adapter/codec-types');
     expect(codecImports[1]?.package).toBe('@test/extension/codec-types');
     expect(operationImports.length).toBe(0);
   });
 
-  it('gets types imports with packs without codecTypes', () => {
-    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
+  it('gets types imports with descriptors without codecTypes', () => {
+    const descriptors: TestDescriptor[] = [
       {
-        manifest: {
-          id: 'test-adapter',
-          version: '1.0.0',
-        },
-        path: '/path/to/pack',
+        kind: 'adapter',
+        id: 'test-adapter',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
       },
     ];
 
-    const codecImports = extractCodecTypeImportsFromPacks(packs);
-    const operationImports = extractOperationTypeImportsFromPacks(packs);
+    const codecImports = extractCodecTypeImports(descriptors);
+    const operationImports = extractOperationTypeImports(descriptors);
     expect(codecImports.length).toBe(0);
     expect(operationImports.length).toBe(0);
   });
 
   it('gets types imports using extractCodecTypeImports and extractOperationTypeImports', () => {
-    const packs: { readonly manifest: ExtensionPackManifest; readonly path: string }[] = [
+    const descriptors: TestDescriptor[] = [
       {
-        manifest: {
-          id: 'test-adapter',
-          version: '1.0.0',
-          types: {
-            codecTypes: {
-              import: {
-                package: '@test/adapter/codec-types',
-                named: 'CodecTypes',
-                alias: 'TestTypes',
-              },
+        kind: 'adapter',
+        id: 'test-adapter',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@test/adapter/codec-types',
+              named: 'CodecTypes',
+              alias: 'TestTypes',
             },
-            operationTypes: {
-              import: {
-                package: '@test/adapter/operation-types',
-                named: 'OperationTypes',
-                alias: 'TestOps',
-              },
+          },
+          operationTypes: {
+            import: {
+              package: '@test/adapter/operation-types',
+              named: 'OperationTypes',
+              alias: 'TestOps',
             },
           },
         },
-        path: '/path/to/pack',
       },
     ];
 
-    const codecImports = extractCodecTypeImportsFromPacks(packs);
-    const operationImports = extractOperationTypeImportsFromPacks(packs);
-    expect(codecImports.length).toBe(1);
-    expect(codecImports[0]?.package).toBe('@test/adapter/codec-types');
-    expect(operationImports.length).toBe(1);
-    expect(operationImports[0]?.package).toBe('@test/adapter/operation-types');
+    const codecImports = extractCodecTypeImports(descriptors);
+    const operationImports = extractOperationTypeImports(descriptors);
+    expect(codecImports).toEqual([
+      { package: '@test/adapter/codec-types', named: 'CodecTypes', alias: 'TestTypes' },
+    ]);
+    expect(operationImports).toEqual([
+      { package: '@test/adapter/operation-types', named: 'OperationTypes', alias: 'TestOps' },
+    ]);
   });
 });

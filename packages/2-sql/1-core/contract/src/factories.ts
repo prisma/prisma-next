@@ -111,7 +111,7 @@ export function contract(opts: {
   targetFamily?: 'sql';
   profileHash?: string;
   capabilities?: Record<string, Record<string, boolean>>;
-  extensions?: Record<string, unknown>;
+  extensionPacks?: Record<string, unknown>;
   meta?: Record<string, unknown>;
   sources?: Record<string, unknown>;
 }): SqlContract {
@@ -126,7 +126,7 @@ export function contract(opts: {
     mappings: (opts.mappings ?? {}) as SqlMappings,
     ...(opts.profileHash !== undefined && { profileHash: opts.profileHash }),
     ...(opts.capabilities !== undefined && { capabilities: opts.capabilities }),
-    ...(opts.extensions !== undefined && { extensions: opts.extensions }),
+    ...(opts.extensionPacks !== undefined && { extensionPacks: opts.extensionPacks }),
     ...(opts.meta !== undefined && { meta: opts.meta }),
     ...(opts.sources !== undefined && { sources: opts.sources as Record<string, unknown> }),
   } as SqlContract;

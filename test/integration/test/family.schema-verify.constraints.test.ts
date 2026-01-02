@@ -1,11 +1,13 @@
 /**
  * Constraint verification tests: primary key, foreign key, unique.
  */
+
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   type CodecTypes,
   defineContract,
   int4Column,
+  postgresPack,
   runSchemaVerify,
   textColumn,
   timeouts,
@@ -34,7 +36,7 @@ describe('family instance schemaVerify - constraints', () => {
       'returns ok=false with primary_key_mismatch issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -89,7 +91,7 @@ describe('family instance schemaVerify - constraints', () => {
       'returns ok=false with foreign_key_mismatch issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })

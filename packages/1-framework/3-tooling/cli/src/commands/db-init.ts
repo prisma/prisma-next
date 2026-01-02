@@ -22,7 +22,10 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
-import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
+import {
+  assertContractRequirementsSatisfied,
+  assertFrameworkComponentsCompatible,
+} from '../utils/framework-components';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   type DbInitResult,
@@ -199,9 +202,9 @@ export function createDbInitCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensions: config.extensions ?? [],
+            extensionPacks: config.extensionPacks ?? [],
           });
-          const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+          const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
           const frameworkComponents = assertFrameworkComponentsCompatible(
             config.family.familyId,
             config.target.targetId,
@@ -210,6 +213,13 @@ export function createDbInitCommand(): Command {
 
           // Validate contract
           const contractIR = familyInstance.validateContractIR(contractJson);
+          assertContractRequirementsSatisfied({
+            contract: contractIR,
+            family: config.family,
+            target: config.target,
+            adapter: config.adapter,
+            extensionPacks: config.extensionPacks,
+          });
 
           // Create planner and runner from target migrations capability
           const planner = migrations.createPlanner(familyInstance);

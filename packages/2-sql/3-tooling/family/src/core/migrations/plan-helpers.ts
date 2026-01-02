@@ -91,7 +91,7 @@ function freezeOperations<TTargetDetails>(
   return Object.freeze(operations.map((operation) => freezeOperation(operation)));
 }
 
-export function createMigrationPlan<TTargetDetails = Record<string, never>>(
+export function createMigrationPlan<TTargetDetails>(
   options: CreateSqlMigrationPlanOptions<TTargetDetails>,
 ): SqlMigrationPlan<TTargetDetails> {
   return Object.freeze({

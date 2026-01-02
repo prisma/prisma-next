@@ -48,6 +48,10 @@
     "./runtime": {
       "types": "./dist/exports/runtime.d.ts",
       "import": "./dist/exports/runtime.js"
+    },
+    "./pack": {
+      "types": "./dist/exports/pack.d.ts",
+      "import": "./dist/exports/pack.js"
     }
   }
 }

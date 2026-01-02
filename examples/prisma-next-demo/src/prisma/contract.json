@@ -2,8 +2,8 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:e178b85f854fc6c5d26637dc5f2d65b6a9d3587293cd860331b6e0d78b3d8761",
-  "profileHash": "sha256:685b5ca1c6135f0c44f6545694b75a136addc2d74f3a76e22428cd66e293c4a8",
+  "coreHash": "sha256:5c01f5eafa94d2009d0d2b299918b3429bdb33057498116dd4c9e4116217fec2",
+  "profileHash": "sha256:58a1990244c9a8cf20e2f77c60aa35d2f6ea9823f641b533a9e75abc8606819f",
   "models": {
     "Post": {
       "fields": {
@@ -115,7 +115,7 @@
       "returning": true
     }
   },
-  "extensions": {
+  "extensionPacks": {
     "pgvector": {}
   },
   "meta": {},

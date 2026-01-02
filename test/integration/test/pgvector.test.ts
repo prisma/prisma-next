@@ -1,49 +1,48 @@
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractOperationTypeImportsFromPacks,
+  assembleOperationRegistry,
+  convertOperationManifest,
+  extractCodecTypeImports,
+  extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../utils/framework-components';
 
 describe('pgvector extension pack integration', () => {
-  it('loads extension pack manifest', () => {
-    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
-    const packs = loadExtensionPacks(undefined, [packPath]);
-
-    expect(packs.length).toBe(1);
-    const pack = packs[0];
-    expect(pack).toBeDefined();
-    expect(pack?.manifest.id).toBe('pgvector');
-    expect(pack?.manifest.version).toBe('1.0.0');
+  it('exposes pgvector descriptor metadata', () => {
+    expect(pgvectorExtensionDescriptor.id).toBe('pgvector');
+    expect(pgvectorExtensionDescriptor.version).toBe('0.0.1');
   });
 
-  it('extracts codec type imports from pack', () => {
-    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
-    const packs = loadExtensionPacks(undefined, [packPath]);
+  it('extracts codec type imports from descriptors', () => {
+    const { descriptors } = getSqlDescriptorBundle({
+      extensions: [pgvectorExtensionDescriptor],
+    });
 
-    const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-    expect(codecTypeImports.length).toBe(1);
+    const codecTypeImports = extractCodecTypeImports(descriptors);
+    expect(codecTypeImports.length).toBe(2);
+    // Adapter codec types come first
     expect(codecTypeImports[0]).toEqual({
+      package: '@prisma-next/adapter-postgres/codec-types',
+      named: 'CodecTypes',
+      alias: 'PgTypes',
+    });
+    // Extension codec types come after
+    expect(codecTypeImports[1]).toEqual({
       package: '@prisma-next/extension-pgvector/codec-types',
       named: 'CodecTypes',
       alias: 'PgVectorTypes',
     });
   });
 
-  it('extracts operation type imports from pack', () => {
-    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
-    const packs = loadExtensionPacks(undefined, [packPath]);
+  it('extracts operation type imports from descriptors', () => {
+    const { descriptors } = getSqlDescriptorBundle({
+      extensions: [pgvectorExtensionDescriptor],
+    });
 
-    const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
+    const operationTypeImports = extractOperationTypeImports(descriptors);
     expect(operationTypeImports.length).toBe(1);
     expect(operationTypeImports[0]).toEqual({
       package: '@prisma-next/extension-pgvector/operation-types',
@@ -52,11 +51,12 @@ describe('pgvector extension pack integration', () => {
     });
   });
 
-  it('assembles operation registry from pack', () => {
-    const packPath = join(__dirname, '../../../packages/3-extensions/pgvector');
-    const packs = loadExtensionPacks(undefined, [packPath]);
+  it('assembles operation registry from descriptors', () => {
+    const { descriptors } = getSqlDescriptorBundle({
+      extensions: [pgvectorExtensionDescriptor],
+    });
 
-    const registry = assembleOperationRegistryFromPacks(packs);
+    const registry = assembleOperationRegistry(descriptors, convertOperationManifest);
 
     const operations = registry.byType('pg/vector@1');
     expect(operations.length).toBe(1);
@@ -70,7 +70,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('runtime extension provides codecs', () => {
-    const extension = pgvector();
+    const extension = pgvector.create();
     const codecs = extension.codecs?.();
     expect(codecs).toBeDefined();
 
@@ -81,7 +81,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('runtime extension provides operations', () => {
-    const extension = pgvector();
+    const extension = pgvector.create();
     const operations = extension.operations?.();
     expect(operations).toBeDefined();
     expect(operations?.length).toBe(1);
@@ -92,7 +92,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('codecs can be registered in registry', () => {
-    const extension = pgvector();
+    const extension = pgvector.create();
     const extensionCodecs = extension.codecs?.();
     expect(extensionCodecs).toBeDefined();
 
@@ -107,7 +107,7 @@ describe('pgvector extension pack integration', () => {
   });
 
   it('operations can be registered in registry', () => {
-    const extension = pgvector();
+    const extension = pgvector.create();
     const extensionOperations = extension.operations?.();
     expect(extensionOperations).toBeDefined();
 

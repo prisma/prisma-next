@@ -21,7 +21,7 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 
 ## Responsibilities
 
-- **SQL Contract Builder**: Provides the `defineContract()` builder API for creating SQL contracts programmatically with type safety
+- **SQL Contract Builder**: Provides the `defineContract()` builder API for creating SQL contracts programmatically with type safety, including pack-ref based `.target()` and `.extensionPacks()` helpers
 - **SQL Contract Validation**: Implements SQL-specific contract validation (`validateContractStructure`, `validateContractLogic`, `validateContract`) and normalization
 - **SQL Contract JSON Schema**: Provides JSON schema for validating contract structure in IDEs and tooling
 - **Composition Layer**: Composes the target-agnostic builder core from `@prisma-next/contract-authoring` with SQL-specific types and validation logic
@@ -54,11 +54,13 @@ This package is part of the package layering architecture:
 ```typescript
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-
+import postgresPack from '@prisma-next/target-postgres/pack';
+import pgvector from '@prisma-next/extension-pgvector/pack';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 
 const contract = defineContract<CodecTypes>()
-  .target('postgres')
+  .target(postgresPack)
+  .extensionPacks({ pgvector })
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })

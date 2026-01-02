@@ -20,7 +20,7 @@ export function createContractIR(
   const hasRelations = 'relations' in overrides;
   const hasStorage = 'storage' in overrides;
   const hasCapabilities = 'capabilities' in overrides;
-  const hasExtensions = 'extensions' in overrides;
+  const hasExtensionPacks = 'extensionPacks' in overrides;
   const hasMeta = 'meta' in overrides;
   const hasSources = 'sources' in overrides;
 
@@ -68,7 +68,7 @@ export function createContractIR(
   // If a field is explicitly undefined, we'll omit it from the result later
   const metaOpts: {
     capabilities?: Record<string, Record<string, boolean>>;
-    extensions?: Record<string, unknown>;
+    extensionPacks?: Record<string, unknown>;
     meta?: Record<string, unknown>;
     sources?: Record<string, unknown>;
   } = {};
@@ -79,10 +79,10 @@ export function createContractIR(
     metaOpts.capabilities = {};
   }
 
-  if (hasExtensions && overrides.extensions !== undefined) {
-    metaOpts.extensions = overrides.extensions;
-  } else if (!hasExtensions) {
-    metaOpts.extensions = {};
+  if (hasExtensionPacks && overrides.extensionPacks !== undefined) {
+    metaOpts.extensionPacks = overrides.extensionPacks;
+  } else if (!hasExtensionPacks) {
+    metaOpts.extensionPacks = {};
   }
 
   if (hasMeta && overrides.meta !== undefined) {
@@ -117,11 +117,11 @@ export function createContractIR(
         : !hasCapabilities || overrides.capabilities !== undefined
           ? meta.capabilities
           : ({} as Record<string, Record<string, boolean>>),
-    extensions:
-      hasExtensions && overrides.extensions === undefined
+    extensionPacks:
+      hasExtensionPacks && overrides.extensionPacks === undefined
         ? (undefined as unknown as Record<string, unknown>)
-        : !hasExtensions || overrides.extensions !== undefined
-          ? meta.extensions
+        : !hasExtensionPacks || overrides.extensionPacks !== undefined
+          ? meta.extensionPacks
           : ({} as Record<string, unknown>),
     meta:
       hasMeta && overrides.meta === undefined

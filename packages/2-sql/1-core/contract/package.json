@@ -40,6 +40,10 @@
     "./factories": {
       "types": "./dist/exports/factories.d.ts",
       "import": "./dist/exports/factories.js"
+    },
+    "./pack-types": {
+      "types": "./dist/exports/pack-types.d.ts",
+      "import": "./dist/exports/pack-types.js"
     }
   }
 }

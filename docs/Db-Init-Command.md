@@ -51,7 +51,7 @@ This doc defines the `db init` command behavior, the TS primitives it composes, 
 - **Extension handling**
   - Treat database-side prerequisites as **component-owned database dependencies** declared by configured framework components (target/adapter/extensions).
 - Planner and verifier consume dependencies from the configured `frameworkComponents` list and evaluate satisfaction via **pure schema IR hooks** (no DB I/O).
-  - Extension packs may still contribute deterministic data under `contract.extensions.<namespace>` for namespacing/types/codecs, but **schema verification and db init planning do not infer database prerequisites from `contract.extensions`**.
+  - Extension packs may still contribute deterministic data under `contract.extensionPacks.<namespace>` for namespacing/types/codecs, but **schema verification and db init planning do not infer database prerequisites from `contract.extensionPacks`**.
 
 - **Contract marker**
   - Write or update the `prisma_contract.marker` row to reflect the **desired contract** when `db init` succeeds.
@@ -346,7 +346,7 @@ This is consistent with:
 
 - **Component-owned database dependencies**
 
-  Rather than baking ecosystem knowledge into targets (or inferring prerequisites from `contract.extensions`), `db init` treats database-side prerequisites as **component-owned database dependencies**:
+  Rather than baking ecosystem knowledge into targets (or inferring prerequisites from `contract.extensionPacks`), `db init` treats database-side prerequisites as **component-owned database dependencies**:
 
   - CLI builds a `frameworkComponents` list in composition order: `[target, adapter, ...extensions]`.
   - Planner:

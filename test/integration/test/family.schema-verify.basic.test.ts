@@ -1,11 +1,13 @@
 /**
  * Basic schema verification tests: happy path, missing table, missing column.
  */
+
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   type CodecTypes,
   defineContract,
   int4Column,
+  postgresPack,
   runSchemaVerify,
   textColumn,
   timeouts,
@@ -44,7 +46,7 @@ describe('family instance schemaVerify - basic', () => {
       'returns ok=true with all pass nodes',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -96,7 +98,7 @@ describe('family instance schemaVerify - basic', () => {
       'returns ok=false with missing_table issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -147,7 +149,7 @@ describe('family instance schemaVerify - basic', () => {
       'returns ok=false with missing_column issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })

@@ -12,6 +12,7 @@ This extension pack adds support for the `vector` data type and vector similarit
 - **Vector Operations**: Registers vector similarity operations (e.g., `cosineDistance`) for use in queries
 - **CLI Integration**: Provides extension descriptor for `prisma-next.config.ts` configuration
 - **Runtime Extension**: Registers codecs and operations at runtime for vector column operations
+- **Pack Ref Export**: Ships a pure `/pack` entrypoint for TypeScript contract authoring without runtime filesystem access
 - **Database Dependencies**: Declares the `vector` Postgres extension as a database dependency, which the migration planner emits as a `CREATE EXTENSION IF NOT EXISTS vector` operation and the verifier checks against the schema IR
 
 ## Dependencies
@@ -62,7 +63,7 @@ export default defineConfig({
 
 ### Contract Definition
 
-Add vector columns to your contract:
+Add vector columns to your contract and enable the namespace via pack refs:
 
 ```typescript
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -70,11 +71,14 @@ import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
 import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
+import pgvector from '@prisma-next/extension-pgvector/pack';
+import postgres from '@prisma-next/target-postgres/pack';
 
 type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
 
 export const contract = defineContract<AllCodecTypes>()
-  .target('postgres')
+  .target(postgres)
+  .extensionPacks({ pgvector })
   .table('post', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })
@@ -175,4 +179,6 @@ The extension declares the following capabilities:
 - [pgvector documentation](https://github.com/pgvector/pgvector)
 - [Prisma Next Architecture Overview](../../../docs/Architecture%20Overview.md)
 - [Extension Packs Guide](../../../docs/reference/Extension-Packs-Naming-and-Layout.md)
+
+Pack refs (`@prisma-next/extension-pgvector/pack`) are pure data objects generated from the hydrated manifest (`src/core/manifest.ts`), so TypeScript contract builders can enable the pgvector namespace in both emit and no-emit workflows without touching the filesystem.
 

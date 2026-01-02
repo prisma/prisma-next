@@ -1,6 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import pgvector from '@prisma-next/extension-pgvector/runtime';
+import pgvectorDescriptor from '@prisma-next/extension-pgvector/runtime';
 import sqlFamily from '@prisma-next/family-sql/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
@@ -29,12 +29,12 @@ export function getRuntime(): Runtime {
 
     pool = new Pool({ connectionString });
 
-    // Create runtime family instance from descriptors
+    // Create runtime family instance from descriptors (extension packs routed through composition)
     const familyInstance = sqlFamily.create({
       target: postgresTarget,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensions: [],
+      extensionPacks: [pgvectorDescriptor],
     });
 
     // Create runtime using family instance
@@ -48,7 +48,6 @@ export function getRuntime(): Runtime {
         mode: 'onFirstUse',
         requireMarker: false,
       },
-      extensions: [pgvector()],
       plugins: [
         budgets({
           maxRows: 10_000,
@@ -59,12 +58,12 @@ export function getRuntime(): Runtime {
       ],
     });
 
-    // Create context for schema/query builders (adapter and extensions from family instance)
-    const adapterInstance = postgresAdapter.create();
-    context = createRuntimeContext({
+    // Create context for schema/query builders
+    context = createRuntimeContext<Contract, 'postgres'>({
       contract,
-      adapter: adapterInstance,
-      extensions: [pgvector()],
+      target: postgresTarget,
+      adapter: postgresAdapter,
+      extensionPacks: [pgvectorDescriptor],
     });
   }
   return runtime;

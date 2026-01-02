@@ -48,7 +48,6 @@ export default defineConfig({
         // Exclude spinner utility - UI/UX code that's hard to test meaningfully
         'src/utils/spinner.ts',
         // Exclude defensive error handling branches that are hard to test meaningfully
-        'src/pack-loading.ts', // Non-Error exception handling (lines 12, 20)
         'src/api/emit-contract.ts', // Non-Error exception handling (lines 104-105)
         'src/load-ts-contract.ts', // Bundle content undefined and non-Error exceptions (lines 170-171, 211)
       ],

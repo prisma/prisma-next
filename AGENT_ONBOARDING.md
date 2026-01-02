@@ -197,7 +197,7 @@ const adapter = createPostgresAdapter();
 const context = createRuntimeContext({
   contract,  // Contract is stored in context
   adapter,
-  extensions: [pgVector()],  // Programmatic extension registration
+  extensionPacks: [pgVector()],  // Programmatic extension registration
 });
 
 // Pass context to runtime and schema (contract comes from context)
@@ -239,7 +239,7 @@ import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
 
 export const sql = sqlBuilder<Contract>({ context });
 export const schema = schemaBuilder<Contract>(context);
@@ -287,7 +287,7 @@ const contract = validateContract<Contract>(contractJson);
 const adapter = createPostgresAdapter();
 
 // Create context with validated contract, adapter, and extensions
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
 
 // Get tables from schema (types extracted automatically from contract)
 const tables = schema(context).tables;
@@ -389,7 +389,7 @@ import contractJson from './contract.json' assert { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
 const adapter = createPostgresAdapter();
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
 const o = orm<Contract>({ context });
 
 // Model registry proxy: orm.user(), orm.post(), etc.
@@ -615,14 +615,14 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
   - `operations`: Array of operation manifests that are assembled into `OperationRegistry` by the CLI
 - **Type Canonicalization**: Type canonicalization (shorthand → fully qualified IDs) happens at **authoring time** (PSL parser or TS builder), **not during emission**. The emitter only validates that all type IDs come from referenced extensions.
 - **I/O Decoupling**: The emitter is decoupled from file I/O. `emit()` returns strings (`contractJson`, `contractDts`); the caller handles all file operations.
-- **No Adapter Special Treatment**: The emitter treats all extension packs uniformly. The adapter appears first in `contract.extensions` but is otherwise identical to other packs.
+- **No Adapter Special Treatment**: The emitter treats all extension packs uniformly. The adapter appears first in `contract.extensionPacks` but is otherwise identical to other packs.
 - **CLI Assembly**: The CLI loads only the user’s config module. It reads `family.hook` and calls family-provided helpers (exposed via `config.family`) to assemble the operation registry, extract codec/operation type imports, and derive extension IDs from `{ adapter, target, extensions }`. This keeps assembly logic in the family layer and the CLI family‑agnostic.
 
 **Implementation:**
 - Core emitter: `packages/1-framework/3-tooling/emitter/src/emitter.ts` - orchestrates validation, hashing, and type generation
 - Target family SPI: The `emit()` function accepts a `targetFamily: TargetFamilyHook` parameter directly. Authoring surfaces (CLI, tests) determine which target family SPI to use based on the contract's `targetFamily` field and pass it directly. No global registry or auto-registration.
 - SQL family SPI: `packages/2-sql/3-tooling/emitter/src/index.ts` - implements SQL-specific validation and type generation, exported as `sqlTargetFamilyHook` (canonical source).
-- Extension pack loading: `packages/1-framework/3-tooling/cli/src/pack-loading.ts` - loads manifests (CLI-only, not exported from emitter)
+- Extension pack descriptor assembly: `packages/2-sql/3-tooling/family/src/core/assembly.ts` - loops over descriptors to collect operations and type imports (CLI-only, not exported from emitter)
 - Manifest types: `packages/1-framework/3-tooling/cli/src/pack-manifest-types.ts` - defines manifest type interfaces (CLI-only, not exported from emitter)
 - Framework CLI assembly: `packages/1-framework/3-tooling/cli/src/pack-assembly.ts` - generic assembly functions that loop over descriptors and delegate to family's `convertOperationManifest()` for family-specific conversion
 
@@ -659,9 +659,9 @@ The emitter uses a **hook-based architecture** where target families (SQL, Docum
   }
   ```
   - `types.codecTypes.import`: Used to generate `contract.d.ts` imports when assembling types
-  - **`capabilities`**: Adapters must declare capabilities in the manifest (for CLI emission) and in code (for runtime). The manifest capabilities are read during emission and included in the contract. See `.cursor/rules/adapter-capability-declaration.mdc` for details.
+  - **`capabilities`**: Adapters must declare capabilities on the adapter descriptor (for contract emission) and in runtime adapter code (for runtime checks); keep these declarations in sync. See `docs/reference/capabilities.md` and the adapter package README (e.g. `packages/3-targets/6-adapters/postgres/README.md#capabilities`).
   - **No `canonicalScalarMap`**: Extension manifests do not include scalar-to-type ID mappings. Type canonicalization happens at authoring time using extension manifests, not via a scalar map in the manifest.
-- Adapter appears first in `contract.extensions` but is otherwise identical to other packs
+- Adapter appears first in `contract.extensionPacks` but is otherwise identical to other packs
 
 **Future Work (Briefs):**
 - TS-only emission: esbuild bundles contract entry with allowlist (`@prisma-next/*`); runner imports bundle, validates purity, canonicalizes, and writes artifacts
@@ -1169,7 +1169,7 @@ test('Type IDs are literal types', () => {
 17. **Test Port Management** - Assign unique port ranges to each test suite to avoid conflicts during parallel test execution.
 18. **Type Tests** - Use Vitest's `expectTypeOf` helpers instead of manual type checks with conditional types. See `.cursor/rules/vitest-expect-typeof.mdc` for details.
 19. **Emitter I/O Decoupling** - The emitter returns strings (`contractJson`, `contractDts`); the caller handles all file I/O. This enables testing without file system dependencies and flexible integration with build systems.
-20. **Adapters as Extension Packs** - Adapters and extension packs use the same manifest structure and are treated identically. The adapter appears first in `contract.extensions` but is otherwise identical to other packs.
+20. **Adapters as Extension Packs** - Adapters and extension packs use the same manifest structure and are treated identically. The adapter appears first in `contract.extensionPacks` but is otherwise identical to other packs.
 21. **Type Canonicalization Timing** - Type canonicalization happens at authoring time (PSL parser or TS builder), not during emission or validation. The emitter only validates that all type IDs come from referenced extensions.
 22. **Package Naming** - The SQL query package was renamed from `@prisma-next/sql` to `@prisma-next/sql-query` to better reflect its purpose.
 23. **No Target Branches** - **CRITICAL**: Never branch on `target` (e.g., `if (target === 'postgres')`) in core packages. Target-specific logic belongs in adapters or extension packs. See `.cursor/rules/no-target-branches.mdc` for details.
@@ -1632,7 +1632,7 @@ const contract = validateContract<Contract>(contractJson);
 
 // Create context with validated contract (caller is responsible for validation)
 const adapter = createPostgresAdapter();
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
 
 // In E2E tests, use loadContractFromDisk to load from committed fixtures
 // Note: loadContractFromDisk is in test/e2e/framework/test/utils.ts, not test-utils
@@ -1741,7 +1741,7 @@ import type { Contract } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);
 const adapter = createPostgresAdapter();
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
 const o = orm<Contract>({ context });
 
 // Read with relation filter
@@ -2023,7 +2023,7 @@ const signature: OperationSignature = {
 
 const adapter = createStubAdapter();
 const context = createTestContext(contract, adapter, {
-  extensions: [
+  extensionPacks: [
     {
       operations: () => [signature],
     },
@@ -2240,7 +2240,7 @@ const ir2: ContractIR = {
 
 **Type Notes:**
 - `capabilities` in `ContractIR` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`
-- `ExtensionPack` requires both `manifest` and `path` properties
+- `extensionPacks` in `ContractIR` is a simple object map keyed by pack ID (`Record<string, unknown>`). There is no `manifest` or `path` shape in runtime code—descriptor metadata lives directly on component descriptors.
 
 ## Modular Refactoring Patterns
 

@@ -7,6 +7,7 @@ import {
   defineContract,
   int4Column,
   pgvector,
+  postgresPack,
   runSchemaVerify,
   textColumn,
   timeouts,
@@ -34,18 +35,14 @@ describe('family instance schemaVerify - modes', () => {
       'returns ok=false with extension_missing issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
               .column('email', { type: textColumn, nullable: false })
               .primaryKey(['id']),
           )
-          .extensions({
-            pgvector: {
-              version: '1.0.0',
-            },
-          })
+          .extensionPacks({ pgvector })
           .build();
 
         const result = await runSchemaVerify(getConnectionString(), contract, {
@@ -85,7 +82,7 @@ describe('family instance schemaVerify - modes', () => {
       'returns ok=false in strict mode with extra_column issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -118,7 +115,7 @@ describe('family instance schemaVerify - modes', () => {
       'returns ok=true in permissive mode with extra column',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })

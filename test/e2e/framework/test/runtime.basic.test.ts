@@ -1,14 +1,16 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import {
   createTestRuntimeFromClient,
   setupE2EDatabase,
 } from '@prisma-next/integration-tests/test/utils';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
+import {
+  createStubAdapter,
+  createTestContext,
+  executePlanAndCollect,
+} from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
@@ -48,8 +50,8 @@ describe('end-to-end basic queries', () => {
             ]);
           });
 
-          const adapter = createPostgresAdapter();
-          const context = createRuntimeContext({ contract, adapter, extensions: [] });
+          const adapter = createStubAdapter();
+          const context = createTestContext(contract, adapter);
           const runtime = createTestRuntimeFromClient(contract, client);
           try {
             const tables = schema<Contract>(context).tables;
