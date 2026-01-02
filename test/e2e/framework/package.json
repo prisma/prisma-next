@@ -16,7 +16,7 @@
     "vitest": "catalog:",
     "typescript": "^5.9.3",
     "vite-tsconfig-paths": "^5.1.4",
-    "@types/node": "^20.11.30",
+    "@types/node": "catalog:",
     "@types/pg": "^8.11.10",
     "pg": "^8.11.5"
   },
