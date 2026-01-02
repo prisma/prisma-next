@@ -30,6 +30,10 @@
     "./result": {
       "types": "./dist/exports/result.d.ts",
       "import": "./dist/exports/result.js"
+    },
+    "./redact-db-url": {
+      "types": "./dist/exports/redact-db-url.d.ts",
+      "import": "./dist/exports/redact-db-url.js"
     }
   }
 }

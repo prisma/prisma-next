@@ -2,10 +2,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
+import { errorRuntime } from '@prisma-next/core-control-plane/errors';
 import type {
   ControlDriverDescriptor,
   ControlDriverInstance,
 } from '@prisma-next/core-control-plane/types';
+import { SqlQueryError } from '@prisma-next/sql-errors';
+import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { type } from 'arktype';
 import { Client } from 'pg';
 import { normalizePgError } from '../normalize-error';
@@ -94,8 +97,34 @@ const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', Postg
     manifest: loadDriverManifest(),
     async create(url: string): Promise<PostgresControlDriver> {
       const client = new Client({ connectionString: url });
-      await client.connect();
-      return new PostgresControlDriver(client);
+      try {
+        await client.connect();
+        return new PostgresControlDriver(client);
+      } catch (error) {
+        const normalized = normalizePgError(error);
+        const redacted = redactDatabaseUrl(url);
+        try {
+          await client.end();
+        } catch {
+          // ignore
+        }
+
+        const codeFromSqlState = SqlQueryError.is(normalized) ? normalized.sqlState : undefined;
+        const causeCode =
+          'cause' in normalized && normalized.cause
+            ? (normalized.cause as { code?: unknown }).code
+            : undefined;
+        const code = codeFromSqlState ?? causeCode;
+
+        throw errorRuntime('Database connection failed', {
+          why: normalized.message,
+          fix: 'Verify the database URL, ensure the database is reachable, and confirm credentials/permissions',
+          meta: {
+            ...(typeof code !== 'undefined' ? { code } : {}),
+            ...redacted,
+          },
+        });
+      }
     },
   };
 

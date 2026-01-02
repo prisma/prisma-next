@@ -124,6 +124,8 @@ export interface MigrationRunnerFailure {
   readonly summary: string;
   /** Optional explanation of why the failure occurred. */
   readonly why?: string;
+  /** Optional metadata for debugging and UX (e.g., schema issues, SQL state). */
+  readonly meta?: Record<string, unknown>;
 }
 
 /**

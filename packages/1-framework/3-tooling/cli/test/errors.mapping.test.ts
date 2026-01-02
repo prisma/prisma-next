@@ -6,23 +6,25 @@ describe('CliStructuredError.toEnvelope()', () => {
     const error = errorDriverRequired();
     const envelope = error.toEnvelope();
 
-    expect(envelope.code).toBe('PN-CLI-4010');
-    expect(envelope.domain).toBe('CLI');
-    expect(envelope.summary).toBe('Driver is required for DB-connected commands');
-    expect(envelope.fix).toBe('Add driver to prisma-next.config.ts');
-    expect(envelope.docsUrl).toBe('https://prisma-next.dev/docs/cli/db-verify');
+    expect(envelope).toMatchObject({
+      code: 'PN-CLI-4010',
+      domain: 'CLI',
+      summary: 'Driver is required for DB-connected commands',
+      fix: 'Add a control-plane driver to prisma-next.config.ts (e.g. import a driver descriptor and set `driver: postgresDriver`)',
+      docsUrl: 'https://prisma-next.dev/docs/cli/config',
+    });
   });
 
   it('converts readMarker error to envelope with PN-CLI-4007', () => {
     const error = errorFamilyReadMarkerSqlRequired();
     const envelope = error.toEnvelope();
 
-    expect(envelope.code).toBe('PN-CLI-4007');
-    expect(envelope.domain).toBe('CLI');
-    expect(envelope.summary).toBe('Family readMarker() is required');
-    expect(envelope.fix).toBe(
-      'Ensure family.verify.readMarker() is exported by your family package',
-    );
-    expect(envelope.docsUrl).toBe('https://prisma-next.dev/docs/cli/db-verify');
+    expect(envelope).toMatchObject({
+      code: 'PN-CLI-4007',
+      domain: 'CLI',
+      summary: 'Family readMarker() is required',
+      fix: 'Ensure family.verify.readMarker() is exported by your family package',
+      docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
+    });
   });
 });

@@ -6,12 +6,15 @@ import type {
   MigrationPlanOperation,
   MigrationRunnerResult,
 } from '@prisma-next/core-control-plane/types';
+import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import {
+  errorContractValidationFailed,
   errorDatabaseUrlRequired,
   errorDriverRequired,
   errorFileNotFound,
+  errorJsonFormatNotSupported,
   errorMigrationPlanningFailed,
   errorRuntime,
   errorTargetMigrationNotSupported,
@@ -69,7 +72,7 @@ export function createDbInitCommand(): Command {
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--plan', 'Preview planned operations without applying', false)
-    .option('--json [format]', 'Output as JSON (object or ndjson)', false)
+    .option('--json [format]', 'Output as JSON (object)', false)
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
     .option('-vv, --trace', 'Trace output: deep internals, stack traces')
@@ -81,6 +84,14 @@ export function createDbInitCommand(): Command {
       const startTime = Date.now();
 
       const result = await performAction(async () => {
+        if (flags.json === 'ndjson') {
+          throw errorJsonFormatNotSupported({
+            command: 'db init',
+            format: 'ndjson',
+            supportedFormats: ['object'],
+          });
+        }
+
         // Load config
         const config = await loadConfig(options.config);
         const configPath = options.config
@@ -121,6 +132,7 @@ export function createDbInitCommand(): Command {
           if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
             throw errorFileNotFound(contractPathAbsolute, {
               why: `Contract file not found at ${contractPathAbsolute}`,
+              fix: `Run \`prisma-next contract emit\` to generate ${contractPath}, or update \`config.contract.output\` in ${configPath}`,
             });
           }
           throw errorUnexpected(error instanceof Error ? error.message : String(error), {
@@ -132,15 +144,18 @@ export function createDbInitCommand(): Command {
         try {
           contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
         } catch (error) {
-          throw errorUnexpected(error instanceof Error ? error.message : String(error), {
-            why: `Failed to parse contract JSON at ${contractPathAbsolute}: ${error instanceof Error ? error.message : String(error)}`,
-          });
+          throw errorContractValidationFailed(
+            `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+            { where: { path: contractPathAbsolute } },
+          );
         }
 
         // Resolve database URL
         const dbUrl = options.db ?? config.db?.url;
         if (!dbUrl) {
-          throw errorDatabaseUrlRequired({ why: 'Database URL is required for db init' });
+          throw errorDatabaseUrlRequired({
+            why: `Database URL is required for db init (set db.url in ${configPath}, or pass --db <url>)`,
+          });
         }
 
         // Check for driver
@@ -158,10 +173,25 @@ export function createDbInitCommand(): Command {
         const migrations = config.target.migrations;
 
         // Create driver
-        const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
-          message: 'Connecting to database...',
-          flags,
-        });
+        let driver: Awaited<ReturnType<(typeof driverDescriptor)['create']>>;
+        try {
+          driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
+            message: 'Connecting to database...',
+            flags,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const code = (error as { code?: unknown }).code;
+          const redacted = redactDatabaseUrl(dbUrl);
+          throw errorRuntime('Database connection failed', {
+            why: message,
+            fix: 'Verify the database URL, ensure the database is reachable, and confirm credentials/permissions',
+            meta: {
+              ...(typeof code !== 'undefined' ? { code } : {}),
+              ...redacted,
+            },
+          });
+        }
 
         try {
           // Create family instance
@@ -270,7 +300,7 @@ export function createDbInitCommand(): Command {
               `Existing contract marker does not match plan destination. Mismatch in ${mismatchParts.join(' and ')}.`,
               {
                 why: 'Database has an existing contract marker that does not match the target contract',
-                fix: 'Use `prisma-next db migrate` to migrate from the existing contract, or drop the database and re-run `db init`',
+                fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
                 meta: {
                   code: 'MARKER_ORIGIN_MISMATCH',
                   markerCoreHash: existingMarker.coreHash,
@@ -341,10 +371,23 @@ export function createDbInitCommand(): Command {
           });
 
           if (!runnerResult.ok) {
+            const meta: Record<string, unknown> = {
+              code: runnerResult.failure.code,
+              ...(runnerResult.failure.meta ?? {}),
+            };
+            const sqlState = typeof meta['sqlState'] === 'string' ? meta['sqlState'] : undefined;
+            const fix =
+              sqlState === '42501'
+                ? 'Grant the database user sufficient privileges (insufficient_privilege), or run db init as a more privileged role'
+                : runnerResult.failure.code === 'SCHEMA_VERIFY_FAILED'
+                  ? 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`'
+                  : undefined;
+
             throw errorRuntime(runnerResult.failure.summary, {
               why:
                 runnerResult.failure.why ?? `Migration runner failed: ${runnerResult.failure.code}`,
-              meta: { code: runnerResult.failure.code },
+              ...(fix ? { fix } : {}),
+              meta,
             });
           }
 
