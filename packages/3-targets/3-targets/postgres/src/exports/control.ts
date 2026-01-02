@@ -7,6 +7,7 @@ import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
+import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
@@ -16,12 +17,7 @@ import { createPostgresMigrationRunner } from '../core/migrations/runner';
  */
 const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =
   {
-    kind: 'target',
-    familyId: 'sql',
-    targetId: 'postgres',
-    id: 'postgres',
-    version: '0.0.1',
-    capabilities: {},
+    ...postgresTargetDescriptorMeta,
     /**
      * Migrations capability for CLI to access planner/runner via core types.
      * The SQL-specific planner/runner types are compatible with the generic

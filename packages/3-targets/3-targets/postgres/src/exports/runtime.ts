@@ -2,6 +2,7 @@ import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
 } from '@prisma-next/core-execution-plane/types';
+import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 
 /**
  * Postgres runtime target instance interface.
@@ -16,12 +17,7 @@ const postgresRuntimeTargetDescriptor: RuntimeTargetDescriptor<
   'postgres',
   PostgresRuntimeTargetInstance
 > = {
-  kind: 'target',
-  familyId: 'sql',
-  targetId: 'postgres',
-  id: 'postgres',
-  version: '0.0.1',
-  capabilities: {},
+  ...postgresTargetDescriptorMeta,
   create(): PostgresRuntimeTargetInstance {
     return {
       familyId: 'sql',
