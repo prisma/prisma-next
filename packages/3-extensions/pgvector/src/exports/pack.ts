@@ -1,6 +1,5 @@
-import type { ExtensionPackRef } from '@prisma-next/contract/framework-components';
 import { pgvectorPackMeta } from '../core/descriptor-meta';
 
-const pgvectorPack: ExtensionPackRef<'sql', 'postgres'> = pgvectorPackMeta;
+const pgvectorPack = pgvectorPackMeta;
 
 export default pgvectorPack;
