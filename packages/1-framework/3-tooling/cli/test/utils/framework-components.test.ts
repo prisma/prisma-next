@@ -1,6 +1,16 @@
 import { CliStructuredError } from '@prisma-next/core-control-plane/errors';
+import type {
+  ControlAdapterDescriptor,
+  ControlExtensionDescriptor,
+  ControlFamilyDescriptor,
+  ControlTargetDescriptor,
+} from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { describe, expect, it } from 'vitest';
-import { assertFrameworkComponentsCompatible } from '../../src/utils/framework-components';
+import {
+  assertContractRequirementsSatisfied,
+  assertFrameworkComponentsCompatible,
+} from '../../src/utils/framework-components';
 
 describe('assertFrameworkComponentsCompatible', () => {
   type TestComponent = {
@@ -127,5 +137,97 @@ describe('assertFrameworkComponentsCompatible', () => {
     expect(() => {
       assertFrameworkComponentsCompatible('sql', 'postgres', [target, adapter, extension, driver]);
     }).not.toThrow();
+  });
+});
+
+describe('assertContractRequirementsSatisfied', () => {
+  const contract: Pick<ContractIR, 'targetFamily' | 'target' | 'extensionPacks'> = {
+    targetFamily: 'sql',
+    target: 'postgres',
+    extensionPacks: {
+      pgvector: {},
+    },
+  };
+
+  const target = {
+    kind: 'target',
+    id: 'postgres',
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
+  } as unknown as ControlTargetDescriptor<'sql', 'postgres'>;
+
+  const adapter = {
+    kind: 'adapter',
+    id: 'postgres-adapter',
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
+  } as unknown as ControlAdapterDescriptor<'sql', 'postgres'>;
+
+  const extension = {
+    kind: 'extension',
+    id: 'pgvector',
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
+  } as unknown as ControlExtensionDescriptor<'sql', 'postgres'>;
+
+  const family = {
+    kind: 'family',
+    id: 'sql',
+    version: '0.0.1',
+    familyId: 'sql',
+    create: () => {
+      throw new Error('not implemented');
+    },
+  } as unknown as ControlFamilyDescriptor<'sql'>;
+
+  it('passes when target and extension packs are satisfied', () => {
+    expect(() =>
+      assertContractRequirementsSatisfied({
+        contract,
+        family,
+        target,
+        adapter,
+        extensions: [extension],
+      }),
+    ).not.toThrow();
+  });
+
+  it('throws when contract target family mismatches config', () => {
+    expect(() =>
+      assertContractRequirementsSatisfied({
+        contract: { ...contract, targetFamily: 'document' },
+        family,
+        target,
+        adapter,
+        extensions: [extension],
+      }),
+    ).toThrow(CliStructuredError);
+  });
+
+  it('throws when contract target mismatches config', () => {
+    expect(() =>
+      assertContractRequirementsSatisfied({
+        contract: { ...contract, target: 'mysql' },
+        family,
+        target,
+        adapter,
+        extensions: [extension],
+      }),
+    ).toThrow(CliStructuredError);
+  });
+
+  it('throws when required extension pack is missing', () => {
+    expect(() =>
+      assertContractRequirementsSatisfied({
+        contract,
+        family,
+        target,
+        adapter,
+        extensions: [],
+      }),
+    ).toThrow(CliStructuredError);
   });
 });

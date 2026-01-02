@@ -38,6 +38,37 @@ export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = Runti
 > &
   Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>;
 
+function assertRuntimeContractRequirements(
+  contract: SqlContract<SqlStorage>,
+  target: RuntimeTargetDescriptor<'sql', string>,
+  adapter: RuntimeAdapterDescriptor<'sql', string, SqlRuntimeAdapterInstance>,
+  extensions: readonly RuntimeExtensionDescriptor<'sql', string>[],
+): void {
+  if (contract.target !== target.targetId) {
+    throw new Error(
+      `Contract target '${contract.target}' does not match runtime target descriptor '${target.targetId}'.`,
+    );
+  }
+
+  const requiredPacks = contract.extensionPacks ? Object.keys(contract.extensionPacks) : [];
+  if (requiredPacks.length === 0) {
+    return;
+  }
+
+  const providedIds = new Set<string>([target.id, adapter.id]);
+  for (const extension of extensions) {
+    providedIds.add(extension.id);
+  }
+
+  for (const packId of requiredPacks) {
+    if (!providedIds.has(packId)) {
+      throw new Error(
+        `Contract requires extension pack '${packId}', but runtime descriptors do not provide a matching component.`,
+      );
+    }
+  }
+}
+
 /**
  * SQL runtime family instance interface.
  * Extends base RuntimeFamilyInstance with SQL-specific runtime creation method.
@@ -81,6 +112,7 @@ export function createSqlRuntimeFamilyInstance(options: {
   readonly extensions: readonly RuntimeExtensionDescriptor<'sql', string>[];
 }): SqlRuntimeFamilyInstance {
   const {
+    target: targetDescriptor,
     adapter: adapterDescriptor,
     driver: driverDescriptor,
     extensions: extensionDescriptors,
@@ -101,6 +133,12 @@ export function createSqlRuntimeFamilyInstance(options: {
       readonly mode?: 'strict' | 'permissive';
       readonly log?: Log;
     }): Runtime {
+      assertRuntimeContractRequirements(
+        runtimeOptions.contract,
+        targetDescriptor,
+        adapterDescriptor,
+        extensionDescriptors,
+      );
       const adapterInstance = adapterDescriptor.create();
       const driverInstance = driverDescriptor.create(runtimeOptions.driverOptions);
 

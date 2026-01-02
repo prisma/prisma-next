@@ -13,7 +13,10 @@ import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { performAction } from '../utils/action';
 import { setCommandDescriptions } from '../utils/command-helpers';
-import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
+import {
+  assertContractRequirementsSatisfied,
+  assertFrameworkComponentsCompatible,
+} from '../utils/framework-components';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -154,6 +157,13 @@ export function createDbSchemaVerifyCommand(): Command {
 
           // Validate contract using instance validator
           const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
+          assertContractRequirementsSatisfied({
+            contract: contractIR,
+            family: config.family,
+            target: config.target,
+            adapter: config.adapter,
+            extensions: config.extensions ?? [],
+          });
 
           // Call family instance schemaVerify method
           let schemaVerifyResult: VerifyDatabaseSchemaResult;

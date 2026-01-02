@@ -34,7 +34,7 @@ describe('pack-loading', () => {
       const result = loadExtensionPackManifest(packPath);
       expect(result).toEqual(manifest);
       expect(result.id).toBe('test-pack');
-      expect(result.version).toBe('1.0.0');
+      expect(result.version).toBe('0.0.1');
     });
 
     it('throws error when manifest file does not exist', () => {

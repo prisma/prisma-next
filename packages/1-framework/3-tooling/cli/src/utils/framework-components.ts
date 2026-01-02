@@ -1,4 +1,11 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type {
+  ControlAdapterDescriptor,
+  ControlExtensionDescriptor,
+  ControlFamilyDescriptor,
+  ControlTargetDescriptor,
+  TargetBoundComponentDescriptor,
+} from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { errorConfigValidation } from './cli-errors';
 
 /**
@@ -100,4 +107,47 @@ export function assertFrameworkComponentsCompatible<
 
   // Type assertion is safe because we've validated all components above
   return frameworkComponents as ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
+}
+
+export function assertContractRequirementsSatisfied<
+  TFamilyId extends string,
+  TTargetId extends string,
+>({
+  contract,
+  family,
+  target,
+  adapter,
+  extensions,
+}: {
+  readonly contract: Pick<ContractIR, 'targetFamily' | 'target' | 'extensionPacks'>;
+  readonly family: ControlFamilyDescriptor<TFamilyId>;
+  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
+  readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
+  readonly extensions?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+}): void {
+  if (contract.targetFamily !== family.familyId) {
+    throw errorConfigValidation('contract.targetFamily', {
+      why: `Contract was emitted for family '${contract.targetFamily}' but CLI config is wired to '${family.familyId}'.`,
+    });
+  }
+
+  if (contract.target !== target.targetId) {
+    throw errorConfigValidation('contract.target', {
+      why: `Contract target '${contract.target}' does not match CLI target '${target.targetId}'.`,
+    });
+  }
+
+  const providedComponentIds = new Set<string>([target.id, adapter.id]);
+  for (const extension of extensions ?? []) {
+    providedComponentIds.add(extension.id);
+  }
+
+  const requiredPacks = contract.extensionPacks ? Object.keys(contract.extensionPacks) : [];
+  for (const packId of requiredPacks) {
+    if (!providedComponentIds.has(packId)) {
+      throw errorConfigValidation('contract.extensionPacks', {
+        why: `Contract requires extension pack '${packId}', but CLI config does not provide a matching descriptor.`,
+      });
+    }
+  }
 }
