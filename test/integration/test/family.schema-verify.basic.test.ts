@@ -2,12 +2,12 @@
  * Basic schema verification tests: happy path, missing table, missing column.
  */
 
-import postgresPack from '@prisma-next/target-postgres/pack';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   type CodecTypes,
   defineContract,
   int4Column,
+  postgresPack,
   runSchemaVerify,
   textColumn,
   timeouts,
