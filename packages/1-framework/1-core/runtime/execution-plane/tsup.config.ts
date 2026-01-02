@@ -3,6 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     'exports/types': 'src/exports/types.ts',
+    'exports/framework-components': 'src/exports/framework-components.ts',
   },
   outDir: 'dist',
   format: ['esm'],

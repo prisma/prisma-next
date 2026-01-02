@@ -32,6 +32,10 @@
     "./types": {
       "types": "./dist/exports/types.d.ts",
       "import": "./dist/exports/types.js"
+    },
+    "./framework-components": {
+      "types": "./dist/exports/framework-components.d.ts",
+      "import": "./dist/exports/framework-components.js"
     }
   }
 }
