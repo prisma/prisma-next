@@ -3,6 +3,7 @@ import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { Extension } from '@prisma-next/sql-runtime';
 import { codecDefinitions } from '../core/codecs';
+import { pgvectorRuntimeOperation } from '../core/descriptor-meta';
 
 /**
  * Creates a pgvector extension instance for runtime registration.
@@ -19,19 +20,7 @@ export default function pgvector(): Extension {
       return registry;
     },
     operations(): ReadonlyArray<SqlOperationSignature> {
-      return [
-        {
-          forTypeId: 'pg/vector@1',
-          method: 'cosineDistance',
-          args: [{ kind: 'param' }],
-          returns: { kind: 'builtin', type: 'number' },
-          lowering: {
-            targetFamily: 'sql',
-            strategy: 'function',
-            template: '1 - ({{self}} <=> {{arg0}})',
-          },
-        },
-      ];
+      return [pgvectorRuntimeOperation];
     },
   };
 }

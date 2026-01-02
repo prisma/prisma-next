@@ -4,6 +4,7 @@ import type {
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { pgvectorPackMeta } from '../core/descriptor-meta';
 
 /**
  * Pure verification hook: checks whether the 'vector' extension is installed
@@ -68,48 +69,7 @@ const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
  * Declares database dependencies for the 'vector' Postgres extension.
  */
 const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
-  kind: 'extension',
-  familyId: 'sql',
-  targetId: 'postgres', // pgvector is postgres-specific
-  id: 'pgvector',
-  version: '0.0.1',
-  capabilities: {
-    postgres: {
-      'pgvector/cosine': true,
-    },
-  },
-  types: {
-    codecTypes: {
-      import: {
-        package: '@prisma-next/extension-pgvector/codec-types',
-        named: 'CodecTypes',
-        alias: 'PgVectorTypes',
-      },
-    },
-    operationTypes: {
-      import: {
-        package: '@prisma-next/extension-pgvector/operation-types',
-        named: 'OperationTypes',
-        alias: 'PgVectorOperationTypes',
-      },
-    },
-    storage: [
-      { typeId: 'pg/vector@1', familyId: 'sql', targetId: 'postgres', nativeType: 'vector' },
-    ],
-  },
-  operations: [
-    {
-      for: 'pg/vector@1',
-      method: 'cosineDistance',
-      args: [{ kind: 'param' }],
-      returns: { kind: 'builtin', type: 'number' },
-      lowering: {
-        targetFamily: 'sql',
-        strategy: 'function',
-        template: '1 - ({{self}} <=> {{arg0}})',
-      },
-    },
-  ],
+  ...pgvectorPackMeta,
   databaseDependencies: pgvectorDatabaseDependencies,
   create: () => ({
     familyId: 'sql' as const,
