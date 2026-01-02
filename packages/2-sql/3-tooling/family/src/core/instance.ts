@@ -328,10 +328,7 @@ export interface SqlControlFamilyInstance
  */
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
-interface CreateSqlFamilyInstanceOptions<
-  TTargetId extends string = string,
-  TTargetDetails = Record<string, never>,
-> {
+interface CreateSqlFamilyInstanceOptions<TTargetId extends string = string, TTargetDetails> {
   readonly target: SqlControlTargetDescriptor<TTargetId, TTargetDetails>;
   readonly adapter: ControlAdapterDescriptor<'sql', string, SqlControlAdapter>;
   readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
@@ -388,10 +385,9 @@ function buildSqlTypeMetadataRegistry(options: {
 /**
  * Creates a SQL family instance for control-plane operations.
  */
-export function createSqlFamilyInstance<
-  TTargetId extends string = string,
-  TTargetDetails = Record<string, never>,
->(options: CreateSqlFamilyInstanceOptions<TTargetId, TTargetDetails>): SqlFamilyInstance {
+export function createSqlFamilyInstance<TTargetId extends string = string, TTargetDetails>(
+  options: CreateSqlFamilyInstanceOptions<TTargetId, TTargetDetails>,
+): SqlFamilyInstance {
   const { target, adapter, extensions } = options;
 
   // Build descriptors array for assembly

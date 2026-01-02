@@ -43,7 +43,7 @@ export type AnyRecord = Readonly<Record<string, unknown>>;
  * The planner emits these as migration operations, and the verifier uses the pure verification
  * hook to check satisfaction against the schema IR.
  */
-export interface ComponentDatabaseDependency<TTargetDetails = Record<string, never>> {
+export interface ComponentDatabaseDependency<TTargetDetails> {
   /** Stable identifier for the dependency (e.g. 'postgres.extension.vector') */
   readonly id: string;
   /** Human label for output (e.g. 'Enable vector extension') */
@@ -65,7 +65,7 @@ export interface ComponentDatabaseDependency<TTargetDetails = Record<string, nev
 /**
  * Database dependencies declared by a framework component.
  */
-export interface ComponentDatabaseDependencies<TTargetDetails = Record<string, never>> {
+export interface ComponentDatabaseDependencies<TTargetDetails> {
   /**
    * Dependencies required for db init.
    * Future: update dependencies can be added later (e.g. widening/destructive).
@@ -124,8 +124,7 @@ export interface SqlMigrationPlanOperationTarget<TTargetDetails> {
  * A single SQL migration operation with SQL-specific fields.
  * Extends the core MigrationPlanOperation with SQL execution details.
  */
-export interface SqlMigrationPlanOperation<TTargetDetails = Record<string, never>>
-  extends MigrationPlanOperation {
+export interface SqlMigrationPlanOperation<TTargetDetails> extends MigrationPlanOperation {
   /** Optional detailed explanation of what this operation does and why. */
   readonly summary?: string;
   readonly target: SqlMigrationPlanOperationTarget<TTargetDetails>;
@@ -147,7 +146,7 @@ export interface SqlMigrationPlanContractInfo {
  * A SQL migration plan with SQL-specific fields.
  * Extends the core MigrationPlan with origin tracking and metadata.
  */
-export interface SqlMigrationPlan<TTargetDetails = Record<string, never>> extends MigrationPlan {
+export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
   /**
    * Origin contract identity that the plan expects the database to currently be at.
    * If omitted, the runner treats the origin as "no marker present" (empty database),
@@ -220,7 +219,7 @@ export interface SqlPlannerFailureResult extends Omit<MigrationPlannerFailureRes
 /**
  * Union type for SQL planner results.
  */
-export type SqlPlannerResult<TTargetDetails = Record<string, never>> =
+export type SqlPlannerResult<TTargetDetails> =
   | SqlPlannerSuccessResult<TTargetDetails>
   | SqlPlannerFailureResult;
 
@@ -244,7 +243,7 @@ export interface SqlMigrationPlannerPlanOptions {
  * SQL migration planner interface.
  * Extends the core MigrationPlanner with SQL-specific types.
  */
-export interface SqlMigrationPlanner<TTargetDetails = Record<string, never>> {
+export interface SqlMigrationPlanner<TTargetDetails> {
   plan(options: SqlMigrationPlannerPlanOptions): SqlPlannerResult<TTargetDetails>;
 }
 
@@ -255,7 +254,7 @@ export interface SqlMigrationPlanner<TTargetDetails = Record<string, never>> {
 /**
  * Callbacks for SQL migration runner execution.
  */
-export interface SqlMigrationRunnerExecuteCallbacks<TTargetDetails = Record<string, never>> {
+export interface SqlMigrationRunnerExecuteCallbacks<TTargetDetails> {
   onOperationStart?(operation: SqlMigrationPlanOperation<TTargetDetails>): void;
   onOperationComplete?(operation: SqlMigrationPlanOperation<TTargetDetails>): void;
 }
@@ -263,7 +262,7 @@ export interface SqlMigrationRunnerExecuteCallbacks<TTargetDetails = Record<stri
 /**
  * Options for SQL migration runner execution.
  */
-export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string, never>> {
+export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
   readonly plan: SqlMigrationPlan<TTargetDetails>;
   readonly driver: ControlDriverInstance<'sql', string>;
   /**
@@ -332,7 +331,7 @@ export type SqlMigrationRunnerResult = Result<
  * SQL migration runner interface.
  * Extends the core MigrationRunner with SQL-specific types.
  */
-export interface SqlMigrationRunner<TTargetDetails = Record<string, never>> {
+export interface SqlMigrationRunner<TTargetDetails> {
   execute(
     options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
   ): Promise<SqlMigrationRunnerResult>;
@@ -346,10 +345,8 @@ export interface SqlMigrationRunner<TTargetDetails = Record<string, never>> {
  * SQL control target descriptor with migration support.
  * Extends the core ControlTargetDescriptor with SQL-specific migration methods.
  */
-export interface SqlControlTargetDescriptor<
-  TTargetId extends string,
-  TTargetDetails = Record<string, never>,
-> extends ControlTargetDescriptor<
+export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDetails>
+  extends ControlTargetDescriptor<
     'sql',
     TTargetId,
     ControlTargetInstance<'sql', TTargetId>,

@@ -22,7 +22,7 @@ export class SqlFamilyDescriptor
   readonly version = '0.0.1';
   readonly hook = sqlTargetFamilyHook;
 
-  create<TTargetId extends string, TTargetDetails = Record<string, never>>(options: {
+  create<TTargetId extends string, TTargetDetails>(options: {
     readonly target: SqlControlTargetDescriptor<TTargetId, TTargetDetails>;
     readonly adapter: ControlAdapterDescriptor<'sql', TTargetId, SqlControlAdapter<TTargetId>>;
     readonly driver: ControlDriverDescriptor<'sql', TTargetId>;
