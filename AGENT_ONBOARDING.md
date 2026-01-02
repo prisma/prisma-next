@@ -197,7 +197,7 @@ const adapter = createPostgresAdapter();
 const context = createRuntimeContext({
   contract,  // Contract is stored in context
   adapter,
-  extensions: [pgVector()],  // Programmatic extension registration
+  extensionPacks: [pgVector()],  // Programmatic extension registration
 });
 
 // Pass context to runtime and schema (contract comes from context)
@@ -239,7 +239,7 @@ import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
 
 export const sql = sqlBuilder<Contract>({ context });
 export const schema = schemaBuilder<Contract>(context);
@@ -287,7 +287,7 @@ const contract = validateContract<Contract>(contractJson);
 const adapter = createPostgresAdapter();
 
 // Create context with validated contract, adapter, and extensions
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
 
 // Get tables from schema (types extracted automatically from contract)
 const tables = schema(context).tables;
@@ -389,7 +389,7 @@ import contractJson from './contract.json' assert { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
 const adapter = createPostgresAdapter();
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
 const o = orm<Contract>({ context });
 
 // Model registry proxy: orm.user(), orm.post(), etc.
@@ -1632,7 +1632,7 @@ const contract = validateContract<Contract>(contractJson);
 
 // Create context with validated contract (caller is responsible for validation)
 const adapter = createPostgresAdapter();
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
 
 // In E2E tests, use loadContractFromDisk to load from committed fixtures
 // Note: loadContractFromDisk is in test/e2e/framework/test/utils.ts, not test-utils
@@ -1741,7 +1741,7 @@ import type { Contract } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);
 const adapter = createPostgresAdapter();
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
 const o = orm<Contract>({ context });
 
 // Read with relation filter
@@ -2023,7 +2023,7 @@ const signature: OperationSignature = {
 
 const adapter = createStubAdapter();
 const context = createTestContext(contract, adapter, {
-  extensions: [
+  extensionPacks: [
     {
       operations: () => [signature],
     },
