@@ -36,9 +36,9 @@
             "type": ["string", "null"],
             "description": "Optional assignee username (e.g., @username)"
           },
-          "ticket": {
+          "linear": {
             "type": ["string", "null"],
-            "description": "Optional ticket reference (e.g., TML-1234)"
+            "description": "Optional Linear ticket URL or reference (e.g., https://linear.app/...)"
           },
           "notes": {
             "type": ["string", "null"],

@@ -368,8 +368,8 @@ async function formatResults(results, warningConfig) {
       if (warningEntry.assignee) {
         console.log(`    Assignee: ${warningEntry.assignee}`);
       }
-      if (warningEntry.ticket) {
-        console.log(`    Ticket: ${warningEntry.ticket}`);
+      if (warningEntry.linear) {
+        console.log(`    Linear: ${warningEntry.linear}`);
       }
       if (expiry.isExpiringSoon) {
         console.log(
@@ -557,7 +557,7 @@ async function main() {
       );
       console.error(`    Reason: ${entry.reason}`);
       if (entry.assignee) console.error(`    Assignee: ${entry.assignee}`);
-      if (entry.ticket) console.error(`    Ticket: ${entry.ticket}`);
+      if (entry.linear) console.error(`    Linear: ${entry.linear}`);
       console.error('');
     }
 
