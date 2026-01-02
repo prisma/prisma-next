@@ -1,54 +1,11 @@
-import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { ifDefined } from '@prisma-next/utils/defined';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  executeCommand,
-  setupCommandMocks,
-  setupDbTestFixture,
-  type setupTestDirectoryFromFixtures,
-  withTempDir,
-} from './utils/cli-test-helpers';
+import { setupCommandMocks, withTempDir } from './utils/cli-test-helpers';
+import { runDbInit, setupDbInitFixture } from './utils/db-init-test-helpers';
 
 // Fixture subdirectory for db-init e2e tests
 const fixtureSubdir = 'db-init';
-
-/**
- * Sets up a test directory for db-init e2e tests.
- * Optionally creates a database schema. By default, creates an empty database.
- */
-async function setupDbInitFixture(
-  connectionString: string,
-  createTempDir: () => string,
-  fixtureSubdir: string,
-  schemaSql?: string,
-): Promise<{ testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>; configPath: string }> {
-  return setupDbTestFixture({
-    connectionString,
-    createTempDir,
-    fixtureSubdir,
-    ...ifDefined('schemaSql', schemaSql),
-  });
-}
-
-/**
- * Runs the db-init command with the given arguments.
- * Handles process.chdir and restores the original working directory.
- */
-async function runDbInit(
-  testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>,
-  args: string[],
-): Promise<number> {
-  const command = createDbInitCommand();
-  const originalCwd = process.cwd();
-  try {
-    process.chdir(testSetup.testDir);
-    return await executeCommand(command, args);
-  } finally {
-    process.chdir(originalCwd);
-  }
-}
 
 withTempDir(({ createTempDir }) => {
   describe('db init command (e2e)', () => {
