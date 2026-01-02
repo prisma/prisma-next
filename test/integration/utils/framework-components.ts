@@ -7,9 +7,12 @@ import type {
 import pgvectorExtension from '@prisma-next/extension-pgvector/control';
 import postgresTarget from '@prisma-next/target-postgres/control';
 
-const targetDescriptor = postgresTarget as ControlTargetDescriptor<'sql', 'postgres'>;
-const adapterDescriptor = postgresAdapter as ControlAdapterDescriptor<'sql', 'postgres'>;
-const pgvectorDescriptor = pgvectorExtension as ControlExtensionDescriptor<'sql', 'postgres'>;
+const targetDescriptor = postgresTarget satisfies ControlTargetDescriptor<'sql', 'postgres'>;
+const adapterDescriptor = postgresAdapter satisfies ControlAdapterDescriptor<'sql', 'postgres'>;
+const pgvectorDescriptor = pgvectorExtension satisfies ControlExtensionDescriptor<
+  'sql',
+  'postgres'
+>;
 
 type SqlDescriptor =
   | ControlTargetDescriptor<'sql', 'postgres'>
@@ -36,7 +39,4 @@ export function getSqlDescriptorBundle(options?: {
   };
 }
 
-export const pgvectorExtensionDescriptor = pgvectorDescriptor as ControlExtensionDescriptor<
-  'sql',
-  'postgres'
->;
+export const pgvectorExtensionDescriptor = pgvectorDescriptor;

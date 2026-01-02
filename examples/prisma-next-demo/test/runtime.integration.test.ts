@@ -24,9 +24,12 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
+import {
+  getSqlDescriptorBundle,
+  pgvectorExtensionDescriptor,
+} from '../../../test/integration/utils/framework-components';
 import { stampMarker } from '../scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
-import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from './utils/framework-components';
 
 let contract: ReturnType<typeof validateContract>;
 
