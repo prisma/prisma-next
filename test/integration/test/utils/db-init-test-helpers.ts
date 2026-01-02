@@ -27,7 +27,7 @@ export async function runDbInit(
   const originalCwd = process.cwd();
   try {
     process.chdir(testSetup.testDir);
-    return await executeCommand(command, args);
+    return await executeCommand(command, [...args]);
   } finally {
     process.chdir(originalCwd);
   }
