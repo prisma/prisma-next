@@ -247,7 +247,7 @@ describe('verifySqlSchema with databaseDependencies', () => {
         frameworkComponents: [], // No extensions provided - configuration mismatch!
       }),
     ).toThrow(
-      "Extension 'pgvector' is declared in the contract but not found in framework components",
+      "Extension pack 'pgvector' is declared in the contract but not found in framework components",
     );
   });
 

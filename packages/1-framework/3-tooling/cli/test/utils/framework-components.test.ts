@@ -190,7 +190,7 @@ describe('assertContractRequirementsSatisfied', () => {
         family,
         target,
         adapter,
-        extensions: [extension],
+        extensionPacks: [extension],
       }),
     ).not.toThrow();
   });
@@ -202,7 +202,7 @@ describe('assertContractRequirementsSatisfied', () => {
         family,
         target,
         adapter,
-        extensions: [extension],
+        extensionPacks: [extension],
       }),
     ).toThrow(CliStructuredError);
   });
@@ -214,7 +214,7 @@ describe('assertContractRequirementsSatisfied', () => {
         family,
         target,
         adapter,
-        extensions: [extension],
+        extensionPacks: [extension],
       }),
     ).toThrow(CliStructuredError);
   });
@@ -226,7 +226,7 @@ describe('assertContractRequirementsSatisfied', () => {
         family,
         target,
         adapter,
-        extensions: [],
+        extensionPacks: [],
       }),
     ).toThrow(CliStructuredError);
   });
