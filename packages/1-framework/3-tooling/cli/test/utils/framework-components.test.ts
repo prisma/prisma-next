@@ -1,11 +1,11 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { CliStructuredError } from '@prisma-next/core-control-plane/errors';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
-} from '@prisma-next/contract/framework-components';
-import type { ContractIR } from '@prisma-next/contract/ir';
+} from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
 import {
   assertContractRequirementsSatisfied,

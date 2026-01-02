@@ -4,6 +4,7 @@ export type {
   // Instances
   AdapterInstance,
   ComponentDescriptor,
+  DescriptorDeclarativeFields,
   DriverDescriptor,
   DriverInstance,
   ExtensionDescriptor,
@@ -13,4 +14,5 @@ export type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
   TargetInstance,
+  TargetPackRef,
 } from '../framework-components';

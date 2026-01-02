@@ -1,5 +1,4 @@
 import type { DescriptorDeclarativeFields } from '@prisma-next/contract/framework-components';
-import type { OperationManifest, TypesImportSpec } from '@prisma-next/contract/types';
 
 /**
  * Storage type metadata for pack refs.

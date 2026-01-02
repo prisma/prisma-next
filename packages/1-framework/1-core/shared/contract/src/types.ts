@@ -243,4 +243,3 @@ export interface OperationManifest {
   readonly lowering: LoweringSpecManifest;
   readonly capabilities?: ReadonlyArray<string>;
 }
-

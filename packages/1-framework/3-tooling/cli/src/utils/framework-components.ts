@@ -1,11 +1,11 @@
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
-  TargetBoundComponentDescriptor,
-} from '@prisma-next/contract/framework-components';
-import type { ContractIR } from '@prisma-next/contract/ir';
+} from '@prisma-next/core-control-plane/types';
 import { errorConfigValidation } from './cli-errors';
 
 /**
