@@ -85,7 +85,7 @@ export function createSqlRuntimeFamilyInstance(options: {
     target: targetDescriptor,
     adapter: adapterDescriptor,
     driver: driverDescriptor,
-    extensionPacks: extensionDescriptors,
+    extensionPacks: extensionDescriptors = [],
   } = options;
 
   return {
