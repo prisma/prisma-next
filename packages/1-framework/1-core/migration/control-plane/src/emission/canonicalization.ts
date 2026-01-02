@@ -73,7 +73,7 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isRequiredModels = isArrayEqual(currentPath, ['models']);
       const isRequiredTables = isArrayEqual(currentPath, ['storage', 'tables']);
       const isRequiredRelations = isArrayEqual(currentPath, ['relations']);
-      const isRequiredExtensions = isArrayEqual(currentPath, ['extensionPacks']);
+      const isRequiredExtensionPacks = isArrayEqual(currentPath, ['extensionPacks']);
       const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
       const isRequiredMeta = isArrayEqual(currentPath, ['meta']);
       const isRequiredSources = isArrayEqual(currentPath, ['sources']);
@@ -104,7 +104,7 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isRequiredModels &&
         !isRequiredTables &&
         !isRequiredRelations &&
-        !isRequiredExtensions &&
+        !isRequiredExtensionPacks &&
         !isRequiredCapabilities &&
         !isRequiredMeta &&
         !isRequiredSources &&
