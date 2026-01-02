@@ -19,7 +19,7 @@ Provide a command-line interface that:
 - **TS Contract Loading**: Bundle and load TypeScript contract files with import allowlist enforcement
 - **CLI Command Interface**: Parse arguments and route to command handlers using commander
 - **File I/O**: Read TS contracts, write emitted artifacts (`contract.json`, `contract.d.ts`)
-  - **Extension Pack Descriptor Assembly**: Collect adapter and extension descriptors for emission
+- **Extension Pack Descriptor Assembly**: Collect adapter and extension descriptors for emission
 - **Help Output Formatting**: Custom styled help output with command trees and formatted descriptions
 - **Config Management**: Load and validate `prisma-next.config.ts` files using Arktype validation
 
