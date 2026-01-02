@@ -331,7 +331,7 @@ export type SqlFamilyInstance = SqlControlFamilyInstance;
 interface CreateSqlFamilyInstanceOptions<TTargetId extends string, TTargetDetails> {
   readonly target: SqlControlTargetDescriptor<TTargetId, TTargetDetails>;
   readonly adapter: ControlAdapterDescriptor<'sql', string, SqlControlAdapter>;
-  readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
+  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', string>[];
 }
 
 /**
@@ -344,9 +344,9 @@ interface CreateSqlFamilyInstanceOptions<TTargetId extends string, TTargetDetail
 function buildSqlTypeMetadataRegistry(options: {
   readonly target: ControlTargetDescriptor<'sql', string>;
   readonly adapter: ControlAdapterDescriptor<'sql', string>;
-  readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
+  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', string>[];
 }): SqlTypeMetadataRegistry {
-  const { target, adapter, extensions } = options;
+  const { target, adapter, extensionPacks: extensions } = options;
   const registry = new Map<string, SqlTypeMetadata>();
 
   // Get targetId from adapter (they should match)
@@ -388,7 +388,7 @@ function buildSqlTypeMetadataRegistry(options: {
 export function createSqlFamilyInstance<TTargetId extends string, TTargetDetails>(
   options: CreateSqlFamilyInstanceOptions<TTargetId, TTargetDetails>,
 ): SqlFamilyInstance {
-  const { target, adapter, extensions } = options;
+  const { target, adapter, extensionPacks: extensions } = options;
 
   // Build descriptors array for assembly
   // Assembly functions only use manifest and id, so we can pass Control*Descriptor types directly
@@ -401,7 +401,11 @@ export function createSqlFamilyInstance<TTargetId extends string, TTargetDetails
   const extensionIds = extractExtensionIds(adapter, target, extensions);
 
   // Build type metadata registry from manifests
-  const typeMetadataRegistry = buildSqlTypeMetadataRegistry({ target, adapter, extensions });
+  const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
+    target,
+    adapter,
+    extensionPacks: extensions,
+  });
 
   /**
    * Strips mappings from a contract (mappings are runtime-only).

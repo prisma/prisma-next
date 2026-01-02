@@ -143,7 +143,7 @@ export function createDbIntrospectCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensions: config.extensions ?? [],
+            extensionPacks: config.extensions ?? [],
           });
 
           // Validate contract IR if we loaded it
@@ -154,7 +154,7 @@ export function createDbIntrospectCommand(): Command {
               family: config.family,
               target: config.target,
               adapter: config.adapter,
-              extensions: config.extensions,
+              extensionPacks: config.extensions,
             });
             contractIR = validatedContract;
           }

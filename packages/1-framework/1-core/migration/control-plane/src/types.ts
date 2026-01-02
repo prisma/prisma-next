@@ -252,7 +252,7 @@ export interface ControlFamilyDescriptor<
     readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
     readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
     readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId>;
-    readonly extensions: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+    readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
   }): TFamilyInstance;
 }
 

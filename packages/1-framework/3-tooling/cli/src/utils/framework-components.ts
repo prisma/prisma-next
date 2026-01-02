@@ -120,7 +120,7 @@ export function assertContractRequirementsSatisfied<
   family,
   target,
   adapter,
-  extensions,
+  extensions: extensionPacks,
 }: {
   readonly contract: Pick<ContractIR, 'targetFamily' | 'target' | 'extensionPacks'>;
   readonly family: ControlFamilyDescriptor<TFamilyId>;
@@ -129,7 +129,7 @@ export function assertContractRequirementsSatisfied<
   readonly extensions?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[] | undefined;
 }): void {
   const providedComponentIds = new Set<string>([target.id, adapter.id]);
-  for (const extension of extensions ?? []) {
+  for (const extension of extensionPacks ?? []) {
     providedComponentIds.add(extension.id);
   }
 

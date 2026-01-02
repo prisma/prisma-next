@@ -26,12 +26,12 @@ export class SqlFamilyDescriptor
     readonly target: SqlControlTargetDescriptor<TTargetId, TTargetDetails>;
     readonly adapter: ControlAdapterDescriptor<'sql', TTargetId, SqlControlAdapter<TTargetId>>;
     readonly driver: ControlDriverDescriptor<'sql', TTargetId>;
-    readonly extensions: readonly ControlExtensionDescriptor<'sql', TTargetId>[];
+    readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', TTargetId>[];
   }): SqlControlFamilyInstance {
     return createSqlFamilyInstance({
       target: options.target,
       adapter: options.adapter,
-      extensions: options.extensions,
+      extensionPacks: options.extensionPacks,
     });
   }
 }

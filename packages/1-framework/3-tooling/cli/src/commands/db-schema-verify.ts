@@ -133,7 +133,7 @@ export function createDbSchemaVerifyCommand(): Command {
           target: config.target,
           adapter: config.adapter,
           driver: driverDescriptor,
-          extensions: config.extensions ?? [],
+          extensionPacks: config.extensions ?? [],
         });
 
         // Validate contract using instance validator
@@ -145,7 +145,7 @@ export function createDbSchemaVerifyCommand(): Command {
           family: config.family,
           target: config.target,
           adapter: config.adapter,
-          extensions: config.extensions ?? [],
+          extensionPacks: config.extensions ?? [],
         });
 
         // Resolve database URL

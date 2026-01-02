@@ -202,7 +202,7 @@ export function createDbInitCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensions: config.extensions ?? [],
+            extensionPacks: config.extensions ?? [],
           });
           const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
           const frameworkComponents = assertFrameworkComponentsCompatible(
@@ -218,7 +218,7 @@ export function createDbInitCommand(): Command {
             family: config.family,
             target: config.target,
             adapter: config.adapter,
-            extensions: config.extensions ?? [],
+            extensionPacks: config.extensions ?? [],
           });
 
           // Create planner and runner from target migrations capability
