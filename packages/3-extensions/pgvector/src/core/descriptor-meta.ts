@@ -9,6 +9,17 @@ const cosineLowering = {
   template: '1 - ({{self}} <=> {{arg0}})',
 } as const;
 
+/**
+ * Shared operation definition used by both pack metadata and runtime descriptor.
+ * Frozen to prevent accidental mutation.
+ */
+const cosineDistanceOperation = Object.freeze({
+  method: 'cosineDistance',
+  args: [{ kind: 'param' }],
+  returns: { kind: 'builtin', type: 'number' },
+  lowering: cosineLowering,
+} as const);
+
 export const pgvectorPackMeta = {
   kind: 'extension',
   id: 'pgvector',
@@ -42,18 +53,12 @@ export const pgvectorPackMeta = {
   operations: [
     {
       for: pgvectorTypeId,
-      method: 'cosineDistance',
-      args: [{ kind: 'param' }],
-      returns: { kind: 'builtin', type: 'number' },
-      lowering: cosineLowering,
+      ...cosineDistanceOperation,
     },
   ],
 } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
 
 export const pgvectorRuntimeOperation: SqlOperationSignature = {
   forTypeId: pgvectorTypeId,
-  method: 'cosineDistance',
-  args: [{ kind: 'param' }],
-  returns: { kind: 'builtin', type: 'number' },
-  lowering: cosineLowering,
+  ...cosineDistanceOperation,
 };
