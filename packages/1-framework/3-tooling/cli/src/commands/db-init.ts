@@ -181,14 +181,13 @@ export function createDbInitCommand(): Command {
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
+          const code = (error as { code?: unknown }).code;
           const redacted = redactDatabaseUrl(dbUrl);
           throw errorRuntime('Database connection failed', {
             why: message,
             fix: 'Verify the database URL, ensure the database is reachable, and confirm credentials/permissions',
             meta: {
-              ...(typeof (error as { code?: unknown }).code !== 'undefined'
-                ? { code: (error as { code?: unknown }).code }
-                : {}),
+              ...(typeof code !== 'undefined' ? { code } : {}),
               ...redacted,
             },
           });

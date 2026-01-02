@@ -7,6 +7,7 @@ import type {
   ControlDriverDescriptor,
   ControlDriverInstance,
 } from '@prisma-next/core-control-plane/types';
+import { SqlQueryError } from '@prisma-next/sql-errors';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { type } from 'arktype';
 import { Client } from 'pg';
@@ -108,11 +109,18 @@ const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', Postg
           // ignore
         }
 
+        const codeFromSqlState = SqlQueryError.is(normalized) ? normalized.sqlState : undefined;
+        const causeCode =
+          'cause' in normalized && normalized.cause
+            ? (normalized.cause as { code?: unknown }).code
+            : undefined;
+        const code = codeFromSqlState ?? causeCode;
+
         throw errorRuntime('Database connection failed', {
           why: normalized.message,
           fix: 'Verify the database URL, ensure the database is reachable, and confirm credentials/permissions',
           meta: {
-            code: (normalized as { code?: unknown }).code,
+            ...(typeof code !== 'undefined' ? { code } : {}),
             ...redacted,
           },
         });
