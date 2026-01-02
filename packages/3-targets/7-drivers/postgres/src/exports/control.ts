@@ -7,6 +7,7 @@ import type {
   ControlDriverDescriptor,
   ControlDriverInstance,
 } from '@prisma-next/core-control-plane/types';
+import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { type } from 'arktype';
 import { Client } from 'pg';
 import { normalizePgError } from '../normalize-error';
@@ -100,29 +101,7 @@ const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', Postg
         return new PostgresControlDriver(client);
       } catch (error) {
         const normalized = normalizePgError(error);
-
-        const redacted: { host?: string; port?: string; database?: string; username?: string } = {};
-        try {
-          const parsed = new URL(url);
-          if (parsed.hostname) {
-            redacted.host = parsed.hostname;
-          }
-          if (parsed.port) {
-            redacted.port = parsed.port;
-          }
-          if (parsed.pathname) {
-            const database = parsed.pathname.replace(/^\//, '');
-            if (database) {
-              redacted.database = database;
-            }
-          }
-          if (parsed.username) {
-            redacted.username = parsed.username;
-          }
-        } catch {
-          // ignore URL parse errors; keep meta minimal
-        }
-
+        const redacted = redactDatabaseUrl(url);
         try {
           await client.end();
         } catch {

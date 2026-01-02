@@ -6,6 +6,7 @@ import type {
   MigrationPlanOperation,
   MigrationRunnerResult,
 } from '@prisma-next/core-control-plane/types';
+import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import {
@@ -180,30 +181,7 @@ export function createDbInitCommand(): Command {
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-
-          const redacted: { host?: string; port?: string; database?: string; username?: string } =
-            {};
-          try {
-            const parsed = new URL(dbUrl);
-            if (parsed.hostname) {
-              redacted.host = parsed.hostname;
-            }
-            if (parsed.port) {
-              redacted.port = parsed.port;
-            }
-            if (parsed.pathname) {
-              const database = parsed.pathname.replace(/^\//, '');
-              if (database) {
-                redacted.database = database;
-              }
-            }
-            if (parsed.username) {
-              redacted.username = parsed.username;
-            }
-          } catch {
-            // ignore URL parse errors; keep meta minimal
-          }
-
+          const redacted = redactDatabaseUrl(dbUrl);
           throw errorRuntime('Database connection failed', {
             why: message,
             fix: 'Verify the database URL, ensure the database is reachable, and confirm credentials/permissions',
