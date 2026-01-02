@@ -156,9 +156,7 @@ describe('family instance verify - basic', () => {
     'verifies database with matching marker via driver',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        const testSetup = createTestDir();
-        const testDirWithDb = testSetup.testDir;
-        const cleanupWithDb = testSetup.cleanup;
+        const { testDir: testDirWithDb, cleanup: cleanupWithDb } = createTestDir();
 
         try {
           // Create and emit contract
