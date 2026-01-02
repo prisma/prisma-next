@@ -40,6 +40,14 @@ export function assertRuntimeContractRequirementsSatisfied<
   }
 
   if (runtimeExtensionPacksProvided === true) {
+    // Runtime extension packs don't have IDs - log warning and defer validation to runtime.
+    if (result.missingExtensionPackIds.length > 0) {
+      console.warn(
+        `Contract requires extension pack(s) [${result.missingExtensionPackIds.join(', ')}], ` +
+          `but cannot verify against runtime extensions (they don't have IDs). ` +
+          'Validation will occur at runtime when codecs/operations are used.',
+      );
+    }
     return;
   }
 
