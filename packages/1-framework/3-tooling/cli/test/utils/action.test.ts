@@ -1,8 +1,9 @@
+import { notOk, ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
+import { performAction, wrapSync } from '../../src/utils/action';
 import { errorConfigFileNotFound } from '../../src/utils/cli-errors';
-import { err, ok, performAction, wrapSync } from '../../src/utils/result';
 
-describe('result utilities', () => {
+describe('action utilities', () => {
   describe('ok', () => {
     it('creates successful result', () => {
       const result = ok('test');
@@ -11,12 +12,12 @@ describe('result utilities', () => {
     });
   });
 
-  describe('err', () => {
+  describe('notOk', () => {
     it('creates error result', () => {
       const error = errorConfigFileNotFound();
-      const result = err(error);
+      const result = notOk(error);
       expect(result.ok).toBe(false);
-      expect(result.error).toBe(error);
+      expect(result.failure).toBe(error);
     });
   });
 
@@ -31,14 +32,14 @@ describe('result utilities', () => {
       }
     });
 
-    it('catches CliStructuredError and returns err', async () => {
+    it('catches CliStructuredError and returns notOk', async () => {
       const error = errorConfigFileNotFound();
       const result = await performAction(async () => {
         throw error;
       });
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe(error);
+        expect(result.failure).toBe(error);
       }
     });
 
@@ -58,7 +59,7 @@ describe('result utilities', () => {
       });
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe(error);
+        expect(result.failure).toBe(error);
       }
     });
   });
@@ -74,14 +75,14 @@ describe('result utilities', () => {
       }
     });
 
-    it('catches CliStructuredError and returns err', () => {
+    it('catches CliStructuredError and returns notOk', () => {
       const error = errorConfigFileNotFound();
       const result = wrapSync(() => {
         throw error;
       });
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe(error);
+        expect(result.failure).toBe(error);
       }
     });
 
