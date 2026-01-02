@@ -3,7 +3,6 @@ import { join, resolve } from 'node:path';
 import { loadContractFromTs } from '@prisma-next/cli';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
-import pgvector from '@prisma-next/extension-pgvector/runtime';
 import {
   assembleOperationRegistry,
   convertOperationManifest,
@@ -13,14 +12,19 @@ import {
 } from '@prisma-next/family-sql/test-utils';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { budgets, createRuntime } from '@prisma-next/sql-runtime';
-import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
+import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { stampMarker } from '../scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
-import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from './utils/framework-components';
+import {
+  getSqlDescriptorBundle,
+  pgvectorExtensionDescriptor,
+  pgvectorExtensionRuntimeDescriptor,
+  postgresAdapterRuntimeDescriptor,
+  postgresTargetRuntimeDescriptor,
+} from './utils/framework-components';
 
 let contract: Contract;
 
@@ -72,8 +76,12 @@ function createTestRuntime(
   runtime: ReturnType<typeof createRuntime>;
   pool: Pool;
 } {
-  const adapter = createStubAdapter();
-  const context = createTestContext(contract, adapter, { extensionPacks: [pgvector] });
+  const context = createRuntimeContext({
+    contract,
+    target: postgresTargetRuntimeDescriptor,
+    adapter: postgresAdapterRuntimeDescriptor,
+    extensionPacks: [pgvectorExtensionRuntimeDescriptor],
+  });
   const pool = new Pool({ connectionString });
   const driver = createPostgresDriverFromOptions({
     connect: { pool },

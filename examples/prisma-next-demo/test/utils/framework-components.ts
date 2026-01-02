@@ -5,5 +5,8 @@
 export {
   getSqlDescriptorBundle,
   pgvectorExtensionDescriptor,
+  pgvectorExtensionRuntimeDescriptor,
+  postgresAdapterRuntimeDescriptor,
+  postgresTargetRuntimeDescriptor,
   type SqlDescriptorBundle,
 } from '../../../../test/integration/utils/framework-components';
