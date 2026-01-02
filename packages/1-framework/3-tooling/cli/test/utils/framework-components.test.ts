@@ -220,14 +220,53 @@ describe('assertContractRequirementsSatisfied', () => {
   });
 
   it('throws when required extension pack is missing', () => {
-    expect(() =>
+    try {
       assertContractRequirementsSatisfied({
         contract,
         family,
         target,
         adapter,
         extensionPacks: [],
-      }),
-    ).toThrow(CliStructuredError);
+      });
+      throw new Error('expected assertContractRequirementsSatisfied to throw');
+    } catch (error) {
+      if (!(error instanceof CliStructuredError)) {
+        throw error;
+      }
+
+      expect(error.meta).toMatchObject({
+        missingExtensionPacks: ['pgvector'],
+      });
+    }
+  });
+
+  it('includes all missing extension packs in error meta', () => {
+    const contractWithTwoPacks: Pick<ContractIR, 'targetFamily' | 'target' | 'extensionPacks'> = {
+      targetFamily: 'sql',
+      target: 'postgres',
+      extensionPacks: {
+        pgvector: {},
+        other: {},
+      },
+    };
+
+    try {
+      assertContractRequirementsSatisfied({
+        contract: contractWithTwoPacks,
+        family,
+        target,
+        adapter,
+        extensionPacks: [],
+      });
+      throw new Error('expected assertContractRequirementsSatisfied to throw');
+    } catch (error) {
+      if (!(error instanceof CliStructuredError)) {
+        throw error;
+      }
+
+      expect(error.meta).toMatchObject({
+        missingExtensionPacks: ['other', 'pgvector'],
+      });
+    }
   });
 });

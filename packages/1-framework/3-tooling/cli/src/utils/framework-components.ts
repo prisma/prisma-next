@@ -9,7 +9,7 @@ import type {
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
-import { errorConfigValidation } from './cli-errors';
+import { errorConfigValidation, errorContractMissingExtensionPacks } from './cli-errors';
 
 /**
  * Asserts that all framework components are compatible with the expected family and target.
@@ -152,9 +152,10 @@ export function assertContractRequirementsSatisfied<
     });
   }
 
-  for (const packId of result.missingExtensionPackIds) {
-    throw errorConfigValidation('contract.extensionPacks', {
-      why: `Contract requires extension pack '${packId}', but CLI config does not provide a matching descriptor.`,
+  if (result.missingExtensionPackIds.length > 0) {
+    throw errorContractMissingExtensionPacks({
+      missingExtensionPacks: result.missingExtensionPackIds,
+      providedComponentIds: [...providedComponentIds],
     });
   }
 }

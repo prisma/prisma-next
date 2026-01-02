@@ -242,6 +242,29 @@ export function errorDriverRequired(options?: { readonly why?: string }): CliStr
 }
 
 /**
+ * Contract requires extension packs that are not provided by config descriptors.
+ */
+export function errorContractMissingExtensionPacks(options: {
+  readonly missingExtensionPacks: readonly string[];
+  readonly providedComponentIds: readonly string[];
+}): CliStructuredError {
+  const missing = [...options.missingExtensionPacks].sort();
+  return new CliStructuredError('4011', 'Missing extension packs in config', {
+    domain: 'CLI',
+    why:
+      missing.length === 1
+        ? `Contract requires extension pack '${missing[0]}', but CLI config does not provide a matching descriptor.`
+        : `Contract requires extension packs ${missing.map((p) => `'${p}'`).join(', ')}, but CLI config does not provide matching descriptors.`,
+    fix: 'Add the missing extension descriptors to `extensions` in prisma-next.config.ts',
+    docsUrl: 'https://prisma-next.dev/docs/cli/config',
+    meta: {
+      missingExtensionPacks: missing,
+      providedComponentIds: [...options.providedComponentIds].sort(),
+    },
+  });
+}
+
+/**
  * Migration planning failed due to conflicts.
  */
 export function errorMigrationPlanningFailed(options: {
