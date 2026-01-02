@@ -630,7 +630,7 @@ describe('sql-target-family-hook', () => {
             },
           },
         },
-      } as TestDescriptor,
+      },
       {
         kind: 'extension',
         id: 'test-extension',
@@ -646,7 +646,7 @@ describe('sql-target-family-hook', () => {
             },
           },
         },
-      } as TestDescriptor,
+      },
     ];
 
     const codecImports = extractCodecTypeImports(descriptors);
@@ -665,7 +665,7 @@ describe('sql-target-family-hook', () => {
         familyId: 'sql',
         targetId: 'postgres',
         version: '0.0.1',
-      } as TestDescriptor,
+      },
     ];
 
     const codecImports = extractCodecTypeImports(descriptors);
@@ -698,7 +698,7 @@ describe('sql-target-family-hook', () => {
             },
           },
         },
-      } as TestDescriptor,
+      },
     ];
 
     const codecImports = extractCodecTypeImports(descriptors);
