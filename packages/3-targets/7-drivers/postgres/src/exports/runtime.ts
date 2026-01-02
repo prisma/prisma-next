@@ -3,6 +3,7 @@ import type {
   RuntimeDriverInstance,
 } from '@prisma-next/core-execution-plane/types';
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
+import { postgresDriverDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresDriverOptions } from '../postgres-driver';
 import { createPostgresDriverFromOptions } from '../postgres-driver';
 
@@ -22,12 +23,7 @@ const postgresRuntimeDriverDescriptor: RuntimeDriverDescriptor<
   'postgres',
   PostgresRuntimeDriver
 > = {
-  kind: 'driver',
-  familyId: 'sql',
-  targetId: 'postgres',
-  id: 'postgres',
-  version: '0.0.1',
-  capabilities: {},
+  ...postgresDriverDescriptorMeta,
   create(options: PostgresDriverOptions): PostgresRuntimeDriver {
     return createPostgresDriverFromOptions(options) as PostgresRuntimeDriver;
   },

@@ -6,6 +6,7 @@ import type {
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { Client } from 'pg';
+import { postgresDriverDescriptorMeta } from '../core/descriptor-meta';
 import { normalizePgError } from '../normalize-error';
 
 /**
@@ -44,12 +45,7 @@ export class PostgresControlDriver implements ControlDriverInstance<'sql', 'post
  */
 const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', PostgresControlDriver> =
   {
-    kind: 'driver',
-    id: 'postgres',
-    familyId: 'sql',
-    targetId: 'postgres',
-    version: '0.0.1',
-    capabilities: {},
+    ...postgresDriverDescriptorMeta,
     async create(url: string): Promise<PostgresControlDriver> {
       const client = new Client({ connectionString: url });
       try {
