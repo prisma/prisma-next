@@ -59,7 +59,6 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 ## Architecture
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Contract normalization responsibilities
-- `.cursor/rules/adapter-capability-declaration.mdc` — Adapter capability declaration (manifest + code)
 - `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype
 - `.cursor/rules/control-plane-descriptors.mdc` — Control plane descriptor pattern (Control*Descriptor types, driver requirement)
 - `.cursor/rules/family-instance-domain-actions.mdc` — Family instance domain actions (inline core logic, import helper functions)
