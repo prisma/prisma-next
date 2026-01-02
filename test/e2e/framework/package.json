@@ -6,9 +6,9 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
-    "lint:fix": "biome check --write . --config-path ../../../biome.json",
-    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../biome.json",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
     "emit": "prisma-next emit",
     "clean": "node ../../../scripts/clean.mjs"
   },

@@ -62,14 +62,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "**/*.test.ts",
-        "**/*.test-d.ts",
-        "**/test/**/*.ts",
-        "**/tests/**/*.ts",
-        "**/packages/1-framework/3-tooling/emitter/**/*.ts",
-        "**/packages/1-framework/3-tooling/cli/**/*.ts"
-      ],
+      "includes": ["**/*.test.ts", "**/*.test-d.ts", "**/test/**/*.ts"],
       "javascript": {
         "globals": ["console", "process", "__dirname", "__filename", "URL"]
       },
