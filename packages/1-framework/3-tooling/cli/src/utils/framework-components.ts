@@ -123,7 +123,7 @@ export function assertContractRequirementsSatisfied<
   readonly family: ControlFamilyDescriptor<TFamilyId>;
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
-  readonly extensions?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+  readonly extensions?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[] | undefined;
 }): void {
   if (contract.targetFamily !== family.familyId) {
     throw errorConfigValidation('contract.targetFamily', {

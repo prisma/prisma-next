@@ -153,7 +153,7 @@ export function createDbVerifyCommand(): Command {
             family: config.family,
             target: config.target,
             adapter: config.adapter,
-            extensions: config.extensions ?? [],
+            extensions: config.extensions,
           });
 
           // Call family instance verify method
