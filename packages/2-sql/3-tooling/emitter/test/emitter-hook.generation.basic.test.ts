@@ -125,11 +125,14 @@ describe('sql-target-family-hook', () => {
 
     const codecImports = extractCodecTypeImports(descriptors);
     const operationImports = extractOperationTypeImports(descriptors);
-    expect(codecImports.length).toBe(1);
-    expect(codecImports[0]?.package).toBe('@test/adapter/codec-types');
-    expect(codecImports[0]?.named).toBe('CodecTypes');
-    expect(codecImports[0]?.alias).toBe('TestTypes');
-    expect(operationImports.length).toBe(0);
+    expect(codecImports).toEqual([
+      {
+        package: '@test/adapter/codec-types',
+        named: 'CodecTypes',
+        alias: 'TestTypes',
+      },
+    ]);
+    expect(operationImports).toEqual([]);
   });
 
   it('generates contract types with multiple extensions', () => {
@@ -197,6 +200,15 @@ describe('sql-target-family-hook', () => {
 
     const codecTypeImports = extractCodecTypeImports(descriptors);
     const operationTypeImports = extractOperationTypeImports(descriptors);
+    expect(codecTypeImports).toEqual([
+      {
+        package: '@prisma-next/adapter-postgres/codec-types',
+        named: 'CodecTypes',
+        alias: 'PgTypes',
+      },
+      { package: '@prisma-next/pgvector/codec-types', named: 'CodecTypes', alias: 'VectorTypes' },
+    ]);
+    expect(operationTypeImports).toEqual([]);
     const types = sqlTargetFamilyHook.generateContractTypes(
       ir,
       codecTypeImports,

@@ -703,9 +703,11 @@ describe('sql-target-family-hook', () => {
 
     const codecImports = extractCodecTypeImports(descriptors);
     const operationImports = extractOperationTypeImports(descriptors);
-    expect(codecImports.length).toBe(1);
-    expect(codecImports[0]?.package).toBe('@test/adapter/codec-types');
-    expect(operationImports.length).toBe(1);
-    expect(operationImports[0]?.package).toBe('@test/adapter/operation-types');
+    expect(codecImports).toEqual([
+      { package: '@test/adapter/codec-types', named: 'CodecTypes', alias: 'TestTypes' },
+    ]);
+    expect(operationImports).toEqual([
+      { package: '@test/adapter/operation-types', named: 'OperationTypes', alias: 'TestOps' },
+    ]);
   });
 });

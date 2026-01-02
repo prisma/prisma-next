@@ -29,6 +29,9 @@ export function getRuntime(): Runtime {
 
     pool = new Pool({ connectionString });
 
+    // Create extension instance (reused for both runtime and context)
+    const pgvectorExt = pgvector();
+
     // Create runtime family instance from descriptors
     const familyInstance = sqlFamily.create({
       target: postgresTarget,
@@ -48,7 +51,7 @@ export function getRuntime(): Runtime {
         mode: 'onFirstUse',
         requireMarker: false,
       },
-      extensionPacks: [pgvector()],
+      extensionPacks: [pgvectorExt],
       plugins: [
         budgets({
           maxRows: 10_000,
@@ -64,7 +67,7 @@ export function getRuntime(): Runtime {
     context = createRuntimeContext({
       contract,
       adapter: adapterInstance,
-      extensionPacks: [pgvector()],
+      extensionPacks: [pgvectorExt],
     });
   }
   return runtime;
