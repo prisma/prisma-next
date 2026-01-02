@@ -143,7 +143,7 @@ export function assertFrameworkComponentsCompatible<
  *   family: config.family,
  *   target: config.target,
  *   adapter: config.adapter,
- *   extensionPacks: config.extensions,
+ *   extensionPacks: config.extensionPacks,
  * });
  * ```
  */

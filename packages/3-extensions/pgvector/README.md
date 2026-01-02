@@ -55,7 +55,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensions: [pgvector],
+  extensionPacks: [pgvector],
 });
 ```
 

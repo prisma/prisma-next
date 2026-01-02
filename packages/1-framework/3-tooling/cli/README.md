@@ -130,7 +130,7 @@ prisma-next db verify -v --timestamps
 
 The `db verify` command requires a `driver` in the config to connect to the database:
 
-If your emitted `contract.json` declares `extensionPacks`, your config must include matching descriptors in `extensions` (by `id`). The CLI validates this wiring before running the command.
+If your emitted `contract.json` declares `extensionPacks`, your config must include matching descriptors in `extensionPacks` (by `id`). The CLI validates this wiring before running the command.
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
@@ -161,7 +161,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
 4. **Verify**: Calls `familyInstance.verify()` which:
    - Reads the contract marker from the database
    - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
@@ -308,7 +308,7 @@ export default defineConfig({
 **Introspection Process:**
 
 1. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-2. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
+2. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
 3. **Introspect**: Calls `familyInstance.introspect()` which:
    - Queries the database catalog to discover schema structure
    - Returns a family-specific schema IR (e.g., `SqlSchemaIR` for SQL family)
@@ -466,7 +466,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
 4. **Schema Verification (Precondition)**: Calls `familyInstance.schemaVerify()` to verify the database schema matches the contract:
    - If verification fails: Prints schema verification output and exits with code 1 (marker is not written)
    - If verification passes: Proceeds to marker signing
@@ -648,7 +648,7 @@ prisma-next db init --json
 
 The `db init` command requires a `driver` in the config to connect to the database:
 
-If your emitted `contract.json` declares `extensionPacks`, your config must include matching descriptors in `extensions` (by `id`). The CLI validates this wiring before running the command.
+If your emitted `contract.json` declares `extensionPacks`, your config must include matching descriptors in `extensionPacks` (by `id`). The CLI validates this wiring before running the command.
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
@@ -679,12 +679,12 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`)
 4. **Introspect Schema**: Calls `familyInstance.introspect()` to get the current database schema IR
 5. **Validate wiring**: Ensures the contract is compatible with the CLI config:
    - `contract.targetFamily` matches `config.family.familyId`
    - `contract.target` matches `config.target.targetId`
-   - `contract.extensionPacks` (if present) are provided by `config.extensions` (matched by descriptor `id`)
+   - `contract.extensionPacks` (if present) are provided by `config.extensionPacks` (matched by descriptor `id`)
 6. **Create Planner/Runner**: Uses `config.target.migrations.createPlanner()` and `config.target.migrations.createRunner()`
 7. **Plan Migration**: Calls `planner.plan()` with the contract IR, schema IR, additive-only policy, and `frameworkComponents` (the active target/adapter/extension descriptors)
    - On conflict: Returns a structured failure with conflict list

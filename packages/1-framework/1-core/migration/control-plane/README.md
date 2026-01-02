@@ -116,7 +116,7 @@ The CLI performs runtime validation at the composition boundary using `assertFra
 
 ```typescript
 // CLI composition boundary - runtime assertion + type narrowing
-const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
+const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
 const frameworkComponents = assertFrameworkComponentsCompatible(
   config.family.familyId,
   config.target.targetId,

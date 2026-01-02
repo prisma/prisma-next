@@ -63,18 +63,23 @@ const family = sqlFamilyDescriptor.create({
   extensions: [],
 });
 
+// Include the active framework components so planner/runner can resolve
+// component-owned database dependencies (e.g., extension installs).
+const frameworkComponents = [postgres, postgresAdapter];
+
 // Create planner and runner from target descriptor
 const planner = postgres.migrations.createPlanner(family);
 const runner = postgres.migrations.createRunner(family);
 
 // Plan and execute migrations
-const planResult = planner.plan({ contract, schema, policy });
+const planResult = planner.plan({ contract, schema, policy, frameworkComponents });
 if (planResult.kind === 'success') {
   const executeResult = await runner.execute({
     plan: planResult.plan,
     driver,
     destinationContract: contract,
     policy,
+    frameworkComponents,
   });
   if (!executeResult.ok) {
     // Handle structured failure (e.g., EXECUTION_FAILED, PRECHECK_FAILED)
