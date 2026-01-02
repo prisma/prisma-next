@@ -328,7 +328,7 @@ export interface SqlControlFamilyInstance
  */
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
-interface CreateSqlFamilyInstanceOptions<TTargetId extends string = string, TTargetDetails> {
+interface CreateSqlFamilyInstanceOptions<TTargetId extends string, TTargetDetails> {
   readonly target: SqlControlTargetDescriptor<TTargetId, TTargetDetails>;
   readonly adapter: ControlAdapterDescriptor<'sql', string, SqlControlAdapter>;
   readonly extensions: readonly ControlExtensionDescriptor<'sql', string>[];
@@ -385,7 +385,7 @@ function buildSqlTypeMetadataRegistry(options: {
 /**
  * Creates a SQL family instance for control-plane operations.
  */
-export function createSqlFamilyInstance<TTargetId extends string = string, TTargetDetails>(
+export function createSqlFamilyInstance<TTargetId extends string, TTargetDetails>(
   options: CreateSqlFamilyInstanceOptions<TTargetId, TTargetDetails>,
 ): SqlFamilyInstance {
   const { target, adapter, extensions } = options;
