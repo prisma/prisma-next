@@ -161,41 +161,45 @@ describe('budgets plugin integration', () => {
     });
   });
 
-  it('allows bounded DSL SELECT within budget', async () => {
-    const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      {
-        verify: { mode: 'onFirstUse', requireMarker: false },
-        plugins: [
-          budgets({
-            maxRows: 10_000,
-            defaultTableRows: 10_000,
-            tableRows: { user: 10_000 },
-          }),
-        ],
-      },
-    );
+  it(
+    'allows bounded DSL SELECT within budget',
+    async () => {
+      const adapter = createPostgresAdapter();
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: false },
+          plugins: [
+            budgets({
+              maxRows: 10_000,
+              defaultTableRows: 10_000,
+              tableRows: { user: 10_000 },
+            }),
+          ],
+        },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const tables = schema(context).tables;
-    const userTable = tables['user']!;
-    const userColumns = userTable.columns;
-    const builder = sql({ context });
-    const plan = builder
-      .from(userTable)
-      .select({ id: userColumns['id']!, email: userColumns['email']! })
-      .limit(5)
-      .build();
+      const context = createTestContext(fixtureContract, adapter);
+      const tables = schema(context).tables;
+      const userTable = tables['user']!;
+      const userColumns = userTable.columns;
+      const builder = sql({ context });
+      const plan = builder
+        .from(userTable)
+        .select({ id: userColumns['id']!, email: userColumns['email']! })
+        .limit(5)
+        .build();
 
-    // Bounded SELECT with LIMIT 5 should pass
-    const results = await executePlanAndCollect(runtime, plan);
-    expect(results.length).toBe(5);
-  });
+      // Bounded SELECT with LIMIT 5 should pass
+      const results = await executePlanAndCollect(runtime, plan);
+      expect(results.length).toBe(5);
+    },
+    timeouts.databaseOperation,
+  );
 
   it('blocks streaming when observed rows exceed budget', async () => {
     const adapter = createPostgresAdapter();

@@ -60,29 +60,33 @@ describe('comparison operators integration', () => {
     await teardownTestDatabase(client, ['user']);
   }, timeouts.databaseOperation);
 
-  it('gt operator returns rows where id > cursor', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      { verify: { mode: 'onFirstUse', requireMarker: true } },
-    );
+  it(
+    'gt operator returns rows where id > cursor',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        { verify: { mode: 'onFirstUse', requireMarker: true } },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const { user } = schema(context).tables;
+      const context = createTestContext(fixtureContract, adapter);
+      const { user } = schema(context).tables;
 
-    const plan = sql({ context })
-      .from(user)
-      .select({ id: user.columns.id, email: user.columns.email })
-      .where(user.columns.id.gt(param('cursor')))
-      .orderBy(user.columns.id.asc())
-      .build({ params: { cursor: 5 } });
+      const plan = sql({ context })
+        .from(user)
+        .select({ id: user.columns.id, email: user.columns.email })
+        .where(user.columns.id.gt(param('cursor')))
+        .orderBy(user.columns.id.asc())
+        .build({ params: { cursor: 5 } });
 
-    const rows = await executePlanAndCollect(runtime, plan);
-    expect(rows.map((r) => r.id)).toEqual([6, 7, 8, 9, 10]);
-  });
+      const rows = await executePlanAndCollect(runtime, plan);
+      expect(rows.map((r) => r.id)).toEqual([6, 7, 8, 9, 10]);
+    },
+    timeouts.databaseOperation,
+  );
 
   it('lt operator returns rows where id < cursor', async () => {
     const runtime = createTestRuntime(
