@@ -23,6 +23,20 @@ Provide a command-line interface that:
 - **Help Output Formatting**: Custom styled help output with command trees and formatted descriptions
 - **Config Management**: Load and validate `prisma-next.config.ts` files using Arktype validation
 
+### Wiring validation
+
+The CLI performs **wiring validation** at the composition boundary: it ensures the emitted contract artifacts are compatible with the descriptors wired in `prisma-next.config.ts`.
+
+This prevents runtime mismatches (for example: a contract that declares extension packs, but a config that doesn’t provide the matching descriptors).
+
+Commands that enforce wiring validation:
+- **`db verify`**
+- **`db introspect`** (when a contract is provided)
+- **`db sign`**
+- **`db init`**
+
+If you hit a wiring validation error: add the required descriptors to `config.extensionPacks` (matched by descriptor `id`) and re-run the command.
+
 **Note**: Control plane domain actions (database verification, contract emission) are implemented in `@prisma-next/core-control-plane`. The CLI uses the control plane domain actions programmatically but does not define control plane types itself.
 
 ## Command Descriptions
@@ -129,8 +143,6 @@ prisma-next db verify -v --timestamps
 **Config File Requirements:**
 
 The `db verify` command requires a `driver` in the config to connect to the database:
-
-If your emitted `contract.json` declares `extensionPacks`, your config must include matching descriptors in `extensionPacks` (by `id`). The CLI validates this wiring before running the command.
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
@@ -647,8 +659,6 @@ prisma-next db init --json
 **Config File Requirements:**
 
 The `db init` command requires a `driver` in the config to connect to the database:
-
-If your emitted `contract.json` declares `extensionPacks`, your config must include matching descriptors in `extensionPacks` (by `id`). The CLI validates this wiring before running the command.
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
