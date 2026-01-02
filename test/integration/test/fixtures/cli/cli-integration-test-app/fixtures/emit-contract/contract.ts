@@ -15,7 +15,7 @@ const contractObj = defineContract<Record<string, never>>()
 
 export const contract = {
   ...contractObj,
-  extensionPacks: {
+  extensions: {
     postgres: {
       version: '0.0.1',
     },

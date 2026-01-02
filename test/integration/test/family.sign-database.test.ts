@@ -37,7 +37,7 @@ function createTestContract(): SqlContract<SqlStorage> {
 
   return {
     ...contractObj,
-    extensionPacks: {
+    extensions: {
       postgres: {
         version: '0.0.1',
       },

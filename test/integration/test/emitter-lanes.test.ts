@@ -64,7 +64,7 @@ describe('emitter → lanes integration', () => {
         schemaVersion: '1',
         targetFamily: 'sql',
         target: 'postgres',
-        extensionPacks: {
+        extensions: {
           postgres: { version: '0.0.1' },
           pg: {},
         },
@@ -141,7 +141,7 @@ describe('emitter → lanes integration', () => {
       expect(contractDtsContent).toContain('export type Contract');
 
       const adapter = createStubAdapter();
-      const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+      const context = createRuntimeContext({ contract, adapter, extensions: [] });
       const tables = schema(context).tables;
       const userTable = tables['user'];
       if (!userTable) throw new Error('user table not found');
@@ -172,7 +172,7 @@ describe('emitter → lanes integration', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensionPacks: {
+      extensions: {
         postgres: { version: '0.0.1' },
         pg: {},
       },
@@ -235,7 +235,7 @@ describe('emitter → lanes integration', () => {
     const contract = validateContract(contractJson);
 
     const adapter = createStubAdapter();
-    const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+    const context = createRuntimeContext({ contract, adapter, extensions: [] });
     const tables = schema(context).tables;
     const userTable = tables['user'];
     if (!userTable) throw new Error('user table not found');
@@ -263,7 +263,7 @@ describe('emitter → lanes integration', () => {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      extensionPacks: {
+      extensions: {
         postgres: { version: '0.0.1' },
         pg: {},
       },
@@ -359,9 +359,9 @@ describe('emitter → lanes integration', () => {
     const context1 = createRuntimeContext({
       contract: validatedContract,
       adapter,
-      extensionPacks: [],
+      extensions: [],
     });
-    const context2 = createRuntimeContext({ contract: contract2, adapter, extensionPacks: [] });
+    const context2 = createRuntimeContext({ contract: contract2, adapter, extensions: [] });
     const tables1 = schema(context1).tables;
     const userTable1 = tables1['user'];
     if (!userTable1) throw new Error('user table not found');

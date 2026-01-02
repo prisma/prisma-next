@@ -39,7 +39,7 @@ function createTestContract(): SqlContract<SqlStorage> {
 
   return {
     ...contractObj,
-    extensionPacks: {
+    extensions: {
       postgres: {
         version: '0.0.1',
       },
@@ -81,7 +81,7 @@ async function emitContract(
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: [],
+    extensions: [],
   });
 
   // emitContract handles stripping mappings and validation internally
@@ -112,7 +112,7 @@ function loadContract(testDir: string): { contractIR: ContractIR; contractPath: 
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: [],
+    extensions: [],
   });
   const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
   return { contractIR, contractPath };
@@ -136,7 +136,7 @@ async function verifyDatabase(options: {
       target: postgres,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensionPacks: [],
+      extensions: [],
     });
 
     return await familyInstance.verify({

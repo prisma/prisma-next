@@ -18,7 +18,7 @@ const contractObj = defineContract<CodecTypes>()
 
 export const contract = {
   ...contractObj,
-  extensionPacks: {
+  extensions: {
     postgres: {
       version: '0.0.1',
     },

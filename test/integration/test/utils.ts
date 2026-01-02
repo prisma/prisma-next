@@ -43,7 +43,7 @@ export function createTestRuntime(
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: [],
+    extensions: [],
   });
 
   // Create runtime using family instance
