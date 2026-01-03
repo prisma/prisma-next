@@ -983,6 +983,7 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli`** (main export): Exports `loadContractFromTs` and `createContractEmitCommand`
 - **`@prisma-next/cli/config-types`**: Exports `defineConfig` and config types
 - **`@prisma-next/cli/pack-loading`**: Exports `loadExtensionPacks` and `loadExtensionPackManifest`
+- **`@prisma-next/cli/control-api`**: Exports `createPrismaNextControlClient` and related types for programmatic access
 - **`@prisma-next/cli/commands/db-init`**: Exports `createDbInitCommand`
 - **`@prisma-next/cli/commands/db-introspect`**: Exports `createDbIntrospectCommand`
 - **`@prisma-next/cli/commands/db-schema-verify`**: Exports `createDbSchemaVerifyCommand`
@@ -992,6 +993,126 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function
 
 **Important**: `loadContractFromTs` is exported from the main package (`@prisma-next/cli`), not from `@prisma-next/cli/pack-loading`. See `.cursor/rules/cli-package-exports.mdc` for import patterns.
+
+## Programmatic Control API (`@prisma-next/cli/control-api`)
+
+The control-api module provides a programmatic interface for executing Prisma Next control-plane operations without shelling out to the CLI. This is useful for:
+
+- **Integration tests**: Execute operations programmatically with proper type safety
+- **CI/CD pipelines**: Automate database initialization and verification
+- **Application scaffolding**: Set up databases programmatically from code
+
+### Usage
+
+```typescript
+import { createPrismaNextControlClient } from '@prisma-next/cli/control-api';
+import sql from '@prisma-next/family-sql/control';
+import postgres from '@prisma-next/target-postgres/control';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+
+// Create client with framework component descriptors
+const client = createPrismaNextControlClient({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensionPacks: [],
+});
+
+try {
+  // Connect to database
+  await client.connect(databaseUrl);
+
+  // Verify database matches contract
+  const verifyResult = await client.verify({ contractIR });
+  if (!verifyResult.ok) {
+    console.log('Verification failed:', verifyResult.summary);
+  }
+
+  // Initialize database schema from contract
+  const initResult = await client.dbInit({
+    contractIR,
+    mode: 'apply', // or 'plan' to preview only
+  });
+
+  // Introspect database schema
+  const schemaIR = await client.introspect();
+
+  // Sign database with contract marker
+  const signResult = await client.sign({ contractIR });
+
+} finally {
+  // Always close the connection
+  await client.close();
+}
+```
+
+### Client Lifecycle
+
+The control client follows a lifecycle pattern:
+
+1. **Create**: `createPrismaNextControlClient(options)` - Creates client with framework descriptors
+2. **Connect**: `client.connect(url)` - Establishes database connection
+3. **Operate**: Call `verify()`, `schemaVerify()`, `sign()`, `dbInit()`, `introspect()`
+4. **Close**: `client.close()` - Cleans up resources
+
+### Operations
+
+| Operation | Description | Returns |
+|-----------|-------------|---------|
+| `verify(options)` | Checks database marker matches contract | `VerifyDatabaseResult` |
+| `schemaVerify(options)` | Verifies database schema satisfies contract | `VerifyDatabaseSchemaResult` |
+| `sign(options)` | Writes/updates contract marker in database | `SignDatabaseResult` |
+| `dbInit(options)` | Initializes database schema from contract | `DbInitResult` |
+| `introspect(options?)` | Returns live database schema as IR | `unknown` (family-specific schema IR) |
+
+### Error Handling
+
+**Domain errors** (marker missing, hash mismatch) are returned as structured result objects with `ok: false`:
+
+```typescript
+const result = await client.verify({ contractIR });
+if (!result.ok) {
+  console.log(result.code);    // e.g., 'PN-RTM-3001'
+  console.log(result.summary); // e.g., 'Marker missing'
+}
+```
+
+**Infrastructure errors** (connection failures, driver errors) throw exceptions:
+
+```typescript
+try {
+  await client.connect(invalidUrl);
+} catch (error) {
+  console.error('Connection failed:', error.message);
+}
+```
+
+### Exports
+
+The control-api module exports:
+
+- `createPrismaNextControlClient` - Factory function to create the client
+- `PrismaNextControlClient` - Client interface type
+- `ControlClientOptions` - Options for creating the client
+- `VerifyOptions`, `SchemaVerifyOptions`, `SignOptions`, `DbInitOptions`, `IntrospectOptions` - Operation option types
+- `VerifyDatabaseResult`, `VerifyDatabaseSchemaResult`, `SignDatabaseResult`, `DbInitResult` - Result types
+
+### Relationship to CLI Commands
+
+The control-api exposes the same operations as CLI commands but without:
+- File I/O (reading config files, contracts from disk)
+- Console output (formatters, spinners, colors)
+- Process exit codes (returns results instead)
+
+| CLI Command | Control API Method |
+|-------------|-------------------|
+| `prisma-next db verify` | `client.verify()` |
+| `prisma-next db schema-verify` | `client.schemaVerify()` |
+| `prisma-next db sign` | `client.sign()` |
+| `prisma-next db init` | `client.dbInit()` |
+| `prisma-next db introspect` | `client.introspect()` |
 
 ## Package Location
 
