@@ -3,10 +3,12 @@ import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { Client } from 'pg';
 import { schema, sql } from '../src/prisma/query';
 import { closeRuntime, getRuntime } from '../src/prisma/runtime';
 
+/**
+ * Collects all rows from a plan execution.
+ */
 async function collectRows<P extends ExecutionPlan | SqlQueryPlan<unknown>>(
   plan: P,
 ): Promise<ResultType<P>[]> {
@@ -18,51 +20,18 @@ async function collectRows<P extends ExecutionPlan | SqlQueryPlan<unknown>>(
   return rows;
 }
 
-async function setupTables() {
-  const connectionString = process.env['DATABASE_URL'];
-  if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is required');
+/**
+ * Generates a sample embedding vector (1536 dimensions).
+ */
+function generateEmbedding(seed: number): number[] {
+  const embedding: number[] = [];
+  for (let i = 0; i < 1536; i++) {
+    embedding.push(Math.sin(seed + i) * 0.1);
   }
-
-  const client = new Client({ connectionString });
-  await client.connect();
-
-  try {
-    // Drop all tables to reset the database
-    await client.query('drop table if exists "post" cascade');
-    await client.query('drop table if exists "user" cascade');
-
-    // Create pgvector extension
-    await client.query('create extension if not exists vector');
-
-    // Create user table
-    await client.query(`
-      create table "user" (
-        id serial primary key,
-        email text not null unique,
-        "createdAt" timestamptz not null default now()
-      )
-    `);
-
-    // Create post table with embedding column
-    await client.query(`
-      create table "post" (
-        id serial primary key,
-        title text not null,
-        "userId" int4 not null,
-        "createdAt" timestamptz not null default now(),
-        embedding vector(1536),
-        constraint post_userId_fkey foreign key ("userId") references "user"(id)
-      )
-    `);
-  } finally {
-    await client.end();
-  }
+  return embedding;
 }
 
 async function main() {
-  // Setup tables first
-  await setupTables();
   const tables = schema.tables;
   const userTable = tables.user;
   const postTable = tables.post;
@@ -106,15 +75,6 @@ async function main() {
 
   console.log(`Created user: ${aliceUser.email} (id: ${aliceUser.id})`);
   console.log(`Created user: ${bobUser.email} (id: ${bobUser.id})`);
-
-  // Generate sample embedding vectors (1536 dimensions, matching common embedding models)
-  const generateEmbedding = (seed: number): number[] => {
-    const embedding: number[] = [];
-    for (let i = 0; i < 1536; i++) {
-      embedding.push(Math.sin(seed + i) * 0.1);
-    }
-    return embedding;
-  };
 
   // Insert posts with embeddings
   const post1Plan = sql
