@@ -77,34 +77,38 @@ describe('@prisma-next/driver-postgres', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it('handles non-Error exceptions in cursor path', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+  it(
+    'handles non-Error exceptions in cursor path',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as Pool },
-      cursor: { batchSize: 1 },
-    });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as Pool },
+        cursor: { batchSize: 1 },
+      });
 
-    cleanup = async () => {
-      await driver.close();
-    };
+      cleanup = async () => {
+        await driver.close();
+      };
 
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1)', ['test']);
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      await driver.query('insert into items(name) values ($1)', ['test']);
 
-    // The cursor path should handle non-Error exceptions and fall back to buffered
-    const rows: Array<{ id: number; name: string }> = [];
-    for await (const row of driver.execute<{ id: number; name: string }>({
-      sql: 'select id, name from items',
-    })) {
-      rows.push(row);
-    }
+      // The cursor path should handle non-Error exceptions and fall back to buffered
+      const rows: Array<{ id: number; name: string }> = [];
+      for await (const row of driver.execute<{ id: number; name: string }>({
+        sql: 'select id, name from items',
+      })) {
+        rows.push(row);
+      }
 
-    expect(rows.length).toBeGreaterThan(0);
-  });
+      expect(rows.length).toBeGreaterThan(0);
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it('throws error when client connection fails with non-already-connected error', async () => {
     const db = newDb();
