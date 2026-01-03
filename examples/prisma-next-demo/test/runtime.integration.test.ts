@@ -95,6 +95,8 @@ describe('runtime execute integration', () => {
   beforeEach(async () => {
     database = await createDevDatabase();
     connectionString = database.connectionString;
+    await setupTables();
+    await signDatabaseMarker();
   }, timeouts.spinUpPpgDev);
 
   afterEach(async () => {
@@ -112,11 +114,9 @@ describe('runtime execute integration', () => {
   it(
     'streams rows and enforces marker verification',
     async () => {
-      await setupTables();
       await withClient(connectionString, async (client: Client) => {
         await client.query('insert into "user" (email) values ($1)', ['alice@example.com']);
       });
-      await signDatabaseMarker();
 
       const { context } = createTestRuntime();
       const tables = schema(context).tables;
@@ -173,7 +173,6 @@ describe('runtime execute integration', () => {
   it(
     'infers correct types from query plans',
     async () => {
-      await setupTables();
       await withClient(connectionString, async (client: Client) => {
         await client.query('insert into "user" (email) values ($1)', ['alice@example.com']);
         await client.query('insert into "post" (title, "userId") values ($1, $2)', [
@@ -181,7 +180,6 @@ describe('runtime execute integration', () => {
           1,
         ]);
       });
-      await signDatabaseMarker();
 
       const { context } = createTestRuntime();
       const tables = schema(context).tables;
@@ -234,13 +232,11 @@ describe('runtime execute integration', () => {
   it(
     'enforces row budget on unbounded queries',
     async () => {
-      await setupTables();
       await withClient(connectionString, async (client: Client) => {
         for (let i = 0; i < 100; i++) {
           await client.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
         }
       });
-      await signDatabaseMarker();
 
       const { context } = createTestRuntime({ maxRows: 50 });
       const tables = schema(context).tables;
@@ -285,13 +281,11 @@ describe('runtime execute integration', () => {
   it(
     'enforces streaming row budget',
     async () => {
-      await setupTables();
       await withClient(connectionString, async (client: Client) => {
         for (let i = 0; i < 50; i++) {
           await client.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
         }
       });
-      await signDatabaseMarker();
 
       const { context } = createTestRuntime({ maxRows: 10 });
       const tables = schema(context).tables;
@@ -321,7 +315,6 @@ describe('runtime execute integration', () => {
   it(
     'includeMany returns users with nested posts array',
     async () => {
-      await setupTables();
       await withClient(connectionString, async (client: Client) => {
         await client.query('insert into "user" (email) values ($1), ($2)', [
           'alice@example.com',
@@ -332,7 +325,6 @@ describe('runtime execute integration', () => {
           ['First Post', 1, 'Second Post', 'Third Post', 2],
         );
       });
-      await signDatabaseMarker();
 
       const { context } = createTestRuntime();
       const tables = schema(context).tables;
