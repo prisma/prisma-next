@@ -23,12 +23,19 @@ git add -u
 git add packages/1-framework/1-core/*/package.json
 ```
 
+## Never Amend Pushed Commits
+
+**CRITICAL**: Do not use `git commit --amend` on commits that have already been pushed to the remote. This rewrites history and causes problems for anyone else working with the branch.
+
+Instead, create a new commit with the fix.
+
 ## Best Practices
 
 1. **Review before staging**: Run `git status` to see what will be staged
 2. **Stage explicitly**: List the specific files or use `-u` for modified files only
 3. **Verify before committing**: Run `git diff --cached` to review staged changes
 4. **Keep commits focused**: Each commit should contain related changes only
+5. **Don't amend pushed commits**: Only amend commits that haven't been pushed yet
 
 A good commit:
 
