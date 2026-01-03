@@ -32,6 +32,7 @@ function generateEmbedding(seed: number): number[] {
 }
 
 async function main() {
+  const now = new Date();
   const tables = schema.tables;
   const userTable = tables.user;
   const postTable = tables.post;
@@ -42,11 +43,13 @@ async function main() {
   const alicePlan = sql
     .insert(userTable, {
       email: param('email'),
+      createdAt: param('createdAt'),
     })
     .returning(userColumns.id, userColumns.email)
     .build({
       params: {
         email: 'alice@example.com',
+        createdAt: now,
       },
     });
 
@@ -55,11 +58,13 @@ async function main() {
   const bobPlan = sql
     .insert(userTable, {
       email: param('email'),
+      createdAt: param('createdAt'),
     })
     .returning(userColumns.id, userColumns.email)
     .build({
       params: {
         email: 'bob@example.com',
+        createdAt: now,
       },
     });
 
@@ -81,6 +86,7 @@ async function main() {
     .insert(postTable, {
       title: param('title'),
       userId: param('userId'),
+      createdAt: param('createdAt'),
       embedding: param('embedding'),
     })
     .returning(postColumns.id, postColumns.title, postColumns.userId)
@@ -88,6 +94,7 @@ async function main() {
       params: {
         title: 'First Post',
         userId: alice.id,
+        createdAt: now,
         embedding: generateEmbedding(1),
       },
     });
@@ -98,6 +105,7 @@ async function main() {
     .insert(postTable, {
       title: param('title'),
       userId: param('userId'),
+      createdAt: param('createdAt'),
       embedding: param('embedding'),
     })
     .returning(postColumns.id, postColumns.title, postColumns.userId)
@@ -105,6 +113,7 @@ async function main() {
       params: {
         title: 'Second Post',
         userId: alice.id,
+        createdAt: now,
         embedding: generateEmbedding(2),
       },
     });
@@ -115,6 +124,7 @@ async function main() {
     .insert(postTable, {
       title: param('title'),
       userId: param('userId'),
+      createdAt: param('createdAt'),
       embedding: param('embedding'),
     })
     .returning(postColumns.id, postColumns.title, postColumns.userId)
@@ -122,6 +132,7 @@ async function main() {
       params: {
         title: 'Third Post',
         userId: bob.id,
+        createdAt: now,
         embedding: generateEmbedding(3),
       },
     });
