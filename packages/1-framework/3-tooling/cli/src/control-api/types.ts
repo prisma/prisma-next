@@ -2,7 +2,6 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
-  ControlDriverInstance,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
   ControlFamilyInstance,
@@ -208,14 +207,4 @@ export interface PrismaNextControlClient {
    * @throws If not connected or infrastructure failure
    */
   introspect(options?: IntrospectOptions): Promise<unknown>;
-}
-
-/**
- * Internal interface for accessing client internals (for testing).
- * Not part of public API.
- */
-export interface PrismaNextControlClientInternals {
-  readonly driver: ControlDriverInstance<string, string> | null;
-  readonly familyInstance: ControlFamilyInstance<string> | null;
-  readonly options: ControlClientOptions;
 }

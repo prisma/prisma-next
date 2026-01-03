@@ -15,7 +15,6 @@ import type {
   DbInitResult,
   IntrospectOptions,
   PrismaNextControlClient,
-  PrismaNextControlClientInternals,
   SchemaVerifyOptions,
   SignOptions,
   VerifyOptions,
@@ -63,9 +62,7 @@ export function createPrismaNextControlClient(
  * Implementation of PrismaNextControlClient.
  * Manages connection state and delegates operations to family instance.
  */
-class PrismaNextControlClientImpl
-  implements PrismaNextControlClient, PrismaNextControlClientInternals
-{
+class PrismaNextControlClientImpl implements PrismaNextControlClient {
   readonly options: ControlClientOptions;
   driver: ControlDriverInstance<string, string> | null = null;
   familyInstance: ControlFamilyInstance<string> | null = null;

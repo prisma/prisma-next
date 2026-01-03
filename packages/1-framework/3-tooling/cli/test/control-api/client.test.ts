@@ -9,10 +9,20 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it, vi } from 'vitest';
 import { createPrismaNextControlClient } from '../../src/control-api/client';
-import type {
-  ControlClientOptions,
-  PrismaNextControlClientInternals,
-} from '../../src/control-api/types';
+import type { ControlClientOptions } from '../../src/control-api/types';
+
+// ============================================================================
+// Test-Only Types
+// ============================================================================
+
+/**
+ * Internal interface for accessing client internals (for testing only).
+ */
+interface PrismaNextControlClientInternals {
+  readonly driver: ControlDriverInstance<string, string> | null;
+  readonly familyInstance: ControlFamilyInstance<string> | null;
+  readonly options: ControlClientOptions;
+}
 
 // ============================================================================
 // Mock Factories
