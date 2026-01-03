@@ -89,7 +89,9 @@ describe('runtime execute integration', () => {
         }),
       ],
     });
-    return { runtime, context };
+    const tables = schema(context).tables;
+    const sql = sqlBuilder({ context });
+    return { runtime, context, tables, sql };
   }
 
   beforeEach(async () => {
@@ -118,10 +120,8 @@ describe('runtime execute integration', () => {
         await client.query('insert into "user" (email) values ($1)', ['alice@example.com']);
       });
 
-      const { context } = createTestRuntime();
-      const tables = schema(context).tables;
+      const { tables, sql: root } = createTestRuntime();
       const userTable = tables['user']!;
-      const root = sqlBuilder({ context });
 
       const plan = root
         .from(userTable)
@@ -181,12 +181,11 @@ describe('runtime execute integration', () => {
         ]);
       });
 
-      const { context } = createTestRuntime();
-      const tables = schema(context).tables;
+      const { tables, sql } = createTestRuntime();
       const userTable = tables['user']!;
       const postTable = tables['post']!;
 
-      const userPlan = sqlBuilder({ context })
+      const userPlan = sql
         .from(userTable)
         .select({
           id: userTable.columns['id']!,
@@ -198,7 +197,7 @@ describe('runtime execute integration', () => {
 
       type UserRow = ResultType<typeof userPlan>;
 
-      const postPlan = sqlBuilder({ context })
+      const postPlan = sql
         .from(postTable)
         .where(postTable.columns['userId']!.eq(param('userId')))
         .select({
@@ -238,11 +237,10 @@ describe('runtime execute integration', () => {
         }
       });
 
-      const { context } = createTestRuntime({ maxRows: 50 });
-      const tables = schema(context).tables;
+      const { tables, sql } = createTestRuntime({ maxRows: 50 });
       const userTable = tables['user']!;
 
-      const unboundedPlan = sqlBuilder({ context })
+      const unboundedPlan = sql
         .from(tables['user']!)
         .select({
           id: userTable.columns['id']!,
@@ -259,7 +257,7 @@ describe('runtime execute integration', () => {
         category: 'BUDGET',
       });
 
-      const boundedPlan = sqlBuilder({ context })
+      const boundedPlan = sql
         .from(tables['user']!)
         .select({
           id: userTable.columns['id']!,
@@ -287,11 +285,10 @@ describe('runtime execute integration', () => {
         }
       });
 
-      const { context } = createTestRuntime({ maxRows: 10 });
-      const tables = schema(context).tables;
+      const { tables, sql } = createTestRuntime({ maxRows: 10 });
       const userTable = tables['user']!;
 
-      const plan = sqlBuilder({ context })
+      const plan = sql
         .from(tables['user']!)
         .select({
           id: userTable.columns['id']!,
@@ -326,12 +323,11 @@ describe('runtime execute integration', () => {
         );
       });
 
-      const { context } = createTestRuntime();
-      const tables = schema(context).tables;
+      const { tables, sql } = createTestRuntime();
       const userTable = tables['user']!;
       const postTable = tables['post']!;
 
-      const plan = sqlBuilder({ context })
+      const plan = sql
         .from(userTable)
         .includeMany(
           postTable,
