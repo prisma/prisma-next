@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "TypeScript authoring surface for Prisma Next (future)",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.json --rootDir src --outDir dist --declaration --declarationMap --emitDeclarationOnly",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json --declaration --declarationMap --emitDeclarationOnly",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
     "lint:fix": "biome check --write . --config-path ../../../../biome.json",

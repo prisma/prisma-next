@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "Normalized SQL driver error types for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.json --rootDir src --outDir dist --declaration --declarationMap --emitDeclarationOnly",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json --declaration --declarationMap --emitDeclarationOnly",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
