@@ -53,19 +53,15 @@ describe('runtime execute integration', () => {
   /**
    * Setup database tables.
    */
-  async function setupTables(options: { includePost?: boolean } = { includePost: true }) {
+  async function setupTables() {
     await withClient(connectionString, async (client: Client) => {
       await client.query(
         'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
       );
-      if (options.includePost) {
-        await client.query(
-          'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-        );
-        await client.query('truncate table "post", "user" restart identity cascade');
-      } else {
-        await client.query('truncate table "user" restart identity cascade');
-      }
+      await client.query(
+        'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+      );
+      await client.query('truncate table "post", "user" restart identity cascade');
     });
   }
 
@@ -238,7 +234,7 @@ describe('runtime execute integration', () => {
   it(
     'enforces row budget on unbounded queries',
     async () => {
-      await setupTables({ includePost: false });
+      await setupTables();
       await withClient(connectionString, async (client: Client) => {
         for (let i = 0; i < 100; i++) {
           await client.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
@@ -289,7 +285,7 @@ describe('runtime execute integration', () => {
   it(
     'enforces streaming row budget',
     async () => {
-      await setupTables({ includePost: false });
+      await setupTables();
       await withClient(connectionString, async (client: Client) => {
         for (let i = 0; i < 50; i++) {
           await client.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
