@@ -8,5 +8,5 @@ coverage
 .env.local
 .env.*.local
 .turbo
-tsconfig.tsbuildinfo
+*.tsbuildinfo
 packages/e2e-tests/.tmp-output

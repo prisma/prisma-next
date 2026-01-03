@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "SQL Schema IR types for schema introspection and verification",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json --declaration --declarationMap --emitDeclarationOnly",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",

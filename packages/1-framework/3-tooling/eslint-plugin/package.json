@@ -20,7 +20,7 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.json --declaration --declarationMap --emitDeclarationOnly",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
