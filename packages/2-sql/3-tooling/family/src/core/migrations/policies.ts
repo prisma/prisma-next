@@ -1,8 +1,5 @@
-import type { MigrationOperationPolicy } from '@prisma-next/core-control-plane/types';
-
 /**
- * Policy used by `db init`: additive-only operations, no widening/destructive steps.
+ * Re-export migration policies from core-control-plane.
+ * This module is kept for backward compatibility with existing SQL family imports.
  */
-export const INIT_ADDITIVE_POLICY: MigrationOperationPolicy = Object.freeze({
-  allowedOperationClasses: Object.freeze(['additive'] as const),
-});
+export { INIT_ADDITIVE_POLICY } from '@prisma-next/core-control-plane/types';

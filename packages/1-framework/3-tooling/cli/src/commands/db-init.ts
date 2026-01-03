@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import type {
-  MigrationPlan,
-  MigrationPlannerResult,
-  MigrationPlanOperation,
-  MigrationRunnerResult,
+import {
+  INIT_ADDITIVE_POLICY,
+  type MigrationPlan,
+  type MigrationPlannerResult,
+  type MigrationPlanOperation,
+  type MigrationRunnerResult,
 } from '@prisma-next/core-control-plane/types';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { Command } from 'commander';
@@ -222,7 +223,7 @@ export function createDbInitCommand(): Command {
           });
 
           // Policy for init mode (additive only)
-          const policy = { allowedOperationClasses: ['additive'] as const };
+          const policy = INIT_ADDITIVE_POLICY;
 
           // Plan migration
           const plannerResult: MigrationPlannerResult = await withSpinner(

@@ -35,3 +35,6 @@ export type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '../types';
+
+// Migration policy constants
+export { INIT_ADDITIVE_POLICY } from '../types';

@@ -35,6 +35,9 @@ export type {
   TargetMigrationsCapability,
 } from './migrations';
 
+// Re-export migration policy constants
+export { INIT_ADDITIVE_POLICY } from './migrations';
+
 // ============================================================================
 // Control*Instance Base Interfaces (ADR 151)
 // ============================================================================

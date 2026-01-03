@@ -1,12 +1,13 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type {
-  ControlDriverInstance,
-  ControlFamilyInstance,
-  MigrationPlan,
-  MigrationPlannerResult,
-  MigrationRunnerResult,
-  TargetMigrationsCapability,
+import {
+  type ControlDriverInstance,
+  type ControlFamilyInstance,
+  INIT_ADDITIVE_POLICY,
+  type MigrationPlan,
+  type MigrationPlannerResult,
+  type MigrationRunnerResult,
+  type TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
 import type { DbInitResult } from '../types';
 
@@ -46,7 +47,7 @@ export async function executeDbInit(options: ExecuteDbInitOptions): Promise<DbIn
   const schemaIR = await familyInstance.introspect({ driver });
 
   // Policy for init mode (additive only)
-  const policy = { allowedOperationClasses: ['additive'] as const };
+  const policy = INIT_ADDITIVE_POLICY;
 
   // Plan migration
   const plannerResult: MigrationPlannerResult = await planner.plan({

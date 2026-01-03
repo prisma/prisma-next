@@ -32,6 +32,14 @@ export interface MigrationOperationPolicy {
   readonly allowedOperationClasses: readonly MigrationOperationClass[];
 }
 
+/**
+ * Policy for db init: only additive operations allowed.
+ * Used when initializing a database from a contract.
+ */
+export const INIT_ADDITIVE_POLICY: MigrationOperationPolicy = Object.freeze({
+  allowedOperationClasses: ['additive'] as const,
+});
+
 // ============================================================================
 // Plan Types (Display-Oriented)
 // ============================================================================
