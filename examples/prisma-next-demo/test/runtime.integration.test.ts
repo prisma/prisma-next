@@ -94,6 +94,15 @@ describe('runtime execute integration', () => {
     return { runtime, context, tables, sql };
   }
 
+  /**
+   * Execute a plan and drain results (for inserts/updates/deletes).
+   */
+  async function executePlan(plan: Parameters<NonNullable<typeof runtime>['execute']>[0]) {
+    for await (const _ of runtime!.execute(plan)) {
+      // drain
+    }
+  }
+
   beforeEach(async () => {
     database = await createDevDatabase();
     connectionString = database.connectionString;
@@ -116,12 +125,15 @@ describe('runtime execute integration', () => {
   it(
     'streams rows and enforces marker verification',
     async () => {
-      await withClient(connectionString, async (client: Client) => {
-        await client.query('insert into "user" (email) values ($1)', ['alice@example.com']);
-      });
-
       const { tables, sql: root } = createTestRuntime();
       const userTable = tables['user']!;
+
+      // Insert test data
+      await executePlan(
+        root
+          .insert(userTable, { email: param('email') })
+          .build({ params: { email: 'alice@example.com' } }),
+      );
 
       const plan = root
         .from(userTable)
@@ -173,17 +185,20 @@ describe('runtime execute integration', () => {
   it(
     'infers correct types from query plans',
     async () => {
-      await withClient(connectionString, async (client: Client) => {
-        await client.query('insert into "user" (email) values ($1)', ['alice@example.com']);
-        await client.query('insert into "post" (title, "userId") values ($1, $2)', [
-          'First Post',
-          1,
-        ]);
-      });
-
       const { tables, sql } = createTestRuntime();
       const userTable = tables['user']!;
       const postTable = tables['post']!;
+
+      await executePlan(
+        sql
+          .insert(userTable, { email: param('email') })
+          .build({ params: { email: 'alice@example.com' } }),
+      );
+      await executePlan(
+        sql
+          .insert(postTable, { title: param('title'), userId: param('userId') })
+          .build({ params: { title: 'First Post', userId: 1 } }),
+      );
 
       const userPlan = sql
         .from(userTable)
@@ -231,14 +246,25 @@ describe('runtime execute integration', () => {
   it(
     'enforces row budget on unbounded queries',
     async () => {
-      await withClient(connectionString, async (client: Client) => {
-        for (let i = 0; i < 100; i++) {
-          await client.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
-        }
-      });
-
-      const { tables, sql } = createTestRuntime({ maxRows: 50 });
+      // First, insert data with the default budget
+      const { tables, sql: insertSql } = createTestRuntime();
       const userTable = tables['user']!;
+
+      // Insert 100 users
+      for (let i = 0; i < 100; i++) {
+        await executePlan(
+          insertSql
+            .insert(userTable, { email: param('email') })
+            .build({ params: { email: `user${i}@example.com` } }),
+        );
+      }
+
+      // Close the first runtime and create one with a lower budget
+      await runtime!.close();
+      pool = undefined;
+      runtime = undefined;
+
+      const { sql } = createTestRuntime({ maxRows: 50 });
 
       const unboundedPlan = sql
         .from(tables['user']!)
@@ -279,14 +305,25 @@ describe('runtime execute integration', () => {
   it(
     'enforces streaming row budget',
     async () => {
-      await withClient(connectionString, async (client: Client) => {
-        for (let i = 0; i < 50; i++) {
-          await client.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
-        }
-      });
-
-      const { tables, sql } = createTestRuntime({ maxRows: 10 });
+      // First, insert data with the default budget
+      const { tables, sql: insertSql } = createTestRuntime();
       const userTable = tables['user']!;
+
+      // Insert 50 users
+      for (let i = 0; i < 50; i++) {
+        await executePlan(
+          insertSql
+            .insert(userTable, { email: param('email') })
+            .build({ params: { email: `user${i}@example.com` } }),
+        );
+      }
+
+      // Close the first runtime and create one with a lower budget
+      await runtime!.close();
+      pool = undefined;
+      runtime = undefined;
+
+      const { sql } = createTestRuntime({ maxRows: 10 });
 
       const plan = sql
         .from(tables['user']!)
@@ -312,20 +349,36 @@ describe('runtime execute integration', () => {
   it(
     'includeMany returns users with nested posts array',
     async () => {
-      await withClient(connectionString, async (client: Client) => {
-        await client.query('insert into "user" (email) values ($1), ($2)', [
-          'alice@example.com',
-          'bob@example.com',
-        ]);
-        await client.query(
-          'insert into "post" (title, "userId") values ($1, $2), ($3, $2), ($4, $5)',
-          ['First Post', 1, 'Second Post', 'Third Post', 2],
-        );
-      });
-
       const { tables, sql } = createTestRuntime();
       const userTable = tables['user']!;
       const postTable = tables['post']!;
+
+      // Insert test data
+      await executePlan(
+        sql
+          .insert(userTable, { email: param('email') })
+          .build({ params: { email: 'alice@example.com' } }),
+      );
+      await executePlan(
+        sql
+          .insert(userTable, { email: param('email') })
+          .build({ params: { email: 'bob@example.com' } }),
+      );
+      await executePlan(
+        sql
+          .insert(postTable, { title: param('title'), userId: param('userId') })
+          .build({ params: { title: 'First Post', userId: 1 } }),
+      );
+      await executePlan(
+        sql
+          .insert(postTable, { title: param('title'), userId: param('userId') })
+          .build({ params: { title: 'Second Post', userId: 1 } }),
+      );
+      await executePlan(
+        sql
+          .insert(postTable, { title: param('title'), userId: param('userId') })
+          .build({ params: { title: 'Third Post', userId: 2 } }),
+      );
 
       const plan = sql
         .from(userTable)
