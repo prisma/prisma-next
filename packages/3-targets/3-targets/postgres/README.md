@@ -17,14 +17,23 @@ Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI c
 - **Target Descriptor Export**: Exports the Postgres `SqlControlTargetDescriptor` for use in CLI configuration files
 - **Descriptor-First Design**: All declarative fields (version, capabilities, types, operations) are properties directly on the descriptor, eliminating the need for separate manifest files
 - **Multi-Plane Support**: Provides both migration-plane (control) and runtime-plane entry points for the Postgres target
-- **Planner Factory**: Implements `createPlanner()` to create Postgres-specific migration planners
-- **Runner Factory**: Implements `createRunner()` to create Postgres-specific migration runners
+- **Planner Factory**: Implements `migrations.createPlanner()` to create Postgres-specific migration planners
+- **Runner Factory**: Implements `migrations.createRunner()` to create Postgres-specific migration runners
 - **Database Dependency Consumption**: The planner extracts database dependencies from the configured framework components (passed as `frameworkComponents`), verifies each dependency against the live schema, and only emits install operations when required. The runner reuses the same metadata for post-apply verification, so there are no hardcoded extension mappings—database dependencies stay component-owned.
 
 This package spans multiple planes:
 - **Migration plane** (`src/exports/control.ts`): Control plane entry point that exports `SqlControlTargetDescriptor` for config files
 - **Runtime plane** (`src/exports/runtime.ts`): Runtime entry point for target-specific runtime code (future)
 - **Authoring pack ref** (`src/exports/pack.ts`): Pure data surface for contract builder workflows
+
+## `db init`
+
+This package provides the Postgres implementation of the SQL migration planner/runner used by `prisma-next db init`:
+
+- **Planner** (`src/core/migrations/planner.ts`): produces an additive-only `MigrationPlan` to bring the database schema in line with a destination contract. Extra unrelated schema is tolerated; non-additive mismatches (type/nullability/constraint incompatibilities) surface as structured conflicts.
+- **Runner** (`src/core/migrations/runner.ts`): executes a plan under an advisory lock, verifies the post-state schema, then writes the contract marker and appends a ledger entry in the `prisma_contract` schema.
+
+For the CLI orchestration, see `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`.
 
 ## Usage
 
@@ -43,8 +52,8 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 // - id: 'postgres'
 // - version: '0.0.1'
 // - capabilities, types, operations (directly on descriptor)
-// - createPlanner(): creates a Postgres migration planner
-// - createRunner(): creates a Postgres migration runner
+// - migrations.createPlanner(): creates a Postgres migration planner
+// - migrations.createRunner(): creates a Postgres migration runner
 
 // Create family instance with target, adapter, and driver
 const family = sqlFamilyDescriptor.create({
@@ -54,18 +63,23 @@ const family = sqlFamilyDescriptor.create({
   extensions: [],
 });
 
+// Include the active framework components so planner/runner can resolve
+// component-owned database dependencies (e.g., extension installs).
+const frameworkComponents = [postgres, postgresAdapter];
+
 // Create planner and runner from target descriptor
-const planner = postgres.createPlanner(family);
-const runner = postgres.createRunner(family);
+const planner = postgres.migrations.createPlanner(family);
+const runner = postgres.migrations.createRunner(family);
 
 // Plan and execute migrations
-const planResult = planner.plan({ contract, schema, policy });
+const planResult = planner.plan({ contract, schema, policy, frameworkComponents });
 if (planResult.kind === 'success') {
   const executeResult = await runner.execute({
     plan: planResult.plan,
     driver,
     destinationContract: contract,
     policy,
+    frameworkComponents,
   });
   if (!executeResult.ok) {
     // Handle structured failure (e.g., EXECUTION_FAILED, PRECHECK_FAILED)
@@ -134,7 +148,8 @@ This package ships a mix of fast planner unit tests and slower runner integratio
 
 - **Default (`pnpm --filter @prisma-next/target-postgres test`)**: runs all tests including integration tests
 - **Test files**:
-  - `test/migrations/planner.case1.test.ts`: Planner unit tests
+  - `test/migrations/planner.behavior.test.ts`: Planner unit tests (classification, conflicts, dependency ops)
+  - `test/migrations/planner.integration.test.ts`: Planner integration tests
   - `test/migrations/runner.*.integration.test.ts`: Runner integration tests (basic, errors, idempotency, policy)
 
 ```bash

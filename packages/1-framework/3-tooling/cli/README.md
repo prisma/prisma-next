@@ -23,6 +23,20 @@ Provide a command-line interface that:
 - **Help Output Formatting**: Custom styled help output with command trees and formatted descriptions
 - **Config Management**: Load and validate `prisma-next.config.ts` files using Arktype validation
 
+### Wiring validation
+
+The CLI performs **wiring validation** at the composition boundary: it ensures the emitted contract artifacts are compatible with the descriptors wired in `prisma-next.config.ts`.
+
+This prevents runtime mismatches (for example: a contract that declares extension packs, but a config that doesn’t provide the matching descriptors).
+
+Commands that enforce wiring validation:
+- **`db verify`**
+- **`db introspect`** (when a contract is provided)
+- **`db sign`**
+- **`db init`**
+
+If you hit a wiring validation error: add the required descriptors to `config.extensionPacks` (matched by descriptor `id`) and re-run the command.
+
 **Note**: Control plane domain actions (database verification, contract emission) are implemented in `@prisma-next/core-control-plane`. The CLI uses the control plane domain actions programmatically but does not define control plane types itself.
 
 ## Command Descriptions
@@ -102,7 +116,7 @@ prisma-next db verify [--db <url>] [--config <path>] [--json] [-v] [-q] [--times
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional, falls back to `config.db.url` or `DATABASE_URL` environment variable)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -159,7 +173,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
 4. **Verify**: Calls `familyInstance.verify()` which:
    - Reads the contract marker from the database
    - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
@@ -256,7 +270,7 @@ prisma-next db introspect [--db <url>] [--config <path>] [--json] [-v] [-q] [--t
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional, falls back to `config.db.url` or `DATABASE_URL` environment variable)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -306,7 +320,7 @@ export default defineConfig({
 **Introspection Process:**
 
 1. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-2. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
+2. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
 3. **Introspect**: Calls `familyInstance.introspect()` which:
    - Queries the database catalog to discover schema structure
    - Returns a family-specific schema IR (e.g., `SqlSchemaIR` for SQL family)
@@ -373,7 +387,7 @@ sql schema (tables: 2)
 
 **Error Codes:**
 - `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-CLI-4011`: Missing database URL — provide `--db` flag or `config.db.url` or `DATABASE_URL` environment variable
+- `PN-CLI-4005`: Missing database URL — provide `--db <url>` or set `db.url` in config
 
 **Family Requirements:**
 
@@ -407,7 +421,7 @@ prisma-next db sign [--db <url>] [--config <path>] [--json] [-v] [-q] [--timesta
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional, falls back to `config.db.url` or `DATABASE_URL` environment variable)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -464,7 +478,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions to create a family instance
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
 4. **Schema Verification (Precondition)**: Calls `familyInstance.schemaVerify()` to verify the database schema matches the contract:
    - If verification fails: Prints schema verification output and exits with code 1 (marker is not written)
    - If verification passes: Proceeds to marker signing
@@ -570,7 +584,7 @@ For updated markers:
 
 **Error Codes:**
 - `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-CLI-4011`: Missing database URL — provide `--db` flag or `config.db.url` or `DATABASE_URL` environment variable
+- `PN-CLI-4005`: Missing database URL — provide `--db <url>` or set `db.url` in config
 - Exit code 1: Schema verification failed — database schema does not match contract (marker is not written)
 
 **Relationship to Other Commands:**
@@ -609,7 +623,7 @@ The SQL family provides this via `@prisma-next/family-sql/control`. The `sign()`
 
 ### `prisma-next db init`
 
-Initialize a database schema from the contract. This command generates a migration plan to bring an empty database in sync with the contract and executes it.
+Initialize a database schema from the contract. This command plans and applies **additive-only** operations (create missing tables/columns/constraints/indexes) until the database satisfies the contract, then writes the contract marker.
 
 **Command:**
 ```bash
@@ -617,10 +631,10 @@ prisma-next db init [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q] [
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional, falls back to `config.db.url` or `DATABASE_URL` environment variable)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--plan`: Only show the migration plan, do not apply it
-- `--json`: Output as JSON object
+- `--json [format]`: Output as JSON (`object` only; `ndjson` is not supported for this command)
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output (debug info, timings)
 - `-vv, --trace`: Trace output (deep internals, stack traces)
@@ -675,51 +689,56 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and extensions
+3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`)
 4. **Introspect Schema**: Calls `familyInstance.introspect()` to get the current database schema IR
-5. **Create Planner/Runner**: Asks the target to construct a `MigrationPlanner` and `MigrationRunner`
-6. **Plan Migration**: Calls `planner.plan()` with the contract IR, schema IR, and additive-only policy
+5. **Validate wiring**: Ensures the contract is compatible with the CLI config:
+   - `contract.targetFamily` matches `config.family.familyId`
+   - `contract.target` matches `config.target.targetId`
+   - `contract.extensionPacks` (if present) are provided by `config.extensionPacks` (matched by descriptor `id`)
+6. **Create Planner/Runner**: Uses `config.target.migrations.createPlanner()` and `config.target.migrations.createRunner()`
+7. **Plan Migration**: Calls `planner.plan()` with the contract IR, schema IR, additive-only policy, and `frameworkComponents` (the active target/adapter/extension descriptors)
    - On conflict: Returns a structured failure with conflict list
    - On success: Returns a migration plan with operations
-7. **Apply Migration** (if not `--plan`):
+8. **Apply Migration** (if not `--plan`):
    - Calls `runner.execute()` to apply the plan
-   - Runner executes pre/post checks for each operation
    - After execution, verifies schema matches contract
-   - Writes contract marker and ledger entry
+   - Writes contract marker (and records a ledger entry via the target runner)
 
 **Output Format (TTY - Plan Mode):**
 
 ```
-prisma-next db init ➜ Initialize database schema from contract
+prisma-next db init ➜ Bootstrap a database to match the current contract
   config:          prisma-next.config.ts
   contract:        src/prisma/contract.json
-  database:        localhost:5432/mydb
+  mode:            plan (dry run)
 
-Migration Plan (4 operations)
-├─ Create extension "plpgsql"
-├─ Create table "user"
-│   ├─ id: int4 (not null, primary key)
-│   └─ email: text (not null)
-└─ Create unique index "user_email_key"
+✔ Planned 4 operation(s)
+│
+├─ Create table user [additive]
+├─ Add unique constraint user_email_key on user [additive]
+├─ Create index user_email_idx on user [additive]
+└─ Add foreign key post_userId_fkey on post [additive]
 
-Run without --plan to apply this migration.
+Destination hash: sha256:abc123...
+
+This is a dry run. No changes were applied.
+Run without --plan to apply changes.
 ```
 
 **Output Format (TTY - Apply Mode):**
 
 ```
-prisma-next db init ➜ Initialize database schema from contract
+prisma-next db init ➜ Bootstrap a database to match the current contract
   config:          prisma-next.config.ts
   contract:        src/prisma/contract.json
-  database:        localhost:5432/mydb
 
-✔ Applied 4 migration operations
-  ├─ Created extension "plpgsql"
-  ├─ Created table "user"
-  └─ Created unique index "user_email_key"
-✔ Contract marker written
-  coreHash: sha256:abc123...
-✔ Ledger entry recorded
+Applying migration plan and verifying schema...
+  → Create table user...
+  → Add unique constraint user_email_key on user...
+  → Create index user_email_idx on user...
+  → Add foreign key post_userId_fkey on post...
+✔ Applied 4 operation(s)
+  Marker written: sha256:abc123...
 ```
 
 **Output Format (JSON):**
@@ -729,33 +748,41 @@ prisma-next db init ➜ Initialize database schema from contract
   "ok": true,
   "mode": "apply",
   "plan": {
-    "operations": [...],
-    "conflicts": []
+    "targetId": "postgres",
+    "destination": {
+      "coreHash": "sha256:abc123..."
+    },
+    "operations": [
+      {
+        "id": "table.user",
+        "label": "Create table user",
+        "operationClass": "additive"
+      }
+    ]
   },
   "execution": {
-    "operations": [...],
-    "marker": {
-      "coreHash": "sha256:abc123...",
-      "profileHash": "sha256:def456..."
-    },
-    "ledger": {
-      "id": "ledger-entry-uuid",
-      "createdAt": "2025-01-01T00:00:00Z"
-    }
+    "operationsPlanned": 4,
+    "operationsExecuted": 4
+  },
+  "marker": {
+    "coreHash": "sha256:abc123..."
   }
 }
 ```
 
 **Error Codes:**
-- `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-CLI-4011`: Missing database URL — provide `--db` flag or `config.db.url` or `DATABASE_URL` environment variable
-- `PN-CLI-4011`: Migration planning failed due to conflicts (exit code 1)
-- `PN-CLI-4012`: Target does not support migrations
+- `PN-CLI-4004`: Contract file not found
+- `PN-CLI-4005`: Missing database URL
+- `PN-CLI-4008`: Unsupported JSON format (`--json ndjson` is rejected for `db init`)
+- `PN-CLI-4010`: Missing driver in config
+- `PN-CLI-4020`: Migration planning failed (conflicts)
+- `PN-CLI-4021`: Target does not support migrations
+- `PN-RTM-3000`: Runtime error (includes marker mismatch failures)
 
-**Current Limitations (v1):**
-- Only supports empty databases (no existing tables)
-- Non-empty databases result in a planning failure with conflict details
-- Future `db update` command will support additive changes to existing schemas
+**Behavior Notes:**
+
+- If the database already has a marker that matches the destination contract, `db init` succeeds as a noop (0 operations planned/executed).
+- If the database has a marker that does **not** match the destination contract, `db init` fails (including in `--plan` mode). Use `db init` for bootstrapping; use your migration workflow to reconcile existing databases.
 
 **Config File (`prisma-next.config.ts`):**
 
