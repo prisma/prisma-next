@@ -185,12 +185,3 @@ export function createTestContract<T extends SqlContract<SqlStorage>>(contract: 
   }
   return contract;
 }
-
-// Re-export generic utilities from test-utils
-export {
-  collectAsync,
-  createDevDatabase,
-  type DevDatabase,
-  teardownTestDatabase,
-  withClient,
-} from '@prisma-next/test-utils';
