@@ -27,6 +27,7 @@ export default defineConfig([
       'commands/db-verify': 'src/commands/db-verify.ts',
       'commands/contract-emit': 'src/commands/contract-emit.ts',
       'config-loader': 'src/config-loader.ts',
+      'control-api': 'src/exports/control-api.ts',
     },
     outDir: 'dist',
     format: ['esm'],

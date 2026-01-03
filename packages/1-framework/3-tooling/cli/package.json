@@ -88,6 +88,10 @@
     "./config-loader": {
       "types": "./dist/config-loader.d.ts",
       "import": "./dist/config-loader.js"
+    },
+    "./control-api": {
+      "types": "./dist/control-api.d.ts",
+      "import": "./dist/control-api.js"
     }
   }
 }
