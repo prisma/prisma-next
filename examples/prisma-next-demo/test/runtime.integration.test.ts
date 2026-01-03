@@ -1,13 +1,19 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import { createPrismaNextControlClient } from '@prisma-next/cli/control-api';
+import postgresDriver from '@prisma-next/driver-postgres/control';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import pgvectorControl from '@prisma-next/extension-pgvector/control';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
+import sql from '@prisma-next/family-sql/control';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
-import { sql } from '@prisma-next/sql-lane';
+import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
@@ -18,16 +24,52 @@ import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 // Load the already-emitted contract
 const contract = validateContract<Contract>(contractJson);
 
+/**
+ * Sign the database marker using the control-api client.
+ * Assumes tables are already created.
+ */
+async function signDatabaseMarker(connectionString: string) {
+  const controlClient = createPrismaNextControlClient({
+    family: sql,
+    target: postgres,
+    adapter: postgresAdapter,
+    driver: postgresDriver,
+    extensionPacks: [pgvectorControl],
+  } as Parameters<typeof createPrismaNextControlClient>[0]);
+
+  await controlClient.connect(connectionString);
+  const result = await controlClient.sign({
+    contractIR: contract as Parameters<typeof controlClient.sign>[0]['contractIR'],
+  });
+  await controlClient.close();
+  return result;
+}
+
 describe('runtime execute integration', () => {
   it(
     'streams rows and enforces marker verification',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        // Create tables manually with proper defaults (SERIAL, DEFAULT NOW())
+        await withClient(connectionString, async (client: Client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query(
+            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+          );
+          await client.query('truncate table "post", "user" restart identity cascade');
+          await client.query('insert into "user" (email) values ($1)', ['alice@example.com']);
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString);
+
         const adapter = createPostgresAdapter();
         const context = createRuntimeContext({ contract, adapter, extensions: [pgvector()] });
         const tables = schema(context).tables;
         const userTable = tables['user']!;
-        const root = sql({ context });
+        const root = sqlBuilder({ context });
         const plan = root
           .from(userTable)
           .select({
@@ -49,22 +91,6 @@ describe('runtime execute integration', () => {
           annotations: { intent: 'report', limit: 1 },
         });
 
-        const rowCount = await withClient(connectionString, async (client: Client) => {
-          await client.query(
-            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-          );
-          await client.query(
-            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-          );
-          await client.query('truncate table "post", "user" restart identity cascade');
-          await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-            'alice@example.com',
-          ]);
-          const result = await client.query('select count(*)::int as count from "user"');
-          return result.rows[0]?.count as number;
-        });
-        expect(rowCount).toBe(1);
-
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
           connect: { pool },
@@ -74,7 +100,7 @@ describe('runtime execute integration', () => {
           context,
           adapter,
           driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
+          verify: { mode: 'onFirstUse', requireMarker: true }, // Marker verification enabled!
           plugins: [
             budgets({
               maxRows: 10_000,
@@ -119,6 +145,25 @@ describe('runtime execute integration', () => {
     'infers correct types from query plans',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client: Client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query(
+            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+          );
+          await client.query('truncate table "post", "user" restart identity cascade');
+          await client.query('insert into "user" (email) values ($1)', ['alice@example.com']);
+          await client.query('insert into "post" (title, "userId") values ($1, $2)', [
+            'First Post',
+            1,
+          ]);
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString);
+
         const adapter = createPostgresAdapter();
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
@@ -130,7 +175,7 @@ describe('runtime execute integration', () => {
           context,
           adapter,
           driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
+          verify: { mode: 'onFirstUse', requireMarker: true },
           plugins: [
             budgets({
               maxRows: 10_000,
@@ -141,28 +186,11 @@ describe('runtime execute integration', () => {
         });
 
         try {
-          await withClient(connectionString, async (client: Client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query(
-              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-            );
-            await client.query('truncate table "post", "user" restart identity cascade');
-            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-              'alice@example.com',
-            ]);
-            await client.query(
-              'insert into "post" (title, "userId", "createdAt") values ($1, $2, now())',
-              ['First Post', 1],
-            );
-          });
-
           const tables = schema(context).tables;
           const userTable = tables['user']!;
           const postTable = tables['post']!;
 
-          const userPlan = sql({ context })
+          const userPlan = sqlBuilder({ context })
             .from(userTable)
             .select({
               id: userTable.columns['id']!,
@@ -174,7 +202,7 @@ describe('runtime execute integration', () => {
 
           type UserRow = ResultType<typeof userPlan>;
 
-          const postPlan = sql({ context })
+          const postPlan = sqlBuilder({ context })
             .from(postTable)
             .where(postTable.columns['userId']!.eq(param('userId')))
             .select({
@@ -213,6 +241,20 @@ describe('runtime execute integration', () => {
     'enforces row budget on unbounded queries',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client: Client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity cascade');
+          for (let i = 0; i < 100; i++) {
+            await client.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
+          }
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString);
+
         const adapter = createPostgresAdapter();
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
@@ -224,7 +266,7 @@ describe('runtime execute integration', () => {
           context,
           adapter,
           driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
+          verify: { mode: 'onFirstUse', requireMarker: true },
           plugins: [
             budgets({
               maxRows: 50,
@@ -235,21 +277,9 @@ describe('runtime execute integration', () => {
         });
 
         try {
-          await withClient(connectionString, async (client: Client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            for (let i = 0; i < 100; i++) {
-              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-                `user${i}@example.com`,
-              ]);
-            }
-          });
-
           const tables = schema(context).tables;
           const userTable = tables['user']!;
-          const unboundedPlan = sql({ context })
+          const unboundedPlan = sqlBuilder({ context })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -266,7 +296,7 @@ describe('runtime execute integration', () => {
             category: 'BUDGET',
           });
 
-          const boundedPlan = sql({ context })
+          const boundedPlan = sqlBuilder({ context })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -293,6 +323,20 @@ describe('runtime execute integration', () => {
     'enforces streaming row budget',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client: Client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity cascade');
+          for (let i = 0; i < 50; i++) {
+            await client.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
+          }
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString);
+
         const adapter = createPostgresAdapter();
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
@@ -304,7 +348,7 @@ describe('runtime execute integration', () => {
           context,
           adapter,
           driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
+          verify: { mode: 'onFirstUse', requireMarker: true },
           plugins: [
             budgets({
               maxRows: 10,
@@ -315,21 +359,9 @@ describe('runtime execute integration', () => {
         });
 
         try {
-          await withClient(connectionString, async (client: Client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            for (let i = 0; i < 50; i++) {
-              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-                `user${i}@example.com`,
-              ]);
-            }
-          });
-
           const tables = schema(context).tables;
           const userTable = tables['user']!;
-          const plan = sql({ context })
+          const plan = sqlBuilder({ context })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -358,6 +390,28 @@ describe('runtime execute integration', () => {
     'includeMany returns users with nested posts array',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query(
+            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+          );
+          await client.query('truncate table "post", "user" restart identity cascade');
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'alice@example.com',
+            'bob@example.com',
+          ]);
+          await client.query(
+            'insert into "post" (title, "userId") values ($1, $2), ($3, $2), ($4, $5)',
+            ['First Post', 1, 'Second Post', 'Third Post', 2],
+          );
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString);
+
         const adapter = createPostgresAdapter();
         const pool = new Pool({ connectionString });
         const driver = createPostgresDriverFromOptions({
@@ -369,7 +423,7 @@ describe('runtime execute integration', () => {
           context,
           adapter,
           driver,
-          verify: { mode: 'onFirstUse', requireMarker: false },
+          verify: { mode: 'onFirstUse', requireMarker: true },
           plugins: [
             budgets({
               maxRows: 10_000,
@@ -380,29 +434,11 @@ describe('runtime execute integration', () => {
         });
 
         try {
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query(
-              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-            );
-            await client.query('truncate table "post", "user" restart identity cascade');
-            await client.query(
-              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
-              ['alice@example.com', 'bob@example.com'],
-            );
-            await client.query(
-              'insert into "post" (title, "userId", "createdAt") values ($1, $2, now()), ($3, $2, now()), ($4, $5, now())',
-              ['First Post', 1, 'Second Post', 'Third Post', 2],
-            );
-          });
-
           const tables = schema(context).tables;
           const userTable = tables['user']!;
           const postTable = tables['post']!;
 
-          const plan = sql({ context })
+          const plan = sqlBuilder({ context })
             .from(userTable)
             .includeMany(
               postTable,

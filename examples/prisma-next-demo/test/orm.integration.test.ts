@@ -2,11 +2,16 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { loadContractFromTs } from '@prisma-next/cli';
+import { createPrismaNextControlClient } from '@prisma-next/cli/control-api';
 import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
+import postgresDriver from '@prisma-next/driver-postgres/control';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
+import pgvectorControl from '@prisma-next/extension-pgvector/control';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
+import sql from '@prisma-next/family-sql/control';
 import {
   assembleOperationRegistryFromPacks,
   extractCodecTypeImportsFromPacks,
@@ -16,10 +21,10 @@ import {
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { stampMarker } from '../scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
 
 let contract: Contract;
@@ -64,6 +69,27 @@ beforeAll(async () => {
 }, timeouts.typeScriptCompilation);
 
 /**
+ * Sign the database marker using the control-api client.
+ * Assumes tables are already created.
+ */
+async function signDatabaseMarker(connectionString: string, contractIR: Contract) {
+  const controlClient = createPrismaNextControlClient({
+    family: sql,
+    target: postgres,
+    adapter: postgresAdapter,
+    driver: postgresDriver,
+    extensionPacks: [pgvectorControl],
+  } as Parameters<typeof createPrismaNextControlClient>[0]);
+
+  await controlClient.connect(connectionString);
+  const result = await controlClient.sign({
+    contractIR: contractIR as Parameters<typeof controlClient.sign>[0]['contractIR'],
+  });
+  await controlClient.close();
+  return result;
+}
+
+/**
  * Creates a test runtime with adapter, context, pool, driver, and runtime configured.
  * Returns both runtime and pool for cleanup.
  */
@@ -85,7 +111,7 @@ function createTestRuntime(
     context,
     adapter,
     driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
+    verify: { mode: 'onFirstUse', requireMarker: true }, // Now enabled with control-api signing!
     plugins: [
       budgets({
         maxRows: 10_000,
@@ -123,26 +149,25 @@ describe('ORM integration tests', () => {
     'orm.getUsers returns users with selected fields, respects limit and ordering',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity cascade');
+          await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
+            'alice@example.com',
+            'bob@example.com',
+            'charlie@example.com',
+          ]);
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString, contract);
+
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            await client.query(
-              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now()), ($3, now())',
-              ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
-            );
-          });
-
           process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsers } = await import('../src/queries/orm-get-users');
           const users = await ormGetUsers(2, runtime);
@@ -166,25 +191,21 @@ describe('ORM integration tests', () => {
     'orm.getUserById returns single user by ID',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity cascade');
+          await client.query('insert into "user" (email) values ($1)', ['alice@example.com']);
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString, contract);
+
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-              'alice@example.com',
-            ]);
-          });
-
           process.env['DATABASE_URL'] = connectionString;
           const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
           const user = await ormGetUserById(1, runtime);
@@ -207,33 +228,31 @@ describe('ORM integration tests', () => {
     'orm relation filters: where.related.posts.some() returns users with at least one post',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query(
+            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+          );
+          await client.query('truncate table "post", "user" restart identity cascade');
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'alice@example.com',
+            'bob@example.com',
+          ]);
+          await client.query('insert into "post" (title, "userId") values ($1, $2)', [
+            'First Post',
+            1,
+          ]);
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString, contract);
+
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query(
-              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-            );
-            await client.query('truncate table "post", "user" restart identity cascade');
-            await client.query(
-              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
-              ['alice@example.com', 'bob@example.com'],
-            );
-            await client.query(
-              'insert into "post" (title, "userId", "createdAt") values ($1, $2, now())',
-              ['First Post', 1],
-            );
-          });
-
           process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters');
           const users = await ormGetUsersWithPosts(runtime);
@@ -255,33 +274,31 @@ describe('ORM integration tests', () => {
     'orm includes: include.posts() returns users with nested posts arrays',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query(
+            'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
+          );
+          await client.query('truncate table "post", "user" restart identity cascade');
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'alice@example.com',
+            'bob@example.com',
+          ]);
+          await client.query(
+            'insert into "post" (title, "userId") values ($1, $2), ($3, $2), ($4, $5)',
+            ['First Post', 1, 'Second Post', 'Third Post', 2],
+          );
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString, contract);
+
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query(
-              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-            );
-            await client.query('truncate table "post", "user" restart identity cascade');
-            await client.query(
-              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
-              ['alice@example.com', 'bob@example.com'],
-            );
-            await client.query(
-              'insert into "post" (title, "userId", "createdAt") values ($1, $2, now()), ($3, $2, now()), ($4, $5, now())',
-              ['First Post', 1, 'Second Post', 'Third Post', 2],
-            );
-          });
-
           process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes');
           const users = await ormGetUsersWithPosts(10, runtime);
@@ -304,22 +321,20 @@ describe('ORM integration tests', () => {
     'orm writes: create() inserts a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity cascade');
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString, contract);
+
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-          });
-
           process.env['DATABASE_URL'] = connectionString;
           const { ormCreateUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormCreateUser('alice@example.com', runtime);
@@ -346,25 +361,21 @@ describe('ORM integration tests', () => {
     'orm writes: update() updates a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity cascade');
+          await client.query('insert into "user" (email) values ($1)', ['alice@example.com']);
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString, contract);
+
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-              'alice@example.com',
-            ]);
-          });
-
           process.env['DATABASE_URL'] = connectionString;
           const { ormUpdateUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
@@ -388,25 +399,21 @@ describe('ORM integration tests', () => {
     'orm writes: delete() deletes a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity cascade');
+          await client.query('insert into "user" (email) values ($1)', ['alice@example.com']);
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString, contract);
+
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-              'alice@example.com',
-            ]);
-          });
-
           process.env['DATABASE_URL'] = connectionString;
           const { ormDeleteUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormDeleteUser(1, runtime);
@@ -433,27 +440,23 @@ describe('ORM integration tests', () => {
     'orm pagination: ormGetUsersByIdCursor returns paginated users with gt cursor',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity cascade');
+          for (let i = 1; i <= 10; i++) {
+            await client.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
+          }
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString, contract);
+
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            for (let i = 1; i <= 10; i++) {
-              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-                `user${i}@example.com`,
-              ]);
-            }
-          });
-
           process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsersByIdCursor } = await import('../src/queries/orm-pagination');
 
@@ -487,27 +490,23 @@ describe('ORM integration tests', () => {
     'orm pagination: ormGetUsersBackward returns users before cursor with lt operator',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Create tables manually with proper defaults
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
+          );
+          await client.query('truncate table "user" restart identity cascade');
+          for (let i = 1; i <= 10; i++) {
+            await client.query('insert into "user" (email) values ($1)', [`user${i}@example.com`]);
+          }
+        });
+
+        // Sign the database marker using control-api
+        await signDatabaseMarker(connectionString, contract);
+
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            for (let i = 1; i <= 10; i++) {
-              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-                `user${i}@example.com`,
-              ]);
-            }
-          });
-
           process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsersBackward } = await import('../src/queries/orm-pagination');
 
