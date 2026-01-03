@@ -25,7 +25,7 @@ git add packages/1-framework/1-core/*/package.json
 
 ## Never Amend Pushed Commits
 
-**CRITICAL**: Do not use `git commit --amend` on commits that have already been pushed to the remote. This rewrites history and causes problems for anyone else working with the branch.
+Do not use `git commit --amend` on commits that have already been pushed to the remote. This rewrites history and causes problems for anyone else working with the branch.
 
 Instead, create a new commit with the fix.
 
