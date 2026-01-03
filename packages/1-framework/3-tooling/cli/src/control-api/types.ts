@@ -95,12 +95,13 @@ export interface IntrospectOptions {
 // Result Types
 // ============================================================================
 
+import type { MigrationPlannerConflict } from '@prisma-next/core-control-plane/types';
+import type { Result } from '@prisma-next/utils/result';
+
 /**
- * Result type for dbInit operation.
- * Matches the CLI's DbInitResult but without file-path metadata.
+ * Successful dbInit result.
  */
-export interface DbInitResult {
-  readonly ok: boolean;
+export interface DbInitSuccess {
   readonly mode: 'plan' | 'apply';
   readonly plan: {
     readonly operations: ReadonlyArray<{
@@ -119,6 +120,34 @@ export interface DbInitResult {
   };
   readonly summary: string;
 }
+
+/**
+ * Failure codes for dbInit operation.
+ */
+export type DbInitFailureCode = 'PLANNING_FAILED' | 'MARKER_ORIGIN_MISMATCH' | 'RUNNER_FAILED';
+
+/**
+ * Failure details for dbInit operation.
+ */
+export interface DbInitFailure {
+  readonly code: DbInitFailureCode;
+  readonly summary: string;
+  readonly conflicts?: ReadonlyArray<MigrationPlannerConflict>;
+  readonly marker?: {
+    readonly coreHash?: string;
+    readonly profileHash?: string;
+  };
+  readonly destination?: {
+    readonly coreHash: string;
+    readonly profileHash?: string;
+  };
+}
+
+/**
+ * Result type for dbInit operation.
+ * Uses Result pattern: success returns DbInitSuccess, failure returns DbInitFailure.
+ */
+export type DbInitResult = Result<DbInitSuccess, DbInitFailure>;
 
 // ============================================================================
 // Client Interface

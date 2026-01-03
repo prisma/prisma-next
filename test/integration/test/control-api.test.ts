@@ -484,10 +484,11 @@ describe('control-api', () => {
               });
 
               expect(result.ok).toBe(true);
-              expect(result.mode).toBe('plan');
-              expect(result.plan.operations.length).toBeGreaterThan(0);
+              if (!result.ok) throw new Error('Expected ok result');
+              expect(result.value.mode).toBe('plan');
+              expect(result.value.plan.operations.length).toBeGreaterThan(0);
               // Should not have execution details in plan mode
-              expect(result.execution).toBeUndefined();
+              expect(result.value.execution).toBeUndefined();
             } finally {
               await client.close();
             }
@@ -519,10 +520,11 @@ describe('control-api', () => {
               });
 
               expect(result.ok).toBe(true);
-              expect(result.mode).toBe('apply');
-              expect(result.execution).toBeDefined();
-              expect(result.marker).toBeDefined();
-              expect(result.marker?.coreHash).toBe(emittedContract.coreHash);
+              if (!result.ok) throw new Error('Expected ok result');
+              expect(result.value.mode).toBe('apply');
+              expect(result.value.execution).toBeDefined();
+              expect(result.value.marker).toBeDefined();
+              expect(result.value.marker?.coreHash).toBe(emittedContract.coreHash);
 
               // Verify marker was written
               const verifyResult = await client.verify({
@@ -568,8 +570,9 @@ describe('control-api', () => {
                 mode: 'apply',
               });
               expect(result2.ok).toBe(true);
-              expect(result2.summary).toBe('Database already at target contract state');
-              expect(result2.plan.operations.length).toBe(0);
+              if (!result2.ok) throw new Error('Expected ok result');
+              expect(result2.value.summary).toBe('Database already at target contract state');
+              expect(result2.value.plan.operations.length).toBe(0);
             } finally {
               await client.close();
             }

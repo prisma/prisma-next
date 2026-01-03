@@ -9,6 +9,7 @@ import {
   type MigrationRunnerResult,
   type TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
+import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbInitResult } from '../types';
 
 /**
@@ -32,9 +33,12 @@ export interface ExecuteDbInitOptions {
  * - CLI error handling (structured CLI errors)
  * - Process exit codes
  *
+ * Domain failures (planning conflicts, marker mismatches, runner failures) are returned
+ * as NotOk results. Infrastructure failures (database connection errors) are thrown.
+ *
  * @param options - Options for the dbInit operation
- * @returns DbInitResult with plan, execution, and marker information
- * @throws Error for infrastructure failures
+ * @returns Result with DbInitSuccess on success, DbInitFailure on domain failure
+ * @throws Error for infrastructure failures (e.g., connection errors)
  */
 export async function executeDbInit(options: ExecuteDbInitOptions): Promise<DbInitResult> {
   const { driver, familyInstance, contractIR, mode, migrations, frameworkComponents } = options;
@@ -50,7 +54,7 @@ export async function executeDbInit(options: ExecuteDbInitOptions): Promise<DbIn
   const policy = INIT_ADDITIVE_POLICY;
 
   // Plan migration
-  const plannerResult: MigrationPlannerResult = await planner.plan({
+  const plannerResult: MigrationPlannerResult = planner.plan({
     contract: contractIR,
     schema: schemaIR,
     policy,
@@ -58,11 +62,11 @@ export async function executeDbInit(options: ExecuteDbInitOptions): Promise<DbIn
   });
 
   if (plannerResult.kind === 'failure') {
-    // Convert conflicts to error message
-    const conflictMessages = plannerResult.conflicts
-      .map((c) => `${c.kind}: ${c.summary}`)
-      .join('; ');
-    throw new Error(`Migration planning failed: ${conflictMessages}`);
+    return notOk({
+      code: 'PLANNING_FAILED' as const,
+      summary: `Migration planning failed: ${plannerResult.conflicts.map((c) => `${c.kind}: ${c.summary}`).join('; ')}`,
+      conflicts: plannerResult.conflicts,
+    });
   }
 
   const migrationPlan: MigrationPlan = plannerResult.plan;
@@ -77,8 +81,7 @@ export async function executeDbInit(options: ExecuteDbInitOptions): Promise<DbIn
 
     if (markerMatchesDestination) {
       // Already at destination - return success with no operations
-      return {
-        ok: true,
+      return ok({
         mode,
         plan: { operations: [] },
         ...(mode === 'apply'
@@ -91,37 +94,30 @@ export async function executeDbInit(options: ExecuteDbInitOptions): Promise<DbIn
             }
           : {}),
         summary: 'Database already at target contract state',
-      };
+      });
     }
 
-    // Marker exists but doesn't match destination - fail
-    const coreHashMismatch = existingMarker.coreHash !== migrationPlan.destination.coreHash;
-    const profileHashMismatch =
-      migrationPlan.destination.profileHash &&
-      existingMarker.profileHash !== migrationPlan.destination.profileHash;
-
-    const mismatchParts: string[] = [];
-    if (coreHashMismatch) {
-      mismatchParts.push(
-        `coreHash (marker: ${existingMarker.coreHash}, destination: ${migrationPlan.destination.coreHash})`,
-      );
-    }
-    if (profileHashMismatch) {
-      mismatchParts.push(
-        `profileHash (marker: ${existingMarker.profileHash}, destination: ${migrationPlan.destination.profileHash})`,
-      );
-    }
-
-    throw new Error(
-      `Existing contract marker does not match plan destination. Mismatch in ${mismatchParts.join(' and ')}.`,
-    );
+    // Marker exists but doesn't match destination - return failure
+    return notOk({
+      code: 'MARKER_ORIGIN_MISMATCH' as const,
+      summary: 'Existing contract marker does not match plan destination',
+      marker: {
+        coreHash: existingMarker.coreHash,
+        ...(existingMarker.profileHash ? { profileHash: existingMarker.profileHash } : {}),
+      },
+      destination: {
+        coreHash: migrationPlan.destination.coreHash,
+        ...(migrationPlan.destination.profileHash
+          ? { profileHash: migrationPlan.destination.profileHash }
+          : {}),
+      },
+    });
   }
 
   // Plan mode - don't execute
   if (mode === 'plan') {
-    return {
-      ok: true,
-      mode: 'plan',
+    return ok({
+      mode: 'plan' as const,
       plan: {
         operations: migrationPlan.operations.map((op) => ({
           id: op.id,
@@ -130,7 +126,7 @@ export async function executeDbInit(options: ExecuteDbInitOptions): Promise<DbIn
         })),
       },
       summary: `Planned ${migrationPlan.operations.length} operation(s)`,
-    };
+    });
   }
 
   // Apply mode - execute runner
@@ -151,14 +147,16 @@ export async function executeDbInit(options: ExecuteDbInitOptions): Promise<DbIn
   });
 
   if (!runnerResult.ok) {
-    throw new Error(`Migration runner failed: ${runnerResult.failure.summary}`);
+    return notOk({
+      code: 'RUNNER_FAILED' as const,
+      summary: `Migration runner failed: ${runnerResult.failure.summary}`,
+    });
   }
 
   const execution = runnerResult.value;
 
-  return {
-    ok: true,
-    mode: 'apply',
+  return ok({
+    mode: 'apply' as const,
     plan: {
       operations: migrationPlan.operations.map((op) => ({
         id: op.id,
@@ -177,5 +175,5 @@ export async function executeDbInit(options: ExecuteDbInitOptions): Promise<DbIn
         }
       : { coreHash: migrationPlan.destination.coreHash },
     summary: `Applied ${execution.operationsExecuted} operation(s), marker written`,
-  };
+  });
 }

@@ -38,10 +38,13 @@ export { createPrismaNextControlClient } from '../control-api/client';
 export type {
   // Client types
   ControlClientOptions,
+  // Result types
+  DbInitFailure,
+  DbInitFailureCode,
   // Operation option types
   DbInitOptions,
-  // Result types
   DbInitResult,
+  DbInitSuccess,
   IntrospectOptions,
   PrismaNextControlClient,
   SchemaVerifyOptions,
