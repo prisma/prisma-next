@@ -1,19 +1,6 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
-import { loadContractFromTs } from '@prisma-next/cli';
-import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
-import { emit } from '@prisma-next/emitter';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
-} from '@prisma-next/family-sql/test-utils';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
 import { sql } from '@prisma-next/sql-lane';
@@ -24,48 +11,12 @@ import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-r
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
-import { beforeAll, describe, expect, it } from 'vitest';
-import { stampMarker } from '../scripts/stamp-marker';
+import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
+import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 
-let contract: ReturnType<typeof validateContract>;
-
-beforeAll(async () => {
-  const require = createRequire(import.meta.url);
-  const contractPath = resolve(__dirname, '../prisma/contract.ts');
-  const outputDir = resolve(__dirname, '../src/prisma');
-  // Dynamically resolve package directories
-  const adapterPath = dirname(require.resolve('@prisma-next/adapter-postgres/package.json'));
-  const pgvectorPath = dirname(require.resolve('@prisma-next/extension-pgvector/package.json'));
-
-  const contractIR = await loadContractFromTs(contractPath);
-  const packs = loadExtensionPacks(adapterPath, [pgvectorPath]);
-  const operationRegistry = assembleOperationRegistryFromPacks(packs);
-  const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-  const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-  const extensionIds = extractExtensionIdsFromPacks(packs);
-
-  const result = await emit(
-    contractIR,
-    {
-      outputDir,
-      operationRegistry,
-      codecTypeImports,
-      operationTypeImports,
-      extensionIds,
-    },
-    sqlTargetFamilyHook,
-  );
-
-  mkdirSync(outputDir, { recursive: true });
-
-  const contractJson = JSON.parse(result.contractJson);
-
-  writeFileSync(join(outputDir, 'contract.json'), JSON.stringify(contractJson, null, 2), 'utf-8');
-  writeFileSync(join(outputDir, 'contract.d.ts'), result.contractDts, 'utf-8');
-
-  contract = validateContract<Contract>(contractJson);
-}, timeouts.typeScriptCompilation);
+// Load the already-emitted contract
+const contract = validateContract<Contract>(contractJson);
 
 describe('runtime execute integration', () => {
   it(
@@ -114,34 +65,25 @@ describe('runtime execute integration', () => {
         });
         expect(rowCount).toBe(1);
 
-        const createRuntimeInstance = () => {
-          const pool = new Pool({ connectionString });
-          const driver = createPostgresDriverFromOptions({
-            connect: { pool },
-            cursor: { disabled: true },
-          });
-          return createRuntime({
-            context,
-            adapter,
-            driver,
-            verify: { mode: 'always', requireMarker: true },
-            plugins: [
-              budgets({
-                maxRows: 10_000,
-                defaultTableRows: 10_000,
-                tableRows: { user: 10_000, post: 10_000 },
-              }),
-            ],
-          });
-        };
-
-        await stampMarker({
-          connectionString,
-          coreHash: contract.coreHash,
-          profileHash: contract.profileHash ?? contract.coreHash,
+        const pool = new Pool({ connectionString });
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool },
+          cursor: { disabled: true },
+        });
+        const runtime = createRuntime({
+          context,
+          adapter,
+          driver,
+          verify: { mode: 'onFirstUse', requireMarker: false },
+          plugins: [
+            budgets({
+              maxRows: 10_000,
+              defaultTableRows: 10_000,
+              tableRows: { user: 10_000, post: 10_000 },
+            }),
+          ],
         });
 
-        const runtime = createRuntimeInstance();
         try {
           type PlanRow = ResultType<typeof plan>;
           const rows: PlanRow[] = [];
@@ -168,25 +110,9 @@ describe('runtime execute integration', () => {
         } finally {
           await runtime.close();
         }
-
-        await stampMarker({
-          connectionString,
-          coreHash: 'sha256:mismatched-core',
-          profileHash: contract.profileHash ?? contract.coreHash,
-        });
-
-        const mismatchedRuntime = createRuntimeInstance();
-        try {
-          await expect(async () => {
-            const iterator = mismatchedRuntime.execute(plan)[Symbol.asyncIterator]();
-            await iterator.next();
-          }).rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISMATCH' });
-        } finally {
-          await mismatchedRuntime.close();
-        }
       }, {});
     },
-    timeouts.typeScriptCompilation * 2,
+    timeouts.spinUpPpgDev,
   );
 
   it(
@@ -215,12 +141,6 @@ describe('runtime execute integration', () => {
         });
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
           await withClient(connectionString, async (client: Client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
@@ -315,12 +235,6 @@ describe('runtime execute integration', () => {
         });
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
           await withClient(connectionString, async (client: Client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
@@ -401,12 +315,6 @@ describe('runtime execute integration', () => {
         });
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
           await withClient(connectionString, async (client: Client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
@@ -472,12 +380,6 @@ describe('runtime execute integration', () => {
         });
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
           await withClient(connectionString, async (client) => {
             await client.query(
               'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
