@@ -34,7 +34,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "test"
   ],
   "exports": {
     ".": {
