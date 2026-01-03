@@ -14,7 +14,13 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
-import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
+import {
+  createDevDatabase,
+  type DevDatabase,
+  drainAsyncIterable,
+  timeouts,
+  withClient,
+} from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -95,12 +101,12 @@ describe('runtime execute integration', () => {
   }
 
   /**
-   * Execute a plan and drain results (for inserts/updates/deletes).
+   * Execute a mutation plan (INSERT/UPDATE/DELETE).
+   * Drains the iterator to trigger execution - queries are lazy and
+   * won't run until the iterator is consumed.
    */
-  async function executePlan(plan: Parameters<NonNullable<typeof runtime>['execute']>[0]) {
-    for await (const _ of runtime!.execute(plan)) {
-      // drain
-    }
+  async function executeMutation(plan: Parameters<NonNullable<typeof runtime>['execute']>[0]) {
+    await drainAsyncIterable(runtime!.execute(plan));
   }
 
   beforeEach(async () => {
@@ -129,7 +135,7 @@ describe('runtime execute integration', () => {
       const userTable = tables['user']!;
 
       // Insert test data
-      await executePlan(
+      await executeMutation(
         root
           .insert(userTable, { email: param('email') })
           .build({ params: { email: 'alice@example.com' } }),
@@ -189,12 +195,12 @@ describe('runtime execute integration', () => {
       const userTable = tables['user']!;
       const postTable = tables['post']!;
 
-      await executePlan(
+      await executeMutation(
         sql
           .insert(userTable, { email: param('email') })
           .build({ params: { email: 'alice@example.com' } }),
       );
-      await executePlan(
+      await executeMutation(
         sql
           .insert(postTable, { title: param('title'), userId: param('userId') })
           .build({ params: { title: 'First Post', userId: 1 } }),
@@ -252,7 +258,7 @@ describe('runtime execute integration', () => {
 
       // Insert 100 users
       for (let i = 0; i < 100; i++) {
-        await executePlan(
+        await executeMutation(
           insertSql
             .insert(userTable, { email: param('email') })
             .build({ params: { email: `user${i}@example.com` } }),
@@ -311,7 +317,7 @@ describe('runtime execute integration', () => {
 
       // Insert 50 users
       for (let i = 0; i < 50; i++) {
-        await executePlan(
+        await executeMutation(
           insertSql
             .insert(userTable, { email: param('email') })
             .build({ params: { email: `user${i}@example.com` } }),
@@ -354,27 +360,27 @@ describe('runtime execute integration', () => {
       const postTable = tables['post']!;
 
       // Insert test data
-      await executePlan(
+      await executeMutation(
         sql
           .insert(userTable, { email: param('email') })
           .build({ params: { email: 'alice@example.com' } }),
       );
-      await executePlan(
+      await executeMutation(
         sql
           .insert(userTable, { email: param('email') })
           .build({ params: { email: 'bob@example.com' } }),
       );
-      await executePlan(
+      await executeMutation(
         sql
           .insert(postTable, { title: param('title'), userId: param('userId') })
           .build({ params: { title: 'First Post', userId: 1 } }),
       );
-      await executePlan(
+      await executeMutation(
         sql
           .insert(postTable, { title: param('title'), userId: param('userId') })
           .build({ params: { title: 'Second Post', userId: 1 } }),
       );
-      await executePlan(
+      await executeMutation(
         sql
           .insert(postTable, { title: param('title'), userId: param('userId') })
           .build({ params: { title: 'Third Post', userId: 2 } }),
