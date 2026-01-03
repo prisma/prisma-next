@@ -27,15 +27,14 @@
     "@prisma-next/target-postgres": "workspace:*"
   },
   "devDependencies": {
-    "@prisma/dev": "catalog:",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
-    "@types/pg": "^8.11.10",
+    "@prisma/dev": "catalog:",
+    "@types/pg": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "pg": "^8.11.5",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
-    "vite-tsconfig-paths": "^5.1.4",
+    "pg": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "exports": {

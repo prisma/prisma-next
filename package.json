@@ -41,7 +41,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
     "turbo": "^2.6.1",
-    "typescript": "^5.9.3",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {

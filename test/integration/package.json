@@ -34,11 +34,10 @@
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
-    "@types/pg": "^8.11.10",
-    "pg": "^8.11.5",
+    "@types/pg": "catalog:",
+    "pg": "catalog:",
     "strip-ansi": "^7.1.0",
-    "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "catalog:",
-    "typescript": "^5.9.3"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

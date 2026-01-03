@@ -30,7 +30,7 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "dotenv": "^16.4.5",
-    "pg": "^8.11.5"
+    "pg": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
@@ -40,11 +40,10 @@
     "@prisma-next/test-utils": "workspace:*",
     "@prisma/dev": "catalog:",
     "@types/node": "catalog:",
-    "@types/pg": "^8.11.10",
-    "tsup": "^8.3.0",
+    "@types/pg": "catalog:",
+    "tsup": "catalog:",
     "tsx": "^4.19.2",
-    "typescript": "^5.9.3",
-    "vite-tsconfig-paths": "^5.1.4",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

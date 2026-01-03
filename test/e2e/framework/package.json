@@ -13,24 +13,23 @@
     "clean": "node ../../../scripts/clean.mjs"
   },
   "devDependencies": {
-    "vitest": "catalog:",
-    "typescript": "^5.9.3",
-    "vite-tsconfig-paths": "^5.1.4",
     "@types/node": "catalog:",
-    "@types/pg": "^8.11.10",
-    "pg": "^8.11.5"
+    "@types/pg": "catalog:",
+    "pg": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/integration-tests": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
-    "@prisma-next/sql-runtime": "workspace:*",
-    "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
-    "@prisma-next/adapter-postgres": "workspace:*",
-    "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*"
   }

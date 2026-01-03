@@ -23,17 +23,17 @@
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "arktype": "^2.0.0",
-    "pg": "^8.11.5",
+    "pg": "catalog:",
     "pg-cursor": "^2.10.5"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
     "pg-mem": "^3.0.5",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:",
-    "@types/pg": "^8.11.10",
+    "@types/pg": "catalog:",
     "@types/pg-cursor": "^2.4.6"
   },
   "files": [

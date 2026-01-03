@@ -43,8 +43,8 @@
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "eslint": "^9.0.0",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {

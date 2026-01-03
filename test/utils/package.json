@@ -15,11 +15,10 @@
   "dependencies": {},
   "devDependencies": {
     "@prisma/dev": "catalog:",
-    "get-port": "^7.1.0",
-    "pg": "^8.11.5",
-    "@types/pg": "^8.11.10",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
+    "pg": "catalog:",
+    "@types/pg": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "exports": {

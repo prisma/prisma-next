@@ -14,8 +14,12 @@ blockExoticSubdeps: true
 catalog:
   '@prisma/dev': 0.19.1
   '@types/node': 24.10.4
-  '@vitest/coverage-v8': ^4.0.0
-  vitest: ^4.0.16
+  '@types/pg': 8.16.0
+  '@vitest/coverage-v8': 4.0.16
+  pg: 8.16.3
+  tsup: 8.5.1
+  typescript: 5.9.3
+  vitest: 4.0.16
 
 catalogMode: prefer
 
