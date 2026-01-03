@@ -411,24 +411,26 @@ describe('runtime execute integration', () => {
       }
 
       expect(rows).toHaveLength(2);
-      expect(rows[0]).toHaveProperty('id');
-      expect(rows[0]).toHaveProperty('email');
-      expect(rows[0]).toHaveProperty('posts');
-      expect(Array.isArray(rows[0]!.posts)).toBe(true);
 
       const alice = rows.find((r) => r.email === 'alice@example.com');
-      expect(alice).toBeDefined();
+      expect(alice).toMatchObject({
+        id: 1,
+        email: 'alice@example.com',
+        createdAt: expect.any(String),
+        posts: expect.arrayContaining([
+          { id: expect.any(Number), title: 'First Post', createdAt: expect.any(String) },
+          { id: expect.any(Number), title: 'Second Post', createdAt: expect.any(String) },
+        ]),
+      });
       expect(alice!.posts).toHaveLength(2);
-      expect(alice!.posts[0]).toHaveProperty('id');
-      expect(alice!.posts[0]).toHaveProperty('title');
-      expect(alice!.posts[0]).toHaveProperty('createdAt');
-      expect(typeof alice!.posts[0]!.id).toBe('number');
-      expect(typeof alice!.posts[0]!.title).toBe('string');
 
       const bob = rows.find((r) => r.email === 'bob@example.com');
-      expect(bob).toBeDefined();
-      expect(bob!.posts).toHaveLength(1);
-      expect(bob!.posts[0]!.title).toBe('Third Post');
+      expect(bob).toMatchObject({
+        id: 2,
+        email: 'bob@example.com',
+        createdAt: expect.any(String),
+        posts: [{ id: expect.any(Number), title: 'Third Post', createdAt: expect.any(String) }],
+      });
     },
     timeouts.spinUpPpgDev,
   );
