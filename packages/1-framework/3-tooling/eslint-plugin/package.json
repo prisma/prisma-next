@@ -16,8 +16,12 @@
     "src"
   ],
   "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
