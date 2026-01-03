@@ -1,4 +1,8 @@
-# Git Staging Best Practices
+---
+description: Git commit best practices - avoid git add -A, stage files explicitly
+alwaysApply: true
+---
+# Git Commit Best Practices
 
 ## Never Use `git add -A` or `git add .`
 
@@ -19,17 +23,15 @@ git add -u
 git add packages/1-framework/1-core/*/package.json
 ```
 
-## Why This Matters
-
-Using `git add -A` can accidentally commit:
-- Unrelated files that happen to be in the working directory
-- Generated files that should be in `.gitignore`
-- Temporary files or editor artifacts
-- Files from other work-in-progress changes
-
 ## Best Practices
 
 1. **Review before staging**: Run `git status` to see what will be staged
 2. **Stage explicitly**: List the specific files or use `-u` for modified files only
 3. **Verify before committing**: Run `git diff --cached` to review staged changes
 4. **Keep commits focused**: Each commit should contain related changes only
+
+A good commit:
+
+- Represents one logical step (a coherent unit of change)
+- Explains intent ("why"), not just mechanics ("what")
+- Is reviewable on its own (small diff, focused scope)
