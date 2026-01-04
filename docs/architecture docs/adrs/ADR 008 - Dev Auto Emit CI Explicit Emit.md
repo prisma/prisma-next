@@ -9,7 +9,7 @@
 ## Decision
 
 - **Development**: auto-emit `contract.json` and `contract.d.ts` on import and file change via build-tool plugins
-- **CI**: require an explicit `prisma-next emit` step that verifies determinism and fails on drift
+- **CI**: require an explicit `prisma-next contract emit` step that verifies determinism and fails on drift
 - Auto-emit is non-authoritative and may be skipped in production builds where contracts are frozen
 - CI is authoritative and publishes hashes used by downstream steps
 
@@ -25,7 +25,7 @@
 
 ### What explicit emit does in CI
 
-- Runs `prisma-next emit` once in a clean environment
+- Runs `prisma-next contract emit` once in a clean environment
 - Canonicalizes and computes coreHash and profileHash
 - Optionally re-emits and byte-compares to enforce determinism
 - Produces a `contract.report.json` containing hashes, emitter version, target profile, and summary diagnostics
@@ -90,7 +90,7 @@
 ### In scope for MVP
 
 - Vite and Next.js plugins for auto-emit
-- `prisma-next emit` CLI with determinism checks
+- `prisma-next contract emit` CLI with determinism checks
 - Frozen contract mode and runtime enforcement
 
 ### Out of scope for MVP
@@ -102,7 +102,7 @@
 
 - PSL-first projects adopt auto-emit without changing authoring flow
 - TS-first projects add a builder entry and gain the same DX
-- CI replaces `prisma generate` with `prisma-next emit` and updates downstream steps to read `contract.report.json`
+- CI replaces `prisma generate` with `prisma-next contract emit` and updates downstream steps to read `contract.report.json`
 
 ## Open questions
 

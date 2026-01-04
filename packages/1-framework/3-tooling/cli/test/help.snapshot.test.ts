@@ -10,11 +10,13 @@ describe('help text snapshots', () => {
   it('formats root help', () => {
     const program = new Command();
     program.name('prisma-next').description('Prisma Next CLI');
+    const contract = new Command('contract').description('Contract management commands');
     const contractEmit = createContractEmitCommand();
+    contract.addCommand(contractEmit);
     const db = new Command('db').description('Database operations');
     const dbVerify = createDbVerifyCommand();
     db.addCommand(dbVerify);
-    program.addCommand(contractEmit);
+    program.addCommand(contract);
     program.addCommand(db);
 
     // Explicitly disable colors for consistent snapshots
@@ -45,11 +47,13 @@ describe('help text snapshots', () => {
   it('formats root help with no color', () => {
     const program = new Command();
     program.name('prisma-next').description('Prisma Next CLI');
+    const contract = new Command('contract').description('Contract management commands');
     const contractEmit = createContractEmitCommand();
+    contract.addCommand(contractEmit);
     const db = new Command('db').description('Database operations');
     const dbVerify = createDbVerifyCommand();
     db.addCommand(dbVerify);
-    program.addCommand(contractEmit);
+    program.addCommand(contract);
     program.addCommand(db);
 
     const flags = parseGlobalFlags({ 'no-color': true });
