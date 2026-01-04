@@ -194,57 +194,61 @@ describe('DML Integration Tests', () => {
       ]);
     }, timeouts.spinUpPpgDev);
 
-    it('updates a row and returns it with returning clause', async () => {
-      const runtime = createTestRuntime(
-        fixtureContract,
-        {
-          connect: { client },
-          cursor: { disabled: true },
-        },
-        {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        },
-      );
-
-      const context = createTestContext(fixtureContract, adapter);
-      const tables = schema(context).tables;
-      const builder = sql({ context });
-      const userTable = tables['user'];
-      if (!userTable) {
-        throw new Error('user table not found');
-      }
-      const userColumns = userTable.columns;
-      const idCol = userColumns['id'];
-      const emailCol = userColumns['email'];
-      if (!idCol || !emailCol) {
-        throw new Error('Required columns not found');
-      }
-
-      const updatePlan = builder
-        .update(userTable, {
-          email: param('newEmail'),
-        })
-        .where(idCol.eq(param('userId')))
-        .returning(idCol as ColumnBuilder, emailCol as ColumnBuilder)
-        .build({
-          params: {
-            newEmail: 'updated@example.com',
-            userId: 1,
+    it(
+      'updates a row and returns it with returning clause',
+      async () => {
+        const runtime = createTestRuntime(
+          fixtureContract,
+          {
+            connect: { client },
+            cursor: { disabled: true },
           },
+          {
+            verify: { mode: 'onFirstUse', requireMarker: true },
+          },
+        );
+
+        const context = createTestContext(fixtureContract, adapter);
+        const tables = schema(context).tables;
+        const builder = sql({ context });
+        const userTable = tables['user'];
+        if (!userTable) {
+          throw new Error('user table not found');
+        }
+        const userColumns = userTable.columns;
+        const idCol = userColumns['id'];
+        const emailCol = userColumns['email'];
+        if (!idCol || !emailCol) {
+          throw new Error('Required columns not found');
+        }
+
+        const updatePlan = builder
+          .update(userTable, {
+            email: param('newEmail'),
+          })
+          .where(idCol.eq(param('userId')))
+          .returning(idCol as ColumnBuilder, emailCol as ColumnBuilder)
+          .build({
+            params: {
+              newEmail: 'updated@example.com',
+              userId: 1,
+            },
+          });
+
+        type Row = ResultType<typeof updatePlan>;
+        const rows: Row[] = await executePlanAndCollect(runtime, updatePlan);
+
+        expect(rows.length).toBe(1);
+        expect(rows[0]).toMatchObject({
+          id: 1,
+          email: 'updated@example.com',
         });
 
-      type Row = ResultType<typeof updatePlan>;
-      const rows: Row[] = await executePlanAndCollect(runtime, updatePlan);
-
-      expect(rows.length).toBe(1);
-      expect(rows[0]).toMatchObject({
-        id: 1,
-        email: 'updated@example.com',
-      });
-
-      const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [1]);
-      expect(selectResult.rows[0].email).toBe('updated@example.com');
-    });
+        const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [1]);
+        expect(selectResult.rows[0].email).toBe('updated@example.com');
+      },
+      timeouts.databaseOperation,
+    );
 
     it('updates a row without returning clause', async () => {
       const runtime = createTestRuntime(
