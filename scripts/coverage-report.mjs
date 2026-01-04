@@ -17,7 +17,7 @@ async function loadWarningConfig() {
     const configContent = await readFile(configPath, 'utf-8');
     const config = JSON.parse(configContent);
     return config.warningOnly || [];
-  } catch (error) {
+  } catch {
     console.warn(
       'Warning: Could not load coverage.config.json, no warning-only packages configured.',
     );
@@ -376,7 +376,7 @@ async function formatResults(results, warningConfig) {
 
       // Show failure details
       if (!result.testPassed) {
-        console.log(`    ❌ Test failures`);
+        console.log('    ❌ Test failures');
         if (result.error) {
           const errorLines = result.error.split('\n').slice(0, 5);
           for (const line of errorLines) {
@@ -387,7 +387,7 @@ async function formatResults(results, warningConfig) {
           }
         }
       } else if (!result.coveragePassed) {
-        console.log(`    ❌ Coverage threshold failures`);
+        console.log('    ❌ Coverage threshold failures');
         const thresholds = await getThresholds(result.package);
         if (thresholds && result.coverageReport) {
           const fileFailures = checkThresholds(result.coverageReport, thresholds);
@@ -402,7 +402,7 @@ async function formatResults(results, warningConfig) {
       }
       console.log('');
     }
-    console.log('='.repeat(80) + '\n');
+    console.log(`${'='.repeat(80)}\n`);
   }
 
   if (testFailures.length > 0) {
@@ -541,7 +541,7 @@ async function main() {
   });
 
   if (expiredWarnings.length > 0) {
-    console.error('\n' + '='.repeat(80));
+    console.error(`\n${'='.repeat(80)}`);
     console.error('❌ EXPIRED COVERAGE WARNINGS - CI BLOCKED');
     console.error('='.repeat(80));
     console.error('The following warning-only packages have EXPIRED and must be resolved:\n');
@@ -563,7 +563,7 @@ async function main() {
     console.error(
       '  2. Update coverage.config.json to extend the expiry date with justification\n',
     );
-    console.error('='.repeat(80) + '\n');
+    console.error(`${'='.repeat(80)}\n`);
 
     process.exit(1);
   }

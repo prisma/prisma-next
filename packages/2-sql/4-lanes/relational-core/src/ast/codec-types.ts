@@ -176,11 +176,12 @@ export function codec<Id extends string, TWire, TJs>(config: {
 /**
  * Type helpers to extract codec types.
  */
-export type CodecId<T> = T extends Codec<infer Id, unknown, unknown>
-  ? Id
-  : T extends { readonly id: infer Id }
+export type CodecId<T> =
+  T extends Codec<infer Id, unknown, unknown>
     ? Id
-    : never;
+    : T extends { readonly id: infer Id }
+      ? Id
+      : never;
 export type CodecInput<T> = T extends Codec<string, unknown, infer JsT> ? JsT : never;
 export type CodecOutput<T> = T extends Codec<string, unknown, infer JsT> ? JsT : never;
 

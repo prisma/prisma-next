@@ -25,13 +25,14 @@ export type ExtractPrimaryKey<
     Record<string, ColumnBuilderState<string, boolean, string>>,
     readonly string[] | undefined
   >,
-> = T extends TableBuilderState<
-  string,
-  Record<string, ColumnBuilderState<string, boolean, string>>,
-  infer PK
->
-  ? PK
-  : never;
+> =
+  T extends TableBuilderState<
+    string,
+    Record<string, ColumnBuilderState<string, boolean, string>>,
+    infer PK
+  >
+    ? PK
+    : never;
 
 export type BuildStorage<
   Tables extends Record<
@@ -92,9 +93,10 @@ export type ExtractModelFields<
     Record<string, string>,
     Record<string, RelationDefinition>
   >,
-> = T extends ModelBuilderState<string, string, infer F, Record<string, RelationDefinition>>
-  ? F
-  : never;
+> =
+  T extends ModelBuilderState<string, string, infer F, Record<string, RelationDefinition>>
+    ? F
+    : never;
 
 export type ExtractModelRelations<
   T extends ModelBuilderState<
