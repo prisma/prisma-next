@@ -106,13 +106,9 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
     });
   }
 
-  // Fallback for unknown failure codes
-  return errorRuntime(failure.summary, {
-    why: `db init failed: ${failure.code}`,
-    meta: {
-      code: failure.code,
-    },
-  });
+  // Exhaustive check - TypeScript will error if a new code is added but not handled
+  const exhaustive: never = failure.code;
+  throw new Error(`Unhandled DbInitFailure code: ${exhaustive}`);
 }
 
 /**
@@ -370,7 +366,6 @@ export function createDbInitCommand(): Command {
 
       const result = await executeDbInitCommand(options, flags, startTime);
 
-      // Handle result
       const exitCode = handleResult(result, flags, (dbInitResult) => {
         if (flags.json === 'object') {
           console.log(formatDbInitJson(dbInitResult));
