@@ -16,6 +16,7 @@ catalog:
   '@types/node': 24.10.4
   '@types/pg': 8.16.0
   '@vitest/coverage-v8': 4.0.16
+  gray-matter: ^4.0.3
   pg: 8.16.3
   tsup: 8.5.1
   typescript: 5.9.3
