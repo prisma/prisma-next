@@ -182,7 +182,7 @@ export interface ConnectedState<TFamilyId extends string, TTargetId extends stri
  *
  * Usage:
  * ```typescript
- * const client = createPrismaNextControlClient({
+ * const client = createControlClient({
  *   family: sql,
  *   target: postgres,
  *   adapter: postgresAdapter,
@@ -199,7 +199,7 @@ export interface ConnectedState<TFamilyId extends string, TTargetId extends stri
  * }
  * ```
  */
-export interface PrismaNextControlClient {
+export interface ControlClient {
   /**
    * Establishes a database connection.
    * Must be called before any database operations.

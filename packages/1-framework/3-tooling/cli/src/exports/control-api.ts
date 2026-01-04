@@ -6,13 +6,13 @@
  *
  * @example
  * ```typescript
- * import { createPrismaNextControlClient } from '@prisma-next/cli/control-api';
+ * import { createControlClient } from '@prisma-next/cli/control-api';
  * import sql from '@prisma-next/family-sql/control';
  * import postgres from '@prisma-next/target-postgres/control';
  * import postgresAdapter from '@prisma-next/adapter-postgres/control';
  * import postgresDriver from '@prisma-next/driver-postgres/control';
  *
- * const client = createPrismaNextControlClient({
+ * const client = createControlClient({
  *   family: sql,
  *   target: postgres,
  *   adapter: postgresAdapter,
@@ -30,10 +30,11 @@
  */
 
 // Client factory
-export { createPrismaNextControlClient } from '../control-api/client';
+export { createControlClient } from '../control-api/client';
 
 // Types
 export type {
+  ControlClient,
   // Client options and interface
   ControlClientOptions,
   // Re-exported from core-control-plane
@@ -46,7 +47,6 @@ export type {
   DbInitResult,
   DbInitSuccess,
   IntrospectOptions,
-  PrismaNextControlClient,
   SchemaVerifyOptions,
   SignDatabaseResult,
   SignOptions,

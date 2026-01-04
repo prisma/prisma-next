@@ -61,12 +61,11 @@ prisma-next contract emit [--config <path>] [--json] [-v] [-q] [--timestamps] [-
 
 **Config File Requirements:**
 
-The `contract emit` command requires a `driver` in the config (even though it doesn't use it) because `ControlFamilyDescriptor.create()` requires it for consistency:
+The `contract emit` command does not require a `driver` in the config since it doesn't connect to a database:
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { contract } from './prisma/contract';
@@ -75,7 +74,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  driver: postgresDriver, // Required even though emit doesn't use it
+  // driver: optional for contract emit
   extensionPacks: [],
   contract: {
     source: contract,
@@ -173,7 +172,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
+3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Verify**: Calls `familyInstance.verify()` which:
    - Reads the contract marker from the database
    - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
@@ -235,16 +234,20 @@ Failure:
 
 **Family Requirements:**
 
-The family must provide a `create()` method in the family descriptor that returns a `ControlFamilyInstance` with a `verify()` method:
+The family must provide a `create()` method in the family descriptor that accepts a `ControlPlaneStack` and returns a `ControlFamilyInstance` with a `verify()` method:
 
 ```typescript
-interface ControlFamilyDescriptor {
-  create(options: {
-    target: ControlTargetDescriptor;
-    adapter: ControlAdapterDescriptor;
-    driver: ControlDriverDescriptor;
-    extensions: ControlExtensionDescriptor[];
-  }): ControlFamilyInstance;
+interface ControlFamilyDescriptor<TFamilyId, TFamilyInstance> {
+  create<TTargetId extends string>(
+    stack: ControlPlaneStack<TFamilyId, TTargetId>,
+  ): TFamilyInstance;
+}
+
+interface ControlPlaneStack<TFamilyId, TTargetId> {
+  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
+  readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
+  readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
+  readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
 }
 
 interface ControlFamilyInstance {
@@ -257,6 +260,8 @@ interface ControlFamilyInstance {
   }): Promise<VerifyDatabaseResult>;
 }
 ```
+
+Use `createControlPlaneStack()` from `@prisma-next/core-control-plane/stack` to create the stack with sensible defaults (`driver` defaults to `undefined`, `extensionPacks` defaults to `[]`).
 
 The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles reading the marker, comparing hashes, and checking codec coverage internally.
 
@@ -320,7 +325,7 @@ export default defineConfig({
 **Introspection Process:**
 
 1. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-2. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
+2. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
 3. **Introspect**: Calls `familyInstance.introspect()` which:
    - Queries the database catalog to discover schema structure
    - Returns a family-specific schema IR (e.g., `SqlSchemaIR` for SQL family)
@@ -478,7 +483,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
+3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Schema Verification (Precondition)**: Calls `familyInstance.schemaVerify()` to verify the database schema matches the contract:
    - If verification fails: Prints schema verification output and exits with code 1 (marker is not written)
    - If verification passes: Proceeds to marker signing
@@ -689,7 +694,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`)
+3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Introspect Schema**: Calls `familyInstance.introspect()` to get the current database schema IR
 5. **Validate wiring**: Ensures the contract is compatible with the CLI config:
    - `contract.targetFamily` matches `config.family.familyId`
@@ -1070,14 +1075,14 @@ The CLI package provides a programmatic control client for running control-plane
 ### Basic Usage
 
 ```typescript
-import { createPrismaNextControlClient } from '@prisma-next/cli/control-api';
+import { createControlClient } from '@prisma-next/cli/control-api';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 
 // Create a control client with framework component descriptors
-const client = createPrismaNextControlClient({
+const client = createControlClient({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
@@ -1143,7 +1148,7 @@ The CLI package exports several subpaths for different use cases:
 
 - **`@prisma-next/cli`** (main export): Exports `loadContractFromTs` and `createContractEmitCommand`
 - **`@prisma-next/cli/config-types`**: Exports `defineConfig` and config types
-- **`@prisma-next/cli/control-api`**: Exports `createPrismaNextControlClient` and control API types
+- **`@prisma-next/cli/control-api`**: Exports `createControlClient` and control API types
 - **`@prisma-next/cli/commands/db-init`**: Exports `createDbInitCommand`
 - **`@prisma-next/cli/commands/db-introspect`**: Exports `createDbIntrospectCommand`
 - **`@prisma-next/cli/commands/db-schema-verify`**: Exports `createDbSchemaVerifyCommand`

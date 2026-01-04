@@ -6,7 +6,7 @@ import type {
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it, vi } from 'vitest';
-import { createPrismaNextControlClient } from '../../src/control-api/client';
+import { createControlClient } from '../../src/control-api/client';
 import type { ControlClientOptions } from '../../src/control-api/types';
 
 // ============================================================================
@@ -18,9 +18,12 @@ function createMockFamilyDescriptor(): ControlFamilyDescriptor<'sql'> {
     kind: 'family',
     familyId: 'sql',
     id: 'sql',
+    version: '1.0.0',
     hook: {
+      id: 'sql',
       generateContractTypes: vi.fn(),
       validateStructure: vi.fn(),
+      validateTypes: vi.fn(),
     },
     create: vi.fn().mockReturnValue({
       familyId: 'sql',
@@ -41,6 +44,7 @@ function createMockTargetDescriptor(): ControlTargetDescriptor<'sql', 'postgres'
     familyId: 'sql',
     targetId: 'postgres',
     id: 'postgres',
+    version: '1.0.0',
     create: vi.fn().mockReturnValue({
       familyId: 'sql',
       targetId: 'postgres',
@@ -54,6 +58,7 @@ function createMockAdapterDescriptor(): ControlAdapterDescriptor<'sql', 'postgre
     familyId: 'sql',
     targetId: 'postgres',
     id: 'postgres-adapter',
+    version: '1.0.0',
     create: vi.fn().mockReturnValue({
       familyId: 'sql',
       targetId: 'postgres',
@@ -67,6 +72,7 @@ function createMockDriverDescriptor(): ControlDriverDescriptor<'sql', 'postgres'
     familyId: 'sql',
     targetId: 'postgres',
     id: 'postgres-driver',
+    version: '1.0.0',
     create: vi.fn().mockResolvedValue({
       familyId: 'sql',
       targetId: 'postgres',
@@ -82,6 +88,7 @@ function createMockExtensionDescriptor(): ControlExtensionDescriptor<'sql', 'pos
     familyId: 'sql',
     targetId: 'postgres',
     id: 'pgvector',
+    version: '1.0.0',
     create: vi.fn().mockReturnValue({
       familyId: 'sql',
       targetId: 'postgres',
@@ -104,12 +111,13 @@ function createMockOptions(overrides?: Partial<ControlClientOptions>): ControlCl
 // Tests
 // ============================================================================
 
-describe('PrismaNextControlClient', () => {
+describe('ControlClient', () => {
   describe('construction', () => {
     it('creates client without driver (for offline operations)', () => {
-      const options = createMockOptions({ driver: undefined });
+      const { driver: _, ...optionsWithoutDriver } = createMockOptions();
+      const options = optionsWithoutDriver as ControlClientOptions;
 
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       expect(client).toBeDefined();
       expect(client.connect).toBeInstanceOf(Function);
@@ -121,7 +129,7 @@ describe('PrismaNextControlClient', () => {
         extensionPacks: [createMockExtensionDescriptor()],
       });
 
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       expect(client).toBeDefined();
     });
@@ -129,8 +137,9 @@ describe('PrismaNextControlClient', () => {
 
   describe('connect()', () => {
     it('throws if driver is not configured', async () => {
-      const options = createMockOptions({ driver: undefined });
-      const client = createPrismaNextControlClient(options);
+      const { driver: _, ...optionsWithoutDriver } = createMockOptions();
+      const options = optionsWithoutDriver as ControlClientOptions;
+      const client = createControlClient(options);
 
       await expect(client.connect('postgres://localhost')).rejects.toThrow(
         'Driver is not configured',
@@ -139,7 +148,7 @@ describe('PrismaNextControlClient', () => {
 
     it('throws if already connected', async () => {
       const options = createMockOptions();
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await client.connect('postgres://localhost');
 
@@ -149,7 +158,7 @@ describe('PrismaNextControlClient', () => {
     it('creates driver instance via driver.create()', async () => {
       const driverDescriptor = createMockDriverDescriptor();
       const options = createMockOptions({ driver: driverDescriptor });
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await client.connect('postgres://localhost/test');
 
@@ -159,7 +168,7 @@ describe('PrismaNextControlClient', () => {
     it('creates family instance via family.create()', async () => {
       const familyDescriptor = createMockFamilyDescriptor();
       const options = createMockOptions({ family: familyDescriptor });
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await client.connect('postgres://localhost');
 
@@ -170,7 +179,7 @@ describe('PrismaNextControlClient', () => {
   describe('close()', () => {
     it('is idempotent (safe to call multiple times)', async () => {
       const options = createMockOptions();
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await client.connect('postgres://localhost');
       await client.close();
@@ -190,7 +199,7 @@ describe('PrismaNextControlClient', () => {
       driverDescriptor.create = vi.fn().mockResolvedValue(mockDriver);
 
       const options = createMockOptions({ driver: driverDescriptor });
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await client.connect('postgres://localhost');
       await client.close();
@@ -201,7 +210,7 @@ describe('PrismaNextControlClient', () => {
     it('allows reconnect after close', async () => {
       const driverDescriptor = createMockDriverDescriptor();
       const options = createMockOptions({ driver: driverDescriptor });
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await client.connect('postgres://localhost');
       await client.close();
@@ -214,7 +223,7 @@ describe('PrismaNextControlClient', () => {
   describe('operations throw if not connected', () => {
     it('verify() throws if not connected', async () => {
       const options = createMockOptions();
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await expect(client.verify({ contractIR: { target: 'postgres' } as never })).rejects.toThrow(
         'Not connected',
@@ -223,7 +232,7 @@ describe('PrismaNextControlClient', () => {
 
     it('schemaVerify() throws if not connected', async () => {
       const options = createMockOptions();
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await expect(
         client.schemaVerify({ contractIR: { target: 'postgres' } as never }),
@@ -232,7 +241,7 @@ describe('PrismaNextControlClient', () => {
 
     it('sign() throws if not connected', async () => {
       const options = createMockOptions();
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await expect(client.sign({ contractIR: { target: 'postgres' } as never })).rejects.toThrow(
         'Not connected',
@@ -241,7 +250,7 @@ describe('PrismaNextControlClient', () => {
 
     it('dbInit() throws if not connected', async () => {
       const options = createMockOptions();
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await expect(
         client.dbInit({ contractIR: { target: 'postgres' } as never, mode: 'plan' }),
@@ -250,7 +259,7 @@ describe('PrismaNextControlClient', () => {
 
     it('introspect() throws if not connected', async () => {
       const options = createMockOptions();
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
 
       await expect(client.introspect()).rejects.toThrow('Not connected');
     });
@@ -276,7 +285,7 @@ describe('PrismaNextControlClient', () => {
       familyDescriptor.create = vi.fn().mockReturnValue(mockFamilyInstance);
 
       const options = createMockOptions({ family: familyDescriptor });
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
       await client.connect('postgres://localhost');
 
       const result = await client.verify({
@@ -300,7 +309,7 @@ describe('PrismaNextControlClient', () => {
       familyDescriptor.create = vi.fn().mockReturnValue(mockFamilyInstance);
 
       const options = createMockOptions({ family: familyDescriptor });
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
       await client.connect('postgres://localhost');
 
       const result = await client.introspect();
@@ -315,7 +324,7 @@ describe('PrismaNextControlClient', () => {
       const targetDescriptor = createMockTargetDescriptor();
       // No migrations capability
       const options = createMockOptions({ target: targetDescriptor });
-      const client = createPrismaNextControlClient(options);
+      const client = createControlClient(options);
       await client.connect('postgres://localhost');
 
       await expect(

@@ -12,11 +12,11 @@ import type {
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { executeDbInit } from './operations/db-init';
 import type {
+  ControlClient,
   ControlClientOptions,
   DbInitOptions,
   DbInitResult,
   IntrospectOptions,
-  PrismaNextControlClient,
   SchemaVerifyOptions,
   SignOptions,
   VerifyOptions,
@@ -34,13 +34,13 @@ import type {
  *
  * @example
  * ```typescript
- * import { createPrismaNextControlClient } from '@prisma-next/cli/control-api';
+ * import { createControlClient } from '@prisma-next/cli/control-api';
  * import sql from '@prisma-next/family-sql/control';
  * import postgres from '@prisma-next/target-postgres/control';
  * import postgresAdapter from '@prisma-next/adapter-postgres/control';
  * import postgresDriver from '@prisma-next/driver-postgres/control';
  *
- * const client = createPrismaNextControlClient({
+ * const client = createControlClient({
  *   family: sql,
  *   target: postgres,
  *   adapter: postgresAdapter,
@@ -57,17 +57,15 @@ import type {
  * }
  * ```
  */
-export function createPrismaNextControlClient(
-  options: ControlClientOptions,
-): PrismaNextControlClient {
-  return new PrismaNextControlClientImpl(options);
+export function createControlClient(options: ControlClientOptions): ControlClient {
+  return new ControlClientImpl(options);
 }
 
 /**
- * Implementation of PrismaNextControlClient.
+ * Implementation of ControlClient.
  * Manages connection state and delegates operations to family instance.
  */
-class PrismaNextControlClientImpl implements PrismaNextControlClient {
+class ControlClientImpl implements ControlClient {
   private readonly options: ControlClientOptions;
   private readonly stack: ControlPlaneStack<string, string>;
   private driver: ControlDriverInstance<string, string> | null = null;
