@@ -203,7 +203,7 @@ export function createDbInitCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensionPacks: config.extensionPacks,
+            extensionPacks: config.extensionPacks ?? [],
           });
           const familyInstance = config.family.create(stack);
           const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
@@ -220,7 +220,7 @@ export function createDbInitCommand(): Command {
             family: config.family,
             target: config.target,
             adapter: config.adapter,
-            extensionPacks: config.extensionPacks,
+            extensionPacks: config.extensionPacks ?? [],
           });
 
           // Create planner and runner from target migrations capability

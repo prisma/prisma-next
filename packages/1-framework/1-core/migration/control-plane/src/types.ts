@@ -250,8 +250,8 @@ export interface ControlPlaneStackInput<
 > {
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: TAdapterDescriptor;
-  readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId>;
-  readonly extensionPacks?: TExtensionPacks;
+  readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
+  readonly extensionPacks: TExtensionPacks | undefined;
 }
 
 export interface ControlPlaneStack<

@@ -143,7 +143,7 @@ export function createDbSignCommand(): Command {
           target: config.target,
           adapter: config.adapter,
           driver: driverDescriptor,
-          extensionPacks: config.extensionPacks,
+          extensionPacks: config.extensionPacks ?? [],
         });
         const familyInstance = config.family.create(stack);
 
@@ -154,7 +154,7 @@ export function createDbSignCommand(): Command {
           family: config.family,
           target: config.target,
           adapter: config.adapter,
-          extensionPacks: config.extensionPacks,
+          extensionPacks: config.extensionPacks ?? [],
         });
 
         const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];

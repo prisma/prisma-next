@@ -108,7 +108,7 @@ export function createContractEmitCommand(): Command {
           target: config.target,
           adapter: config.adapter,
           driver: config.driver,
-          extensionPacks: config.extensionPacks,
+          extensionPacks: config.extensionPacks ?? [],
         });
         const familyInstance = config.family.create(stack);
 
