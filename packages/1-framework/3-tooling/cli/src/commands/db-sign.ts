@@ -159,10 +159,7 @@ export function createDbSignCommand(): Command {
         );
 
         // Create driver (expensive operation - done after validation)
-        // Create driver - the connection type is driver-specific (e.g., string URL for Postgres)
-        // but config.db.connection is typed as unknown. Cast required for contravariance.
-        // biome-ignore lint/suspicious/noExplicitAny: required for runtime connection type flexibility
-        const driver = await driverDescriptor.create(dbConnection as any);
+        const driver = await driverDescriptor.create(dbConnection);
 
         try {
           // Schema verification precondition with spinner
