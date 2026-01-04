@@ -8,7 +8,6 @@
   "scripts": {
     "emit": "prisma-next contract emit",
     "db:drop": "tsx scripts/drop-db.ts",
-    "stamp-marker": "tsx scripts/stamp-marker.ts",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/main.ts",
     "start:no-emit": "tsx src/main-no-emit.ts",

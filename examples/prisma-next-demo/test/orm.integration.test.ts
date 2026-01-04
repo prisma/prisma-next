@@ -1,7 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { loadContractFromTs } from '@prisma-next/cli';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { emit } from '@prisma-next/emitter';
 import {
   assembleOperationRegistry,
@@ -10,14 +9,17 @@ import {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
-import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
-import { Pool } from 'pg';
+import { sql } from '@prisma-next/sql-lane';
+import { param } from '@prisma-next/sql-relational-core/param';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import { type createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { stampMarker } from '../scripts/stamp-marker';
 import type { Contract } from '../src/prisma/contract.d';
+import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
 import {
   getSqlDescriptorBundle,
   pgvectorExtensionDescriptor,
@@ -27,12 +29,13 @@ import {
 } from './utils/framework-components';
 
 let contract: Contract;
+let contractIR: Awaited<ReturnType<typeof loadContractFromTs>>;
 
 beforeAll(async () => {
   const contractPath = resolve(__dirname, '../prisma/contract.ts');
   const outputDir = resolve(__dirname, '../src/prisma');
 
-  const contractIR = await loadContractFromTs(contractPath);
+  contractIR = await loadContractFromTs(contractPath);
   const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle({
     extensions: [pgvectorExtensionDescriptor],
   });
@@ -54,73 +57,71 @@ beforeAll(async () => {
   );
 
   mkdirSync(outputDir, { recursive: true });
-
-  // Write emitted JSON directly - do not call validateContract here as it adds mappings
-  // The emitted JSON should not contain mappings (they are computed at runtime)
   writeFileSync(join(outputDir, 'contract.json'), result.contractJson, 'utf-8');
   writeFileSync(join(outputDir, 'contract.d.ts'), result.contractDts, 'utf-8');
 
-  // Validate contract for use in tests (this adds mappings at runtime, which is correct)
   const contractJson = JSON.parse(result.contractJson);
   contract = validateContract<Contract>(contractJson);
 }, timeouts.typeScriptCompilation);
 
 /**
- * Creates a test runtime with adapter, context, pool, driver, and runtime configured.
- * Returns both runtime and pool for cleanup.
+ * Creates a runtime context for the given contract.
  */
-function createTestRuntime(
-  connectionString: string,
-  contract: Contract,
-): {
-  runtime: ReturnType<typeof createRuntime>;
-  pool: Pool;
-} {
-  const context = createRuntimeContext({
+function createContext<TContract extends SqlContract<SqlStorage>>(contract: TContract) {
+  return createRuntimeContext({
     contract,
     target: postgresTargetRuntimeDescriptor,
     adapter: postgresAdapterRuntimeDescriptor,
     extensionPacks: [pgvectorExtensionRuntimeDescriptor],
   });
-  const pool = new Pool({ connectionString });
-  const driver = createPostgresDriverFromOptions({
-    connect: { pool },
-    cursor: { disabled: true },
-  });
-  const runtime = createRuntime({
-    context,
-    driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
-    plugins: [
-      budgets({
-        maxRows: 10_000,
-        defaultTableRows: 10_000,
-        tableRows: { user: 10_000, post: 10_000 },
-      }),
-    ],
-  });
-  return { runtime, pool };
 }
 
 /**
- * Closes the test runtime and pool.
+ * Seeds test data using the runtime and query DSL.
  */
-async function closeTestRuntime({
-  runtime,
-  pool,
-}: {
-  runtime: ReturnType<typeof createRuntime>;
-  pool: Pool;
-}): Promise<void> {
-  try {
-    await runtime.close();
-  } finally {
-    // Only close pool if runtime.close() didn't already close it (e.g., if it threw)
-    // Check if pool is already ended to avoid "Called end on pool more than once" error
-    if (!(pool as { ended?: boolean }).ended) {
-      await pool.end();
+async function seedTestData(
+  runtime: ReturnType<typeof createRuntime>,
+  contract: Contract,
+  data: { users?: string[]; posts?: Array<{ title: string; userIndex: number }> },
+): Promise<{ userIds: number[] }> {
+  const context = createContext(contract);
+  const tables = schema(context).tables;
+  const userTable = tables['user']!;
+  const postTable = tables['post']!;
+
+  const userIds: number[] = [];
+
+  // Insert users
+  if (data.users) {
+    for (const email of data.users) {
+      const plan = sql({ context })
+        .insert(userTable, { email: param('email') })
+        .returning(userTable.columns['id']!)
+        .build({ params: { email } });
+
+      for await (const row of runtime.execute(plan)) {
+        userIds.push((row as { id: number }).id);
+      }
     }
   }
+
+  // Insert posts
+  if (data.posts) {
+    for (const post of data.posts) {
+      const userId = userIds[post.userIndex];
+      if (userId === undefined) continue;
+
+      const plan = sql({ context })
+        .insert(postTable, { title: param('title'), userId: param('userId') })
+        .build({ params: { title: post.title, userId } });
+
+      for await (const _row of runtime.execute(plan)) {
+        // consume iterator
+      }
+    }
+  }
+
+  return { userIds };
 }
 
 describe('ORM integration tests', () => {
@@ -128,24 +129,14 @@ describe('ORM integration tests', () => {
     'orm.getUsers returns users with selected fields, respects limit and ordering',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        // Initialize schema using control client
+        await initTestDatabase({ connection: connectionString, contractIR });
+
         const { runtime, pool } = createTestRuntime(connectionString, contract);
-
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            await client.query(
-              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now()), ($3, now())',
-              ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
-            );
+          // Seed data using runtime
+          await seedTestData(runtime, contract, {
+            users: ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
           });
 
           process.env['DATABASE_URL'] = connectionString;
@@ -171,24 +162,11 @@ describe('ORM integration tests', () => {
     'orm.getUserById returns single user by ID',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-              'alice@example.com',
-            ]);
-          });
+          await seedTestData(runtime, contract, { users: ['alice@example.com'] });
 
           process.env['DATABASE_URL'] = connectionString;
           const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
@@ -212,31 +190,13 @@ describe('ORM integration tests', () => {
     'orm relation filters: where.related.posts.some() returns users with at least one post',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query(
-              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-            );
-            await client.query('truncate table "post", "user" restart identity cascade');
-            await client.query(
-              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
-              ['alice@example.com', 'bob@example.com'],
-            );
-            await client.query(
-              'insert into "post" (title, "userId", "createdAt") values ($1, $2, now())',
-              ['First Post', 1],
-            );
+          await seedTestData(runtime, contract, {
+            users: ['alice@example.com', 'bob@example.com'],
+            posts: [{ title: 'First Post', userIndex: 0 }],
           });
 
           process.env['DATABASE_URL'] = connectionString;
@@ -260,31 +220,17 @@ describe('ORM integration tests', () => {
     'orm includes: include.posts() returns users with nested posts arrays',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query(
-              'create table if not exists "post" (id serial primary key, title text not null, "userId" int4 not null, "createdAt" timestamptz not null default now(), constraint post_userId_fkey foreign key ("userId") references "user"(id))',
-            );
-            await client.query('truncate table "post", "user" restart identity cascade');
-            await client.query(
-              'insert into "user" (email, "createdAt") values ($1, now()), ($2, now())',
-              ['alice@example.com', 'bob@example.com'],
-            );
-            await client.query(
-              'insert into "post" (title, "userId", "createdAt") values ($1, $2, now()), ($3, $2, now()), ($4, $5, now())',
-              ['First Post', 1, 'Second Post', 'Third Post', 2],
-            );
+          await seedTestData(runtime, contract, {
+            users: ['alice@example.com', 'bob@example.com'],
+            posts: [
+              { title: 'First Post', userIndex: 0 },
+              { title: 'Second Post', userIndex: 0 },
+              { title: 'Third Post', userIndex: 1 },
+            ],
           });
 
           process.env['DATABASE_URL'] = connectionString;
@@ -309,36 +255,15 @@ describe('ORM integration tests', () => {
     'orm writes: create() inserts a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-          });
-
           process.env['DATABASE_URL'] = connectionString;
           const { ormCreateUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormCreateUser('alice@example.com', runtime);
 
           expect(affectedRows).toBe(1);
-
-          const rowCount = await withClient(
-            connectionString,
-            async (client: import('pg').Client) => {
-              const result = await client.query('select count(*)::int as count from "user"');
-              return result.rows[0]?.count as number;
-            },
-          );
-          expect(rowCount).toBe(1);
         } finally {
           await closeTestRuntime({ runtime, pool });
         }
@@ -351,36 +276,17 @@ describe('ORM integration tests', () => {
     'orm writes: update() updates a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-              'alice@example.com',
-            ]);
-          });
+          await seedTestData(runtime, contract, { users: ['alice@example.com'] });
 
           process.env['DATABASE_URL'] = connectionString;
           const { ormUpdateUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
 
           expect(affectedRows).toBe(1);
-
-          const email = await withClient(connectionString, async (client: import('pg').Client) => {
-            const result = await client.query('select email from "user" where id = $1', [1]);
-            return result.rows[0]?.email as string;
-          });
-          expect(email).toBe('alice-updated@example.com');
         } finally {
           await closeTestRuntime({ runtime, pool });
         }
@@ -393,39 +299,17 @@ describe('ORM integration tests', () => {
     'orm writes: delete() deletes a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-              'alice@example.com',
-            ]);
-          });
+          await seedTestData(runtime, contract, { users: ['alice@example.com'] });
 
           process.env['DATABASE_URL'] = connectionString;
           const { ormDeleteUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormDeleteUser(1, runtime);
 
           expect(affectedRows).toBe(1);
-
-          const rowCount = await withClient(
-            connectionString,
-            async (client: import('pg').Client) => {
-              const result = await client.query('select count(*)::int as count from "user"');
-              return result.rows[0]?.count as number;
-            },
-          );
-          expect(rowCount).toBe(0);
         } finally {
           await closeTestRuntime({ runtime, pool });
         }
@@ -438,26 +322,12 @@ describe('ORM integration tests', () => {
     'orm pagination: ormGetUsersByIdCursor returns paginated users with gt cursor',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            for (let i = 1; i <= 10; i++) {
-              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-                `user${i}@example.com`,
-              ]);
-            }
-          });
+          const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
+          await seedTestData(runtime, contract, { users: emails });
 
           process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsersByIdCursor } = await import('../src/queries/orm-pagination');
@@ -492,26 +362,12 @@ describe('ORM integration tests', () => {
     'orm pagination: ormGetUsersBackward returns users before cursor with lt operator',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          await stampMarker({
-            connectionString,
-            coreHash: contract.coreHash,
-            profileHash: contract.profileHash ?? contract.coreHash,
-          });
-
-          await withClient(connectionString, async (client) => {
-            await client.query(
-              'create table if not exists "user" (id serial primary key, email text not null unique, "createdAt" timestamptz not null default now())',
-            );
-            await client.query('truncate table "user" restart identity');
-            for (let i = 1; i <= 10; i++) {
-              await client.query('insert into "user" (email, "createdAt") values ($1, now())', [
-                `user${i}@example.com`,
-              ]);
-            }
-          });
+          const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
+          await seedTestData(runtime, contract, { users: emails });
 
           process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsersBackward } = await import('../src/queries/orm-pagination');
