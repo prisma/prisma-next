@@ -152,9 +152,7 @@ export function createDbSignCommand(): Command {
         assertContractRequirementsSatisfied({
           contract: contractIR,
           family: config.family,
-          target: config.target,
-          adapter: config.adapter,
-          extensionPacks: config.extensionPacks,
+          stack,
         });
 
         const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];

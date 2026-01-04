@@ -153,9 +153,7 @@ export function createDbVerifyCommand(): Command {
           assertContractRequirementsSatisfied({
             contract: contractIR,
             family: config.family,
-            target: config.target,
-            adapter: config.adapter,
-            extensionPacks: config.extensionPacks,
+            stack,
           });
 
           // Call family instance verify method

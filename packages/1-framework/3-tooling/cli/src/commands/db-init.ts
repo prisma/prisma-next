@@ -218,9 +218,7 @@ export function createDbInitCommand(): Command {
           assertContractRequirementsSatisfied({
             contract: contractIR,
             family: config.family,
-            target: config.target,
-            adapter: config.adapter,
-            extensionPacks: config.extensionPacks,
+            stack,
           });
 
           // Create planner and runner from target migrations capability

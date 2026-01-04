@@ -154,9 +154,7 @@ export function createDbIntrospectCommand(): Command {
             assertContractRequirementsSatisfied({
               contract: validatedContract,
               family: config.family,
-              target: config.target,
-              adapter: config.adapter,
-              extensionPacks: config.extensionPacks,
+              stack,
             });
             contractIR = validatedContract;
           }

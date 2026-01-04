@@ -145,9 +145,7 @@ export function createDbSchemaVerifyCommand(): Command {
         assertContractRequirementsSatisfied({
           contract: contractIR,
           family: config.family,
-          target: config.target,
-          adapter: config.adapter,
-          extensionPacks: config.extensionPacks,
+          stack,
         });
 
         // Resolve database URL
