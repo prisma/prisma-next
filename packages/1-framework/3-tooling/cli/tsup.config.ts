@@ -17,8 +17,8 @@ export default defineConfig([
   },
   {
     entry: {
-      index: 'src/exports/index.ts',
-      'config-types': 'src/exports/config-types.ts',
+      'exports/index': 'src/exports/index.ts',
+      'exports/config-types': 'src/exports/config-types.ts',
       'commands/db-init': 'src/commands/db-init.ts',
       'commands/db-introspect': 'src/commands/db-introspect.ts',
       'commands/db-schema-verify': 'src/commands/db-schema-verify.ts',

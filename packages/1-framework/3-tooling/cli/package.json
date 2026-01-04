@@ -51,11 +51,11 @@
   "exports": {
     ".": {
       "types": "./dist/exports/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/exports/index.js"
     },
     "./config-types": {
       "types": "./dist/exports/config-types.d.ts",
-      "import": "./dist/config-types.js"
+      "import": "./dist/exports/config-types.js"
     },
     "./commands/db-init": {
       "types": "./dist/commands/db-init.d.ts",
