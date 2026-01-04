@@ -10,7 +10,6 @@ export type {
   ControlFamilyDescriptor,
   ControlFamilyInstance,
   ControlPlaneStack,
-  ControlPlaneStackInput,
   ControlTargetDescriptor,
   ControlTargetInstance,
   EmitContractResult,

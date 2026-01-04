@@ -236,40 +236,11 @@ export interface OperationContext {
 // Control*Descriptor Interfaces (ADR 151)
 // ============================================================================
 
-export interface ControlPlaneStackInput<
-  TFamilyId extends string,
-  TTargetId extends string,
-  TAdapterDescriptor extends ControlAdapterDescriptor<
-    TFamilyId,
-    TTargetId
-  > = ControlAdapterDescriptor<TFamilyId, TTargetId>,
-  TExtensionPacks extends readonly ControlExtensionDescriptor<
-    TFamilyId,
-    TTargetId
-  >[] = readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[],
-> {
+export interface ControlPlaneStack<TFamilyId extends string, TTargetId extends string> {
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
-  readonly adapter: TAdapterDescriptor;
+  readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
   readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
-  readonly extensionPacks: TExtensionPacks | undefined;
-}
-
-export interface ControlPlaneStack<
-  TFamilyId extends string,
-  TTargetId extends string,
-  TAdapterDescriptor extends ControlAdapterDescriptor<
-    TFamilyId,
-    TTargetId
-  > = ControlAdapterDescriptor<TFamilyId, TTargetId>,
-  TExtensionPacks extends readonly ControlExtensionDescriptor<
-    TFamilyId,
-    TTargetId
-  >[] = readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[],
-> {
-  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
-  readonly adapter: TAdapterDescriptor;
-  readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
-  readonly extensionPacks: TExtensionPacks;
+  readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
 }
 
 /**

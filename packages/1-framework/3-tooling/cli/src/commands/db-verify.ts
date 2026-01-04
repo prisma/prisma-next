@@ -144,7 +144,7 @@ export function createDbVerifyCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensionPacks: config.extensionPacks ?? [],
+            extensionPacks: config.extensionPacks,
           });
           const familyInstance = config.family.create(stack);
 
@@ -155,7 +155,7 @@ export function createDbVerifyCommand(): Command {
             family: config.family,
             target: config.target,
             adapter: config.adapter,
-            extensionPacks: config.extensionPacks ?? [],
+            extensionPacks: config.extensionPacks,
           });
 
           // Call family instance verify method

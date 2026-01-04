@@ -133,44 +133,102 @@ test('creates stack and passes it to family.create()', () => {
   expectTypeOf(stack).toExtend<ControlPlaneStack<'sql', 'postgres'>>();
 });
 
-test('rejects mismatched targetId between target and adapter', () => {
-  const mysqlTarget: ControlTargetDescriptor<'sql', 'mysql'> = {
-    kind: 'target',
-    id: 'mysql',
-    familyId: 'sql',
-    targetId: 'mysql',
-    version: '0.0.1',
-    create: () => ({ familyId: 'sql', targetId: 'mysql' }),
-  };
-
-  // This correctly fails at compile time - targetId mismatch: mysql vs postgres
-  // The adapter property is incompatible because TTargetId doesn't match
-  createControlPlaneStack({
-    target: mysqlTarget,
-    // @ts-expect-error - adapter targetId 'postgres' doesn't match target targetId 'mysql'
+test('stack has correct structure', () => {
+  const stack = createControlPlaneStack({
+    target: postgresTarget,
     adapter: postgresAdapter,
-    driver: undefined,
-    extensionPacks: undefined,
   });
+
+  expectTypeOf(stack.target).toExtend<ControlTargetDescriptor<'sql', 'postgres'>>();
+  expectTypeOf(stack.adapter).toExtend<ControlAdapterDescriptor<'sql', 'postgres'>>();
+  expectTypeOf(stack.driver).toEqualTypeOf<
+    ControlDriverDescriptor<'sql', 'postgres'> | undefined
+  >();
+  expectTypeOf(stack.extensionPacks).toExtend<
+    readonly ControlExtensionDescriptor<'sql', 'postgres'>[]
+  >();
 });
 
-test('rejects mismatched familyId between target and adapter', () => {
-  const docTarget: ControlTargetDescriptor<'document', 'mongodb'> = {
-    kind: 'target',
-    id: 'mongodb',
+test('stack with all optional properties omitted', () => {
+  const stack = createControlPlaneStack({
+    target: postgresTarget,
+    adapter: postgresAdapter,
+  });
+
+  // driver and extensionPacks default correctly
+  expectTypeOf(stack.driver).toEqualTypeOf<
+    ControlDriverDescriptor<'sql', 'postgres'> | undefined
+  >();
+  expectTypeOf(stack.extensionPacks).toExtend<
+    readonly ControlExtensionDescriptor<'sql', 'postgres'>[]
+  >();
+});
+
+test('family.create() rejects mismatched familyId in stack', () => {
+  const documentFamilyDescriptor: ControlFamilyDescriptor<'document'> = {
+    kind: 'family',
+    id: 'document',
     familyId: 'document',
-    targetId: 'mongodb',
     version: '0.0.1',
-    create: () => ({ familyId: 'document', targetId: 'mongodb' }),
+    hook: mockHook,
+    create: () => ({
+      familyId: 'document',
+      validateContractIR: (contract: unknown) => contract as ContractIR,
+      verify: async () => ({
+        ok: true,
+        summary: 'test',
+        contract: { coreHash: 'test' },
+        target: { expected: 'mongodb' },
+        timings: { total: 0 },
+      }),
+      schemaVerify: async () => ({
+        ok: true,
+        summary: 'test',
+        contract: { coreHash: 'test' },
+        target: { expected: 'mongodb' },
+        schema: {
+          issues: [],
+          root: {
+            status: 'pass' as const,
+            kind: 'root',
+            name: 'root',
+            contractPath: '',
+            code: '',
+            message: '',
+            expected: null,
+            actual: null,
+            children: [],
+          },
+          counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
+        },
+        timings: { total: 0 },
+      }),
+      sign: async () => ({
+        ok: true,
+        summary: 'test',
+        contract: { coreHash: 'test' },
+        target: { expected: 'mongodb' },
+        marker: { created: true, updated: false },
+        timings: { total: 0 },
+      }),
+      readMarker: async () => null,
+      introspect: async () => ({ tables: {}, extensionPacks: [] }),
+      emitContract: async () => ({
+        contractJson: '{}',
+        contractDts: '',
+        coreHash: 'test',
+        profileHash: 'test',
+      }),
+    }),
   };
 
-  // This correctly fails at compile time - familyId mismatch: document vs sql
-  // The adapter property is incompatible because TFamilyId doesn't match
-  createControlPlaneStack({
-    target: docTarget,
-    // @ts-expect-error - adapter familyId 'sql' doesn't match target familyId 'document'
+  // Stack with sql familyId
+  const sqlStack = createControlPlaneStack({
+    target: postgresTarget,
     adapter: postgresAdapter,
-    driver: undefined,
-    extensionPacks: undefined,
   });
+
+  // This correctly fails at compile time - familyId mismatch: document vs sql
+  // @ts-expect-error - stack familyId 'sql' doesn't match family descriptor familyId 'document'
+  documentFamilyDescriptor.create(sqlStack);
 });

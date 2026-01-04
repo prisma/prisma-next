@@ -144,7 +144,7 @@ export function createDbIntrospectCommand(): Command {
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensionPacks: config.extensionPacks ?? [],
+            extensionPacks: config.extensionPacks,
           });
           const familyInstance = config.family.create(stack);
 
@@ -156,7 +156,7 @@ export function createDbIntrospectCommand(): Command {
               family: config.family,
               target: config.target,
               adapter: config.adapter,
-              extensionPacks: config.extensionPacks ?? [],
+              extensionPacks: config.extensionPacks,
             });
             contractIR = validatedContract;
           }
