@@ -57,8 +57,8 @@ This package depends on all packages under test via workspace protocol:
 - `@prisma-next/emitter` - Contract emission
 - `@prisma-next/runtime` - Execution runtime
 - `@prisma-next/sql-contract-ts` - SQL contract authoring (for integration tests)
-- `@prisma-next/sql-query` - Query builders
-- `@prisma-next/sql-target` - SQL family (legacy transitional package; see `@prisma-next/sql-*` packages)
+- `@prisma-next/sql-query` - Query builders (legacy; prefer `@prisma-next/sql-lane` and `@prisma-next/sql-relational-core`)
+- `@prisma-next/sql-contract` - SQL contract types (canonical source: `@prisma-next/sql-contract/types`)
 
 ## Location
 

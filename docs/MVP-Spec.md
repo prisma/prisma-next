@@ -24,7 +24,7 @@ Supporting acceptance
 To de‑risk package organization and prove extensibility across planes and families, we will complete the following validations in order. These do not change the MVP demo goals; they harden the architecture while we develop features.
 
 1) SQL Extension Pack: PGVector (SQL domain — Targets + Lanes + Adapters)
-- Scope: add vector scalar + ops in `@prisma-next/sql-contract-types`/`@prisma-next/sql-operations`; expose ops in lanes; ensure adapter lowering executes successfully.
+- Scope: add vector scalar + ops in `@prisma-next/sql-contract/types`/`@prisma-next/sql-operations`; expose ops in lanes; ensure adapter lowering executes successfully.
 - Acceptance: write vector queries through DSL/ORM, produce valid Plans, lower to SQL, execute via Postgres adapter, decode results with codecs.
 
 2) Migration Plane MVP (Framework Tooling + SQL Targets)

@@ -19,7 +19,7 @@ This package provides the relational query DSL and raw SQL helpers for building 
 - `@prisma-next/contract` - Contract types and plan metadata
 - `@prisma-next/plan` - Plan helpers and error utilities
 - `@prisma-next/sql-relational-core` - Schema and column builders, AST factories
-- `@prisma-next/sql-target` - SQL contract types and AST definitions
+- `@prisma-next/sql-contract` - SQL contract types (via `@prisma-next/sql-contract/types`)
 
 ## Exports
 
@@ -59,4 +59,4 @@ All AST construction flows through factories from `@prisma-next/sql-relational-c
 
 - `@prisma-next/sql-relational-core` - Provides schema and column builders, AST factories used by this package
 - `@prisma-next/sql-orm-lane` - ORM builder that compiles to this package's DSL primitives
-- `@prisma-next/sql-target` - Defines SQL contract types and AST structures
+- `@prisma-next/sql-contract` - Defines SQL contract types (via `@prisma-next/sql-contract/types`)

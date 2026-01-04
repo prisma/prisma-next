@@ -10,7 +10,7 @@ This package contains the SQL-specific TypeScript contract authoring surface for
 - **Layer**: authoring
 - **Plane**: migration
 
-**Note**: SQL authoring may depend on SQL targets layer (e.g., `@prisma-next/sql-contract-types`) within the same domain.
+**Note**: SQL authoring may depend on SQL core layer (e.g., `@prisma-next/sql-contract/types`) within the same domain.
 
 ## Overview
 
