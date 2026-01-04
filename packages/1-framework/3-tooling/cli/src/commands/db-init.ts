@@ -171,7 +171,7 @@ export function createDbInitCommand(): Command {
           target: config.target,
           adapter: config.adapter,
           driver: config.driver,
-          extensionPacks: config.extensionPacks,
+          extensionPacks: config.extensionPacks ?? [],
         });
 
         // Connect to database with spinner
@@ -209,29 +209,30 @@ export function createDbInitCommand(): Command {
 
           // Map control-api DbInitResult to CLI output format
           if (!result.ok) {
+            const failure = result.failure;
             // Map failures to CLI structured errors
-            if (result.error.code === 'PLANNING_FAILED') {
-              throw errorMigrationPlanningFailed({ conflicts: result.error.conflicts ?? [] });
+            if (failure.code === 'PLANNING_FAILED') {
+              throw errorMigrationPlanningFailed({ conflicts: failure.conflicts ?? [] });
             }
 
-            if (result.error.code === 'MARKER_ORIGIN_MISMATCH') {
+            if (failure.code === 'MARKER_ORIGIN_MISMATCH') {
               const mismatchParts: string[] = [];
               if (
-                result.error.marker?.coreHash !== result.error.destination?.coreHash &&
-                result.error.marker?.coreHash &&
-                result.error.destination?.coreHash
+                failure.marker?.coreHash !== failure.destination?.coreHash &&
+                failure.marker?.coreHash &&
+                failure.destination?.coreHash
               ) {
                 mismatchParts.push(
-                  `coreHash (marker: ${result.error.marker.coreHash}, destination: ${result.error.destination.coreHash})`,
+                  `coreHash (marker: ${failure.marker.coreHash}, destination: ${failure.destination.coreHash})`,
                 );
               }
               if (
-                result.error.marker?.profileHash !== result.error.destination?.profileHash &&
-                result.error.marker?.profileHash &&
-                result.error.destination?.profileHash
+                failure.marker?.profileHash !== failure.destination?.profileHash &&
+                failure.marker?.profileHash &&
+                failure.destination?.profileHash
               ) {
                 mismatchParts.push(
-                  `profileHash (marker: ${result.error.marker.profileHash}, destination: ${result.error.destination.profileHash})`,
+                  `profileHash (marker: ${failure.marker.profileHash}, destination: ${failure.destination.profileHash})`,
                 );
               }
 
@@ -242,25 +243,25 @@ export function createDbInitCommand(): Command {
                   fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
                   meta: {
                     code: 'MARKER_ORIGIN_MISMATCH',
-                    ...(result.error.marker?.coreHash
-                      ? { markerCoreHash: result.error.marker.coreHash }
+                    ...(failure.marker?.coreHash
+                      ? { markerCoreHash: failure.marker.coreHash }
                       : {}),
-                    ...(result.error.destination?.coreHash
-                      ? { destinationCoreHash: result.error.destination.coreHash }
+                    ...(failure.destination?.coreHash
+                      ? { destinationCoreHash: failure.destination.coreHash }
                       : {}),
-                    ...(result.error.marker?.profileHash
-                      ? { markerProfileHash: result.error.marker.profileHash }
+                    ...(failure.marker?.profileHash
+                      ? { markerProfileHash: failure.marker.profileHash }
                       : {}),
-                    ...(result.error.destination?.profileHash
-                      ? { destinationProfileHash: result.error.destination.profileHash }
+                    ...(failure.destination?.profileHash
+                      ? { destinationProfileHash: failure.destination.profileHash }
                       : {}),
                   },
                 },
               );
             }
 
-            if (result.error.code === 'RUNNER_FAILED') {
-              throw errorRuntime(result.error.summary, {
+            if (failure.code === 'RUNNER_FAILED') {
+              throw errorRuntime(failure.summary, {
                 why: 'Migration runner failed',
                 fix: 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`',
                 meta: {
@@ -270,10 +271,10 @@ export function createDbInitCommand(): Command {
             }
 
             // Fallback for unknown failure codes
-            throw errorRuntime(result.error.summary, {
-              why: `db init failed: ${result.error.code}`,
+            throw errorRuntime(failure.summary, {
+              why: `db init failed: ${failure.code}`,
               meta: {
-                code: result.error.code,
+                code: failure.code,
               },
             });
           }
@@ -282,6 +283,7 @@ export function createDbInitCommand(): Command {
           // Note: control-api DbInitSuccess doesn't include targetId/destination in plan,
           // but CLI output format expects it. We'll need to get this from the migration plan
           // if available, or omit it for now.
+          const profileHash = result.value.marker?.profileHash;
           const dbInitResult: DbInitResult = {
             ok: true,
             mode: result.value.mode,
@@ -289,7 +291,7 @@ export function createDbInitCommand(): Command {
               targetId: '', // Not available in control-api result
               destination: {
                 coreHash: result.value.marker?.coreHash ?? '',
-                profileHash: result.value.marker?.profileHash,
+                ...(profileHash ? { profileHash } : {}),
               },
               operations: result.value.plan.operations.map((op) => ({
                 id: op.id,
@@ -309,7 +311,9 @@ export function createDbInitCommand(): Command {
               ? {
                   marker: {
                     coreHash: result.value.marker.coreHash,
-                    profileHash: result.value.marker.profileHash,
+                    ...(result.value.marker.profileHash
+                      ? { profileHash: result.value.marker.profileHash }
+                      : {}),
                   },
                 }
               : {}),

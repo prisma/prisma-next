@@ -220,7 +220,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     driver,
     destinationContract: contractIR,
     policy,
-    callbacks,
+    ...(callbacks ? { callbacks } : {}),
     // db init plans and applies back-to-back from a fresh introspection, so per-operation
     // pre/postchecks and the idempotency probe are usually redundant overhead. We still
     // enforce marker/origin compatibility and a full schema verification after apply.
