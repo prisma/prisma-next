@@ -1,13 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type { DbInitFailure } from '../control-api/types';
 import {
-  type CliStructuredError,
+  CliStructuredError,
   errorContractValidationFailed,
   errorDatabaseConnectionRequired,
   errorDriverRequired,
@@ -109,36 +108,6 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
   // Exhaustive check - TypeScript will error if a new code is added but not handled
   const exhaustive: never = failure.code;
   throw new Error(`Unhandled DbInitFailure code: ${exhaustive}`);
-}
-
-/**
- * Maps a connection error to a CliStructuredError.
- */
-function mapConnectionError(error: unknown, dbConnection: unknown): CliStructuredError | undefined {
-  const message = error instanceof Error ? error.message : String(error);
-  const code = (error as { code?: unknown }).code;
-
-  // Check if this is a connection error (thrown during connect phase)
-  // Connection errors typically have codes like ECONNREFUSED, ENOTFOUND, etc.
-  const isConnectionError =
-    typeof code === 'string' &&
-    ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH'].includes(code);
-
-  if (!isConnectionError) {
-    return undefined;
-  }
-
-  // Only redact if connection is a string (URL)
-  const redacted = typeof dbConnection === 'string' ? redactDatabaseUrl(dbConnection) : undefined;
-
-  return errorRuntime('Database connection failed', {
-    why: message,
-    fix: 'Verify the database connection, ensure the database is reachable, and confirm credentials/permissions',
-    meta: {
-      ...(typeof code !== 'undefined' ? { code } : {}),
-      ...(redacted ?? {}),
-    },
-  });
 }
 
 /**
@@ -315,13 +284,12 @@ async function executeDbInitCommand(
 
     return ok(dbInitResult);
   } catch (error) {
-    // Handle connection errors with specific formatting
-    const connectionError = mapConnectionError(error, dbConnection);
-    if (connectionError) {
-      return notOk(connectionError);
+    // Driver already throws CliStructuredError for connection failures
+    if (error instanceof CliStructuredError) {
+      return notOk(error);
     }
 
-    // For other errors, wrap as unexpected
+    // Wrap unexpected errors
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {
         why: `Unexpected error during db init: ${error instanceof Error ? error.message : String(error)}`,
