@@ -1,11 +1,8 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
-  ControlDriverInstance,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
-  ControlFamilyInstance,
   ControlTargetDescriptor,
   MigrationPlannerConflict,
   SignDatabaseResult,
@@ -169,20 +166,6 @@ export interface DbInitFailure {
  * Uses Result pattern: success returns DbInitSuccess, failure returns DbInitFailure.
  */
 export type DbInitResult = Result<DbInitSuccess, DbInitFailure>;
-
-// ============================================================================
-// Internal Types
-// ============================================================================
-
-/**
- * Internal connected state for the control client.
- * Used by the client implementation to track connection state.
- */
-export interface ConnectedState<TFamilyId extends string, TTargetId extends string> {
-  readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
-  readonly familyInstance: ControlFamilyInstance<TFamilyId>;
-  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
-}
 
 // ============================================================================
 // Client Interface
