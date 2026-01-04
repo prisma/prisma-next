@@ -11,60 +11,56 @@
  *   - bytes/lines for alwaysApply: true rulecards only
  *   - bytes/lines for AGENTS.md
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import matter from 'gray-matter';
 
 const RULES_DIR = '.cursor/rules';
 const AGENTS_FILE = 'AGENTS.md';
+const CONFIG_FILE = '.cursor/rules-footprint.config.json';
 
-// Thresholds for --check mode (adjust as needed)
-const THRESHOLDS = {
-  // alwaysApply rulecards should stay minimal
+const DEFAULT_THRESHOLDS = {
   alwaysApplyLines: 500,
   alwaysApplyBytes: 20_000,
-  // AGENTS.md should stay concise
   agentsLines: 200,
   agentsBytes: 10_000,
-  // Total rules footprint
   totalRulesLines: 5_000,
   totalRulesBytes: 200_000,
 };
+
+function loadThresholds() {
+  if (!existsSync(CONFIG_FILE)) {
+    console.warn(`Warning: ${CONFIG_FILE} not found, using defaults`);
+    return DEFAULT_THRESHOLDS;
+  }
+
+  try {
+    const raw = readFileSync(CONFIG_FILE, 'utf8');
+    const config = JSON.parse(raw);
+
+    if (!config.thresholds || typeof config.thresholds !== 'object') {
+      console.warn(`Warning: ${CONFIG_FILE} missing 'thresholds' object, using defaults`);
+      return DEFAULT_THRESHOLDS;
+    }
+
+    return { ...DEFAULT_THRESHOLDS, ...config.thresholds };
+  } catch (err) {
+    console.warn(`Warning: Failed to parse ${CONFIG_FILE}: ${err.message}, using defaults`);
+    return DEFAULT_THRESHOLDS;
+  }
+}
 
 function countLines(content) {
   return content.split(/\r?\n/).length;
 }
 
-function parseFrontmatter(src) {
-  const obj = {};
-  const lines = src.split(/\r?\n/);
-  for (const line of lines) {
-    const m = line.match(/^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/);
-    if (!m) continue;
-    const key = m[1];
-    let val = m[2].trim();
-    if (val === 'true') val = true;
-    else if (val === 'false') val = false;
-    else if (val === '') {
-      if (key === 'globs') val = [];
-      else val = undefined;
-    } else if (val.startsWith('[') && val.endsWith(']')) {
-      const inner = val.slice(1, -1).trim();
-      obj[key] = inner ? inner.split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')) : [];
-      continue;
-    } else {
-      val = val.replace(/^['"]|['"]$/g, '');
-    }
-    if (val !== undefined) {
-      obj[key] = val;
-    }
-  }
-  return obj;
-}
-
 function extractFrontmatter(content) {
-  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
-  if (!fmMatch) return null;
-  return parseFrontmatter(fmMatch[1]);
+  try {
+    const parsed = matter(content);
+    return parsed.data && Object.keys(parsed.data).length > 0 ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 function formatBytes(bytes) {
@@ -73,12 +69,8 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function main() {
-  const checkMode = process.argv.includes('--check');
-  const violations = [];
-
-  // Collect rule file stats
-  const files = readdirSync(RULES_DIR).filter((f) => /\.(md|mdc)$/i.test(f) && !/^README\.md$/i.test(f));
+function scanRulecardFiles(dir) {
+  const files = readdirSync(dir).filter((f) => /\.(md|mdc)$/i.test(f) && !/^README\.md$/i.test(f));
 
   let totalBytes = 0;
   let totalLines = 0;
@@ -88,7 +80,7 @@ function main() {
   const allRuleStats = [];
 
   for (const file of files) {
-    const full = join(RULES_DIR, file);
+    const full = join(dir, file);
     const content = readFileSync(full, 'utf8');
     const stats = statSync(full);
     const lines = countLines(content);
@@ -114,29 +106,53 @@ function main() {
     }
   }
 
-  // AGENTS.md stats
-  let agentsBytes = 0;
-  let agentsLines = 0;
-  try {
-    const agentsContent = readFileSync(AGENTS_FILE, 'utf8');
-    const agentsStats = statSync(AGENTS_FILE);
-    agentsBytes = agentsStats.size;
-    agentsLines = countLines(agentsContent);
-  } catch {
-    console.warn(`Warning: ${AGENTS_FILE} not found`);
-  }
-
   // README.md in rules dir (add to total but not counted as a rulecard)
   try {
-    const readmeContent = readFileSync(join(RULES_DIR, 'README.md'), 'utf8');
-    const readmeStats = statSync(join(RULES_DIR, 'README.md'));
+    const readmeContent = readFileSync(join(dir, 'README.md'), 'utf8');
+    const readmeStats = statSync(join(dir, 'README.md'));
     totalBytes += readmeStats.size;
     totalLines += countLines(readmeContent);
   } catch {
     // README.md not found, ignore
   }
 
-  // Print report
+  return {
+    files,
+    allRuleStats,
+    totalBytes,
+    totalLines,
+    alwaysApplyFiles,
+    alwaysApplyBytes,
+    alwaysApplyLines,
+  };
+}
+
+function readAgentsStats(file) {
+  try {
+    const content = readFileSync(file, 'utf8');
+    const stats = statSync(file);
+    return {
+      agentsBytes: stats.size,
+      agentsLines: countLines(content),
+    };
+  } catch {
+    console.warn(`Warning: ${file} not found`);
+    return { agentsBytes: 0, agentsLines: 0 };
+  }
+}
+
+function printReport(stats) {
+  const {
+    files,
+    totalBytes,
+    totalLines,
+    alwaysApplyFiles,
+    alwaysApplyBytes,
+    alwaysApplyLines,
+    agentsBytes,
+    agentsLines,
+  } = stats;
+
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('                    RULES FOOTPRINT REPORT                     ');
   console.log('═══════════════════════════════════════════════════════════════');
@@ -171,69 +187,85 @@ function main() {
   console.log(`   Lines: ${combinedLines.toLocaleString()}`);
   console.log(`   Bytes: ${formatBytes(combinedBytes)}`);
   console.log();
+}
 
-  // Check thresholds if in check mode
-  if (checkMode) {
-    console.log('═══════════════════════════════════════════════════════════════');
-    console.log('                      THRESHOLD CHECK                          ');
-    console.log('═══════════════════════════════════════════════════════════════');
-    console.log();
+function checkThresholds(stats, thresholds, checkMode) {
+  if (!checkMode) return;
 
-    if (alwaysApplyLines > THRESHOLDS.alwaysApplyLines) {
-      violations.push(
-        `alwaysApply lines: ${alwaysApplyLines} > ${THRESHOLDS.alwaysApplyLines}`,
-      );
-    }
-    if (alwaysApplyBytes > THRESHOLDS.alwaysApplyBytes) {
-      violations.push(
-        `alwaysApply bytes: ${formatBytes(alwaysApplyBytes)} > ${formatBytes(THRESHOLDS.alwaysApplyBytes)}`,
-      );
-    }
-    if (agentsLines > THRESHOLDS.agentsLines) {
-      violations.push(`AGENTS.md lines: ${agentsLines} > ${THRESHOLDS.agentsLines}`);
-    }
-    if (agentsBytes > THRESHOLDS.agentsBytes) {
-      violations.push(
-        `AGENTS.md bytes: ${formatBytes(agentsBytes)} > ${formatBytes(THRESHOLDS.agentsBytes)}`,
-      );
-    }
-    if (totalLines > THRESHOLDS.totalRulesLines) {
-      violations.push(
-        `Total rules lines: ${totalLines} > ${THRESHOLDS.totalRulesLines}`,
-      );
-    }
-    if (totalBytes > THRESHOLDS.totalRulesBytes) {
-      violations.push(
-        `Total rules bytes: ${formatBytes(totalBytes)} > ${formatBytes(THRESHOLDS.totalRulesBytes)}`,
-      );
-    }
+  const { totalBytes, totalLines, alwaysApplyBytes, alwaysApplyLines, agentsBytes, agentsLines } =
+    stats;
 
-    if (violations.length > 0) {
-      console.log('❌ THRESHOLDS EXCEEDED:');
-      for (const v of violations) {
-        console.log(`   - ${v}`);
-      }
-      console.log();
-      console.log('Adjust thresholds in scripts/rules-footprint.mjs if intentional.');
-      process.exit(1);
-    } else {
-      console.log('✅ All thresholds passed');
-    }
-    console.log();
+  const violations = [];
+
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('                      THRESHOLD CHECK                          ');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log();
+
+  if (alwaysApplyLines > thresholds.alwaysApplyLines) {
+    violations.push(`alwaysApply lines: ${alwaysApplyLines} > ${thresholds.alwaysApplyLines}`);
+  }
+  if (alwaysApplyBytes > thresholds.alwaysApplyBytes) {
+    violations.push(
+      `alwaysApply bytes: ${formatBytes(alwaysApplyBytes)} > ${formatBytes(thresholds.alwaysApplyBytes)}`,
+    );
+  }
+  if (agentsLines > thresholds.agentsLines) {
+    violations.push(`AGENTS.md lines: ${agentsLines} > ${thresholds.agentsLines}`);
+  }
+  if (agentsBytes > thresholds.agentsBytes) {
+    violations.push(
+      `AGENTS.md bytes: ${formatBytes(agentsBytes)} > ${formatBytes(thresholds.agentsBytes)}`,
+    );
+  }
+  if (totalLines > thresholds.totalRulesLines) {
+    violations.push(`Total rules lines: ${totalLines} > ${thresholds.totalRulesLines}`);
+  }
+  if (totalBytes > thresholds.totalRulesBytes) {
+    violations.push(
+      `Total rules bytes: ${formatBytes(totalBytes)} > ${formatBytes(thresholds.totalRulesBytes)}`,
+    );
   }
 
-  // Print current thresholds for reference
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log('                    CURRENT THRESHOLDS                         ');
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log(`   alwaysApply lines: ${THRESHOLDS.alwaysApplyLines.toLocaleString()}`);
-  console.log(`   alwaysApply bytes: ${formatBytes(THRESHOLDS.alwaysApplyBytes)}`);
-  console.log(`   AGENTS.md lines:   ${THRESHOLDS.agentsLines.toLocaleString()}`);
-  console.log(`   AGENTS.md bytes:   ${formatBytes(THRESHOLDS.agentsBytes)}`);
-  console.log(`   Total rules lines: ${THRESHOLDS.totalRulesLines.toLocaleString()}`);
-  console.log(`   Total rules bytes: ${formatBytes(THRESHOLDS.totalRulesBytes)}`);
+  if (violations.length > 0) {
+    console.log('❌ THRESHOLDS EXCEEDED:');
+    for (const v of violations) {
+      console.log(`   - ${v}`);
+    }
+    console.log();
+    console.log('Adjust thresholds in .cursor/rules-footprint.config.json if intentional.');
+    process.exit(1);
+  } else {
+    console.log('✅ All thresholds passed');
+  }
   console.log();
 }
 
-main();
+function printThresholds(thresholds) {
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('                    CURRENT THRESHOLDS                         ');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log(`   alwaysApply lines: ${thresholds.alwaysApplyLines.toLocaleString()}`);
+  console.log(`   alwaysApply bytes: ${formatBytes(thresholds.alwaysApplyBytes)}`);
+  console.log(`   AGENTS.md lines:   ${thresholds.agentsLines.toLocaleString()}`);
+  console.log(`   AGENTS.md bytes:   ${formatBytes(thresholds.agentsBytes)}`);
+  console.log(`   Total rules lines: ${thresholds.totalRulesLines.toLocaleString()}`);
+  console.log(`   Total rules bytes: ${formatBytes(thresholds.totalRulesBytes)}`);
+  console.log();
+}
 
+function main() {
+  const checkMode = process.argv.includes('--check');
+  const thresholds = loadThresholds();
+
+  const ruleStats = scanRulecardFiles(RULES_DIR);
+  const agentsStats = readAgentsStats(AGENTS_FILE);
+
+  const stats = { ...ruleStats, ...agentsStats };
+
+  printReport(stats);
+  checkThresholds(stats, thresholds, checkMode);
+  printThresholds(thresholds);
+}
+
+main();
