@@ -2,14 +2,14 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    adapter: 'src/exports/adapter.ts',
-    types: 'src/exports/types.ts',
-    'codec-types': 'src/exports/codec-types.ts',
-    'column-types': 'src/exports/column-types.ts',
-    control: 'src/exports/control.ts',
-    runtime: 'src/exports/runtime.ts',
+    'exports/adapter': 'src/exports/adapter.ts',
+    'exports/types': 'src/exports/types.ts',
+    'exports/codec-types': 'src/exports/codec-types.ts',
+    'exports/column-types': 'src/exports/column-types.ts',
+    'exports/control': 'src/exports/control.ts',
+    'exports/runtime': 'src/exports/runtime.ts',
   },
-  outDir: 'dist/exports',
+  outDir: 'dist',
   format: ['esm'],
   sourcemap: true,
   dts: false,

@@ -2,14 +2,14 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    control: 'src/exports/control.ts',
-    'control-adapter': 'src/exports/control-adapter.ts',
-    runtime: 'src/exports/runtime.ts',
-    verify: 'src/exports/verify.ts',
-    'test-utils': 'src/exports/test-utils.ts',
-    'schema-verify': 'src/exports/schema-verify.ts',
+    'exports/control': 'src/exports/control.ts',
+    'exports/control-adapter': 'src/exports/control-adapter.ts',
+    'exports/runtime': 'src/exports/runtime.ts',
+    'exports/verify': 'src/exports/verify.ts',
+    'exports/test-utils': 'src/exports/test-utils.ts',
+    'exports/schema-verify': 'src/exports/schema-verify.ts',
   },
-  outDir: 'dist/exports',
+  outDir: 'dist',
   format: ['esm'],
   sourcemap: true,
   dts: false,
