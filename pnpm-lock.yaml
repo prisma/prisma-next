@@ -39,7 +39,7 @@ importers:
   .:
     devDependencies:
       '@biomejs/biome':
-        specifier: ^2.0.6
+        specifier: 2.0.6
         version: 2.0.6
       '@changesets/cli':
         specifier: ^2.27.8
