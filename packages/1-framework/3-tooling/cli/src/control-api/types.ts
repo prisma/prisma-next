@@ -11,14 +11,6 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import type { Result } from '@prisma-next/utils/result';
 
-// Re-export result types for consumer convenience
-export type {
-  ControlPlaneStack,
-  SignDatabaseResult,
-  VerifyDatabaseResult,
-  VerifyDatabaseSchemaResult,
-} from '@prisma-next/core-control-plane/types';
-
 // ============================================================================
 // Client Options
 // ============================================================================

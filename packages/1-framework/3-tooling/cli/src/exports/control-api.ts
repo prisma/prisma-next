@@ -8,28 +8,27 @@
  * @module
  */
 
+// Re-export core control plane types for consumer convenience
+export type {
+  ControlPlaneStack,
+  SignDatabaseResult,
+  VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/core-control-plane/types';
 // Client factory
 export { createControlClient } from '../control-api/client';
 
-// Types
+// CLI-specific types
 export type {
   ControlClient,
-  // Client options and interface
   ControlClientOptions,
-  // Re-exported from core-control-plane
-  ControlPlaneStack,
-  // Result types
   DbInitFailure,
   DbInitFailureCode,
-  // Operation options
   DbInitOptions,
   DbInitResult,
   DbInitSuccess,
   IntrospectOptions,
   SchemaVerifyOptions,
-  SignDatabaseResult,
   SignOptions,
-  VerifyDatabaseResult,
-  VerifyDatabaseSchemaResult,
   VerifyOptions,
 } from '../control-api/types';
