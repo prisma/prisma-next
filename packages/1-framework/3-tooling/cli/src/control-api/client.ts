@@ -214,6 +214,7 @@ class ControlClientImpl implements ControlClient {
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
+      onProgress: options.onProgress,
     });
   }
 
