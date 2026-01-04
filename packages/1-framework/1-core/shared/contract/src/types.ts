@@ -7,10 +7,10 @@ export interface ContractBase {
   readonly targetFamily: string;
   readonly coreHash: string;
   readonly profileHash?: string;
-  readonly capabilities?: Record<string, Record<string, boolean>>;
-  readonly extensionPacks?: Record<string, unknown>;
-  readonly meta?: Record<string, unknown>;
-  readonly sources?: Record<string, Source>;
+  readonly capabilities: Record<string, Record<string, boolean>>;
+  readonly extensionPacks: Record<string, unknown>;
+  readonly meta: Record<string, unknown>;
+  readonly sources: Record<string, Source>;
 }
 
 export interface FieldType {

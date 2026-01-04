@@ -6,6 +6,7 @@
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/control';
@@ -57,7 +58,7 @@ export function createDemoControlClient(options: TestControlClientOptions): Cont
  */
 export async function initTestDatabase(options: {
   readonly connection: string;
-  readonly contractIR: unknown;
+  readonly contractIR: ContractIR;
 }): Promise<void> {
   const client = createDemoControlClient({ connection: options.connection });
 
