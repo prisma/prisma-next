@@ -47,6 +47,77 @@ export interface ControlClientOptions {
 }
 
 // ============================================================================
+// Progress Events
+// ============================================================================
+
+/**
+ * Action names for control-api operations that can emit progress events.
+ */
+export type ControlActionName = 'dbInit' | 'verify' | 'schemaVerify' | 'sign' | 'introspect';
+
+/**
+ * Progress event emitted during control-api operation execution.
+ *
+ * Events model operation progress using a span-based model:
+ * - `spanStart` / `spanEnd`: Timed segments within an action (supports nesting)
+ * - `spanEvent`: Point-in-time events inside a span (e.g., per-migration-operation start/end)
+ *
+ * Events are delivered via an optional `onProgress` callback to avoid polluting
+ * return types. If the callback is absent, operations emit no events (zero overhead).
+ */
+export type ControlProgressEvent =
+  | {
+      readonly action: ControlActionName;
+      readonly kind: 'spanStart';
+      readonly spanId: string;
+      readonly parentSpanId?: string;
+      readonly label: string;
+    }
+  | {
+      readonly action: ControlActionName;
+      readonly kind: 'spanEnd';
+      readonly spanId: string;
+      readonly outcome: 'ok' | 'skipped';
+    }
+  | {
+      readonly action: 'dbInit';
+      readonly kind: 'spanEvent';
+      readonly spanId: string;
+      readonly name: 'migrationPlanOperationStart';
+      readonly attributes: {
+        readonly migrationOperationIndex: number;
+        readonly migrationOperationCount: number;
+        readonly migrationPlanOperation: {
+          readonly id: string;
+          readonly label: string;
+          readonly operationClass: string;
+        };
+      };
+    }
+  | {
+      readonly action: 'dbInit';
+      readonly kind: 'spanEvent';
+      readonly spanId: string;
+      readonly name: 'migrationPlanOperationEnd';
+      readonly attributes: {
+        readonly migrationOperationIndex: number;
+        readonly migrationOperationCount: number;
+        readonly migrationPlanOperation: {
+          readonly id: string;
+          readonly label: string;
+          readonly operationClass: string;
+        };
+      };
+    };
+
+/**
+ * Callback function for receiving progress events during control-api operations.
+ *
+ * @param event - The progress event emitted by the operation
+ */
+export type OnControlProgress = (event: ControlProgressEvent) => void;
+
+// ============================================================================
 // Operation Options
 // ============================================================================
 
@@ -56,6 +127,8 @@ export interface ControlClientOptions {
 export interface VerifyOptions {
   /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
 }
 
 /**
@@ -70,6 +143,8 @@ export interface SchemaVerifyOptions {
    * Default: false (tolerant mode - allows superset)
    */
   readonly strict?: boolean;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
 }
 
 /**
@@ -78,6 +153,8 @@ export interface SchemaVerifyOptions {
 export interface SignOptions {
   /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
 }
 
 /**
@@ -92,6 +169,8 @@ export interface DbInitOptions {
    * - 'apply': Applies operations and writes marker
    */
   readonly mode: 'plan' | 'apply';
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
 }
 
 /**
@@ -102,6 +181,8 @@ export interface IntrospectOptions {
    * Optional schema name to introspect.
    */
   readonly schema?: string;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
 }
 
 // ============================================================================

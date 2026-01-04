@@ -20,14 +20,17 @@ export { createControlClient } from '../control-api/client';
 
 // CLI-specific types
 export type {
+  ControlActionName,
   ControlClient,
   ControlClientOptions,
+  ControlProgressEvent,
   DbInitFailure,
   DbInitFailureCode,
   DbInitOptions,
   DbInitResult,
   DbInitSuccess,
   IntrospectOptions,
+  OnControlProgress,
   SchemaVerifyOptions,
   SignOptions,
   VerifyOptions,
