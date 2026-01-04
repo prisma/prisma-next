@@ -2,8 +2,10 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/frame
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
+  ControlDriverInstance,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
+  ControlFamilyInstance,
   ControlTargetDescriptor,
   MigrationPlannerConflict,
   SignDatabaseResult,
@@ -177,8 +179,8 @@ export type DbInitResult = Result<DbInitSuccess, DbInitFailure>;
  * Used by the client implementation to track connection state.
  */
 export interface ConnectedState<TFamilyId extends string, TTargetId extends string> {
-  readonly driver: Awaited<ReturnType<ControlDriverDescriptor<TFamilyId, TTargetId>['create']>>;
-  readonly familyInstance: ReturnType<ControlFamilyDescriptor<TFamilyId>['create']>;
+  readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
+  readonly familyInstance: ControlFamilyInstance<TFamilyId>;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
 }
 
