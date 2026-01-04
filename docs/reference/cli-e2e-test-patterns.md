@@ -82,7 +82,7 @@ withTempDir(({ createTempDir }) => {
 
 ## Helper Function
 
-**`setupTestDirectoryFromFixtures(createTempDir, fixtureSubdir, configFileName?, replacements?)`**
+**`setupTestDirectoryFromFixtures(createTempDir: () => string, fixtureSubdir, configFileName?, replacements?)`**
 
 - **`createTempDir`**: Required. Function that returns a new ephemeral test directory path.
 - **`fixtureSubdir`**: Name of the fixture subdirectory (e.g., `'emit'`, `'db-verify'`)
