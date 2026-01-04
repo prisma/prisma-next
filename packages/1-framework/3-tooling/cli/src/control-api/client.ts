@@ -1,5 +1,4 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type {
   ControlDriverInstance,
@@ -144,7 +143,7 @@ class ControlClientImpl implements ControlClient {
     const { driver, familyInstance } = this.ensureConnected();
 
     // Validate contract using family instance
-    const contractIR = familyInstance.validateContractIR(options.contractIR) as ContractIR;
+    const contractIR = familyInstance.validateContractIR(options.contractIR);
 
     // Delegate to family instance verify method
     // Note: We pass empty strings for contractPath/configPath since the programmatic
@@ -197,7 +196,7 @@ class ControlClientImpl implements ControlClient {
     }
 
     // Validate contract using family instance
-    const contractIR = familyInstance.validateContractIR(options.contractIR) as ContractIR;
+    const contractIR = familyInstance.validateContractIR(options.contractIR);
 
     // Delegate to extracted dbInit operation
     return executeDbInit({
