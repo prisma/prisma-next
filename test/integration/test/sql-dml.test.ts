@@ -47,6 +47,9 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
       returning: true,
     },
   },
+  extensionPacks: {},
+  meta: {},
+  sources: {},
 };
 const fixtureContract = validateContract(fixtureContractRaw);
 

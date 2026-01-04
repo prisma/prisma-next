@@ -238,18 +238,22 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
 
 /**
  * Creates a valid test contract without using validateContract.
- * Ensures mappings are present and returns the contract with proper typing.
+ * Ensures all required fields are present (mappings, capabilities, extensionPacks, meta, sources)
+ * and returns the contract with proper typing.
  * This helper allows tests to create contracts without depending on sql-query.
  */
-export function createTestContract<T extends SqlContract<SqlStorage>>(contract: T): T {
-  // Ensure mappings are present
-  if (!contract.mappings) {
-    return {
-      ...contract,
-      mappings: { codecTypes: {}, operationTypes: {} },
-    } as T;
-  }
-  return contract;
+export function createTestContract<T extends SqlContract<SqlStorage>>(
+  contract: Partial<T> &
+    Omit<T, 'mappings' | 'capabilities' | 'extensionPacks' | 'meta' | 'sources'>,
+): T {
+  return {
+    ...contract,
+    mappings: contract.mappings ?? { codecTypes: {}, operationTypes: {} },
+    capabilities: contract.capabilities ?? {},
+    extensionPacks: contract.extensionPacks ?? {},
+    meta: contract.meta ?? {},
+    sources: contract.sources ?? {},
+  } as T;
 }
 
 // Re-export generic utilities from test-utils

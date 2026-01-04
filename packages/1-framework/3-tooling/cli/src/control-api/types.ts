@@ -82,10 +82,9 @@ export interface SchemaVerifyOptions {
 
 /**
  * Options for the sign operation.
- * The contractIR is validated internally by the family instance.
  */
 export interface SignOptions {
-  readonly contractIR: unknown;
+  readonly contractIR: ContractIR;
 }
 
 /**

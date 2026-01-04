@@ -49,6 +49,8 @@ describe('update builder', () => {
       codecTypes: {},
       operationTypes: {},
     },
+    capabilities: {},
+    extensionPacks: {},
     meta: {},
     sources: {},
   };
