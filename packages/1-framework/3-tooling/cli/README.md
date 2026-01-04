@@ -74,7 +74,6 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  // driver: optional for contract emit
   extensionPacks: [],
   contract: {
     source: contract,
