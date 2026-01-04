@@ -118,16 +118,6 @@ async function executeDbInitCommand(
   flags: import('../utils/global-flags').GlobalFlags,
   startTime: number,
 ): Promise<Result<DbInitResult, CliStructuredError>> {
-  if (flags.json === 'ndjson') {
-    return notOk(
-      errorJsonFormatNotSupported({
-        command: 'db init',
-        format: 'ndjson',
-        supportedFormats: ['object'],
-      }),
-    );
-  }
-
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -331,6 +321,19 @@ export function createDbInitCommand(): Command {
     .action(async (options: DbInitOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
+
+      // Validate JSON format option
+      if (flags.json === 'ndjson') {
+        const result = notOk(
+          errorJsonFormatNotSupported({
+            command: 'db init',
+            format: 'ndjson',
+            supportedFormats: ['object'],
+          }),
+        );
+        const exitCode = handleResult(result, flags);
+        process.exit(exitCode);
+      }
 
       const result = await executeDbInitCommand(options, flags, startTime);
 
