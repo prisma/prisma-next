@@ -9,7 +9,7 @@ This package provides the core domain logic for control plane operations (contra
 ## Responsibilities
 
 - **Config Types**: Type definitions for Prisma Next configuration (`PrismaNextConfig`, `ControlFamilyDescriptor`, `ControlTargetDescriptor`, `ControlAdapterDescriptor`, `ControlDriverDescriptor`, `ControlExtensionDescriptor`)
-- **ControlPlaneStack**: A struct bundling `target`, `adapter`, `driver`, and `extensionPacks` for passing to `family.create()`. Use `createControlPlaneStack()` to construct with sensible defaults.
+- **ControlPlaneStack**: A struct bundling `target`, `adapter`, `driver`, and `extensionPacks` for control plane operations. Use `createControlPlaneStack()` to construct with sensible defaults.
 - **Config Validation**: Pure validation logic for config structure (no file I/O)
 - **Config Normalization**: `defineConfig()` function for normalizing config with defaults
 - **Domain Actions**:
@@ -72,7 +72,7 @@ validateConfig(config);
 
 ### ControlPlaneStack
 
-The `ControlPlaneStack` bundles component descriptors for passing to `family.create()`:
+The `ControlPlaneStack` bundles component descriptors for control plane operations (creating family instances, running CLI commands, connecting to databases):
 
 ```typescript
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
@@ -86,8 +86,10 @@ const stack = createControlPlaneStack({
   extensionPacks: [pgvector], // optional, defaults to []
 });
 
-// Pass the stack to family.create()
+// Use stack for family instance creation
 const familyInstance = config.family.create(stack);
+
+// Stack is also used internally by ControlClient and CLI commands
 ```
 
 **Stack shape after construction:**
