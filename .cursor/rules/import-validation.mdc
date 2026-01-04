@@ -1,7 +1,7 @@
 ---
 description: Import validation and package layering rules
-globs:
-alwaysApply: true
+globs: ["architecture.config.json", "dependency-cruiser.config.mjs", "packages/**"]
+alwaysApply: false
 ---
 
 # Import Validation

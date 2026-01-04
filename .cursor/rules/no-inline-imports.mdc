@@ -1,7 +1,7 @@
 ---
 description: Prohibit inline type imports in source files
 globs: ["packages/**/*.ts", "!packages/**/*.test.ts", "!packages/**/test/**/*.ts"]
-alwaysApply: true
+alwaysApply: false
 ---
 
 # No Inline Type Imports

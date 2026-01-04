@@ -2,13 +2,15 @@
 
 Curated rules for agents and developers. Keep narrative in `docs/` and use these rulecards for quick, actionable guidance.
 
-## Always Apply (curated)
+## Always Apply (minimal)
+
+**Always-apply rules must be short, globally relevant, and stable.** If a rule only applies to a specific area (SQL, CLI, tests, package layout), scope it with `globs` and set `alwaysApply: false`.
+
 - `.cursor/rules/use-correct-tools.mdc` — Use configured tools and scripts
-- `.cursor/rules/no-target-branches.mdc` — Don't branch on target; use adapters
-- `.cursor/rules/omit-should-in-tests.mdc` — Test descriptions omit "should"
-- `.cursor/rules/cli-command-descriptions.mdc` — CLI command description patterns
 - `.cursor/rules/doc-maintenance.mdc` — Keep docs/READMEs/rules up‑to‑date
 - `.cursor/rules/read-agents-md.mdc` — Read AGENTS.md (onboarding deep dive is optional)
+- `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview before writing code
+- `.cursor/rules/omit-should-in-tests.mdc` — Test descriptions omit "should"
 
 ## Testing
 - `.cursor/rules/testing-guide.mdc` — Testing guide pointers and patterns
@@ -21,7 +23,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/prefer-object-matcher.mdc` — Prefer object matchers over multiple individual expect().toBe() calls
 - `.cursor/rules/use-ast-factories.mdc` — Use factory functions for creating AST nodes instead of manual object creation
 - `.cursor/rules/use-contract-ir-factories.mdc` — Use factory functions for ContractIR objects in tests
-- `.cursor/rules/cli-error-handling.mdc` — CLI command error handling patterns (throw errors, don't call process.exit)
+- `.cursor/rules/cli-error-handling.mdc` — CLI command error handling patterns
 - `.cursor/rules/cli-e2e-test-patterns.mdc` — CLI e2e test fixture patterns using shared fixture app
 - `.cursor/rules/cli-package-exports.mdc` — CLI package export structure and import patterns
 
@@ -65,4 +67,4 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.
-- Keep `alwaysApply` minimal—default to scoped rules with `appliesTo` in frontmatter.
+- Keep `alwaysApply` minimal—default to scoped rules with `globs` in frontmatter.

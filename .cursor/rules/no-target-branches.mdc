@@ -1,7 +1,7 @@
 ---
 description: Never branch on target - use adapters instead
-globs:
-alwaysApply: true
+globs: ["packages/**", "examples/**", "test/**"]
+alwaysApply: false
 ---
 
 # No Target-Specific Branches

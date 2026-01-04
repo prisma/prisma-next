@@ -1,7 +1,7 @@
 ---
 description: Directory layout rules for SQL family vs concrete targets
-globs:
-alwaysApply: true
+globs: ["packages/**", "architecture.config.json"]
+alwaysApply: false
 ---
 
 # Directory Layout — Numbered Prefixes, Domains, Layers, and Planes

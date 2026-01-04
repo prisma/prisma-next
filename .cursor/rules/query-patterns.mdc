@@ -1,7 +1,7 @@
 ---
 description: Standard patterns for working with Prisma Next queries
-globs: ["packages/sql/**"]
-alwaysApply: true
+globs: ["packages/2-sql/**", "packages/sql/**", "examples/**", "test/**"]
+alwaysApply: false
 ---
 
 # Query Patterns

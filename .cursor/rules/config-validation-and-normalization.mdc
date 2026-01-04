@@ -1,7 +1,7 @@
 ---
 description: Patterns for config validation and normalization using Arktype
-globs:
-alwaysApply: true
+globs: ["packages/1-framework/3-tooling/cli/**", "**/prisma-next.config.ts"]
+alwaysApply: false
 ---
 
 # Config Validation and Normalization

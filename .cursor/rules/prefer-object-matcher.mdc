@@ -1,7 +1,7 @@
 ---
 description: Prefer object matchers over multiple individual expect().toBe() calls
-globs: ["**/*.test.ts", "**/*.spec.ts"]
-alwaysApply: true
+globs: ["**/*.test.ts", "**/*.test-d.ts", "test/**", "packages/**/test/**", "examples/**/test/**"]
+alwaysApply: false
 ---
 
 # Prefer Object Matchers Over Multiple Individual Assertions

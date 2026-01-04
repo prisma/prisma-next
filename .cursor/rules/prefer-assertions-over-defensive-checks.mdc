@@ -1,7 +1,7 @@
 ---
 description: Prefer assertions over defensive checks when data is guaranteed to be valid
-globs: ["**/*.ts"]
-alwaysApply: true
+globs: ["packages/**/*.ts", "test/**/*.ts", "examples/**/*.ts"]
+alwaysApply: false
 ---
 
 # Prefer Assertions Over Defensive Checks

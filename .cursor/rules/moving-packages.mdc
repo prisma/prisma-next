@@ -1,7 +1,7 @@
 ---
 description: Guidelines for moving packages and updating relative paths
-globs:
-alwaysApply: true
+globs: ["packages/**/package.json", "packages/**/tsconfig.json", "test/**/tsconfig.json", "tsconfig.base.json", "pnpm-workspace.yaml"]
+alwaysApply: false
 ---
 
 # Moving Packages

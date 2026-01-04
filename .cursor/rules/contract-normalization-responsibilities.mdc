@@ -1,7 +1,7 @@
 ---
 description: Clarify normalization responsibilities across authoring, emitter, and runtime
-globs:
-alwaysApply: true
+globs: ["packages/**"]
+alwaysApply: false
 ---
 
 # Contract Normalization Responsibilities

@@ -1,6 +1,7 @@
 ---
 description: Control plane descriptor and instance implementation patterns
-alwaysApply: true
+globs: ["packages/**", "**/prisma-next.config.ts"]
+alwaysApply: false
 ---
 
 # Control Plane Descriptors Pattern

@@ -1,7 +1,7 @@
 ---
 description: When writing type tests
-globs: ["**/*.test.ts", "**/*.spec.ts"]
-alwaysApply: true
+globs: ["**/*.test-d.ts"]
+alwaysApply: false
 ---
 # Vitest expectTypeOf API
 
