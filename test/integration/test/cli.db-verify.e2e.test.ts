@@ -365,7 +365,7 @@ withTempDir(({ createTempDir }) => {
           const testSetup = setupTestDirectoryFromFixtures(
             createTempDir,
             fixtureSubdir,
-            'prisma-next.config.no-query-runner.ts',
+            'prisma-next.config.no-driver.ts',
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
