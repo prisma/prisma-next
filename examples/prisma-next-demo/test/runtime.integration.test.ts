@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: non-null assertions are fine for tests */
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
@@ -39,7 +40,10 @@ function createContext(contractForContext: ReturnType<typeof validateContract>) 
 async function seedTestData(
   runtime: ReturnType<typeof createRuntime>,
   contractForSeed: ReturnType<typeof validateContract>,
-  data: { users?: string[]; posts?: Array<{ title: string; userIndex: number }> },
+  data: {
+    users?: string[];
+    posts?: Array<{ title: string; userIndex: number }>;
+  },
 ): Promise<{ userIds: number[] }> {
   const context = createContext(contractForSeed);
   const tables = schema(context).tables;
@@ -64,8 +68,9 @@ async function seedTestData(
         .returning(userTable.columns['id']!)
         .build({ params: { id, email, createdAt } });
 
+      type InsertedRow = ResultType<typeof plan>;
       for await (const row of runtime.execute(plan)) {
-        userIds.push((row as unknown as { id: number }).id);
+        userIds.push((row as InsertedRow)['id']!);
       }
     }
   }
@@ -104,7 +109,10 @@ describe('runtime execute integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         // Initialize schema and marker using control client
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({
+          connection: connectionString,
+          contractIR: contract,
+        });
 
         const context = createRuntimeContext({
           contract,
@@ -132,7 +140,10 @@ describe('runtime execute integration', () => {
 
         const functionPlan = root.raw('select id from "user" where email = $1 limit $2', {
           params: ['alice@example.com', 1],
-          refs: { tables: ['user'], columns: [{ table: 'user', column: 'email' }] },
+          refs: {
+            tables: ['user'],
+            columns: [{ table: 'user', column: 'email' }],
+          },
           annotations: { intent: 'report', limit: 1 },
         });
 
@@ -159,7 +170,9 @@ describe('runtime execute integration', () => {
         // Seed data using a runtime instance
         const seedRuntime = createRuntimeInstance();
         try {
-          await seedTestData(seedRuntime, contract, { users: ['alice@example.com'] });
+          await seedTestData(seedRuntime, contract, {
+            users: ['alice@example.com'],
+          });
         } finally {
           await seedRuntime.close();
         }
@@ -204,7 +217,10 @@ describe('runtime execute integration', () => {
     'infers correct types from query plans',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({
+          connection: connectionString,
+          contractIR: contract,
+        });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -257,7 +273,10 @@ describe('runtime execute integration', () => {
             postRows.push(row as PostRow);
           }
           expect(postRows).toHaveLength(1);
-          expect(postRows[0]).toMatchObject({ title: 'First Post', userId: 1 });
+          expect(postRows[0]).toMatchObject({
+            title: 'First Post',
+            userId: 1,
+          });
         } finally {
           await closeTestRuntime({ runtime, pool });
         }
@@ -270,7 +289,10 @@ describe('runtime execute integration', () => {
     'enforces row budget on unbounded queries',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({
+          connection: connectionString,
+          contractIR: contract,
+        });
 
         const context = createRuntimeContext({
           contract,
@@ -353,7 +375,10 @@ describe('runtime execute integration', () => {
     'enforces streaming row budget',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({
+          connection: connectionString,
+          contractIR: contract,
+        });
 
         const context = createRuntimeContext({
           contract,
@@ -421,7 +446,10 @@ describe('runtime execute integration', () => {
     'includeMany returns users with nested posts array',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({
+          connection: connectionString,
+          contractIR: contract,
+        });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
