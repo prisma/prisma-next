@@ -18,7 +18,7 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
-import { parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   type DbInitResult,
   formatCommandHelp,
@@ -115,7 +115,7 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
  */
 async function executeDbInitCommand(
   options: DbInitOptions,
-  flags: import('../utils/global-flags').GlobalFlags,
+  flags: GlobalFlags,
   startTime: number,
 ): Promise<Result<DbInitResult, CliStructuredError>> {
   // Load config
