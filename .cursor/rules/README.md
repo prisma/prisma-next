@@ -11,6 +11,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 
 **Always-apply rules must be short, globally relevant, and stable.** If a rule only applies to a specific area (SQL, CLI, tests, package layout), scope it with `globs` and set `alwaysApply: false`.
 
+- `.cursor/rules/git-staging.mdc` — Git staging/commit best practices (stage explicitly, keep commits focused)
 - `.cursor/rules/use-correct-tools.mdc` — Use configured tools and scripts
 - `.cursor/rules/doc-maintenance.mdc` — Keep docs/READMEs/rules up‑to‑date
 - `.cursor/rules/read-agents-md.mdc` — Read AGENTS.md (onboarding deep dive is optional)
