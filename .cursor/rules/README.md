@@ -16,7 +16,7 @@ pnpm rules:footprint         # Report current footprint
 pnpm lint:rules:footprint    # Check against thresholds (fails if exceeded)
 ```
 
-Thresholds are defined in `scripts/rules-footprint.mjs`.
+Thresholds are defined in `.cursor/rules-footprint.config.json`.
 
 ## Always Apply (minimal)
 
