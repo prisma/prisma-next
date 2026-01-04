@@ -150,11 +150,7 @@ export function createDbVerifyCommand(): Command {
 
           // Validate contract using instance validator
           const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
-          assertContractRequirementsSatisfied({
-            contract: contractIR,
-            family: config.family,
-            stack,
-          });
+          assertContractRequirementsSatisfied({ contract: contractIR, stack });
 
           // Call family instance verify method
           let verifyResult: VerifyDatabaseResult;

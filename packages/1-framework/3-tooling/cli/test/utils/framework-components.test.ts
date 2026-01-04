@@ -3,7 +3,6 @@ import { CliStructuredError } from '@prisma-next/core-control-plane/errors';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
-  ControlFamilyDescriptor,
   ControlPlaneStack,
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
@@ -174,16 +173,6 @@ describe('assertContractRequirementsSatisfied', () => {
     targetId: 'postgres',
   } as unknown as ControlExtensionDescriptor<'sql', 'postgres'>;
 
-  const family = {
-    kind: 'family',
-    id: 'sql',
-    version: '0.0.1',
-    familyId: 'sql',
-    create: (_stack: unknown) => {
-      throw new Error('not implemented');
-    },
-  } as unknown as ControlFamilyDescriptor<'sql'>;
-
   const createStack = (
     extensionPacks: readonly ControlExtensionDescriptor<'sql', 'postgres'>[] = [],
   ): ControlPlaneStack<'sql', 'postgres'> => ({
@@ -197,7 +186,6 @@ describe('assertContractRequirementsSatisfied', () => {
     expect(() =>
       assertContractRequirementsSatisfied({
         contract,
-        family,
         stack: createStack([extension]),
       }),
     ).not.toThrow();
@@ -207,7 +195,6 @@ describe('assertContractRequirementsSatisfied', () => {
     expect(() =>
       assertContractRequirementsSatisfied({
         contract: { ...contract, targetFamily: 'document' },
-        family,
         stack: createStack([extension]),
       }),
     ).toThrow(CliStructuredError);
@@ -217,7 +204,6 @@ describe('assertContractRequirementsSatisfied', () => {
     expect(() =>
       assertContractRequirementsSatisfied({
         contract: { ...contract, target: 'mysql' },
-        family,
         stack: createStack([extension]),
       }),
     ).toThrow(CliStructuredError);
@@ -227,7 +213,6 @@ describe('assertContractRequirementsSatisfied', () => {
     try {
       assertContractRequirementsSatisfied({
         contract,
-        family,
         stack: createStack([]),
       });
       throw new Error('expected assertContractRequirementsSatisfied to throw');
@@ -255,7 +240,6 @@ describe('assertContractRequirementsSatisfied', () => {
     try {
       assertContractRequirementsSatisfied({
         contract: contractWithTwoPacks,
-        family,
         stack: createStack([]),
       });
       throw new Error('expected assertContractRequirementsSatisfied to throw');

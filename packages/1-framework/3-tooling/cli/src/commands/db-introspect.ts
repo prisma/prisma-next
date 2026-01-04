@@ -151,11 +151,7 @@ export function createDbIntrospectCommand(): Command {
           // Validate contract IR if we loaded it
           if (contractIR) {
             const validatedContract = familyInstance.validateContractIR(contractIR);
-            assertContractRequirementsSatisfied({
-              contract: validatedContract,
-              family: config.family,
-              stack,
-            });
+            assertContractRequirementsSatisfied({ contract: validatedContract, stack });
             contractIR = validatedContract;
           }
 

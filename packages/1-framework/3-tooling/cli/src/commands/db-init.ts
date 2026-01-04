@@ -215,11 +215,7 @@ export function createDbInitCommand(): Command {
 
           // Validate contract
           const contractIR = familyInstance.validateContractIR(contractJson);
-          assertContractRequirementsSatisfied({
-            contract: contractIR,
-            family: config.family,
-            stack,
-          });
+          assertContractRequirementsSatisfied({ contract: contractIR, stack });
 
           // Create planner and runner from target migrations capability
           const planner = migrations.createPlanner(familyInstance);

@@ -149,11 +149,7 @@ export function createDbSignCommand(): Command {
 
         // Validate contract using instance validator (fail-fast before DB connection)
         const contractIR = familyInstance.validateContractIR(contractJson);
-        assertContractRequirementsSatisfied({
-          contract: contractIR,
-          family: config.family,
-          stack,
-        });
+        assertContractRequirementsSatisfied({ contract: contractIR, stack });
 
         const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
         const frameworkComponents = assertFrameworkComponentsCompatible(

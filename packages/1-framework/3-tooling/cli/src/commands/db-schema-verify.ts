@@ -142,11 +142,7 @@ export function createDbSchemaVerifyCommand(): Command {
         const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
 
         // Validate contract requirements fail-fast before connecting to database
-        assertContractRequirementsSatisfied({
-          contract: contractIR,
-          family: config.family,
-          stack,
-        });
+        assertContractRequirementsSatisfied({ contract: contractIR, stack });
 
         // Resolve database URL
         const dbUrl = options.db ?? config.db?.url;
