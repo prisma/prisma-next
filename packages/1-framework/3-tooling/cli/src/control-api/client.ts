@@ -28,33 +28,8 @@ import type {
  * manages driver lifecycle via connect()/close(), and exposes domain
  * operations that delegate to the existing family instance methods.
  *
- * Generic parameters are inferred from the descriptors you pass in,
- * so no type casts are needed.
- *
- * @example
- * ```typescript
- * import { createControlClient } from '@prisma-next/cli/control-api';
- * import sql from '@prisma-next/family-sql/control';
- * import postgres from '@prisma-next/target-postgres/control';
- * import postgresAdapter from '@prisma-next/adapter-postgres/control';
- * import postgresDriver from '@prisma-next/driver-postgres/control';
- *
- * const client = createControlClient({
- *   family: sql,
- *   target: postgres,
- *   adapter: postgresAdapter,
- *   driver: postgresDriver,
- *   extensionPacks: [],
- * });
- *
- * try {
- *   await client.connect(databaseUrl);
- *   const verifyResult = await client.verify({ contractIR });
- *   const initResult = await client.dbInit({ contractIR, mode: 'apply' });
- * } finally {
- *   await client.close();
- * }
- * ```
+ * @see {@link ControlClient} for the client interface
+ * @see README.md "Programmatic Control API" section for usage examples
  */
 export function createControlClient(options: ControlClientOptions): ControlClient {
   return new ControlClientImpl(options);

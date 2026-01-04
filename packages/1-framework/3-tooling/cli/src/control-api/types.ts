@@ -180,24 +180,9 @@ export interface ConnectedState<TFamilyId extends string, TTargetId extends stri
 /**
  * Programmatic control client for Prisma Next operations.
  *
- * Usage:
- * ```typescript
- * const client = createControlClient({
- *   family: sql,
- *   target: postgres,
- *   adapter: postgresAdapter,
- *   driver: postgresDriver,
- *   extensionPacks: [],
- * });
+ * Lifecycle: call `connect(url)` before operations, `close()` when done.
  *
- * try {
- *   await client.connect(databaseUrl);
- *   const result = await client.verify({ contractIR });
- *   // ...
- * } finally {
- *   await client.close();
- * }
- * ```
+ * @see README.md "Programmatic Control API" section for usage examples
  */
 export interface ControlClient {
   /**
