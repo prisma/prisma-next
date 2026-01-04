@@ -21,6 +21,9 @@ export class SqlFamilyDescriptor
   create<TTargetId extends string>(
     stack: ControlPlaneStack<'sql', TTargetId>,
   ): SqlControlFamilyInstance {
+    // Note: driver is not passed here because SqlFamilyInstance operations
+    // (validate, emit, etc.) don't require DB connectivity. Commands that
+    // need the driver (verify, introspect) get it directly from the stack.
     return createSqlFamilyInstance({
       target: stack.target,
       adapter: stack.adapter,

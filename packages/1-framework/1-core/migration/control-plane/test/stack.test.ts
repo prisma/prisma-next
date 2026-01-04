@@ -1,15 +1,25 @@
+import type {
+  ControlAdapterDescriptor,
+  ControlTargetDescriptor,
+} from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
 import { createControlPlaneStack } from '../src/stack';
 
 describe('createControlPlaneStack', () => {
   it('defaults driver to undefined and extensionPacks to []', () => {
-    const target = { kind: 'target', familyId: 'sql', targetId: 'postgres' } as const;
-    const adapter = { kind: 'adapter', familyId: 'sql', targetId: 'postgres' } as const;
+    const target = {
+      kind: 'target',
+      familyId: 'sql',
+      targetId: 'postgres',
+    } as unknown as ControlTargetDescriptor<'sql', 'postgres'>;
 
-    const stack = createControlPlaneStack({
-      target: target as unknown,
-      adapter: adapter as unknown,
-    });
+    const adapter = {
+      kind: 'adapter',
+      familyId: 'sql',
+      targetId: 'postgres',
+    } as unknown as ControlAdapterDescriptor<'sql', 'postgres'>;
+
+    const stack = createControlPlaneStack({ target, adapter });
 
     expect(stack).toMatchObject({
       target,

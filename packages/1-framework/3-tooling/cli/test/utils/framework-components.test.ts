@@ -1,9 +1,9 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { CliStructuredError } from '@prisma-next/core-control-plane/errors';
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
-  ControlPlaneStack,
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
@@ -175,12 +175,7 @@ describe('assertContractRequirementsSatisfied', () => {
 
   const createStack = (
     extensionPacks: readonly ControlExtensionDescriptor<'sql', 'postgres'>[] = [],
-  ): ControlPlaneStack<'sql', 'postgres'> => ({
-    target,
-    adapter,
-    driver: undefined,
-    extensionPacks,
-  });
+  ) => createControlPlaneStack({ target, adapter, extensionPacks });
 
   it('passes when target and extension packs are satisfied', () => {
     expect(() =>

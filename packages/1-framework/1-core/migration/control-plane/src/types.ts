@@ -236,6 +236,16 @@ export interface OperationContext {
 // Control*Descriptor Interfaces (ADR 151)
 // ============================================================================
 
+/**
+ * A bundle of control-plane component descriptors for a specific family and target.
+ *
+ * This struct groups the target, adapter, driver (optional), and extension packs
+ * needed to create a family instance and run CLI commands. Use `createControlPlaneStack()`
+ * to construct with sensible defaults.
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ */
 export interface ControlPlaneStack<TFamilyId extends string, TTargetId extends string> {
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
