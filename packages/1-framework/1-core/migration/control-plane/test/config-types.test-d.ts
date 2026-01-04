@@ -24,7 +24,7 @@ const sqlFamilyDescriptor: ControlFamilyDescriptor<'sql'> = {
   familyId: 'sql',
   manifest: { id: 'sql', version: '0.0.1' },
   hook: mockHook,
-  create: () => ({
+  create: (_stack) => ({
     familyId: 'sql',
   }),
 };
@@ -84,11 +84,11 @@ test('accepts compatible Control*Descriptor types', () => {
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
     driver: postgresDriverDescriptor,
-    extensions: [postgresExtensionDescriptor],
+    extensionPacks: [postgresExtensionDescriptor],
   };
 
   const result = defineConfig(config);
-  expectTypeOf(result).toMatchTypeOf<PrismaNextConfig<'sql', 'postgres'>>();
+  expectTypeOf(result).toExtend<PrismaNextConfig<'sql', 'postgres'>>();
 });
 
 test('rejects mismatched targetId in target', () => {

@@ -35,7 +35,6 @@ import {
   extractOperationTypeImports,
 } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
-import type { SqlControlTargetDescriptor } from './migrations/types';
 import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
@@ -328,10 +327,21 @@ export interface SqlControlFamilyInstance
  */
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
-interface CreateSqlFamilyInstanceOptions<TTargetId extends string, TTargetDetails> {
-  readonly target: SqlControlTargetDescriptor<TTargetId, TTargetDetails>;
-  readonly adapter: ControlAdapterDescriptor<'sql', string, SqlControlAdapter>;
-  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', string>[];
+interface CreateSqlFamilyInstanceOptions<TTargetId extends string> {
+  readonly target: ControlTargetDescriptor<'sql', TTargetId>;
+  readonly adapter: ControlAdapterDescriptor<'sql', TTargetId>;
+  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', TTargetId>[];
+}
+
+function isSqlControlAdapter<TTargetId extends string>(
+  value: unknown,
+): value is SqlControlAdapter<TTargetId> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'introspect' in value &&
+    typeof (value as { introspect: unknown }).introspect === 'function'
+  );
 }
 
 /**
@@ -385,8 +395,8 @@ function buildSqlTypeMetadataRegistry(options: {
 /**
  * Creates a SQL family instance for control-plane operations.
  */
-export function createSqlFamilyInstance<TTargetId extends string, TTargetDetails>(
-  options: CreateSqlFamilyInstanceOptions<TTargetId, TTargetDetails>,
+export function createSqlFamilyInstance<TTargetId extends string>(
+  options: CreateSqlFamilyInstanceOptions<TTargetId>,
 ): SqlFamilyInstance {
   const { target, adapter, extensionPacks: extensions = [] } = options;
 
@@ -594,6 +604,9 @@ export function createSqlFamilyInstance<TTargetId extends string, TTargetDetails
 
       // Introspect live schema (DB I/O)
       const controlAdapter = adapter.create();
+      if (!isSqlControlAdapter(controlAdapter)) {
+        throw new Error('Adapter does not implement SqlControlAdapter.introspect()');
+      }
       const schemaIR = await controlAdapter.introspect(driver, contractIR);
 
       // Pure verification (no I/O) - delegates to extracted pure function
@@ -724,6 +737,9 @@ export function createSqlFamilyInstance<TTargetId extends string, TTargetDetails
       const { driver, contractIR } = options;
 
       const controlAdapter = adapter.create();
+      if (!isSqlControlAdapter(controlAdapter)) {
+        throw new Error('Adapter does not implement SqlControlAdapter.introspect()');
+      }
       return controlAdapter.introspect(driver, contractIR);
     },
 

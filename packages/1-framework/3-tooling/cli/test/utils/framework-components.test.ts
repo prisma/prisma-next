@@ -178,7 +178,7 @@ describe('assertContractRequirementsSatisfied', () => {
     id: 'sql',
     version: '0.0.1',
     familyId: 'sql',
-    create: () => {
+    create: (_stack: unknown) => {
       throw new Error('not implemented');
     },
   } as unknown as ControlFamilyDescriptor<'sql'>;

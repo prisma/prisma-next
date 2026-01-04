@@ -1,3 +1,4 @@
+export { createControlPlaneStack } from '../stack';
 export type {
   // Control* types (ADR 151)
   ControlAdapterDescriptor,
@@ -8,6 +9,8 @@ export type {
   ControlExtensionInstance,
   ControlFamilyDescriptor,
   ControlFamilyInstance,
+  ControlPlaneStack,
+  ControlPlaneStackInput,
   ControlTargetDescriptor,
   ControlTargetInstance,
   EmitContractResult,

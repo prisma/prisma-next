@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { performAction } from '../utils/action';
@@ -103,21 +104,13 @@ export function createContractEmitCommand(): Command {
           console.log(header);
         }
 
-        // Create family instance (assembles operation registry, type imports, extension IDs)
-        // Note: emit command doesn't need driver, but ControlFamilyDescriptor.create() requires it
-        // We'll need to provide a minimal driver descriptor or make driver optional for emit
-        // For now, we'll require driver to be present in config even for emit
-        if (!config.driver) {
-          throw errorContractConfigMissing({
-            why: 'Config.driver is required. Even though emit does not use the driver, it is required by ControlFamilyDescriptor.create()',
-          });
-        }
-        const familyInstance = config.family.create({
+        const stack = createControlPlaneStack({
           target: config.target,
           adapter: config.adapter,
           driver: config.driver,
-          extensionPacks: config.extensionPacks ?? [],
+          extensionPacks: config.extensionPacks,
         });
+        const familyInstance = config.family.create(stack);
 
         // Resolve contract source from config (user's config handles loading)
         let contractRaw: unknown;

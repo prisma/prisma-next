@@ -236,6 +236,42 @@ export interface OperationContext {
 // Control*Descriptor Interfaces (ADR 151)
 // ============================================================================
 
+export interface ControlPlaneStackInput<
+  TFamilyId extends string,
+  TTargetId extends string,
+  TAdapterDescriptor extends ControlAdapterDescriptor<
+    TFamilyId,
+    TTargetId
+  > = ControlAdapterDescriptor<TFamilyId, TTargetId>,
+  TExtensionPacks extends readonly ControlExtensionDescriptor<
+    TFamilyId,
+    TTargetId
+  >[] = readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[],
+> {
+  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
+  readonly adapter: TAdapterDescriptor;
+  readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId>;
+  readonly extensionPacks?: TExtensionPacks;
+}
+
+export interface ControlPlaneStack<
+  TFamilyId extends string,
+  TTargetId extends string,
+  TAdapterDescriptor extends ControlAdapterDescriptor<
+    TFamilyId,
+    TTargetId
+  > = ControlAdapterDescriptor<TFamilyId, TTargetId>,
+  TExtensionPacks extends readonly ControlExtensionDescriptor<
+    TFamilyId,
+    TTargetId
+  >[] = readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[],
+> {
+  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
+  readonly adapter: TAdapterDescriptor;
+  readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
+  readonly extensionPacks: TExtensionPacks;
+}
+
 /**
  * Descriptor for a control-plane family (e.g., SQL).
  * Provides the family hook and factory method.
@@ -248,12 +284,7 @@ export interface ControlFamilyDescriptor<
   TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
 > extends FamilyDescriptor<TFamilyId> {
   readonly hook: TargetFamilyHook;
-  create<TTargetId extends string>(options: {
-    readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
-    readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
-    readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId>;
-    readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
-  }): TFamilyInstance;
+  create<TTargetId extends string>(stack: ControlPlaneStack<TFamilyId, TTargetId>): TFamilyInstance;
 }
 
 /**

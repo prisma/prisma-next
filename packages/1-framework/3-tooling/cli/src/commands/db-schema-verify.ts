@@ -9,6 +9,7 @@ import {
   errorUnexpected,
 } from '@prisma-next/core-control-plane/errors';
 import type { VerifyDatabaseSchemaResult } from '@prisma-next/core-control-plane/types';
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { performAction } from '../utils/action';
@@ -129,12 +130,13 @@ export function createDbSchemaVerifyCommand(): Command {
         const driverDescriptor = config.driver;
 
         // Create family instance (needed for contract validation)
-        const familyInstance = config.family.create({
+        const stack = createControlPlaneStack({
           target: config.target,
           adapter: config.adapter,
           driver: driverDescriptor,
-          extensionPacks: config.extensionPacks ?? [],
+          extensionPacks: config.extensionPacks,
         });
+        const familyInstance = config.family.create(stack);
 
         // Validate contract using instance validator
         const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
