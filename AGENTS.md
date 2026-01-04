@@ -1,54 +1,148 @@
-# Agents TL;DR — Prisma Next
+# Agents — Prisma Next
 
-Welcome. This is a contract‑first, agent‑friendly data layer. Start here for the shortest path to context, rules, and commands you’ll actually use.
+Welcome. This is a contract‑first, agent‑friendly data layer.
 
 ## Start Here
-- Architecture Overview: `docs/Architecture Overview.md`
-- MVP Spec: `docs/MVP-Spec.md`
-- Testing Guide: `docs/Testing Guide.md`
-- Rules Index: `.cursor/rules/README.md`
-- Repo Map & Layering: `architecture.config.json`
+
+- [Architecture Overview](docs/Architecture%20Overview.md) — High-level design principles
+- [MVP Spec](docs/MVP-Spec.md) — Current goals and acceptance criteria
+- [Testing Guide](docs/Testing%20Guide.md) — Philosophy, patterns, and commands
+- [Rules Index](.cursor/rules/README.md) — All Cursor rules organized by topic
+- [ADRs](docs/architecture%20docs/adrs/) — Architecture Decision Records
+
+### Modular Onboarding
+
+- [Getting Started](docs/onboarding/Getting-Started.md) — Build, test, and run demo
+- [Repo Map & Layering](docs/onboarding/Repo-Map-and-Layering.md) — Package organization and import rules
+- [Conventions](docs/onboarding/Conventions.md) — TypeScript, tooling, and code style
+- [Testing](docs/onboarding/Testing.md) — Test commands, patterns, and organization
+- [Common Tasks Playbook](docs/onboarding/Common-Tasks-Playbook.md) — Add operation, split monolith, fix import
+
+## Project Overview
+
+**Prisma Next** is a contract-first data access layer:
+
+- **Contract-first**: Emit `contract.json` + `contract.d.ts` — no executable runtime code generation
+- **Composable DSL**: Type-safe query builder (`sql().from(...).select(...)`)
+- **Machine-readable**: Structured artifacts that agents can understand and manipulate
+- **Runtime verification**: Contract hashes and guardrails ensure safety before execution
 
 ## Golden Rules
-- Use pnpm and local scripts (not ad‑hoc `tsc`, `jest`): see `.cursor/rules/use-correct-tools.mdc`.
-- Don’t branch on target; use adapters: `.cursor/rules/no-target-branches.mdc`.
-- Keep tests concise; omit “should”: `.cursor/rules/omit-should-in-tests.mdc`.
-- Keep docs current (READMEs, rules, links): `.cursor/rules/doc-maintenance.mdc`.
-- Prefer links to canonical docs over long comments.
+
+- Use pnpm and local scripts (not ad‑hoc `tsc`, `jest`): `.cursor/rules/use-correct-tools.mdc`
+- Don't branch on target; use adapters: `.cursor/rules/no-target-branches.mdc`
+- Keep tests concise; omit "should": `.cursor/rules/omit-should-in-tests.mdc`
+- Keep docs current (READMEs, rules, links): `.cursor/rules/doc-maintenance.mdc`
+- Prefer links to canonical docs over long comments
 
 ## Common Commands
+
 ```bash
 pnpm build                 # Build via Turbo
 pnpm test:packages         # Run package tests
 pnpm test:e2e              # Run e2e tests
 pnpm test:integration      # Run integration tests
-pnpm test:all              # Run all tests (packages + examples + integration + e2e)
+pnpm test:all              # Run all tests
 pnpm coverage:packages     # Coverage (packages only)
 pnpm lint:deps             # Validate layering/imports
-cd examples/todo-app && pnpm demo  # End-to-end demo
 ```
 
-## Boundaries & Safety Rails
-- No backward‑compat shims; update call sites instead: `.cursor/rules/no-backward-compatibility.md`.
-- Package layering is enforced; fix violations rather than bypassing: see `scripts/check-imports.mjs` and `.cursor/rules/import-validation.mdc`.
-- Capability‑gated features (e.g., includeMany, returning) must be enabled in contract capabilities.
+## Core Concepts
 
-## Quick Context
-- Contract‑first: we emit `contract.json` and `contract.d.ts` only; queries compile at runtime.
-- Modular packages with domain/layer/plane guardrails: `architecture.config.json`.
-- Use Arktype for validation; extract types via `.infer` where needed: `.cursor/rules/arktype-usage.mdc`.
-- Directory layout: the entire SQL family (all layers and planes) lives under `packages/2-sql/**`. The top-level `packages/3-targets/**` is reserved for concrete target extension packs (e.g., `packages/3-targets/3-targets/postgres` for target, `packages/3-targets/6-adapters/postgres` for adapter, `packages/3-targets/7-drivers/postgres` for driver), not for family internals. Numbered prefixes indicate dependency direction: lower numbers can be imported by higher numbers, never the reverse.
-- Targets domain separation: keep dialect, adapter, and driver as separate packages under `packages/3-targets/**` so consumers can mix and match.
-- Single adapter package, multi-plane entrypoints: adapters expose `./adapter` (shared core), `./control` (migration/control plane), and `./runtime` (runtime). We map these entrypoints to planes via subpath globs in `architecture.config.json`. See `.cursor/rules/multi-plane-entrypoints.mdc` and `.cursor/rules/directory-layout.mdc`.
-- **CLI Config**: Apps declare family, target, adapter, driver, and extension packs in `prisma-next.config.ts` using `Control*Descriptor` types (e.g., `ControlFamilyDescriptor`, `ControlTargetDescriptor`). Family descriptors (e.g., `@prisma-next/family-sql/control`) provide family-specific hooks and helpers. The CLI loads config and uses family-provided helpers to assemble operation registries and type imports. Configs are validated and normalized using Arktype in `defineConfig()`. All descriptors must have matching `familyId` and `targetId` for type-level compatibility. See `packages/1-framework/3-tooling/cli/README.md` for details. See `.cursor/rules/control-plane-descriptors.mdc` for the descriptor pattern.
+### Contract Flow
+
+1. **Authoring**: Write `schema.psl` or use TypeScript builders → canonicalized Contract IR
+2. **Emission**: Emitter validates and generates `contract.json` + `contract.d.ts`
+3. **Validation**: `validateContract<Contract>(json)` validates structure and returns typed contract
+4. **Usage**: DSL functions (`sql()`, `schema()`) accept contract and propagate types
+
+### Key Patterns
+
+- **Type Parameter Pattern**: JSON imports lose literal types. Use `.d.ts` for precise types, `validateContract()` for runtime validation
+- **RuntimeContext**: Encapsulates contract, adapter, and extension registries. Pass to `schema()`, `sql()`, `orm()`
+- **Interface-Based Design**: Export interfaces and factory functions, not classes
+- **Capability Gating**: Features like `includeMany` and `returning()` require capabilities in contract
+
+### Package Organization
+
+Organized by **Domains → Layers → Planes**:
+
+- **Domains**: Framework (target-agnostic), SQL, Document, Targets, Extensions
+- **Layers**: Core → Authoring → Tooling → Lanes → Runtime → Adapters
+- **Planes**: Migration, Runtime, Shared
+
+See `architecture.config.json` for the complete mapping and `pnpm lint:deps` to validate.
+
+## Quick Reference
+
+### Query Pattern
+
+```typescript
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import { sql } from '@prisma-next/sql-lane/sql';
+import { createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
+
+const contract = validateContract<Contract>(contractJson);
+const adapter = createPostgresAdapter();
+const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+
+const tables = schema(context).tables;
+const plan = sql({ context })
+  .from(tables.user)
+  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
+  .limit(10)
+  .build();
+```
+
+### Contract Validation
+
+```typescript
+// CRITICAL: Type parameter must be the fully-typed Contract from contract.d.ts
+const contract = validateContract<Contract>(contractJson);
+```
+
+## Common Pitfalls
+
+1. **Don't infer types from JSON** — Use type parameter pattern with `.d.ts`
+2. **validateContract requires fully-typed Contract** — NOT generic `SqlContract<SqlStorage>`
+3. **Type canonicalization happens at authoring time** — Not during validation
+4. **No target-specific branches in core** — Use adapters instead
+5. **Builder chaining** — Methods return new instances, always chain calls
+6. **Column access** — Use `table.columns.fieldName` to avoid conflicts with table properties
+
+## Boundaries & Safety Rails
+
+- No backward‑compat shims; update call sites instead: `.cursor/rules/no-backward-compatibility.md`
+- Package layering is enforced; fix violations rather than bypassing: `scripts/check-imports.mjs` and `.cursor/rules/import-validation.mdc`
+- Capability‑gated features must be enabled in contract capabilities
 
 ## Frequent Tasks
-- Add SQL operation: see `docs/briefs/complete` and `.cursor/plans/add-sql-operation.md` (template).
-- Split monolith into modules: `.cursor/plans/split-into-modules.md`.
-- Fix import violation: `.cursor/plans/fix-import-violation.md`.
+
+- Add SQL operation: `docs/briefs/complete` and `.cursor/plans/add-sql-operation.md`
+- Split monolith into modules: `.cursor/plans/split-into-modules.md`
+- Fix import violation: `.cursor/plans/fix-import-violation.md`
+
+## Subsystem Deep Dives
+
+See `docs/architecture docs/subsystems/`:
+
+1. **Data Contract** — Contract structure and semantics
+2. **Contract Emitter & Types** — How contracts are generated
+3. **Query Lanes** — SQL DSL, ORM, Raw SQL surfaces
+4. **Runtime & Plugin Framework** — Execution pipeline and plugins
+5. **Adapters & Targets** — Postgres adapter, capability gating
+6. **Error Handling** — Error envelope and stable codes
+7. **Migration System** — Schema migrations
 
 ## Ask First
-- Significant refactors to rule scope (`alwaysApply`) or architecture docs.
-- Changes that affect demo, examples, or CI.
 
-That’s it—follow links above for deep dives.
+- Significant refactors to rule scope (`alwaysApply`) or architecture docs
+- Changes that affect demo, examples, or CI
+
+---
+
+**Remember**: This is a prototype. Focus on the MVP spec and implemented features.
