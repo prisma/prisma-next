@@ -131,11 +131,8 @@ export interface ExecutionPlan<Row = unknown, Ast = unknown> {
  * SqlQueryPlan includes a phantom `_Row` property to preserve the generic parameter
  * for type extraction.
  */
-export type ResultType<P> = P extends ExecutionPlan<infer R, unknown>
-  ? R
-  : P extends { readonly _Row?: infer R }
-    ? R
-    : never;
+export type ResultType<P> =
+  P extends ExecutionPlan<infer R, unknown> ? R : P extends { readonly _Row?: infer R } ? R : never;
 
 /**
  * Type guard to check if a contract is a Document contract

@@ -237,7 +237,7 @@ describe('extensionPacks', () => {
       defineContract<CodecTypes>()
         .target(postgresTargetPack)
         .extensionPacks({ pgvector: wrongFamilyPack }),
-    ).toThrow('targets family \"document\" but this builder targets \"sql\"');
+    ).toThrow('targets family "document" but this builder targets "sql"');
   });
 
   it('rejects target mismatches', () => {
@@ -245,6 +245,6 @@ describe('extensionPacks', () => {
       defineContract<CodecTypes>()
         .target(postgresTargetPack)
         .extensionPacks({ pgvector: mysqlTargetPack }),
-    ).toThrow('builder target is \"postgres\"');
+    ).toThrow('builder target is "postgres"');
   });
 });

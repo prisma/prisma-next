@@ -411,19 +411,19 @@ class SqlContractBuilder<
 
       if (packRef.kind !== 'extension') {
         throw new Error(
-          `extensionPacks() only accepts extension pack refs. Received kind \"${packRef.kind}\".`,
+          `extensionPacks() only accepts extension pack refs. Received kind "${packRef.kind}".`,
         );
       }
 
       if (packRef.familyId !== 'sql') {
         throw new Error(
-          `extension pack \"${packRef.id}\" targets family \"${packRef.familyId}\" but this builder targets \"sql\".`,
+          `extension pack "${packRef.id}" targets family "${packRef.familyId}" but this builder targets "sql".`,
         );
       }
 
       if (packRef.targetId && packRef.targetId !== this.state.target) {
         throw new Error(
-          `extension pack \"${packRef.id}\" targets \"${packRef.targetId}\" but builder target is \"${this.state.target}\".`,
+          `extension pack "${packRef.id}" targets "${packRef.targetId}" but builder target is "${this.state.target}".`,
         );
       }
 
