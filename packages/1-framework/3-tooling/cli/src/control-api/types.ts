@@ -80,7 +80,7 @@ export type ControlProgressEvent =
       readonly action: ControlActionName;
       readonly kind: 'spanEnd';
       readonly spanId: string;
-      readonly outcome: 'ok' | 'skipped';
+      readonly outcome: 'ok' | 'skipped' | 'error';
     };
 
 /**
@@ -142,6 +142,12 @@ export interface DbInitOptions {
    * - 'apply': Applies operations and writes marker
    */
   readonly mode: 'plan' | 'apply';
+  /**
+   * Database connection. If provided, dbInit will connect before executing.
+   * If omitted, the client must already be connected.
+   * The type is driver-specific (e.g., string URL for Postgres).
+   */
+  readonly connection?: unknown;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }

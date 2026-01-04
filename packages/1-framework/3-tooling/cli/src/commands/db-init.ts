@@ -28,7 +28,6 @@ import {
 } from '../utils/output';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
-import { withSpinner } from '../utils/spinner';
 
 interface DbInitOptions {
   readonly db?: string;
@@ -174,36 +173,16 @@ export function createDbInitCommand(): Command {
           extensionPacks: config.extensionPacks ?? [],
         });
 
-        // Connect to database with spinner
-        try {
-          await withSpinner(() => client.connect(dbConnection), {
-            message: 'Connecting to database...',
-            flags,
-          });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          const code = (error as { code?: unknown }).code;
-          // Only redact if connection is a string (URL)
-          const redacted =
-            typeof dbConnection === 'string' ? redactDatabaseUrl(dbConnection) : undefined;
-          throw errorRuntime('Database connection failed', {
-            why: message,
-            fix: 'Verify the database connection, ensure the database is reachable, and confirm credentials/permissions',
-            meta: {
-              ...(typeof code !== 'undefined' ? { code } : {}),
-              ...(redacted ?? {}),
-            },
-          });
-        }
+        // Create progress adapter
+        const onProgress = createProgressAdapter({ flags });
 
         try {
-          // Create progress adapter
-          const onProgress = createProgressAdapter({ flags });
-
-          // Call dbInit with progress callback
+          // Call dbInit with connection and progress callback
+          // Connection happens inside dbInit with a 'connect' progress span
           const result = await client.dbInit({
             contractIR: contractJson,
             mode: options.plan ? 'plan' : 'apply',
+            connection: dbConnection,
             onProgress,
           });
 
@@ -322,6 +301,33 @@ export function createDbInitCommand(): Command {
           };
 
           return dbInitResult;
+        } catch (error) {
+          // Handle connection errors with specific formatting
+          const message = error instanceof Error ? error.message : String(error);
+          const code = (error as { code?: unknown }).code;
+
+          // Check if this is a connection error (thrown during connect phase)
+          // Connection errors typically have codes like ECONNREFUSED, ENOTFOUND, etc.
+          const isConnectionError =
+            typeof code === 'string' &&
+            ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH'].includes(code);
+
+          if (isConnectionError) {
+            // Only redact if connection is a string (URL)
+            const redacted =
+              typeof dbConnection === 'string' ? redactDatabaseUrl(dbConnection) : undefined;
+            throw errorRuntime('Database connection failed', {
+              why: message,
+              fix: 'Verify the database connection, ensure the database is reachable, and confirm credentials/permissions',
+              meta: {
+                ...(typeof code !== 'undefined' ? { code } : {}),
+                ...(redacted ?? {}),
+              },
+            });
+          }
+
+          // Re-throw other errors
+          throw error;
         } finally {
           await client.close();
         }

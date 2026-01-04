@@ -196,6 +196,35 @@ class ControlClientImpl implements ControlClient {
   }
 
   async dbInit(options: DbInitOptions): Promise<DbInitResult> {
+    const { onProgress } = options;
+
+    // Connect with progress span if connection provided
+    if (options.connection !== undefined) {
+      onProgress?.({
+        action: 'dbInit',
+        kind: 'spanStart',
+        spanId: 'connect',
+        label: 'Connecting to database...',
+      });
+      try {
+        await this.connect(options.connection);
+        onProgress?.({
+          action: 'dbInit',
+          kind: 'spanEnd',
+          spanId: 'connect',
+          outcome: 'ok',
+        });
+      } catch (error) {
+        onProgress?.({
+          action: 'dbInit',
+          kind: 'spanEnd',
+          spanId: 'connect',
+          outcome: 'error',
+        });
+        throw error;
+      }
+    }
+
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
     // Check target supports migrations
@@ -214,7 +243,7 @@ class ControlClientImpl implements ControlClient {
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
-      ...(options.onProgress ? { onProgress: options.onProgress } : {}),
+      ...(onProgress ? { onProgress } : {}),
     });
   }
 

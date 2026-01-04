@@ -71,7 +71,9 @@ export function createProgressAdapter(options: ProgressAdapterOptions): OnContro
       const spanState = activeSpans.get(event.spanId);
       if (spanState) {
         const elapsed = Date.now() - spanState.startTime;
-        if (event.outcome === 'skipped') {
+        if (event.outcome === 'error') {
+          spanState.spinner.fail(`${spanState.spinner.text} (failed)`);
+        } else if (event.outcome === 'skipped') {
           spanState.spinner.info(`${spanState.spinner.text} (skipped)`);
         } else {
           spanState.spinner.succeed(`${spanState.spinner.text} (${elapsed}ms)`);
