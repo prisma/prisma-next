@@ -20,6 +20,6 @@ export default defineConfig({
   },
   db: {
     // biome-ignore lint/style/noNonNullAssertion: loaded from .env
-    url: process.env['DATABASE_URL']!,
+    connection: process.env['DATABASE_URL']!,
   },
 });

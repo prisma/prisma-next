@@ -45,9 +45,15 @@ export interface ControlClientOptions {
   readonly adapter: ControlAdapterDescriptor<any, any, any>;
   /** Optional - control client can be created without driver for offline operations */
   // biome-ignore lint/suspicious/noExplicitAny: required for contravariance in driver.create()
-  readonly driver?: ControlDriverDescriptor<any, any, any>;
+  readonly driver?: ControlDriverDescriptor<any, any, any, any>;
   // biome-ignore lint/suspicious/noExplicitAny: required for contravariance in extension.create()
   readonly extensionPacks?: ReadonlyArray<ControlExtensionDescriptor<any, any, any>>;
+  /**
+   * Optional default connection for auto-connect.
+   * When provided, operations will auto-connect if not already connected.
+   * The type is driver-specific (e.g., string URL for Postgres).
+   */
+  readonly connection?: unknown;
 }
 
 // ============================================================================
@@ -180,23 +186,40 @@ export interface ConnectedState<TFamilyId extends string, TTargetId extends stri
 /**
  * Programmatic control client for Prisma Next operations.
  *
- * Lifecycle: call `connect(url)` before operations, `close()` when done.
+ * Lifecycle: `connect(connection)` before operations, `close()` when done.
+ * Both `init()` and `connect()` are auto-called by operations if needed,
+ * but `connect()` requires a connection so must be called explicitly first
+ * unless a default connection was provided in options.
  *
  * @see README.md "Programmatic Control API" section for usage examples
  */
 export interface ControlClient {
   /**
-   * Establishes a database connection.
-   * Must be called before any database operations.
+   * Initializes the client by creating the control plane stack,
+   * family instance, and validating framework components.
    *
-   * @param url - Database connection string
-   * @throws If connection fails, already connected, or driver is not configured
+   * Idempotent (safe to call multiple times).
+   * Called automatically by `connect()` if not already initialized.
    */
-  connect(url: string): Promise<void>;
+  init(): void;
 
   /**
-   * Closes the database connection and cleans up resources.
+   * Establishes a database connection.
+   * Auto-calls `init()` if not already initialized.
+   * Must be called before any database operations unless a default connection
+   * was provided in options.
+   *
+   * @param connection - Driver-specific connection input (e.g., URL string for Postgres).
+   *   If omitted, uses the default connection from options (if provided).
+   * @throws If connection fails, already connected, driver is not configured,
+   *   or no connection provided and no default connection in options.
+   */
+  connect(connection?: unknown): Promise<void>;
+
+  /**
+   * Closes the database connection.
    * Idempotent (safe to call multiple times).
+   * After close(), can call `connect()` again with same or different URL.
    */
   close(): Promise<void>;
 

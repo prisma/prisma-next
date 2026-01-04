@@ -17,6 +17,6 @@ export default defineConfig({
     types: 'output/contract.d.ts',
   },
   db: {
-    url: '{{DB_URL}}',
+    connection: '{{DB_URL}}',
   },
 });

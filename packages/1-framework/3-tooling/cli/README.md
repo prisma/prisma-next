@@ -115,7 +115,7 @@ prisma-next db verify [--db <url>] [--config <path>] [--json] [-v] [-q] [--times
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -163,7 +163,7 @@ export default defineConfig({
     types: 'src/prisma/contract.d.ts',
   },
   db: {
-    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+    connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
 });
 ```
@@ -275,7 +275,7 @@ prisma-next db introspect [--db <url>] [--config <path>] [--json] [-v] [-q] [--t
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -317,7 +317,7 @@ export default defineConfig({
   driver: postgresDriver,
   extensionPacks: [],
   db: {
-    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+    connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
 });
 ```
@@ -392,7 +392,7 @@ sql schema (tables: 2)
 
 **Error Codes:**
 - `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-CLI-4005`: Missing database URL — provide `--db <url>` or set `db.url` in config
+- `PN-CLI-4005`: Missing database connection — provide `--db <url>` or set `db.connection` in config
 
 **Family Requirements:**
 
@@ -426,7 +426,7 @@ prisma-next db sign [--db <url>] [--config <path>] [--json] [-v] [-q] [--timesta
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -474,7 +474,7 @@ export default defineConfig({
     types: 'src/prisma/contract.d.ts',
   },
   db: {
-    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+    connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
 });
 ```
@@ -589,7 +589,7 @@ For updated markers:
 
 **Error Codes:**
 - `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-CLI-4005`: Missing database URL — provide `--db <url>` or set `db.url` in config
+- `PN-CLI-4005`: Missing database connection — provide `--db <url>` or set `db.connection` in config
 - Exit code 1: Schema verification failed — database schema does not match contract (marker is not written)
 
 **Relationship to Other Commands:**
@@ -636,7 +636,7 @@ prisma-next db init [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q] [
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--plan`: Only show the migration plan, do not apply it
 - `--json [format]`: Output as JSON (`object` only; `ndjson` is not supported for this command)
@@ -685,7 +685,7 @@ export default defineConfig({
     types: 'src/prisma/contract.d.ts',
   },
   db: {
-    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+    connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
 });
 ```

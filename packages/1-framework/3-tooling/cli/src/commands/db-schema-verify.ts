@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import {
-  errorDatabaseUrlRequired,
+  errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
   errorRuntime,
@@ -144,14 +144,14 @@ export function createDbSchemaVerifyCommand(): Command {
         // Validate contract requirements fail-fast before connecting to database
         assertContractRequirementsSatisfied({ contract: contractIR, stack });
 
-        // Resolve database URL
-        const dbUrl = options.db ?? config.db?.url;
-        if (!dbUrl) {
-          throw errorDatabaseUrlRequired();
+        // Resolve database connection (--db flag or config.db.connection)
+        const dbConnection = options.db ?? config.db?.connection;
+        if (!dbConnection) {
+          throw errorDatabaseConnectionRequired();
         }
 
-        // Create driver
-        const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
+        // Create driver (cast to unknown since CLI connection type is driver-specific at runtime)
+        const driver = await withSpinner(() => driverDescriptor.create(dbConnection as unknown), {
           message: 'Connecting to database...',
           flags,
         });
