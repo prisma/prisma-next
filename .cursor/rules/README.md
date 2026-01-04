@@ -7,6 +7,17 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - **Soft limit**: 100 lines — prefer this for most rulecards
 - **Hard limit**: 200 lines — rulecards above this must be **trimmed**, **split**, or have long examples moved to `docs/`
 
+## Footprint monitoring
+
+Track context bloat with:
+
+```bash
+pnpm rules:footprint         # Report current footprint
+pnpm lint:rules:footprint    # Check against thresholds (fails if exceeded)
+```
+
+Thresholds are defined in `scripts/rules-footprint.mjs`.
+
 ## Always Apply (minimal)
 
 **Always-apply rules must be short, globally relevant, and stable.** If a rule only applies to a specific area (SQL, CLI, tests, package layout), scope it with `globs` and set `alwaysApply: false`.

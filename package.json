@@ -24,6 +24,8 @@
     "lint:examples": "turbo run lint --filter='./examples/**'",
     "lint:deps": "depcruise --config dependency-cruiser.config.mjs packages",
     "lint:rules": "node scripts/validate-rules.mjs",
+    "lint:rules:footprint": "node scripts/rules-footprint.mjs --check",
+    "rules:footprint": "node scripts/rules-footprint.mjs",
     "lint:docs": "node scripts/validate-package-readmes.mjs",
     "typecheck": "turbo run typecheck",
     "typecheck:all": "turbo run typecheck --include-examples",
