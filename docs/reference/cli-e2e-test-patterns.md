@@ -274,5 +274,5 @@ await command.parseAsync(['node', 'cli.js', ...args]);  // Works but verbose
 ## Related Patterns
 
 - `docs/Testing Guide.md`: General testing patterns
-- `.cursor/rules/test-import-patterns.mdc`: Test import patterns
+- `docs/reference/test-import-patterns.md`: Test import patterns
 - `packages/framework/tooling/cli/test/utils/test-helpers.ts`: Implementation of `setupTestDirectoryFromFixtures` and `setupIntegrationTestDirectoryFromFixtures`

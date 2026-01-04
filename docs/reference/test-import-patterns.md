@@ -273,9 +273,9 @@ export function assembleOperationRegistryFromPacks(packs: ReadonlyArray<...>): O
 }
 
 // packages/framework/tooling/cli/test/emit.test.ts (different package)
-import { assembleOperationRegistryFromPacks } from '../../../../sql/family/src/core/assembly';
+import { assembleOperationRegistry } from '@prisma-next/family-sql/test-utils';
 // Uses the public test utility, not the private function
-const registry = assembleOperationRegistryFromPacks(packs);
+const registry = assembleOperationRegistry(packs);
 ```
 
 **Why?**

@@ -252,8 +252,8 @@ const ColumnSchema = type({
 
 const TableSchema = type({
   columns: type({ '[string]': ColumnSchema }),  // Record with schema-typed values
-  'primaryKey?': PrimaryKeySchema,              // Optional object reference
-  'foreignKeys?': ForeignKeySchema.array(),     // Array of schemas using .array()
+  'primaryKey?': PrimaryKeySchema,              // See "Type Declaration and Readonly Arrays" above
+  'foreignKeys?': ForeignKeySchema.array(),     // See "Schema References in Object Properties" above
 });
 
 const StorageSchema = type({
@@ -266,13 +266,16 @@ const ContractSchema = type({
   storage: StorageSchema,                       // Direct schema reference
 });
 
-export function validate<T>(value: T): T {
+type Contract = typeof ContractSchema.infer;
+
+export function validate(value: Contract): Contract {
   const result = ContractSchema(value);
-  if (Array.isArray(result)) {
-    throw new Error(result.map(p => p.message).join('; '));
+  if (result instanceof type.errors) {
+    const messages = result.map((p: { message: string }) => p.message).join('; ');
+    throw new Error(`Validation failed: ${messages}`);
   }
 
   // Arktype automatically validates all nested structures including arrays
-  return value;  // Preserve literal types
+  return value; // Preserve literal types
 }
 ```
