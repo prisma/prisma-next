@@ -8,7 +8,7 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/omit-should-in-tests.mdc` — Test descriptions omit "should"
 - `.cursor/rules/cli-command-descriptions.mdc` — CLI command description patterns
 - `.cursor/rules/doc-maintenance.mdc` — Keep docs/READMEs/rules up‑to‑date
-- `.cursor/rules/read-agents-md.mdc` — Read AGENTS.md and AGENT_ONBOARDING.md
+- `.cursor/rules/read-agents-md.mdc` — Read AGENTS.md (onboarding deep dive is optional)
 
 ## Testing
 - `.cursor/rules/testing-guide.mdc` — Testing guide pointers and patterns

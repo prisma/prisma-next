@@ -1,7 +1,9 @@
 ---
-description: Read AGENTS.md and AGENT_ONBOARDING.md for onboarding context
+description: Read AGENTS.md for repo entrypoint and high-level constraints
 globs:
 alwaysApply: true
 ---
 
-Read AGENTS.md and AGENT_ONBOARDING.md
+Read `AGENTS.md`.
+
+Read `AGENT_ONBOARDING.md` only when you need deeper background.
