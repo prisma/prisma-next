@@ -59,8 +59,11 @@ export type ControlActionName = 'dbInit' | 'verify' | 'schemaVerify' | 'sign' | 
  * Progress event emitted during control-api operation execution.
  *
  * Events model operation progress using a span-based model:
- * - `spanStart` / `spanEnd`: Timed segments within an action (supports nesting)
- * - `spanEvent`: Point-in-time events inside a span (e.g., per-migration-operation start/end)
+ * - `spanStart`: Begin a timed segment (supports nesting via parentSpanId)
+ * - `spanEnd`: Complete a timed segment
+ *
+ * All operation-specific progress (e.g., per-migration-operation) is modeled
+ * as nested spans rather than special event types.
  *
  * Events are delivered via an optional `onProgress` callback to avoid polluting
  * return types. If the callback is absent, operations emit no events (zero overhead).
@@ -78,36 +81,6 @@ export type ControlProgressEvent =
       readonly kind: 'spanEnd';
       readonly spanId: string;
       readonly outcome: 'ok' | 'skipped';
-    }
-  | {
-      readonly action: 'dbInit';
-      readonly kind: 'spanEvent';
-      readonly spanId: string;
-      readonly name: 'migrationPlanOperationStart';
-      readonly attributes: {
-        readonly migrationOperationIndex: number;
-        readonly migrationOperationCount: number;
-        readonly migrationPlanOperation: {
-          readonly id: string;
-          readonly label: string;
-          readonly operationClass: string;
-        };
-      };
-    }
-  | {
-      readonly action: 'dbInit';
-      readonly kind: 'spanEvent';
-      readonly spanId: string;
-      readonly name: 'migrationPlanOperationEnd';
-      readonly attributes: {
-        readonly migrationOperationIndex: number;
-        readonly migrationOperationCount: number;
-        readonly migrationPlanOperation: {
-          readonly id: string;
-          readonly label: string;
-          readonly operationClass: string;
-        };
-      };
     };
 
 /**

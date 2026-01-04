@@ -60,7 +60,7 @@ describe('progress adapter', () => {
     }
   });
 
-  it('handles migration plan operation span events', () => {
+  it('prints nested spans as lines instead of spinners', () => {
     // Mock process.stdout.isTTY
     const originalIsTTY = process.stdout.isTTY;
     process.stdout.isTTY = true;
@@ -72,23 +72,15 @@ describe('progress adapter', () => {
       const adapter = createProgressAdapter({ flags: {} });
       const event: ControlProgressEvent = {
         action: 'dbInit',
-        kind: 'spanEvent',
-        spanId: 'apply',
-        name: 'migrationPlanOperationStart',
-        attributes: {
-          migrationOperationIndex: 0,
-          migrationOperationCount: 1,
-          migrationPlanOperation: {
-            id: 'op-1',
-            label: 'Create table users',
-            operationClass: 'additive',
-          },
-        },
+        kind: 'spanStart',
+        spanId: 'operation:op-1',
+        parentSpanId: 'apply',
+        label: 'Create table users',
       };
 
       adapter(event);
 
-      // Should log the operation
+      // Should log the operation as a line
       expect(consoleLogSpy).toHaveBeenCalledWith('  → Create table users...');
     } finally {
       consoleLogSpy.mockRestore();

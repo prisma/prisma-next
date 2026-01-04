@@ -16,7 +16,7 @@ interface ProgressAdapterOptions {
  * State for tracking active spans in the progress adapter.
  */
 interface SpanState {
-  readonly spinner: ora.Ora;
+  readonly spinner: ReturnType<typeof ora>;
   readonly startTime: number;
 }
 
@@ -25,9 +25,8 @@ interface SpanState {
  * into CLI spinner/progress output.
  *
  * The adapter:
- * - Starts/succeeds spinners for span boundaries
- * - Updates spinner text for nested spans
- * - Prints per-operation lines for migration plan operations
+ * - Starts/succeeds spinners for top-level span boundaries
+ * - Prints per-operation lines for nested spans (e.g., migration operations under 'apply')
  * - Respects quiet/json/non-TTY flags (no-op in those cases)
  *
  * @param options - Progress adapter configuration
@@ -51,7 +50,13 @@ export function createProgressAdapter(options: ProgressAdapterOptions): OnContro
 
   return (event: ControlProgressEvent) => {
     if (event.kind === 'spanStart') {
-      // Start a new spinner for this span
+      // Nested spans (with parentSpanId) are printed as lines, not spinners
+      if (event.parentSpanId) {
+        console.log(`  → ${event.label}...`);
+        return;
+      }
+
+      // Top-level spans get a spinner
       const spinner = ora({
         text: event.label,
         color: flags.color !== false ? 'cyan' : false,
@@ -62,7 +67,7 @@ export function createProgressAdapter(options: ProgressAdapterOptions): OnContro
         startTime: Date.now(),
       });
     } else if (event.kind === 'spanEnd') {
-      // Complete the spinner for this span
+      // Complete the spinner for this span (only top-level spans have spinners)
       const spanState = activeSpans.get(event.spanId);
       if (spanState) {
         const elapsed = Date.now() - spanState.startTime;
@@ -73,15 +78,7 @@ export function createProgressAdapter(options: ProgressAdapterOptions): OnContro
         }
         activeSpans.delete(event.spanId);
       }
-    } else if (event.kind === 'spanEvent') {
-      // Handle span events (e.g., per-migration-operation start/end)
-      if (event.action === 'dbInit') {
-        if (event.name === 'migrationPlanOperationStart') {
-          // Print per-operation line
-          console.log(`  → ${event.attributes.migrationPlanOperation.label}...`);
-        }
-        // migrationPlanOperationEnd is currently a no-op (could log completion if needed)
-      }
+      // Nested span ends are no-ops (could log completion if needed)
     }
   };
 }

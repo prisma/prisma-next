@@ -193,49 +193,23 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     label: 'Applying migration plan',
   });
 
-  const migrationOperationCount = migrationPlan.operations.length;
-  // Build a map of operation ID to index for efficient lookup
-  const operationIndexMap = new Map<string, number>();
-  for (let i = 0; i < migrationPlan.operations.length; i++) {
-    operationIndexMap.set(migrationPlan.operations[i].id, i);
-  }
-
   const callbacks = onProgress
     ? {
         onOperationStart: (op: MigrationPlanOperation) => {
-          const index = operationIndexMap.get(op.id) ?? 0;
           onProgress({
             action: 'dbInit',
-            kind: 'spanEvent',
-            spanId: applySpanId,
-            name: 'migrationPlanOperationStart',
-            attributes: {
-              migrationOperationIndex: index,
-              migrationOperationCount,
-              migrationPlanOperation: {
-                id: op.id,
-                label: op.label,
-                operationClass: op.operationClass,
-              },
-            },
+            kind: 'spanStart',
+            spanId: `operation:${op.id}`,
+            parentSpanId: applySpanId,
+            label: op.label,
           });
         },
         onOperationComplete: (op: MigrationPlanOperation) => {
-          const index = operationIndexMap.get(op.id) ?? 0;
           onProgress({
             action: 'dbInit',
-            kind: 'spanEvent',
-            spanId: applySpanId,
-            name: 'migrationPlanOperationEnd',
-            attributes: {
-              migrationOperationIndex: index,
-              migrationOperationCount,
-              migrationPlanOperation: {
-                id: op.id,
-                label: op.label,
-                operationClass: op.operationClass,
-              },
-            },
+            kind: 'spanEnd',
+            spanId: `operation:${op.id}`,
+            outcome: 'ok',
           });
         },
       }
