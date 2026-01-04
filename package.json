@@ -35,7 +35,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.0.6",
+    "@biomejs/biome": "2.0.6",
     "@changesets/cli": "^2.27.8",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
