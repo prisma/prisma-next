@@ -1,16 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { loadContractFromTs } from '@prisma-next/cli';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
-import { emit } from '@prisma-next/emitter';
-import {
-  assembleOperationRegistry,
-  convertOperationManifest,
-  extractCodecTypeImports,
-  extractExtensionIds,
-  extractOperationTypeImports,
-} from '@prisma-next/family-sql/test-utils';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
 import { sql } from '@prisma-next/sql-lane';
@@ -20,54 +8,18 @@ import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
+import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
 import {
-  getSqlDescriptorBundle,
-  pgvectorExtensionDescriptor,
   pgvectorExtensionRuntimeDescriptor,
   postgresAdapterRuntimeDescriptor,
   postgresTargetRuntimeDescriptor,
 } from './utils/framework-components';
 
-let contract: ReturnType<typeof validateContract>;
-let contractIR: Awaited<ReturnType<typeof loadContractFromTs>>;
-
-beforeAll(async () => {
-  const contractPath = resolve(__dirname, '../prisma/contract.ts');
-  const outputDir = resolve(__dirname, '../src/prisma');
-
-  contractIR = await loadContractFromTs(contractPath);
-  const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle({
-    extensions: [pgvectorExtensionDescriptor],
-  });
-  const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
-  const codecTypeImports = extractCodecTypeImports(descriptors);
-  const operationTypeImports = extractOperationTypeImports(descriptors);
-  const extensionIds = extractExtensionIds(adapter, target, extensions);
-
-  const result = await emit(
-    contractIR,
-    {
-      outputDir,
-      operationRegistry,
-      codecTypeImports,
-      operationTypeImports,
-      extensionIds,
-    },
-    sqlTargetFamilyHook,
-  );
-
-  mkdirSync(outputDir, { recursive: true });
-
-  const contractJson = JSON.parse(result.contractJson);
-
-  writeFileSync(join(outputDir, 'contract.json'), JSON.stringify(contractJson, null, 2), 'utf-8');
-  writeFileSync(join(outputDir, 'contract.d.ts'), result.contractDts, 'utf-8');
-
-  contract = validateContract<Contract>(contractJson);
-}, timeouts.typeScriptCompilation);
+// Use the emitted JSON contract which has the real computed hashes
+const contract = validateContract<Contract>(contractJson);
 
 /**
  * Creates a runtime context for the given contract.
@@ -96,13 +48,21 @@ async function seedTestData(
 
   const userIds: number[] = [];
 
-  // Insert users
+  // Insert users (provide all required columns since contract doesn't have defaults)
   if (data.users) {
-    for (const email of data.users) {
+    for (let i = 0; i < data.users.length; i++) {
+      const email = data.users[i]!;
+      const id = i + 1;
+      const createdAt = new Date();
+
       const plan = sql({ context })
-        .insert(userTable, { email: param('email') })
+        .insert(userTable, {
+          id: param('id'),
+          email: param('email'),
+          createdAt: param('createdAt'),
+        })
         .returning(userTable.columns['id']!)
-        .build({ params: { email } });
+        .build({ params: { id, email, createdAt } });
 
       for await (const row of runtime.execute(plan)) {
         userIds.push((row as unknown as { id: number }).id);
@@ -110,15 +70,24 @@ async function seedTestData(
     }
   }
 
-  // Insert posts
+  // Insert posts (provide all required columns)
   if (data.posts) {
-    for (const post of data.posts) {
+    for (let i = 0; i < data.posts.length; i++) {
+      const post = data.posts[i]!;
       const userId = userIds[post.userIndex];
       if (userId === undefined) continue;
 
+      const id = i + 1;
+      const createdAt = new Date();
+
       const plan = sql({ context })
-        .insert(postTable, { title: param('title'), userId: param('userId') })
-        .build({ params: { title: post.title, userId } });
+        .insert(postTable, {
+          id: param('id'),
+          title: param('title'),
+          userId: param('userId'),
+          createdAt: param('createdAt'),
+        })
+        .build({ params: { id, title: post.title, userId, createdAt } });
 
       for await (const _row of runtime.execute(plan)) {
         // consume iterator
@@ -135,7 +104,7 @@ describe('runtime execute integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         // Initialize schema and marker using control client
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
 
         const context = createRuntimeContext({
           contract,
@@ -235,7 +204,7 @@ describe('runtime execute integration', () => {
     'infers correct types from query plans',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -301,7 +270,7 @@ describe('runtime execute integration', () => {
     'enforces row budget on unbounded queries',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
 
         const context = createRuntimeContext({
           contract,
@@ -328,9 +297,14 @@ describe('runtime execute integration', () => {
         });
 
         try {
-          // Seed 100 users
-          const emails = Array.from({ length: 100 }, (_, i) => `user${i}@example.com`);
-          await seedTestData(runtime, contract, { users: emails });
+          // Seed 100 users using a separate runtime without strict budgets
+          const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+          try {
+            const emails = Array.from({ length: 100 }, (_, i) => `user${i}@example.com`);
+            await seedTestData(seedRuntime, contract, { users: emails });
+          } finally {
+            await seedRuntime.close();
+          }
 
           const tables = schema(context).tables;
           const userTable = tables['user']!;
@@ -368,7 +342,7 @@ describe('runtime execute integration', () => {
           expect(rows.length).toBeLessThanOrEqual(10);
         } finally {
           await runtime.close();
-          await pool.end();
+          // Note: runtime.close() already closes the pool
         }
       }, {});
     },
@@ -379,7 +353,7 @@ describe('runtime execute integration', () => {
     'enforces streaming row budget',
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
 
         const context = createRuntimeContext({
           contract,
@@ -406,9 +380,14 @@ describe('runtime execute integration', () => {
         });
 
         try {
-          // Seed 50 users
-          const emails = Array.from({ length: 50 }, (_, i) => `user${i}@example.com`);
-          await seedTestData(runtime, contract, { users: emails });
+          // Seed 50 users using a separate runtime without strict budgets
+          const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+          try {
+            const emails = Array.from({ length: 50 }, (_, i) => `user${i}@example.com`);
+            await seedTestData(seedRuntime, contract, { users: emails });
+          } finally {
+            await seedRuntime.close();
+          }
 
           const tables = schema(context).tables;
           const userTable = tables['user']!;
@@ -431,7 +410,7 @@ describe('runtime execute integration', () => {
           });
         } finally {
           await runtime.close();
-          await pool.end();
+          // Note: runtime.close() already closes the pool
         }
       }, {});
     },
@@ -442,7 +421,7 @@ describe('runtime execute integration', () => {
     'includeMany returns users with nested posts array',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {

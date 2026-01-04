@@ -9,7 +9,7 @@
     "build": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev --name init",
-    "emit": "prisma-next emit",
+    "emit": "prisma-next contract emit",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/index.ts",
     "test": "vitest run --config vitest.config.ts",

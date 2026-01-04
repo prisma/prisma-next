@@ -2,8 +2,11 @@ import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { orm } from '../prisma/query';
 
-export async function ormCreateUser(email: string, runtime: Runtime) {
-  const plan = orm.user().create({ email });
+export async function ormCreateUser(
+  data: { id: number; email: string; createdAt: Date },
+  runtime: Runtime,
+) {
+  const plan = orm.user().create({ id: data.id, email: data.email, createdAt: data.createdAt });
 
   // Drain the result stream (DML operations don't return rows without RETURNING)
   for await (const _row of runtime.execute(plan)) {

@@ -1,68 +1,22 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { loadContractFromTs } from '@prisma-next/cli';
-import { emit } from '@prisma-next/emitter';
-import {
-  assembleOperationRegistry,
-  convertOperationManifest,
-  extractCodecTypeImports,
-  extractExtensionIds,
-  extractOperationTypeImports,
-} from '@prisma-next/family-sql/test-utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { type createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
+import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
 import {
-  getSqlDescriptorBundle,
-  pgvectorExtensionDescriptor,
   pgvectorExtensionRuntimeDescriptor,
   postgresAdapterRuntimeDescriptor,
   postgresTargetRuntimeDescriptor,
 } from './utils/framework-components';
 
-let contract: Contract;
-let contractIR: Awaited<ReturnType<typeof loadContractFromTs>>;
-
-beforeAll(async () => {
-  const contractPath = resolve(__dirname, '../prisma/contract.ts');
-  const outputDir = resolve(__dirname, '../src/prisma');
-
-  contractIR = await loadContractFromTs(contractPath);
-  const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle({
-    extensions: [pgvectorExtensionDescriptor],
-  });
-  const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
-  const codecTypeImports = extractCodecTypeImports(descriptors);
-  const operationTypeImports = extractOperationTypeImports(descriptors);
-  const extensionIds = extractExtensionIds(adapter, target, extensions);
-
-  const result = await emit(
-    contractIR,
-    {
-      outputDir,
-      operationRegistry,
-      codecTypeImports,
-      operationTypeImports,
-      extensionIds,
-    },
-    sqlTargetFamilyHook,
-  );
-
-  mkdirSync(outputDir, { recursive: true });
-  writeFileSync(join(outputDir, 'contract.json'), result.contractJson, 'utf-8');
-  writeFileSync(join(outputDir, 'contract.d.ts'), result.contractDts, 'utf-8');
-
-  const contractJson = JSON.parse(result.contractJson);
-  contract = validateContract<Contract>(contractJson);
-}, timeouts.typeScriptCompilation);
+// Use the emitted JSON contract which has the real computed hashes
+const contract = validateContract<Contract>(contractJson);
 
 /**
  * Creates a runtime context for the given contract.
@@ -91,13 +45,21 @@ async function seedTestData(
 
   const userIds: number[] = [];
 
-  // Insert users
+  // Insert users (provide all required columns since contract doesn't have defaults)
   if (data.users) {
-    for (const email of data.users) {
+    for (let i = 0; i < data.users.length; i++) {
+      const email = data.users[i]!;
+      const id = i + 1;
+      const createdAt = new Date();
+
       const plan = sql({ context })
-        .insert(userTable, { email: param('email') })
+        .insert(userTable, {
+          id: param('id'),
+          email: param('email'),
+          createdAt: param('createdAt'),
+        })
         .returning(userTable.columns['id']!)
-        .build({ params: { email } });
+        .build({ params: { id, email, createdAt } });
 
       for await (const row of runtime.execute(plan)) {
         userIds.push((row as { id: number }).id);
@@ -105,15 +67,24 @@ async function seedTestData(
     }
   }
 
-  // Insert posts
+  // Insert posts (provide all required columns)
   if (data.posts) {
-    for (const post of data.posts) {
+    for (let i = 0; i < data.posts.length; i++) {
+      const post = data.posts[i]!;
       const userId = userIds[post.userIndex];
       if (userId === undefined) continue;
 
+      const id = i + 1;
+      const createdAt = new Date();
+
       const plan = sql({ context })
-        .insert(postTable, { title: param('title'), userId: param('userId') })
-        .build({ params: { title: post.title, userId } });
+        .insert(postTable, {
+          id: param('id'),
+          title: param('title'),
+          userId: param('userId'),
+          createdAt: param('createdAt'),
+        })
+        .build({ params: { id, title: post.title, userId, createdAt } });
 
       for await (const _row of runtime.execute(plan)) {
         // consume iterator
@@ -130,7 +101,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         // Initialize schema using control client
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
 
         const { runtime, pool } = createTestRuntime(connectionString, contract);
         try {
@@ -162,7 +133,7 @@ describe('ORM integration tests', () => {
     'orm.getUserById returns single user by ID',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -190,7 +161,7 @@ describe('ORM integration tests', () => {
     'orm relation filters: where.related.posts.some() returns users with at least one post',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -220,7 +191,7 @@ describe('ORM integration tests', () => {
     'orm includes: include.posts() returns users with nested posts arrays',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -255,13 +226,16 @@ describe('ORM integration tests', () => {
     'orm writes: create() inserts a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
           process.env['DATABASE_URL'] = connectionString;
           const { ormCreateUser } = await import('../src/queries/orm-writes');
-          const affectedRows = await ormCreateUser('alice@example.com', runtime);
+          const affectedRows = await ormCreateUser(
+            { id: 1, email: 'alice@example.com', createdAt: new Date() },
+            runtime,
+          );
 
           expect(affectedRows).toBe(1);
         } finally {
@@ -276,7 +250,7 @@ describe('ORM integration tests', () => {
     'orm writes: update() updates a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -299,7 +273,7 @@ describe('ORM integration tests', () => {
     'orm writes: delete() deletes a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -322,7 +296,7 @@ describe('ORM integration tests', () => {
     'orm pagination: ormGetUsersByIdCursor returns paginated users with gt cursor',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
@@ -362,7 +336,7 @@ describe('ORM integration tests', () => {
     'orm pagination: ormGetUsersBackward returns users before cursor with lt operator',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR });
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {

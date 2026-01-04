@@ -1,7 +1,4 @@
-import { resolve } from 'node:path';
 import postgresAdapterRuntime from '@prisma-next/adapter-postgres/runtime';
-import { loadContractFromTs } from '@prisma-next/cli';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
@@ -9,18 +6,13 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { type createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import postgresTargetRuntime from '@prisma-next/target-postgres/runtime';
 import { withDevDatabase } from '@prisma-next/test-utils';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma-next/contract.d';
 import contractJson from '../src/prisma-next/contract.json' with { type: 'json' };
 import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
 
+// Use the emitted JSON contract which has the real computed hashes
 const contract = validateContract<Contract>(contractJson);
-let contractIR: ContractIR;
-
-beforeAll(async () => {
-  const contractPath = resolve(__dirname, '../prisma/contract.ts');
-  contractIR = await loadContractFromTs(contractPath);
-});
 
 /**
  * Creates a runtime context for the given contract.
@@ -47,17 +39,21 @@ async function seedTestUsers(
   if (!userTable) throw new Error('User table not found');
 
   for (let i = 0; i < count; i++) {
+    const createdAt = new Date();
+
     const plan = sql({ context })
       .insert(userTable, {
         id: param('id'),
         email: param('email'),
         name: param('name'),
+        createdAt: param('createdAt'),
       })
       .build({
         params: {
           id: `id-${i}`,
           email: `user${i}@example.com`,
           name: `User ${i}`,
+          createdAt,
         },
       });
 
@@ -89,8 +85,17 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
   it('blocks unbounded SELECT queries', async () => {
     await withDevDatabase(async ({ connectionString }) => {
       // Initialize schema using control client
-      await initTestDatabase({ connection: connectionString, contractIR });
+      await initTestDatabase({ connection: connectionString, contractIR: contract });
 
+      // Seed 100 test users using a runtime without strict budgets
+      const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+      try {
+        await seedTestUsers(seedRuntime, 100);
+      } finally {
+        await seedRuntime.close();
+      }
+
+      // Now create a runtime with strict budget for testing
       const { runtime, pool } = createTestRuntime(connectionString, contract, {
         maxRows: 50,
         defaultTableRows: 10_000,
@@ -98,9 +103,6 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       });
 
       try {
-        // Seed 100 test users
-        await seedTestUsers(runtime, 100);
-
         const context = createContext(contract);
         const tables = schema(context).tables;
         const userTable = tables['User'];
@@ -132,7 +134,15 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
 
   it('allows bounded SELECT queries within budget', async () => {
     await withDevDatabase(async ({ connectionString }) => {
-      await initTestDatabase({ connection: connectionString, contractIR });
+      await initTestDatabase({ connection: connectionString, contractIR: contract });
+
+      // Seed users using a runtime without strict budgets
+      const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+      try {
+        await seedTestUsers(seedRuntime, 100);
+      } finally {
+        await seedRuntime.close();
+      }
 
       const { runtime, pool } = createTestRuntime(connectionString, contract, {
         maxRows: 10_000,
@@ -141,8 +151,6 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       });
 
       try {
-        await seedTestUsers(runtime, 100);
-
         const context = createContext(contract);
         const tables = schema(context).tables;
         const userTable = tables['User'];
@@ -172,7 +180,15 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
 
   it('enforces streaming row budget', async () => {
     await withDevDatabase(async ({ connectionString }) => {
-      await initTestDatabase({ connection: connectionString, contractIR });
+      await initTestDatabase({ connection: connectionString, contractIR: contract });
+
+      // Seed users using a runtime without strict budgets
+      const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+      try {
+        await seedTestUsers(seedRuntime, 100);
+      } finally {
+        await seedRuntime.close();
+      }
 
       const { runtime, pool } = createTestRuntime(connectionString, contract, {
         maxRows: 10,
@@ -181,8 +197,6 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       });
 
       try {
-        await seedTestUsers(runtime, 100);
-
         const context = createContext(contract);
         const tables = schema(context).tables;
         const userTable = tables['User'];
