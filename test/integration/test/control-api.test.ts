@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
@@ -12,6 +12,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createIntegrationTestDir } from './utils/cli-test-helpers';
 
 // ============================================================================
 // Test Fixtures
@@ -31,26 +32,6 @@ function createTestContract(): SqlContract<SqlStorage> {
     )
     .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
     .build();
-}
-
-/**
- * Creates a simple test directory for fixtures.
- */
-function createTestDir(): { testDir: string; cleanup: () => void } {
-  const testDir = resolve(
-    `/tmp/prisma-next-control-api-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
-  mkdirSync(testDir, { recursive: true });
-  return {
-    testDir,
-    cleanup: () => {
-      try {
-        rmSync(testDir, { recursive: true, force: true });
-      } catch {
-        // Ignore cleanup errors
-      }
-    },
-  };
 }
 
 /**
@@ -89,16 +70,15 @@ async function emitContract(
 
 describe('control-api', () => {
   let testDir: string;
-  let testDirCleanup: () => void;
 
   beforeEach(() => {
-    const result = createTestDir();
-    testDir = result.testDir;
-    testDirCleanup = result.cleanup;
+    testDir = createIntegrationTestDir();
   });
 
   afterEach(() => {
-    testDirCleanup();
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   describe(
