@@ -56,8 +56,10 @@ describe('control client integration', () => {
         try {
           const verifyResult = await client.verify({ contractIR: contract });
 
-          expect(verifyResult.ok).toBe(true);
-          expect(verifyResult.contract.coreHash).toBeDefined();
+          expect(verifyResult).toMatchObject({
+            ok: true,
+            contract: { coreHash: expect.anything() },
+          });
         } finally {
           await client.close();
         }
