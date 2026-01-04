@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": ["@prisma-next/tsconfig/base"],
   "compilerOptions": {
     "outDir": "./dist",
     "types": ["vitest/globals"]

@@ -167,7 +167,7 @@ When adding a new package:
    }
    ```
 
-2. **Update `tsconfig.base.json`**: Add path mappings and project references if needed
+2. **Update `tsconfig.base.json`**: Add project references if needed
 
 3. **Update `pnpm-workspace.yaml`**: Add package glob pattern if needed
 

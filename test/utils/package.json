@@ -12,11 +12,11 @@
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist coverage .tmp-output"
   },
-  "dependencies": {},
   "devDependencies": {
+    "@prisma-next/tsconfig": "workspace:*",
     "@prisma/dev": "catalog:",
-    "pg": "catalog:",
     "@types/pg": "catalog:",
+    "pg": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

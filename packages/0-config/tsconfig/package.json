@@ -1,0 +1,11 @@
+{
+  "name": "@prisma-next/tsconfig",
+  "private": true,
+  "sideEffects": false,
+  "version": "0.0.0",
+  "description": "Base tsconfig providing package for the monorepo",
+  "license": "MIT",
+  "files": [
+    "./base.json"
+  ]
+}

@@ -146,6 +146,6 @@ Extension packs require multiple entries in `architecture.config.json` to map ea
 This convention keeps imports clear and consistent, keeps the repo navigable, and scales across domains. The `extension-` prefix is preferred over shorter alternatives (like `ext-`) for clarity and discoverability. The numbered directory prefix (`3-extensions/`) indicates that extensions are in domain 3, which can import from domains 1 (framework) and 2 (sql/document). Metadata enables automated loading and validation.
 
 ## Related Documentation
-- [Package Naming and Path Aliases](./Package%20Naming%20and%20Path%20Aliases.md)
+- [Package Naming Conventions](./Package%20Naming%20Conventions.md)
 - [ADR 112 - Target Extension Packs](../architecture%20docs/adrs/ADR%20112%20-%20Target%20Extension%20Packs.md)
 - `.cursor/rules/multi-plane-packages.mdc` - Multi-plane package patterns

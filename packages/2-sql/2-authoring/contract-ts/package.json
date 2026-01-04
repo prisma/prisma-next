@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
     "@types/pg": "catalog:",
     "pg": "catalog:",
     "tsup": "catalog:",

@@ -37,6 +37,7 @@
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
     "@prisma/dev": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
