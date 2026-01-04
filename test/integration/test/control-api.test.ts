@@ -282,14 +282,15 @@ describe('control-api', () => {
                 mode: 'apply',
               });
 
-              expect(result.ok).toBe(true);
-              if (result.ok) {
-                expect(result.value.mode).toBe('apply');
-                expect(result.value.execution).toBeDefined();
-                expect(result.value.marker).toBeDefined();
-                expect(result.value.marker?.coreHash).toBeDefined();
-                expect(result.value.summary).toContain('Applied');
-              }
+              expect(result).toMatchObject({
+                ok: true,
+                value: {
+                  mode: 'apply',
+                  execution: expect.anything(),
+                  marker: expect.objectContaining({ coreHash: expect.any(String) }),
+                  summary: expect.stringContaining('Applied'),
+                },
+              });
 
               // Verify marker was written by calling verify
               const verifyResult = await client.verify({

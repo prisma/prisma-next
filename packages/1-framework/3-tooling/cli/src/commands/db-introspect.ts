@@ -132,8 +132,10 @@ export function createDbIntrospectCommand(): Command {
         // Store driver descriptor after null check
         const driverDescriptor = config.driver;
 
-        // Create driver (cast to unknown since CLI connection type is driver-specific at runtime)
-        const driver = await withSpinner(() => driverDescriptor.create(dbConnection as unknown), {
+        // Create driver - the connection type is driver-specific (e.g., string URL for Postgres)
+        // but config.db.connection is typed as unknown. Cast required for contravariance.
+        // biome-ignore lint/suspicious/noExplicitAny: required for runtime connection type flexibility
+        const driver = await withSpinner(() => driverDescriptor.create(dbConnection as any), {
           message: 'Connecting to database...',
           flags,
         });

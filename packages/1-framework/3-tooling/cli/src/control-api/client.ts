@@ -220,10 +220,9 @@ class ControlClientImpl implements ControlClient {
   async introspect(options?: IntrospectOptions): Promise<unknown> {
     const { driver, familyInstance } = await this.ensureConnected();
 
-    // Delegate to family instance introspect method
-    // Note: The schema option is not currently used by the family instance introspect,
-    // but we accept it for future compatibility
-    void options?.schema;
+    // TODO: Pass schema option to familyInstance.introspect when schema filtering is implemented
+    const _schema = options?.schema;
+    void _schema;
 
     return familyInstance.introspect({ driver });
   }

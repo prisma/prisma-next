@@ -439,7 +439,7 @@ withTempDir(({ createTempDir }) => {
               types: 'output/contract.d.ts',
             },
             db: {
-              url: connectionString,
+              connection: connectionString,
             },
           } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
 

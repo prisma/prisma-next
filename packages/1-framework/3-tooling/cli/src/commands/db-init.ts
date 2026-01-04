@@ -176,10 +176,12 @@ export function createDbInitCommand(): Command {
         }
         const migrations = config.target.migrations;
 
-        // Create driver (cast to unknown since CLI connection type is driver-specific at runtime)
+        // Create driver - the connection type is driver-specific (e.g., string URL for Postgres)
+        // but config.db.connection is typed as unknown. Cast required for contravariance.
         let driver: Awaited<ReturnType<(typeof driverDescriptor)['create']>>;
         try {
-          driver = await withSpinner(() => driverDescriptor.create(dbConnection as unknown), {
+          // biome-ignore lint/suspicious/noExplicitAny: required for runtime connection type flexibility
+          driver = await withSpinner(() => driverDescriptor.create(dbConnection as any), {
             message: 'Connecting to database...',
             flags,
           });
