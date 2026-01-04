@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import {
-  errorDatabaseUrlRequired,
+  errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
   errorRuntime,
@@ -124,10 +124,10 @@ export function createDbSignCommand(): Command {
         }
         const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
-        // Resolve database URL
-        const dbUrl = options.db ?? config.db?.url;
-        if (!dbUrl) {
-          throw errorDatabaseUrlRequired();
+        // Resolve database connection (--db flag or config.db.connection)
+        const dbConnection = options.db ?? config.db?.connection;
+        if (!dbConnection) {
+          throw errorDatabaseConnectionRequired();
         }
 
         // Check for driver
@@ -159,7 +159,7 @@ export function createDbSignCommand(): Command {
         );
 
         // Create driver (expensive operation - done after validation)
-        const driver = await driverDescriptor.create(dbUrl);
+        const driver = await driverDescriptor.create(dbConnection);
 
         try {
           // Schema verification precondition with spinner

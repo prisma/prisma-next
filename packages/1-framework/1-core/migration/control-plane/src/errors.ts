@@ -171,13 +171,15 @@ export function errorFileNotFound(
 }
 
 /**
- * Database URL is required but not provided.
+ * Database connection is required but not provided.
  */
-export function errorDatabaseUrlRequired(options?: { readonly why?: string }): CliStructuredError {
-  return new CliStructuredError('4005', 'Database URL is required', {
+export function errorDatabaseConnectionRequired(options?: {
+  readonly why?: string;
+}): CliStructuredError {
+  return new CliStructuredError('4005', 'Database connection is required', {
     domain: 'CLI',
-    why: options?.why ?? 'Database URL is required for this command',
-    fix: 'Provide `--db <url>` or set `db: { url: "postgres://…" }` in prisma-next.config.ts',
+    why: options?.why ?? 'Database connection is required for this command',
+    fix: 'Provide `--db <url>` or set `db: { connection: "postgres://…" }` in prisma-next.config.ts',
   });
 }
 

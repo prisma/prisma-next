@@ -61,12 +61,11 @@ prisma-next contract emit [--config <path>] [--json] [-v] [-q] [--timestamps] [-
 
 **Config File Requirements:**
 
-The `contract emit` command requires a `driver` in the config (even though it doesn't use it) because `ControlFamilyDescriptor.create()` requires it for consistency:
+The `contract emit` command does not require a `driver` in the config since it doesn't connect to a database:
 
 ```typescript
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { contract } from './prisma/contract';
@@ -75,7 +74,6 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  driver: postgresDriver, // Required even though emit doesn't use it
   extensionPacks: [],
   contract: {
     source: contract,
@@ -116,7 +114,7 @@ prisma-next db verify [--db <url>] [--config <path>] [--json] [-v] [-q] [--times
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -164,7 +162,7 @@ export default defineConfig({
     types: 'src/prisma/contract.d.ts',
   },
   db: {
-    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+    connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
 });
 ```
@@ -173,7 +171,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
+3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Verify**: Calls `familyInstance.verify()` which:
    - Reads the contract marker from the database
    - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
@@ -235,16 +233,20 @@ Failure:
 
 **Family Requirements:**
 
-The family must provide a `create()` method in the family descriptor that returns a `ControlFamilyInstance` with a `verify()` method:
+The family must provide a `create()` method in the family descriptor that accepts a `ControlPlaneStack` and returns a `ControlFamilyInstance` with a `verify()` method:
 
 ```typescript
-interface ControlFamilyDescriptor {
-  create(options: {
-    target: ControlTargetDescriptor;
-    adapter: ControlAdapterDescriptor;
-    driver: ControlDriverDescriptor;
-    extensions: ControlExtensionDescriptor[];
-  }): ControlFamilyInstance;
+interface ControlFamilyDescriptor<TFamilyId, TFamilyInstance> {
+  create<TTargetId extends string>(
+    stack: ControlPlaneStack<TFamilyId, TTargetId>,
+  ): TFamilyInstance;
+}
+
+interface ControlPlaneStack<TFamilyId, TTargetId> {
+  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
+  readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
+  readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
+  readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
 }
 
 interface ControlFamilyInstance {
@@ -258,6 +260,8 @@ interface ControlFamilyInstance {
 }
 ```
 
+Use `createControlPlaneStack()` from `@prisma-next/core-control-plane/stack` to create the stack with sensible defaults (`driver` defaults to `undefined`, `extensionPacks` defaults to `[]`).
+
 The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles reading the marker, comparing hashes, and checking codec coverage internally.
 
 ### `prisma-next db introspect`
@@ -270,7 +274,7 @@ prisma-next db introspect [--db <url>] [--config <path>] [--json] [-v] [-q] [--t
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -312,7 +316,7 @@ export default defineConfig({
   driver: postgresDriver,
   extensionPacks: [],
   db: {
-    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+    connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
 });
 ```
@@ -320,7 +324,7 @@ export default defineConfig({
 **Introspection Process:**
 
 1. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-2. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
+2. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
 3. **Introspect**: Calls `familyInstance.introspect()` which:
    - Queries the database catalog to discover schema structure
    - Returns a family-specific schema IR (e.g., `SqlSchemaIR` for SQL family)
@@ -387,7 +391,7 @@ sql schema (tables: 2)
 
 **Error Codes:**
 - `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-CLI-4005`: Missing database URL — provide `--db <url>` or set `db.url` in config
+- `PN-CLI-4005`: Missing database connection — provide `--db <url>` or set `db.connection` in config
 
 **Family Requirements:**
 
@@ -421,7 +425,7 @@ prisma-next db sign [--db <url>] [--config <path>] [--json] [-v] [-q] [--timesta
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -469,7 +473,7 @@ export default defineConfig({
     types: 'src/prisma/contract.d.ts',
   },
   db: {
-    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+    connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
 });
 ```
@@ -478,7 +482,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`) to create a family instance
+3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Schema Verification (Precondition)**: Calls `familyInstance.schemaVerify()` to verify the database schema matches the contract:
    - If verification fails: Prints schema verification output and exits with code 1 (marker is not written)
    - If verification passes: Proceeds to marker signing
@@ -584,7 +588,7 @@ For updated markers:
 
 **Error Codes:**
 - `PN-CLI-4010`: Missing driver in config — provide a driver descriptor
-- `PN-CLI-4005`: Missing database URL — provide `--db <url>` or set `db.url` in config
+- `PN-CLI-4005`: Missing database connection — provide `--db <url>` or set `db.connection` in config
 - Exit code 1: Schema verification failed — database schema does not match contract (marker is not written)
 
 **Relationship to Other Commands:**
@@ -631,7 +635,7 @@ prisma-next db init [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q] [
 ```
 
 Options:
-- `--db <url>`: Database connection string (optional; defaults to `config.db.url` if set)
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
 - `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
 - `--plan`: Only show the migration plan, do not apply it
 - `--json [format]`: Output as JSON (`object` only; `ndjson` is not supported for this command)
@@ -680,7 +684,7 @@ export default defineConfig({
     types: 'src/prisma/contract.d.ts',
   },
   db: {
-    url: process.env.DATABASE_URL, // Optional: can also use --db flag
+    connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
 });
 ```
@@ -689,7 +693,7 @@ export default defineConfig({
 
 1. **Load Contract**: Reads the emitted `contract.json` from `config.contract.output`
 2. **Connect to Database**: Uses `config.driver.create(url)` to create a driver
-3. **Create Family Instance**: Calls `config.family.create()` with target, adapter, driver, and `extensionPacks` (passed as `extensions`)
+3. **Create Family Instance**: Creates a `ControlPlaneStack` via `createControlPlaneStack()` and passes it to `config.family.create(stack)` to create a family instance
 4. **Introspect Schema**: Calls `familyInstance.introspect()` to get the current database schema IR
 5. **Validate wiring**: Ensures the contract is compatible with the CLI config:
    - `contract.targetFamily` matches `config.family.familyId`
@@ -1058,12 +1062,92 @@ pnpm test:integration       # Run integration tests only
 pnpm test:e2e               # Run e2e tests only
 ```
 
+## Programmatic Control API
+
+The CLI package provides a programmatic control client for running control-plane operations without using the command line. This is useful for:
+
+- Integration with build tools and CI pipelines
+- Custom orchestration workflows
+- Test automation
+- Programmatic database management
+
+### Basic Usage
+
+```typescript
+import { createControlClient } from '@prisma-next/cli/control-api';
+import sql from '@prisma-next/family-sql/control';
+import postgres from '@prisma-next/target-postgres/control';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+
+// Create a control client with framework component descriptors
+const client = createControlClient({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensionPacks: [],
+});
+
+try {
+  // Connect to database
+  await client.connect(databaseUrl);
+
+  // Run operations
+  const verifyResult = await client.verify({ contractIR });
+  const initResult = await client.dbInit({ contractIR, mode: 'apply' });
+  const introspectResult = await client.introspect();
+} finally {
+  // Clean up
+  await client.close();
+}
+```
+
+### Available Operations
+
+| Method | Description |
+|--------|-------------|
+| `connect(url)` | Establishes database connection |
+| `close()` | Closes connection (idempotent) |
+| `verify(options)` | Verifies database marker matches contract |
+| `schemaVerify(options)` | Verifies database schema satisfies contract |
+| `sign(options)` | Writes contract marker to database |
+| `dbInit(options)` | Initializes database schema from contract |
+| `introspect(options)` | Introspects database schema |
+
+### Result Types
+
+Operations return structured result types:
+
+- `verify()` → `VerifyDatabaseResult`
+- `schemaVerify()` → `VerifyDatabaseSchemaResult`
+- `sign()` → `SignDatabaseResult`
+- `dbInit()` → `Result<DbInitSuccess, DbInitFailure>` (uses Result pattern)
+- `introspect()` → Schema IR (family-specific)
+
+### Error Handling
+
+- **Connection errors**: Thrown as exceptions from `connect()`
+- **Not connected errors**: Thrown if operations called before `connect()`
+- **Driver not configured**: Thrown if driver is not provided in options
+- **Operation failures**: Returned as structured results (not thrown)
+
+### Key Differences from CLI
+
+| Aspect | CLI | Control API |
+|--------|-----|-------------|
+| Config | Reads `prisma-next.config.ts` | Accepts descriptors directly |
+| File I/O | Reads contract.json from disk | Accepts contract IR directly |
+| Output | Formats for console | Returns structured data |
+| Exit codes | Uses `process.exit()` | Returns results/throws |
+
 ## Entrypoints
 
 The CLI package exports several subpaths for different use cases:
 
 - **`@prisma-next/cli`** (main export): Exports `loadContractFromTs` and `createContractEmitCommand`
 - **`@prisma-next/cli/config-types`**: Exports `defineConfig` and config types
+- **`@prisma-next/cli/control-api`**: Exports `createControlClient` and control API types
 - **`@prisma-next/cli/commands/db-init`**: Exports `createDbInitCommand`
 - **`@prisma-next/cli/commands/db-introspect`**: Exports `createDbIntrospectCommand`
 - **`@prisma-next/cli/commands/db-schema-verify`**: Exports `createDbSchemaVerifyCommand`

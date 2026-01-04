@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import {
-  errorDatabaseUrlRequired,
+  errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorRuntime,
   errorUnexpected,
@@ -103,9 +103,9 @@ export function createDbIntrospectCommand(): Command {
             // Mask password in URL for security
             const maskedUrl = options.db.replace(/:([^:@]+)@/, ':****@');
             details.push({ label: 'database', value: maskedUrl });
-          } else if (config.db?.url) {
+          } else if (config.db?.connection && typeof config.db.connection === 'string') {
             // Mask password in URL for security
-            const maskedUrl = config.db.url.replace(/:([^:@]+)@/, ':****@');
+            const maskedUrl = config.db.connection.replace(/:([^:@]+)@/, ':****@');
             details.push({ label: 'database', value: maskedUrl });
           }
           const header = formatStyledHeader({
@@ -118,10 +118,10 @@ export function createDbIntrospectCommand(): Command {
           console.log(header);
         }
 
-        // Resolve database URL
-        const dbUrl = options.db ?? config.db?.url;
-        if (!dbUrl) {
-          throw errorDatabaseUrlRequired();
+        // Resolve database connection (--db flag or config.db.connection)
+        const dbConnection = options.db ?? config.db?.connection;
+        if (!dbConnection) {
+          throw errorDatabaseConnectionRequired();
         }
 
         // Check for driver
@@ -132,8 +132,7 @@ export function createDbIntrospectCommand(): Command {
         // Store driver descriptor after null check
         const driverDescriptor = config.driver;
 
-        // Create driver
-        const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
+        const driver = await withSpinner(() => driverDescriptor.create(dbConnection), {
           message: 'Connecting to database...',
           flags,
         });
@@ -199,6 +198,12 @@ export function createDbIntrospectCommand(): Command {
           }
 
           // Build result envelope
+          // Get masked connection URL for meta (only for string connections)
+          const connectionForMeta =
+            typeof dbConnection === 'string'
+              ? dbConnection.replace(/:([^:@]+)@/, ':****@')
+              : undefined;
+
           const introspectResult: IntrospectSchemaResult<unknown> = {
             ok: true,
             summary: 'Schema introspected successfully',
@@ -207,18 +212,11 @@ export function createDbIntrospectCommand(): Command {
               id: config.target.targetId,
             },
             schema: schemaIR,
-            ...(configPath || options.db || config.db?.url
+            ...(configPath || connectionForMeta
               ? {
                   meta: {
                     ...(configPath ? { configPath } : {}),
-                    ...(options.db || config.db?.url
-                      ? {
-                          dbUrl: (options.db ?? config.db?.url ?? '').replace(
-                            /:([^:@]+)@/,
-                            ':****@',
-                          ),
-                        }
-                      : {}),
+                    ...(connectionForMeta ? { dbUrl: connectionForMeta } : {}),
                   },
                 }
               : {}),

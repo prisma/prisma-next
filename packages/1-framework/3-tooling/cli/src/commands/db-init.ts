@@ -13,7 +13,7 @@ import { loadConfig } from '../config-loader';
 import { performAction } from '../utils/action';
 import {
   errorContractValidationFailed,
-  errorDatabaseUrlRequired,
+  errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
   errorJsonFormatNotSupported,
@@ -154,11 +154,11 @@ export function createDbInitCommand(): Command {
           );
         }
 
-        // Resolve database URL
-        const dbUrl = options.db ?? config.db?.url;
-        if (!dbUrl) {
-          throw errorDatabaseUrlRequired({
-            why: `Database URL is required for db init (set db.url in ${configPath}, or pass --db <url>)`,
+        // Resolve database connection (--db flag or config.db.connection)
+        const dbConnection = options.db ?? config.db?.connection;
+        if (!dbConnection) {
+          throw errorDatabaseConnectionRequired({
+            why: `Database connection is required for db init (set db.connection in ${configPath}, or pass --db <url>)`,
           });
         }
 
@@ -176,23 +176,24 @@ export function createDbInitCommand(): Command {
         }
         const migrations = config.target.migrations;
 
-        // Create driver
         let driver: Awaited<ReturnType<(typeof driverDescriptor)['create']>>;
         try {
-          driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
+          driver = await withSpinner(() => driverDescriptor.create(dbConnection), {
             message: 'Connecting to database...',
             flags,
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           const code = (error as { code?: unknown }).code;
-          const redacted = redactDatabaseUrl(dbUrl);
+          // Only redact if connection is a string (URL)
+          const redacted =
+            typeof dbConnection === 'string' ? redactDatabaseUrl(dbConnection) : undefined;
           throw errorRuntime('Database connection failed', {
             why: message,
-            fix: 'Verify the database URL, ensure the database is reachable, and confirm credentials/permissions',
+            fix: 'Verify the database connection, ensure the database is reachable, and confirm credentials/permissions',
             meta: {
               ...(typeof code !== 'undefined' ? { code } : {}),
-              ...redacted,
+              ...(redacted ?? {}),
             },
           });
         }

@@ -361,11 +361,11 @@ withTempDir(({ createTempDir }) => {
       'reports PN-CLI-4010 when driver is missing',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
-          // Set up test directory from fixtures with config that has db.url but no driver
+          // Set up test directory from fixtures with config that has db.connection but no driver
           const testSetup = setupTestDirectoryFromFixtures(
             createTempDir,
             fixtureSubdir,
-            'prisma-next.config.no-query-runner.ts',
+            'prisma-next.config.no-driver.ts',
             { '{{DB_URL}}': connectionString },
           );
           const testDir = testSetup.testDir;
@@ -439,7 +439,7 @@ withTempDir(({ createTempDir }) => {
               types: 'output/contract.d.ts',
             },
             db: {
-              url: connectionString,
+              connection: connectionString,
             },
           } as unknown as Awaited<ReturnType<typeof originalLoadConfig.loadConfig>>);
 

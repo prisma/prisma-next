@@ -133,7 +133,7 @@ fixtures/db-verify/
   contract.ts
   prisma-next.config.ts                    # Basic config
   prisma-next.config.with-db.ts           # Config with database
-  prisma-next.config.no-query-runner.ts   # Config missing queryRunnerFactory
+  prisma-next.config.no-driver.ts         # Config missing driver
   prisma-next.config.no-verify.ts         # Config missing verify.readMarkerSql
 ```
 

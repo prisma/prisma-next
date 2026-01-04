@@ -11,7 +11,7 @@ export default defineConfig({
   driver: postgresDriver,
   extensions: [],
   db: {
-    url: '{{DB_URL}}',
+    connection: '{{DB_URL}}',
   },
   contract: {
     source: './contract.ts',

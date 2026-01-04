@@ -42,6 +42,10 @@ const testContract: SqlContract<SqlStorage> = {
     codecTypes: {},
     operationTypes: {},
   },
+  capabilities: {},
+  extensionPacks: {},
+  meta: {},
+  sources: {},
 };
 
 // Shared query module that accepts a client with used methods

@@ -316,9 +316,14 @@ export interface ControlAdapterDescriptor<
 /**
  * Descriptor for a control-plane driver component (e.g., Postgres driver).
  *
+ * The connection input type is driver-specific. For example:
+ * - Postgres uses a connection string (URL)
+ * - Other drivers may accept structured objects (e.g., file paths, credentials)
+ *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  * @template TDriverInstance - The driver instance type
+ * @template TConnection - The connection input type (defaults to `string` for URL-based drivers)
  */
 export interface ControlDriverDescriptor<
   TFamilyId extends string,
@@ -327,8 +332,9 @@ export interface ControlDriverDescriptor<
     TFamilyId,
     TTargetId
   >,
+  TConnection = string,
 > extends DriverDescriptor<TFamilyId, TTargetId> {
-  create(url: string): Promise<TDriverInstance>;
+  create(connection: TConnection): Promise<TDriverInstance>;
 }
 
 /**

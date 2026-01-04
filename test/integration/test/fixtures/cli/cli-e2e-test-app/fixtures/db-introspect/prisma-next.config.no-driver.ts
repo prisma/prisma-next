@@ -17,6 +17,6 @@ export default {
     types: 'output/contract.d.ts',
   },
   db: {
-    url: '{{DB_URL}}', // Placeholder to be replaced in tests
+    connection: '{{DB_URL}}', // Placeholder to be replaced in tests
   },
 };

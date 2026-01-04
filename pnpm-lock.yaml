@@ -162,6 +162,9 @@ importers:
       '@prisma-next/compat-prisma':
         specifier: workspace:*
         version: link:../../packages/3-extensions/compat-prisma
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/1-core/shared/contract
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/7-drivers/postgres

@@ -392,7 +392,7 @@ withTempDir(({ createTempDir }) => {
         const testDir = createTempDir();
         const configPath = resolve(testDir, 'prisma-next.config.ts');
 
-        // Create config file without db.url
+        // Create config file without db.connection
         const configContent = `import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
@@ -409,7 +409,7 @@ export default defineConfig({
     source: './contract.ts',
     output: './src/prisma/contract.json',
   },
-  // db.url is intentionally missing - this is what we're testing
+  // db.connection is intentionally missing - this is what we're testing
 });`;
         mkdirSync(dirname(configPath), { recursive: true });
         writeFileSync(configPath, configContent, 'utf-8');
@@ -430,7 +430,7 @@ export default defineConfig({
         const originalCwd = process.cwd();
         try {
           process.chdir(testDir);
-          // Don't provide --db flag, and config has no db.url
+          // Don't provide --db flag, and config has no db.connection
           await expect(
             executeCommand(command, ['--config', configPath, '--no-color']),
           ).rejects.toThrow();
@@ -442,7 +442,7 @@ export default defineConfig({
         const errorOutput = consoleErrors.join('\n');
         const allOutput = `${consoleOutput.join('\n')}\n${errorOutput}`;
         // Error should be in either consoleErrors or consoleOutput
-        expect(allOutput).toMatch(/PN-CLI-4005|Database URL is required/i);
+        expect(allOutput).toMatch(/PN-CLI-4005|Database connection is required/i);
       },
       timeouts.spinUpPpgDev,
     );
@@ -767,7 +767,7 @@ export default defineConfig({
           const originalCwd = process.cwd();
           try {
             process.chdir(testSetup.testDir);
-            // Provide --db flag even though config has db.url - this tests the options.db branch
+            // Provide --db flag even though config has db.connection - this tests the options.db branch
             await executeCommand(command, [
               '--config',
               configPath,

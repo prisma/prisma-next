@@ -57,6 +57,8 @@ function createTestContract(): SqlContract<SqlStorage> {
       codecTypes: {},
       operationTypes: {},
     },
+    capabilities: {},
+    extensionPacks: {},
     meta: {},
     sources: {},
   };

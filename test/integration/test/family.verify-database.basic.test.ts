@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
@@ -21,6 +21,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createIntegrationTestDir } from './utils/cli-test-helpers';
 
 /**
  * Creates a test contract for testing.
@@ -44,26 +45,6 @@ function createTestContract(): SqlContract<SqlStorage> {
         version: '0.0.1',
       },
       pg: {},
-    },
-  };
-}
-
-/**
- * Creates a simple test directory for fixtures.
- */
-function createTestDir(): { testDir: string; cleanup: () => void } {
-  const testDir = resolve(
-    `/tmp/prisma-next-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
-  mkdirSync(testDir, { recursive: true });
-  return {
-    testDir,
-    cleanup: () => {
-      try {
-        rmSync(testDir, { recursive: true, force: true });
-      } catch {
-        // Ignore cleanup errors
-      }
     },
   };
 }
@@ -156,7 +137,7 @@ describe('family instance verify - basic', () => {
     'verifies database with matching marker via driver',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        const { testDir: testDirWithDb, cleanup: cleanupWithDb } = createTestDir();
+        const testDirWithDb = createIntegrationTestDir();
 
         try {
           // Create and emit contract
@@ -201,7 +182,9 @@ describe('family instance verify - basic', () => {
           });
           expect(result.timings.total).toBeGreaterThanOrEqual(0);
         } finally {
-          cleanupWithDb();
+          if (existsSync(testDirWithDb)) {
+            rmSync(testDirWithDb, { recursive: true, force: true });
+          }
         }
       });
     },
@@ -212,9 +195,7 @@ describe('family instance verify - basic', () => {
     'handles contract without profileHash',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        const testSetup = createTestDir();
-        const testDirWithDb = testSetup.testDir;
-        const cleanupWithDb = testSetup.cleanup;
+        const testDirWithDb = createIntegrationTestDir();
 
         try {
           // Create and emit contract
@@ -267,7 +248,9 @@ describe('family instance verify - basic', () => {
           });
           expect(result.contract.profileHash).toBeUndefined();
         } finally {
-          cleanupWithDb();
+          if (existsSync(testDirWithDb)) {
+            rmSync(testDirWithDb, { recursive: true, force: true });
+          }
         }
       });
     },

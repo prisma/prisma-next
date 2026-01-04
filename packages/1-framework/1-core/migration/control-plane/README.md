@@ -9,6 +9,7 @@ This package provides the core domain logic for control plane operations (contra
 ## Responsibilities
 
 - **Config Types**: Type definitions for Prisma Next configuration (`PrismaNextConfig`, `ControlFamilyDescriptor`, `ControlTargetDescriptor`, `ControlAdapterDescriptor`, `ControlDriverDescriptor`, `ControlExtensionDescriptor`)
+- **ControlPlaneStack**: A struct bundling `target`, `adapter`, `driver`, and `extensionPacks` for control plane operations. Use `createControlPlaneStack()` to construct with sensible defaults.
 - **Config Validation**: Pure validation logic for config structure (no file I/O)
 - **Config Normalization**: `defineConfig()` function for normalizing config with defaults
 - **Domain Actions**:
@@ -68,6 +69,34 @@ const config = defineConfig({
 // Validate config structure (pure validation, no file I/O)
 validateConfig(config);
 ```
+
+### ControlPlaneStack
+
+The `ControlPlaneStack` bundles component descriptors for control plane operations (creating family instances, running CLI commands, connecting to databases):
+
+```typescript
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
+import type { ControlPlaneStack } from '@prisma-next/core-control-plane/types';
+
+// Create a stack with sensible defaults
+const stack = createControlPlaneStack({
+  target: postgresTarget,
+  adapter: postgresAdapter,
+  driver: postgresDriver, // optional, defaults to undefined
+  extensionPacks: [pgvector], // optional, defaults to []
+});
+
+// Use stack for family instance creation
+const familyInstance = config.family.create(stack);
+
+// Stack is also used internally by ControlClient and CLI commands
+```
+
+**Stack shape after construction:**
+- `target`: Required target descriptor
+- `adapter`: Required adapter descriptor
+- `driver`: `ControlDriverDescriptor | undefined` (always present, may be `undefined`)
+- `extensionPacks`: `readonly ControlExtensionDescriptor[]` (always an array, possibly empty)
 
 ### Verify Database
 

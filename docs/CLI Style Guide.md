@@ -77,9 +77,9 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - Config file names: `prisma-next.config.ts|.mjs|.js` (ESM); optional CJS fallback.
 - Discovery precedence: `--config <path>` > `PRISMA_NEXT_CONFIG` > nearest `prisma-next.config.*` in CWD (no upward search).
 - Precedence: flags > config > defaults.
-- Env policy: the CLI does not auto‑load `.env`. Apps may do so in `prisma-next.config.*` and pass values (e.g., `db.url`).
+- Env policy: the CLI does not auto‑load `.env`. Apps may do so in `prisma-next.config.*` and pass values (e.g., `db.connection`).
 - Contract source/output and migration directory: defined in config; flags should not override (for now).
-- DB URL: `--db=<URL>` or `config.db.url`.
+- DB Connection: `--db=<URL>` or `config.db.connection`.
 
 ## Exit Codes & Streams
 - Exit codes: `0` success, `1` runtime/error, `2` usage/config error.
@@ -94,11 +94,11 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 
 ## Database Commands
 - `db verify` (canonical):
-  - Loads config + contract, connects via `--db` or `config.db.url`.
+  - Loads config + contract, connects via `--db` or `config.db.connection`.
   - Checks marker presence, `coreHash`/`profileHash` equality, target match.
   - Non‑interactive; single JSON with `--json`.
 - `db schema-verify` (canonical):
-  - Loads config + contract, connects via `config.db.url` (or `--db` when supported).
+  - Loads config + contract, connects via `config.db.connection` (or `--db` when supported).
   - Verifies that the live database schema satisfies the contract (catalog-based checks).
   - Non‑interactive; single JSON object with `--json`.
 - `db sign` (canonical):

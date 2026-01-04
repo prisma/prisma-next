@@ -1,0 +1,34 @@
+/**
+ * Programmatic Control API for Prisma Next.
+ *
+ * This module exports the control client factory and types for programmatic
+ * access to control-plane operations without using the CLI.
+ *
+ * @see README.md "Programmatic Control API" section for usage examples
+ * @module
+ */
+
+// Re-export core control plane types for consumer convenience
+export type {
+  ControlPlaneStack,
+  SignDatabaseResult,
+  VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/core-control-plane/types';
+// Client factory
+export { createControlClient } from '../control-api/client';
+
+// CLI-specific types
+export type {
+  ControlClient,
+  ControlClientOptions,
+  DbInitFailure,
+  DbInitFailureCode,
+  DbInitOptions,
+  DbInitResult,
+  DbInitSuccess,
+  IntrospectOptions,
+  SchemaVerifyOptions,
+  SignOptions,
+  VerifyOptions,
+} from '../control-api/types';

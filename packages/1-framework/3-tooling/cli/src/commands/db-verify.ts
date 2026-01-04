@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import {
-  errorDatabaseUrlRequired,
+  errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
   errorHashMismatch,
@@ -118,10 +118,10 @@ export function createDbVerifyCommand(): Command {
         }
         const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
 
-        // Resolve database URL
-        const dbUrl = options.db ?? config.db?.url;
-        if (!dbUrl) {
-          throw errorDatabaseUrlRequired();
+        // Resolve database connection (--db flag or config.db.connection)
+        const dbConnection = options.db ?? config.db?.connection;
+        if (!dbConnection) {
+          throw errorDatabaseConnectionRequired();
         }
 
         // Check for driver
@@ -132,8 +132,7 @@ export function createDbVerifyCommand(): Command {
         // Store driver descriptor after null check
         const driverDescriptor = config.driver;
 
-        // Create driver
-        const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
+        const driver = await withSpinner(() => driverDescriptor.create(dbConnection), {
           message: 'Connecting to database...',
           flags,
         });

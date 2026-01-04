@@ -16,12 +16,58 @@ Implement all tasks assigned to you and ONLY those task(s) that have been assign
 2. Analyze patterns in the codebase according to its built-in workflow
 3. Implement the assigned task group according to requirements and standards
 4. Update `agent-os/specs/[this-spec]/tasks.md` to update the tasks you've implemented to mark that as done by updating their checkbox to checked state: `- [x]`
+5. Make logical git commits as you go so the PR reads as a small story (see “Git workflow” below)
 
 ## Guide your implementation using:
 - **The existing patterns** that you've found and analyzed in the codebase.
 - **Specific notes provided in requirements.md, spec.md AND/OR tasks.md**
 - **Visuals provided (if any)** which would be located in `agent-os/specs/[this-spec]/planning/visuals/`
 - **User Standards & Preferences** which are defined below.
+
+## Git workflow: tell the story through commits
+
+Your PR should read as a small story told through commits: each commit isolates one logical change, and the message explains **why it exists** at a useful granularity.
+
+### Commit cadence
+
+- Commit after each coherent unit of work (often: one sub-task or one “move the system forward” step).
+- Prefer multiple small commits over one large commit when it improves blame and review.
+- Keep commits focused: don’t mix unrelated refactors, formatting, and feature work.
+
+### Each commit should be reviewable
+
+- Keep the repo in a reasonable state per commit (ideally: builds and relevant tests pass).
+- If you’re working test-first, you can still keep commits green by committing tests + implementation together (write tests first in your workflow; commit them when they pass).
+
+### How to make a commit (every time)
+
+1. Check what changed: `git status` + `git diff`
+2. Run the smallest relevant test command(s) for the change
+3. Stage explicitly (never `git add -A` / `git add .`)
+   - Prefer: `git add path/to/fileA path/to/fileB`
+   - Or, if appropriate: `git add -u`
+4. Review exactly what will ship: `git diff --cached`
+5. Commit with a message that explains intent (see below)
+
+### Commit message style
+
+- Subject line: imperative, concise; add a scope prefix when helpful (e.g. `cli:`, `sql-runtime:`)
+- Body: explain **why** and any constraints/tradeoffs; avoid restating the diff
+
+Example:
+
+```
+cli: resolve framework components from normalized descriptors
+
+Why:
+- keep config parsing consistent across commands
+- make missing component failures actionable
+```
+
+### Safety rails
+
+- Don’t amend commits that may already be shared; add a follow-up commit instead.
+- Never commit anything under `wip/`.
 
 ## Self-verify and test your work by:
 - Running ONLY the tests you've written (if any) and ensuring those tests pass.

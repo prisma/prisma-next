@@ -9,8 +9,7 @@
     "build": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev --name init",
-    "emit": "prisma-next emit",
-    "stamp-marker": "tsx scripts/stamp-marker.ts",
+    "emit": "prisma-next contract emit",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/index.ts",
     "test": "vitest run --config vitest.config.ts",
@@ -20,6 +19,7 @@
   "dependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/compat-prisma": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",

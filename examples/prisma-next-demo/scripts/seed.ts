@@ -1,11 +1,17 @@
 import 'dotenv/config';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadContractFromTs } from '@prisma-next/cli';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { Client } from 'pg';
 import { schema, sql } from '../src/prisma/query';
 import { closeRuntime, getRuntime } from '../src/prisma/runtime';
+import { createDemoControlClient } from '../test/utils/control-client';
 
 async function collectRows<P extends ExecutionPlan | SqlQueryPlan<unknown>>(
   plan: P,
@@ -18,51 +24,33 @@ async function collectRows<P extends ExecutionPlan | SqlQueryPlan<unknown>>(
   return rows;
 }
 
-async function setupTables() {
+async function initializeSchema() {
   const connectionString = process.env['DATABASE_URL'];
   if (!connectionString) {
     throw new Error('DATABASE_URL environment variable is required');
   }
 
-  const client = new Client({ connectionString });
-  await client.connect();
+  // Load the contract from TypeScript source
+  const contractPath = resolve(__dirname, '../prisma/contract.ts');
+  const contractIR = await loadContractFromTs(contractPath);
 
+  // Use control client to initialize schema and write marker
+  const client = createDemoControlClient({ connection: connectionString });
   try {
-    // Drop all tables to reset the database
-    await client.query('drop table if exists "post" cascade');
-    await client.query('drop table if exists "user" cascade');
-
-    // Create pgvector extension
-    await client.query('create extension if not exists vector');
-
-    // Create user table
-    await client.query(`
-      create table "user" (
-        id serial primary key,
-        email text not null unique,
-        "createdAt" timestamptz not null default now()
-      )
-    `);
-
-    // Create post table with embedding column
-    await client.query(`
-      create table "post" (
-        id serial primary key,
-        title text not null,
-        "userId" int4 not null,
-        "createdAt" timestamptz not null default now(),
-        embedding vector(1536),
-        constraint post_userId_fkey foreign key ("userId") references "user"(id)
-      )
-    `);
+    const result = await client.dbInit({ contractIR, mode: 'apply' });
+    if (!result.ok) {
+      throw new Error(`dbInit failed: ${result.failure.summary}`);
+    }
+    console.log(`Schema initialized: ${result.value.summary}`);
   } finally {
-    await client.end();
+    await client.close();
   }
 }
 
 async function main() {
-  // Setup tables first
-  await setupTables();
+  // Initialize schema using control client
+  await initializeSchema();
+
   const tables = schema.tables;
   const userTable = tables.user;
   const postTable = tables.post;

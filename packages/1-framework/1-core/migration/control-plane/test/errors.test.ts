@@ -6,7 +6,7 @@ import {
   errorContractConfigMissing,
   errorContractMissingExtensionPacks,
   errorContractValidationFailed,
-  errorDatabaseUrlRequired,
+  errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
@@ -129,15 +129,15 @@ describe('Config Errors', () => {
     expect(error.why).toBe('Custom reason');
   });
 
-  it('errorDatabaseUrlRequired creates correct error', () => {
-    const error = errorDatabaseUrlRequired();
+  it('errorDatabaseConnectionRequired creates correct error', () => {
+    const error = errorDatabaseConnectionRequired();
     expect(error.code).toBe('4005');
-    expect(error.message).toBe('Database URL is required');
+    expect(error.message).toBe('Database connection is required');
     expect(error.domain).toBe('CLI');
   });
 
-  it('errorDatabaseUrlRequired with custom why', () => {
-    const error = errorDatabaseUrlRequired({ why: 'Custom reason' });
+  it('errorDatabaseConnectionRequired with custom why', () => {
+    const error = errorDatabaseConnectionRequired({ why: 'Custom reason' });
     expect(error.why).toBe('Custom reason');
   });
 

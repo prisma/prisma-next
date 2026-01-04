@@ -6,7 +6,7 @@ export {
   errorContractConfigMissing,
   errorContractMissingExtensionPacks,
   errorContractValidationFailed,
-  errorDatabaseUrlRequired,
+  errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,

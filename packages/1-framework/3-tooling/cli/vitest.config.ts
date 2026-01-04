@@ -48,6 +48,10 @@ export default defineConfig({
         // Exclude defensive error handling branches that are hard to test meaningfully
         'src/api/emit-contract.ts', // Non-Error exception handling (lines 104-105)
         'src/load-ts-contract.ts', // Bundle content undefined and non-Error exceptions (lines 170-171, 211)
+        // Control API is tested via integration tests (test/integration/test/control-api.test.ts).
+        // Unit tests with mocked components only test orchestration wiring, not real behavior.
+        // Coverage is measured in integration tests, not package-level coverage.
+        'src/control-api/**',
       ],
       thresholds: {
         lines: 95,
