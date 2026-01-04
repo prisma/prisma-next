@@ -1,6 +1,10 @@
 import 'dotenv/config';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadContractFromTs } from '@prisma-next/cli';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
