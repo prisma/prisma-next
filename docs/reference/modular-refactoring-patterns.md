@@ -1,9 +1,3 @@
----
-description: Patterns for refactoring large monolithic files into modular structures
-globs: ["packages/**/*.ts", "packages/**/*.tsx"]
-alwaysApply: false
----
-
 # Modular Refactoring Patterns
 
 This document covers patterns for refactoring large monolithic files into modular, maintainable structures while maintaining API stability.

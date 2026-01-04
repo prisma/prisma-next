@@ -1,9 +1,3 @@
----
-description: Patterns for CLI e2e tests using shared fixture app
-globs: ["test/e2e/**", "test/integration/**", "packages/1-framework/3-tooling/cli/**"]
-alwaysApply: false
----
-
 # CLI E2E Test Fixture Patterns
 
 ## Overview
@@ -55,24 +49,24 @@ packages/framework/tooling/cli/test/cli-e2e-test-app/
 **✅ CORRECT: Use shared fixture app with command-specific subdirectories**
 
 ```typescript
-import { setupTestDirectoryFromFixtures } from './utils/test-helpers';
+import { withTempDir, setupTestDirectoryFromFixtures } from './utils/test-helpers';
 
 // Fixture subdirectory for this command's tests
 const fixtureSubdir = 'emit';
 
-describe('command e2e tests', () => {
-  it('test description', async () => {
-    // Set up test directory from fixtures
-    const testSetup = setupTestDirectoryFromFixtures(
-      fixtureSubdir,
-      'prisma-next.config.emit.ts',  // Config file name
-      { '{{PLACEHOLDER}}': 'value' }, // Optional replacements
-    );
-    const testDir = testSetup.testDir;
-    const configPath = testSetup.configPath;
-    const cleanupDir = testSetup.cleanup;
+withTempDir(({ createTempDir }) => {
+  describe('command e2e tests', () => {
+    it('test description', async () => {
+      // Set up test directory from fixtures
+      const testSetup = setupTestDirectoryFromFixtures(
+        createTempDir,
+        fixtureSubdir,
+        'prisma-next.config.emit.ts', // Config file name
+        { '{{PLACEHOLDER}}': 'value' }, // Optional replacements
+      );
+      const testDir = testSetup.testDir;
+      const configPath = testSetup.configPath;
 
-    try {
       // Run command from testDir
       const originalCwd = process.cwd();
       try {
@@ -81,18 +75,16 @@ describe('command e2e tests', () => {
       } finally {
         process.chdir(originalCwd);
       }
-    } finally {
-      // Each test must clean up its own directory
-      cleanupDir();
-    }
+    });
   });
 });
 ```
 
 ## Helper Function
 
-**`setupTestDirectoryFromFixtures(fixtureSubdir, configFileName?, replacements?)`**
+**`setupTestDirectoryFromFixtures(createTempDir, fixtureSubdir, configFileName?, replacements?)`**
 
+- **`createTempDir`**: Required. Function that returns a new ephemeral test directory path.
 - **`fixtureSubdir`**: Name of the fixture subdirectory (e.g., `'emit'`, `'db-verify'`)
 - **`configFileName`**: Optional. Name of the config file to copy (defaults to `'prisma-next.config.ts'`)
 - **`replacements`**: Optional. Object mapping placeholders to values (e.g., `{ '{{DB_URL}}': connectionString }`)
@@ -102,7 +94,8 @@ describe('command e2e tests', () => {
 - `contractPath`: Path to the copied `contract.ts` file
 - `outputDir`: Path to the `output/` subdirectory
 - `configPath`: Path to the copied config file
-- `cleanup`: Function to delete the test directory
+
+**Note**: If you need a cleanup function, use `setupIntegrationTestDirectoryFromFixtures(...)` instead (it returns `{ ..., cleanup }`).
 
 ## Key Points
 
@@ -116,7 +109,7 @@ describe('command e2e tests', () => {
 
 5. **Ephemeral directories**: Each test gets its own directory, ensuring isolation. Each test must clean up its own directory.
 
-6. **Cleanup responsibility**: Each test is responsible for cleaning up its own directory. Use `afterEach` hooks for tests that set up directories in `beforeEach`, or call `cleanupDir()` in `finally` blocks for tests that create directories within individual test cases. **Never use `afterAll` hooks for cleanup** - they can interfere with tests that are still running and cause race conditions. **Never use global cleanup functions** that scan and delete directories - this causes race conditions when tests run in parallel.
+6. **Cleanup responsibility**: Prefer `withTempDir(...)` for per-test cleanup (it tracks directories and removes them in `afterEach`). If you need an explicit cleanup function, use `setupIntegrationTestDirectoryFromFixtures(...)`. **Never use `afterAll` hooks for cleanup** - they can interfere with tests that are still running and cause race conditions. **Never use global cleanup functions** that scan and delete directories - this causes race conditions when tests run in parallel.
 
 7. **Module resolution**: Tests run from within the ephemeral directory, which is a subdirectory of the fixture app. Node's module resolution walks up to find the parent `package.json` and `node_modules`, allowing workspace packages to be resolved correctly.
 
@@ -146,36 +139,31 @@ fixtures/db-verify/
 
 **Using placeholders:**
 ```typescript
-const testSetup = setupTestDirectoryFromFixtures(
-  'db-verify',
-  'prisma-next.config.with-db.ts',
-  { '{{DB_URL}}': connectionString },
-);
-const cleanupDir = testSetup.cleanup;
+withTempDir(({ createTempDir }) => {
+  const testSetup = setupTestDirectoryFromFixtures(
+    createTempDir,
+    'db-verify',
+    'prisma-next.config.with-db.ts',
+    { '{{DB_URL}}': connectionString },
+  );
 
-try {
   // ... test code ...
-} finally {
-  cleanupDir(); // Each test cleans up its own directory
-}
+});
 ```
 
 **Using afterEach for cleanup:**
 ```typescript
-describe('command tests', () => {
-  let cleanupDir: () => void;
+withTempDir(({ createTempDir }) => {
+  describe('command tests', () => {
+    let testSetup: ReturnType<typeof setupTestDirectoryFromFixtures>;
 
-  beforeEach(() => {
-    const testSetup = setupTestDirectoryFromFixtures(fixtureSubdir);
-    cleanupDir = testSetup.cleanup;
-  });
+    beforeEach(() => {
+      testSetup = setupTestDirectoryFromFixtures(createTempDir, fixtureSubdir);
+    });
 
-  afterEach(() => {
-    cleanupDir(); // Clean up after each test
-  });
-
-  it('test description', async () => {
-    // ... test code ...
+    it('test description', async () => {
+      // ... test code using testSetup.testDir ...
+    });
   });
 });
 ```

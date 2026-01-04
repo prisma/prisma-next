@@ -865,7 +865,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Error Handling**: Uses `exitOverride()` to catch unhandled errors (non-structured errors that fail fast) and print stack traces. Commands handle structured errors themselves via `process.exit()`.
 - **Command Taxonomy**: Groups commands by domain/plane (e.g., `contract emit`)
 - **Help Formatting**: Uses `configureHelp()` to customize help output with styled format matching normal command output. Root help shows "prisma-next" title with command tree; command help shows "prisma-next <command> ➜ <description>" with options and docs URLs. See `utils/output.ts` for help formatters.
-- **Command Descriptions**: Commands use `setCommandDescriptions()` to set separate short and long descriptions. See `utils/command-helpers.ts`.
+- **Command Descriptions**: See the “Command Descriptions” section above for `setCommandDescriptions()` usage.
 
 ### Contract Emit Command (`commands/contract-emit.ts`)
 - Canonical command implementation using commander

@@ -1,8 +1,3 @@
----
-description: When you would otherwise reach for Zod, use Arktype. Read this any time you need to work with Arktype
-globs: ["packages/**", "test/**", "examples/**"]
-alwaysApply: false
----
 # Arktype Usage Guidelines
 
 This document covers common patterns and pitfalls when using Arktype for schema validation in this codebase.

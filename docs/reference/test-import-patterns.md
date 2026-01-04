@@ -1,9 +1,3 @@
----
-description: Test import patterns and conventions
-globs: ["**/*.test.ts", "**/*.test-d.ts", "test/**", "packages/**/test/**", "examples/**/test/**"]
-alwaysApply: false
----
-
 # Test Import Patterns
 
 ## Core Principle

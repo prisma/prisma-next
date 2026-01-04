@@ -1,9 +1,3 @@
----
-description: Standard patterns for working with Prisma Next queries
-globs: ["packages/2-sql/**", "packages/sql/**", "examples/**", "test/**"]
-alwaysApply: false
----
-
 # Query Patterns
 
 This document covers standard patterns for working with Prisma Next queries, including table access, type inference, and common usage patterns.
@@ -218,70 +212,57 @@ const builder = o.user();
 
 ```typescript
 const plan = o.user()
-  .where((u) => {
-    const model = u as { id: { eq: (p: unknown) => unknown } };
-    return model.id.eq(param('userId'));
-  })
-  .orderBy((u) => {
-    const model = u as { createdAt: { desc: () => unknown } };
-    return model.createdAt.desc();
-  })
+  .where((u) => u.id.eq(param('userId')))
+  .orderBy((u) => u.createdAt.desc())
   .take(10)
-  .select((u) => {
-    const model = u as { id: unknown; email: unknown };
-    return { id: model.id, email: model.email };
-  })
-  .findMany();
+  .select((u) => ({
+    id: u.id,
+    email: u.email,
+  }))
+  .findMany({
+    params: { userId: 123 },
+  });
 ```
 
 **✅ CORRECT: Relation filters**
 
 ```typescript
-// Find users who have at least one published post
+// Find users who have at least one matching post
 const plan = o.user()
-  .where((u) => {
-    const model = u as { id: { eq: (p: unknown) => unknown } };
-    return o.user().where.related.posts.some((p) => {
-      const postModel = p as { published: { eq: (v: boolean) => unknown } };
-      return postModel.published.eq(true);
-    });
-  })
-  .select((u) => {
-    const model = u as { id: unknown; email: unknown };
-    return { id: model.id, email: model.email };
-  })
-  .findMany();
+  .where.related.posts.some((p) => p.where((m) => m.id.eq(param('postId'))))
+  .select((u) => ({
+    id: u.id,
+    email: u.email,
+  }))
+  .take(100)
+  .findMany({
+    params: { postId: 1 },
+  });
 ```
 
 **✅ CORRECT: Includes with child builder**
 
 ```typescript
 const plan = o.user()
-  .include.posts((child) => {
-    const childBuilder = child as {
-      where: (fn: (model: unknown) => unknown) => unknown;
-      orderBy: (fn: (model: unknown) => unknown) => unknown;
-      select: (fn: (model: unknown) => unknown) => unknown;
-    };
-    return childBuilder
-      .where((p) => {
-        const model = p as { published: { eq: (v: boolean) => unknown } };
-        return model.published.eq(true);
-      })
-      .orderBy((p) => {
-        const model = p as { createdAt: { desc: () => unknown } };
-        return model.createdAt.desc();
-      })
-      .select((p) => {
-        const model = p as { id: unknown; title: unknown };
-        return { id: model.id, title: model.title };
-      });
-  })
-  .select((u) => {
-    const model = u as { id: unknown; email: unknown; posts: boolean };
-    return { id: model.id, email: model.email, posts: true };
-  })
-  .findMany();
+  .include.posts((child) =>
+    child
+      .where((m) => m.id.eq(param('postId')))
+      .select((m) => ({
+        id: m.id,
+        title: m.title,
+        createdAt: m.createdAt,
+      }))
+      .orderBy((m) => m.createdAt.desc()),
+  )
+  .select((u) => ({
+    id: u.id,
+    email: u.email,
+    posts: true,
+  }))
+  .take(10)
+  .findMany({
+    params: { postId: 1 },
+  });
 ```
 
 **✅ CORRECT: Write operations**
@@ -295,20 +276,14 @@ const createPlan = o.user().create({
 
 // Update
 const updatePlan = o.user().update(
-  (u) => {
-    const model = u as { id: { eq: (p: unknown) => unknown } };
-    return model.id.eq(param('userId'));
-  },
+  (u) => u.id.eq(param('userId')),
   { email: 'newemail@example.com' },
   { params: { userId: 1 } },
 );
 
 // Delete
 const deletePlan = o.user().delete(
-  (u) => {
-    const model = u as { id: { eq: (p: unknown) => unknown } };
-    return model.id.eq(param('userId'));
-  },
+  (u) => u.id.eq(param('userId')),
   { params: { userId: 1 } },
 );
 ```

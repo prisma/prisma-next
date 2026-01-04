@@ -24,4 +24,3 @@ This rulecard is intentionally short. For full examples, see `docs/reference/que
 
 - `.cursor/rules/sql-types-imports.mdc`
 - `.cursor/rules/validate-contract-usage.mdc`
-- `.cursor/rules/query-patterns.mdc`
