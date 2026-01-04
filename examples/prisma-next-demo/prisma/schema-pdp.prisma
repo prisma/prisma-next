@@ -1,0 +1,2139 @@
+// Change for production incident on 09-03-2025
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
+  output          = "../node_modules/prisma-client"
+}
+
+generator client_qc {
+  provider        = "prisma-client"
+  previewFeatures = ["relationJoins"]
+  output          = "./generated"
+  engineType      = "client"
+  runtime         = "cloudflare"
+}
+
+datasource db {
+  provider  = "postgres"
+  url       = env("DATABASE_URL_ACCELERATE")
+  directUrl = env("DATABASE_URL_DIRECT")
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// User
+// --------------------------------------------------------------------------------------
+//
+//
+
+model User {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                              UserModelKind                     @default(User)
+  id                                String                            @id @default(cuid())
+  createdAt                         DateTime                          @default(now())
+  updatedAt                         DateTime                          @updatedAt
+  // -------
+  // Domain
+  // -------
+  deactivated                       Boolean?
+  deactivatedAt                     DateTime?
+  displayName                       String?
+  email                             String                            @unique
+  image                             String?
+  toltReferralId                    String?                           @unique
+  // The ID of the Tolt Affiliate user that referred this user.
+  //  bNot used by our codebase. Utilized by the data team for mapping purposes.
+  toltReferredByAffiliateId         String?
+  experimentalFeatureAccessPolicies ExperimentalFeatureAccessPolicy[]
+  sessions                          Session[]
+  // ---------
+  // Back-Relations
+  // ---------
+  accounts                          Account[]
+  organizationMemberships           OrganizationMembership[]
+  preferences                       Preferences?
+  actionLogs                        ActionLog[]
+  notifications                     Notification[]
+  managementTokens                  ManagementToken[]
+  signatures                        MachineSignature[]
+  attributedPlanSubscriptions       PlanSubscription[]
+  workspacePreferences              PreferencesUserWorkspace[]
+  oauthTokens                       OAuthToken[]                      @relation("User_Tokens")
+  oauthAuthCodes                    OAuthAuthorizationCode[]          @relation("User_AuthCodes")
+
+  @@index([id, createdAt])
+  @@index([createdAt, id])
+  @@index([createdAt])
+}
+
+enum UserModelKind {
+  User
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Management Token
+// --------------------------------------------------------------------------------------
+//
+//
+
+model ManagementToken {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind        ManagementTokenModelKind @default(ManagementToken)
+  id          String                   @id @default(cuid())
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  // -------
+  // Domain
+  // -------
+  hash        String                   @unique()
+  valueHint   String
+  displayName String
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+}
+
+enum ManagementTokenModelKind {
+  ManagementToken
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Integration Token
+// --------------------------------------------------------------------------------------
+//
+//
+
+model IntegrationToken {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                 IntegrationTokenModelKind @default(IntegrationToken)
+  id                   String                    @id @default(cuid())
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  // -------
+  // Domain
+  // -------
+  hash                 String                    @unique()
+  valueHint            String
+  displayName          String
+  // -------
+  // Back relations
+  // -------
+  workspaceId          String
+  workspace            Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceIntegration WorkspaceIntegration?
+
+  @@index([workspaceId])
+}
+
+enum IntegrationTokenModelKind {
+  IntegrationToken
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Sessions
+// --------------------------------------------------------------------------------------
+//
+//
+
+model Session {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                       SessionModelKind      @default(Session)
+  id                         String                @id @default(cuid())
+  createdAt                  DateTime              @default(now())
+  updatedAt                  DateTime              @updatedAt
+  // -------
+  // Domain
+  // -------
+  expiresAt                  DateTime
+  user                       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                     String
+  /// See https://docs.uaparser.js.org/v2/api/ua-parser-js/get-browser.html
+  browserHandle              BrowserHandle         @default(unknown)
+  browserHandleOther         String?
+  browserVersion             String?
+  /// See https://docs.uaparser.js.org/v2/api/ua-parser-js/get-os.html#name-string
+  operatingSystemHandle      operatingSystemHandle @default(unknown)
+  operatingSystemHandleOther String?
+  /// See https://docs.uaparser.js.org/v2/api/ua-parser-js/get-os.html#version-string
+  operatingSystemVersion     String?
+  /// See https://docs.uaparser.js.org/v2/api/ua-parser-js/get-device.html#type-string
+  deviceTypeHandle           DeviceTypeHandle      @default(unknown)
+  deviceTypeHandleOther      String?
+  /// See https://docs.uaparser.js.org/v2/api/ua-parser-js/get-device.html#model-string
+  deviceModel                String?
+  /// See https://docs.uaparser.js.org/v2/api/ua-parser-js/get-device.html#vendor-string
+  deviceVendorHandle         DeviceVendorHandle    @default(unknown)
+  deviceVendorHandleOther    String?
+
+  @@index([userId])
+}
+
+model OAuthClient {
+  id                 String                   @id @default(cuid())
+  name               String
+  description        String?
+  redirectUris       String[]
+  clientSecretHash   String
+  clientSecretHint   String                   @default("")
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  //  ---------
+  //  Back-Relations
+  //  ---------
+  workspaceId        String
+  workspace          Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  authorizationCodes OAuthAuthorizationCode[] @relation("OAuthClient_AuthCodes")
+  tokens             OAuthToken[]             @relation("OAuthClient_Tokens")
+}
+
+model OAuthAuthorizationCode {
+  id                  String              @id @default(cuid())
+  code                String              @unique
+  redirectUri         String
+  scopes              String[]
+  expiresAt           DateTime
+  usedAt              DateTime?
+  createdAt           DateTime            @default(now())
+  // PKCE fields
+  codeChallenge       String?
+  codeChallengeMethod CodeChallengeMethod @default(S256)
+  //  ---------
+  //  Back-Relations
+  //  ---------
+  client              OAuthClient         @relation("OAuthClient_AuthCodes", fields: [clientId], references: [id], onDelete: Cascade)
+  clientId            String
+  user                User                @relation("User_AuthCodes", fields: [userId], references: [id], onDelete: Cascade)
+  userId              String
+  workspace           Workspace           @relation("Workspace_AuthCodes", fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId         String
+}
+
+enum CodeChallengeMethod {
+  plain
+  S256
+}
+
+model OAuthToken {
+  id                    String      @id @default(cuid())
+  // ---------
+  // Tokens
+  // ---------
+  // Remark: access token does not need to be hashed when refresh tokens are implemented. Reason: access tokens are short lived
+  accessTokenHash       String      @unique
+  // Will be used for short lived access tokens (no need for hashing). TODO: This will be implemented together withh refresh tokens
+  accessToken           String?     @unique // Optional for future use
+  refreshTokenHash      String?     @unique
+  // ---------
+  // Expiration
+  // ---------
+  accessTokenExpiresAt  DateTime
+  // When the refresh token is used `refreshTokenExpiresAt` will be set to the same time as `refreshTokenUsedAt`
+  refreshTokenExpiresAt DateTime?
+  // ---------
+  // Metadata
+  // ---------
+  scopes                String[]
+  createdAt             DateTime    @default(now())
+  refreshTokenUsedAt    DateTime?
+  // ---------
+  // Back-Relations
+  // ---------
+  client                OAuthClient @relation("OAuthClient_Tokens", fields: [clientId], references: [id], onDelete: Cascade)
+  clientId              String
+  createdByUser         User        @relation("User_Tokens", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdByUserId       String
+  workspace             Workspace   @relation("Workspace_Tokens", fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId           String
+}
+
+enum operatingSystemHandle {
+  windows
+  macos
+  linux
+  ios
+  android
+  ubuntu
+  other
+  unknown
+}
+
+enum BrowserHandle {
+  chrome
+  firefox
+  safari
+  edge
+  opera
+  other
+  unknown
+}
+
+enum DeviceVendorHandle {
+  apple
+  samsung
+  microsoft
+  amazon
+  acer
+  lenovo
+  google
+  other
+  unknown
+}
+
+enum DeviceTypeHandle {
+  desktop
+  tablet
+  mobile
+  smarttv
+  console
+  wearable
+  embedded
+  unknown
+}
+
+enum SessionModelKind {
+  Session
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Preferences
+// --------------------------------------------------------------------------------------
+//
+//
+
+model Preferences {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                  PreferencesKind @default(PreferencesKind)
+  id                    String          @id @default(cuid())
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  // -------
+  // Domain
+  // -------
+  /// defaultOrganization is optional because a user might have had default org set to an another users org, which the other user might choose to delete.
+  defaultOrganization   Workspace?      @relation(fields: [defaultOrganizationId], references: [id])
+  defaultOrganizationId String?
+
+  // ---------
+  // Back-Relations
+  // ---------
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  @@index([userId])
+}
+
+enum PreferencesKind {
+  // TODO rename to "Preferences"
+  PreferencesKind
+}
+
+model PreferencesUserWorkspace {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind          PreferencesUserWorkspaceKind @default(PreferencesUserWorkspace)
+  id            String                       @id @default(cuid())
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
+  // -----------
+  // Domain
+  // -----------
+  notifications NotificationSettings[]
+
+  // ---------
+  // Back-Relations
+  // ---------
+  // This relation enables a cascade delete of the PreferencesUserWorkspace record when the OrganizationMembership record is deleted.
+  workspaceMembership OrganizationMembership @relation(fields: [userId, workspaceId], references: [userId, organizationId], onDelete: Cascade)
+  workspaceId         String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@unique([userId, workspaceId])
+  @@index([userId])
+}
+
+enum PreferencesUserWorkspaceKind {
+  PreferencesUserWorkspace
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Pilot User
+// --------------------------------------------------------------------------------------
+//
+//
+
+model PilotUser {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind      PilotUserKind         @default(PilotUser)
+  id        String                @id @default(cuid())
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  // -------
+  // Domain
+  // -------
+  email     String                @unique
+  features  ExperimentalFeature[]
+}
+
+enum PilotUserKind {
+  PilotUser
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Account
+// --------------------------------------------------------------------------------------
+//
+//
+
+// todo Identity
+model Account {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                              AccountModelKind                    @default(Account)
+  id                                String                              @id @default(cuid())
+  createdAt                         DateTime                            @default(now())
+  updatedAt                         DateTime                            @updatedAt
+  // -------
+  // Domain
+  // -------
+  /// The provider that the user used to sign up.
+  providerHandle                    AccountProviderHandle
+  /// The mechanism the provider uses to provider credentials
+  // TODO remove @default once we have migrated the schema once.
+  providerType                      IdentityProviderType                @default(oauth)
+  /// Typically an ID of the user in the provider's system. This should be the most reliable way to identify a
+  /// user since it should not change, whilst everything else can (handle, email, etc.).
+  userIdentifier                    String
+  /// Primary email address for the identity.
+  emailPrimary                      String
+  /// Some providers allow users to have secondary emails on their profile. For example, GitHub.
+  /// Note that to the extent made possible we do NOT store unverified emails. For example, GitHub
+  /// exposes in its API which emails the user has are verified. Any email that is NOT verified would not be stored here.
+  emailsSecondary                   String[]
+  // ---
+  // OAuth properties
+  // ---
+  /// A URL to the user's profile picture. This is useful for example to display the user's profile picture in the UI.
+  // todo oauth_imageUrl
+  imageUrl                          String?
+  /// Some providers allow users to choose handles that are unique across all users in the provider's system.
+  /// For example GitHub has this concept modelled on the "login" property of the user object. Some providers
+  /// will not have this concept though, such as Google.
+  // todo oauth_handle
+  handle                            String?
+  /// The access token that can be used to make requests to the provider's API on behalf of the user.
+  // todo oauth_accessToken
+  accessToken                       String?
+  /// If null, this should mean that the access token never expires.
+  /// Typically this information would be available from within the decoded access token. Keeping it here has some benefits, though:
+  /// 1. Maybe there would be a case of a non-JWT access token? (TODO: is that actually possible in OAuth though?)
+  /// 2. Use traditional SQL to operate on access tokens. E.g. no need for Postgres JSON SQL against decoded access tokens (which not all tools support, e.g. Prisma Client)
+  ///    or reading access tokens into memory for filtering.
+  // todo oauth_accessTokenExpires
+  accessTokenExpires                DateTime?
+  /// If null, this should mean that the access token never expires.
+  /// This is not always present. For example, with GitHub OAuth login, the flow only provides this if the GitHub app has been configured to do
+  /// so (see https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens#about-user-access-tokens-that-expire).
+  // todo oauth_refreshToken
+  refreshToken                      String?
+  // ---
+  // Email auth properties
+  // ---
+  email_passwordHash                String?
+  // ---------
+  // Back-Relations
+  // ---------
+  user                              User                                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                            String
+  IdentityEmailPasswordResetRequest IdentityEmailPasswordResetRequest[]
+
+  @@unique([providerHandle, userIdentifier])
+  /// This constraint narrows the real-world domain to make our internal business rules easier to manage.
+  /// Specifically, if a person
+  /// - has two Github accounts, and
+  /// - they sign up for one Prisma account for each Github account (so two users, internally), and
+  /// - they change the primary email addresses associated with their Github accounts such that the first
+  ///   account uses the primary email address from the second account, and
+  /// - they sign in to Prisma using the first account,
+  /// then there will be an error against this constraint, and the user would have to contact us to
+  /// untangle their accounts. We've decided to not try to automatically resolve this edge case.
+  ///
+  /// See more discussion at https://github.com/prisma/pdp-control-plane/pull/1293#discussion_r1658074469
+  // todo there's still a github user with two accounts set up with the same email address
+  @@unique([providerHandle, emailPrimary])
+}
+
+// todo IdentityModelKind
+enum AccountModelKind {
+  Account
+}
+
+// todo IdentityProviderHandle
+enum AccountProviderHandle {
+  github
+  google
+  email
+  vercel
+}
+
+enum IdentityProviderType {
+  oauth
+  email
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// IdentityEmailPasswordResetRequest
+// --------------------------------------------------------------------------------------
+//
+//
+
+model IdentityEmailPasswordResetRequest {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind      IdentityEmailPasswordResetRequestKind @default(IdentityEmailPasswordResetRequest)
+  id        String                                @id @default(cuid())
+  createdAt DateTime                              @default(now())
+  updatedAt DateTime                              @updatedAt
+
+  // -------
+  // Domain
+  // -------
+  token     String   @unique
+  expiresAt DateTime
+
+  // ---------
+  // Back-Relations
+  // ---------
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId String  @unique
+
+  @@map("IdentityEmailPasswordResetRequest")
+}
+
+enum IdentityEmailPasswordResetRequestKind {
+  IdentityEmailPasswordResetRequest
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// IdentityEmailPending
+// --------------------------------------------------------------------------------------
+//
+//
+
+model IdentityEmailPending {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind      IdentityEmailPendingKind @default(IdentityEmailPending)
+  id        String                   @id @default(cuid())
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  // -------
+  // Domain
+  // -------
+  email        String   @unique
+  token        String   @unique
+  passwordHash String
+  expiresAt    DateTime
+}
+
+enum IdentityEmailPendingKind {
+  IdentityEmailPending
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// PaymentMethodCard
+// --------------------------------------------------------------------------------------
+//
+//
+
+model PaymentMethodCard {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind            PaymentMethodCardKind  @default(PaymentMethodCard)
+  id              String                 @id @default(cuid())
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  // -------
+  // Domain
+  // -------
+  /// This strongly typed field is the parse result of stripeBrand. In case of "unknown"
+  /// check the value of stripeBrand to see if it contains a new kind of value added into
+  /// Stripe's API that needs to be added to our parsing logic.
+  brand           PaymentMethodCardBrand
+  stripeBrand     String
+  last4           String
+  expiryMonth     Int
+  expiryYear      Int
+  /// The Stripe API also adhears to this format.
+  /// @see https://stripe.com/docs/api/cards/object#card_object-country
+  billingCountry  CountryCodeISO3166
+  billingName     String
+  // ---------
+  // Back-Relations
+  // ---------
+  paymentMethod   PaymentMethod          @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
+  paymentMethodId String                 @unique
+}
+
+enum PaymentMethodCardKind {
+  PaymentMethodCard
+}
+
+/// These values are based on the Stripe API.
+/// @see https://stripe.com/docs/api/cards/object#card_object-brand
+enum PaymentMethodCardBrand {
+  mastercard
+  visa
+  discover
+  amex
+  diners
+  eftpos_au
+  jcb
+  unionpay
+  unknown
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Payment Method
+// --------------------------------------------------------------------------------------
+// This is basically a join table between Organization and PaymentMethodCard, or in graph terms,
+// the edge between Organization and PaymentMethodCard. It allows defining a model per different kinds of
+// payment mechanism (Credit Card, ...). It also affords a natural place to  annotate which one is the
+// default one for the organization.
+//
+
+model PaymentMethod {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                  PaymentMethodKind  @default(PaymentMethod)
+  id                    String             @id @default(cuid())
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  // -------
+  // Domain
+  // -------
+  stripePaymentMethodId String             @unique
+  isDefault             Boolean            @default(false)
+  /// Signals the type of payment method which in turn indicates an invariant
+  /// that the corresponding relation pointing to the record of this type is non-null.
+  /// For example a value of "card" indicates that the "card" field
+  /// relation should be non-null.
+  type                  PaymentMethodType
+  /// Should always be non-null if type is "card".
+  card                  PaymentMethodCard?
+  // ---------
+  // Relations
+  // ---------
+  organization          Workspace          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId        String
+
+  @@index([organizationId])
+}
+
+enum PaymentMethodType {
+  card
+}
+
+enum PaymentMethodKind {
+  PaymentMethod
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Organization
+// --------------------------------------------------------------------------------------
+//
+//
+
+model Workspace {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind              OrganizationModelKind    @default(Organization)
+  id                String                   @id @default(cuid())
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  // -------
+  // Domain
+  // -------
+  displayName       String
+  stripeCustomerId  String?                  @unique
+  billingEmail      String
+  memberships       OrganizationMembership[]
+  projects          Project[]
+  holds             Hold[]
+  /// Workspace should always have exactly one active PlanSubscription.
+  /// The rest should be deleted PlanSubscriptions, the history of the
+  /// workspace's plan subscriptions.
+  planSubscriptions PlanSubscription[]
+  preferences       Preferences[]
+  paymentMethods    PaymentMethod[]
+  actionLogs        ActionLog[]
+  /// An optional physical address. This is useful for example
+  /// to display on invoices sent to the organization.
+  billingAddress    PhysicalAddress?
+  // Workspace integrations
+  integrations      WorkspaceIntegration[]
+  integrationTokens IntegrationToken[]
+  spendLimitCents   Int?
+
+  /// Name of the integration of this workspace, For example: `Vercel`
+  integrationName   String?
+  /// Source where the integration was installed. For example: `marketplace`
+  integrationSource String?
+  /// Store Vercel-specific configuration
+  integrationVercel IntegrationVercel?
+
+  // OAuth back relations
+  oauthClients   OAuthClient[]
+  oauthTokens    OAuthToken[]             @relation("Workspace_Tokens")
+  oauthAuthCodes OAuthAuthorizationCode[] @relation("Workspace_AuthCodes")
+
+  @@map("Organization")
+}
+
+enum OrganizationModelKind {
+  Organization
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// WorkspaceIntegration
+// --------------------------------------------------------------------------------------
+//
+//
+model WorkspaceIntegration {
+  id                  String                 @id @default(cuid())
+  serviceProviderName IntegrationService
+  serviceProviderType IntegrationServiceType
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  workspaceId        String
+  workspace          Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  configuration      Json?
+  // WorkspaceIntegration can exists without integrationToken. This state represents an inactive integration
+  integrationTokenId String?           @unique
+  integrationToken   IntegrationToken? @relation(fields: [integrationTokenId], references: [id])
+
+  @@index([workspaceId, serviceProviderName])
+}
+
+enum IntegrationServiceType {
+  deploymentPlatform
+  codespace
+}
+
+enum IntegrationService {
+  netlify
+  vercel
+}
+
+model PhysicalAddress {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind            PhysicalAddressModelKind @default(PhysicalAddress)
+  id              String                   @id @default(cuid())
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  // -------
+  // Domain
+  // -------
+  country         CountryCodeISO3166?
+  /// State, province, etc.
+  region          String?
+  city            String?
+  /// Street, PO Box, company name, etc.
+  addressLine1    String?
+  /// Apartment, suite, unit, or building
+  addressLine2    String?
+  postalCodeOrZIP String?
+  organization    Workspace                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId  String                   @unique
+}
+
+enum PhysicalAddressModelKind {
+  PhysicalAddress
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// OrganizationMembership
+// --------------------------------------------------------------------------------------
+//
+//
+
+model OrganizationMembership {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                 OrganizationMembershipModelKind @default(OrganizationMembership)
+  id                   String                          @id @default(cuid())
+  createdAt            DateTime                        @default(now())
+  updatedAt            DateTime                        @updatedAt
+  // -------
+  // Domain
+  // -------
+  role                 OrganizationRole
+  // ---------
+  // Back-Relations
+  // ---------
+  user                 User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId               String
+  /// OrganizationMembership will ALWAYS have an Organization.
+  organization         Workspace?                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId       String?
+  workspacePreferences PreferencesUserWorkspace?
+
+  @@unique([userId, organizationId])
+  // we do multi-level joins sometimes where the user id is not involved
+  @@index([organizationId])
+}
+
+enum OrganizationMembershipModelKind {
+  OrganizationMembership
+}
+
+enum OrganizationRole {
+  admin
+  accountant
+  developer
+  viewer
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Project
+// --------------------------------------------------------------------------------------
+//
+//
+
+model Project {
+  // Boilerplate
+  // -----------
+  kind           ProjectModelKind @default(Project)
+  id             String           @id @default(cuid())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  // -------
+  // Domain
+  // -------
+  displayName    String
+  theme          String?
+  // ---------
+  // Back-Relations
+  // ---------
+  environments   Environment[]
+  /// Project will ALWAYS have an Organization.
+  organization   Workspace?       @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  actionLogs     ActionLog[]
+
+  @@index([organizationId])
+}
+
+enum ProjectModelKind {
+  Project
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Environment
+// --------------------------------------------------------------------------------------
+//
+//
+
+model Environment {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                 EnvironmentModelKind @default(Environment)
+  id                   String               @id @default(cuid())
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  // -------
+  // Domain
+  // -------
+  displayName          String
+  /// This value is only available for PPg environments (`allowRemoteDatabases` is `false`).
+  ///
+  /// Reason for the `display` prefix:
+  /// This is the value that the user selects on the UI when they create a new PPg environment.
+  /// This might be different from the region stored in Tenant Manager because there is a region
+  /// mapping happens on tenant creation.
+  displayPpgRegionId   String?
+  isDefault            Boolean
+  serviceKeys          ServiceKey[]
+  databaseLinks        DatabaseLink[]
+  tenantId             String               @unique
+  /// - true if products in the environment may connect to external, user-controlled databases
+  /// - false for PPg environments
+  allowRemoteDatabases Boolean              @default(true)
+  /// the current status of environment provisioning
+  /// - 'ready' when an environment is ready to be used (most environments, most of the time)
+  /// - the status of a ppg provisioning process
+  /// - the status of a ppg migration process
+  ///
+  /// see core:types:EnvironmentProvisionStatus (it's not an enum yet because migrating enums in
+  /// Postgres with Prisma is flaky, and these values will change)
+  provisionStatus      String               @default("ready")
+  // ---------
+  // Back-Relations
+  // ---------
+  project              Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId            String
+  actionLogs           ActionLog[]
+  vercelResource       VercelResource?
+  /// Holds are at the scope of a worksapce however some kinds of holds can specify specific environments they apply to.
+  /// This contains a list of any such holds.
+  hold                 Hold?                @relation(fields: [holdId], references: [id])
+  holdId               String?
+
+  @@index([projectId])
+}
+
+enum EnvironmentModelKind {
+  Environment
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// ServiceKey
+// --------------------------------------------------------------------------------------
+//
+//
+
+model ServiceKey {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind           ServiceKeyModelKind @default(ServiceKey)
+  id             String              @id @default(cuid())
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  // -------
+  // Domain
+  // -------
+  displayName    String
+  /// A snippet of the full value that can be used to hint the user what the value is.
+  /// Useful for making comparisons to full values easier. E.g. a user might have a token
+  /// but not be sure which project environment it came from.
+  valueHint      String
+  tenantApiKeyId String              @unique
+  // ---------
+  // Back-Relations
+  // ---------
+  environment    Environment         @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  environmentId  String
+
+  @@index([environmentId])
+}
+
+enum ServiceKeyModelKind {
+  ServiceKey
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// DatabaseLink
+// --------------------------------------------------------------------------------------
+//
+//
+
+model DatabaseLink {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                    DatabaseLinkModelKind            @default(DatabaseLink)
+  id                      String                           @id @default(cuid())
+  createdAt               DateTime                         @default(now())
+  updatedAt               DateTime                         @updatedAt
+  // -------
+  // Domain
+  // -------
+  deletedAt               DateTime?
+  displayName             String
+  databaseName            String?
+  userName                String?
+  protocol                DatabaseProtocol
+  provider                DatabaseProvider
+  /// A snippet of the full value that can be used to hint the user what the value is.
+  /// Useful for making comparisons to full values easier. E.g. a user might have a token
+  /// but not be sure which project environment it came from.
+  // todo drop this hint column after we derive the display text from hostname/port/database
+  connectionStringHint    String
+  // todo make the hostname required after we backfill it
+  hostname                String?
+  /// null when the database connection string doesn't have an explicit port
+  /// (so the user is relying on whatever the default is)
+  port                    Int?
+  staticIpsEnabled        Boolean                          @default(false)
+  /// The reference to the Tenant Manager Database resource
+  tenantDatabaseId        String
+  /// DatabaseLink can have only one active accelerateConfiguration.
+  /// The rest indicate the history of the product enablement.
+  accelerateConfiguration ProductConfigurationAccelerate[]
+  /// DatabaseLink can have only one active pulseConfiguration.
+  /// The rest indicate the history of the product enablement.
+  pulseConfiguration      ProductConfigurationPulse[]
+  // ---------
+  // Back-Relations
+  // ---------
+  environment             Environment                      @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  environmentId           String
+
+  @@index([environmentId])
+}
+
+enum DatabaseLinkModelKind {
+  DatabaseLink
+}
+
+enum DatabaseProtocol {
+  mongo
+  postgres
+  mysql
+  sqlserver
+}
+
+enum DatabaseProvider {
+  aws
+  gcp
+  azure
+  neon
+  railway
+  supabase
+  planetscale
+  atlas
+  fly
+  aiven
+  vercel
+  cockroach
+  digitalOcean
+  render
+  elephant
+  tidb
+  xata
+  ipv4
+  ipv6
+  local
+  prisma
+  other
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// ProductConfigurationAccelerate
+// --------------------------------------------------------------------------------------
+//
+//
+
+model ProductConfigurationAccelerate {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                                         ProductConfigurationAccelerateModelKind @default(ProductConfigurationAccelerate)
+  id                                           String                                  @id @default(cuid())
+  createdAt                                    DateTime                                @default(now())
+  updatedAt                                    DateTime                                @updatedAt
+  // -------
+  // Domain
+  // -------
+  deletedAt                                    DateTime?
+  /// @deprecated: Use DatabaseLink.staticIpsEnabled instead
+  featureStaticIps_enabled                     Boolean?                                @default(false)
+  featureAutoScaling_connectionLimit           Int?
+  /// @default Initial Free/Starter limit (5MB)
+  featureResponseSizeLimit_bytes               Int                                     @default(5242880)
+  /// @default Initial Free/Starter limit (10s)
+  featureQueryTimeout_seconds                  Int                                     @default(10)
+  /// @default Initial Free/Starter limit (15s)
+  featureInteractiveTransactionTimeout_seconds Int                                     @default(15)
+  // ---------
+  // Back-Relations
+  // ---------
+  databaseLink                                 DatabaseLink                            @relation(fields: [databaseLinkId], references: [id], onDelete: Cascade)
+  /// ProductConfiguration* supports soft delete so that we can track how
+  /// a product has been configured on/off over time for one `DatabaseLink`.
+  /// This means there can be multiple records related to `DatabaseLink`.
+  /// But at any given time, within a set of same databaseLinkId records,
+  /// only ONE should be `deletedAt: null`.
+  databaseLinkId                               String
+
+  @@index([databaseLinkId])
+}
+
+enum ProductConfigurationAccelerateModelKind {
+  ProductConfigurationAccelerate
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// ProductConfigurationPulse
+// --------------------------------------------------------------------------------------
+//
+//
+
+model ProductConfigurationPulse {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                              ProductConfigurationPulseModelKind @default(ProductConfigurationPulse)
+  id                                String                             @id @default(cuid())
+  createdAt                         DateTime                           @default(now())
+  updatedAt                         DateTime                           @updatedAt
+  // -------
+  // Domain
+  // -------
+  deletedAt                         DateTime?
+  featureStream_enabled             Boolean
+  featureSlotConfigType             FeatureSlotConfigType
+  /// Should be available if featureSlotConfigType is 'custom'
+  featureSlotConfigType_custom_name String?
+  // ---------
+  // Back-Relations
+  // ---------
+  databaseLink                      DatabaseLink                       @relation(fields: [databaseLinkId], references: [id], onDelete: Cascade)
+  /// ProductConfiguration* supports soft delete so that we can track how
+  /// a product has been configured on/off over time for one `DatabaseLink`.
+  /// This means there can be multiple records related to `DatabaseLink`.
+  /// But at any given time, within a set of same databaseLinkId records,
+  /// only ONE should be `deletedAt: null`.
+  databaseLinkId                    String
+
+  @@index([databaseLinkId])
+}
+
+enum ProductConfigurationPulseModelKind {
+  ProductConfigurationPulse
+}
+
+enum FeatureSlotConfigType {
+  automatic
+  custom
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Plan
+// --------------------------------------------------------------------------------------
+//
+//
+
+model Plan {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind            PlanModelKind      @default(Plan)
+  id              String             @id @default(cuid())
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  // -------
+  // Domain
+  // -------
+  handle          String
+  displayName     String
+  /// Is this the default plan?
+  /// The default plan can be useful, for example, to model
+  /// a free plan that all new organizations should be on by default.
+  /// There should always be exactly ONE plan that is the default.
+  isDefault       Boolean            @default(false)
+  /// The degree of breadth and depth of features offered by this plan.
+  /// Higher numbers represent more power.
+  /// Useful for ranking plans.
+  power           Int                @default(0)
+  // TODO rename this to isSelfServe
+  selectable      Boolean            @default(false)
+  version         Int
+  /// Exactly one record of a handle group at all times should have this field set true.
+  /// All other records in the group should have this field be set false.
+  versionIsLatest Boolean            @default(false)
+  offers          Offer[]
+  // ---------
+  // Back-Relations
+  // ---------
+  // TODO rename this to "subscribers"
+  subscriptions   PlanSubscription[]
+
+  // Once @unique on nullable is supported enable this compound unique: https://github.com/prisma/prisma/issues/3387
+  // Note: This means changing versionIsLatest is be nullable, and all false values becoming nullable
+  // @@unique([handle, versionIsLatest])
+  @@unique([handle, version])
+}
+
+enum PlanModelKind {
+  Plan
+}
+
+enum PriceConsumptionMode {
+  licensed
+  metered
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// PlanSubscription
+// --------------------------------------------------------------------------------------
+//
+//
+
+model PlanSubscription {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                                                 PlanSubscriptionModelKind          @default(PlanSubscription)
+  id                                                   String                             @id @default(cuid())
+  createdAt                                            DateTime                           @default(now())
+  updatedAt                                            DateTime                           @updatedAt
+  // -------
+  // Domain
+  // -------
+  /// A PlanSubscription will ALWAYS have a Plan.
+  plan                                                 Plan?                              @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId                                               String?
+  customOffers                                         Offer[]
+  /// Null should mean plan is free.
+  stripeSubscriptionId                                 String?                            @unique
+  /// @deprecated
+  stripeSubscriptionLineItemIds                        String[]
+  /// - When plan is free, this should be empty
+  /// - When plan is paid, this should be non-empty
+  stripeSubscriptionLineItems                          Json[]
+  stripeUsageRecordSyncronizations                     StripeUsageRecordSynchronization[]
+  organization                                         Workspace                          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId                                       String
+  deletedAt                                            DateTime?
+  createdByReferredUser                                User?                              @relation(fields: [createdByReferredUserToltReferralId], references: [toltReferralId], onDelete: SetNull)
+  createdByReferredUserToltReferralId                  String?
+  actionLogsWorkspaceChangePlan_planSubscriptionAfter  ActionLog[]                        @relation("actionWorkspaceChangePlan_planSubscriptionAfter")
+  actionLogsWorkspaceChangePlan_planSubscriptionBefore ActionLog[]                        @relation("actionWorkspaceChangePlan_planSubscriptionBefore")
+
+  @@index([planId])
+  // todo make this index conditional once prisma supports it
+  // https://github.com/prisma/prisma/issues/6974
+  @@index([organizationId, deletedAt])
+}
+
+enum PlanSubscriptionModelKind {
+  PlanSubscription
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Offer
+// --------------------------------------------------------------------------------------
+//
+//
+
+/// @see https://www.notion.so/prismaio/Offer-Modelling-43ae2df0502f44d8af967e8d9553da04?pvs=4
+model Offer {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                             OfferModelKind    @default(Offer)
+  id                               String            @id @default(cuid())
+  createdAt                        DateTime          @default(now())
+  updatedAt                        DateTime          @updatedAt
+  // -------
+  // Domain
+  // -------
+  type                             OfferType
+  feature                          Feature           @relation(fields: [featureId], references: [id])
+  featureId                        String
+  value                            Json?
+  timeIntervalType                 TimeIntervalType?
+  timeIntervalPreviousMilliseconds Int?
+
+  limitType           LimitType2?
+  limitEnumAllowed    String[]
+  limitNumberFnType   NumberPredicateFnType?
+  limitNumberFnAmount Float?
+
+  priceType                         PriceType2?
+  priceConstantCents                Int?
+  priceTieredTiers                  Json[]
+  priceStripePriceId                String?
+  // ---------
+  // Back-Relations
+  // ---------
+  // A FeatureOffer will ALWAYS have EITHER a planSubscription _or_ a plan.
+  // The two are mutually exclusive.
+  // If there is a planSubscription it means this feature offer is customizing a base plan.
+  plan                              Plan?                              @relation(fields: [planId], references: [id])
+  planId                            String?
+  planSubscription                  PlanSubscription?                  @relation(fields: [planSubscriptionId], references: [id], onDelete: Cascade)
+  planSubscriptionId                String?
+  stripeUsageRecordSynchronizations StripeUsageRecordSynchronization[]
+
+  @@unique([planId, featureId])
+  @@unique([planSubscriptionId, featureId])
+}
+
+// Model for storing the user's machine signature from Prisma CLI
+// In the future, we might want to re-iterate in differentiating between the CLI and other clients
+model MachineSignature {
+  // -----------
+  // Boilerplate
+  // -----------
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // -----------
+  // Domain
+  // -----------
+  lastUsed  DateTime @default(now())
+  signature String   @unique
+  // ---------
+  // Back-Relations
+  // ---------
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+}
+
+enum OfferType {
+  OfferAbstract
+  OfferResourceAggregation
+  OfferResourceProperty
+  OfferValue
+}
+
+enum OfferModelKind {
+  Offer
+}
+
+enum TimeIntervalType {
+  TimeIntervalCycle
+  TimeIntervalPrevious
+}
+
+enum LimitType2 {
+  LimitEnum
+  LimitNumber
+}
+
+enum PriceType2 {
+  PriceConstant
+  PriceTiered
+  PriceFlatRateOnce
+}
+
+enum NumberPredicateFnType {
+  NumberPredicateFnLTE
+  NumberPredicateFnLT
+  NumberPredicateFnGTE
+  NumberPredicateFnGT
+  NumberPredicateFnEQ
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Feature
+// --------------------------------------------------------------------------------------
+//
+//
+
+/// @deprecated: https://linear.app/prisma-company/issue/PLT-4779/deprecate-and-remove-feature-model-from-database
+model Feature {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                         FeatureModelKind              @default(Feature)
+  id                           String                        @id @default(cuid())
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  // -------
+  // Domain
+  // -------
+  // TODO make non-nullable
+  type                         FeatureType?
+  handle                       String                        @unique
+  // TODO make non-nullable
+  stripeProductId              String?                       @unique
+  displayName                  String?
+  description                  String?
+  scope                        String?
+  resource                     String?
+  valueTypeType                ValueTypeType?
+  valueTypeEnumMembers         String[]
+  valueResolverPropertyField   String?
+  valueResolverAggregationType ValueResolverAggregationType?
+
+  // ---------
+  // Back-Relations
+  // ---------
+  offers Offer[]
+  Hold   Hold[]
+}
+
+enum FeatureType {
+  FeatureResourceAggregation
+  FeatureResourceProperty
+  FeatureValue
+  FeatureAbstract
+}
+
+enum ValueResolverAggregationType {
+  count
+  avg
+}
+
+enum ValueTypeType {
+  ValueTypeString
+  ValueTypeNumber
+  ValueTypeEnum
+  ValueTypeBoolean
+}
+
+enum FeatureModelKind {
+  Feature
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// StripeUsageRecordSynchronization
+// --------------------------------------------------------------------------------------
+//
+//
+
+model StripeUsageRecordSynchronization {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind               StripeUsageRecordSynchronizationKind @default(StripeUsageRecordSynchronization)
+  id                 String                               @id @default(cuid())
+  createdAt          DateTime                             @default(now())
+  updatedAt          DateTime                             @updatedAt
+  // -------
+  // Domain
+  // -------
+  timestamp          DateTime
+  offerId            String
+  offer              Offer                                @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  planSubscription   PlanSubscription                     @relation(fields: [planSubscriptionId], references: [id], onDelete: Cascade)
+  planSubscriptionId String
+
+  @@index([planSubscriptionId, offerId])
+}
+
+enum StripeUsageRecordSynchronizationKind {
+  StripeUsageRecordSynchronization
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// ExperimentalFeatureAccessPolicy
+// --------------------------------------------------------------------------------------
+//
+//
+
+model ExperimentalFeatureAccessPolicy {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind      ExperimentalFeatureAccessPolicyKind @default(ExperimentalFeatureAccessPolicy)
+  id        String                              @id @default(cuid())
+  createdAt DateTime                            @default(now())
+  updatedAt DateTime                            @updatedAt
+  // -------
+  // Domain
+  // -------
+  rule      ExperimentalFeatureAccessPolicyRule @default(allow)
+  feature   ExperimentalFeature
+  user      User                                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  @@unique([userId, feature])
+}
+
+enum ExperimentalFeatureAccessPolicyKind {
+  ExperimentalFeatureAccessPolicy
+}
+
+enum ExperimentalFeatureAccessPolicyRule {
+  allow
+  deny
+}
+
+enum ExperimentalFeature {
+  mercury
+  venus
+  mars
+  change_annual_plan
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// ActionLog
+// --------------------------------------------------------------------------------------
+//
+//
+
+model ActionLog {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind      ActionLogKind @default(ActionLog)
+  id        String        @id @default(cuid())
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // -------
+  // Domain
+  // -------
+  action                                             ActionLogType
+  // TODO do we really want cascade delete here? That would mean that if a user deletes their account a workspace loses its audit history. Seems wrong. Need concept of "ghost user".
+  // null User means that the action was made by system
+  user                                               User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                                             String?
+  organization                                       Workspace?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId                                     String?
+  project                                            Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId                                          String?
+  environment                                        Environment?      @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  environmentId                                      String?
+  actionWorkspaceChangePlan_planSubscriptionAfter    PlanSubscription? @relation("actionWorkspaceChangePlan_planSubscriptionAfter", fields: [actionWorkspaceChangePlan_planSubscriptionAfterId], references: [id], onDelete: Cascade)
+  actionWorkspaceChangePlan_planSubscriptionAfterId  String?
+  actionWorkspaceChangePlan_planSubscriptionBefore   PlanSubscription? @relation("actionWorkspaceChangePlan_planSubscriptionBefore", fields: [actionWorkspaceChangePlan_planSubscriptionBeforeId], references: [id], onDelete: Cascade)
+  actionWorkspaceChangePlan_planSubscriptionBeforeId String?
+
+  @@index([organizationId])
+}
+
+enum ActionLogKind {
+  ActionLog
+}
+
+enum ActionLogType {
+  AcceleratePurgeCacheRequest
+  workspaceChangePlan
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Notification
+// --------------------------------------------------------------------------------------
+//
+//
+
+model Notification {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                                                  NotificationKind @default(Notification)
+  id                                                    String           @id @default(cuid())
+  createdAt                                             DateTime         @default(now())
+  updatedAt                                             DateTime         @updatedAt
+  // -------
+  // Domain
+  // -------
+  type                                                  NotificationType
+  payload_workspaceId                                   String?
+  payloadOfferUsageLimitThresholdCrossed_offerId        String?
+  payloadOfferUsageLimitThresholdCrossed_organizationId String?
+  // Threshold that was crossed, for example 0.5, indicating 50% of the usage has been consumed.
+  // When type is AccelerateUsageLimitThresholdCrossed: this should be non-null
+  payloadOfferUsageLimitThresholdCrossed_threshold      Float?
+
+  // When type is WeeklyAccelerateUsageInsights: this should be non-null
+  payloadWeeklyAccelerateUsageInsights_workspaceId String?
+
+  // Threshold that was crossed, for example 0.75, indicating 75% of the spend limit has been consumed
+  payloadSpendLimitThresholdCrossed_threshold   Float?
+  // Current spend amount when the threshold was crossed
+  payloadSpendLimitThresholdCrossed_amountCents Int?
+  // Current spend limit when the threshold was crossed
+  payloadSpendLimitThresholdCrossed_limitCents  Int?
+
+  // ---------
+  // Back-Relations
+  // ---------
+  user         User                              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  channelEmail NotificationDispatchChannelEmail?
+
+  @@index([userId])
+  // see https://github.com/prisma/pdp-control-plane/blob/f6318f9cb5d6d529b15f4cb1e970789115a7cea1/app/operations/Notification/%24/helpers.ts#L65
+  @@index([payloadOfferUsageLimitThresholdCrossed_organizationId])
+  @@index([payload_workspaceId])
+  // Useful for notification crons
+  @@index([type])
+  @@index([userId, type])
+}
+
+enum NotificationType {
+  OfferUsageLimitThresholdCrossed
+  WeeklyAccelerateUsageInsights
+  SignupWelcome
+  GetStarted1
+  GetStarted2
+  NoUsageSinceProductEnablement
+  FirstUsageAfterProductEnablement
+  PlanChange
+  ChurnRisk
+  PulseEventsIngestedNotRead
+  SpendLimitThresholdCrossed
+}
+
+enum NotificationKind {
+  Notification
+}
+
+model NotificationSettings {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                       NotifiationSettingsKind  @default(NotificationSettings)
+  id                         String                   @id @default(cuid())
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  // -----------
+  // Domain
+  // -----------
+  type                       NotificationType
+  enabled                    Boolean
+  // ---------
+  // Back-Relations
+  // ---------
+  preferencesUserWorkspace   PreferencesUserWorkspace @relation(fields: [preferencesUserWorkspaceId], references: [id], onDelete: Cascade)
+  preferencesUserWorkspaceId String
+
+  @@unique([preferencesUserWorkspaceId, type])
+}
+
+enum NotifiationSettingsKind {
+  NotificationSettings
+}
+
+model NotificationDispatchChannelEmail {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind           NotificationDispatchChannelEmailKind @default(NotificationDispatchChannelEmail)
+  id             String                               @id @default(cuid())
+  createdAt      DateTime                             @default(now())
+  updatedAt      DateTime                             @updatedAt
+  // -------
+  // Domain
+  // -------
+  status         NotificationDispatchStatus
+  // When status = "pending" or "errored": this should be null
+  resendEmailId  String?
+  // When status = "pending" or "errored": this should be null
+  brevoEmailId   String?
+  notification   Notification                         @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notificationId String                               @unique()
+
+  @@index([status])
+}
+
+enum NotificationDispatchChannelEmailKind {
+  NotificationDispatchChannelEmail
+}
+
+enum NotificationDispatchStatus {
+  // Either there was error on our side or the provider API returned an error.
+  errored
+  // API request to the delivery provider still pending
+  pending
+  // API request to the delivery provider was successful
+  sent
+}
+
+/// @see https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+enum CountryCodeISO3166 {
+  AD
+  AE
+  AF
+  AG
+  AI
+  AL
+  AM
+  AO
+  AQ
+  AR
+  AS
+  AT
+  AU
+  AW
+  AX
+  AZ
+  BA
+  BB
+  BD
+  BE
+  BF
+  BG
+  BH
+  BI
+  BJ
+  BL
+  BM
+  BN
+  BO
+  BQ
+  BR
+  BS
+  BT
+  BV
+  BW
+  BY
+  BZ
+  CA
+  CC
+  CD
+  CF
+  CG
+  CH
+  CI
+  CK
+  CL
+  CM
+  CN
+  CO
+  CR
+  CU
+  CV
+  CW
+  CX
+  CY
+  CZ
+  DE
+  DJ
+  DK
+  DM
+  DO
+  DZ
+  EC
+  EE
+  EG
+  EH
+  ER
+  ES
+  ET
+  FI
+  FJ
+  FK
+  FM
+  FO
+  FR
+  GA
+  GB
+  GD
+  GE
+  GF
+  GG
+  GH
+  GI
+  GL
+  GM
+  GN
+  GP
+  GQ
+  GR
+  GS
+  GT
+  GU
+  GW
+  GY
+  HK
+  HM
+  HN
+  HR
+  HT
+  HU
+  ID
+  IE
+  IL
+  IM
+  IN
+  IO
+  IQ
+  IR
+  IS
+  IT
+  JE
+  JM
+  JO
+  JP
+  KE
+  KG
+  KH
+  KI
+  KM
+  KN
+  KP
+  KR
+  KW
+  KY
+  KZ
+  LA
+  LB
+  LC
+  LI
+  LK
+  LR
+  LS
+  LT
+  LU
+  LV
+  LY
+  MA
+  MC
+  MD
+  ME
+  MF
+  MG
+  MH
+  MK
+  ML
+  MM
+  MN
+  MO
+  MP
+  MQ
+  MR
+  MS
+  MT
+  MU
+  MV
+  MW
+  MX
+  MY
+  MZ
+  NA
+  NC
+  NE
+  NF
+  NG
+  NI
+  NL
+  NO
+  NP
+  NR
+  NU
+  NZ
+  OM
+  PA
+  PE
+  PF
+  PG
+  PH
+  PK
+  PL
+  PM
+  PN
+  PR
+  PS
+  PT
+  PW
+  PY
+  QA
+  RE
+  RO
+  RS
+  RU
+  RW
+  SA
+  SB
+  SC
+  SD
+  SE
+  SG
+  SH
+  SI
+  SJ
+  SK
+  SL
+  SM
+  SN
+  SO
+  SR
+  SS
+  ST
+  SV
+  SX
+  SY
+  SZ
+  TC
+  TD
+  TF
+  TG
+  TH
+  TJ
+  TK
+  TL
+  TM
+  TN
+  TO
+  TR
+  TT
+  TV
+  TW
+  TZ
+  UA
+  UG
+  UM
+  US
+  UY
+  UZ
+  VA
+  VC
+  VE
+  VG
+  VI
+  VN
+  VU
+  WF
+  WS
+  YE
+  YT
+  ZA
+  ZM
+  ZW
+}
+
+//
+//
+// --------------------------------------------------------------------------------------
+// Hold
+// --------------------------------------------------------------------------------------
+//
+//
+
+model Hold {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind                                     HoldKind      @default(Hold)
+  id                                       String        @id @default(cuid())
+  createdAt                                DateTime      @default(now())
+  updatedAt                                DateTime      @updatedAt
+  // -------
+  // Domain
+  // -------
+  workspace                                Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId                              String
+  type                                     HoldType
+  /// The product feature is held in all environments.
+  typeProductFeatureLimitReached_feature   Feature?      @relation(fields: [typeProductFeatureLimitReached_featureId], references: [id], onDelete: Cascade)
+  typeProductFeatureLimitReached_featureId String?
+  /// If empty array then all environment product features are held.
+  /// If non-empty array, then only the listed environment product features are held.
+  typeContactSupport_environments          Environment[]
+  expiresAt                                DateTime?
+  deletedAt                                DateTime?
+
+  @@index([workspaceId, deletedAt])
+}
+
+enum HoldType {
+  productFeatureLimitReached
+  paymentOverdue
+  contactSupport
+  spendLimitReached
+}
+
+enum HoldKind {
+  Hold
+}
+
+// --------------------------------------------------------------------------------------
+// IntegrationVercel
+// --------------------------------------------------------------------------------------
+
+model IntegrationVercel {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind            IntegrationVercelModelKind @default(VercelIntegration)
+  id              String                     @id @default(cuid())
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  deletedAt       DateTime?
+  // -------
+  // Domain
+  // -------
+  // If Vercel creates the installation, this should be defined
+  installationId  String?                    @unique
+  // If Vercel connects the user account, this should be defined
+  configurationId String?                    @unique
+  accountId       String?
+  teamId          String?
+  /// URL to the Vercel team's dashboard
+  teamUrl         String?
+
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String           @unique
+  // ---------
+  // Back-Relations
+  // ---------
+  resources   VercelResource[]
+
+  sourceVercelResourceTransferRequests VercelResourceTransferRequest[] @relation("SourceVercelResourceTransferRequests")
+  targetVercelResourceTransferRequests VercelResourceTransferRequest[] @relation("TargetVercelResourceTransferRequests")
+
+  @@index([installationId])
+  @@index([configurationId])
+  @@index([accountId])
+  @@index([teamId])
+}
+
+enum IntegrationVercelModelKind {
+  VercelIntegration
+}
+
+// --------------------------------------------------------------------------------------
+// VercelResource
+// --------------------------------------------------------------------------------------
+
+model VercelResource {
+  // -----------
+  // Boilerplate
+  // -----------
+  kind          VercelResourceModelKind @default(VercelResource)
+  id            String                  @id @default(cuid())
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  deletedAt     DateTime?
+  // -------
+  // Domain
+  // -------
+  productHandle String
+  tenantId      String                  @unique
+  name          String
+  region        String
+
+  // ---------
+  // Back-Relations
+  // ---------
+  installation   IntegrationVercel @relation(fields: [installationId], references: [installationId], onDelete: Cascade)
+  installationId String
+  environment    Environment       @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  environmentId  String            @unique
+
+  vercelResourceTransferRequests VercelResourceTransferRequest[]
+  secretRotationRequests         VercelSecretRotationRequest[]
+
+  @@index([installationId])
+  @@index([tenantId])
+  @@index([environmentId])
+}
+
+enum VercelResourceModelKind {
+  VercelResource
+}
+
+model VercelResourceTransferRequest {
+  id                   String                              @id
+  createdAt            DateTime                            @default(now())
+  updatedAt            DateTime                            @updatedAt
+  sourceInstallationId String
+  sourceInstallation   IntegrationVercel                   @relation("SourceVercelResourceTransferRequests", fields: [sourceInstallationId], references: [installationId])
+  targetInstallationId String?
+  targetInstallation   IntegrationVercel?                  @relation("TargetVercelResourceTransferRequests", fields: [targetInstallationId], references: [installationId])
+  status               VercelResourceTransferRequestStatus @default(pending)
+  expiresAt            DateTime
+  resources            VercelResource[]
+
+  @@index([sourceInstallationId])
+  @@index([targetInstallationId])
+  @@index([status])
+}
+
+enum VercelResourceTransferRequestStatus {
+  pending
+  completed
+  cancelled
+}
+
+// ----------------------------------------
+// Vercel Secret Rotation
+// ----------------------------------------
+// Tracks pending secret rotation requests for delayed key deletion.
+// When a user rotates secrets with delayOldSecretsExpirationHours > 0,
+// we store the old key IDs here and a cron job deletes them later.
+
+model VercelSecretRotationRequest {
+  id         String         @id @default(cuid())
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  resourceId String
+  resource   VercelResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  oldKeyIds         String[]
+  scheduledDeleteAt DateTime
+
+  status      VercelSecretRotationStatus @default(pending)
+  completedAt DateTime?
+
+  failedKeyIds     String[] @default([])
+  deletionAttempts Int      @default(0)
+  lastError        String?
+
+  @@index([resourceId])
+  @@index([status, scheduledDeleteAt])
+}
+
+enum VercelSecretRotationStatus {
+  pending
+  completed
+  failed
+}
