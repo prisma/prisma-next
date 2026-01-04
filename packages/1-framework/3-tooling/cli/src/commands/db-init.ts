@@ -1,15 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import type {
-  MigrationPlan,
-  MigrationPlannerResult,
-  MigrationPlanOperation,
-  MigrationRunnerResult,
-} from '@prisma-next/core-control-plane/types';
-import { createControlPlaneStack } from '@prisma-next/core-control-plane/types';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
+import { createControlClient } from '../control-api/client';
 import { performAction } from '../utils/action';
 import {
   errorContractValidationFailed,
@@ -23,10 +17,6 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
-import {
-  assertContractRequirementsSatisfied,
-  assertFrameworkComponentsCompatible,
-} from '../utils/framework-components';
 import { parseGlobalFlags } from '../utils/global-flags';
 import {
   type DbInitResult,
@@ -36,6 +26,7 @@ import {
   formatDbInitPlanOutput,
   formatStyledHeader,
 } from '../utils/output';
+import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 import { withSpinner } from '../utils/spinner';
 
@@ -166,7 +157,6 @@ export function createDbInitCommand(): Command {
         if (!config.driver) {
           throw errorDriverRequired({ why: 'Config.driver is required for db init' });
         }
-        const driverDescriptor = config.driver;
 
         // Check target supports migrations via the migrations capability
         if (!config.target.migrations) {
@@ -174,11 +164,19 @@ export function createDbInitCommand(): Command {
             why: `Target "${config.target.id}" does not support migrations`,
           });
         }
-        const migrations = config.target.migrations;
 
-        let driver: Awaited<ReturnType<(typeof driverDescriptor)['create']>>;
+        // Create control client
+        const client = createControlClient({
+          family: config.family,
+          target: config.target,
+          adapter: config.adapter,
+          driver: config.driver,
+          extensionPacks: config.extensionPacks,
+        });
+
+        // Connect to database with spinner
         try {
-          driver = await withSpinner(() => driverDescriptor.create(dbConnection), {
+          await withSpinner(() => client.connect(dbConnection), {
             message: 'Connecting to database...',
             flags,
           });
@@ -199,235 +197,129 @@ export function createDbInitCommand(): Command {
         }
 
         try {
-          // Create family instance
-          const stack = createControlPlaneStack({
-            target: config.target,
-            adapter: config.adapter,
-            driver: driverDescriptor,
-            extensionPacks: config.extensionPacks,
-          });
-          const familyInstance = config.family.create(stack);
-          const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
-          const frameworkComponents = assertFrameworkComponentsCompatible(
-            config.family.familyId,
-            config.target.targetId,
-            rawComponents,
-          );
+          // Create progress adapter
+          const onProgress = createProgressAdapter({ flags });
 
-          // Validate contract
-          const contractIR = familyInstance.validateContractIR(contractJson);
-          assertContractRequirementsSatisfied({ contract: contractIR, stack });
-
-          // Create planner and runner from target migrations capability
-          const planner = migrations.createPlanner(familyInstance);
-          const runner = migrations.createRunner(familyInstance);
-
-          // Introspect live schema
-          const schemaIR = await withSpinner(() => familyInstance.introspect({ driver }), {
-            message: 'Introspecting database schema...',
-            flags,
+          // Call dbInit with progress callback
+          const result = await client.dbInit({
+            contractIR: contractJson,
+            mode: options.plan ? 'plan' : 'apply',
+            onProgress,
           });
 
-          // Policy for init mode (additive only)
-          const policy = { allowedOperationClasses: ['additive'] as const };
-
-          // Plan migration
-          const plannerResult: MigrationPlannerResult = await withSpinner(
-            async () =>
-              planner.plan({
-                contract: contractIR,
-                schema: schemaIR,
-                policy,
-                frameworkComponents,
-              }),
-            {
-              message: 'Planning migration...',
-              flags,
-            },
-          );
-
-          if (plannerResult.kind === 'failure') {
-            throw errorMigrationPlanningFailed({ conflicts: plannerResult.conflicts });
-          }
-
-          const migrationPlan: MigrationPlan = plannerResult.plan;
-
-          // Check for existing marker - handle idempotency and mismatch errors
-          const existingMarker = await familyInstance.readMarker({ driver });
-          if (existingMarker) {
-            const markerMatchesDestination =
-              existingMarker.coreHash === migrationPlan.destination.coreHash &&
-              (!migrationPlan.destination.profileHash ||
-                existingMarker.profileHash === migrationPlan.destination.profileHash);
-
-            if (markerMatchesDestination) {
-              // Already at destination - return success with no operations
-              const dbInitResult: DbInitResult = {
-                ok: true,
-                mode: options.plan ? 'plan' : 'apply',
-                plan: {
-                  targetId: migrationPlan.targetId,
-                  destination: migrationPlan.destination,
-                  operations: [],
-                },
-                ...(options.plan
-                  ? {}
-                  : {
-                      execution: { operationsPlanned: 0, operationsExecuted: 0 },
-                      marker: {
-                        coreHash: existingMarker.coreHash,
-                        profileHash: existingMarker.profileHash,
-                      },
-                    }),
-                summary: 'Database already at target contract state',
-                timings: { total: Date.now() - startTime },
-              };
-              return dbInitResult;
+          // Map control-api DbInitResult to CLI output format
+          if (!result.ok) {
+            // Map failures to CLI structured errors
+            if (result.error.code === 'PLANNING_FAILED') {
+              throw errorMigrationPlanningFailed({ conflicts: result.error.conflicts ?? [] });
             }
 
-            // Marker exists but doesn't match destination - fail
-            const coreHashMismatch = existingMarker.coreHash !== migrationPlan.destination.coreHash;
-            const profileHashMismatch =
-              migrationPlan.destination.profileHash &&
-              existingMarker.profileHash !== migrationPlan.destination.profileHash;
-
-            const mismatchParts: string[] = [];
-            if (coreHashMismatch) {
-              mismatchParts.push(
-                `coreHash (marker: ${existingMarker.coreHash}, destination: ${migrationPlan.destination.coreHash})`,
-              );
-            }
-            if (profileHashMismatch) {
-              mismatchParts.push(
-                `profileHash (marker: ${existingMarker.profileHash}, destination: ${migrationPlan.destination.profileHash})`,
-              );
-            }
-
-            throw errorRuntime(
-              `Existing contract marker does not match plan destination. Mismatch in ${mismatchParts.join(' and ')}.`,
-              {
-                why: 'Database has an existing contract marker that does not match the target contract',
-                fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
-                meta: {
-                  code: 'MARKER_ORIGIN_MISMATCH',
-                  markerCoreHash: existingMarker.coreHash,
-                  destinationCoreHash: migrationPlan.destination.coreHash,
-                  ...(existingMarker.profileHash
-                    ? { markerProfileHash: existingMarker.profileHash }
-                    : {}),
-                  ...(migrationPlan.destination.profileHash
-                    ? { destinationProfileHash: migrationPlan.destination.profileHash }
-                    : {}),
-                },
-              },
-            );
-          }
-
-          // Plan mode - don't execute
-          if (options.plan) {
-            const dbInitResult: DbInitResult = {
-              ok: true,
-              mode: 'plan',
-              plan: {
-                targetId: migrationPlan.targetId,
-                destination: migrationPlan.destination,
-                operations: migrationPlan.operations.map((op) => ({
-                  id: op.id,
-                  label: op.label,
-                  operationClass: op.operationClass,
-                })),
-              },
-              summary: `Planned ${migrationPlan.operations.length} operation(s)`,
-              timings: { total: Date.now() - startTime },
-            };
-            return dbInitResult;
-          }
-
-          // Apply mode - execute runner
-          // Log main message once, then show individual operations via callbacks
-          if (!flags.quiet && flags.json !== 'object') {
-            console.log('Applying migration plan and verifying schema...');
-          }
-
-          const callbacks = {
-            onOperationStart: (op: MigrationPlanOperation) => {
-              if (!flags.quiet && flags.json !== 'object') {
-                console.log(`  → ${op.label}...`);
+            if (result.error.code === 'MARKER_ORIGIN_MISMATCH') {
+              const mismatchParts: string[] = [];
+              if (
+                result.error.marker?.coreHash !== result.error.destination?.coreHash &&
+                result.error.marker?.coreHash &&
+                result.error.destination?.coreHash
+              ) {
+                mismatchParts.push(
+                  `coreHash (marker: ${result.error.marker.coreHash}, destination: ${result.error.destination.coreHash})`,
+                );
               }
-            },
-            onOperationComplete: (_op: MigrationPlanOperation) => {
-              // Could log completion if needed
-            },
-          };
+              if (
+                result.error.marker?.profileHash !== result.error.destination?.profileHash &&
+                result.error.marker?.profileHash &&
+                result.error.destination?.profileHash
+              ) {
+                mismatchParts.push(
+                  `profileHash (marker: ${result.error.marker.profileHash}, destination: ${result.error.destination.profileHash})`,
+                );
+              }
 
-          const runnerResult: MigrationRunnerResult = await runner.execute({
-            plan: migrationPlan,
-            driver,
-            destinationContract: contractIR,
-            policy,
-            callbacks,
-            // db init plans and applies back-to-back from a fresh introspection, so per-operation
-            // pre/postchecks and the idempotency probe are usually redundant overhead. We still
-            // enforce marker/origin compatibility and a full schema verification after apply.
-            executionChecks: {
-              prechecks: false,
-              postchecks: false,
-              idempotencyChecks: false,
-            },
-            frameworkComponents,
-          });
+              throw errorRuntime(
+                `Existing contract marker does not match plan destination.${mismatchParts.length > 0 ? ` Mismatch in ${mismatchParts.join(' and ')}.` : ''}`,
+                {
+                  why: 'Database has an existing contract marker that does not match the target contract',
+                  fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
+                  meta: {
+                    code: 'MARKER_ORIGIN_MISMATCH',
+                    ...(result.error.marker?.coreHash
+                      ? { markerCoreHash: result.error.marker.coreHash }
+                      : {}),
+                    ...(result.error.destination?.coreHash
+                      ? { destinationCoreHash: result.error.destination.coreHash }
+                      : {}),
+                    ...(result.error.marker?.profileHash
+                      ? { markerProfileHash: result.error.marker.profileHash }
+                      : {}),
+                    ...(result.error.destination?.profileHash
+                      ? { destinationProfileHash: result.error.destination.profileHash }
+                      : {}),
+                  },
+                },
+              );
+            }
 
-          if (!runnerResult.ok) {
-            const meta: Record<string, unknown> = {
-              code: runnerResult.failure.code,
-              ...(runnerResult.failure.meta ?? {}),
-            };
-            const sqlState = typeof meta['sqlState'] === 'string' ? meta['sqlState'] : undefined;
-            const fix =
-              sqlState === '42501'
-                ? 'Grant the database user sufficient privileges (insufficient_privilege), or run db init as a more privileged role'
-                : runnerResult.failure.code === 'SCHEMA_VERIFY_FAILED'
-                  ? 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`'
-                  : undefined;
+            if (result.error.code === 'RUNNER_FAILED') {
+              throw errorRuntime(result.error.summary, {
+                why: 'Migration runner failed',
+                fix: 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`',
+                meta: {
+                  code: 'RUNNER_FAILED',
+                },
+              });
+            }
 
-            throw errorRuntime(runnerResult.failure.summary, {
-              why:
-                runnerResult.failure.why ?? `Migration runner failed: ${runnerResult.failure.code}`,
-              ...(fix ? { fix } : {}),
-              meta,
+            // Fallback for unknown failure codes
+            throw errorRuntime(result.error.summary, {
+              why: `db init failed: ${result.error.code}`,
+              meta: {
+                code: result.error.code,
+              },
             });
           }
 
-          const execution = runnerResult.value;
-
+          // Convert success result to CLI output format
+          // Note: control-api DbInitSuccess doesn't include targetId/destination in plan,
+          // but CLI output format expects it. We'll need to get this from the migration plan
+          // if available, or omit it for now.
           const dbInitResult: DbInitResult = {
             ok: true,
-            mode: 'apply',
+            mode: result.value.mode,
             plan: {
-              targetId: migrationPlan.targetId,
-              destination: migrationPlan.destination,
-              operations: migrationPlan.operations.map((op) => ({
+              targetId: '', // Not available in control-api result
+              destination: {
+                coreHash: result.value.marker?.coreHash ?? '',
+                profileHash: result.value.marker?.profileHash,
+              },
+              operations: result.value.plan.operations.map((op) => ({
                 id: op.id,
                 label: op.label,
                 operationClass: op.operationClass,
               })),
             },
-            execution: {
-              operationsPlanned: execution.operationsPlanned,
-              operationsExecuted: execution.operationsExecuted,
-            },
-            marker: migrationPlan.destination.profileHash
+            ...(result.value.execution
               ? {
-                  coreHash: migrationPlan.destination.coreHash,
-                  profileHash: migrationPlan.destination.profileHash,
+                  execution: {
+                    operationsPlanned: result.value.execution.operationsPlanned,
+                    operationsExecuted: result.value.execution.operationsExecuted,
+                  },
                 }
-              : { coreHash: migrationPlan.destination.coreHash },
-            summary: `Applied ${execution.operationsExecuted} operation(s), marker written`,
+              : {}),
+            ...(result.value.marker
+              ? {
+                  marker: {
+                    coreHash: result.value.marker.coreHash,
+                    profileHash: result.value.marker.profileHash,
+                  },
+                }
+              : {}),
+            summary: result.value.summary,
             timings: { total: Date.now() - startTime },
           };
+
           return dbInitResult;
         } finally {
-          await driver.close();
+          await client.close();
         }
       });
 
