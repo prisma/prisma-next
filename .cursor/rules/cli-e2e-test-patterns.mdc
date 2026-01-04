@@ -1,6 +1,6 @@
 ---
 description: Patterns for CLI e2e tests using shared fixture app
-globs:
+globs: ["test/e2e/**", "test/integration/**", "packages/1-framework/3-tooling/cli/**"]
 alwaysApply: false
 ---
 

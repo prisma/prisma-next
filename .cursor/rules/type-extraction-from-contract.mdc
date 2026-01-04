@@ -1,7 +1,7 @@
 ---
 description: Extract TypeScript types from contract.d.ts and helpers
-globs:
-alwaysApply: true
+globs: ["packages/**", "examples/**", "test/**"]
+alwaysApply: false
 ---
 
 # Type Extraction from Contract

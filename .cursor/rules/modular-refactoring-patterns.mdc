@@ -1,7 +1,7 @@
 ---
 description: Patterns for refactoring large monolithic files into modular structures
-globs:
-alwaysApply: true
+globs: ["packages/**/*.ts", "packages/**/*.tsx"]
+alwaysApply: false
 ---
 
 # Modular Refactoring Patterns

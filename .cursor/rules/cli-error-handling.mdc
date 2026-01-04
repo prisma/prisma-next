@@ -1,7 +1,7 @@
 ---
 description: CLI command error handling patterns
-globs:
-alwaysApply: true
+globs: ["packages/1-framework/3-tooling/cli/**"]
+alwaysApply: false
 ---
 
 # CLI Error Handling

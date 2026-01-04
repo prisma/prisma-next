@@ -1,7 +1,7 @@
 ---
 description: Single package exposing migration/runtime/shared entrypoints via subpaths
-globs:
-alwaysApply: true
+globs: ["packages/**", "architecture.config.json"]
+alwaysApply: false
 ---
 
 # Multi‑Plane Entrypoints in a Single Package

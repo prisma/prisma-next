@@ -1,7 +1,7 @@
 ---
 description: Guidelines for packages that span multiple planes
-globs:
-alwaysApply: true
+globs: ["packages/**", "architecture.config.json"]
+alwaysApply: false
 ---
 
 # Multi-Plane Packages

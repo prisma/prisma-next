@@ -1,7 +1,7 @@
 ---
 description: Canonical import paths for SQL types
-globs: ["packages/sql/**"]
-alwaysApply: true
+globs: ["packages/2-sql/**", "packages/sql/**", "packages/3-targets/**", "packages/targets/**", "examples/**", "test/**"]
+alwaysApply: false
 ---
 
 # SQL Types Import Path

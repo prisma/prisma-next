@@ -1,6 +1,7 @@
 ---
 description: Typechecking configuration for test fixtures
-alwaysApply: true
+globs: ["test/**/tsconfig.json", "packages/**/tsconfig.json"]
+alwaysApply: false
 ---
 
 # Test Fixture Typechecking

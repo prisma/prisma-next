@@ -1,7 +1,7 @@
 ---
 description: Testing guide and best practices for Prisma Next
-globs:
-alwaysApply: true
+globs: ["**/*.test.ts", "**/*.test-d.ts", "test/**", "packages/**/test/**", "examples/**/test/**"]
+alwaysApply: false
 ---
 
 # Testing Guide

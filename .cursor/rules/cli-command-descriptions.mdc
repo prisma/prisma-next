@@ -1,7 +1,7 @@
 ---
 description: Patterns for CLI command descriptions (short vs long)
-globs:
-alwaysApply: true
+globs: ["packages/1-framework/3-tooling/cli/**"]
+alwaysApply: false
 ---
 
 # CLI Command Descriptions

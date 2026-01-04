@@ -1,7 +1,7 @@
 ---
 description: Use factory functions for creating ContractIR objects instead of manual object creation
-globs: ["**/*.test.ts", "**/*.spec.ts"]
-alwaysApply: true
+globs: ["**/*.test.ts", "**/*.test-d.ts", "test/**", "packages/**/test/**", "examples/**/test/**"]
+alwaysApply: false
 ---
 
 # Use Factory Functions for ContractIR

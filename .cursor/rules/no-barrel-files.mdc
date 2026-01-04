@@ -1,7 +1,7 @@
 ---
 description: Avoid barrel files and unnecessary re-exports
-globs:
-alwaysApply: true
+globs: ["packages/**"]
+alwaysApply: false
 ---
 
 # Avoid Barrel Files and Re-exports

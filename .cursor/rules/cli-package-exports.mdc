@@ -1,6 +1,7 @@
 ---
 description: CLI package export patterns and import conventions
-alwaysApply: true
+globs: ["packages/1-framework/3-tooling/cli/**"]
+alwaysApply: false
 ---
 
 # CLI Package Exports

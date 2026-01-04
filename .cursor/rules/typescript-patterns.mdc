@@ -1,7 +1,7 @@
 ---
 description: TypeScript and architecture patterns for this codebase
 globs:
-alwaysApply: true
+alwaysApply: false
 ---
 # TypeScript and Architecture Patterns
 

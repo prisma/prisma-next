@@ -1,7 +1,7 @@
 ---
 description: Prefer declarative configuration over hardcoded logic
-globs: ["**/*.config.*", "**/*.mjs", "**/*.js"]
-alwaysApply: true
+globs: ["architecture.config.json", "dependency-cruiser.config.mjs", "turbo.json", "scripts/**/*.mjs"]
+alwaysApply: false
 ---
 
 # Declarative Configuration
