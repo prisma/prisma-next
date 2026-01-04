@@ -1,0 +1,263 @@
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type {
+  ControlAdapterDescriptor,
+  ControlDriverDescriptor,
+  ControlExtensionDescriptor,
+  ControlFamilyDescriptor,
+  ControlTargetDescriptor,
+  MigrationPlannerConflict,
+  SignDatabaseResult,
+  VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/core-control-plane/types';
+import type { Result } from '@prisma-next/utils/result';
+
+// Re-export result types for consumer convenience
+export type {
+  ControlPlaneStack,
+  SignDatabaseResult,
+  VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/core-control-plane/types';
+
+// ============================================================================
+// Client Options
+// ============================================================================
+
+/**
+ * Options for creating a control client.
+ *
+ * Note: This is NOT the same as CLI config. There's no `contract` field,
+ * no file paths. The client is config-agnostic.
+ *
+ * The descriptor types use permissive `any` because family-specific descriptors
+ * (e.g., SqlFamilyDescriptor) have more specific `create` method signatures that
+ * are not compatible with the base ControlFamilyDescriptor type due to TypeScript
+ * variance rules. The client implementation casts these internally.
+ */
+export interface ControlClientOptions {
+  // biome-ignore lint/suspicious/noExplicitAny: required for contravariance - SqlFamilyDescriptor.create has specific parameter types
+  readonly family: ControlFamilyDescriptor<any, any>;
+  // biome-ignore lint/suspicious/noExplicitAny: required for contravariance - SqlControlTargetDescriptor extends with additional methods
+  readonly target: ControlTargetDescriptor<any, any, any, any>;
+  // biome-ignore lint/suspicious/noExplicitAny: required for contravariance in adapter.create()
+  readonly adapter: ControlAdapterDescriptor<any, any, any>;
+  /** Optional - control client can be created without driver for offline operations */
+  // biome-ignore lint/suspicious/noExplicitAny: required for contravariance in driver.create()
+  readonly driver?: ControlDriverDescriptor<any, any, any>;
+  // biome-ignore lint/suspicious/noExplicitAny: required for contravariance in extension.create()
+  readonly extensionPacks?: ReadonlyArray<ControlExtensionDescriptor<any, any, any>>;
+}
+
+// ============================================================================
+// Operation Options
+// ============================================================================
+
+/**
+ * Options for the verify operation.
+ */
+export interface VerifyOptions {
+  readonly contractIR: ContractIR;
+}
+
+/**
+ * Options for the schemaVerify operation.
+ */
+export interface SchemaVerifyOptions {
+  readonly contractIR: ContractIR;
+  /**
+   * Whether to use strict mode for schema verification.
+   * In strict mode, extra tables/columns are reported as issues.
+   * Default: false (tolerant mode - allows superset)
+   */
+  readonly strict?: boolean;
+}
+
+/**
+ * Options for the sign operation.
+ */
+export interface SignOptions {
+  readonly contractIR: ContractIR;
+}
+
+/**
+ * Options for the dbInit operation.
+ */
+export interface DbInitOptions {
+  readonly contractIR: ContractIR;
+  /**
+   * Mode for the dbInit operation.
+   * - 'plan': Returns planned operations without applying
+   * - 'apply': Applies operations and writes marker
+   */
+  readonly mode: 'plan' | 'apply';
+}
+
+/**
+ * Options for the introspect operation.
+ */
+export interface IntrospectOptions {
+  /**
+   * Optional schema name to introspect.
+   */
+  readonly schema?: string;
+}
+
+// ============================================================================
+// Result Types
+// ============================================================================
+
+/**
+ * Successful dbInit result.
+ */
+export interface DbInitSuccess {
+  readonly mode: 'plan' | 'apply';
+  readonly plan: {
+    readonly operations: ReadonlyArray<{
+      readonly id: string;
+      readonly label: string;
+      readonly operationClass: string;
+    }>;
+  };
+  readonly execution?: {
+    readonly operationsPlanned: number;
+    readonly operationsExecuted: number;
+  };
+  readonly marker?: {
+    readonly coreHash: string;
+    readonly profileHash?: string;
+  };
+  readonly summary: string;
+}
+
+/**
+ * Failure codes for dbInit operation.
+ */
+export type DbInitFailureCode = 'PLANNING_FAILED' | 'MARKER_ORIGIN_MISMATCH' | 'RUNNER_FAILED';
+
+/**
+ * Failure details for dbInit operation.
+ */
+export interface DbInitFailure {
+  readonly code: DbInitFailureCode;
+  readonly summary: string;
+  readonly conflicts?: ReadonlyArray<MigrationPlannerConflict>;
+  readonly marker?: {
+    readonly coreHash?: string;
+    readonly profileHash?: string;
+  };
+  readonly destination?: {
+    readonly coreHash: string;
+    readonly profileHash?: string | undefined;
+  };
+}
+
+/**
+ * Result type for dbInit operation.
+ * Uses Result pattern: success returns DbInitSuccess, failure returns DbInitFailure.
+ */
+export type DbInitResult = Result<DbInitSuccess, DbInitFailure>;
+
+// ============================================================================
+// Internal Types
+// ============================================================================
+
+/**
+ * Internal connected state for the control client.
+ * Used by the client implementation to track connection state.
+ */
+export interface ConnectedState<TFamilyId extends string, TTargetId extends string> {
+  readonly driver: Awaited<ReturnType<ControlDriverDescriptor<TFamilyId, TTargetId>['create']>>;
+  readonly familyInstance: ReturnType<ControlFamilyDescriptor<TFamilyId>['create']>;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
+}
+
+// ============================================================================
+// Client Interface
+// ============================================================================
+
+/**
+ * Programmatic control client for Prisma Next operations.
+ *
+ * Usage:
+ * ```typescript
+ * const client = createPrismaNextControlClient({
+ *   family: sql,
+ *   target: postgres,
+ *   adapter: postgresAdapter,
+ *   driver: postgresDriver,
+ *   extensionPacks: [],
+ * });
+ *
+ * try {
+ *   await client.connect(databaseUrl);
+ *   const result = await client.verify({ contractIR });
+ *   // ...
+ * } finally {
+ *   await client.close();
+ * }
+ * ```
+ */
+export interface PrismaNextControlClient {
+  /**
+   * Establishes a database connection.
+   * Must be called before any database operations.
+   *
+   * @param url - Database connection string
+   * @throws If connection fails, already connected, or driver is not configured
+   */
+  connect(url: string): Promise<void>;
+
+  /**
+   * Closes the database connection and cleans up resources.
+   * Idempotent (safe to call multiple times).
+   */
+  close(): Promise<void>;
+
+  /**
+   * Verifies database marker matches the contract.
+   * Compares coreHash and profileHash.
+   *
+   * @returns Structured result (ok: false for mismatch, not throwing)
+   * @throws If not connected or infrastructure failure
+   */
+  verify(options: VerifyOptions): Promise<VerifyDatabaseResult>;
+
+  /**
+   * Verifies database schema satisfies the contract requirements.
+   *
+   * @param options.strict - If true, extra tables/columns are issues. Default: false
+   * @returns Structured result with schema issues
+   * @throws If not connected or infrastructure failure
+   */
+  schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult>;
+
+  /**
+   * Signs the database with a contract marker.
+   * Writes or updates the contract marker if schema verification passes.
+   * Idempotent (no-op if marker already matches).
+   *
+   * @returns Structured result
+   * @throws If not connected or infrastructure failure
+   */
+  sign(options: SignOptions): Promise<SignDatabaseResult>;
+
+  /**
+   * Initializes database schema from contract.
+   * Uses additive-only policy (no destructive changes).
+   *
+   * @param options.mode - 'plan' to preview, 'apply' to execute
+   * @returns Result pattern: Ok with planned/executed operations, NotOk with failure details
+   * @throws If not connected, target doesn't support migrations, or infrastructure failure
+   */
+  dbInit(options: DbInitOptions): Promise<DbInitResult>;
+
+  /**
+   * Introspects the database schema.
+   *
+   * @returns Raw schema IR
+   * @throws If not connected or infrastructure failure
+   */
+  introspect(options?: IntrospectOptions): Promise<unknown>;
+}

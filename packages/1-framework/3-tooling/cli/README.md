@@ -1058,12 +1058,92 @@ pnpm test:integration       # Run integration tests only
 pnpm test:e2e               # Run e2e tests only
 ```
 
+## Programmatic Control API
+
+The CLI package provides a programmatic control client for running control-plane operations without using the command line. This is useful for:
+
+- Integration with build tools and CI pipelines
+- Custom orchestration workflows
+- Test automation
+- Programmatic database management
+
+### Basic Usage
+
+```typescript
+import { createPrismaNextControlClient } from '@prisma-next/cli/control-api';
+import sql from '@prisma-next/family-sql/control';
+import postgres from '@prisma-next/target-postgres/control';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+
+// Create a control client with framework component descriptors
+const client = createPrismaNextControlClient({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensionPacks: [],
+});
+
+try {
+  // Connect to database
+  await client.connect(databaseUrl);
+
+  // Run operations
+  const verifyResult = await client.verify({ contractIR });
+  const initResult = await client.dbInit({ contractIR, mode: 'apply' });
+  const introspectResult = await client.introspect();
+} finally {
+  // Clean up
+  await client.close();
+}
+```
+
+### Available Operations
+
+| Method | Description |
+|--------|-------------|
+| `connect(url)` | Establishes database connection |
+| `close()` | Closes connection (idempotent) |
+| `verify(options)` | Verifies database marker matches contract |
+| `schemaVerify(options)` | Verifies database schema satisfies contract |
+| `sign(options)` | Writes contract marker to database |
+| `dbInit(options)` | Initializes database schema from contract |
+| `introspect(options)` | Introspects database schema |
+
+### Result Types
+
+Operations return structured result types:
+
+- `verify()` → `VerifyDatabaseResult`
+- `schemaVerify()` → `VerifyDatabaseSchemaResult`
+- `sign()` → `SignDatabaseResult`
+- `dbInit()` → `Result<DbInitSuccess, DbInitFailure>` (uses Result pattern)
+- `introspect()` → Schema IR (family-specific)
+
+### Error Handling
+
+- **Connection errors**: Thrown as exceptions from `connect()`
+- **Not connected errors**: Thrown if operations called before `connect()`
+- **Driver not configured**: Thrown if driver is not provided in options
+- **Operation failures**: Returned as structured results (not thrown)
+
+### Key Differences from CLI
+
+| Aspect | CLI | Control API |
+|--------|-----|-------------|
+| Config | Reads `prisma-next.config.ts` | Accepts descriptors directly |
+| File I/O | Reads contract.json from disk | Accepts contract IR directly |
+| Output | Formats for console | Returns structured data |
+| Exit codes | Uses `process.exit()` | Returns results/throws |
+
 ## Entrypoints
 
 The CLI package exports several subpaths for different use cases:
 
 - **`@prisma-next/cli`** (main export): Exports `loadContractFromTs` and `createContractEmitCommand`
 - **`@prisma-next/cli/config-types`**: Exports `defineConfig` and config types
+- **`@prisma-next/cli/control-api`**: Exports `createPrismaNextControlClient` and control API types
 - **`@prisma-next/cli/commands/db-init`**: Exports `createDbInitCommand`
 - **`@prisma-next/cli/commands/db-introspect`**: Exports `createDbIntrospectCommand`
 - **`@prisma-next/cli/commands/db-schema-verify`**: Exports `createDbSchemaVerifyCommand`
