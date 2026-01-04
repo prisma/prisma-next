@@ -168,7 +168,7 @@ describe('control-api', () => {
             try {
               await client.connect(connectionString);
               const result = await client.verify({
-                contractIR: contractJson as never,
+                contractIR: contractJson,
               });
 
               expect(result.ok).toBe(false);
@@ -242,7 +242,7 @@ describe('control-api', () => {
             try {
               await client.connect(connectionString);
               const result = await client.dbInit({
-                contractIR: contractJson as never,
+                contractIR: contractJson,
                 mode: 'plan',
               });
 
@@ -278,7 +278,7 @@ describe('control-api', () => {
             try {
               await client.connect(connectionString);
               const result = await client.dbInit({
-                contractIR: contractJson as never,
+                contractIR: contractJson,
                 mode: 'apply',
               });
 
@@ -294,7 +294,7 @@ describe('control-api', () => {
 
               // Verify marker was written by calling verify
               const verifyResult = await client.verify({
-                contractIR: contractJson as never,
+                contractIR: contractJson,
               });
               expect(verifyResult.ok).toBe(true);
             } finally {
@@ -325,14 +325,14 @@ describe('control-api', () => {
 
               // Apply first time
               const result1 = await client.dbInit({
-                contractIR: contractJson as never,
+                contractIR: contractJson,
                 mode: 'apply',
               });
               expect(result1.ok).toBe(true);
 
               // Apply second time - should be idempotent
               const result2 = await client.dbInit({
-                contractIR: contractJson as never,
+                contractIR: contractJson,
                 mode: 'apply',
               });
 
@@ -375,14 +375,14 @@ describe('control-api', () => {
 
               // First init the database
               const initResult = await client.dbInit({
-                contractIR: contractJson as never,
+                contractIR: contractJson,
                 mode: 'apply',
               });
               expect(initResult.ok).toBe(true);
 
               // Then sign it (should be idempotent since marker already written)
               const signResult = await client.sign({
-                contractIR: contractJson as never,
+                contractIR: contractJson,
               });
 
               expect(signResult.ok).toBe(true);
@@ -421,14 +421,14 @@ describe('control-api', () => {
 
               // First init the database
               const initResult = await client.dbInit({
-                contractIR: contractJson as never,
+                contractIR: contractJson,
                 mode: 'apply',
               });
               expect(initResult.ok).toBe(true);
 
               // Then verify schema
               const schemaResult = await client.schemaVerify({
-                contractIR: contractJson as never,
+                contractIR: contractJson,
                 strict: false,
               });
 
