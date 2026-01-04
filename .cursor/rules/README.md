@@ -2,6 +2,11 @@
 
 Curated rules for agents and developers. Keep narrative in `docs/` and use these rulecards for quick, actionable guidance.
 
+## Rulecard size budget
+
+- **Soft limit**: 100 lines — prefer this for most rulecards
+- **Hard limit**: 200 lines — rulecards above this must be **trimmed**, **split**, or have long examples moved to `docs/`
+
 ## Always Apply (minimal)
 
 **Always-apply rules must be short, globally relevant, and stable.** If a rule only applies to a specific area (SQL, CLI, tests, package layout), scope it with `globs` and set `alwaysApply: false`.
@@ -44,7 +49,11 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/sql-types-imports.mdc` — SQL types import path (use @prisma-next/sql-contract/types)
 
 ## TypeScript & Typing
-- `.cursor/rules/typescript-patterns.mdc` — TS & architecture patterns
+- `.cursor/rules/typescript-patterns.mdc` — TS patterns index (short)
+- `.cursor/rules/generic-parameters.mdc` — Generic parameter defaults
+- `.cursor/rules/interface-factory-pattern.mdc` — Interface-based design + factories
+- `.cursor/rules/type-predicates.mdc` — Replace blind casts with type predicates
+- `.cursor/rules/test-mocking-patterns.mdc` — Test-only assertions and mocking patterns
 - `.cursor/rules/arktype-usage.mdc` — Arktype usage guidelines
 - `.cursor/rules/type-extraction-from-contract.mdc` — Extracting types from contracts
 - `.cursor/rules/validate-contract-usage.mdc` — validateContract usage pattern (requires fully-typed contract type)
