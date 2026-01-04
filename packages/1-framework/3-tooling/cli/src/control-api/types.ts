@@ -1,5 +1,4 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -64,14 +63,16 @@ export interface ControlClientOptions {
  * Options for the verify operation.
  */
 export interface VerifyOptions {
-  readonly contractIR: ContractIR;
+  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  readonly contractIR: unknown;
 }
 
 /**
  * Options for the schemaVerify operation.
  */
 export interface SchemaVerifyOptions {
-  readonly contractIR: ContractIR;
+  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  readonly contractIR: unknown;
   /**
    * Whether to use strict mode for schema verification.
    * In strict mode, extra tables/columns are reported as issues.
@@ -84,14 +85,16 @@ export interface SchemaVerifyOptions {
  * Options for the sign operation.
  */
 export interface SignOptions {
-  readonly contractIR: ContractIR;
+  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  readonly contractIR: unknown;
 }
 
 /**
  * Options for the dbInit operation.
  */
 export interface DbInitOptions {
-  readonly contractIR: ContractIR;
+  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  readonly contractIR: unknown;
   /**
    * Mode for the dbInit operation.
    * - 'plan': Returns planned operations without applying
