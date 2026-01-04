@@ -43,7 +43,7 @@ Read the full testing guide at `docs/Testing Guide.md` for comprehensive testing
 - Define `CodecTypes` inline in test fixtures to remain adapter-agnostic
 - Use `createStubAdapter()` from `@prisma-next/runtime/test/utils` instead of specific adapter factories in tests
 - This prevents cyclic dependencies and keeps tests adapter-agnostic
-- See `AGENT_ONBOARDING.md` for details
+- See `docs/Testing Guide.md` and `.cursor/rules/test-import-patterns.mdc` for details
 
 **CLI E2E Test Fixtures:**
 - Use shared `cli-e2e-test-app` directory with static `package.json` at root
