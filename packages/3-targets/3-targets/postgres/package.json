@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "Postgres target pack for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -37,6 +37,7 @@
   },
   "files": [
     "dist",
+    "src",
     "packs"
   ],
   "exports": {

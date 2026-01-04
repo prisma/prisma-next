@@ -2,15 +2,15 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    types: 'src/exports/types.ts',
-    'pack-manifest-types': 'src/exports/pack-manifest-types.ts',
-    ir: 'src/exports/ir.ts',
-    'framework-components': 'src/exports/framework-components.ts',
+    'exports/types': 'src/exports/types.ts',
+    'exports/pack-manifest-types': 'src/exports/pack-manifest-types.ts',
+    'exports/ir': 'src/exports/ir.ts',
+    'exports/framework-components': 'src/exports/framework-components.ts',
   },
-  outDir: 'dist/exports',
+  outDir: 'dist',
   format: ['esm'],
   sourcemap: true,
-  dts: true,
+  dts: false,
   clean: true,
   target: 'es2022',
   minify: false,

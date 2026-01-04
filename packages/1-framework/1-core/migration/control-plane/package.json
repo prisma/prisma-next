@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "Control plane domain actions, config types, validation, and error factories for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -29,7 +29,8 @@
     "vitest": "catalog:"
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "exports": {
     "./config-types": {
