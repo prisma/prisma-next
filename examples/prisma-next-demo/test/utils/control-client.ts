@@ -36,9 +36,8 @@ export function createDemoControlClient(options: TestControlClientOptions): Cont
 /**
  * Initializes a test database with schema and marker from a contract.
  *
- * This replaces the manual table creation and stampMarker calls:
- * - dbInit creates all tables/indexes from the contract
- * - sign writes the contract marker
+ * This replaces the manual table creation and stampMarker calls.
+ * dbInit in 'apply' mode creates all tables/indexes and writes the marker.
  *
  * @example
  * ```typescript
@@ -58,11 +57,6 @@ export async function initTestDatabase(options: {
     const initResult = await client.dbInit({ contractIR: options.contractIR, mode: 'apply' });
     if (!initResult.ok) {
       throw new Error(`dbInit failed: ${initResult.failure.summary}`);
-    }
-
-    const signResult = await client.sign({ contractIR: options.contractIR });
-    if (!signResult.ok) {
-      throw new Error(`sign failed: ${signResult.summary}`);
     }
   } finally {
     await client.close();
