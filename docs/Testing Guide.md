@@ -677,7 +677,7 @@ expect(err).toBeUndefined();
 // ANTI-PATTERN: Conditional expectations
 it('processes user data', () => {
   const result = processUser(input);
-  
+
   if (result.status === 'success') {
     expect(result.data).toBeDefined();
     expect(result.data.email).toBe('test@example.com');
@@ -1014,5 +1014,5 @@ pnpm --filter @prisma-next/sql-runtime typecheck
 - **Test Descriptions:** `.cursor/rules/omit-should-in-tests.mdc`
 - **Type Testing:** `.cursor/rules/vitest-expect-typeof.mdc`
 - **TypeScript Patterns:** `.cursor/rules/typescript-patterns.mdc` (DRY Test Patterns section)
-- **Agent Onboarding:** `AGENT_ONBOARDING.md` (Testing section)
+- **Agent Reference:** `AGENTS.md`
 
