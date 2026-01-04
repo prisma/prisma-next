@@ -27,7 +27,6 @@ When moving packages to new locations, you must update all relative paths that r
    - From `test/integration/` → `../../tsconfig.base.json` (2 levels)
 
 2. **`package.json`** - Script paths:
-   - `biome.json` config path
    - `scripts/clean.mjs` path
    - Any other root-level script references
 
@@ -64,7 +63,7 @@ const packs = loadExtensionPacks(join(__dirname, '../../../packages/3-targets/6-
 ```json
 {
   "scripts": {
-    "lint": "biome check . --config-path ../../../../biome.json"
+    "clean": "node ../../../../scripts/clean.mjs"
   }
 }
 ```
@@ -73,7 +72,7 @@ const packs = loadExtensionPacks(join(__dirname, '../../../packages/3-targets/6-
 ```json
 {
   "scripts": {
-    "lint": "biome check . --config-path ../../../biome.json"
+    "clean": "node ../../../scripts/clean.mjs"
   }
 }
 ```
@@ -81,7 +80,7 @@ const packs = loadExtensionPacks(join(__dirname, '../../../packages/3-targets/6-
 ## Checklist When Moving Packages
 
 1. **Update `tsconfig.json`** - `extends` path to `tsconfig.base.json` (count directory depth to root)
-2. **Update `package.json`** - All script paths (`biome.json`, `clean.mjs`, etc.) based on new depth
+2. **Update `package.json`** - All script paths (`clean.mjs`, etc.) based on new depth
 3. **Update test files** - Paths to other packages, fixtures, manifests
 4. **Update `pnpm-workspace.yaml`** - Add/remove package globs if needed
 5. **Update `architecture.config.json`** - Add/remove package entries
@@ -122,7 +121,7 @@ const packs = loadExtensionPacks(join(__dirname, '../../../packages/3-targets/6-
 **❌ WRONG: Assuming same depth**
 ```typescript
 // Assuming 4 levels up works for all packages
-const path = join(__dirname, '../../../../biome.json');
+const path = join(__dirname, '../../../../scripts/clean.mjs');
 // Wrong if package is at packages/3-extensions/pgvector/ (only 3 levels)
 ```
 
@@ -130,9 +129,9 @@ const path = join(__dirname, '../../../../biome.json');
 ```typescript
 // Calculate based on actual location
 // From packages/1-framework/1-core/shared/plan/ = 5 levels up
-const path = join(__dirname, '../../../../../biome.json');
+const path = join(__dirname, '../../../../../scripts/clean.mjs');
 // From packages/3-extensions/pgvector/ = 3 levels up
-const path = join(__dirname, '../../../biome.json');
+const path = join(__dirname, '../../../scripts/clean.mjs');
 ```
 
 ## Test Packages Special Case
