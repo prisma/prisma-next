@@ -3,12 +3,7 @@ import {
   type TargetBoundComponentDescriptor,
 } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type {
-  ControlAdapterDescriptor,
-  ControlExtensionDescriptor,
-  ControlFamilyDescriptor,
-  ControlTargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
+import type { ControlPlaneStack } from '@prisma-next/core-control-plane/types';
 import { errorConfigValidation, errorContractMissingExtensionPacks } from './cli-errors';
 
 /**
@@ -113,17 +108,14 @@ export function assertFrameworkComponentsCompatible<
 }
 
 /**
- * Validates that a contract is compatible with the configured family, target, adapter,
+ * Validates that a contract is compatible with the configured target, adapter,
  * and extension packs. Throws on family/target mismatches or missing extension packs.
  *
  * This check ensures the emitted contract matches the CLI config before running
  * commands that depend on the contract (e.g., db verify, db sign).
  *
  * @param contract - The contract IR to validate (must include targetFamily, target, extensionPacks).
- * @param family - The configured family descriptor.
- * @param target - The configured target descriptor.
- * @param adapter - The configured adapter descriptor.
- * @param extensionPacks - Optional array of extension descriptors provided by the config.
+ * @param stack - The control plane stack (target, adapter, driver, extensionPacks).
  *
  * @throws {CliStructuredError} errorConfigValidation when contract.targetFamily or contract.target
  *   doesn't match the configured family/target.
@@ -136,15 +128,10 @@ export function assertFrameworkComponentsCompatible<
  *
  * const config = await loadConfig();
  * const contractIR = await loadContractJson(config.contract.output);
+ * const stack = createControlPlaneStack({ target: config.target, adapter: config.adapter, ... });
  *
  * // Throws if contract is incompatible with config
- * assertContractRequirementsSatisfied({
- *   contract: contractIR,
- *   family: config.family,
- *   target: config.target,
- *   adapter: config.adapter,
- *   extensionPacks: config.extensionPacks,
- * });
+ * assertContractRequirementsSatisfied({ contract: contractIR, stack });
  * ```
  */
 export function assertContractRequirementsSatisfied<
@@ -152,26 +139,20 @@ export function assertContractRequirementsSatisfied<
   TTargetId extends string,
 >({
   contract,
-  family,
-  target,
-  adapter,
-  extensionPacks,
+  stack,
 }: {
   readonly contract: Pick<ContractIR, 'targetFamily' | 'target' | 'extensionPacks'>;
-  readonly family: ControlFamilyDescriptor<TFamilyId>;
-  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
-  readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
-  readonly extensionPacks?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[] | undefined;
+  readonly stack: ControlPlaneStack<TFamilyId, TTargetId>;
 }): void {
-  const providedComponentIds = new Set<string>([target.id, adapter.id]);
-  for (const extension of extensionPacks ?? []) {
+  const providedComponentIds = new Set<string>([stack.target.id, stack.adapter.id]);
+  for (const extension of stack.extensionPacks) {
     providedComponentIds.add(extension.id);
   }
 
   const result = checkContractComponentRequirements({
     contract,
-    expectedTargetFamily: family.familyId,
-    expectedTargetId: target.targetId,
+    expectedTargetFamily: stack.target.familyId,
+    expectedTargetId: stack.target.targetId,
     providedComponentIds,
   });
 

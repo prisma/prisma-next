@@ -8,6 +8,7 @@ import {
 } from '@prisma-next/core-control-plane/errors';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type { IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { performAction } from '../utils/action';
@@ -139,23 +140,18 @@ export function createDbIntrospectCommand(): Command {
 
         try {
           // Create family instance
-          const familyInstance = config.family.create({
+          const stack = createControlPlaneStack({
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensionPacks: config.extensionPacks ?? [],
+            extensionPacks: config.extensionPacks,
           });
+          const familyInstance = config.family.create(stack);
 
           // Validate contract IR if we loaded it
           if (contractIR) {
             const validatedContract = familyInstance.validateContractIR(contractIR);
-            assertContractRequirementsSatisfied({
-              contract: validatedContract,
-              family: config.family,
-              target: config.target,
-              adapter: config.adapter,
-              extensionPacks: config.extensionPacks,
-            });
+            assertContractRequirementsSatisfied({ contract: validatedContract, stack });
             contractIR = validatedContract;
           }
 

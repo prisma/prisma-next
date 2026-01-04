@@ -237,6 +237,23 @@ export interface OperationContext {
 // ============================================================================
 
 /**
+ * A bundle of control-plane component descriptors for a specific family and target.
+ *
+ * This struct groups the target, adapter, driver (optional), and extension packs
+ * needed to create a family instance and run CLI commands. Use `createControlPlaneStack()`
+ * to construct with sensible defaults.
+ *
+ * @template TFamilyId - The family ID (e.g., 'sql', 'document')
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ */
+export interface ControlPlaneStack<TFamilyId extends string, TTargetId extends string> {
+  readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
+  readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
+  readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
+  readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+}
+
+/**
  * Descriptor for a control-plane family (e.g., SQL).
  * Provides the family hook and factory method.
  *
@@ -248,12 +265,7 @@ export interface ControlFamilyDescriptor<
   TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
 > extends FamilyDescriptor<TFamilyId> {
   readonly hook: TargetFamilyHook;
-  create<TTargetId extends string>(options: {
-    readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
-    readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
-    readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId>;
-    readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
-  }): TFamilyInstance;
+  create<TTargetId extends string>(stack: ControlPlaneStack<TFamilyId, TTargetId>): TFamilyInstance;
 }
 
 /**

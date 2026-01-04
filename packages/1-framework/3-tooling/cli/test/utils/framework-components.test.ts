@@ -1,9 +1,9 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { CliStructuredError } from '@prisma-next/core-control-plane/errors';
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
-  ControlFamilyDescriptor,
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
@@ -173,24 +173,15 @@ describe('assertContractRequirementsSatisfied', () => {
     targetId: 'postgres',
   } as unknown as ControlExtensionDescriptor<'sql', 'postgres'>;
 
-  const family = {
-    kind: 'family',
-    id: 'sql',
-    version: '0.0.1',
-    familyId: 'sql',
-    create: () => {
-      throw new Error('not implemented');
-    },
-  } as unknown as ControlFamilyDescriptor<'sql'>;
+  const createStack = (
+    extensionPacks: readonly ControlExtensionDescriptor<'sql', 'postgres'>[] = [],
+  ) => createControlPlaneStack({ target, adapter, extensionPacks });
 
   it('passes when target and extension packs are satisfied', () => {
     expect(() =>
       assertContractRequirementsSatisfied({
         contract,
-        family,
-        target,
-        adapter,
-        extensionPacks: [extension],
+        stack: createStack([extension]),
       }),
     ).not.toThrow();
   });
@@ -199,10 +190,7 @@ describe('assertContractRequirementsSatisfied', () => {
     expect(() =>
       assertContractRequirementsSatisfied({
         contract: { ...contract, targetFamily: 'document' },
-        family,
-        target,
-        adapter,
-        extensionPacks: [extension],
+        stack: createStack([extension]),
       }),
     ).toThrow(CliStructuredError);
   });
@@ -211,10 +199,7 @@ describe('assertContractRequirementsSatisfied', () => {
     expect(() =>
       assertContractRequirementsSatisfied({
         contract: { ...contract, target: 'mysql' },
-        family,
-        target,
-        adapter,
-        extensionPacks: [extension],
+        stack: createStack([extension]),
       }),
     ).toThrow(CliStructuredError);
   });
@@ -223,10 +208,7 @@ describe('assertContractRequirementsSatisfied', () => {
     try {
       assertContractRequirementsSatisfied({
         contract,
-        family,
-        target,
-        adapter,
-        extensionPacks: [],
+        stack: createStack([]),
       });
       throw new Error('expected assertContractRequirementsSatisfied to throw');
     } catch (error) {
@@ -253,10 +235,7 @@ describe('assertContractRequirementsSatisfied', () => {
     try {
       assertContractRequirementsSatisfied({
         contract: contractWithTwoPacks,
-        family,
-        target,
-        adapter,
-        extensionPacks: [],
+        stack: createStack([]),
       });
       throw new Error('expected assertContractRequirementsSatisfied to throw');
     } catch (error) {

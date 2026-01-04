@@ -49,6 +49,10 @@
       "types": "./dist/exports/types.d.ts",
       "import": "./dist/exports/types.js"
     },
+    "./stack": {
+      "types": "./dist/exports/stack.d.ts",
+      "import": "./dist/exports/stack.js"
+    },
     "./emission": {
       "types": "./dist/exports/emission.d.ts",
       "import": "./dist/exports/emission.js"

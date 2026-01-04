@@ -6,6 +6,7 @@ import type {
   MigrationPlanOperation,
   MigrationRunnerResult,
 } from '@prisma-next/core-control-plane/types';
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/types';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
@@ -198,12 +199,13 @@ export function createDbInitCommand(): Command {
 
         try {
           // Create family instance
-          const familyInstance = config.family.create({
+          const stack = createControlPlaneStack({
             target: config.target,
             adapter: config.adapter,
             driver: driverDescriptor,
-            extensionPacks: config.extensionPacks ?? [],
+            extensionPacks: config.extensionPacks,
           });
+          const familyInstance = config.family.create(stack);
           const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
           const frameworkComponents = assertFrameworkComponentsCompatible(
             config.family.familyId,
@@ -213,13 +215,7 @@ export function createDbInitCommand(): Command {
 
           // Validate contract
           const contractIR = familyInstance.validateContractIR(contractJson);
-          assertContractRequirementsSatisfied({
-            contract: contractIR,
-            family: config.family,
-            target: config.target,
-            adapter: config.adapter,
-            extensionPacks: config.extensionPacks,
-          });
+          assertContractRequirementsSatisfied({ contract: contractIR, stack });
 
           // Create planner and runner from target migrations capability
           const planner = migrations.createPlanner(familyInstance);

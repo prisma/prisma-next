@@ -11,6 +11,7 @@ import type {
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/types';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { performAction } from '../utils/action';
@@ -138,22 +139,17 @@ export function createDbSignCommand(): Command {
         const driverDescriptor = config.driver;
 
         // Create family instance (needed for contract validation - no DB connection required)
-        const familyInstance = config.family.create({
+        const stack = createControlPlaneStack({
           target: config.target,
           adapter: config.adapter,
           driver: driverDescriptor,
-          extensionPacks: config.extensionPacks ?? [],
+          extensionPacks: config.extensionPacks,
         });
+        const familyInstance = config.family.create(stack);
 
         // Validate contract using instance validator (fail-fast before DB connection)
         const contractIR = familyInstance.validateContractIR(contractJson);
-        assertContractRequirementsSatisfied({
-          contract: contractIR,
-          family: config.family,
-          target: config.target,
-          adapter: config.adapter,
-          extensionPacks: config.extensionPacks,
-        });
+        assertContractRequirementsSatisfied({ contract: contractIR, stack });
 
         const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
         const frameworkComponents = assertFrameworkComponentsCompatible(
