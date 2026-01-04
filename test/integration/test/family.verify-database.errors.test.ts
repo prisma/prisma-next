@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
@@ -20,6 +20,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createIntegrationTestDir } from './utils/cli-test-helpers';
 
 /**
  * Creates a test contract for testing.
@@ -43,26 +44,6 @@ function createTestContract(): SqlContract<SqlStorage> {
         version: '0.0.1',
       },
       pg: {},
-    },
-  };
-}
-
-/**
- * Creates a simple test directory for fixtures.
- */
-function createTestDir(): { testDir: string; cleanup: () => void } {
-  const testDir = resolve(
-    `/tmp/prisma-next-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
-  mkdirSync(testDir, { recursive: true });
-  return {
-    testDir,
-    cleanup: () => {
-      try {
-        rmSync(testDir, { recursive: true, force: true });
-      } catch {
-        // Ignore cleanup errors
-      }
     },
   };
 }
@@ -155,9 +136,7 @@ describe('family instance verify - errors', () => {
     'reports error when marker is missing via driver',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        const testSetup = createTestDir();
-        const testDirWithDb = testSetup.testDir;
-        const cleanupWithDb = testSetup.cleanup;
+        const testDirWithDb = createIntegrationTestDir();
 
         try {
           // Create and emit contract
@@ -193,7 +172,9 @@ describe('family instance verify - errors', () => {
           });
           expect(result.marker).toBeUndefined();
         } finally {
-          cleanupWithDb();
+          if (existsSync(testDirWithDb)) {
+            rmSync(testDirWithDb, { recursive: true, force: true });
+          }
         }
       });
     },
@@ -204,9 +185,7 @@ describe('family instance verify - errors', () => {
     'returns error when coreHash mismatch',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        const testSetup = createTestDir();
-        const testDirWithDb = testSetup.testDir;
-        const cleanupWithDb = testSetup.cleanup;
+        const testDirWithDb = createIntegrationTestDir();
 
         try {
           // Create and emit contract
@@ -251,7 +230,9 @@ describe('family instance verify - errors', () => {
             marker: { coreHash: 'sha256:different-hash' },
           });
         } finally {
-          cleanupWithDb();
+          if (existsSync(testDirWithDb)) {
+            rmSync(testDirWithDb, { recursive: true, force: true });
+          }
         }
       });
     },
@@ -262,9 +243,7 @@ describe('family instance verify - errors', () => {
     'returns error when profileHash mismatch',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        const testSetup = createTestDir();
-        const testDirWithDb = testSetup.testDir;
-        const cleanupWithDb = testSetup.cleanup;
+        const testDirWithDb = createIntegrationTestDir();
 
         try {
           // Create and emit contract
@@ -309,7 +288,9 @@ describe('family instance verify - errors', () => {
             marker: { profileHash: 'sha256:different-profile-hash' },
           });
         } finally {
-          cleanupWithDb();
+          if (existsSync(testDirWithDb)) {
+            rmSync(testDirWithDb, { recursive: true, force: true });
+          }
         }
       });
     },
@@ -320,9 +301,7 @@ describe('family instance verify - errors', () => {
     'handles invalid contract structure (missing coreHash or target)',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        const testSetup = createTestDir();
-        const testDirWithDb = testSetup.testDir;
-        const cleanupWithDb = testSetup.cleanup;
+        const testDirWithDb = createIntegrationTestDir();
 
         try {
           // Create and emit a valid contract first
@@ -349,7 +328,9 @@ describe('family instance verify - errors', () => {
             }),
           ).rejects.toThrow('Contract is missing required fields: coreHash or target');
         } finally {
-          cleanupWithDb();
+          if (existsSync(testDirWithDb)) {
+            rmSync(testDirWithDb, { recursive: true, force: true });
+          }
         }
       });
     },
@@ -360,9 +341,7 @@ describe('family instance verify - errors', () => {
     'reports missing codecs when collectSupportedCodecTypeIds returns non-empty array',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        const testSetup = createTestDir();
-        const testDirWithDb = testSetup.testDir;
-        const cleanupWithDb = testSetup.cleanup;
+        const testDirWithDb = createIntegrationTestDir();
 
         try {
           // Create and emit contract
@@ -408,7 +387,9 @@ describe('family instance verify - errors', () => {
           // Otherwise, missingCodecs should be undefined
           // This test verifies the branch is covered, regardless of whether missingCodecs is set
         } finally {
-          cleanupWithDb();
+          if (existsSync(testDirWithDb)) {
+            rmSync(testDirWithDb, { recursive: true, force: true });
+          }
         }
       });
     },
