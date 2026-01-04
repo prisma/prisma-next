@@ -47,6 +47,8 @@ jobs:
         run: pnpm lint:examples
       - name: Validate rules
         run: pnpm lint:rules
+      - name: Check rules footprint
+        run: pnpm lint:rules:footprint
       - name: Validate package READMEs
         run: pnpm lint:docs
 
