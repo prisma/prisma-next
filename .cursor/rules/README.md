@@ -19,7 +19,6 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/omit-should-in-tests.mdc` — Test descriptions omit "should"
 
 ## Testing
-- `.cursor/rules/testing-guide.mdc` — Testing guide pointers and patterns
 - `.cursor/rules/test-import-patterns.mdc` — Test import patterns (source files, relative paths, don't export for tests)
 - `.cursor/rules/test-file-organization.mdc` — Test file organization (max 500 lines, split by functionality)
 - `.cursor/rules/test-database-limitations.mdc` — Test database limitations and patterns

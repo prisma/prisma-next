@@ -209,7 +209,7 @@ it('exits with code 2 for config errors', async () => {
 
 ## Related Patterns
 
-- `.cursor/rules/testing-guide.mdc`: Testing best practices
+- `docs/Testing Guide.md`: Testing best practices
 - `packages/framework/tooling/cli/src/utils/cli-errors.ts`: Structured error factories
 - `packages/framework/tooling/cli/src/utils/result.ts`: Result pattern utilities
 - `packages/framework/tooling/cli/src/utils/result-handler.ts`: Result processing
