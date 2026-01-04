@@ -103,7 +103,7 @@ class ControlClientImpl implements ControlClient {
     }
 
     // Check for driver descriptor
-    if (!this.stack!.driver) {
+    if (!this.stack?.driver) {
       throw new Error(
         'Driver is not configured. Pass a driver descriptor when creating the control client to enable database operations.',
       );
@@ -114,7 +114,7 @@ class ControlClientImpl implements ControlClient {
     // The driver descriptor is typed with any for TConnection in ControlClientOptions,
     // but createControlPlaneStack defaults it to string. We bridge this at runtime.
     // biome-ignore lint/suspicious/noExplicitAny: required for runtime connection type flexibility
-    this.driver = await this.stack!.driver.create(resolvedConnection as any);
+    this.driver = await this.stack?.driver.create(resolvedConnection as any);
   }
 
   async close(): Promise<void> {
