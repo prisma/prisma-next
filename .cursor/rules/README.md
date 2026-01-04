@@ -2,10 +2,16 @@
 
 Curated rules for agents and developers. Keep narrative in `docs/` and use these rulecards for quick, actionable guidance.
 
+## Rulecard size budget
+
+- **Soft limit**: 100 lines — prefer this for most rulecards
+- **Hard limit**: 200 lines — rulecards above this must be **trimmed**, **split**, or have long examples moved to `docs/`
+
 ## Always Apply (minimal)
 
 **Always-apply rules must be short, globally relevant, and stable.** If a rule only applies to a specific area (SQL, CLI, tests, package layout), scope it with `globs` and set `alwaysApply: false`.
 
+- `.cursor/rules/git-staging.mdc` — Git staging/commit best practices (stage explicitly, keep commits focused)
 - `.cursor/rules/use-correct-tools.mdc` — Use configured tools and scripts
 - `.cursor/rules/doc-maintenance.mdc` — Keep docs/READMEs/rules up‑to‑date
 - `.cursor/rules/read-agents-md.mdc` — Read AGENTS.md (onboarding deep dive is optional)
@@ -13,7 +19,6 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/omit-should-in-tests.mdc` — Test descriptions omit "should"
 
 ## Testing
-- `.cursor/rules/testing-guide.mdc` — Testing guide pointers and patterns
 - `.cursor/rules/test-import-patterns.mdc` — Test import patterns (source files, relative paths, don't export for tests)
 - `.cursor/rules/test-file-organization.mdc` — Test file organization (max 500 lines, split by functionality)
 - `.cursor/rules/test-database-limitations.mdc` — Test database limitations and patterns
@@ -44,7 +49,11 @@ Curated rules for agents and developers. Keep narrative in `docs/` and use these
 - `.cursor/rules/sql-types-imports.mdc` — SQL types import path (use @prisma-next/sql-contract/types)
 
 ## TypeScript & Typing
-- `.cursor/rules/typescript-patterns.mdc` — TS & architecture patterns
+- `.cursor/rules/typescript-patterns.mdc` — TS patterns index (short)
+- `.cursor/rules/generic-parameters.mdc` — Generic parameter defaults
+- `.cursor/rules/interface-factory-pattern.mdc` — Interface-based design + factories
+- `.cursor/rules/type-predicates.mdc` — Replace blind casts with type predicates
+- `.cursor/rules/test-mocking-patterns.mdc` — Test-only assertions and mocking patterns
 - `.cursor/rules/arktype-usage.mdc` — Arktype usage guidelines
 - `.cursor/rules/type-extraction-from-contract.mdc` — Extracting types from contracts
 - `.cursor/rules/validate-contract-usage.mdc` — validateContract usage pattern (requires fully-typed contract type)
