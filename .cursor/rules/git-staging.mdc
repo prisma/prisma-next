@@ -37,6 +37,12 @@ Instead, create a new commit with the fix.
 4. **Keep commits focused**: Each commit should contain related changes only
 5. **Don't amend pushed commits**: Only amend commits that haven't been pushed yet
 
+## Shell-safe commit messages
+
+When using `git commit -m`, avoid shell interpolation pitfalls:
+- Prefer **single quotes** around `-m` message strings.
+- Don’t use backticks in commit messages (they can trigger command substitution in some shells).
+
 A good commit:
 
 - Represents one logical step (a coherent unit of change)
