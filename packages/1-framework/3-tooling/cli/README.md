@@ -46,7 +46,7 @@ Commands use separate short and long descriptions via `setCommandDescriptions()`
 - **Short description**: One-liner used in command trees and headers (e.g., "Emit signed contract artifacts")
 - **Long description**: Multiline text shown at the bottom of help output with detailed context
 
-See `.cursor/rules/cli-command-descriptions.mdc` for details.
+See `src/utils/command-helpers.ts` for `setCommandDescriptions()` and `getLongDescription()`.
 
 ## Commands
 
@@ -865,7 +865,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - **Error Handling**: Uses `exitOverride()` to catch unhandled errors (non-structured errors that fail fast) and print stack traces. Commands handle structured errors themselves via `process.exit()`.
 - **Command Taxonomy**: Groups commands by domain/plane (e.g., `contract emit`)
 - **Help Formatting**: Uses `configureHelp()` to customize help output with styled format matching normal command output. Root help shows "prisma-next" title with command tree; command help shows "prisma-next <command> ➜ <description>" with options and docs URLs. See `utils/output.ts` for help formatters.
-- **Command Descriptions**: Commands use `setCommandDescriptions()` to set separate short and long descriptions. See `utils/command-helpers.ts` and `.cursor/rules/cli-command-descriptions.mdc`.
+- **Command Descriptions**: Commands use `setCommandDescriptions()` to set separate short and long descriptions. See `utils/command-helpers.ts`.
 
 ### Contract Emit Command (`commands/contract-emit.ts`)
 - Canonical command implementation using commander
