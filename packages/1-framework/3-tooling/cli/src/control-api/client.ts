@@ -200,7 +200,7 @@ class ControlClientImpl implements ControlClient {
 
     // Check target supports migrations
     if (!this.options.target.migrations) {
-      throw new Error(`Target "${this.options.target.id}" does not support migrations`);
+      throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
     // Validate contract using family instance
