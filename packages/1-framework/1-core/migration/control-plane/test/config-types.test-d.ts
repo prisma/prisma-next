@@ -180,7 +180,7 @@ test('rejects mismatched targetId in extension', () => {
     family: sqlFamilyDescriptor,
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
-    extensions: [mysqlExtensionDescriptor], // Wrong targetId
+    extensionPacks: [mysqlExtensionDescriptor], // Wrong targetId
   };
 
   void config;
