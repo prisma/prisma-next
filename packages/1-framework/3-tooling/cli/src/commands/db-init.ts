@@ -96,8 +96,14 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
   }
 
   if (failure.code === 'RUNNER_FAILED') {
+    // Include SQL in error message for execution failures (helps with debugging)
+    const sql = failure.meta?.['sql'];
+    const whyWithSql =
+      sql && typeof sql === 'string'
+        ? `${failure.why ?? 'Migration runner failed'}\n  SQL: ${sql}`
+        : (failure.why ?? 'Migration runner failed');
     return errorRuntime(failure.summary, {
-      why: failure.why ?? 'Migration runner failed',
+      why: whyWithSql,
       fix: 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`',
       meta: {
         code: 'RUNNER_FAILED',
