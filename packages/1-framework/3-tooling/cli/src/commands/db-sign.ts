@@ -46,23 +46,20 @@ interface DbSignOptions {
 }
 
 /**
- * Result type for db sign command using discriminated union.
- * Two possible outcomes: schema verification failed, or signing succeeded.
+ * Failure type for db sign command.
+ * Either an infrastructure error (CliStructuredError) or a logical failure (schema verification failed).
  */
-type DbSignResult =
-  | {
-      readonly outcome: 'schemaVerifyFailed';
-      readonly schemaVerifyResult: VerifyDatabaseSchemaResult;
-    }
-  | { readonly outcome: 'signed'; readonly signResult: SignDatabaseResult };
+type DbSignFailure = CliStructuredError | VerifyDatabaseSchemaResult;
 
 /**
  * Executes the db sign command and returns a structured Result.
+ * Success: SignDatabaseResult (sign happened)
+ * Failure: CliStructuredError (infra error) or VerifyDatabaseSchemaResult (schema mismatch)
  */
 async function executeDbSignCommand(
   options: DbSignOptions,
   flags: GlobalFlags,
-): Promise<Result<DbSignResult, CliStructuredError>> {
+): Promise<Result<SignDatabaseResult, DbSignFailure>> {
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -160,13 +157,13 @@ async function executeDbSignCommand(
       onProgress,
     });
 
-    // If schema verification failed, return result for handling
+    // If schema verification failed, return as failure
     if (!schemaVerifyResult.ok) {
       // Add blank line after all async operations if spinners were shown
       if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
         console.log('');
       }
-      return ok({ outcome: 'schemaVerifyFailed', schemaVerifyResult });
+      return notOk(schemaVerifyResult);
     }
 
     // Step 2: Sign (already connected from schemaVerify)
@@ -182,7 +179,7 @@ async function executeDbSignCommand(
       console.log('');
     }
 
-    return ok({ outcome: 'signed', signResult });
+    return ok(signResult);
   } catch (error) {
     // Driver already throws CliStructuredError for connection failures
     if (error instanceof CliStructuredError) {
@@ -244,45 +241,38 @@ export function createDbSignCommand(): Command {
 
       const result = await executeDbSignCommand(options, flags);
 
-      // Handle result - formats output and returns exit code
-      const exitCode = handleResult(result, flags, (value) => {
-        switch (value.outcome) {
-          case 'schemaVerifyFailed': {
-            // Schema verification failed - format and print schema verification output
-            if (flags.json === 'object') {
-              console.log(formatSchemaVerifyJson(value.schemaVerifyResult));
-            } else {
-              const output = formatSchemaVerifyOutput(value.schemaVerifyResult, flags);
-              if (output) {
-                console.log(output);
-              }
-            }
-            break;
-          }
-          case 'signed': {
-            // Schema verification passed - format sign output
-            if (flags.json === 'object') {
-              console.log(formatSignJson(value.signResult));
-            } else {
-              const output = formatSignOutput(value.signResult, flags);
-              if (output) {
-                console.log(output);
-              }
-            }
-            break;
+      if (result.ok) {
+        // Success - format sign output
+        if (flags.json === 'object') {
+          console.log(formatSignJson(result.value));
+        } else {
+          const output = formatSignOutput(result.value, flags);
+          if (output) {
+            console.log(output);
           }
         }
-      });
+        process.exit(0);
+      }
 
-      // For logical schema mismatches, check if schema verification passed
-      // Infra errors already handled by handleResult (returns non-zero exit code)
-      if (result.ok && result.value.outcome === 'schemaVerifyFailed') {
-        // Schema verification failed - exit with code 1
-        process.exit(1);
-      } else {
-        // Success or infra error - use exit code from handleResult
+      // Failure - determine type and handle appropriately
+      const failure = result.failure;
+
+      if (failure instanceof CliStructuredError) {
+        // Infrastructure error - use standard handler
+        const exitCode = handleResult(result as Result<never, CliStructuredError>, flags);
         process.exit(exitCode);
       }
+
+      // Schema verification failed - format and print schema verification output
+      if (flags.json === 'object') {
+        console.log(formatSchemaVerifyJson(failure));
+      } else {
+        const output = formatSchemaVerifyOutput(failure, flags);
+        if (output) {
+          console.log(output);
+        }
+      }
+      process.exit(1);
     });
 
   return command;
