@@ -2,6 +2,34 @@ import type { ControlDriverInstance } from '@prisma-next/core-control-plane/type
 import { describe, expect, it } from 'vitest';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
 
+type EnumRow = { enum_name: string; enum_value: string; sort_order: number };
+
+function createMockDriver(options: {
+  enumRows?: EnumRow[];
+}): ControlDriverInstance<'sql', 'postgres'> {
+  const { enumRows = [] } = options;
+  return {
+    familyId: 'sql',
+    targetId: 'postgres',
+    query: async <Row = Record<string, unknown>>(sql: string) => {
+      if (sql.includes('information_schema.tables')) {
+        return { rows: [] as Row[] };
+      }
+      if (sql.includes('pg_extension')) {
+        return { rows: [] as Row[] };
+      }
+      if (sql.includes('pg_enum')) {
+        return { rows: enumRows as Row[] };
+      }
+      if (sql.includes('version()')) {
+        return { rows: [{ version: 'PostgreSQL 15.1' }] as Row[] };
+      }
+      return { rows: [] as Row[] };
+    },
+    close: async () => {},
+  };
+}
+
 describe('PostgresControlAdapter', () => {
   it('has correct familyId and targetId', () => {
     const adapter = new PostgresControlAdapter();
@@ -907,36 +935,15 @@ describe('PostgresControlAdapter', () => {
 
     it('introspects enum types', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
-        familyId: 'sql',
-        targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_enum')) {
-            return {
-              rows: [
-                { enum_name: 'role', enum_value: 'USER', sort_order: 1 },
-                { enum_name: 'role', enum_value: 'ADMIN', sort_order: 2 },
-                { enum_name: 'role', enum_value: 'MODERATOR', sort_order: 3 },
-                { enum_name: 'status', enum_value: 'ACTIVE', sort_order: 1 },
-                { enum_name: 'status', enum_value: 'INACTIVE', sort_order: 2 },
-              ] as Row[],
-            };
-          }
-          if (sql.includes('version()')) {
-            return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
-            };
-          }
-          return { rows: [] as Row[] };
-        },
-        close: async () => {},
-      };
+      const mockDriver = createMockDriver({
+        enumRows: [
+          { enum_name: 'role', enum_value: 'USER', sort_order: 1 },
+          { enum_name: 'role', enum_value: 'ADMIN', sort_order: 2 },
+          { enum_name: 'role', enum_value: 'MODERATOR', sort_order: 3 },
+          { enum_name: 'status', enum_value: 'ACTIVE', sort_order: 1 },
+          { enum_name: 'status', enum_value: 'INACTIVE', sort_order: 2 },
+        ],
+      });
 
       const result = await adapter.introspect(mockDriver);
 
@@ -948,65 +955,22 @@ describe('PostgresControlAdapter', () => {
 
     it('preserves enum value order from pg_enum', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
-        familyId: 'sql',
-        targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_enum')) {
-            // Values returned in SQL ORDER BY order (t.typname, e.enumsortorder)
-            return {
-              rows: [
-                { enum_name: 'priority', enum_value: 'LOW', sort_order: 1 },
-                { enum_name: 'priority', enum_value: 'HIGH', sort_order: 2 },
-                { enum_name: 'priority', enum_value: 'CRITICAL', sort_order: 3 },
-              ] as Row[],
-            };
-          }
-          if (sql.includes('version()')) {
-            return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
-            };
-          }
-          return { rows: [] as Row[] };
-        },
-        close: async () => {},
-      };
+      const mockDriver = createMockDriver({
+        enumRows: [
+          { enum_name: 'priority', enum_value: 'LOW', sort_order: 1 },
+          { enum_name: 'priority', enum_value: 'HIGH', sort_order: 2 },
+          { enum_name: 'priority', enum_value: 'CRITICAL', sort_order: 3 },
+        ],
+      });
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.enums?.['priority']?.values).toEqual(['LOW', 'HIGH', 'CRITICAL']);
+      expect(result.enums['priority']?.values).toEqual(['LOW', 'HIGH', 'CRITICAL']);
     });
 
     it('returns empty enums when no enum types exist', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
-        familyId: 'sql',
-        targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_enum')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('version()')) {
-            return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
-            };
-          }
-          return { rows: [] as Row[] };
-        },
-        close: async () => {},
-      };
+      const mockDriver = createMockDriver({ enumRows: [] });
 
       const result = await adapter.introspect(mockDriver);
 
