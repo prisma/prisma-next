@@ -54,7 +54,13 @@ export interface ControlClientOptions {
 /**
  * Action names for control-api operations that can emit progress events.
  */
-export type ControlActionName = 'dbInit' | 'verify' | 'schemaVerify' | 'sign' | 'introspect';
+export type ControlActionName =
+  | 'dbInit'
+  | 'verify'
+  | 'schemaVerify'
+  | 'sign'
+  | 'introspect'
+  | 'emit';
 
 /**
  * Progress event emitted during control-api operation execution.
@@ -197,6 +203,61 @@ export interface IntrospectOptions {
   readonly onProgress?: OnControlProgress;
 }
 
+/**
+ * Contract source as a raw value (any JSON-serializable value).
+ */
+export interface ContractSourceValue {
+  readonly kind: 'value';
+  readonly value: unknown;
+}
+
+/**
+ * Contract source as a lazy loader function.
+ */
+export interface ContractSourceLoader {
+  readonly kind: 'loader';
+  readonly load: () => unknown | Promise<unknown>;
+}
+
+/**
+ * Discriminated union for contract source.
+ * Use `kind` to determine how to resolve the contract.
+ */
+export type EmitContractSource = ContractSourceValue | ContractSourceLoader;
+
+/**
+ * Contract configuration for emit operation.
+ */
+export interface EmitContractConfig {
+  /**
+   * Contract source - either a raw value or a loader function.
+   * Switch on `source.kind` to determine how to resolve.
+   */
+  readonly source: EmitContractSource;
+  /**
+   * Output path for contract.json.
+   * Should be an absolute or relative path.
+   */
+  readonly output: string;
+  /**
+   * Output path for contract.d.ts.
+   * Should be an absolute or relative path.
+   */
+  readonly types: string;
+}
+
+/**
+ * Options for the emit operation.
+ */
+export interface EmitOptions {
+  /**
+   * Contract configuration containing source, output, and types paths.
+   */
+  readonly contractConfig: EmitContractConfig;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
+}
+
 // ============================================================================
 // Result Types
 // ============================================================================
@@ -253,6 +314,42 @@ export interface DbInitFailure {
  * Uses Result pattern: success returns DbInitSuccess, failure returns DbInitFailure.
  */
 export type DbInitResult = Result<DbInitSuccess, DbInitFailure>;
+
+/**
+ * Successful emit result.
+ * Contains the hashes and paths of emitted files.
+ */
+export interface EmitSuccess {
+  /** Core hash of the emitted contract */
+  readonly coreHash: string;
+  /** Profile hash of the emitted contract (target-specific) */
+  readonly profileHash: string;
+  /** The emitted contract as JSON string */
+  readonly contractJson: string;
+  /** The emitted contract TypeScript declarations */
+  readonly contractDts: string;
+}
+
+/**
+ * Failure codes for emit operation.
+ */
+export type EmitFailureCode = 'CONTRACT_SOURCE_INVALID' | 'EMIT_FAILED';
+
+/**
+ * Failure details for emit operation.
+ */
+export interface EmitFailure {
+  readonly code: EmitFailureCode;
+  readonly summary: string;
+  readonly why: string | undefined;
+  readonly meta: Record<string, unknown> | undefined;
+}
+
+/**
+ * Result type for emit operation.
+ * Uses Result pattern: success returns EmitSuccess, failure returns EmitFailure.
+ */
+export type EmitResult = Result<EmitSuccess, EmitFailure>;
 
 // ============================================================================
 // Client Interface
@@ -352,4 +449,13 @@ export interface ControlClient {
    * @returns CoreSchemaView if the family supports it, undefined otherwise
    */
   toSchemaView(schemaIR: unknown): CoreSchemaView | undefined;
+
+  /**
+   * Emits the contract to JSON and TypeScript declarations.
+   * This is an offline operation that does NOT require a database connection.
+   * Uses `init()` to create the stack but does NOT call `connect()`.
+   *
+   * @returns Result pattern: Ok with emit details, NotOk with failure details
+   */
+  emit(options: EmitOptions): Promise<EmitResult>;
 }

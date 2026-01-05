@@ -20,6 +20,8 @@ export { createControlClient } from '../control-api/client';
 
 // CLI-specific types
 export type {
+  ContractSourceLoader,
+  ContractSourceValue,
   ControlActionName,
   ControlClient,
   ControlClientOptions,
@@ -29,6 +31,13 @@ export type {
   DbInitOptions,
   DbInitResult,
   DbInitSuccess,
+  EmitContractConfig,
+  EmitContractSource,
+  EmitFailure,
+  EmitFailureCode,
+  EmitOptions,
+  EmitResult,
+  EmitSuccess,
   IntrospectOptions,
   OnControlProgress,
   SchemaVerifyOptions,

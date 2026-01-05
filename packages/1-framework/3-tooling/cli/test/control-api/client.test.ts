@@ -61,6 +61,12 @@ function createMockComponents() {
       marker: { created: false, updated: true },
       timings: { total: 10 },
     }),
+    emitContract: async () => ({
+      coreHash: 'test-core-hash',
+      profileHash: 'test-profile-hash',
+      contractJson: '{"test": true}',
+      contractDts: 'export interface Contract {}',
+    }),
   } as unknown as ControlFamilyInstance<string>;
 
   const mockFamily = {
@@ -373,6 +379,162 @@ describe('ControlClient progress emission', () => {
     });
   });
 
+  describe('emit()', () => {
+    it('emits resolveSource and emit spans', async () => {
+      const events: ControlProgressEvent[] = [];
+      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+        // No driver needed for emit
+      });
+
+      const result = await client.emit({
+        contractConfig: {
+          source: { kind: 'value', value: { test: true } },
+          output: '/tmp/contract.json',
+          types: '/tmp/contract.d.ts',
+        },
+        onProgress: (event) => events.push(event),
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(true);
+
+      // Should emit resolveSource span
+      const resolveSourceStart = events.find(
+        (e) => e.kind === 'spanStart' && e.spanId === 'resolveSource',
+      );
+      const resolveSourceEnd = events.find(
+        (e) => e.kind === 'spanEnd' && e.spanId === 'resolveSource',
+      );
+      expect(resolveSourceStart).toBeDefined();
+      expect(resolveSourceEnd).toMatchObject({ outcome: 'ok' });
+
+      // Should emit emit span
+      const emitStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'emit');
+      const emitEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'emit');
+      expect(emitStart).toBeDefined();
+      expect(emitEnd).toMatchObject({ outcome: 'ok' });
+
+      // All events should have action = 'emit'
+      for (const event of events) {
+        expect(event.action).toBe('emit');
+      }
+    });
+
+    it('emits resolveSource and emit spans when source is a function', async () => {
+      const events: ControlProgressEvent[] = [];
+      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+      });
+
+      const result = await client.emit({
+        contractConfig: {
+          source: { kind: 'loader', load: async () => ({ test: true }) },
+          output: '/tmp/contract.json',
+          types: '/tmp/contract.d.ts',
+        },
+        onProgress: (event) => events.push(event),
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(true);
+
+      // Should emit resolveSource span
+      const resolveSourceStart = events.find(
+        (e) => e.kind === 'spanStart' && e.spanId === 'resolveSource',
+      );
+      const resolveSourceEnd = events.find(
+        (e) => e.kind === 'spanEnd' && e.spanId === 'resolveSource',
+      );
+      expect(resolveSourceStart).toBeDefined();
+      expect(resolveSourceEnd).toMatchObject({ outcome: 'ok' });
+    });
+
+    it('emits error outcome when source function throws', async () => {
+      const events: ControlProgressEvent[] = [];
+      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+      });
+
+      const result = await client.emit({
+        contractConfig: {
+          source: {
+            kind: 'loader',
+            load: async () => {
+              throw new Error('Source load error');
+            },
+          },
+          output: '/tmp/contract.json',
+          types: '/tmp/contract.d.ts',
+        },
+        onProgress: (event) => events.push(event),
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('CONTRACT_SOURCE_INVALID');
+      }
+
+      // Should emit resolveSource span with error outcome
+      const resolveSourceEnd = events.find(
+        (e) => e.kind === 'spanEnd' && e.spanId === 'resolveSource',
+      );
+      expect(resolveSourceEnd).toMatchObject({ outcome: 'error' });
+    });
+
+    it('emits error outcome when emitContract throws', async () => {
+      const events: ControlProgressEvent[] = [];
+      const { mockFamily, mockTarget, mockAdapter, mockFamilyInstance } = createMockComponents();
+
+      // Override emitContract to throw
+      mockFamilyInstance.emitContract = async () => {
+        throw new Error('Emit error');
+      };
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+      });
+
+      const result = await client.emit({
+        contractConfig: {
+          source: { kind: 'value', value: { test: true } },
+          output: '/tmp/contract.json',
+          types: '/tmp/contract.d.ts',
+        },
+        onProgress: (event) => events.push(event),
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('EMIT_FAILED');
+      }
+
+      // Should emit emit span with error outcome
+      const emitEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'emit');
+      expect(emitEnd).toMatchObject({ outcome: 'error' });
+    });
+  });
+
   describe('no onProgress callback', () => {
     it('does not throw when onProgress is omitted from verify', async () => {
       const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor } = createMockComponents();
@@ -451,6 +613,28 @@ describe('ControlClient progress emission', () => {
       await client.close();
 
       expect(result).toBeDefined();
+    });
+
+    it('does not throw when onProgress is omitted from emit', async () => {
+      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+      });
+
+      const result = await client.emit({
+        contractConfig: {
+          source: { kind: 'value', value: { test: true } },
+          output: '/tmp/contract.json',
+          types: '/tmp/contract.d.ts',
+        },
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(true);
     });
   });
 });
