@@ -1,32 +1,29 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
+import type { VerifyDatabaseSchemaResult } from '@prisma-next/core-control-plane/types';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { Command } from 'commander';
+import { loadConfig } from '../config-loader';
+import { createControlClient } from '../control-api/client';
 import {
+  CliStructuredError,
+  errorContractValidationFailed,
   errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
-  errorRuntime,
+  errorJsonFormatNotSupported,
   errorUnexpected,
-} from '@prisma-next/core-control-plane/errors';
-import type { VerifyDatabaseSchemaResult } from '@prisma-next/core-control-plane/types';
-import { createControlPlaneStack } from '@prisma-next/core-control-plane/types';
-import { Command } from 'commander';
-import { loadConfig } from '../config-loader';
-import { performAction } from '../utils/action';
+} from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
-import {
-  assertContractRequirementsSatisfied,
-  assertFrameworkComponentsCompatible,
-} from '../utils/framework-components';
-import { parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
   formatSchemaVerifyJson,
   formatSchemaVerifyOutput,
   formatStyledHeader,
 } from '../utils/output';
+import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
-import { withSpinner } from '../utils/spinner';
 
 interface DbSchemaVerifyOptions {
   readonly db?: string;
@@ -42,6 +39,132 @@ interface DbSchemaVerifyOptions {
   readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+}
+
+/**
+ * Executes the db schema-verify command and returns a structured Result.
+ */
+async function executeDbSchemaVerifyCommand(
+  options: DbSchemaVerifyOptions,
+  flags: GlobalFlags,
+): Promise<Result<VerifyDatabaseSchemaResult, CliStructuredError>> {
+  // Load config
+  const config = await loadConfig(options.config);
+  const configPath = options.config
+    ? relative(process.cwd(), resolve(options.config))
+    : 'prisma-next.config.ts';
+  const contractPathAbsolute = config.contract?.output
+    ? resolve(config.contract.output)
+    : resolve('src/prisma/contract.json');
+  const contractPath = relative(process.cwd(), contractPathAbsolute);
+
+  // Output header
+  if (flags.json !== 'object' && !flags.quiet) {
+    const details: Array<{ label: string; value: string }> = [
+      { label: 'config', value: configPath },
+      { label: 'contract', value: contractPath },
+    ];
+    if (options.db) {
+      details.push({ label: 'database', value: options.db });
+    }
+    const header = formatStyledHeader({
+      command: 'db schema-verify',
+      description: 'Check whether the database schema satisfies your contract',
+      url: 'https://pris.ly/db-schema-verify',
+      details,
+      flags,
+    });
+    console.log(header);
+  }
+
+  // Load contract file
+  let contractJsonContent: string;
+  try {
+    contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
+  } catch (error) {
+    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+      return notOk(
+        errorFileNotFound(contractPathAbsolute, {
+          why: `Contract file not found at ${contractPathAbsolute}`,
+          fix: `Run \`prisma-next contract emit\` to generate ${contractPath}, or update \`config.contract.output\` in ${configPath}`,
+        }),
+      );
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  }
+
+  let contractJson: Record<string, unknown>;
+  try {
+    contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  } catch (error) {
+    return notOk(
+      errorContractValidationFailed(
+        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        { where: { path: contractPathAbsolute } },
+      ),
+    );
+  }
+
+  // Resolve database connection (--db flag or config.db.connection)
+  const dbConnection = options.db ?? config.db?.connection;
+  if (!dbConnection) {
+    return notOk(
+      errorDatabaseConnectionRequired({
+        why: `Database connection is required for db schema-verify (set db.connection in ${configPath}, or pass --db <url>)`,
+      }),
+    );
+  }
+
+  // Check for driver
+  if (!config.driver) {
+    return notOk(errorDriverRequired({ why: 'Config.driver is required for db schema-verify' }));
+  }
+
+  // Create control client
+  const client = createControlClient({
+    family: config.family,
+    target: config.target,
+    adapter: config.adapter,
+    driver: config.driver,
+    extensionPacks: config.extensionPacks ?? [],
+  });
+
+  // Create progress adapter
+  const onProgress = createProgressAdapter({ flags });
+
+  try {
+    const schemaVerifyResult = await client.schemaVerify({
+      contractIR: contractJson,
+      strict: options.strict ?? false,
+      connection: dbConnection,
+      onProgress,
+    });
+
+    // Add blank line after all async operations if spinners were shown
+    if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
+      console.log('');
+    }
+
+    return ok(schemaVerifyResult);
+  } catch (error) {
+    // Driver already throws CliStructuredError for connection failures
+    if (error instanceof CliStructuredError) {
+      return notOk(error);
+    }
+
+    // Wrap unexpected errors
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Unexpected error during db schema-verify: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  } finally {
+    await client.close();
+  }
 }
 
 export function createDbSchemaVerifyCommand(): Command {
@@ -62,7 +185,7 @@ export function createDbSchemaVerifyCommand(): Command {
     })
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--json [format]', 'Output as JSON (object or ndjson)', false)
+    .option('--json [format]', 'Output as JSON (object)', false)
     .option('--strict', 'Strict mode: extra schema elements cause failures', false)
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
@@ -73,142 +196,26 @@ export function createDbSchemaVerifyCommand(): Command {
     .action(async (options: DbSchemaVerifyOptions) => {
       const flags = parseGlobalFlags(options);
 
-      const result = await performAction(async () => {
-        // Load config (file I/O)
-        const config = await loadConfig(options.config);
-        // Normalize config path for display (match contract path format - no ./ prefix)
-        const configPath = options.config
-          ? relative(process.cwd(), resolve(options.config))
-          : 'prisma-next.config.ts';
-        const contractPathAbsolute = config.contract?.output
-          ? resolve(config.contract.output)
-          : resolve('src/prisma/contract.json');
-        // Convert to relative path for display
-        const contractPath = relative(process.cwd(), contractPathAbsolute);
-
-        // Output header (only for human-readable output)
-        if (flags.json !== 'object' && !flags.quiet) {
-          const details: Array<{ label: string; value: string }> = [
-            { label: 'config', value: configPath },
-            { label: 'contract', value: contractPath },
-          ];
-          if (options.db) {
-            details.push({ label: 'database', value: options.db });
-          }
-          const header = formatStyledHeader({
+      // Validate JSON format option
+      if (flags.json === 'ndjson') {
+        const result = notOk(
+          errorJsonFormatNotSupported({
             command: 'db schema-verify',
-            description: 'Check whether the database schema satisfies your contract',
-            url: 'https://pris.ly/db-schema-verify',
-            details,
-            flags,
-          });
-          console.log(header);
-        }
+            format: 'ndjson',
+            supportedFormats: ['object'],
+          }),
+        );
+        const exitCode = handleResult(result, flags);
+        process.exit(exitCode);
+      }
 
-        // Load contract file (file I/O)
-        let contractJsonContent: string;
-        try {
-          contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
-        } catch (error) {
-          if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-            throw errorFileNotFound(contractPathAbsolute, {
-              why: `Contract file not found at ${contractPathAbsolute}`,
-            });
-          }
-          throw errorUnexpected(error instanceof Error ? error.message : String(error), {
-            why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
-          });
-        }
-        const contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-
-        // Check for driver (needed for family instance creation)
-        if (!config.driver) {
-          throw errorDriverRequired();
-        }
-
-        // Store driver descriptor after null check
-        const driverDescriptor = config.driver;
-
-        // Create family instance (needed for contract validation)
-        const stack = createControlPlaneStack({
-          target: config.target,
-          adapter: config.adapter,
-          driver: driverDescriptor,
-          extensionPacks: config.extensionPacks,
-        });
-        const familyInstance = config.family.create(stack);
-
-        // Validate contract using instance validator
-        const contractIR = familyInstance.validateContractIR(contractJson) as ContractIR;
-
-        // Validate contract requirements fail-fast before connecting to database
-        assertContractRequirementsSatisfied({ contract: contractIR, stack });
-
-        // Resolve database connection (--db flag or config.db.connection)
-        const dbConnection = options.db ?? config.db?.connection;
-        if (!dbConnection) {
-          throw errorDatabaseConnectionRequired();
-        }
-
-        const driver = await withSpinner(() => driverDescriptor.create(dbConnection), {
-          message: 'Connecting to database...',
-          flags,
-        });
-
-        try {
-          const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
-          const frameworkComponents = assertFrameworkComponentsCompatible(
-            config.family.familyId,
-            config.target.targetId,
-            rawComponents,
-          );
-
-          // Call family instance schemaVerify method
-          let schemaVerifyResult: VerifyDatabaseSchemaResult;
-          try {
-            schemaVerifyResult = await withSpinner(
-              () =>
-                familyInstance.schemaVerify({
-                  driver,
-                  contractIR,
-                  strict: options.strict ?? false,
-                  contractPath: contractPathAbsolute,
-                  configPath,
-                  frameworkComponents,
-                }),
-              {
-                message: 'Verifying database schema...',
-                flags,
-              },
-            );
-          } catch (error) {
-            // Wrap errors from schemaVerify() in structured error
-            throw errorRuntime(error instanceof Error ? error.message : String(error), {
-              why: `Failed to verify database schema: ${error instanceof Error ? error.message : String(error)}`,
-            });
-          }
-
-          // Add blank line after all async operations if spinners were shown
-          if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
-            console.log('');
-          }
-
-          // Return result (don't throw for logical mismatches - handle exit code separately)
-          return schemaVerifyResult;
-        } finally {
-          // Ensure driver connection is closed
-          await driver.close();
-        }
-      });
+      const result = await executeDbSchemaVerifyCommand(options, flags);
 
       // Handle result - formats output and returns exit code
       const exitCode = handleResult(result, flags, (schemaVerifyResult) => {
-        // Output based on flags
         if (flags.json === 'object') {
-          // JSON output to stdout
           console.log(formatSchemaVerifyJson(schemaVerifyResult));
         } else {
-          // Human-readable output to stdout
           const output = formatSchemaVerifyOutput(schemaVerifyResult, flags);
           if (output) {
             console.log(output);
