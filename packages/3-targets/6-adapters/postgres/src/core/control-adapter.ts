@@ -3,6 +3,7 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import type {
   PrimaryKey,
   SqlColumnIR,
+  SqlEnumIR,
   SqlForeignKeyIR,
   SqlIndexIR,
   SqlSchemaIR,
@@ -333,6 +334,42 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
+    // Query enum types
+    const enumsResult = await driver.query<{
+      enum_name: string;
+      enum_value: string;
+      sort_order: number;
+    }>(
+      `SELECT
+         t.typname AS enum_name,
+         e.enumlabel AS enum_value,
+         e.enumsortorder AS sort_order
+       FROM pg_type t
+       JOIN pg_enum e ON t.oid = e.enumtypid
+       JOIN pg_namespace n ON t.typnamespace = n.oid
+       WHERE n.nspname = $1
+         AND t.typtype = 'e'
+       ORDER BY t.typname, e.enumsortorder`,
+      [schema],
+    );
+
+    // Sort enum values by sort_order, then group by enum name
+    const sortedEnumRows = [...enumsResult.rows].sort((a, b) => a.sort_order - b.sort_order);
+    const enums: Record<string, SqlEnumIR> = {};
+    for (const row of sortedEnumRows) {
+      if (!enums[row.enum_name]) {
+        enums[row.enum_name] = {
+          name: row.enum_name,
+          values: [],
+        };
+      }
+      (enums[row.enum_name].values as string[]).push(row.enum_value);
+    }
+    // Freeze values arrays
+    for (const enumIR of Object.values(enums)) {
+      (enumIR as { values: readonly string[] }).values = Object.freeze(enumIR.values);
+    }
+
     // Query extensions
     const extensionsResult = await driver.query<{
       extname: string;
@@ -355,6 +392,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
     return {
       tables,
+      enums,
       extensions,
       annotations,
     };
