@@ -239,7 +239,7 @@ async function executeDbInitCommand(
       ok: true,
       mode: result.value.mode,
       plan: {
-        targetId: '', // Not available in control-api result
+        targetId: config.target.targetId,
         destination: {
           coreHash: result.value.marker?.coreHash ?? '',
           ...(profileHash ? { profileHash } : {}),
