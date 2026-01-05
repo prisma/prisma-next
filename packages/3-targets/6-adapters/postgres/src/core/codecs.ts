@@ -178,6 +178,12 @@ const pgBoolCodec = codec<'pg/bool@1', boolean, boolean>({
  * Generic codec for Postgres enum types.
  * Enums are wire-encoded as strings and JS-typed as strings.
  * The specific enum type name is provided via nativeType in the storage column.
+ *
+ * Note: Runtime validation of enum values is not performed at the codec level
+ * because codecs are designed to be stateless and context-free. The valid enum
+ * values are defined per-column in the contract, which is not accessible here.
+ * TypeScript types provide compile-time safety. Future enhancement: add an
+ * optional validation layer at the encoding step that has contract context.
  */
 const pgEnumCodec = codec<'pg/enum@1', string, string>({
   typeId: 'pg/enum@1',
