@@ -21,12 +21,19 @@ interface TableBuilderInternalState<
   readonly foreignKeys: readonly ForeignKeyDef[];
 }
 
-type TableBuilderOptions<
-  Name extends string,
-  Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
-  PrimaryKey extends readonly string[] | undefined,
-> = Partial<Omit<TableBuilderInternalState<Name, Columns, PrimaryKey>, 'name'>> & { name: Name };
+/**
+ * Creates a new table builder with the given name.
+ * This is the preferred way to create a TableBuilder - it ensures
+ * type parameters are inferred correctly without unsafe casts.
+ */
+export function createTable<Name extends string>(name: Name): TableBuilder<Name> {
+  return new TableBuilder(name, {}, undefined, undefined, [], [], []);
+}
 
+/**
+ * Builder for defining table structure with type-safe chaining.
+ * Use `createTable(name)` to create instances.
+ */
 export class TableBuilder<
   Name extends string,
   Columns extends Record<string, ColumnBuilderState<string, boolean, string>> = Record<
@@ -37,15 +44,24 @@ export class TableBuilder<
 > {
   private readonly _state: TableBuilderInternalState<Name, Columns, PrimaryKey>;
 
-  constructor(options: TableBuilderOptions<Name, Columns, PrimaryKey>) {
+  /** @internal Use createTable() instead */
+  constructor(
+    name: Name,
+    columns: Columns,
+    primaryKey: PrimaryKey,
+    primaryKeyName: string | undefined,
+    uniques: readonly UniqueConstraintDef[],
+    indexes: readonly IndexDef[],
+    foreignKeys: readonly ForeignKeyDef[],
+  ) {
     this._state = {
-      name: options.name,
-      columns: (options.columns ?? {}) as Columns,
-      primaryKey: options.primaryKey as PrimaryKey,
-      primaryKeyName: options.primaryKeyName,
-      uniques: options.uniques ?? [],
-      indexes: options.indexes ?? [],
-      foreignKeys: options.foreignKeys ?? [],
+      name,
+      columns,
+      primaryKey,
+      primaryKeyName,
+      uniques,
+      indexes,
+      foreignKeys,
     };
   }
 
@@ -89,41 +105,61 @@ export class TableBuilder<
       type: codecId,
       nativeType,
     } as ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>;
-    return new TableBuilder({
-      ...this._state,
-      columns: { ...this._columns, [name]: columnState } as Columns &
-        Record<
-          ColName,
-          ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>
-        >,
-    });
+    const newColumns = { ...this._columns, [name]: columnState } as Columns &
+      Record<
+        ColName,
+        ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>
+      >;
+    return new TableBuilder(
+      this._state.name,
+      newColumns,
+      this._state.primaryKey,
+      this._state.primaryKeyName,
+      this._state.uniques,
+      this._state.indexes,
+      this._state.foreignKeys,
+    );
   }
 
   primaryKey<PK extends readonly string[]>(
     columns: PK,
     name?: string,
   ): TableBuilder<Name, Columns, PK> {
-    return new TableBuilder({
-      ...this._state,
-      primaryKey: columns,
-      primaryKeyName: name,
-    });
+    return new TableBuilder(
+      this._state.name,
+      this._state.columns,
+      columns,
+      name,
+      this._state.uniques,
+      this._state.indexes,
+      this._state.foreignKeys,
+    );
   }
 
   unique(columns: readonly string[], name?: string): TableBuilder<Name, Columns, PrimaryKey> {
     const constraint: UniqueConstraintDef = name ? { columns, name } : { columns };
-    return new TableBuilder({
-      ...this._state,
-      uniques: [...this._state.uniques, constraint],
-    });
+    return new TableBuilder(
+      this._state.name,
+      this._state.columns,
+      this._state.primaryKey,
+      this._state.primaryKeyName,
+      [...this._state.uniques, constraint],
+      this._state.indexes,
+      this._state.foreignKeys,
+    );
   }
 
   index(columns: readonly string[], name?: string): TableBuilder<Name, Columns, PrimaryKey> {
     const indexDef: IndexDef = name ? { columns, name } : { columns };
-    return new TableBuilder({
-      ...this._state,
-      indexes: [...this._state.indexes, indexDef],
-    });
+    return new TableBuilder(
+      this._state.name,
+      this._state.columns,
+      this._state.primaryKey,
+      this._state.primaryKeyName,
+      this._state.uniques,
+      [...this._state.indexes, indexDef],
+      this._state.foreignKeys,
+    );
   }
 
   foreignKey(
@@ -132,10 +168,15 @@ export class TableBuilder<
     name?: string,
   ): TableBuilder<Name, Columns, PrimaryKey> {
     const fkDef: ForeignKeyDef = name ? { columns, references, name } : { columns, references };
-    return new TableBuilder({
-      ...this._state,
-      foreignKeys: [...this._state.foreignKeys, fkDef],
-    });
+    return new TableBuilder(
+      this._state.name,
+      this._state.columns,
+      this._state.primaryKey,
+      this._state.primaryKeyName,
+      this._state.uniques,
+      this._state.indexes,
+      [...this._state.foreignKeys, fkDef],
+    );
   }
 
   build(): TableBuilderState<Name, Columns, PrimaryKey> {

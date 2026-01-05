@@ -7,7 +7,7 @@ import type {
   TableBuilderState,
 } from './builder-state';
 import { ModelBuilder } from './model-builder';
-import { TableBuilder } from './table-builder';
+import { createTable, TableBuilder } from './table-builder';
 
 export class ContractBuilder<
   Target extends string | undefined = undefined,
@@ -83,7 +83,7 @@ export class ContractBuilder<
     ExtensionPacks,
     Capabilities
   > {
-    const tableBuilder = new TableBuilder<TableName>({ name });
+    const tableBuilder = createTable(name);
     const result = callback(tableBuilder);
     const finalBuilder = result instanceof TableBuilder ? result : tableBuilder;
     const tableState = finalBuilder.build();

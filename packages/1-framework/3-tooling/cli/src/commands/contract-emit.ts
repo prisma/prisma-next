@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
-import { createControlPlaneStack } from '@prisma-next/core-control-plane/types';
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { performAction } from '../utils/action';

@@ -49,7 +49,7 @@ exports[`help text snapshots > formats db introspect help 1`] = `
 │
 │ --db <url>            Database connection string
 │ --config <path>       Path to prisma-next.config.ts
-│ --json [format]       Output as JSON (object or ndjson)
+│ --json [format]       Output as JSON (object)
 │                       default: false
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
@@ -72,7 +72,7 @@ exports[`help text snapshots > formats db verify help 1`] = `
 │
 │ --db <url>            Database connection string
 │ --config <path>       Path to prisma-next.config.ts
-│ --json [format]       Output as JSON (object or ndjson)
+│ --json [format]       Output as JSON (object)
 │                       default: false
 │ -q, --quiet           Quiet mode: errors only
 │ -v, --verbose         Verbose output: debug info, timings
