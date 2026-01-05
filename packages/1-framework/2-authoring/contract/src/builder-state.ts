@@ -18,6 +18,34 @@ export interface ColumnBuilderState<
   readonly nativeType: string;
 }
 
+/**
+ * Unique constraint definition for table builder.
+ */
+export interface UniqueConstraintDef {
+  readonly columns: readonly string[];
+  readonly name?: string;
+}
+
+/**
+ * Index definition for table builder.
+ */
+export interface IndexDef {
+  readonly columns: readonly string[];
+  readonly name?: string;
+}
+
+/**
+ * Foreign key definition for table builder.
+ */
+export interface ForeignKeyDef {
+  readonly columns: readonly string[];
+  readonly references: {
+    readonly table: string;
+    readonly columns: readonly string[];
+  };
+  readonly name?: string;
+}
+
 export interface TableBuilderState<
   Name extends string,
   Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
@@ -26,6 +54,10 @@ export interface TableBuilderState<
   readonly name: Name;
   readonly columns: Columns;
   readonly primaryKey?: PrimaryKey;
+  readonly primaryKeyName?: string;
+  readonly uniques: readonly UniqueConstraintDef[];
+  readonly indexes: readonly IndexDef[];
+  readonly foreignKeys: readonly ForeignKeyDef[];
 }
 
 export type RelationDefinition = {

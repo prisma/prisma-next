@@ -30,27 +30,64 @@ describe('TableBuilder', () => {
     expect(table.primaryKey).toEqual(['id']);
   });
 
-  it('supports unique method', () => {
+  it('stores unique constraints and emits them in build()', () => {
     const builder = new TableBuilder('user');
-    const result = builder.column('email', { type: textColumn }).unique(['email']);
-    expect(result).toBeInstanceOf(TableBuilder);
+    const table = builder
+      .column('email', { type: textColumn })
+      .unique(['email'])
+      .unique(['email'], 'user_email_unique')
+      .build();
+
+    expect(table.uniques).toHaveLength(2);
+    expect(table.uniques[0]).toEqual({ columns: ['email'] });
+    expect(table.uniques[1]).toEqual({ columns: ['email'], name: 'user_email_unique' });
   });
 
-  it('supports index method', () => {
+  it('stores indexes and emits them in build()', () => {
     const builder = new TableBuilder('user');
-    const result = builder.column('email', { type: textColumn }).index(['email']);
-    expect(result).toBeInstanceOf(TableBuilder);
+    const table = builder
+      .column('email', { type: textColumn })
+      .index(['email'])
+      .index(['email'], 'user_email_idx')
+      .build();
+
+    expect(table.indexes).toHaveLength(2);
+    expect(table.indexes[0]).toEqual({ columns: ['email'] });
+    expect(table.indexes[1]).toEqual({ columns: ['email'], name: 'user_email_idx' });
   });
 
-  it('supports foreignKey method', () => {
+  it('stores foreign keys and emits them in build()', () => {
     const builder = new TableBuilder('post');
-    const result = builder
+    const table = builder
       .column('userId', { type: intColumn })
-      .foreignKey(['userId'], { table: 'user', columns: ['id'] });
-    expect(result).toBeInstanceOf(TableBuilder);
+      .foreignKey(['userId'], { table: 'user', columns: ['id'] })
+      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey')
+      .build();
+
+    expect(table.foreignKeys).toHaveLength(2);
+    expect(table.foreignKeys[0]).toEqual({
+      columns: ['userId'],
+      references: { table: 'user', columns: ['id'] },
+    });
+    expect(table.foreignKeys[1]).toEqual({
+      columns: ['userId'],
+      references: { table: 'user', columns: ['id'] },
+      name: 'post_userId_fkey',
+    });
   });
 
-  it('builds table state without primary key', () => {
+  it('stores primary key name when provided', () => {
+    const builder = new TableBuilder('user');
+    const table = builder
+      .column('id', { type: intColumn, nullable: false })
+      .primaryKey(['id'], 'user_pkey')
+      .build();
+
+    expect(table.primaryKey).toEqual(['id']);
+    expect(table.primaryKeyName).toBe('user_pkey');
+  });
+
+  it('builds table state without primary key but with default empty constraint arrays', () => {
     const builder = new TableBuilder('user');
     const table = builder.column('id', { type: intColumn, nullable: false }).build();
 
@@ -62,6 +99,9 @@ describe('TableBuilder', () => {
       nativeType: 'int4',
     });
     expect(table).not.toHaveProperty('primaryKey');
+    expect(table.uniques).toEqual([]);
+    expect(table.indexes).toEqual([]);
+    expect(table.foreignKeys).toEqual([]);
   });
 
   it('defaults nullable to false when not provided', () => {

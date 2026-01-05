@@ -3,9 +3,12 @@ export type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
   ContractBuilderState,
+  ForeignKeyDef,
+  IndexDef,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
+  UniqueConstraintDef,
 } from './builder-state';
 
 export { ContractBuilder, defineContract } from './contract-builder';

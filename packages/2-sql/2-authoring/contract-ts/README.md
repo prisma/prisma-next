@@ -65,11 +65,33 @@ const contract = defineContract<CodecTypes>()
     t
       .column('id', { type: int4Column, nullable: false })
       .column('email', { type: textColumn, nullable: false })
-      .primaryKey(['id']),
+      .primaryKey(['id'])
+      .unique(['email'])                    // Add unique constraint
+      .index(['email'], 'user_email_idx'),  // Add named index
+  )
+  .table('post', (t) =>
+    t
+      .column('id', { type: int4Column, nullable: false })
+      .column('userId', { type: int4Column, nullable: false })
+      .column('title', { type: textColumn, nullable: false })
+      .primaryKey(['id'])
+      .foreignKey(['userId'], { table: 'user', columns: ['id'] }),  // Add foreign key
   )
   .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
+  .model('Post', 'post', (m) => m.field('id', 'id').field('userId', 'userId').field('title', 'title'))
   .build();
 ```
+
+#### Table Builder Methods
+
+The table builder supports the following constraint methods:
+
+| Method | Description |
+|--------|-------------|
+| `.primaryKey(columns, name?)` | Define primary key with optional name |
+| `.unique(columns, name?)` | Add unique constraint with optional name |
+| `.index(columns, name?)` | Add index with optional name |
+| `.foreignKey(columns, references, name?)` | Add foreign key with optional name |
 
 ### Validating Contracts
 
