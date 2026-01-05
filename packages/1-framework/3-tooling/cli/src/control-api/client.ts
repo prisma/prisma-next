@@ -9,6 +9,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { executeDbInit } from './operations/db-init';
 import type {
@@ -16,6 +17,8 @@ import type {
   ControlClientOptions,
   DbInitOptions,
   DbInitResult,
+  EmitOptions,
+  EmitResult,
   IntrospectOptions,
   SchemaVerifyOptions,
   SignOptions,
@@ -489,5 +492,100 @@ class ControlClientImpl implements ControlClient {
       return this.familyInstance.toSchemaView(schemaIR);
     }
     return undefined;
+  }
+
+  async emit(options: EmitOptions): Promise<EmitResult> {
+    const { onProgress, contractConfig } = options;
+
+    // Ensure initialized (creates stack and family instance)
+    // emit() does NOT require a database connection
+    this.init();
+
+    if (!this.familyInstance) {
+      return notOk({
+        code: 'EMIT_FAILED',
+        summary: 'Failed to initialize family instance',
+        why: 'Family instance could not be created',
+        meta: undefined,
+      });
+    }
+
+    // Resolve contract source
+    let contractRaw: unknown;
+    onProgress?.({
+      action: 'emit',
+      kind: 'spanStart',
+      spanId: 'resolveSource',
+      label: 'Resolving contract source...',
+    });
+
+    try {
+      if (typeof contractConfig.source === 'function') {
+        contractRaw = await contractConfig.source();
+      } else {
+        contractRaw = contractConfig.source;
+      }
+
+      onProgress?.({
+        action: 'emit',
+        kind: 'spanEnd',
+        spanId: 'resolveSource',
+        outcome: 'ok',
+      });
+    } catch (error) {
+      onProgress?.({
+        action: 'emit',
+        kind: 'spanEnd',
+        spanId: 'resolveSource',
+        outcome: 'error',
+      });
+
+      return notOk({
+        code: 'CONTRACT_SOURCE_INVALID',
+        summary: 'Failed to resolve contract source',
+        why: error instanceof Error ? error.message : String(error),
+        meta: undefined,
+      });
+    }
+
+    // Emit contract
+    onProgress?.({
+      action: 'emit',
+      kind: 'spanStart',
+      spanId: 'emit',
+      label: 'Emitting contract...',
+    });
+
+    try {
+      const emitResult = await this.familyInstance.emitContract({ contractIR: contractRaw });
+
+      onProgress?.({
+        action: 'emit',
+        kind: 'spanEnd',
+        spanId: 'emit',
+        outcome: 'ok',
+      });
+
+      return ok({
+        coreHash: emitResult.coreHash,
+        profileHash: emitResult.profileHash,
+        contractJson: emitResult.contractJson,
+        contractDts: emitResult.contractDts,
+      });
+    } catch (error) {
+      onProgress?.({
+        action: 'emit',
+        kind: 'spanEnd',
+        spanId: 'emit',
+        outcome: 'error',
+      });
+
+      return notOk({
+        code: 'EMIT_FAILED',
+        summary: 'Failed to emit contract',
+        why: error instanceof Error ? error.message : String(error),
+        meta: undefined,
+      });
+    }
   }
 }
