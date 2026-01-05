@@ -139,6 +139,10 @@ export interface SignOptions {
   /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
   /**
+   * Path to the contract file (for metadata in the result).
+   */
+  readonly contractPath?: string;
+  /**
    * Database connection. If provided, sign will connect before executing.
    * If omitted, the client must already be connected.
    * The type is driver-specific (e.g., string URL for Postgres).

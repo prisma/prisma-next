@@ -166,6 +166,7 @@ async function executeDbSignCommand(
     // Step 2: Sign (already connected from schemaVerify)
     const signResult = await client.sign({
       contractIR: contractJson,
+      contractPath,
       onProgress,
     });
 

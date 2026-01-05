@@ -341,7 +341,7 @@ class ControlClientImpl implements ControlClient {
       const result = await familyInstance.sign({
         driver,
         contractIR,
-        contractPath: '',
+        contractPath: options.contractPath ?? '',
       });
 
       onProgress?.({
