@@ -95,6 +95,8 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
       code: 'PLANNING_FAILED' as const,
       summary: 'Migration planning failed due to conflicts',
       conflicts: plannerResult.conflicts,
+      why: undefined,
+      meta: undefined,
     });
   }
 
@@ -164,6 +166,9 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
         coreHash: migrationPlan.destination.coreHash,
         profileHash: migrationPlan.destination.profileHash,
       },
+      why: undefined,
+      conflicts: undefined,
+      meta: undefined,
     });
   }
 
@@ -242,6 +247,9 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     return notOk({
       code: 'RUNNER_FAILED' as const,
       summary: runnerResult.failure.summary,
+      why: runnerResult.failure.why,
+      meta: runnerResult.failure.meta,
+      conflicts: undefined,
     });
   }
 

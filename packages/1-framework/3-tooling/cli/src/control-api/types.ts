@@ -202,7 +202,9 @@ export type DbInitFailureCode = 'PLANNING_FAILED' | 'MARKER_ORIGIN_MISMATCH' | '
 export interface DbInitFailure {
   readonly code: DbInitFailureCode;
   readonly summary: string;
-  readonly conflicts?: ReadonlyArray<MigrationPlannerConflict>;
+  readonly why: string | undefined;
+  readonly conflicts: ReadonlyArray<MigrationPlannerConflict> | undefined;
+  readonly meta: Record<string, unknown> | undefined;
   readonly marker?: {
     readonly coreHash?: string;
     readonly profileHash?: string;

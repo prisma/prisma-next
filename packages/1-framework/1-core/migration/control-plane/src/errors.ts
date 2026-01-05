@@ -94,6 +94,23 @@ export class CliStructuredError extends Error {
       docsUrl: this.docsUrl,
     };
   }
+
+  /**
+   * Type guard to check if an error is a CliStructuredError.
+   * Uses duck-typing to work across module boundaries where instanceof may fail.
+   */
+  static is(error: unknown): error is CliStructuredError {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+    const candidate = error as CliStructuredError;
+    return (
+      candidate.name === 'CliStructuredError' &&
+      typeof candidate.code === 'string' &&
+      (candidate.domain === 'CLI' || candidate.domain === 'RTM') &&
+      typeof candidate.toEnvelope === 'function'
+    );
+  }
 }
 
 // ============================================================================

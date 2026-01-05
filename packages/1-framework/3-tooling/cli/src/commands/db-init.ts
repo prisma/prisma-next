@@ -97,10 +97,11 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
 
   if (failure.code === 'RUNNER_FAILED') {
     return errorRuntime(failure.summary, {
-      why: 'Migration runner failed',
+      why: failure.why ?? 'Migration runner failed',
       fix: 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`',
       meta: {
         code: 'RUNNER_FAILED',
+        ...(failure.meta ?? {}),
       },
     });
   }
@@ -275,7 +276,8 @@ async function executeDbInitCommand(
     return ok(dbInitResult);
   } catch (error) {
     // Driver already throws CliStructuredError for connection failures
-    if (error instanceof CliStructuredError) {
+    // Use static type guard to work across module boundaries
+    if (CliStructuredError.is(error)) {
       return notOk(error);
     }
 
