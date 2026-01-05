@@ -5,8 +5,8 @@
   "sideEffects": false,
   "description": "PSL parser and IR for Prisma Next (future)",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "build": "tsup && tsc",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",

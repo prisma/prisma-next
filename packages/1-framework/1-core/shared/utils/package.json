@@ -5,10 +5,10 @@
   "sideEffects": false,
   "description": "Shared utility functions for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsup && tsc",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "clean": "rm -rf dist coverage .tmp-output"
   },
