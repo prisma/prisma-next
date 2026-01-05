@@ -330,10 +330,10 @@ export type Relations = Contract['relations'];
       if (!enumDef) continue;
 
       const values = enumDef.values.map((v) => `'${v}'`).join(' | ');
-      typeAliases.push(`export type ${enumName} = ${values};`);
+      typeAliases.push(`  export type ${enumName} = ${values};`);
     }
 
-    return typeAliases.join('\n');
+    return `export namespace Enums {\n${typeAliases.join('\n')}\n}`;
   },
 
   generateModelsType(
@@ -364,7 +364,7 @@ export type Relations = Contract['relations'];
           // Use enum type alias for enum columns instead of generic codec output
           let baseType: string;
           if (typeId === 'pg/enum@1' && storage.enums && column.nativeType in storage.enums) {
-            baseType = column.nativeType;
+            baseType = `Enums.${column.nativeType}`;
           } else {
             baseType = `CodecTypes['${typeId}']['output']`;
           }

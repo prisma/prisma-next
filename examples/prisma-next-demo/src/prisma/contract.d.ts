@@ -16,7 +16,9 @@ export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = PgVectorOperationTypes;
 
-export type Role = 'USER' | 'ADMIN' | 'MODERATOR';
+export namespace Enums {
+  export type Role = 'USER' | 'ADMIN' | 'MODERATOR';
+}
 
 export type Contract = SqlContract<
   {
@@ -97,7 +99,7 @@ export type Contract = SqlContract<
       fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly email: CodecTypes['pg/text@1']['output'];
-        readonly role: Role;
+        readonly role: Enums.Role;
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       };
     };
