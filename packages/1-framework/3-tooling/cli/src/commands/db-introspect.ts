@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type { IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
@@ -58,24 +57,12 @@ async function executeDbIntrospectCommand(
     ? relative(process.cwd(), resolve(options.config))
     : 'prisma-next.config.ts';
 
-  // Optionally load contract if contract config exists
-  let contractIR: unknown | undefined;
-  if (config.contract?.output) {
-    const contractPath = resolve(config.contract.output);
-    try {
-      const contractJsonContent = await readFile(contractPath, 'utf-8');
-      contractIR = JSON.parse(contractJsonContent);
-    } catch (error) {
-      // Contract file is optional for introspection - don't fail if it doesn't exist
-      if (error instanceof Error && (error as { code?: string }).code !== 'ENOENT') {
-        return notOk(
-          errorUnexpected(error.message, {
-            why: `Failed to read contract file: ${error.message}`,
-          }),
-        );
-      }
-    }
-  }
+  // TODO: Load contractIR for toSchemaView once ControlClient exposes it.
+  // The contract is needed to convert the raw schema IR to a CoreSchemaView
+  // for rich output formatting, but ControlClient.introspect() doesn't support
+  // this yet. For now, we skip loading and use undefined schemaView.
+  const contractIR: unknown | undefined = undefined;
+  void contractIR; // Placeholder for future toSchemaView support
 
   // Output header
   if (flags.json !== 'object' && !flags.quiet) {
@@ -140,15 +127,9 @@ async function executeDbIntrospectCommand(
       console.log('');
     }
 
-    // Optionally call toSchemaView if available
-    // We need to access the family instance for toSchemaView
-    // Since ControlClient doesn't expose this, we access it through init
-    client.init();
-
-    let schemaView: CoreSchemaView | undefined;
-    // The ControlClient doesn't expose toSchemaView, so we skip it for now
-    // In the future, the introspect method could return the schema view
-    void contractIR; // Mark as used
+    // TODO: Use contractIR with toSchemaView once ControlClient exposes it.
+    // This would enable rich output formatting with CoreSchemaView.
+    const schemaView: CoreSchemaView | undefined = undefined;
 
     const totalTime = Date.now() - startTime;
 
