@@ -1,6 +1,7 @@
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import type {
   ColumnBuilderState,
+  EnumBuilderState,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
@@ -70,6 +71,13 @@ type BuildStorageTable<
   ? { readonly primaryKey: { readonly columns: PK; readonly name?: string } }
   : Record<string, never>);
 
+type BuildStorageEnums<Enums extends Record<string, EnumBuilderState<string, readonly string[]>>> =
+  {
+    readonly [K in keyof Enums]: {
+      readonly values: Enums[K]['values'];
+    };
+  };
+
 type BuildStorage<
   Tables extends Record<
     string,
@@ -79,6 +87,7 @@ type BuildStorage<
       readonly string[] | undefined
     >
   >,
+  Enums extends Record<string, EnumBuilderState<string, readonly string[]>> = Record<never, never>,
 > = {
   readonly tables: {
     readonly [K in keyof Tables]: BuildStorageTable<
@@ -87,6 +96,7 @@ type BuildStorage<
       ExtractPrimaryKey<Tables[K]>
     >;
   };
+  readonly enums: BuildStorageEnums<Enums>;
 };
 
 type BuildStorageTables<
@@ -127,10 +137,11 @@ class SqlContractBuilder<
     string,
     ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   > = Record<never, never>,
+  Enums extends Record<string, EnumBuilderState<string, readonly string[]>> = Record<never, never>,
   CoreHash extends string | undefined = undefined,
   ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
-> extends ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
+> extends ContractBuilder<Target, Tables, Models, Enums, CoreHash, ExtensionPacks, Capabilities> {
   /**
    * This method is responsible for normalizing the contract IR by setting default values
    * for all required fields:
@@ -151,7 +162,7 @@ class SqlContractBuilder<
    */
   build(): Target extends string
     ? SqlContract<
-        BuildStorage<Tables>,
+        BuildStorage<Tables, Enums>,
         BuildModels<Models>,
         BuildRelations<Models>,
         ContractBuilderMappings<CodecTypes>
@@ -170,7 +181,7 @@ class SqlContractBuilder<
     // Type helper to ensure literal types are preserved in return type
     type BuiltContract = Target extends string
       ? SqlContract<
-          BuildStorage<Tables>,
+          BuildStorage<Tables, Enums>,
           BuildModels<Models>,
           BuildRelations<Models>,
           ContractBuilderMappings<CodecTypes>
@@ -268,7 +279,21 @@ class SqlContractBuilder<
       (storageTables as Mutable<BuildStorageTables<Tables>>)[tableName] = table;
     }
 
-    const storage = { tables: storageTables as BuildStorageTables<Tables> } as BuildStorage<Tables>;
+    // Build enums from state
+    const storageEnums = {} as Mutable<BuildStorageEnums<Enums>>;
+    for (const enumName of Object.keys(this.state.enums) as Array<keyof Enums & string>) {
+      const enumState = this.state.enums[enumName];
+      if (!enumState) continue;
+
+      storageEnums[enumName] = {
+        values: enumState.values,
+      } as BuildStorageEnums<Enums>[typeof enumName];
+    }
+
+    const storage = {
+      tables: storageTables as BuildStorageTables<Tables>,
+      enums: storageEnums as BuildStorageEnums<Enums>,
+    } as BuildStorage<Tables, Enums>;
 
     // Build models - construct as partial first, then assert full type
     const modelsPartial: Partial<BuildModels<Models>> = {};
@@ -389,6 +414,7 @@ class SqlContractBuilder<
         Target,
         Tables,
         Models,
+        Enums,
         CoreHash,
         ExtensionPacks,
         Capabilities
@@ -398,12 +424,22 @@ class SqlContractBuilder<
 
   override target<T extends string>(
     packRef: TargetPackRef<'sql', T>,
-  ): SqlContractBuilder<CodecTypes, T, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
+  ): SqlContractBuilder<
+    CodecTypes,
+    T,
+    Tables,
+    Models,
+    Enums,
+    CoreHash,
+    ExtensionPacks,
+    Capabilities
+  > {
     return new SqlContractBuilder<
       CodecTypes,
       T,
       Tables,
       Models,
+      Enums,
       CoreHash,
       ExtensionPacks,
       Capabilities
@@ -420,6 +456,7 @@ class SqlContractBuilder<
     Target,
     Tables,
     Models,
+    Enums,
     CoreHash,
     ExtensionPacks,
     Capabilities
@@ -459,6 +496,7 @@ class SqlContractBuilder<
       Target,
       Tables,
       Models,
+      Enums,
       CoreHash,
       ExtensionPacks,
       Capabilities
@@ -470,8 +508,17 @@ class SqlContractBuilder<
 
   override capabilities<C extends Record<string, Record<string, boolean>>>(
     capabilities: C,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, ExtensionPacks, C> {
-    return new SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, ExtensionPacks, C>({
+  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, Enums, CoreHash, ExtensionPacks, C> {
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      Enums,
+      CoreHash,
+      ExtensionPacks,
+      C
+    >({
       ...this.state,
       capabilities,
     });
@@ -479,12 +526,22 @@ class SqlContractBuilder<
 
   override coreHash<H extends string>(
     hash: H,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, H, ExtensionPacks, Capabilities> {
+  ): SqlContractBuilder<
+    CodecTypes,
+    Target,
+    Tables,
+    Models,
+    Enums,
+    H,
+    ExtensionPacks,
+    Capabilities
+  > {
     return new SqlContractBuilder<
       CodecTypes,
       Target,
       Tables,
       Models,
+      Enums,
       H,
       ExtensionPacks,
       Capabilities
@@ -509,6 +566,7 @@ class SqlContractBuilder<
     Target,
     Tables & Record<TableName, ReturnType<T['build']>>,
     Models,
+    Enums,
     CoreHash,
     ExtensionPacks,
     Capabilities
@@ -523,6 +581,7 @@ class SqlContractBuilder<
       Target,
       Tables & Record<TableName, ReturnType<T['build']>>,
       Models,
+      Enums,
       CoreHash,
       ExtensionPacks,
       Capabilities
@@ -553,6 +612,7 @@ class SqlContractBuilder<
     Target,
     Tables,
     Models & Record<ModelName, ReturnType<M['build']>>,
+    Enums,
     CoreHash,
     ExtensionPacks,
     Capabilities
@@ -567,6 +627,7 @@ class SqlContractBuilder<
       Target,
       Tables,
       Models & Record<ModelName, ReturnType<M['build']>>,
+      Enums,
       CoreHash,
       ExtensionPacks,
       Capabilities
@@ -574,6 +635,45 @@ class SqlContractBuilder<
       ...this.state,
       models: { ...this.state.models, [name]: modelState } as Models &
         Record<ModelName, ReturnType<M['build']>>,
+    });
+  }
+
+  /**
+   * Define an enum type with ordered values.
+   * @param name The name of the enum type (e.g., 'Role', 'Status')
+   * @param values The ordered list of enum values (e.g., ['USER', 'ADMIN'])
+   */
+  override enum<EnumName extends string, Values extends readonly [string, ...string[]]>(
+    name: EnumName,
+    values: Values,
+  ): SqlContractBuilder<
+    CodecTypes,
+    Target,
+    Tables,
+    Models,
+    Enums & Record<EnumName, EnumBuilderState<EnumName, Values>>,
+    CoreHash,
+    ExtensionPacks,
+    Capabilities
+  > {
+    const enumState: EnumBuilderState<EnumName, Values> = {
+      name,
+      values,
+    };
+
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      Enums & Record<EnumName, EnumBuilderState<EnumName, Values>>,
+      CoreHash,
+      ExtensionPacks,
+      Capabilities
+    >({
+      ...this.state,
+      enums: { ...this.state.enums, [name]: enumState } as Enums &
+        Record<EnumName, EnumBuilderState<EnumName, Values>>,
     });
   }
 }

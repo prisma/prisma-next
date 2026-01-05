@@ -2,6 +2,7 @@ import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import type {
   ColumnBuilderState,
   ContractBuilderState,
+  EnumBuilderState,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
@@ -23,6 +24,7 @@ export class ContractBuilder<
     string,
     ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   > = Record<never, never>,
+  Enums extends Record<string, EnumBuilderState<string, readonly string[]>> = Record<never, never>,
   CoreHash extends string | undefined = undefined,
   ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
@@ -31,26 +33,44 @@ export class ContractBuilder<
     Target,
     Tables,
     Models,
+    Enums,
     CoreHash,
     ExtensionPacks,
     Capabilities
   >;
 
   constructor(
-    state?: ContractBuilderState<Target, Tables, Models, CoreHash, ExtensionPacks, Capabilities>,
+    state?: ContractBuilderState<
+      Target,
+      Tables,
+      Models,
+      Enums,
+      CoreHash,
+      ExtensionPacks,
+      Capabilities
+    >,
   ) {
     this.state =
       state ??
       ({
         tables: {},
         models: {},
-      } as ContractBuilderState<Target, Tables, Models, CoreHash, ExtensionPacks, Capabilities>);
+        enums: {},
+      } as ContractBuilderState<
+        Target,
+        Tables,
+        Models,
+        Enums,
+        CoreHash,
+        ExtensionPacks,
+        Capabilities
+      >);
   }
 
   target<T extends string>(
     packRef: TargetPackRef<string, T>,
-  ): ContractBuilder<T, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
-    return new ContractBuilder<T, Tables, Models, CoreHash, ExtensionPacks, Capabilities>({
+  ): ContractBuilder<T, Tables, Models, Enums, CoreHash, ExtensionPacks, Capabilities> {
+    return new ContractBuilder<T, Tables, Models, Enums, CoreHash, ExtensionPacks, Capabilities>({
       ...this.state,
       target: packRef.targetId,
     });
@@ -58,8 +78,8 @@ export class ContractBuilder<
 
   capabilities<C extends Record<string, Record<string, boolean>>>(
     capabilities: C,
-  ): ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, C> {
-    return new ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, C>({
+  ): ContractBuilder<Target, Tables, Models, Enums, CoreHash, ExtensionPacks, C> {
+    return new ContractBuilder<Target, Tables, Models, Enums, CoreHash, ExtensionPacks, C>({
       ...this.state,
       capabilities,
     });
@@ -79,6 +99,7 @@ export class ContractBuilder<
     Target,
     Tables & Record<TableName, ReturnType<T['build']>>,
     Models,
+    Enums,
     CoreHash,
     ExtensionPacks,
     Capabilities
@@ -92,6 +113,7 @@ export class ContractBuilder<
       Target,
       Tables & Record<TableName, ReturnType<T['build']>>,
       Models,
+      Enums,
       CoreHash,
       ExtensionPacks,
       Capabilities
@@ -121,6 +143,7 @@ export class ContractBuilder<
     Target,
     Tables,
     Models & Record<ModelName, ReturnType<M['build']>>,
+    Enums,
     CoreHash,
     ExtensionPacks,
     Capabilities
@@ -134,6 +157,7 @@ export class ContractBuilder<
       Target,
       Tables,
       Models & Record<ModelName, ReturnType<M['build']>>,
+      Enums,
       CoreHash,
       ExtensionPacks,
       Capabilities
@@ -144,10 +168,47 @@ export class ContractBuilder<
     });
   }
 
+  /**
+   * Define an enum type with ordered values.
+   * @param name The name of the enum type (e.g., 'Role', 'Status')
+   * @param values The ordered list of enum values (e.g., ['USER', 'ADMIN'])
+   */
+  enum<EnumName extends string, Values extends readonly [string, ...string[]]>(
+    name: EnumName,
+    values: Values,
+  ): ContractBuilder<
+    Target,
+    Tables,
+    Models,
+    Enums & Record<EnumName, EnumBuilderState<EnumName, Values>>,
+    CoreHash,
+    ExtensionPacks,
+    Capabilities
+  > {
+    const enumState: EnumBuilderState<EnumName, Values> = {
+      name,
+      values,
+    };
+
+    return new ContractBuilder<
+      Target,
+      Tables,
+      Models,
+      Enums & Record<EnumName, EnumBuilderState<EnumName, Values>>,
+      CoreHash,
+      ExtensionPacks,
+      Capabilities
+    >({
+      ...this.state,
+      enums: { ...this.state.enums, [name]: enumState } as Enums &
+        Record<EnumName, EnumBuilderState<EnumName, Values>>,
+    });
+  }
+
   coreHash<H extends string>(
     hash: H,
-  ): ContractBuilder<Target, Tables, Models, H, ExtensionPacks, Capabilities> {
-    return new ContractBuilder<Target, Tables, Models, H, ExtensionPacks, Capabilities>({
+  ): ContractBuilder<Target, Tables, Models, Enums, H, ExtensionPacks, Capabilities> {
+    return new ContractBuilder<Target, Tables, Models, Enums, H, ExtensionPacks, Capabilities>({
       ...this.state,
       coreHash: hash,
     });

@@ -3,6 +3,7 @@ export type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
   ContractBuilderState,
+  EnumBuilderState,
   ForeignKeyDef,
   IndexDef,
   ModelBuilderState,

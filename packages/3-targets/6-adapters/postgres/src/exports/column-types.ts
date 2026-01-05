@@ -51,3 +51,17 @@ export const boolColumn: ColumnTypeDescriptor = {
   codecId: 'pg/bool@1',
   nativeType: 'bool',
 } as const;
+
+/**
+ * Create a column type descriptor for a Postgres enum type.
+ * @param enumName The name of the enum type (must match the enum defined in the contract)
+ * @returns A ColumnTypeDescriptor for the enum column
+ */
+export function enumColumn<T extends string>(
+  enumName: T,
+): ColumnTypeDescriptor & { nativeType: T } {
+  return {
+    codecId: 'pg/enum@1',
+    nativeType: enumName,
+  };
+}

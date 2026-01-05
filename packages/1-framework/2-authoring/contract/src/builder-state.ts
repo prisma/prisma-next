@@ -86,6 +86,14 @@ export interface ModelBuilderState<
   readonly relations: Relations;
 }
 
+/**
+ * Enum builder state containing the enum name and ordered list of values.
+ */
+export interface EnumBuilderState<Name extends string, Values extends readonly string[]> {
+  readonly name: Name;
+  readonly values: Values;
+}
+
 export interface ContractBuilderState<
   Target extends string | undefined = string | undefined,
   Tables extends Record<
@@ -110,6 +118,10 @@ export interface ContractBuilderState<
     never,
     ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   >,
+  Enums extends Record<string, EnumBuilderState<string, readonly string[]>> = Record<
+    never,
+    EnumBuilderState<string, readonly string[]>
+  >,
   CoreHash extends string | undefined = string | undefined,
   ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
@@ -117,6 +129,7 @@ export interface ContractBuilderState<
   readonly target?: Target;
   readonly tables: Tables;
   readonly models: Models;
+  readonly enums: Enums;
   readonly coreHash?: CoreHash;
   readonly extensionPacks?: ExtensionPacks;
   readonly capabilities?: Capabilities;
