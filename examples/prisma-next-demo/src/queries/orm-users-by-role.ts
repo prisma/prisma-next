@@ -24,12 +24,12 @@ export async function ormGetUsersByRole(role: Role, runtime: Runtime) {
 
 /**
  * Get all moderators using the ORM API.
- * Demonstrates using enum literal values with the ORM.
+ * Demonstrates using enum values from the contract (no string literals).
  */
 export async function ormGetModerators(runtime: Runtime) {
   const plan = orm
     .user()
-    .where((u) => u.role.eq('MODERATOR'))
+    .where((u) => u.role.eq(enums.Role.MODERATOR))
     .select((u) => ({
       id: u.id,
       email: u.email,
@@ -41,12 +41,12 @@ export async function ormGetModerators(runtime: Runtime) {
 
 /**
  * Get users excluding a specific role.
- * Demonstrates using not-equal with enums.
+ * Demonstrates using not-equal with enum values from the contract.
  */
 export async function ormGetNonAdminUsers(runtime: Runtime) {
   const plan = orm
     .user()
-    .where((u) => u.role.neq('ADMIN'))
+    .where((u) => u.role.neq(enums.Role.ADMIN))
     .select((u) => ({
       id: u.id,
       email: u.email,

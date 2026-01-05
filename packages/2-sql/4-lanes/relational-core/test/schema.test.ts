@@ -406,6 +406,17 @@ describe('schema enums', () => {
     expect(roleEnum.values).toEqual(['USER', 'ADMIN', 'MODERATOR']);
   });
 
+  it('enum exposes individual values as properties', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithEnums, adapter);
+    const schemaHandle = schema(context);
+
+    const roleEnum = schemaHandle.enums.Role;
+    expect(roleEnum.USER).toBe('USER');
+    expect(roleEnum.ADMIN).toBe('ADMIN');
+    expect(roleEnum.MODERATOR).toBe('MODERATOR');
+  });
+
   it('enum values are frozen', () => {
     const adapter = createStubAdapter();
     const context = createTestContext(contractWithEnums, adapter);

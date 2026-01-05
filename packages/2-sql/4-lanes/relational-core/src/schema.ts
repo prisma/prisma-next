@@ -291,8 +291,19 @@ type ExtractSchemaTables<
 };
 
 /**
+ * Converts a tuple of string literals to an object with each value as both key and value.
+ * e.g., ['USER', 'ADMIN'] -> { USER: 'USER', ADMIN: 'ADMIN' }
+ */
+type ValuesToObject<T extends readonly string[]> = {
+  readonly [K in T[number]]: K;
+};
+
+/**
  * Extracts enum definitions from the contract storage.
- * Each enum is represented as a readonly object with its values as a readonly array.
+ * Each enum exposes:
+ * - name: the enum name
+ * - values: readonly array of all values
+ * - Individual value properties (e.g., enums.Role.ADMIN === 'ADMIN')
  */
 type ExtractSchemaEnums<Contract extends SqlContract<SqlStorage>> = Contract['storage'] extends {
   enums: infer E;
@@ -302,7 +313,7 @@ type ExtractSchemaEnums<Contract extends SqlContract<SqlStorage>> = Contract['st
         readonly [EnumName in keyof E]: {
           readonly name: EnumName;
           readonly values: E[EnumName]['values'];
-        };
+        } & ValuesToObject<E[EnumName]['values']>;
       }
     : Record<string, never>
   : Record<string, never>;
@@ -392,10 +403,16 @@ export function schema<Contract extends SqlContract<SqlStorage>>(
     for (const enumName of Object.keys(storageEnums)) {
       const enumDef = storageEnums[enumName];
       if (enumDef) {
-        (enums as Record<string, unknown>)[enumName] = Object.freeze({
+        // Build enum object with name, values array, and individual value properties
+        const enumObj: Record<string, unknown> = {
           name: enumName,
           values: Object.freeze(enumDef.values),
-        });
+        };
+        // Add each value as a property (e.g., Role.ADMIN = 'ADMIN')
+        for (const value of enumDef.values) {
+          enumObj[value] = value;
+        }
+        (enums as Record<string, unknown>)[enumName] = Object.freeze(enumObj);
       }
     }
   }

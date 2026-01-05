@@ -28,7 +28,7 @@ export async function getUsersByRole(role: Role) {
 
 /**
  * Get all admin users.
- * Demonstrates using enum literal values in queries.
+ * Demonstrates using enum values from the contract (no string literals).
  */
 export async function getAdminUsers() {
   const runtime = getRuntime();
@@ -42,7 +42,7 @@ export async function getAdminUsers() {
       email: userTable.columns.email,
       role: userTable.columns.role,
     })
-    .build({ params: { role: 'ADMIN' } });
+    .build({ params: { role: enums.Role.ADMIN } });
 
   return collect(runtime.execute(plan));
 }

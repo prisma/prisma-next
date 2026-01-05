@@ -99,3 +99,13 @@ test('enum has name and values properties with correct types', () => {
   // Verify values are the literal tuple of enum values
   expectTypeOf(roleEnum.values).toEqualTypeOf<readonly ['USER', 'ADMIN']>();
 });
+
+test('enum exposes individual values as typed properties', () => {
+  // Verify individual enum values are accessible as properties
+  expectTypeOf(roleEnum).toHaveProperty('USER');
+  expectTypeOf(roleEnum).toHaveProperty('ADMIN');
+
+  // Verify each value property has the correct literal type
+  expectTypeOf(roleEnum.USER).toEqualTypeOf<'USER'>();
+  expectTypeOf(roleEnum.ADMIN).toEqualTypeOf<'ADMIN'>();
+});
