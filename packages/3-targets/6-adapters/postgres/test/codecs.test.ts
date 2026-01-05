@@ -256,5 +256,40 @@ describe('adapter-postgres codecs', () => {
         expect(enumCodec.decode(value)).toBe(value);
       }
     });
+
+    it('handles empty string', () => {
+      expect(enumCodec.encode('')).toBe('');
+      expect(enumCodec.decode('')).toBe('');
+    });
+
+    it('handles strings with spaces', () => {
+      const value = 'WITH SPACES';
+      expect(enumCodec.encode(value)).toBe(value);
+      expect(enumCodec.decode(value)).toBe(value);
+    });
+
+    it('handles strings with punctuation', () => {
+      const values = ['hello-world', 'hello_world', 'hello.world', 'hello!world'];
+      for (const value of values) {
+        expect(enumCodec.encode(value)).toBe(value);
+        expect(enumCodec.decode(value)).toBe(value);
+      }
+    });
+
+    it('handles Unicode characters', () => {
+      const values = ['Å', 'π', '日本語', 'émoji', '🎉'];
+      for (const value of values) {
+        expect(enumCodec.encode(value)).toBe(value);
+        expect(enumCodec.decode(value)).toBe(value);
+      }
+    });
+
+    it('handles values with quotes and backslashes', () => {
+      const values = ["it's", 'with"quote', 'back\\slash', 'mixed\'"\\'];
+      for (const value of values) {
+        expect(enumCodec.encode(value)).toBe(value);
+        expect(enumCodec.decode(value)).toBe(value);
+      }
+    });
   });
 });
