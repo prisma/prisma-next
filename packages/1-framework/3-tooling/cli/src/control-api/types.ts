@@ -1,3 +1,4 @@
+import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -342,4 +343,13 @@ export interface ControlClient {
    * @throws If not connected or infrastructure failure
    */
   introspect(options?: IntrospectOptions): Promise<unknown>;
+
+  /**
+   * Converts a schema IR to a schema view for CLI tree rendering.
+   * Delegates to the family instance's toSchemaView method.
+   *
+   * @param schemaIR - The schema IR from introspect()
+   * @returns CoreSchemaView if the family supports it, undefined otherwise
+   */
+  toSchemaView(schemaIR: unknown): CoreSchemaView | undefined;
 }

@@ -1,6 +1,5 @@
 import { relative, resolve } from 'node:path';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
-import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type { IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -122,17 +121,7 @@ async function executeDbIntrospectCommand(
     }
 
     // Call toSchemaView to convert schema IR to CoreSchemaView for tree rendering
-    let schemaView: CoreSchemaView | undefined;
-    const stack = createControlPlaneStack({
-      target: config.target,
-      adapter: config.adapter,
-      driver: config.driver,
-      extensionPacks: config.extensionPacks,
-    });
-    const familyInstance = config.family.create(stack);
-    if (familyInstance.toSchemaView) {
-      schemaView = familyInstance.toSchemaView(schemaIR);
-    }
+    const schemaView = client.toSchemaView(schemaIR);
 
     const totalTime = Date.now() - startTime;
 

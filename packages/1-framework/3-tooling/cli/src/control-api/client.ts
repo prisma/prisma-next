@@ -1,4 +1,5 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type {
   ControlDriverInstance,
@@ -480,5 +481,13 @@ class ControlClientImpl implements ControlClient {
       });
       throw error;
     }
+  }
+
+  toSchemaView(schemaIR: unknown): CoreSchemaView | undefined {
+    this.init();
+    if (this.familyInstance?.toSchemaView) {
+      return this.familyInstance.toSchemaView(schemaIR);
+    }
+    return undefined;
   }
 }
