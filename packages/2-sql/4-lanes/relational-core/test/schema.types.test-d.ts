@@ -74,3 +74,28 @@ test('schema extracts CodecTypes automatically from contract', () => {
   expectTypeOf(schemaHandle.tables).toHaveProperty('user');
   expectTypeOf(schemaHandle.tables.user.columns).toHaveProperty('id');
 });
+
+// Enum access at module level for compile-time checking
+const roleEnum = schemaHandle.enums.role;
+
+test('schema exposes enums with literal keys', () => {
+  // Verify enums can be accessed with dot notation
+  expectTypeOf(schemaHandle).toHaveProperty('enums');
+  expectTypeOf(schemaHandle.enums).toHaveProperty('role');
+
+  // Verify enum keys are literal types
+  type EnumKeys = keyof typeof schemaHandle.enums;
+  expectTypeOf<EnumKeys>().toEqualTypeOf<'role' | 'status'>();
+});
+
+test('enum has name and values properties with correct types', () => {
+  // Verify the role enum has the correct structure
+  expectTypeOf(roleEnum).toHaveProperty('name');
+  expectTypeOf(roleEnum).toHaveProperty('values');
+
+  // Verify the name is the literal type
+  expectTypeOf(roleEnum.name).toEqualTypeOf<'role'>();
+
+  // Verify values are the literal tuple of enum values
+  expectTypeOf(roleEnum.values).toEqualTypeOf<readonly ['USER', 'ADMIN']>();
+});

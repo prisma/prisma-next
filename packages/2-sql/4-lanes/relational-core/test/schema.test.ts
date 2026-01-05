@@ -329,3 +329,119 @@ describe('schema', () => {
     expect(numberAccess).toBeUndefined();
   });
 });
+
+describe('schema enums', () => {
+  type ContractWithEnums = SqlContract<
+    {
+      readonly tables: {
+        readonly user: {
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              readonly nullable: false;
+            };
+            readonly role: {
+              readonly nativeType: 'Role';
+              readonly codecId: 'pg/enum@1';
+              readonly nullable: false;
+            };
+          };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
+        };
+      };
+      readonly enums: {
+        readonly Role: { readonly values: readonly ['USER', 'ADMIN', 'MODERATOR'] };
+      };
+    },
+    Record<string, never>,
+    Record<string, never>,
+    SqlMappings
+  >;
+
+  const contractWithEnums = validateContract<ContractWithEnums>({
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    coreHash: 'sha256:test',
+    models: {},
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            role: { nativeType: 'Role', codecId: 'pg/enum@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+      enums: {
+        Role: { values: ['USER', 'ADMIN', 'MODERATOR'] },
+      },
+    },
+  });
+
+  it('exposes enums from contract', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithEnums, adapter);
+    const schemaHandle = schema(context);
+
+    expect(schemaHandle.enums).toBeDefined();
+    expect(schemaHandle.enums.Role).toBeDefined();
+  });
+
+  it('enum has name and values', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithEnums, adapter);
+    const schemaHandle = schema(context);
+
+    const roleEnum = schemaHandle.enums.Role;
+    expect(roleEnum.name).toBe('Role');
+    expect(roleEnum.values).toEqual(['USER', 'ADMIN', 'MODERATOR']);
+  });
+
+  it('enum values are frozen', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithEnums, adapter);
+    const schemaHandle = schema(context);
+
+    expect(Object.isFrozen(schemaHandle.enums.Role)).toBe(true);
+    expect(Object.isFrozen(schemaHandle.enums.Role.values)).toBe(true);
+  });
+
+  it('returns empty enums when contract has no enums', () => {
+    const contractWithoutEnums = validateContract<TestContract>({
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test',
+      models: {},
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithoutEnums, adapter);
+    const schemaHandle = schema(context);
+
+    expect(schemaHandle.enums).toBeDefined();
+    expect(Object.keys(schemaHandle.enums)).toHaveLength(0);
+  });
+});

@@ -290,12 +290,30 @@ type ExtractSchemaTables<
     TableRef;
 };
 
+/**
+ * Extracts enum definitions from the contract storage.
+ * Each enum is represented as a readonly object with its values as a readonly array.
+ */
+type ExtractSchemaEnums<Contract extends SqlContract<SqlStorage>> = Contract['storage'] extends {
+  enums: infer E;
+}
+  ? E extends Record<string, { values: readonly string[] }>
+    ? {
+        readonly [EnumName in keyof E]: {
+          readonly name: EnumName;
+          readonly values: E[EnumName]['values'];
+        };
+      }
+    : Record<string, never>
+  : Record<string, never>;
+
 export type SchemaHandle<
   Contract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends CodecTypesType = CodecTypesType,
   Operations extends OperationTypes = Record<string, never>,
 > = {
   readonly tables: ExtractSchemaTables<Contract, CodecTypes, Operations>;
+  readonly enums: ExtractSchemaEnums<Contract>;
 };
 
 type SchemaReturnType<Contract extends SqlContract<SqlStorage>> = SchemaHandle<
@@ -367,7 +385,22 @@ export function schema<Contract extends SqlContract<SqlStorage>>(
     ) as ExtractSchemaTables<Contract, CodecTypes, Operations>[typeof tableName];
   }
 
-  return Object.freeze({ tables }) as SchemaReturnType<Contract>;
+  // Build enums from storage
+  const enums = {} as ExtractSchemaEnums<Contract>;
+  const storageEnums = (storage as { enums?: Record<string, { values: readonly string[] }> }).enums;
+  if (storageEnums) {
+    for (const enumName of Object.keys(storageEnums)) {
+      const enumDef = storageEnums[enumName];
+      if (enumDef) {
+        (enums as Record<string, unknown>)[enumName] = Object.freeze({
+          name: enumName,
+          values: Object.freeze(enumDef.values),
+        });
+      }
+    }
+  }
+
+  return Object.freeze({ tables, enums }) as SchemaReturnType<Contract>;
 }
 
 export type { ColumnBuilderImpl as Column, TableBuilderImpl as Table };
