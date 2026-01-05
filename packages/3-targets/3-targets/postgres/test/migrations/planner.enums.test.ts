@@ -196,6 +196,97 @@ describe('PostgresMigrationPlanner - enum support', () => {
     });
   });
 
+  describe('table column enum type references', () => {
+    it('uses schema-qualified quoted enum type in CREATE TABLE column definitions', () => {
+      // This test verifies the fix for: PostgreSQL lowercases unquoted identifiers,
+      // so "Role" must be quoted as "public"."Role" in column definitions to match
+      // how the enum was created with CREATE TYPE "public"."Role"
+      const contract = createTestContractWithEnumColumn({
+        enums: {
+          Role: { values: ['USER', 'ADMIN'] },
+        },
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          role: { nativeType: 'Role', codecId: 'pg/enum@1', nullable: false },
+        },
+      });
+
+      const schema: SqlSchemaIR = {
+        tables: {},
+        extensions: [],
+        enums: {},
+      };
+
+      const result = planner.plan({
+        contract,
+        schema,
+        policy: INIT_ADDITIVE_POLICY,
+        frameworkComponents: [],
+      });
+
+      expect(result.kind).toBe('success');
+      if (result.kind !== 'success') {
+        throw new Error('expected planner success');
+      }
+
+      const tableOp = result.plan.operations.find((op) => op.id === 'table.user');
+      expect(tableOp).toBeDefined();
+      // Column type must be schema-qualified and quoted to match enum creation
+      expect(tableOp!.execute[0]!.sql).toContain('"role" "public"."Role"');
+    });
+
+    it('uses schema-qualified quoted enum type in ADD COLUMN statements', () => {
+      const contract = createTestContractWithEnumColumn({
+        enums: {
+          Status: { values: ['ACTIVE', 'INACTIVE'] },
+        },
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          status: { nativeType: 'Status', codecId: 'pg/enum@1', nullable: true },
+        },
+      });
+
+      const schema: SqlSchemaIR = {
+        tables: {
+          user: {
+            name: 'user',
+            columns: {
+              id: { name: 'id', nativeType: 'uuid', nullable: false },
+              email: { name: 'email', nativeType: 'text', nullable: false },
+              // status column is missing - will be added
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            foreignKeys: [],
+            indexes: [],
+          },
+        },
+        extensions: [],
+        enums: {
+          Status: { name: 'Status', values: ['ACTIVE', 'INACTIVE'] },
+        },
+      };
+
+      const result = planner.plan({
+        contract,
+        schema,
+        policy: INIT_ADDITIVE_POLICY,
+        frameworkComponents: [],
+      });
+
+      expect(result.kind).toBe('success');
+      if (result.kind !== 'success') {
+        throw new Error('expected planner success');
+      }
+
+      const addColumnOp = result.plan.operations.find((op) => op.id === 'column.user.status');
+      expect(addColumnOp).toBeDefined();
+      // Column type must be schema-qualified and quoted to match enum creation
+      expect(addColumnOp!.execute[0]!.sql).toContain('"public"."Status"');
+    });
+  });
+
   describe('multiple enums', () => {
     it('creates multiple enum types in sorted order', () => {
       const contract = createTestContract({
@@ -259,6 +350,46 @@ function createTestContract(
         },
       },
       enums: options.enums ?? {},
+    },
+    models: {},
+    relations: {},
+    mappings: {
+      codecTypes: {},
+      operationTypes: {},
+    },
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+    sources: {},
+  };
+}
+
+function createTestContractWithEnumColumn(options: {
+  enums: Record<string, StorageEnum>;
+  columns: Record<string, { nativeType: string; codecId: string; nullable?: boolean }>;
+}): SqlContract<SqlStorage> {
+  return {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    coreHash: 'sha256:contract',
+    profileHash: 'sha256:profile',
+    storage: {
+      tables: {
+        user: {
+          columns: Object.fromEntries(
+            Object.entries(options.columns).map(([name, col]) => [
+              name,
+              { nativeType: col.nativeType, codecId: col.codecId, nullable: col.nullable ?? false },
+            ]),
+          ),
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+      enums: options.enums,
     },
     models: {},
     relations: {},
