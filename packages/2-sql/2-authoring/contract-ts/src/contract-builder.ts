@@ -513,7 +513,7 @@ class SqlContractBuilder<
     ExtensionPacks,
     Capabilities
   > {
-    const tableBuilder = new TableBuilder<TableName>(name);
+    const tableBuilder = new TableBuilder<TableName>({ name });
     const result = callback(tableBuilder);
     const finalBuilder = result instanceof TableBuilder ? result : tableBuilder;
     const tableState = finalBuilder.build();

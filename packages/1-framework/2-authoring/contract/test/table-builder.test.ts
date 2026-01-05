@@ -7,7 +7,7 @@ const textColumn: ColumnTypeDescriptor = { codecId: 'test/text@1', nativeType: '
 
 describe('TableBuilder', () => {
   it('builds table state with columns', () => {
-    const builder = new TableBuilder('user');
+    const builder = new TableBuilder({ name: 'user' });
     const table = builder
       .column('id', { type: intColumn, nullable: false })
       .column('email', { type: textColumn, nullable: true })
@@ -31,7 +31,7 @@ describe('TableBuilder', () => {
   });
 
   it('stores unique constraints and emits them in build()', () => {
-    const builder = new TableBuilder('user');
+    const builder = new TableBuilder({ name: 'user' });
     const table = builder
       .column('email', { type: textColumn })
       .unique(['email'])
@@ -44,7 +44,7 @@ describe('TableBuilder', () => {
   });
 
   it('stores indexes and emits them in build()', () => {
-    const builder = new TableBuilder('user');
+    const builder = new TableBuilder({ name: 'user' });
     const table = builder
       .column('email', { type: textColumn })
       .index(['email'])
@@ -57,7 +57,7 @@ describe('TableBuilder', () => {
   });
 
   it('stores foreign keys and emits them in build()', () => {
-    const builder = new TableBuilder('post');
+    const builder = new TableBuilder({ name: 'post' });
     const table = builder
       .column('userId', { type: intColumn })
       .foreignKey(['userId'], { table: 'user', columns: ['id'] })
@@ -77,7 +77,7 @@ describe('TableBuilder', () => {
   });
 
   it('stores primary key name when provided', () => {
-    const builder = new TableBuilder('user');
+    const builder = new TableBuilder({ name: 'user' });
     const table = builder
       .column('id', { type: intColumn, nullable: false })
       .primaryKey(['id'], 'user_pkey')
@@ -88,7 +88,7 @@ describe('TableBuilder', () => {
   });
 
   it('builds table state without primary key but with default empty constraint arrays', () => {
-    const builder = new TableBuilder('user');
+    const builder = new TableBuilder({ name: 'user' });
     const table = builder.column('id', { type: intColumn, nullable: false }).build();
 
     expect(table.name).toBe('user');
@@ -105,7 +105,7 @@ describe('TableBuilder', () => {
   });
 
   it('defaults nullable to false when not provided', () => {
-    const builder = new TableBuilder('user');
+    const builder = new TableBuilder({ name: 'user' });
     const table = builder.column('id', { type: intColumn }).build();
     expect(table.columns.id.nullable).toBe(false);
   });

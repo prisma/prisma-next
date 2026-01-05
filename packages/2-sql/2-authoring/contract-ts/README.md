@@ -65,9 +65,9 @@ const contract = defineContract<CodecTypes>()
     t
       .column('id', { type: int4Column, nullable: false })
       .column('email', { type: textColumn, nullable: false })
-      .primaryKey(['id'])
-      .unique(['email'])                    // Add unique constraint
-      .index(['email'], 'user_email_idx'),  // Add named index
+      .primaryKey(['id'], 'user_pkey')           // Named primary key
+      .unique(['email'], 'user_email_unique')    // Named unique constraint
+      .index(['email'], 'user_email_idx'),       // Named index
   )
   .table('post', (t) =>
     t
@@ -75,7 +75,7 @@ const contract = defineContract<CodecTypes>()
       .column('userId', { type: int4Column, nullable: false })
       .column('title', { type: textColumn, nullable: false })
       .primaryKey(['id'])
-      .foreignKey(['userId'], { table: 'user', columns: ['id'] }),  // Add foreign key
+      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey'),  // Named FK
   )
   .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
   .model('Post', 'post', (m) => m.field('id', 'id').field('userId', 'userId').field('title', 'title'))
