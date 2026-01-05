@@ -43,8 +43,7 @@ describe('verifySqlSchema - enums', () => {
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(result).toMatchObject({ ok: true, schema: { issues: [] } });
     });
   });
 
@@ -214,8 +213,7 @@ describe('verifySqlSchema - enums', () => {
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(result).toMatchObject({ ok: true, schema: { issues: [] } });
     });
 
     it('reports multiple enum issues', () => {
@@ -304,8 +302,11 @@ describe('verifySqlSchema - enums', () => {
       const enumNode = result.schema.root.children.find(
         (c) => c.kind === 'enum' && c.name.includes('role'),
       );
-      expect(enumNode).toBeDefined();
-      expect(enumNode?.status).toBe('pass');
+      expect(enumNode).toMatchObject({
+        status: 'pass',
+        kind: 'enum',
+        name: expect.stringContaining('role'),
+      });
     });
   });
 });
