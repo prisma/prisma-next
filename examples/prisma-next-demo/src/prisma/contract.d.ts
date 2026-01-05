@@ -16,6 +16,8 @@ export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = PgVectorOperationTypes;
 
+export type Role = 'USER' | 'ADMIN' | 'MODERATOR';
+
 export type Contract = SqlContract<
   {
     readonly tables: {
@@ -29,6 +31,11 @@ export type Contract = SqlContract<
           readonly email: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly role: {
+            readonly nativeType: 'Role';
+            readonly codecId: 'pg/enum@1';
             readonly nullable: false;
           };
           readonly createdAt: {
@@ -73,9 +80,16 @@ export type Contract = SqlContract<
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
         indexes: readonly [];
-        foreignKeys: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['userId'];
+            readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly name: 'post_userId_fkey';
+          },
+        ];
       };
     };
+    readonly enums: { readonly Role: { readonly values: readonly ['USER', 'ADMIN', 'MODERATOR'] } };
   },
   {
     readonly User: {
@@ -83,6 +97,7 @@ export type Contract = SqlContract<
       fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly email: CodecTypes['pg/text@1']['output'];
+        readonly role: CodecTypes['pg/enum@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       };
     };
@@ -126,6 +141,7 @@ export type Contract = SqlContract<
       readonly User: {
         readonly id: 'id';
         readonly email: 'email';
+        readonly role: 'role';
         readonly createdAt: 'createdAt';
       };
       readonly Post: {
@@ -140,6 +156,7 @@ export type Contract = SqlContract<
       readonly user: {
         readonly id: 'id';
         readonly email: 'email';
+        readonly role: 'role';
         readonly createdAt: 'createdAt';
       };
       readonly post: {
