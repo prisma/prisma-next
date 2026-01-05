@@ -122,6 +122,7 @@ const contract = createTestContract();
 
 const emptySchema: SqlSchemaIR = {
   tables: {},
+  enums: {},
   extensions: [],
 };
 
@@ -169,6 +170,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     const frameworkComponents = [createFrameworkComponent()];
     const schemaWithExtension: SqlSchemaIR = {
       tables: {},
+      enums: {},
       extensions: ['vector'],
     };
 
@@ -238,6 +240,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
           indexes: [],
         },
       },
+      enums: {},
       extensions: [],
     };
 
@@ -298,6 +301,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
           indexes: [],
         },
       },
+      enums: {},
       extensions: [],
     };
 

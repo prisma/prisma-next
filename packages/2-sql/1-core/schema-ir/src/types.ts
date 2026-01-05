@@ -91,7 +91,7 @@ export type SqlEnumIR = {
  */
 export type SqlSchemaIR = {
   readonly tables: Record<string, SqlTableIR>;
-  readonly enums?: Record<string, SqlEnumIR>; // enum types keyed by name
+  readonly enums: Record<string, SqlEnumIR>; // enum types keyed by name
   readonly extensions: readonly string[]; // logical extension ids or DB extension names
   readonly annotations?: SqlAnnotations; // extensible global metadata
 };

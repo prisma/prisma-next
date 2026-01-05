@@ -24,6 +24,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
+      enums: {},
       extensions: [],
     };
 
@@ -54,6 +55,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
+      enums: {},
       extensions: [],
     };
 
@@ -92,6 +94,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
+      enums: {},
       extensions: [],
     };
 

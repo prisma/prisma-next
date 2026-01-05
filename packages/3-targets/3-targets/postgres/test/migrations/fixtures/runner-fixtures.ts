@@ -42,6 +42,7 @@ export const contract: SqlContract<SqlStorage> = {
 
 export const emptySchema: SqlSchemaIR = {
   tables: {},
+  enums: {},
   extensions: [],
 };
 

@@ -49,6 +49,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [{ columns: ['email'], unique: true, name: 'user_email_idx' }], // Has unique index
           },
         },
+        enums: {},
         extensions: [],
       };
 
@@ -102,6 +103,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [{ columns: ['email'], unique: true, name: 'user_email_idx' }], // Has unique index
           },
         },
+        enums: {},
         extensions: [],
       };
 
@@ -153,6 +155,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [], // No indexes
           },
         },
+        enums: {},
         extensions: [],
       };
 
@@ -206,6 +209,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [{ columns: ['email'], unique: false, name: 'user_email_idx' }], // Different name
           },
         },
+        enums: {},
         extensions: [],
       };
 
@@ -257,6 +261,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [{ columns: ['email'], unique: false, name: 'user_email_idx' }],
           },
         },
+        enums: {},
         extensions: [],
       };
 
