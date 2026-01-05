@@ -188,7 +188,9 @@ const pgEnumCodec = codec<'pg/enum@1', string, string>({
     db: {
       sql: {
         postgres: {
-          // nativeType is dynamic per-column, not fixed for the codec
+          // The actual enum type name is specified per-column via nativeType.
+          // This placeholder indicates it's an enum without specifying which one.
+          nativeType: 'enum',
         },
       },
     },
