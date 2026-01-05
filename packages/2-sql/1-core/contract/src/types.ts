@@ -6,6 +6,10 @@ export type StorageColumn = {
   readonly nullable: boolean;
 };
 
+export type StorageEnum = {
+  readonly values: readonly string[];
+};
+
 export type PrimaryKey = {
   readonly columns: readonly string[];
   readonly name?: string;
@@ -42,6 +46,7 @@ export type StorageTable = {
 
 export type SqlStorage = {
   readonly tables: Record<string, StorageTable>;
+  readonly enums?: Record<string, StorageEnum>;
 };
 
 export type ModelField = {

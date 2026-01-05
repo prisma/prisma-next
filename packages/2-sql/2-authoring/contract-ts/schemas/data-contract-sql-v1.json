@@ -79,6 +79,13 @@
           "additionalProperties": {
             "$ref": "#/$defs/StorageTable"
           }
+        },
+        "enums": {
+          "type": "object",
+          "description": "Enum type definitions keyed by enum type name",
+          "additionalProperties": {
+            "$ref": "#/$defs/StorageEnum"
+          }
         }
       },
       "required": ["tables"]
@@ -131,16 +138,37 @@
       "description": "Column definition with type and nullability",
       "additionalProperties": false,
       "properties": {
-        "type": {
+        "nativeType": {
           "type": "string",
-          "description": "Column type (e.g., 'text', 'int4', 'timestamptz', 'bool')"
+          "description": "Native database type (e.g., 'text', 'int4', 'timestamptz', 'bool', or enum type name)"
+        },
+        "codecId": {
+          "type": "string",
+          "description": "Codec identifier for type encoding/decoding (e.g., 'pg/text@1', 'pg/enum@1')"
         },
         "nullable": {
           "type": "boolean",
           "default": false,
           "description": "Whether the column allows NULL values"
         }
-      }
+      },
+      "required": ["nativeType", "codecId", "nullable"]
+    },
+    "StorageEnum": {
+      "type": "object",
+      "description": "Enum type definition with ordered values",
+      "additionalProperties": false,
+      "properties": {
+        "values": {
+          "type": "array",
+          "description": "Ordered list of enum values",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      },
+      "required": ["values"]
     },
     "PrimaryKey": {
       "type": "object",

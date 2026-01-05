@@ -10,6 +10,7 @@ import type {
   SqlMappings,
   SqlStorage,
   StorageColumn,
+  StorageEnum,
   StorageTable,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
@@ -60,8 +61,13 @@ const StorageTableSchema = type.declare<StorageTable>().type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
+const StorageEnumSchema = type.declare<StorageEnum>().type({
+  values: type.string.array().readonly(),
+});
+
 const StorageSchema = type.declare<SqlStorage>().type({
   tables: type({ '[string]': StorageTableSchema }),
+  'enums?': type({ '[string]': StorageEnumSchema }),
 });
 
 const ModelFieldSchema = type.declare<ModelField>().type({
@@ -427,6 +433,13 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
       normalizedStorage = {
         ...storage,
         tables: normalizedTables,
+        enums: storage['enums'] ?? {},
+      };
+    } else {
+      // Storage exists but has no tables - still normalize enums
+      normalizedStorage = {
+        ...storage,
+        enums: storage['enums'] ?? {},
       };
     }
   }
