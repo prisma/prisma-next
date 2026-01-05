@@ -89,7 +89,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
       action: 'dbInit',
       kind: 'spanEnd',
       spanId: planSpanId,
-      outcome: 'ok',
+      outcome: 'error',
     });
     return notOk({
       code: 'PLANNING_FAILED' as const,
@@ -151,7 +151,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
       action: 'dbInit',
       kind: 'spanEnd',
       spanId: checkMarkerSpanId,
-      outcome: 'ok',
+      outcome: 'error',
     });
     return notOk({
       code: 'MARKER_ORIGIN_MISMATCH' as const,
@@ -237,7 +237,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
       action: 'dbInit',
       kind: 'spanEnd',
       spanId: applySpanId,
-      outcome: 'ok',
+      outcome: 'error',
     });
     return notOk({
       code: 'RUNNER_FAILED' as const,
