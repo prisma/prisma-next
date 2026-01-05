@@ -964,11 +964,11 @@ describe('PostgresControlAdapter', () => {
             return { rows: [] as Row[] };
           }
           if (sql.includes('pg_enum')) {
-            // Values returned out of order to verify sorting
+            // Values returned in SQL ORDER BY order (t.typname, e.enumsortorder)
             return {
               rows: [
-                { enum_name: 'priority', enum_value: 'HIGH', sort_order: 2 },
                 { enum_name: 'priority', enum_value: 'LOW', sort_order: 1 },
+                { enum_name: 'priority', enum_value: 'HIGH', sort_order: 2 },
                 { enum_name: 'priority', enum_value: 'CRITICAL', sort_order: 3 },
               ] as Row[],
             };
