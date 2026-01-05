@@ -32,7 +32,6 @@
   "devDependencies": {
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
-    "@vitest/coverage-v8": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

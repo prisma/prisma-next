@@ -20,9 +20,8 @@
     "arktype": "^2.1.25"
   },
   "devDependencies": {
-    "@prisma/dev": "catalog:",
     "@prisma-next/test-utils": "workspace:*",
-    "@vitest/coverage-v8": "catalog:",
+    "@prisma/dev": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

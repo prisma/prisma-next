@@ -26,7 +26,6 @@
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@types/pg": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
     "pg": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
