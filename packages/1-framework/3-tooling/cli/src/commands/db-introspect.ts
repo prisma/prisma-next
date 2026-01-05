@@ -1,7 +1,7 @@
 import { relative, resolve } from 'node:path';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type { IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
-import { createControlPlaneStack } from '@prisma-next/core-control-plane/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
