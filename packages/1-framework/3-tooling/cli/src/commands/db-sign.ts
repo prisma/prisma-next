@@ -45,10 +45,16 @@ interface DbSignOptions {
   readonly 'no-color'?: boolean;
 }
 
-interface DbSignResult {
-  readonly schemaVerifyResult: VerifyDatabaseSchemaResult | undefined;
-  readonly signResult: SignDatabaseResult | undefined;
-}
+/**
+ * Result type for db sign command using discriminated union.
+ * Two possible outcomes: schema verification failed, or signing succeeded.
+ */
+type DbSignResult =
+  | {
+      readonly outcome: 'schemaVerifyFailed';
+      readonly schemaVerifyResult: VerifyDatabaseSchemaResult;
+    }
+  | { readonly outcome: 'signed'; readonly signResult: SignDatabaseResult };
 
 /**
  * Executes the db sign command and returns a structured Result.
@@ -160,7 +166,7 @@ async function executeDbSignCommand(
       if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
         console.log('');
       }
-      return ok({ schemaVerifyResult, signResult: undefined });
+      return ok({ outcome: 'schemaVerifyFailed', schemaVerifyResult });
     }
 
     // Step 2: Sign (already connected from schemaVerify)
@@ -176,7 +182,7 @@ async function executeDbSignCommand(
       console.log('');
     }
 
-    return ok({ schemaVerifyResult: undefined, signResult });
+    return ok({ outcome: 'signed', signResult });
   } catch (error) {
     // Driver already throws CliStructuredError for connection failures
     if (error instanceof CliStructuredError) {
@@ -240,37 +246,37 @@ export function createDbSignCommand(): Command {
 
       // Handle result - formats output and returns exit code
       const exitCode = handleResult(result, flags, (value) => {
-        const { schemaVerifyResult, signResult } = value;
-
-        // If schema verification failed, format and print schema verification output
-        if (schemaVerifyResult && !schemaVerifyResult.ok) {
-          if (flags.json === 'object') {
-            console.log(formatSchemaVerifyJson(schemaVerifyResult));
-          } else {
-            const output = formatSchemaVerifyOutput(schemaVerifyResult, flags);
-            if (output) {
-              console.log(output);
+        switch (value.outcome) {
+          case 'schemaVerifyFailed': {
+            // Schema verification failed - format and print schema verification output
+            if (flags.json === 'object') {
+              console.log(formatSchemaVerifyJson(value.schemaVerifyResult));
+            } else {
+              const output = formatSchemaVerifyOutput(value.schemaVerifyResult, flags);
+              if (output) {
+                console.log(output);
+              }
             }
+            break;
           }
-          return;
-        }
-
-        // Schema verification passed - format sign output
-        if (signResult) {
-          if (flags.json === 'object') {
-            console.log(formatSignJson(signResult));
-          } else {
-            const output = formatSignOutput(signResult, flags);
-            if (output) {
-              console.log(output);
+          case 'signed': {
+            // Schema verification passed - format sign output
+            if (flags.json === 'object') {
+              console.log(formatSignJson(value.signResult));
+            } else {
+              const output = formatSignOutput(value.signResult, flags);
+              if (output) {
+                console.log(output);
+              }
             }
+            break;
           }
         }
       });
 
       // For logical schema mismatches, check if schema verification passed
       // Infra errors already handled by handleResult (returns non-zero exit code)
-      if (result.ok && result.value.schemaVerifyResult && !result.value.schemaVerifyResult.ok) {
+      if (result.ok && result.value.outcome === 'schemaVerifyFailed') {
         // Schema verification failed - exit with code 1
         process.exit(1);
       } else {
