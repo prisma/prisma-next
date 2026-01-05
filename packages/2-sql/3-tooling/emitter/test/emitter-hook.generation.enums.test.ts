@@ -1,22 +1,6 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
+import { createContractIR } from '@prisma-next/emitter/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
-
-function createContractIR(overrides: Partial<ContractIR>): ContractIR {
-  return {
-    schemaVersion: '1',
-    targetFamily: 'sql',
-    target: 'test-db',
-    models: {},
-    relations: {},
-    storage: { tables: {} },
-    extensions: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-    ...overrides,
-  };
-}
 
 describe('sql-target-family-hook enum generation', () => {
   it('generates enum types in storage', () => {
