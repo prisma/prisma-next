@@ -135,6 +135,20 @@ describe('contract builder constraint support', () => {
     });
   });
 
+  it('emits primary key without name when not provided', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .model('User', 'user', (m) => m.field('id', 'id'))
+      .build();
+
+    expect(contract.storage.tables.user.primaryKey).toEqual({
+      columns: ['id'],
+    });
+    // Ensure name property is not present when not provided
+    expect(contract.storage.tables.user.primaryKey).not.toHaveProperty('name');
+  });
+
   it('emits primary key name in the contract', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
