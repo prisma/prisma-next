@@ -77,11 +77,21 @@ export type SqlTableIR = {
 };
 
 /**
+ * SQL enum IR representing an enum type in the schema.
+ * Enums are identified by name and values must match exactly (no superset tolerance).
+ */
+export type SqlEnumIR = {
+  readonly name: string;
+  readonly values: readonly string[]; // ordered list of enum values
+};
+
+/**
  * SQL Schema IR representing the complete database schema.
  * This is the target-agnostic representation used for verification and migration planning.
  */
 export type SqlSchemaIR = {
   readonly tables: Record<string, SqlTableIR>;
+  readonly enums?: Record<string, SqlEnumIR>; // enum types keyed by name
   readonly extensions: readonly string[]; // logical extension ids or DB extension names
   readonly annotations?: SqlAnnotations; // extensible global metadata
 };
