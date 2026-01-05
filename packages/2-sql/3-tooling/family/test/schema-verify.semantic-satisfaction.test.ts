@@ -389,5 +389,112 @@ describe('verifySqlSchema - semantic satisfaction', () => {
       expect(result.ok).toBe(true);
       expect(result.schema.issues).toHaveLength(0);
     });
+
+    it('fails when foreign key is missing from schema', () => {
+      const contract = createTestContract({
+        user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
+        post: createContractTable(
+          {
+            id: { nativeType: 'int4', nullable: false },
+            author_id: { nativeType: 'int4', nullable: false },
+          },
+          {
+            foreignKeys: [
+              {
+                columns: ['author_id'],
+                references: { table: 'user', columns: ['id'] },
+                name: 'post_author_fk',
+              },
+            ],
+          },
+        ),
+      });
+
+      // Schema has no foreign key
+      const schema = createTestSchemaIR({
+        user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
+        post: createSchemaTable('post', {
+          id: { nativeType: 'int4', nullable: false },
+          author_id: { nativeType: 'int4', nullable: false },
+        }),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.schema.issues).toContainEqual(
+        expect.objectContaining({
+          kind: 'foreign_key_mismatch',
+          table: 'post',
+        }),
+      );
+    });
+
+    it('passes with multi-column FK when columns and references match but names differ', () => {
+      const contract = createTestContract({
+        tenant: createContractTable({
+          id: { nativeType: 'int4', nullable: false },
+          org_id: { nativeType: 'int4', nullable: false },
+        }),
+        document: createContractTable(
+          {
+            id: { nativeType: 'int4', nullable: false },
+            tenant_id: { nativeType: 'int4', nullable: false },
+            tenant_org_id: { nativeType: 'int4', nullable: false },
+          },
+          {
+            foreignKeys: [
+              {
+                columns: ['tenant_id', 'tenant_org_id'],
+                references: { table: 'tenant', columns: ['id', 'org_id'] },
+                name: 'document_tenant_fk',
+              },
+            ],
+          },
+        ),
+      });
+
+      const schema = createTestSchemaIR({
+        tenant: createSchemaTable('tenant', {
+          id: { nativeType: 'int4', nullable: false },
+          org_id: { nativeType: 'int4', nullable: false },
+        }),
+        document: createSchemaTable(
+          'document',
+          {
+            id: { nativeType: 'int4', nullable: false },
+            tenant_id: { nativeType: 'int4', nullable: false },
+            tenant_org_id: { nativeType: 'int4', nullable: false },
+          },
+          {
+            foreignKeys: [
+              {
+                columns: ['tenant_id', 'tenant_org_id'],
+                referencedTable: 'tenant',
+                referencedColumns: ['id', 'org_id'],
+                name: 'document_tenant_id_tenant_org_id_fkey', // Different name
+              },
+            ],
+          },
+        ),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.schema.issues).toHaveLength(0);
+    });
   });
 });

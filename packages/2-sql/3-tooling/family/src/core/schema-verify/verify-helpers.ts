@@ -33,6 +33,65 @@ export function arraysEqual(a: readonly string[], b: readonly string[]): boolean
   return true;
 }
 
+// ============================================================================
+// Semantic Satisfaction Predicates
+// ============================================================================
+// These predicates implement the "stronger satisfies weaker" logic for storage
+// objects. They are used by both verification and migration planning to ensure
+// consistent behavior across the control plane.
+
+/**
+ * Checks if a unique constraint requirement is satisfied by the given columns.
+ *
+ * Semantic satisfaction: a unique constraint requirement can be satisfied by:
+ * - A unique constraint with the same columns, OR
+ * - A unique index with the same columns
+ *
+ * @param uniques - The unique constraints in the schema table
+ * @param indexes - The indexes in the schema table
+ * @param columns - The columns required by the unique constraint
+ * @returns true if the requirement is satisfied
+ */
+export function isUniqueConstraintSatisfied(
+  uniques: readonly SqlUniqueIR[],
+  indexes: readonly SqlIndexIR[],
+  columns: readonly string[],
+): boolean {
+  // Check for matching unique constraint
+  const hasConstraint = uniques.some((unique) => arraysEqual(unique.columns, columns));
+  if (hasConstraint) {
+    return true;
+  }
+  // Check for matching unique index (semantic satisfaction)
+  return indexes.some((index) => index.unique && arraysEqual(index.columns, columns));
+}
+
+/**
+ * Checks if an index requirement is satisfied by the given columns.
+ *
+ * Semantic satisfaction: a non-unique index requirement can be satisfied by:
+ * - Any index (unique or non-unique) with the same columns, OR
+ * - A unique constraint with the same columns (stronger satisfies weaker)
+ *
+ * @param indexes - The indexes in the schema table
+ * @param uniques - The unique constraints in the schema table
+ * @param columns - The columns required by the index
+ * @returns true if the requirement is satisfied
+ */
+export function isIndexSatisfied(
+  indexes: readonly SqlIndexIR[],
+  uniques: readonly SqlUniqueIR[],
+  columns: readonly string[],
+): boolean {
+  // Check for any matching index (unique or non-unique)
+  const hasMatchingIndex = indexes.some((index) => arraysEqual(index.columns, columns));
+  if (hasMatchingIndex) {
+    return true;
+  }
+  // Check for matching unique constraint (semantic satisfaction)
+  return uniques.some((unique) => arraysEqual(unique.columns, columns));
+}
+
 /**
  * Verifies primary key matches between contract and schema.
  * Returns 'pass' or 'fail'.
