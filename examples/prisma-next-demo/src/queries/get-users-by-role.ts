@@ -1,6 +1,6 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Role } from '../prisma/contract.d';
-import { sql, tables } from '../prisma/query';
+import { enums, sql, tables } from '../prisma/query';
 import { getRuntime } from '../prisma/runtime';
 import { collect } from './utils';
 
@@ -36,13 +36,13 @@ export async function getAdminUsers() {
 
   const plan = sql
     .from(userTable)
-    .where(userTable.columns.role.eq('ADMIN'))
+    .where(userTable.columns.role.eq(param('role')))
     .select({
       id: userTable.columns.id,
       email: userTable.columns.email,
       role: userTable.columns.role,
     })
-    .build();
+    .build({ params: { role: 'ADMIN' } });
 
   return collect(runtime.execute(plan));
 }
@@ -75,4 +75,14 @@ export async function getUsersWithRoles(limit = 100) {
   };
 
   return byRole;
+}
+
+/**
+ * Get all valid role values from the contract.
+ * Demonstrates accessing enum definitions at runtime via schema().enums.
+ */
+export function getRoleValues(): readonly ['USER', 'ADMIN', 'MODERATOR'] {
+  // Access enum values directly from the schema
+  // This is useful for building dropdowns, validation, etc.
+  return enums.Role.values;
 }

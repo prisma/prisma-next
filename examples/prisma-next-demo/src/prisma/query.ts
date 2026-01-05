@@ -12,6 +12,7 @@ export const sql = sqlBuilder<Contract>({
 
 export const schema = schemaBuilder<Contract>(context);
 export const tables = schema.tables;
+export const enums = schema.enums;
 
 export const orm = ormBuilder<Contract>({
   context,
