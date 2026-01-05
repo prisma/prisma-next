@@ -5,7 +5,7 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
-import type { EmitFailure } from '../control-api/types';
+import type { EmitContractSource, EmitFailure } from '../control-api/types';
 import { CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
@@ -126,10 +126,17 @@ async function executeContractEmitCommand(
   const onProgress = createProgressAdapter({ flags });
 
   try {
+    // Convert user config source to discriminated union
+    // Type assertion is safe: we check typeof to determine if it's a function
+    const source: EmitContractSource =
+      typeof contractConfig.source === 'function'
+        ? { kind: 'loader', load: contractConfig.source as () => unknown | Promise<unknown> }
+        : { kind: 'value', value: contractConfig.source };
+
     // Call emit with progress callback
     const result = await client.emit({
       contractConfig: {
-        source: contractConfig.source,
+        source,
         output: outputJsonPath,
         types: outputDtsPath,
       },

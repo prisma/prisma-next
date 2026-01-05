@@ -393,7 +393,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          source: { test: true },
+          source: { kind: 'value', value: { test: true } },
           output: '/tmp/contract.json',
           types: '/tmp/contract.d.ts',
         },
@@ -438,7 +438,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          source: async () => ({ test: true }),
+          source: { kind: 'loader', load: async () => ({ test: true }) },
           output: '/tmp/contract.json',
           types: '/tmp/contract.d.ts',
         },
@@ -472,8 +472,11 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          source: async () => {
-            throw new Error('Source load error');
+          source: {
+            kind: 'loader',
+            load: async () => {
+              throw new Error('Source load error');
+            },
           },
           output: '/tmp/contract.json',
           types: '/tmp/contract.d.ts',
@@ -512,7 +515,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          source: { test: true },
+          source: { kind: 'value', value: { test: true } },
           output: '/tmp/contract.json',
           types: '/tmp/contract.d.ts',
         },
@@ -623,7 +626,7 @@ describe('ControlClient progress emission', () => {
 
       const result = await client.emit({
         contractConfig: {
-          source: { test: true },
+          source: { kind: 'value', value: { test: true } },
           output: '/tmp/contract.json',
           types: '/tmp/contract.d.ts',
         },

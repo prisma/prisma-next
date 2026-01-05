@@ -204,15 +204,36 @@ export interface IntrospectOptions {
 }
 
 /**
+ * Contract source as a raw value (any JSON-serializable value).
+ */
+export interface ContractSourceValue {
+  readonly kind: 'value';
+  readonly value: unknown;
+}
+
+/**
+ * Contract source as a lazy loader function.
+ */
+export interface ContractSourceLoader {
+  readonly kind: 'loader';
+  readonly load: () => unknown | Promise<unknown>;
+}
+
+/**
+ * Discriminated union for contract source.
+ * Use `kind` to determine how to resolve the contract.
+ */
+export type EmitContractSource = ContractSourceValue | ContractSourceLoader;
+
+/**
  * Contract configuration for emit operation.
- * Matches the structure from defineConfig().
  */
 export interface EmitContractConfig {
   /**
-   * Contract source - either raw contract IR or a function that loads it.
-   * When a function, it is called lazily to resolve the contract.
+   * Contract source - either a raw value or a loader function.
+   * Switch on `source.kind` to determine how to resolve.
    */
-  readonly source: unknown | (() => unknown | Promise<unknown>);
+  readonly source: EmitContractSource;
   /**
    * Output path for contract.json.
    * Should be an absolute or relative path.

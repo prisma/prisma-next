@@ -520,10 +520,13 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
-      if (typeof contractConfig.source === 'function') {
-        contractRaw = await contractConfig.source();
-      } else {
-        contractRaw = contractConfig.source;
+      switch (contractConfig.source.kind) {
+        case 'loader':
+          contractRaw = await contractConfig.source.load();
+          break;
+        case 'value':
+          contractRaw = contractConfig.source.value;
+          break;
       }
 
       onProgress?.({
