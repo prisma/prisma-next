@@ -93,15 +93,23 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
 
     // Build extension operations from component-owned database dependencies
     // Enum operations come before table operations since tables may reference enum types
+    const contractEnums = options.contract.storage.enums ?? {};
+    const enumNames = new Set(Object.keys(contractEnums));
     operations.push(
       ...this.buildDatabaseDependencyOperations(options),
-      ...this.buildEnumOperations(
-        options.contract.storage.enums ?? {},
-        options.schema.enums ?? {},
+      ...this.buildEnumOperations(contractEnums, options.schema.enums ?? {}, schemaName),
+      ...this.buildTableOperations(
+        options.contract.storage.tables,
+        options.schema,
         schemaName,
+        enumNames,
       ),
-      ...this.buildTableOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildColumnOperations(options.contract.storage.tables, options.schema, schemaName),
+      ...this.buildColumnOperations(
+        options.contract.storage.tables,
+        options.schema,
+        schemaName,
+        enumNames,
+      ),
       ...this.buildPrimaryKeyOperations(
         options.contract.storage.tables,
         options.schema,
@@ -253,6 +261,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     tables: SqlContract<SqlStorage>['storage']['tables'],
     schema: SqlSchemaIR,
     schemaName: string,
+    enumNames?: ReadonlySet<string>,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of sortedEntries(tables)) {
@@ -278,7 +287,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         execute: [
           {
             description: `create table "${tableName}"`,
-            sql: buildCreateTableSql(qualified, table),
+            sql: buildCreateTableSql(qualified, table, schemaName, enumNames),
           },
         ],
         postcheck: [
@@ -296,6 +305,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     tables: SqlContract<SqlStorage>['storage']['tables'],
     schema: SqlSchemaIR,
     schemaName: string,
+    enumNames?: ReadonlySet<string>,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of sortedEntries(tables)) {
@@ -307,7 +317,9 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         if (schemaTable.columns[columnName]) {
           continue;
         }
-        operations.push(this.buildAddColumnOperation(schemaName, tableName, columnName, column));
+        operations.push(
+          this.buildAddColumnOperation(schemaName, tableName, columnName, column, enumNames),
+        );
       }
     }
     return operations;
@@ -318,6 +330,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     tableName: string,
     columnName: string,
     column: StorageColumn,
+    enumNames?: ReadonlySet<string>,
   ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
     const qualified = qualifyTableName(schema, tableName);
     const notNull = column.nullable === false;
@@ -338,7 +351,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const execute = [
       {
         description: `add column "${columnName}"`,
-        sql: buildAddColumnSql(qualified, columnName, column),
+        sql: buildAddColumnSql(qualified, columnName, column, schema, enumNames),
       },
     ];
     const postcheck = [
@@ -710,12 +723,21 @@ function sortDependencies(
   return [...dependencies].sort((a, b) => a.id.localeCompare(b.id));
 }
 
-function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): string {
+function buildCreateTableSql(
+  qualifiedTableName: string,
+  table: StorageTable,
+  schemaName: string,
+  enumNames?: ReadonlySet<string>,
+): string {
   const columnDefinitions = Object.entries(table.columns).map(
     ([columnName, column]: [string, StorageColumn]) => {
+      // If nativeType is an enum, use schema-qualified and quoted reference
+      const typeRef = enumNames?.has(column.nativeType)
+        ? `${quoteIdentifier(schemaName)}.${quoteIdentifier(column.nativeType)}`
+        : column.nativeType;
       const parts = [
         quoteIdentifier(columnName),
-        column.nativeType,
+        typeRef,
         column.nullable ? '' : 'NOT NULL',
       ].filter(Boolean);
       return parts.join(' ');
@@ -841,10 +863,16 @@ function buildAddColumnSql(
   qualifiedTableName: string,
   columnName: string,
   column: StorageColumn,
+  schemaName: string,
+  enumNames?: ReadonlySet<string>,
 ): string {
+  // If nativeType is an enum, use schema-qualified and quoted reference
+  const typeRef = enumNames?.has(column.nativeType)
+    ? `${quoteIdentifier(schemaName)}.${quoteIdentifier(column.nativeType)}`
+    : column.nativeType;
   const parts = [
     `ALTER TABLE ${qualifiedTableName}`,
-    `ADD COLUMN ${quoteIdentifier(columnName)} ${column.nativeType}`,
+    `ADD COLUMN ${quoteIdentifier(columnName)} ${typeRef}`,
     column.nullable ? '' : 'NOT NULL',
   ].filter(Boolean);
   return parts.join(' ');

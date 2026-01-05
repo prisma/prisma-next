@@ -1,6 +1,6 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage, StorageEnum } from '@prisma-next/sql-contract/types';
-import type { SqlEnumIR, SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 
@@ -36,11 +36,10 @@ describe('PostgresMigrationPlanner - enum support', () => {
       }
 
       const enumOp = result.plan.operations.find((op) => op.id === 'enum.role');
-      expect(enumOp).toBeDefined();
-      expect(enumOp!.label).toBe('Create enum type role');
-      expect(enumOp!.execute[0].sql).toBe(
-        `CREATE TYPE "public"."role" AS ENUM ('USER', 'ADMIN', 'MODERATOR')`,
-      );
+      expect(enumOp).toMatchObject({
+        label: 'Create enum type role',
+        execute: [{ sql: `CREATE TYPE "public"."role" AS ENUM ('USER', 'ADMIN', 'MODERATOR')` }],
+      });
     });
 
     it('orders enum operations before table operations', () => {
