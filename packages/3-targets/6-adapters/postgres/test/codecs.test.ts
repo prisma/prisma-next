@@ -226,4 +226,35 @@ describe('adapter-postgres codecs', () => {
       expect(decoded).toBe(value);
     });
   });
+
+  describe('enum codec', () => {
+    const enumCodec = codecDefinitions.enum.codec as {
+      encode: (value: string) => string;
+      decode: (wire: string) => string;
+    };
+
+    it('has correct typeId', () => {
+      expect(codecDefinitions.enum.typeId).toBe('pg/enum@1');
+    });
+
+    it('encodes string as-is', () => {
+      const value = 'ADMIN';
+      const encoded = enumCodec.encode(value);
+      expect(encoded).toBe(value);
+    });
+
+    it('decodes string as-is', () => {
+      const value = 'USER';
+      const decoded = enumCodec.decode(value);
+      expect(decoded).toBe(value);
+    });
+
+    it('handles various enum values', () => {
+      const values = ['USER', 'ADMIN', 'MODERATOR', 'ACTIVE', 'INACTIVE'];
+      for (const value of values) {
+        expect(enumCodec.encode(value)).toBe(value);
+        expect(enumCodec.decode(value)).toBe(value);
+      }
+    });
+  });
 });
