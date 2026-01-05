@@ -360,9 +360,16 @@ export type Relations = Contract['relations'];
 
           const typeId = column.codecId;
           const nullable = column.nullable ?? false;
-          const jsType = nullable
-            ? `CodecTypes['${typeId}']['output'] | null`
-            : `CodecTypes['${typeId}']['output']`;
+
+          // Use enum type alias for enum columns instead of generic codec output
+          let baseType: string;
+          if (typeId === 'pg/enum@1' && storage.enums && column.nativeType in storage.enums) {
+            baseType = column.nativeType;
+          } else {
+            baseType = `CodecTypes['${typeId}']['output']`;
+          }
+
+          const jsType = nullable ? `${baseType} | null` : baseType;
 
           fields.push(`readonly ${fieldName}: ${jsType}`);
         }

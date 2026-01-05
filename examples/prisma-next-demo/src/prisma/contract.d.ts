@@ -97,7 +97,7 @@ export type Contract = SqlContract<
       fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly email: CodecTypes['pg/text@1']['output'];
-        readonly role: CodecTypes['pg/enum@1']['output'];
+        readonly role: Role;
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       };
     };

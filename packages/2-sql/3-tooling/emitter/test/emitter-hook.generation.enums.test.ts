@@ -133,4 +133,52 @@ describe('sql-target-family-hook enum generation', () => {
 
     expect(types).toContain("export type SingleValue = 'ONLY';");
   });
+
+  it('uses enum type alias for model field types instead of codec output', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              role: { nativeType: 'Role', codecId: 'pg/enum@1', nullable: false },
+              status: { nativeType: 'Status', codecId: 'pg/enum@1', nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+        enums: {
+          Role: { values: ['USER', 'ADMIN'] },
+          Status: { values: ['ACTIVE', 'INACTIVE'] },
+        },
+      },
+      models: {
+        User: {
+          storage: { table: 'user' },
+          fields: {
+            id: { column: 'id' },
+            role: { column: 'role' },
+            status: { column: 'status' },
+          },
+          relations: {},
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+
+    // Field types should use the enum type alias, not CodecTypes['pg/enum@1']['output']
+    expect(types).toContain('readonly role: Role');
+    expect(types).not.toContain("readonly role: CodecTypes['pg/enum@1']['output']");
+
+    // Nullable enum field should use 'EnumName | null'
+    expect(types).toContain('readonly status: Status | null');
+    expect(types).not.toContain("readonly status: CodecTypes['pg/enum@1']['output'] | null");
+
+    // Non-enum fields should still use CodecTypes
+    expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
+  });
 });
