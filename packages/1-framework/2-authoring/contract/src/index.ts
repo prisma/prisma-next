@@ -13,7 +13,7 @@ export type {
 
 export { ContractBuilder, defineContract } from './contract-builder';
 export { ModelBuilder } from './model-builder';
-export { TableBuilder } from './table-builder';
+export { createTable, TableBuilder } from './table-builder';
 
 export type {
   BuildModelFields,

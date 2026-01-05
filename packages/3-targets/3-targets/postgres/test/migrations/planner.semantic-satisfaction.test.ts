@@ -173,7 +173,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
   });
 
   describe('name mismatches', () => {
-    it('does not emit operations when only names differ', () => {
+    it('succeeds with no operations when only constraint/index names differ', () => {
       const contract = createTestContract({
         storage: {
           tables: {
@@ -216,59 +216,12 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         frameworkComponents: [],
       });
 
+      // Should succeed (no conflicts) and emit no operations (semantic match)
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') {
         throw new Error('expected planner success');
       }
-      // No operations should be emitted since everything matches semantically
       expect(result.plan.operations).toHaveLength(0);
-    });
-
-    it('does not produce conflicts for name mismatches', () => {
-      const contract = createTestContract({
-        storage: {
-          tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'], name: 'user_pk' },
-              uniques: [{ columns: ['email'], name: 'user_email_unique' }],
-              indexes: [{ columns: ['email'], name: 'user_email_index' }],
-              foreignKeys: [],
-            },
-          },
-        },
-      });
-
-      // Schema has different names
-      const schema: SqlSchemaIR = {
-        tables: {
-          user: {
-            name: 'user',
-            columns: {
-              id: { name: 'id', nativeType: 'uuid', nullable: false },
-              email: { name: 'email', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'], name: 'user_pkey' },
-            uniques: [{ columns: ['email'], name: 'user_email_key' }],
-            foreignKeys: [],
-            indexes: [{ columns: ['email'], unique: false, name: 'user_email_idx' }],
-          },
-        },
-        extensions: [],
-      };
-
-      const result = planner.plan({
-        contract,
-        schema,
-        policy: INIT_ADDITIVE_POLICY,
-        frameworkComponents: [],
-      });
-
-      // Should succeed, not fail with conflicts
-      expect(result.kind).toBe('success');
     });
   });
 });

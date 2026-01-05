@@ -10,6 +10,7 @@ import {
   type BuildRelations,
   type BuildStorageColumn,
   ContractBuilder,
+  createTable,
   type ExtractColumns,
   type ExtractPrimaryKey,
   ModelBuilder,
@@ -513,7 +514,7 @@ class SqlContractBuilder<
     ExtensionPacks,
     Capabilities
   > {
-    const tableBuilder = new TableBuilder<TableName>({ name });
+    const tableBuilder = createTable(name);
     const result = callback(tableBuilder);
     const finalBuilder = result instanceof TableBuilder ? result : tableBuilder;
     const tableState = finalBuilder.build();

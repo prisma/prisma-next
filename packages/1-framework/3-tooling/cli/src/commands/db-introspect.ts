@@ -137,14 +137,10 @@ async function executeDbIntrospectCommand(
         id: config.target.targetId,
       },
       schema: schemaIR,
-      ...(configPath || connectionForMeta
-        ? {
-            meta: {
-              ...(configPath ? { configPath } : {}),
-              ...(connectionForMeta ? { dbUrl: connectionForMeta } : {}),
-            },
-          }
-        : {}),
+      meta: {
+        ...(configPath ? { configPath } : {}),
+        ...(connectionForMeta ? { dbUrl: connectionForMeta } : {}),
+      },
       timings: {
         total: totalTime,
       },
