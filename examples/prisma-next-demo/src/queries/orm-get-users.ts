@@ -8,6 +8,7 @@ export async function ormGetUsers(limit: number, runtime: Runtime) {
     .select((u) => ({
       id: u.id,
       email: u.email,
+      role: u.role,
       createdAt: u.createdAt,
     }))
     .orderBy((u) => u.createdAt.desc())

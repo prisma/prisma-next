@@ -11,6 +11,7 @@ export async function getUsers(limit = 10) {
     .select({
       id: userTable.columns.id,
       email: userTable.columns.email,
+      role: userTable.columns.role,
       createdAt: userTable.columns.createdAt,
     })
     .limit(limit)

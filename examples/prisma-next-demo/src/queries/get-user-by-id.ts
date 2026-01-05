@@ -13,6 +13,7 @@ export async function getUserById(userId: number) {
     .select({
       id: userTable.columns.id,
       email: userTable.columns.email,
+      role: userTable.columns.role,
       createdAt: userTable.columns.createdAt,
     })
     .limit(1)
