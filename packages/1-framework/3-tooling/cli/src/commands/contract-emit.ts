@@ -66,7 +66,20 @@ async function executeContractEmitCommand(
   startTime: number,
 ): Promise<Result<EmitContractResult, CliStructuredError>> {
   // Load config
-  const config = await loadConfig(options.config);
+  let config: Awaited<ReturnType<typeof loadConfig>>;
+  try {
+    config = await loadConfig(options.config);
+  } catch (error) {
+    // Convert thrown CliStructuredError to Result
+    if (error instanceof CliStructuredError) {
+      return notOk(error);
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: 'Failed to load config',
+      }),
+    );
+  }
 
   // Resolve contract from config
   if (!config.contract) {
