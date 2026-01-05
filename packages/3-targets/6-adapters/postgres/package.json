@@ -24,8 +24,8 @@
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
-    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
@@ -33,7 +33,6 @@
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
-    "@vitest/coverage-v8": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
