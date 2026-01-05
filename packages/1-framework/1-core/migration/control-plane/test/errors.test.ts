@@ -75,6 +75,64 @@ describe('CliStructuredError', () => {
     expect(envelope.domain).toBe('RTM');
     expect(envelope.summary).toBe('Test error');
   });
+
+  describe('is() type guard', () => {
+    it('returns true for CliStructuredError instances', () => {
+      const error = new CliStructuredError('4001', 'Test error', { domain: 'CLI' });
+      expect(CliStructuredError.is(error)).toBe(true);
+    });
+
+    it('returns true for CliStructuredError with RTM domain', () => {
+      const error = new CliStructuredError('3000', 'Test error', { domain: 'RTM' });
+      expect(CliStructuredError.is(error)).toBe(true);
+    });
+
+    it('returns false for non-Error values', () => {
+      expect(CliStructuredError.is(null)).toBe(false);
+      expect(CliStructuredError.is(undefined)).toBe(false);
+      expect(CliStructuredError.is('string')).toBe(false);
+      expect(CliStructuredError.is(123)).toBe(false);
+      expect(CliStructuredError.is({})).toBe(false);
+    });
+
+    it('returns false for plain Error', () => {
+      const error = new Error('Plain error');
+      expect(CliStructuredError.is(error)).toBe(false);
+    });
+
+    it('returns false for Error with wrong name', () => {
+      const error = new Error('Test error') as unknown as Record<string, unknown>;
+      error['code'] = '4001';
+      error['domain'] = 'CLI';
+      error['toEnvelope'] = () => ({});
+      expect(CliStructuredError.is(error)).toBe(false);
+    });
+
+    it('returns false for Error with missing code', () => {
+      const error = new Error('Test error') as unknown as Record<string, unknown>;
+      error['name'] = 'CliStructuredError';
+      error['domain'] = 'CLI';
+      error['toEnvelope'] = () => ({});
+      expect(CliStructuredError.is(error)).toBe(false);
+    });
+
+    it('returns false for Error with wrong domain', () => {
+      const error = new Error('Test error') as unknown as Record<string, unknown>;
+      error['name'] = 'CliStructuredError';
+      error['code'] = '4001';
+      error['domain'] = 'OTHER';
+      error['toEnvelope'] = () => ({});
+      expect(CliStructuredError.is(error)).toBe(false);
+    });
+
+    it('returns false for Error without toEnvelope method', () => {
+      const error = new Error('Test error') as unknown as Record<string, unknown>;
+      error['name'] = 'CliStructuredError';
+      error['code'] = '4001';
+      error['domain'] = 'CLI';
+      expect(CliStructuredError.is(error)).toBe(false);
+    });
+  });
 });
 
 describe('Config Errors', () => {

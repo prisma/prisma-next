@@ -47,6 +47,50 @@ export interface ControlClientOptions {
 }
 
 // ============================================================================
+// Progress Events
+// ============================================================================
+
+/**
+ * Action names for control-api operations that can emit progress events.
+ */
+export type ControlActionName = 'dbInit' | 'verify' | 'schemaVerify' | 'sign' | 'introspect';
+
+/**
+ * Progress event emitted during control-api operation execution.
+ *
+ * Events model operation progress using a span-based model:
+ * - `spanStart`: Begin a timed segment (supports nesting via parentSpanId)
+ * - `spanEnd`: Complete a timed segment
+ *
+ * All operation-specific progress (e.g., per-migration-operation) is modeled
+ * as nested spans rather than special event types.
+ *
+ * Events are delivered via an optional `onProgress` callback to avoid polluting
+ * return types. If the callback is absent, operations emit no events (zero overhead).
+ */
+export type ControlProgressEvent =
+  | {
+      readonly action: ControlActionName;
+      readonly kind: 'spanStart';
+      readonly spanId: string;
+      readonly parentSpanId?: string;
+      readonly label: string;
+    }
+  | {
+      readonly action: ControlActionName;
+      readonly kind: 'spanEnd';
+      readonly spanId: string;
+      readonly outcome: 'ok' | 'skipped' | 'error';
+    };
+
+/**
+ * Callback function for receiving progress events during control-api operations.
+ *
+ * @param event - The progress event emitted by the operation
+ */
+export type OnControlProgress = (event: ControlProgressEvent) => void;
+
+// ============================================================================
 // Operation Options
 // ============================================================================
 
@@ -56,6 +100,8 @@ export interface ControlClientOptions {
 export interface VerifyOptions {
   /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
 }
 
 /**
@@ -70,6 +116,8 @@ export interface SchemaVerifyOptions {
    * Default: false (tolerant mode - allows superset)
    */
   readonly strict?: boolean;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
 }
 
 /**
@@ -78,6 +126,8 @@ export interface SchemaVerifyOptions {
 export interface SignOptions {
   /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
 }
 
 /**
@@ -92,6 +142,14 @@ export interface DbInitOptions {
    * - 'apply': Applies operations and writes marker
    */
   readonly mode: 'plan' | 'apply';
+  /**
+   * Database connection. If provided, dbInit will connect before executing.
+   * If omitted, the client must already be connected.
+   * The type is driver-specific (e.g., string URL for Postgres).
+   */
+  readonly connection?: unknown;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
 }
 
 /**
@@ -102,6 +160,8 @@ export interface IntrospectOptions {
    * Optional schema name to introspect.
    */
   readonly schema?: string;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
 }
 
 // ============================================================================
@@ -142,7 +202,9 @@ export type DbInitFailureCode = 'PLANNING_FAILED' | 'MARKER_ORIGIN_MISMATCH' | '
 export interface DbInitFailure {
   readonly code: DbInitFailureCode;
   readonly summary: string;
-  readonly conflicts?: ReadonlyArray<MigrationPlannerConflict>;
+  readonly why: string | undefined;
+  readonly conflicts: ReadonlyArray<MigrationPlannerConflict> | undefined;
+  readonly meta: Record<string, unknown> | undefined;
   readonly marker?: {
     readonly coreHash?: string;
     readonly profileHash?: string;
