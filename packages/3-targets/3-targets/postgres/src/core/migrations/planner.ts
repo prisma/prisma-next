@@ -772,15 +772,35 @@ function tableHasPrimaryKeyCheck(
 )`;
 }
 
+/**
+ * Checks if table has a unique constraint satisfied by the given columns.
+ * Semantic satisfaction: a unique index can also satisfy the requirement.
+ */
 function hasUniqueConstraint(
   table: SqlSchemaIR['tables'][string],
   columns: readonly string[],
 ): boolean {
-  return table.uniques.some((unique) => arraysEqual(unique.columns, columns));
+  // Check for matching unique constraint
+  const hasConstraint = table.uniques.some((unique) => arraysEqual(unique.columns, columns));
+  if (hasConstraint) {
+    return true;
+  }
+  // Check for matching unique index (semantic satisfaction)
+  return table.indexes.some((index) => index.unique && arraysEqual(index.columns, columns));
 }
 
+/**
+ * Checks if table has an index satisfied by the given columns.
+ * Semantic satisfaction: a unique index or unique constraint can also satisfy a non-unique index requirement.
+ */
 function hasIndex(table: SqlSchemaIR['tables'][string], columns: readonly string[]): boolean {
-  return table.indexes.some((index) => !index.unique && arraysEqual(index.columns, columns));
+  // Check for any matching index (unique or non-unique)
+  const hasMatchingIndex = table.indexes.some((index) => arraysEqual(index.columns, columns));
+  if (hasMatchingIndex) {
+    return true;
+  }
+  // Check for matching unique constraint (semantic satisfaction)
+  return table.uniques.some((unique) => arraysEqual(unique.columns, columns));
 }
 
 function hasForeignKey(table: SqlSchemaIR['tables'][string], fk: ForeignKey): boolean {

@@ -373,9 +373,11 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     tableChildren.push(...fkStatuses);
 
     // Compare unique constraints
+    // Pass schemaIndexes so unique indexes can satisfy unique constraint requirements
     const uniqueStatuses = verifyUniqueConstraints(
       contractTable.uniques,
       schemaTable.uniques,
+      schemaTable.indexes,
       tableName,
       tablePath,
       issues,
@@ -384,9 +386,11 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     tableChildren.push(...uniqueStatuses);
 
     // Compare indexes
+    // Pass schemaUniques so unique constraints can satisfy index requirements
     const indexStatuses = verifyIndexes(
       contractTable.indexes,
       schemaTable.indexes,
+      schemaTable.uniques,
       tableName,
       tablePath,
       issues,
