@@ -1,4 +1,31 @@
-import type { ColumnBuilderState, ColumnTypeDescriptor, TableBuilderState } from './builder-state';
+import type {
+  ColumnBuilderState,
+  ColumnTypeDescriptor,
+  ForeignKeyDef,
+  IndexDef,
+  TableBuilderState,
+  UniqueConstraintDef,
+} from './builder-state';
+
+interface TableBuilderInternalState<
+  Name extends string,
+  Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
+  PrimaryKey extends readonly string[] | undefined,
+> {
+  readonly name: Name;
+  readonly columns: Columns;
+  readonly primaryKey: PrimaryKey;
+  readonly primaryKeyName: string | undefined;
+  readonly uniques: readonly UniqueConstraintDef[];
+  readonly indexes: readonly IndexDef[];
+  readonly foreignKeys: readonly ForeignKeyDef[];
+}
+
+type TableBuilderOptions<
+  Name extends string,
+  Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
+  PrimaryKey extends readonly string[] | undefined,
+> = Partial<Omit<TableBuilderInternalState<Name, Columns, PrimaryKey>, 'name'>> & { name: Name };
 
 export class TableBuilder<
   Name extends string,
@@ -8,14 +35,30 @@ export class TableBuilder<
   >,
   PrimaryKey extends readonly string[] | undefined = undefined,
 > {
-  private readonly _name: Name;
-  private readonly _columns: Columns;
-  private readonly _primaryKey: PrimaryKey;
+  private readonly _state: TableBuilderInternalState<Name, Columns, PrimaryKey>;
 
-  constructor(name: Name, columns: Columns = {} as Columns, primaryKey?: PrimaryKey) {
-    this._name = name;
-    this._columns = columns;
-    this._primaryKey = primaryKey as PrimaryKey;
+  constructor(options: TableBuilderOptions<Name, Columns, PrimaryKey>) {
+    this._state = {
+      name: options.name,
+      columns: (options.columns ?? {}) as Columns,
+      primaryKey: options.primaryKey as PrimaryKey,
+      primaryKeyName: options.primaryKeyName,
+      uniques: options.uniques ?? [],
+      indexes: options.indexes ?? [],
+      foreignKeys: options.foreignKeys ?? [],
+    };
+  }
+
+  private get _name(): Name {
+    return this._state.name;
+  }
+
+  private get _columns(): Columns {
+    return this._state.columns;
+  }
+
+  private get _primaryKey(): PrimaryKey {
+    return this._state.primaryKey;
   }
 
   column<
@@ -46,38 +89,53 @@ export class TableBuilder<
       type: codecId,
       nativeType,
     } as ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>;
-    return new TableBuilder(
-      this._name,
-      { ...this._columns, [name]: columnState } as Columns &
+    return new TableBuilder({
+      ...this._state,
+      columns: { ...this._columns, [name]: columnState } as Columns &
         Record<
           ColName,
           ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>
         >,
-      this._primaryKey,
-    );
+    });
   }
 
   primaryKey<PK extends readonly string[]>(
     columns: PK,
-    _name?: string,
+    name?: string,
   ): TableBuilder<Name, Columns, PK> {
-    return new TableBuilder(this._name, this._columns, columns);
+    return new TableBuilder({
+      ...this._state,
+      primaryKey: columns,
+      primaryKeyName: name,
+    });
   }
 
-  unique(_columns: readonly string[], _name?: string): TableBuilder<Name, Columns, PrimaryKey> {
-    return this;
+  unique(columns: readonly string[], name?: string): TableBuilder<Name, Columns, PrimaryKey> {
+    const constraint: UniqueConstraintDef = name ? { columns, name } : { columns };
+    return new TableBuilder({
+      ...this._state,
+      uniques: [...this._state.uniques, constraint],
+    });
   }
 
-  index(_columns: readonly string[], _name?: string): TableBuilder<Name, Columns, PrimaryKey> {
-    return this;
+  index(columns: readonly string[], name?: string): TableBuilder<Name, Columns, PrimaryKey> {
+    const indexDef: IndexDef = name ? { columns, name } : { columns };
+    return new TableBuilder({
+      ...this._state,
+      indexes: [...this._state.indexes, indexDef],
+    });
   }
 
   foreignKey(
-    _columns: readonly string[],
-    _references: { table: string; columns: readonly string[] },
-    _name?: string,
+    columns: readonly string[],
+    references: { table: string; columns: readonly string[] },
+    name?: string,
   ): TableBuilder<Name, Columns, PrimaryKey> {
-    return this;
+    const fkDef: ForeignKeyDef = name ? { columns, references, name } : { columns, references };
+    return new TableBuilder({
+      ...this._state,
+      foreignKeys: [...this._state.foreignKeys, fkDef],
+    });
   }
 
   build(): TableBuilderState<Name, Columns, PrimaryKey> {
@@ -85,6 +143,12 @@ export class TableBuilder<
       name: this._name,
       columns: this._columns,
       ...(this._primaryKey !== undefined ? { primaryKey: this._primaryKey } : {}),
+      ...(this._state.primaryKeyName !== undefined
+        ? { primaryKeyName: this._state.primaryKeyName }
+        : {}),
+      uniques: this._state.uniques,
+      indexes: this._state.indexes,
+      foreignKeys: this._state.foreignKeys,
     } as TableBuilderState<Name, Columns, PrimaryKey>;
   }
 }

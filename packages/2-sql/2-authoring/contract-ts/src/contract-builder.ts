@@ -59,11 +59,15 @@ type BuildStorageTable<
       ? BuildStorageColumn<Null & boolean, TType>
       : never;
   };
-  readonly uniques: ReadonlyArray<never>;
-  readonly indexes: ReadonlyArray<never>;
-  readonly foreignKeys: ReadonlyArray<never>;
+  readonly uniques: ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>;
+  readonly indexes: ReadonlyArray<{ readonly columns: readonly string[]; readonly name?: string }>;
+  readonly foreignKeys: ReadonlyArray<{
+    readonly columns: readonly string[];
+    readonly references: { readonly table: string; readonly columns: readonly string[] };
+    readonly name?: string;
+  }>;
 } & (PK extends readonly string[]
-  ? { readonly primaryKey: { readonly columns: PK } }
+  ? { readonly primaryKey: { readonly columns: PK; readonly name?: string } }
   : Record<string, never>);
 
 type BuildStorage<
@@ -222,6 +226,25 @@ class SqlContractBuilder<
         >;
       }
 
+      // Build uniques from table state
+      const uniques = (tableState.uniques ?? []).map((u) => ({
+        columns: u.columns,
+        ...(u.name ? { name: u.name } : {}),
+      }));
+
+      // Build indexes from table state
+      const indexes = (tableState.indexes ?? []).map((i) => ({
+        columns: i.columns,
+        ...(i.name ? { name: i.name } : {}),
+      }));
+
+      // Build foreign keys from table state
+      const foreignKeys = (tableState.foreignKeys ?? []).map((fk) => ({
+        columns: fk.columns,
+        references: fk.references,
+        ...(fk.name ? { name: fk.name } : {}),
+      }));
+
       const table = {
         columns: columns as {
           [K in keyof ColumnDefs]: BuildStorageColumn<
@@ -229,13 +252,14 @@ class SqlContractBuilder<
             ColumnDefs[K]['type']
           >;
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
+        uniques,
+        indexes,
+        foreignKeys,
         ...(tableState.primaryKey
           ? {
               primaryKey: {
                 columns: tableState.primaryKey,
+                ...(tableState.primaryKeyName ? { name: tableState.primaryKeyName } : {}),
               },
             }
           : {}),
@@ -489,7 +513,7 @@ class SqlContractBuilder<
     ExtensionPacks,
     Capabilities
   > {
-    const tableBuilder = new TableBuilder<TableName>(name);
+    const tableBuilder = new TableBuilder<TableName>({ name });
     const result = callback(tableBuilder);
     const finalBuilder = result instanceof TableBuilder ? result : tableBuilder;
     const tableState = finalBuilder.build();

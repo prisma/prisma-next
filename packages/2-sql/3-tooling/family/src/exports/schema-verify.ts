@@ -6,6 +6,11 @@
  * other tools that need to compare schema states.
  */
 
-export { arraysEqual, verifyDatabaseDependencies } from '../core/schema-verify/verify-helpers';
+export {
+  arraysEqual,
+  isIndexSatisfied,
+  isUniqueConstraintSatisfied,
+  verifyDatabaseDependencies,
+} from '../core/schema-verify/verify-helpers';
 export type { VerifySqlSchemaOptions } from '../core/schema-verify/verify-sql-schema';
 export { verifySqlSchema } from '../core/schema-verify/verify-sql-schema';
