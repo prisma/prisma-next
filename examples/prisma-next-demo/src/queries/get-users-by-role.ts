@@ -49,7 +49,7 @@ export async function getAdminUsers() {
 
 /**
  * Get all users grouped by role.
- * Returns users with their role for client-side grouping.
+ * Demonstrates using enums.Role.values to dynamically group by all enum values.
  */
 export async function getUsersWithRoles(limit = 100) {
   const runtime = getRuntime();
@@ -67,12 +67,11 @@ export async function getUsersWithRoles(limit = 100) {
 
   const users = await collect(runtime.execute(plan));
 
-  // Group users by role client-side
-  const byRole = {
-    USER: users.filter((u) => u.role === 'USER'),
-    ADMIN: users.filter((u) => u.role === 'ADMIN'),
-    MODERATOR: users.filter((u) => u.role === 'MODERATOR'),
-  };
+  // Dynamically group users by all role values from the contract
+  // This ensures grouping stays in sync with contract changes
+  const byRole = Object.fromEntries(
+    enums.Role.values.map((role) => [role, users.filter((u) => u.role === role)]),
+  );
 
   return byRole;
 }

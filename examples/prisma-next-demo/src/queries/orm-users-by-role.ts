@@ -1,6 +1,6 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
 import type { Role } from '../prisma/contract.d';
-import { orm } from '../prisma/query';
+import { enums, orm } from '../prisma/query';
 import { collect } from './utils';
 
 /**
@@ -56,4 +56,34 @@ export async function ormGetNonAdminUsers(runtime: Runtime) {
     .findMany();
 
   return collect(runtime.execute(plan));
+}
+
+/**
+ * Get user counts for each role.
+ * Demonstrates iterating over enum values from the contract.
+ */
+export async function ormGetUserCountsByRole(runtime: Runtime) {
+  const counts: Record<Role, number> = {} as Record<Role, number>;
+
+  // Iterate over all role values from the contract
+  for (const role of enums.Role.values) {
+    const plan = orm
+      .user()
+      .where((u) => u.role.eq(role))
+      .select((u) => ({ id: u.id }))
+      .findMany();
+
+    const users = await collect(runtime.execute(plan));
+    counts[role] = users.length;
+  }
+
+  return counts;
+}
+
+/**
+ * Validate if a string is a valid role.
+ * Uses enum values from the contract for runtime validation.
+ */
+export function isValidRole(value: string): value is Role {
+  return (enums.Role.values as readonly string[]).includes(value);
 }
