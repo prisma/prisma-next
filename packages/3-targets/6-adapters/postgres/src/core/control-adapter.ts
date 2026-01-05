@@ -357,13 +357,15 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const sortedEnumRows = [...enumsResult.rows].sort((a, b) => a.sort_order - b.sort_order);
     const enums: Record<string, SqlEnumIR> = {};
     for (const row of sortedEnumRows) {
-      if (!enums[row.enum_name]) {
-        enums[row.enum_name] = {
+      let enumEntry = enums[row.enum_name];
+      if (!enumEntry) {
+        enumEntry = {
           name: row.enum_name,
           values: [],
         };
+        enums[row.enum_name] = enumEntry;
       }
-      (enums[row.enum_name].values as string[]).push(row.enum_value);
+      (enumEntry.values as string[]).push(row.enum_value);
     }
     // Freeze values arrays
     for (const enumIR of Object.values(enums)) {

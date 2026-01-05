@@ -2,6 +2,7 @@ export type {
   PrimaryKey,
   SqlAnnotations,
   SqlColumnIR,
+  SqlEnumIR,
   SqlForeignKeyIR,
   SqlIndexIR,
   SqlSchemaIR,

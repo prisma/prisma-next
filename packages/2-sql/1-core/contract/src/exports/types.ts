@@ -12,6 +12,7 @@ export type {
   SqlMappings,
   SqlStorage,
   StorageColumn,
+  StorageEnum,
   StorageTable,
   UniqueConstraint,
 } from '../types';

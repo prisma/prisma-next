@@ -22,11 +22,12 @@ import type {
   SqlContract,
   SqlStorage,
   StorageColumn,
+  StorageEnum,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlEnumIR, SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
-type OperationClass = 'extension' | 'table' | 'unique' | 'index' | 'foreignKey';
+type OperationClass = 'extension' | 'enum' | 'table' | 'unique' | 'index' | 'foreignKey';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -91,8 +92,14 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
     // Build extension operations from component-owned database dependencies
+    // Enum operations come before table operations since tables may reference enum types
     operations.push(
       ...this.buildDatabaseDependencyOperations(options),
+      ...this.buildEnumOperations(
+        options.contract.storage.enums ?? {},
+        options.schema.enums ?? {},
+        schemaName,
+      ),
       ...this.buildTableOperations(options.contract.storage.tables, options.schema, schemaName),
       ...this.buildColumnOperations(options.contract.storage.tables, options.schema, schemaName),
       ...this.buildPrimaryKeyOperations(
@@ -189,6 +196,57 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       }
     }
     return sortDependencies(deps);
+  }
+
+  private buildEnumOperations(
+    contractEnums: Record<string, StorageEnum>,
+    schemaEnums: Record<string, SqlEnumIR>,
+    schemaName: string,
+  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    for (const [enumName, enumDef] of sortedEntries(contractEnums)) {
+      const schemaEnum = schemaEnums[enumName];
+      if (schemaEnum && arraysEqual(schemaEnum.values, enumDef.values)) {
+        // Enum exists and values match exactly - skip
+        continue;
+      }
+      // If schemaEnum exists but values don't match, that's a conflict handled by classifySchema
+      // Here we only handle missing enums (additive)
+      if (schemaEnum) {
+        continue;
+      }
+      const qualifiedName = `${quoteIdentifier(schemaName)}.${quoteIdentifier(enumName)}`;
+      const valuesLiteral = enumDef.values.map((v) => `'${escapeLiteral(v)}'`).join(', ');
+      operations.push({
+        id: `enum.${enumName}`,
+        label: `Create enum type ${enumName}`,
+        summary: `Creates enum type ${enumName} with values: ${enumDef.values.join(', ')}`,
+        operationClass: 'additive',
+        target: {
+          id: 'postgres',
+          details: this.buildTargetDetails('enum', enumName, schemaName),
+        },
+        precheck: [
+          {
+            description: `ensure enum type "${enumName}" does not exist`,
+            sql: enumTypeExistsCheck({ schema: schemaName, typeName: enumName, exists: false }),
+          },
+        ],
+        execute: [
+          {
+            description: `create enum type "${enumName}"`,
+            sql: `CREATE TYPE ${qualifiedName} AS ENUM (${valuesLiteral})`,
+          },
+        ],
+        postcheck: [
+          {
+            description: `verify enum type "${enumName}" exists`,
+            sql: enumTypeExistsCheck({ schema: schemaName, typeName: enumName }),
+          },
+        ],
+      });
+    }
+    return operations;
   }
 
   private buildTableOperations(
@@ -578,9 +636,28 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
         return this.buildConflict('indexIncompatible', issue);
       case 'foreign_key_mismatch':
         return this.buildConflict('foreignKeyConflict', issue);
+      case 'enum_values_mismatch':
+        return this.buildEnumConflict(issue);
       default:
         return null;
     }
+  }
+
+  private buildEnumConflict(issue: SchemaIssue): SqlPlannerConflict {
+    const meta =
+      issue.expected || issue.actual
+        ? Object.freeze({
+            ...(issue.expected ? { expected: issue.expected } : {}),
+            ...(issue.actual ? { actual: issue.actual } : {}),
+          })
+        : undefined;
+
+    return {
+      kind: 'enumValuesMismatch',
+      summary: issue.message,
+      ...(issue.enumName ? { location: { enum: issue.enumName } } : {}),
+      ...(meta ? { meta } : {}),
+    };
   }
 
   private buildConflict(kind: SqlPlannerConflict['kind'], issue: SchemaIssue): SqlPlannerConflict {
@@ -697,6 +774,25 @@ function constraintExistsCheck({
 )`;
 }
 
+function enumTypeExistsCheck({
+  schema,
+  typeName,
+  exists = true,
+}: {
+  schema: string;
+  typeName: string;
+  exists?: boolean;
+}): string {
+  const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
+  return `SELECT ${existsClause} (
+  SELECT 1 FROM pg_type t
+  JOIN pg_namespace n ON t.typnamespace = n.oid
+  WHERE t.typname = '${escapeLiteral(typeName)}'
+  AND n.nspname = '${escapeLiteral(schema)}'
+  AND t.typtype = 'e'
+)`;
+}
+
 function columnExistsCheck({
   schema,
   table,
@@ -810,6 +906,7 @@ function isAdditiveIssue(issue: SchemaIssue): boolean {
     case 'missing_table':
     case 'missing_column':
     case 'extension_missing':
+    case 'enum_missing':
       return true;
     case 'primary_key_mismatch':
       return issue.actual === undefined;

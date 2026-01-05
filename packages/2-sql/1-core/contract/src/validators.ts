@@ -10,6 +10,7 @@ import type {
   SqlContract,
   SqlStorage,
   StorageColumn,
+  StorageEnum,
   StorageTable,
   UniqueConstraint,
 } from './types';
@@ -54,8 +55,13 @@ const StorageTableSchema = type.declare<StorageTable>().type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
+const StorageEnumSchema = type.declare<StorageEnum>().type({
+  values: type.string.array().readonly(),
+});
+
 const StorageSchema = type.declare<SqlStorage>().type({
   tables: type({ '[string]': StorageTableSchema }),
+  'enums?': type({ '[string]': StorageEnumSchema }),
 });
 
 const ModelFieldSchema = type.declare<ModelField>().type({

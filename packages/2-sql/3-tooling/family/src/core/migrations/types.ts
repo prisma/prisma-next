@@ -176,7 +176,8 @@ export type SqlPlannerConflictKind =
   | 'missingButNonAdditive'
   | 'unsupportedExtension'
   | 'extensionMissing'
-  | 'unsupportedOperation';
+  | 'unsupportedOperation'
+  | 'enumValuesMismatch';
 
 /**
  * Location information for SQL planner conflicts.
@@ -187,6 +188,7 @@ export interface SqlPlannerConflictLocation {
   readonly index?: string;
   readonly constraint?: string;
   readonly extension?: string;
+  readonly enum?: string;
 }
 
 /**
