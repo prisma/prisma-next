@@ -148,51 +148,219 @@ class ControlClientImpl implements ControlClient {
   }
 
   async verify(options: VerifyOptions): Promise<VerifyDatabaseResult> {
+    const { onProgress } = options;
+
+    // Connect with progress span if connection provided
+    if (options.connection !== undefined) {
+      onProgress?.({
+        action: 'verify',
+        kind: 'spanStart',
+        spanId: 'connect',
+        label: 'Connecting to database...',
+      });
+      try {
+        await this.connect(options.connection);
+        onProgress?.({
+          action: 'verify',
+          kind: 'spanEnd',
+          spanId: 'connect',
+          outcome: 'ok',
+        });
+      } catch (error) {
+        onProgress?.({
+          action: 'verify',
+          kind: 'spanEnd',
+          spanId: 'connect',
+          outcome: 'error',
+        });
+        throw error;
+      }
+    }
+
     const { driver, familyInstance } = await this.ensureConnected();
 
     // Validate contract using family instance
     const contractIR = familyInstance.validateContractIR(options.contractIR);
 
-    // Delegate to family instance verify method
-    // Note: We pass empty strings for contractPath/configPath since the programmatic
-    // API doesn't deal with file paths. The family instance accepts these as optional
-    // metadata for error reporting.
-    return familyInstance.verify({
-      driver,
-      contractIR,
-      expectedTargetId: this.options.target.targetId,
-      contractPath: '',
+    // Emit verify span
+    onProgress?.({
+      action: 'verify',
+      kind: 'spanStart',
+      spanId: 'verify',
+      label: 'Verifying contract marker...',
     });
+
+    try {
+      // Delegate to family instance verify method
+      // Note: We pass empty strings for contractPath/configPath since the programmatic
+      // API doesn't deal with file paths. The family instance accepts these as optional
+      // metadata for error reporting.
+      const result = await familyInstance.verify({
+        driver,
+        contractIR,
+        expectedTargetId: this.options.target.targetId,
+        contractPath: '',
+      });
+
+      onProgress?.({
+        action: 'verify',
+        kind: 'spanEnd',
+        spanId: 'verify',
+        outcome: result.ok ? 'ok' : 'error',
+      });
+
+      return result;
+    } catch (error) {
+      onProgress?.({
+        action: 'verify',
+        kind: 'spanEnd',
+        spanId: 'verify',
+        outcome: 'error',
+      });
+      throw error;
+    }
   }
 
   async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
+    const { onProgress } = options;
+
+    // Connect with progress span if connection provided
+    if (options.connection !== undefined) {
+      onProgress?.({
+        action: 'schemaVerify',
+        kind: 'spanStart',
+        spanId: 'connect',
+        label: 'Connecting to database...',
+      });
+      try {
+        await this.connect(options.connection);
+        onProgress?.({
+          action: 'schemaVerify',
+          kind: 'spanEnd',
+          spanId: 'connect',
+          outcome: 'ok',
+        });
+      } catch (error) {
+        onProgress?.({
+          action: 'schemaVerify',
+          kind: 'spanEnd',
+          spanId: 'connect',
+          outcome: 'error',
+        });
+        throw error;
+      }
+    }
+
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
     // Validate contract using family instance
     const contractIR = familyInstance.validateContractIR(options.contractIR);
 
-    // Delegate to family instance schemaVerify method
-    return familyInstance.schemaVerify({
-      driver,
-      contractIR,
-      strict: options.strict ?? false,
-      contractPath: '',
-      frameworkComponents,
+    // Emit schemaVerify span
+    onProgress?.({
+      action: 'schemaVerify',
+      kind: 'spanStart',
+      spanId: 'schemaVerify',
+      label: 'Verifying database schema...',
     });
+
+    try {
+      // Delegate to family instance schemaVerify method
+      const result = await familyInstance.schemaVerify({
+        driver,
+        contractIR,
+        strict: options.strict ?? false,
+        contractPath: '',
+        frameworkComponents,
+      });
+
+      onProgress?.({
+        action: 'schemaVerify',
+        kind: 'spanEnd',
+        spanId: 'schemaVerify',
+        outcome: result.ok ? 'ok' : 'error',
+      });
+
+      return result;
+    } catch (error) {
+      onProgress?.({
+        action: 'schemaVerify',
+        kind: 'spanEnd',
+        spanId: 'schemaVerify',
+        outcome: 'error',
+      });
+      throw error;
+    }
   }
 
   async sign(options: SignOptions): Promise<SignDatabaseResult> {
+    const { onProgress } = options;
+
+    // Connect with progress span if connection provided
+    if (options.connection !== undefined) {
+      onProgress?.({
+        action: 'sign',
+        kind: 'spanStart',
+        spanId: 'connect',
+        label: 'Connecting to database...',
+      });
+      try {
+        await this.connect(options.connection);
+        onProgress?.({
+          action: 'sign',
+          kind: 'spanEnd',
+          spanId: 'connect',
+          outcome: 'ok',
+        });
+      } catch (error) {
+        onProgress?.({
+          action: 'sign',
+          kind: 'spanEnd',
+          spanId: 'connect',
+          outcome: 'error',
+        });
+        throw error;
+      }
+    }
+
     const { driver, familyInstance } = await this.ensureConnected();
 
     // Validate contract using family instance
     const contractIR = familyInstance.validateContractIR(options.contractIR);
 
-    // Delegate to family instance sign method
-    return familyInstance.sign({
-      driver,
-      contractIR,
-      contractPath: '',
+    // Emit sign span
+    onProgress?.({
+      action: 'sign',
+      kind: 'spanStart',
+      spanId: 'sign',
+      label: 'Signing database...',
     });
+
+    try {
+      // Delegate to family instance sign method
+      const result = await familyInstance.sign({
+        driver,
+        contractIR,
+        contractPath: '',
+      });
+
+      onProgress?.({
+        action: 'sign',
+        kind: 'spanEnd',
+        spanId: 'sign',
+        outcome: 'ok',
+      });
+
+      return result;
+    } catch (error) {
+      onProgress?.({
+        action: 'sign',
+        kind: 'spanEnd',
+        spanId: 'sign',
+        outcome: 'error',
+      });
+      throw error;
+    }
   }
 
   async dbInit(options: DbInitOptions): Promise<DbInitResult> {
@@ -248,12 +416,68 @@ class ControlClientImpl implements ControlClient {
   }
 
   async introspect(options?: IntrospectOptions): Promise<unknown> {
+    const onProgress = options?.onProgress;
+
+    // Connect with progress span if connection provided
+    if (options?.connection !== undefined) {
+      onProgress?.({
+        action: 'introspect',
+        kind: 'spanStart',
+        spanId: 'connect',
+        label: 'Connecting to database...',
+      });
+      try {
+        await this.connect(options.connection);
+        onProgress?.({
+          action: 'introspect',
+          kind: 'spanEnd',
+          spanId: 'connect',
+          outcome: 'ok',
+        });
+      } catch (error) {
+        onProgress?.({
+          action: 'introspect',
+          kind: 'spanEnd',
+          spanId: 'connect',
+          outcome: 'error',
+        });
+        throw error;
+      }
+    }
+
     const { driver, familyInstance } = await this.ensureConnected();
 
     // TODO: Pass schema option to familyInstance.introspect when schema filtering is implemented
     const _schema = options?.schema;
     void _schema;
 
-    return familyInstance.introspect({ driver });
+    // Emit introspect span
+    onProgress?.({
+      action: 'introspect',
+      kind: 'spanStart',
+      spanId: 'introspect',
+      label: 'Introspecting database schema...',
+    });
+
+    try {
+      const result = await familyInstance.introspect({ driver });
+
+      onProgress?.({
+        action: 'introspect',
+        kind: 'spanEnd',
+        spanId: 'introspect',
+        outcome: 'ok',
+      });
+
+      return result;
+    } catch (error) {
+      onProgress?.({
+        action: 'introspect',
+        kind: 'spanEnd',
+        spanId: 'introspect',
+        outcome: 'error',
+      });
+      throw error;
+    }
   }
 }

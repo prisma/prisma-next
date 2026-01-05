@@ -100,6 +100,12 @@ export type OnControlProgress = (event: ControlProgressEvent) => void;
 export interface VerifyOptions {
   /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
+  /**
+   * Database connection. If provided, verify will connect before executing.
+   * If omitted, the client must already be connected.
+   * The type is driver-specific (e.g., string URL for Postgres).
+   */
+  readonly connection?: unknown;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }
@@ -116,6 +122,12 @@ export interface SchemaVerifyOptions {
    * Default: false (tolerant mode - allows superset)
    */
   readonly strict?: boolean;
+  /**
+   * Database connection. If provided, schemaVerify will connect before executing.
+   * If omitted, the client must already be connected.
+   * The type is driver-specific (e.g., string URL for Postgres).
+   */
+  readonly connection?: unknown;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }
@@ -126,6 +138,12 @@ export interface SchemaVerifyOptions {
 export interface SignOptions {
   /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
   readonly contractIR: unknown;
+  /**
+   * Database connection. If provided, sign will connect before executing.
+   * If omitted, the client must already be connected.
+   * The type is driver-specific (e.g., string URL for Postgres).
+   */
+  readonly connection?: unknown;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }
@@ -160,6 +178,12 @@ export interface IntrospectOptions {
    * Optional schema name to introspect.
    */
   readonly schema?: string;
+  /**
+   * Database connection. If provided, introspect will connect before executing.
+   * If omitted, the client must already be connected.
+   * The type is driver-specific (e.g., string URL for Postgres).
+   */
+  readonly connection?: unknown;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }
