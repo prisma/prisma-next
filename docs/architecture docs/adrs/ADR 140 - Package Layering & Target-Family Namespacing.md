@@ -94,7 +94,7 @@ packages/
 - Target families are encoded via prefixes (e.g., `sql-`), producing names like `@prisma-next/sql-lane`, regardless of nested folders.
 - Adapters/drivers retain conventional names (`@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`) and are located under `packages/3-targets/**` as separate packages (target, adapter, driver).
 - Layers are for dependency direction, not naming; only `runtime-core` carries its layer in the name for clarity.
-- See also: `docs/reference/Package Naming and Path Aliases.md` for concrete path→package mappings and tsconfig alias examples.
+- See also: `docs/reference/Package Naming Conventions.md` for concrete path→package mappings.
 
 ## Consequences
 
@@ -113,7 +113,7 @@ packages/
 
 ## Migration Plan (High-Level)
 
-1) ✅  Scaffold the new folder skeleton and path aliases; add import guardrails and CI checks.
+1) ✅  Scaffold the new folder skeleton; add import guardrails and CI checks.
 2) ✅  Extract `contract-authoring` out of `@prisma-next/sql-query` into `packages/1-framework/2-authoring/contract`.
 3) ✅  Stand up `lanes/relational-core` and move schema/column builders and operation attachment there.
 4) ✅  Split lanes into `sql-lane` and `orm-lane`; keep tests with their respective packages.

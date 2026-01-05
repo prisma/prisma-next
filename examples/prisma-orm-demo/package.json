@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
     "@prisma/dev": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",

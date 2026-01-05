@@ -312,47 +312,6 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/3-extensions/compat-prisma/` | `@prisma-next/compat-prisma` |
 | `packages/3-extensions/pgvector/` | `@prisma-next/extension-pgvector` |
 
-## TypeScript Path Aliases
-
-### Published Package Name Aliases
-
-Path aliases map published package names to source entry files:
-
-```json
-{
-  "compilerOptions": {
-    "paths": {
-      "@prisma-next/contract": ["packages/1-framework/1-core/shared/contract/src/exports/types.ts"],
-      "@prisma-next/plan": ["packages/1-framework/1-core/shared/plan/src/index.ts"],
-      "@prisma-next/operations": ["packages/1-framework/1-core/shared/operations/src/index.ts"],
-      "@prisma-next/core-control-plane": ["packages/1-framework/1-core/migration/control-plane/src/index.ts"],
-      "@prisma-next/core-execution-plane": ["packages/1-framework/1-core/runtime/execution-plane/src/index.ts"],
-      "@prisma-next/contract-authoring": ["packages/1-framework/2-authoring/contract/src/index.ts"],
-      "@prisma-next/contract-ts": ["packages/1-framework/2-authoring/contract-ts/src/index.ts"],
-      "@prisma-next/contract-psl": ["packages/1-framework/2-authoring/contract-psl/src/index.ts"],
-      "@prisma-next/cli": ["packages/1-framework/3-tooling/cli/src/exports/index.ts"],
-      "@prisma-next/emitter": ["packages/1-framework/3-tooling/emitter/src/exports/index.ts"],
-      "@prisma-next/runtime-executor": ["packages/1-framework/4-runtime-executor/src/index.ts"],
-      "@prisma-next/sql-contract": ["packages/2-sql/1-core/contract/src/exports/types.ts"],
-      "@prisma-next/sql-operations": ["packages/2-sql/1-core/operations/src/index.ts"],
-      "@prisma-next/sql-schema-ir": ["packages/2-sql/1-core/schema-ir/src/index.ts"],
-      "@prisma-next/sql-contract-ts": ["packages/2-sql/2-authoring/contract-ts/src/index.ts"],
-      "@prisma-next/sql-contract-emitter": ["packages/2-sql/3-tooling/emitter/src/index.ts"],
-      "@prisma-next/family-sql": ["packages/2-sql/3-tooling/family/src/index.ts"],
-      "@prisma-next/sql-relational-core": ["packages/2-sql/4-lanes/relational-core/src/index.ts"],
-      "@prisma-next/sql-lane": ["packages/2-sql/4-lanes/sql-lane/src/index.ts"],
-      "@prisma-next/sql-orm-lane": ["packages/2-sql/4-lanes/orm-lane/src/index.ts"],
-      "@prisma-next/sql-runtime": ["packages/2-sql/5-runtime/src/index.ts"],
-      "@prisma-next/target-postgres": ["packages/3-targets/3-targets/postgres/src/index.ts"],
-      "@prisma-next/adapter-postgres": ["packages/3-targets/6-adapters/postgres/src/exports/index.ts"],
-      "@prisma-next/driver-postgres": ["packages/3-targets/7-drivers/postgres/src/exports/index.ts"],
-      "@prisma-next/compat-prisma": ["packages/3-extensions/compat-prisma/src/index.ts"],
-      "@prisma-next/extension-pgvector": ["packages/3-extensions/pgvector/src/index.ts"]
-    }
-  }
-}
-```
-
 ## Dependency Rules
 
 ### General Rules
@@ -463,7 +422,7 @@ When adding a new package:
 4. **Follow naming conventions** - use hyphenated names, encode family in prefix
 5. **Add package mapping** to `architecture.config.json` with domain/layer/plane
    - For multi-plane packages, add separate globs for each plane (e.g., `src/core/**` for shared, `src/exports/cli.ts` for migration, `src/exports/runtime.ts` for runtime)
-6. **Add project reference** to `tsconfig.base.json`.
+6. **Add project references** to `tsconfig.base.json`.
 7. **Add workspace pattern** to `pnpm-workspace.yaml` if needed
 8. **Create README.md** documenting purpose, dependencies, and architecture with domain/layer/plane labels
 9. **Run import check** to verify no violations
@@ -494,7 +453,7 @@ The package layering structure uses numbered directory prefixes for visual hiera
 - All layer directories created with numbered prefixes (e.g., `1-core/`, `2-authoring/`, `3-tooling/`, `4-lanes/`, `5-runtime/`)
 - Plane subdirectories added where needed (`shared/`, `migration/`, `runtime/`)
 - Workspace configuration updated (`pnpm-workspace.yaml`)
-- TypeScript path aliases and project references updated (`tsconfig.base.json`)
+- TypeScript project references updated (`tsconfig.base.json`)
 - Import validation configured (Dependency Cruiser with `dependency-cruiser.config.mjs`)
 - Architecture configuration file updated (`architecture.config.json`)
 - `pnpm lint:deps` script validates dependency direction

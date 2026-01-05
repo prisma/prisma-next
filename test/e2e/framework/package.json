@@ -13,6 +13,7 @@
     "clean": "rm -rf dist coverage .tmp-output"
   },
   "devDependencies": {
+    "@prisma-next/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "pg": "catalog:",

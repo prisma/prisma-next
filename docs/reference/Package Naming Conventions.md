@@ -1,6 +1,6 @@
-# Package Naming and Path Aliases
+# Package Naming Conventions
 
-This document defines the relationship between the repository directory layout and published package names, and provides canonical TypeScript path aliases for local development.
+This document defines the relationship between the repository directory layout and published package names.
 
 ## Directory Structure
 

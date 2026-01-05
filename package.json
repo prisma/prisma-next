@@ -37,6 +37,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.3.11",
     "@changesets/cli": "^2.27.8",
+    "@prisma-next/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "^4.0.16",
     "dependency-cruiser": "^16.3.3",

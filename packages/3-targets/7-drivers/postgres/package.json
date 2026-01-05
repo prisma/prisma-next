@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
     "@types/pg": "catalog:",
     "@types/pg-cursor": "^2.4.6",
     "pg-mem": "^3.0.5",
