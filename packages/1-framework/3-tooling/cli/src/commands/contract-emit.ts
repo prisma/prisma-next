@@ -86,7 +86,7 @@ async function executeContractEmitCommand(
     return notOk(
       errorContractConfigMissing({
         why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ..., types: ... }',
-      }) as CliStructuredError,
+      }),
     );
   }
 
@@ -98,7 +98,7 @@ async function executeContractEmitCommand(
     return notOk(
       errorContractConfigMissing({
         why: 'Contract config must have output and types paths. This should not happen if defineConfig() was used.',
-      }) as CliStructuredError,
+      }),
     );
   }
   const outputJsonPath = resolve(contractConfig.output);
