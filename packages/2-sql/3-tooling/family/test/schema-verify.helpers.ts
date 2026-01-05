@@ -1,8 +1,18 @@
 /**
  * Shared test helpers for schema verification tests.
  */
-import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type {
+  SqlContract,
+  SqlStorage,
+  StorageEnum,
+  StorageTable,
+} from '@prisma-next/sql-contract/types';
+import type {
+  SqlColumnIR,
+  SqlEnumIR,
+  SqlSchemaIR,
+  SqlTableIR,
+} from '@prisma-next/sql-schema-ir/types';
 
 /**
  * Empty type metadata registry for tests that don't need codec warnings.
@@ -15,13 +25,14 @@ export const emptyTypeMetadataRegistry = new Map<string, { nativeType?: string }
 export function createTestContract(
   tables: Record<string, StorageTable>,
   extensionPacks: Record<string, unknown> = {},
+  enums: Record<string, StorageEnum> = {},
 ): SqlContract<SqlStorage> {
   return {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
     coreHash: 'sha256:test',
-    storage: { tables },
+    storage: { tables, enums },
     models: {},
     relations: {},
     mappings: {
@@ -38,8 +49,9 @@ export function createTestContract(
 export function createTestSchemaIR(
   tables: Record<string, SqlTableIR>,
   extensions: readonly string[] = [],
+  enums: Record<string, SqlEnumIR> = {},
 ): SqlSchemaIR {
-  return { tables, extensions };
+  return { tables, extensions, enums };
 }
 
 /**

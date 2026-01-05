@@ -404,10 +404,13 @@ export interface SchemaIssue {
     | 'foreign_key_mismatch'
     | 'unique_constraint_mismatch'
     | 'index_mismatch'
-    | 'extension_missing';
+    | 'extension_missing'
+    | 'enum_missing'
+    | 'enum_values_mismatch';
   readonly table: string;
   readonly column?: string;
   readonly indexOrConstraint?: string;
+  readonly enumName?: string;
   readonly expected?: string;
   readonly actual?: string;
   readonly message: string;

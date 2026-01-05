@@ -454,6 +454,79 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     }
   }
 
+  // Compare enums
+  const contractEnums = contract.storage.enums ?? {};
+  const schemaEnums = schema.enums ?? {};
+
+  for (const [enumName, contractEnum] of Object.entries(contractEnums)) {
+    const schemaEnum = schemaEnums[enumName];
+    const enumPath = `storage.enums.${enumName}`;
+
+    if (!schemaEnum) {
+      // Missing enum
+      issues.push({
+        kind: 'enum_missing',
+        table: '', // Enums are not table-scoped
+        enumName,
+        message: `Enum type "${enumName}" is missing from database`,
+      });
+      rootChildren.push({
+        status: 'fail',
+        kind: 'enum',
+        name: `enum ${enumName}`,
+        contractPath: enumPath,
+        code: 'enum_missing',
+        message: `Enum "${enumName}" is missing`,
+        expected: contractEnum.values,
+        actual: undefined,
+        children: [],
+      });
+      continue;
+    }
+
+    // Check if values match exactly (same set and order)
+    const contractValues = contractEnum.values;
+    const schemaValues = schemaEnum.values;
+    const valuesMatch =
+      contractValues.length === schemaValues.length &&
+      contractValues.every((v, i) => v === schemaValues[i]);
+
+    if (!valuesMatch) {
+      issues.push({
+        kind: 'enum_values_mismatch',
+        table: '', // Enums are not table-scoped
+        enumName,
+        expected: contractValues.join(', '),
+        actual: schemaValues.join(', '),
+        message: `Enum "${enumName}" has values mismatch: expected [${contractValues.join(', ')}], got [${schemaValues.join(', ')}]`,
+      });
+      rootChildren.push({
+        status: 'fail',
+        kind: 'enum',
+        name: `enum ${enumName}`,
+        contractPath: enumPath,
+        code: 'enum_values_mismatch',
+        message: `Values mismatch: expected [${contractValues.join(', ')}], got [${schemaValues.join(', ')}]`,
+        expected: contractValues,
+        actual: schemaValues,
+        children: [],
+      });
+    } else {
+      // Enum matches
+      rootChildren.push({
+        status: 'pass',
+        kind: 'enum',
+        name: `enum ${enumName}`,
+        contractPath: enumPath,
+        code: '',
+        message: '',
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
+    }
+  }
+
   // Validate that all extension packs declared in the contract are present in frameworkComponents
   // This is a configuration integrity check - if the contract was emitted with an extension,
   // that extension must be provided in the current configuration.
