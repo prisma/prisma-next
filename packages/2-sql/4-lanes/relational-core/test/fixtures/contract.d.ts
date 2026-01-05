@@ -9,6 +9,7 @@ type CodecTypes = {
   readonly 'pg/int4@1': { readonly output: number };
   readonly 'pg/text@1': { readonly output: string };
   readonly 'pg/timestamptz@1': { readonly output: string };
+  readonly 'pg/enum@1': { readonly output: string };
 };
 
 // Contract type representing the contract data structure
@@ -21,12 +22,18 @@ export type Contract = SqlContract<
           readonly id: { readonly nativeType: 'int4'; readonly codecId: 'pg/int4@1'; nullable: false };
           readonly email: { readonly nativeType: 'text'; readonly codecId: 'pg/text@1'; nullable: false };
           readonly createdAt: { readonly nativeType: 'timestamptz'; readonly codecId: 'pg/timestamptz@1'; nullable: false };
+          readonly role: { readonly nativeType: 'role'; readonly codecId: 'pg/enum@1'; nullable: false };
+          readonly status: { readonly nativeType: 'status'; readonly codecId: 'pg/enum@1'; nullable: true };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: ReadonlyArray<never>;
         readonly indexes: ReadonlyArray<never>;
         readonly foreignKeys: ReadonlyArray<never>;
       };
+    };
+    readonly enums: {
+      readonly role: { readonly values: readonly ['USER', 'ADMIN', 'MODERATOR'] };
+      readonly status: { readonly values: readonly ['ACTIVE', 'INACTIVE', 'PENDING'] };
     };
   },
   {
@@ -36,6 +43,8 @@ export type Contract = SqlContract<
         readonly id: { readonly column: 'id' };
         readonly email: { readonly column: 'email' };
         readonly createdAt: { readonly column: 'createdAt' };
+        readonly role: { readonly column: 'role' };
+        readonly status: { readonly column: 'status' };
       };
       readonly relations: Record<string, never>;
     };
@@ -49,6 +58,8 @@ export type Contract = SqlContract<
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
+        readonly role: 'role';
+        readonly status: 'status';
       };
     };
     readonly columnToField: {
@@ -56,6 +67,8 @@ export type Contract = SqlContract<
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
+        readonly role: 'role';
+        readonly status: 'status';
       };
     };
     readonly codecTypes: CodecTypes;

@@ -297,8 +297,9 @@ type OperationReturn<
  * Computes JavaScript type for a column at column creation time.
  *
  * Type inference:
- * - Read columnMeta.codecId as typeId string literal
- * - Look up CodecTypes[typeId].output
+ * - For enum columns (codecId: 'pg/enum@1'): look up nativeType in Contract['storage']['enums']
+ *   and return the union of enum values
+ * - For other columns: look up CodecTypes[codecId].output
  * - Apply nullability: nullable ? Output | null : Output
  */
 type ColumnMetaTypeId<ColumnMeta> = ColumnMeta extends { codecId: infer CodecId extends string }
@@ -307,24 +308,58 @@ type ColumnMetaTypeId<ColumnMeta> = ColumnMeta extends { codecId: infer CodecId 
     ? TypeId
     : never;
 
+/**
+ * Extract enum values union from contract storage enums.
+ * Returns the values[number] union type if the enum exists, otherwise never.
+ */
+type ExtractEnumJsType<
+  Contract extends SqlContract<SqlStorage>,
+  NativeType extends string,
+> = Contract['storage'] extends { enums: infer Enums }
+  ? Enums extends Record<string, { values: readonly string[] }>
+    ? NativeType extends keyof Enums
+      ? Enums[NativeType]['values'][number]
+      : never
+    : never
+  : never;
+
+/**
+ * Check if a column is an enum column (uses pg/enum@1 codec).
+ */
+type IsEnumColumn<ColumnMeta extends StorageColumn> = ColumnMeta extends {
+  codecId: 'pg/enum@1';
+}
+  ? true
+  : false;
+
 export type ComputeColumnJsType<
-  _Contract extends SqlContract<SqlStorage>,
+  Contract extends SqlContract<SqlStorage>,
   _TableName extends string,
   _ColumnName extends string,
   ColumnMeta extends StorageColumn,
   CodecTypes extends Record<string, { readonly output: unknown }>,
-> = ColumnMeta extends { nullable: infer Nullable }
-  ? ColumnMetaTypeId<ColumnMeta> extends infer TypeId
-    ? TypeId extends string
-      ? ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
-        ? [CodecOutput] extends [never]
-          ? unknown // Codec not found in CodecTypes
+> = ColumnMeta extends { nullable: infer Nullable; nativeType: infer NativeType }
+  ? IsEnumColumn<ColumnMeta> extends true
+    ? NativeType extends string
+      ? ExtractEnumJsType<Contract, NativeType> extends infer EnumType
+        ? [EnumType] extends [never]
+          ? string // Fallback to string if enum not found in contract
           : Nullable extends true
-            ? CodecOutput | null
-            : CodecOutput
+            ? EnumType | null
+            : EnumType
+        : string
+      : string
+    : ColumnMetaTypeId<ColumnMeta> extends infer TypeId
+      ? TypeId extends string
+        ? ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
+          ? [CodecOutput] extends [never]
+            ? unknown // Codec not found in CodecTypes
+            : Nullable extends true
+              ? CodecOutput | null
+              : CodecOutput
+          : unknown
         : unknown
       : unknown
-    : unknown
   : unknown;
 
 /**
@@ -336,15 +371,14 @@ export type ComputeColumnJsType<
 /**
  * Extracts the inferred JsType carried by a ColumnBuilder.
  */
-type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> =
-  CB extends ColumnBuilder<
-    infer _ColumnName extends string,
-    infer _ColumnMeta extends StorageColumn,
-    infer JsType,
-    infer _Ops
-  >
-    ? JsType
-    : never;
+type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB extends ColumnBuilder<
+  infer _ColumnName extends string,
+  infer _ColumnMeta extends StorageColumn,
+  infer JsType,
+  infer _Ops
+>
+  ? JsType
+  : never;
 
 export type InferProjectionRow<P extends Record<string, AnyColumnBuilder>> = {
   [K in keyof P]: ExtractJsTypeFromColumnBuilder<P[K]>;

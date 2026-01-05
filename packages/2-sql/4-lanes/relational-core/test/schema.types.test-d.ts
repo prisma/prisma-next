@@ -43,7 +43,7 @@ test('table columns have literal keys, not index signatures', () => {
   expectTypeOf(createdAtColumn).not.toBeUndefined();
 
   // Verify column keys are literal types
-  expectTypeOf<ColumnKeys>().toEqualTypeOf<'id' | 'email' | 'createdAt'>();
+  expectTypeOf<ColumnKeys>().toEqualTypeOf<'id' | 'email' | 'createdAt' | 'role' | 'status'>();
 });
 
 test('schema returns correct SchemaHandle type', () => {
