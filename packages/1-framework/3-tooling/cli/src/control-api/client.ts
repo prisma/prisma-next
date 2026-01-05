@@ -502,12 +502,7 @@ class ControlClientImpl implements ControlClient {
     this.init();
 
     if (!this.familyInstance) {
-      return notOk({
-        code: 'EMIT_FAILED',
-        summary: 'Failed to initialize family instance',
-        why: 'Family instance could not be created',
-        meta: undefined,
-      });
+      throw new Error('Family instance was not initialized. This is a bug.');
     }
 
     // Resolve contract source

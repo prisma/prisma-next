@@ -195,8 +195,8 @@ async function executeContractEmitCommand(
 
     // Wrap unexpected errors
     return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Unexpected error during contract emit: ${error instanceof Error ? error.message : String(error)}`,
+      errorUnexpected('Unexpected error during contract emit', {
+        why: error instanceof Error ? error.message : String(error),
       }),
     );
   } finally {
