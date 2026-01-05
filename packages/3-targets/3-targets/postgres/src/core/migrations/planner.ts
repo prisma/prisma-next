@@ -26,6 +26,7 @@ import type {
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlEnumIR, SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 type OperationClass = 'extension' | 'enum' | 'table' | 'unique' | 'index' | 'foreignKey';
 
@@ -660,8 +661,8 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
     const meta =
       issue.expected || issue.actual
         ? Object.freeze({
-            ...(issue.expected ? { expected: issue.expected } : {}),
-            ...(issue.actual ? { actual: issue.actual } : {}),
+            ...ifDefined('expected', issue.expected),
+            ...ifDefined('actual', issue.actual),
           })
         : undefined;
 
@@ -669,7 +670,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       kind: 'enumValuesMismatch',
       summary: issue.message,
       ...(issue.enumName ? { location: { enum: issue.enumName } } : {}),
-      ...(meta ? { meta } : {}),
+      ...ifDefined('meta', meta),
     };
   }
 
