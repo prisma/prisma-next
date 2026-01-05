@@ -159,7 +159,7 @@ Start with the [Architecture Overview](./docs/Architecture%20Overview.md) for a 
 
 **Prisma Next Workflow:**
 1. Write `schema.psl`
-2. Run `prisma-next emit` → generates lightweight types + contract
+2. Run `prisma-next contract emit` → generates lightweight types + contract
   - In the future this will likely be replaced by a Vite plugin or equivalent
 3. Write application code using composable DSL: `sql().from(t.user).select(...)`
 

@@ -9,7 +9,7 @@
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
-    "emit": "prisma-next emit",
+    "emit": "prisma-next contract emit",
     "clean": "node ../../../scripts/clean.mjs"
   },
   "devDependencies": {

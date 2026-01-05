@@ -92,7 +92,8 @@ exports[`help text snapshots > formats db verify help 1`] = `
 exports[`help text snapshots > formats root help 1`] = `
 "prisma-next Manage your data layer
 │
-│ ├─ emit               Write your contract to JSON and sign it
+│ ├─ contract         
+│ │  └─ emit            Write your contract to JSON and sign it
 │ └─ db               
 │    └─ verify          Check whether the database has been signed with your contract
 │
@@ -106,7 +107,8 @@ exports[`help text snapshots > formats root help 1`] = `
 exports[`help text snapshots > formats root help with no color 1`] = `
 "prisma-next Manage your data layer
 │
-│ ├─ emit               Write your contract to JSON and sign it
+│ ├─ contract         
+│ │  └─ emit            Write your contract to JSON and sign it
 │ └─ db               
 │    └─ verify          Check whether the database has been signed with your contract
 │
