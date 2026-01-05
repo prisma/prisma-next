@@ -940,14 +940,9 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.enums).toBeDefined();
-      expect(result.enums?.['role']).toEqual({
-        name: 'role',
-        values: ['USER', 'ADMIN', 'MODERATOR'],
-      });
-      expect(result.enums?.['status']).toEqual({
-        name: 'status',
-        values: ['ACTIVE', 'INACTIVE'],
+      expect(result.enums).toMatchObject({
+        role: { name: 'role', values: ['USER', 'ADMIN', 'MODERATOR'] },
+        status: { name: 'status', values: ['ACTIVE', 'INACTIVE'] },
       });
     });
 
