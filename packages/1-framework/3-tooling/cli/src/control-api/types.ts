@@ -143,6 +143,10 @@ export interface SignOptions {
    */
   readonly contractPath?: string;
   /**
+   * Path to the config file (for metadata in the result).
+   */
+  readonly configPath?: string;
+  /**
    * Database connection. If provided, sign will connect before executing.
    * If omitted, the client must already be connected.
    * The type is driver-specific (e.g., string URL for Postgres).

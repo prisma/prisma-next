@@ -167,6 +167,7 @@ async function executeDbSignCommand(
     const signResult = await client.sign({
       contractIR: contractJson,
       contractPath,
+      configPath,
       onProgress,
     });
 

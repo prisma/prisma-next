@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type { IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
@@ -58,25 +57,6 @@ async function executeDbIntrospectCommand(
   const configPath = options.config
     ? relative(process.cwd(), resolve(options.config))
     : 'prisma-next.config.ts';
-
-  // Optionally load contract if contract config exists (needed for toSchemaView)
-  let contractIR: unknown | undefined;
-  if (config.contract?.output) {
-    const contractFilePath = resolve(config.contract.output);
-    try {
-      const contractJsonContent = await readFile(contractFilePath, 'utf-8');
-      contractIR = JSON.parse(contractJsonContent);
-    } catch (error) {
-      // Contract file is optional for introspection - don't fail if it doesn't exist
-      if (error instanceof Error && (error as { code?: string }).code !== 'ENOENT') {
-        return notOk(
-          errorUnexpected(error.message, {
-            why: `Failed to read contract file: ${error.message}`,
-          }),
-        );
-      }
-    }
-  }
 
   // Output header
   if (flags.json !== 'object' && !flags.quiet) {
@@ -142,23 +122,16 @@ async function executeDbIntrospectCommand(
     }
 
     // Call toSchemaView to convert schema IR to CoreSchemaView for tree rendering
-    // This requires the contract and a family instance with toSchemaView support
     let schemaView: CoreSchemaView | undefined;
-    if (contractIR) {
-      const stack = createControlPlaneStack({
-        target: config.target,
-        adapter: config.adapter,
-        driver: config.driver,
-        extensionPacks: config.extensionPacks,
-      });
-      const familyInstance = config.family.create(stack);
-      if (familyInstance.toSchemaView) {
-        const validatedContract = familyInstance.validateContractIR(contractIR);
-        schemaView = familyInstance.toSchemaView({
-          contractIR: validatedContract,
-          schemaIR: schemaIR,
-        });
-      }
+    const stack = createControlPlaneStack({
+      target: config.target,
+      adapter: config.adapter,
+      driver: config.driver,
+      extensionPacks: config.extensionPacks,
+    });
+    const familyInstance = config.family.create(stack);
+    if (familyInstance.toSchemaView) {
+      schemaView = familyInstance.toSchemaView(schemaIR);
     }
 
     const totalTime = Date.now() - startTime;

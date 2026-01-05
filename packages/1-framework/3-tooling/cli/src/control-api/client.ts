@@ -342,6 +342,7 @@ class ControlClientImpl implements ControlClient {
         driver,
         contractIR,
         contractPath: options.contractPath ?? '',
+        ...(options.configPath ? { configPath: options.configPath } : {}),
       });
 
       onProgress?.({
