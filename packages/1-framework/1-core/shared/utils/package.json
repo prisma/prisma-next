@@ -10,7 +10,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --error-on-warnings",
-    "clean": "node ../../../../../scripts/clean.mjs"
+    "clean": "rm -rf dist coverage .tmp-output"
   },
   "devDependencies": {
     "tsup": "catalog:",

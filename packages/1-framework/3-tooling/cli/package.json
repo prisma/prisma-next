@@ -15,7 +15,7 @@
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
-    "clean": "node ../../../../scripts/clean.mjs"
+    "clean": "rm -rf dist coverage .tmp-output"
   },
   "bin": {
     "prisma-next": "./dist/cli.js"
