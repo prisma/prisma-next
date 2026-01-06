@@ -66,7 +66,7 @@ describe('family instance introspect', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const schemaIR = await familyInstance.introspect({
@@ -97,7 +97,7 @@ describe('family instance introspect', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const schemaIR = await familyInstance.introspect({
@@ -158,7 +158,7 @@ describe('family instance introspect', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const schemaIR = await familyInstance.introspect({
@@ -192,7 +192,7 @@ describe('family instance introspect', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const schemaIR = await familyInstance.introspect({
@@ -229,7 +229,7 @@ describe('family instance introspect', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const schemaIR = await familyInstance.introspect({
@@ -275,7 +275,7 @@ describe('family instance introspect', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const schemaIR = await familyInstance.introspect({
@@ -312,7 +312,7 @@ describe('family instance introspect', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const schemaIR = await familyInstance.introspect({
@@ -340,10 +340,12 @@ describe('family instance introspect', () => {
         target: postgres,
         adapter: adapterWithInvalidCreate,
         driver: postgresDriver,
-        extensions: [],
+        extensionPacks: [],
       });
 
       const mockDriver = {
+        familyId: 'sql' as const,
+        targetId: 'postgres' as const,
         query: async () => ({ rows: [] }),
         close: async () => {},
       };
@@ -372,7 +374,7 @@ describe('family instance introspect', () => {
           target: postgres,
           adapter: postgresAdapter,
           driver: postgresDriver,
-          extensions: [],
+          extensionPacks: [],
         });
 
         await expect(
@@ -417,7 +419,7 @@ describe('family instance introspect', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensions: [],
+            extensionPacks: [],
           });
 
           const schemaIR = await familyInstance.introspect({
