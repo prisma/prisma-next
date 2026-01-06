@@ -2,11 +2,18 @@ import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
+  RuntimeParameterizedCodecDescriptor,
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeExtensionInstance,
 } from '@prisma-next/sql-runtime';
+import { type as arktype } from 'arktype';
 import { codecDefinitions } from '../core/codecs';
 import { pgvectorPackMeta, pgvectorRuntimeOperation } from '../core/descriptor-meta';
+
+const vectorTypeId = 'pg/vector@1' as const;
+const vectorParamsSchema = arktype({
+  length: 'number',
+});
 
 /**
  * pgvector SQL runtime extension instance.
@@ -27,6 +34,17 @@ class PgVectorRuntimeExtensionInstance implements SqlRuntimeExtensionInstance<'p
 
   operations(): ReadonlyArray<SqlOperationSignature> {
     return [pgvectorRuntimeOperation];
+  }
+
+  parameterizedCodecs(): ReadonlyArray<
+    RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
+  > {
+    return [
+      {
+        codecId: vectorTypeId,
+        paramsSchema: vectorParamsSchema,
+      },
+    ];
   }
 }
 
