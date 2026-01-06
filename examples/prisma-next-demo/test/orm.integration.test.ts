@@ -4,8 +4,9 @@ import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { type createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
-import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
-import { describe, expect, it } from 'vitest';
+import { createDevDatabase, type DevDatabase, timeouts } from '@prisma-next/test-utils';
+import type { Pool } from 'pg';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
@@ -35,7 +36,6 @@ function createContext<TContract extends SqlContract<SqlStorage>>(contract: TCon
  */
 async function seedTestData(
   runtime: ReturnType<typeof createRuntime>,
-  contract: Contract,
   data: { users?: string[]; posts?: Array<{ title: string; userIndex: number }> },
 ): Promise<{ userIds: number[] }> {
   const context = createContext(contract);
@@ -96,275 +96,166 @@ async function seedTestData(
 }
 
 describe('ORM integration tests', () => {
-  it(
-    'orm.getUsers returns users with selected fields, respects limit and ordering',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        // Initialize schema using control client
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+  let devDb: DevDatabase;
+  let runtime: ReturnType<typeof createRuntime>;
+  let pool: Pool;
 
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
-        try {
-          // Seed data using runtime
-          await seedTestData(runtime, contract, {
-            users: ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
-          });
+  beforeEach(async () => {
+    devDb = await createDevDatabase();
+    await initTestDatabase({ connection: devDb.connectionString, contractIR: contract });
+    const testRuntime = createTestRuntime(devDb.connectionString, contract);
+    runtime = testRuntime.runtime;
+    pool = testRuntime.pool;
+    // Set DATABASE_URL for query modules that use the global runtime
+    process.env['DATABASE_URL'] = devDb.connectionString;
+  }, timeouts.spinUpPpgDev);
 
-          process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUsers } = await import('../src/queries/orm-get-users');
-          const users = await ormGetUsers(2, runtime);
+  afterEach(async () => {
+    await closeTestRuntime({ runtime, pool });
+    await devDb.close();
+  });
 
-          expect(users).toHaveLength(2);
-          expect(users[0]).toMatchObject({
-            id: expect.any(Number),
-            email: expect.any(String),
-            createdAt: expect.anything(),
-          });
-          expect(users[0]).not.toMatchObject({ posts: expect.anything() });
-        } finally {
-          await closeTestRuntime({ runtime, pool });
-        }
-      });
-    },
-    timeouts.typeScriptCompilation,
-  );
+  it('getUsers returns users with selected fields, respects limit and ordering', async () => {
+    await seedTestData(runtime, {
+      users: ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
+    });
 
-  it(
-    'orm.getUserById returns single user by ID',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+    const { ormGetUsers } = await import('../src/queries/orm-get-users');
+    const users = await ormGetUsers(2, runtime);
 
-        try {
-          await seedTestData(runtime, contract, { users: ['alice@example.com'] });
+    expect(users).toHaveLength(2);
+    expect(users[0]).toMatchObject({
+      id: expect.any(Number),
+      email: expect.any(String),
+      createdAt: expect.anything(),
+    });
+    expect(users[0]).not.toMatchObject({ posts: expect.anything() });
+  });
 
-          process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
-          const user = await ormGetUserById(1, runtime);
+  it('getUserById returns single user by ID', async () => {
+    await seedTestData(runtime, { users: ['alice@example.com'] });
 
-          expect(user).not.toBeNull();
-          expect(user).toMatchObject({
-            id: 1,
-            email: 'alice@example.com',
-            createdAt: expect.anything(),
-          });
-        } finally {
-          await closeTestRuntime({ runtime, pool });
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+    const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
+    const user = await ormGetUserById(1, runtime);
 
-  it(
-    'orm relation filters: where.related.posts.some() returns users with at least one post',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+    expect(user).not.toBeNull();
+    expect(user).toMatchObject({
+      id: 1,
+      email: 'alice@example.com',
+      createdAt: expect.anything(),
+    });
+  });
 
-        try {
-          await seedTestData(runtime, contract, {
-            users: ['alice@example.com', 'bob@example.com'],
-            posts: [{ title: 'First Post', userIndex: 0 }],
-          });
+  it('relation filters: where.related.posts.some() returns users with at least one post', async () => {
+    await seedTestData(runtime, {
+      users: ['alice@example.com', 'bob@example.com'],
+      posts: [{ title: 'First Post', userIndex: 0 }],
+    });
 
-          process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters');
-          const users = await ormGetUsersWithPosts(runtime);
+    const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters');
+    const users = await ormGetUsersWithPosts(runtime);
 
-          expect(users.length).toBeGreaterThan(0);
-          expect(users[0]).toMatchObject({
-            id: expect.anything(),
-            email: expect.anything(),
-          });
-        } finally {
-          await closeTestRuntime({ runtime, pool });
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+    expect(users.length).toBeGreaterThan(0);
+    expect(users[0]).toMatchObject({
+      id: expect.anything(),
+      email: expect.anything(),
+    });
+  });
 
-  it(
-    'orm includes: include.posts() returns users with nested posts arrays',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+  it('includes: include.posts() returns users with nested posts arrays', async () => {
+    await seedTestData(runtime, {
+      users: ['alice@example.com', 'bob@example.com'],
+      posts: [
+        { title: 'First Post', userIndex: 0 },
+        { title: 'Second Post', userIndex: 0 },
+        { title: 'Third Post', userIndex: 1 },
+      ],
+    });
 
-        try {
-          await seedTestData(runtime, contract, {
-            users: ['alice@example.com', 'bob@example.com'],
-            posts: [
-              { title: 'First Post', userIndex: 0 },
-              { title: 'Second Post', userIndex: 0 },
-              { title: 'Third Post', userIndex: 1 },
-            ],
-          });
+    const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes');
+    const users = await ormGetUsersWithPosts(10, runtime);
 
-          process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes');
-          const users = await ormGetUsersWithPosts(10, runtime);
+    expect(users.length).toBeGreaterThan(0);
+    expect(users[0]).toMatchObject({
+      id: expect.anything(),
+      email: expect.anything(),
+      posts: expect.any(Array),
+    });
+  });
 
-          expect(users.length).toBeGreaterThan(0);
-          expect(users[0]).toMatchObject({
-            id: expect.anything(),
-            email: expect.anything(),
-            posts: expect.any(Array),
-          });
-        } finally {
-          await closeTestRuntime({ runtime, pool });
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+  it('writes: create() inserts a user', async () => {
+    const { ormCreateUser } = await import('../src/queries/orm-writes');
+    const affectedRows = await ormCreateUser(
+      { id: 1, email: 'alice@example.com', createdAt: new Date() },
+      runtime,
+    );
 
-  it(
-    'orm writes: create() inserts a user',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+    expect(affectedRows).toBe(1);
+  });
 
-        try {
-          process.env['DATABASE_URL'] = connectionString;
-          const { ormCreateUser } = await import('../src/queries/orm-writes');
-          const affectedRows = await ormCreateUser(
-            { id: 1, email: 'alice@example.com', createdAt: new Date() },
-            runtime,
-          );
+  it('writes: update() updates a user', async () => {
+    await seedTestData(runtime, { users: ['alice@example.com'] });
 
-          expect(affectedRows).toBe(1);
-        } finally {
-          await closeTestRuntime({ runtime, pool });
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+    const { ormUpdateUser } = await import('../src/queries/orm-writes');
+    const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
 
-  it(
-    'orm writes: update() updates a user',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+    expect(affectedRows).toBe(1);
+  });
 
-        try {
-          await seedTestData(runtime, contract, { users: ['alice@example.com'] });
+  it('writes: delete() deletes a user', async () => {
+    await seedTestData(runtime, { users: ['alice@example.com'] });
 
-          process.env['DATABASE_URL'] = connectionString;
-          const { ormUpdateUser } = await import('../src/queries/orm-writes');
-          const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
+    const { ormDeleteUser } = await import('../src/queries/orm-writes');
+    const affectedRows = await ormDeleteUser(1, runtime);
 
-          expect(affectedRows).toBe(1);
-        } finally {
-          await closeTestRuntime({ runtime, pool });
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+    expect(affectedRows).toBe(1);
+  });
 
-  it(
-    'orm writes: delete() deletes a user',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+  it('pagination: ormGetUsersByIdCursor returns paginated users with gt cursor', async () => {
+    const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
+    await seedTestData(runtime, { users: emails });
 
-        try {
-          await seedTestData(runtime, contract, { users: ['alice@example.com'] });
+    const { ormGetUsersByIdCursor } = await import('../src/queries/orm-pagination');
 
-          process.env['DATABASE_URL'] = connectionString;
-          const { ormDeleteUser } = await import('../src/queries/orm-writes');
-          const affectedRows = await ormDeleteUser(1, runtime);
+    const firstPage = await ormGetUsersByIdCursor(null, 3, runtime);
+    expect(firstPage).toHaveLength(3);
+    expect(firstPage.map((u) => u.id)).toEqual([1, 2, 3]);
 
-          expect(affectedRows).toBe(1);
-        } finally {
-          await closeTestRuntime({ runtime, pool });
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+    const secondPage = await ormGetUsersByIdCursor(3, 3, runtime);
+    expect(secondPage).toHaveLength(3);
+    expect(secondPage.map((u) => u.id)).toEqual([4, 5, 6]);
 
-  it(
-    'orm pagination: ormGetUsersByIdCursor returns paginated users with gt cursor',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+    const thirdPage = await ormGetUsersByIdCursor(6, 3, runtime);
+    expect(thirdPage).toHaveLength(3);
+    expect(thirdPage.map((u) => u.id)).toEqual([7, 8, 9]);
 
-        try {
-          const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
-          await seedTestData(runtime, contract, { users: emails });
+    const lastPage = await ormGetUsersByIdCursor(9, 3, runtime);
+    expect(lastPage).toHaveLength(1);
+    expect(lastPage.map((u) => u.id)).toEqual([10]);
 
-          process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUsersByIdCursor } = await import('../src/queries/orm-pagination');
+    const emptyPage = await ormGetUsersByIdCursor(10, 3, runtime);
+    expect(emptyPage).toHaveLength(0);
+  });
 
-          const firstPage = await ormGetUsersByIdCursor(null, 3, runtime);
-          expect(firstPage).toHaveLength(3);
-          expect(firstPage.map((u) => u.id)).toEqual([1, 2, 3]);
+  it('pagination: ormGetUsersBackward returns users before cursor with lt operator', async () => {
+    const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
+    await seedTestData(runtime, { users: emails });
 
-          const secondPage = await ormGetUsersByIdCursor(3, 3, runtime);
-          expect(secondPage).toHaveLength(3);
-          expect(secondPage.map((u) => u.id)).toEqual([4, 5, 6]);
+    const { ormGetUsersBackward } = await import('../src/queries/orm-pagination');
 
-          const thirdPage = await ormGetUsersByIdCursor(6, 3, runtime);
-          expect(thirdPage).toHaveLength(3);
-          expect(thirdPage.map((u) => u.id)).toEqual([7, 8, 9]);
+    const page = await ormGetUsersBackward(8, 3, runtime);
+    expect(page).toHaveLength(3);
+    expect(page.map((u) => u.id)).toEqual([7, 6, 5]);
 
-          const lastPage = await ormGetUsersByIdCursor(9, 3, runtime);
-          expect(lastPage).toHaveLength(1);
-          expect(lastPage.map((u) => u.id)).toEqual([10]);
+    const earlierPage = await ormGetUsersBackward(4, 3, runtime);
+    expect(earlierPage).toHaveLength(3);
+    expect(earlierPage.map((u) => u.id)).toEqual([3, 2, 1]);
 
-          const emptyPage = await ormGetUsersByIdCursor(10, 3, runtime);
-          expect(emptyPage).toHaveLength(0);
-        } finally {
-          await closeTestRuntime({ runtime, pool });
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+    const partialPage = await ormGetUsersBackward(2, 3, runtime);
+    expect(partialPage).toHaveLength(1);
+    expect(partialPage.map((u) => u.id)).toEqual([1]);
 
-  it(
-    'orm pagination: ormGetUsersBackward returns users before cursor with lt operator',
-    async () => {
-      await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
-
-        try {
-          const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
-          await seedTestData(runtime, contract, { users: emails });
-
-          process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUsersBackward } = await import('../src/queries/orm-pagination');
-
-          const page = await ormGetUsersBackward(8, 3, runtime);
-          expect(page).toHaveLength(3);
-          expect(page.map((u) => u.id)).toEqual([7, 6, 5]);
-
-          const earlierPage = await ormGetUsersBackward(4, 3, runtime);
-          expect(earlierPage).toHaveLength(3);
-          expect(earlierPage.map((u) => u.id)).toEqual([3, 2, 1]);
-
-          const partialPage = await ormGetUsersBackward(2, 3, runtime);
-          expect(partialPage).toHaveLength(1);
-          expect(partialPage.map((u) => u.id)).toEqual([1]);
-
-          const emptyPage = await ormGetUsersBackward(1, 3, runtime);
-          expect(emptyPage).toHaveLength(0);
-        } finally {
-          await closeTestRuntime({ runtime, pool });
-        }
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
+    const emptyPage = await ormGetUsersBackward(1, 3, runtime);
+    expect(emptyPage).toHaveLength(0);
+  });
 });
