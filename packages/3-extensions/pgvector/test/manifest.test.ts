@@ -60,4 +60,31 @@ describe('pgvector descriptor', () => {
     // Type-only exports don't exist at runtime, so we just verify the import succeeds
     await expect(import('../src/exports/operation-types')).resolves.toBeDefined();
   });
+
+  describe('parameterized codec descriptors', () => {
+    it('has parameterizedCodecs for vector type', () => {
+      const parameterizedCodecs = pgvectorExtensionDescriptor.types?.parameterizedCodecs;
+      expect(parameterizedCodecs).toBeDefined();
+      expect(parameterizedCodecs?.length).toBe(1);
+    });
+
+    it('vector codec descriptor has correct codecId', () => {
+      const vectorDescriptor = pgvectorExtensionDescriptor.types?.parameterizedCodecs?.[0];
+      expect(vectorDescriptor?.codecId).toBe('pg/vector@1');
+    });
+
+    it('vector codec descriptor has template renderer', () => {
+      const vectorDescriptor = pgvectorExtensionDescriptor.types?.parameterizedCodecs?.[0];
+      expect(vectorDescriptor?.outputTypeRenderer).toBe('Vector<{{length}}>');
+    });
+
+    it('vector codec descriptor has types import', () => {
+      const vectorDescriptor = pgvectorExtensionDescriptor.types?.parameterizedCodecs?.[0];
+      expect(vectorDescriptor?.typesImport).toEqual({
+        package: '@prisma-next/extension-pgvector/vector-types',
+        named: 'Vector',
+        alias: 'Vector',
+      });
+    });
+  });
 });

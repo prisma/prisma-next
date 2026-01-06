@@ -1,10 +1,227 @@
+import type { ParameterizedCodecDescriptor } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import { extractParameterizedRenderers } from '../src/core/assembly';
+import {
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractParameterizedCodecs,
+  extractParameterizedRenderers,
+} from '../src/core/assembly';
+
+// Minimal mock descriptors for testing
+function createMockTarget(
+  overrides: Partial<ControlTargetDescriptor<'sql', 'postgres'>> = {},
+): ControlTargetDescriptor<'sql', 'postgres'> {
+  return {
+    kind: 'target',
+    id: 'postgres',
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
+    ...overrides,
+  };
+}
+
+function createMockAdapter(
+  overrides: Partial<ControlAdapterDescriptor<'sql', 'postgres'>> = {},
+): ControlAdapterDescriptor<'sql', 'postgres'> {
+  return {
+    kind: 'adapter',
+    id: 'postgres',
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    ...overrides,
+  };
+}
+
+function createMockExtension(
+  id: string,
+  overrides: Partial<ControlExtensionDescriptor<'sql', 'postgres'>> = {},
+): ControlExtensionDescriptor<'sql', 'postgres'> {
+  return {
+    kind: 'extension',
+    id,
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    ...overrides,
+  };
+}
+
+describe('extractParameterizedCodecs', () => {
+  it('returns empty map when no descriptors have parameterized codecs', () => {
+    const target = createMockTarget();
+    const adapter = createMockAdapter();
+
+    const result = extractParameterizedCodecs([target, adapter]);
+
+    expect(result.size).toBe(0);
+  });
+
+  it('extracts parameterized codecs from extension descriptor', () => {
+    const target = createMockTarget();
+    const adapter = createMockAdapter();
+    const vectorCodec: ParameterizedCodecDescriptor = {
+      codecId: 'pg/vector@1',
+      outputTypeRenderer: 'Vector<{{length}}>',
+    };
+    const extension = createMockExtension('pgvector', {
+      types: {
+        parameterizedCodecs: [vectorCodec],
+      },
+    });
+
+    const result = extractParameterizedCodecs([target, adapter, extension]);
+
+    expect(result.size).toBe(1);
+    expect(result.get('pg/vector@1')).toEqual(vectorCodec);
+  });
+
+  it('extracts parameterized codecs from adapter descriptor', () => {
+    const target = createMockTarget();
+    const decimalCodec: ParameterizedCodecDescriptor = {
+      codecId: 'pg/decimal@1',
+      outputTypeRenderer: 'Decimal<{{precision}}, {{scale}}>',
+    };
+    const adapter = createMockAdapter({
+      types: {
+        parameterizedCodecs: [decimalCodec],
+      },
+    });
+
+    const result = extractParameterizedCodecs([target, adapter]);
+
+    expect(result.size).toBe(1);
+    expect(result.get('pg/decimal@1')).toEqual(decimalCodec);
+  });
+
+  it('collects parameterized codecs from multiple descriptors', () => {
+    const target = createMockTarget();
+    const decimalCodec: ParameterizedCodecDescriptor = {
+      codecId: 'pg/decimal@1',
+      outputTypeRenderer: 'Decimal<{{precision}}, {{scale}}>',
+    };
+    const adapter = createMockAdapter({
+      types: {
+        parameterizedCodecs: [decimalCodec],
+      },
+    });
+    const vectorCodec: ParameterizedCodecDescriptor = {
+      codecId: 'pg/vector@1',
+      outputTypeRenderer: 'Vector<{{length}}>',
+    };
+    const extension = createMockExtension('pgvector', {
+      types: {
+        parameterizedCodecs: [vectorCodec],
+      },
+    });
+
+    const result = extractParameterizedCodecs([target, adapter, extension]);
+
+    expect(result.size).toBe(2);
+    expect(result.get('pg/decimal@1')).toEqual(decimalCodec);
+    expect(result.get('pg/vector@1')).toEqual(vectorCodec);
+  });
+
+  it('throws error for duplicate codecId across descriptors', () => {
+    const target = createMockTarget();
+    const adapterVector: ParameterizedCodecDescriptor = {
+      codecId: 'pg/vector@1',
+      outputTypeRenderer: 'AdapterVector<{{size}}>',
+    };
+    const adapter = createMockAdapter({
+      types: {
+        parameterizedCodecs: [adapterVector],
+      },
+    });
+    const extensionVector: ParameterizedCodecDescriptor = {
+      codecId: 'pg/vector@1',
+      outputTypeRenderer: 'ExtensionVector<{{length}}>',
+      typesImport: {
+        package: '@prisma-next/extension-pgvector/vector-types',
+        named: 'Vector',
+        alias: 'Vector',
+      },
+    };
+    const extension = createMockExtension('pgvector', {
+      types: {
+        parameterizedCodecs: [extensionVector],
+      },
+    });
+
+    expect(() => extractParameterizedCodecs([target, adapter, extension])).toThrow(
+      /Duplicate parameterized codec for codecId "pg\/vector@1".*"pgvector" conflicts with "postgres"/,
+    );
+  });
+
+  it('handles descriptors with empty parameterizedCodecs array', () => {
+    const target = createMockTarget();
+    const adapter = createMockAdapter({
+      types: {
+        parameterizedCodecs: [],
+      },
+    });
+
+    const result = extractParameterizedCodecs([target, adapter]);
+
+    expect(result.size).toBe(0);
+  });
+
+  it('preserves typesImport in extracted descriptor', () => {
+    const target = createMockTarget();
+    const adapter = createMockAdapter();
+    const vectorCodec: ParameterizedCodecDescriptor = {
+      codecId: 'pg/vector@1',
+      outputTypeRenderer: 'Vector<{{length}}>',
+      typesImport: {
+        package: '@prisma-next/extension-pgvector/vector-types',
+        named: 'Vector',
+        alias: 'Vector',
+      },
+    };
+    const extension = createMockExtension('pgvector', {
+      types: {
+        parameterizedCodecs: [vectorCodec],
+      },
+    });
+
+    const result = extractParameterizedCodecs([target, adapter, extension]);
+
+    expect(result.get('pg/vector@1')?.typesImport).toEqual({
+      package: '@prisma-next/extension-pgvector/vector-types',
+      named: 'Vector',
+      alias: 'Vector',
+    });
+  });
+
+  it('preserves inputTypeRenderer when present', () => {
+    const target = createMockTarget();
+    const adapter = createMockAdapter();
+    const asymmetricCodec: ParameterizedCodecDescriptor = {
+      codecId: 'pg/asymmetric@1',
+      outputTypeRenderer: 'Output<{{param}}>',
+      inputTypeRenderer: 'Input<{{param}}>',
+    };
+    const extension = createMockExtension('asymmetric', {
+      types: {
+        parameterizedCodecs: [asymmetricCodec],
+      },
+    });
+
+    const result = extractParameterizedCodecs([target, adapter, extension]);
+
+    const extracted = result.get('pg/asymmetric@1');
+    expect(extracted?.outputTypeRenderer).toBe('Output<{{param}}>');
+    expect(extracted?.inputTypeRenderer).toBe('Input<{{param}}>');
+  });
+});
 
 type TestDescriptor =
   | ControlTargetDescriptor<'sql', string>
@@ -290,5 +507,43 @@ describe('extractParameterizedRenderers', () => {
     expect(() => renderer.render({}, { codecTypesName: 'CodecTypes' })).toThrow(
       /Missing template parameter "length" in template "Vector<\{\{length\}\}>"/,
     );
+  });
+});
+
+describe('extractCodecTypeImports', () => {
+  it('extracts codec type imports from descriptors', () => {
+    const adapter = createMockAdapter({
+      types: {
+        codecTypes: {
+          import: {
+            package: '@prisma-next/adapter-postgres/codec-types',
+            named: 'CodecTypes',
+            alias: 'PgTypes',
+          },
+        },
+      },
+    });
+
+    const result = extractCodecTypeImports([adapter]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      package: '@prisma-next/adapter-postgres/codec-types',
+      named: 'CodecTypes',
+      alias: 'PgTypes',
+    });
+  });
+});
+
+describe('extractExtensionIds', () => {
+  it('extracts extension IDs in deterministic order', () => {
+    const target = createMockTarget();
+    const adapter = createMockAdapter();
+    const extension1 = createMockExtension('pgvector');
+    const extension2 = createMockExtension('postgis');
+
+    const result = extractExtensionIds(adapter, target, [extension1, extension2]);
+
+    expect(result).toEqual(['postgres', 'pgvector', 'postgis']);
   });
 });

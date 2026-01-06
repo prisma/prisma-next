@@ -4,7 +4,7 @@ import type {
 } from '@prisma-next/contract/framework-components';
 import { normalizeRenderer } from '@prisma-next/contract/framework-components';
 import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
-import type { TypesImportSpec } from '@prisma-next/contract/types';
+import type { ParameterizedCodecDescriptor, TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
@@ -119,6 +119,45 @@ export function extractExtensionIds(
   }
 
   return ids;
+}
+
+/**
+ * Extracts parameterized codec descriptors from descriptors for contract.d.ts generation.
+ * Returns a map of codecId → ParameterizedCodecDescriptor for quick lookup.
+ *
+ * Throws an error if multiple descriptors provide a renderer for the same codecId.
+ * This is intentional - duplicate codecId is a hard error, not a silent override.
+ */
+export function extractParameterizedCodecs(
+  descriptors: ReadonlyArray<
+    | ControlTargetDescriptor<'sql', string>
+    | ControlAdapterDescriptor<'sql', string>
+    | ControlExtensionDescriptor<'sql', string>
+  >,
+): Map<string, ParameterizedCodecDescriptor> {
+  const codecs = new Map<string, ParameterizedCodecDescriptor>();
+  const owners = new Map<string, string>(); // codecId -> descriptor.id for error messages
+
+  for (const descriptor of descriptors) {
+    const parameterizedCodecs = descriptor.types?.parameterizedCodecs;
+    if (!parameterizedCodecs) continue;
+
+    for (const codecDescriptor of parameterizedCodecs) {
+      const existingOwner = owners.get(codecDescriptor.codecId);
+      if (existingOwner !== undefined) {
+        throw new Error(
+          `Duplicate parameterized codec for codecId "${codecDescriptor.codecId}". ` +
+            `Descriptor "${descriptor.id}" conflicts with "${existingOwner}". ` +
+            'Each codecId can only have one parameterized codec descriptor.',
+        );
+      }
+
+      codecs.set(codecDescriptor.codecId, codecDescriptor);
+      owners.set(codecDescriptor.codecId, descriptor.id);
+    }
+  }
+
+  return codecs;
 }
 
 /**
