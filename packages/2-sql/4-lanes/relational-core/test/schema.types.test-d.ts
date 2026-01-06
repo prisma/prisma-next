@@ -112,68 +112,131 @@ test('schema extracts CodecTypes automatically from contract', () => {
 // schema.types type tests
 // =============================================================================
 
-test('schema returns types property', () => {
-  // Verify schema returns types object
-  expectTypeOf(schemaHandle).toHaveProperty('types');
-  expectTypeOf(schemaHandle.types).toBeObject();
-});
-
-test('schema.types has literal keys from contract storage.types', () => {
-  // Create a contract with storage.types
-  const contractWithTypes: ContractWithTypes = {
-    schemaVersion: '1',
-    target: 'postgres',
-    targetFamily: 'sql',
-    coreHash: 'sha256:test',
-    storage: {
-      tables: {
-        test: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
+// Create typed schema for contracts with storage.types
+const contractWithTypes: ContractWithTypes = {
+  schemaVersion: '1',
+  target: 'postgres',
+  targetFamily: 'sql',
+  coreHash: 'sha256:test',
+  storage: {
+    tables: {
+      test: {
+        columns: {
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
         },
-      },
-      types: {
-        Vector1536: {
-          codecId: 'pg/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
-        },
-        Vector768: {
-          codecId: 'pg/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 768 },
-        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
-    models: {},
-    relations: {},
-    mappings: { codecTypes: {}, operationTypes: {} },
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-  };
+    types: {
+      Vector1536: {
+        codecId: 'pg/vector@1',
+        nativeType: 'vector',
+        typeParams: { length: 1536 },
+      },
+      Vector768: {
+        codecId: 'pg/vector@1',
+        nativeType: 'vector',
+        typeParams: { length: 768 },
+      },
+    },
+  },
+  models: {},
+  relations: {},
+  mappings: { codecTypes: {}, operationTypes: {} },
+  extensionPacks: {},
+  capabilities: {},
+  meta: {},
+  sources: {},
+};
 
-  const typesContext = createTestContext(contractWithTypes);
-  const typesSchema = schema(typesContext);
+const typesContext = createTestContext(contractWithTypes);
+const typesSchema = schema(typesContext);
 
-  // Verify types has literal keys matching storage.types
-  type TypeKeys = keyof typeof typesSchema.types;
-  expectTypeOf<TypeKeys>().toEqualTypeOf<'Vector1536' | 'Vector768'>();
+// Module-level assignments to catch compile-time type errors
+const vector1536Helper = typesSchema.types['Vector1536'];
+const vector768Helper = typesSchema.types['Vector768'];
 
-  // Verify type helpers can be accessed with dot notation
-  expectTypeOf(typesSchema.types).toHaveProperty('Vector1536');
-  expectTypeOf(typesSchema.types).toHaveProperty('Vector768');
+test('schema returns types property alongside tables', () => {
+  // Verify schema returns both tables and types
+  expectTypeOf(schemaHandle).toHaveProperty('tables');
+  expectTypeOf(schemaHandle).toHaveProperty('types');
+
+  // Verify types is an object, not undefined
+  expectTypeOf(schemaHandle.types).toBeObject();
+  expectTypeOf(typesSchema.types).toBeObject();
 });
 
-test('schema.types is accessible when contract has no storage.types', () => {
-  // The current contract has no storage.types, but schema.types should still be accessible
-  // as an empty record type
-  const types = schemaHandle.types;
-  expectTypeOf(types).toBeObject();
+test('schema.types keys are literal union matching storage.types keys', () => {
+  // Verify types has exactly the literal keys from storage.types
+  type TypeKeys = keyof typeof typesSchema.types;
+
+  // Should be exactly these keys, not a broader string type
+  expectTypeOf<TypeKeys>().toEqualTypeOf<'Vector1536' | 'Vector768'>();
+
+  // Verify it's NOT a string index signature (would be `string` instead of union)
+  expectTypeOf<TypeKeys>().not.toEqualTypeOf<string>();
+});
+
+test('schema.types values are accessible and defined', () => {
+  // Verify that accessing types by key returns a defined value type
+  expectTypeOf(vector1536Helper).not.toBeNever();
+  expectTypeOf(vector768Helper).not.toBeNever();
+
+  // The value type is unknown because helper types depend on runtime init hooks
+  // This is expected - we can't know at compile time what the init hook returns
+  expectTypeOf(vector1536Helper).toBeUnknown();
+  expectTypeOf(vector768Helper).toBeUnknown();
+});
+
+test('schema.types is readonly', () => {
+  // Verify the types object is readonly (immutable)
+  expectTypeOf(typesSchema.types).toMatchTypeOf<Readonly<Record<string, unknown>>>();
+
+  // This tests that we can't assign to the types object
+  // (would be a compile error: Cannot assign to 'types' because it is a read-only property)
+  type TypesIsReadonly =
+    Readonly<typeof typesSchema.types> extends typeof typesSchema.types ? true : false;
+  expectTypeOf<TypesIsReadonly>().toEqualTypeOf<true>();
+});
+
+test('schema.types is empty record when contract has no storage.types', () => {
+  // For contracts without storage.types, types should still exist but be empty
+  const emptyTypes = schemaHandle.types;
+
+  // Should be an object
+  expectTypeOf(emptyTypes).toBeObject();
+
+  // Should have string keys (fallback index signature for empty contracts)
+  type EmptyTypeKeys = keyof typeof emptyTypes;
+  expectTypeOf<EmptyTypeKeys>().toEqualTypeOf<string>();
+});
+
+test('schemaHandle is frozen (readonly)', () => {
+  // Verify the entire schema handle is readonly
+  expectTypeOf(schemaHandle).toMatchTypeOf<{
+    readonly tables: unknown;
+    readonly types: unknown;
+  }>();
+
+  expectTypeOf(typesSchema).toMatchTypeOf<{
+    readonly tables: unknown;
+    readonly types: unknown;
+  }>();
+});
+
+test('schema.types preserves type information through schema() call', () => {
+  // Create a fresh schema to verify types flow through correctly
+  const freshContext = createTestContext(contractWithTypes);
+  const freshSchema = schema(freshContext);
+
+  // Keys should still be preserved as literals after passing through schema()
+  type FreshTypeKeys = keyof typeof freshSchema.types;
+  expectTypeOf<FreshTypeKeys>().toEqualTypeOf<'Vector1536' | 'Vector768'>();
+
+  // Values should be accessible
+  const v1536 = freshSchema.types['Vector1536'];
+  expectTypeOf(v1536).not.toBeNever();
 });
