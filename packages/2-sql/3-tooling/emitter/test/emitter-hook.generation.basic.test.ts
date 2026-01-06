@@ -1,4 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
+import type { TypeRenderEntry } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
@@ -576,5 +577,94 @@ describe('sql-target-family-hook', () => {
     // When nullable is undefined, it should default to false (not nullable)
     expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
     expect(types).not.toContain("readonly id: CodecTypes['pg/int4@1']['output'] | null");
+  });
+
+  it('renders parameterized type when column has typeParams and renderer exists', () => {
+    const ir = createContractIR({
+      models: {
+        Embedding: {
+          storage: { table: 'embedding' },
+          fields: {
+            id: { column: 'id' },
+            vector: { column: 'vector' },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          embedding: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              vector: {
+                nativeType: 'vector',
+                codecId: 'pg/vector@1',
+                nullable: false,
+                typeParams: { length: 1536 },
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const vectorRenderer: TypeRenderEntry = {
+      codecId: 'pg/vector@1',
+      render: (params) => `Vector<${params['length']}>`,
+    };
+
+    const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+    parameterizedRenderers.set('pg/vector@1', vectorRenderer);
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      parameterizedRenderers,
+    });
+
+    // The parameterized renderer should be used for the vector column
+    expect(types).toContain('readonly vector: Vector<1536>');
+    // The scalar codec should still use CodecTypes lookup
+    expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
+  });
+
+  it('falls back to CodecTypes when column has typeParams but no renderer', () => {
+    const ir = createContractIR({
+      models: {
+        Embedding: {
+          storage: { table: 'embedding' },
+          fields: {
+            vector: { column: 'vector' },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          embedding: {
+            columns: {
+              vector: {
+                nativeType: 'vector',
+                codecId: 'pg/vector@1',
+                nullable: false,
+                typeParams: { length: 1536 },
+              },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    // No parameterized renderers provided
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+
+    // Should fall back to CodecTypes lookup since no renderer exists
+    expect(types).toContain("readonly vector: CodecTypes['pg/vector@1']['output']");
+    expect(types).not.toContain('Vector<1536>');
   });
 });
