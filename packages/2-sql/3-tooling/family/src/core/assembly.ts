@@ -57,6 +57,9 @@ export function extractCodecTypeImports(
     if (codecTypes?.import) {
       imports.push(codecTypes.import);
     }
+    if (codecTypes?.typeImports) {
+      imports.push(...codecTypes.typeImports);
+    }
   }
 
   return imports;

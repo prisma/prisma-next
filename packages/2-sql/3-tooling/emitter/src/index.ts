@@ -257,8 +257,16 @@ export const sqlTargetFamilyHook = {
       return `import type { ${importClause} } from '${imp.package}';`;
     });
 
-    const codecTypes = codecTypeImports.map((imp) => imp.alias).join(' & ');
-    const operationTypes = operationTypeImports.map((imp) => imp.alias).join(' & ');
+    // Only intersect actual codec/operation type maps. Extra type-only imports (e.g. Vector<N>) are
+    // included in importLines via codecTypeImports but must not be intersected into CodecTypes.
+    const codecTypes = codecTypeImports
+      .filter((imp) => imp.named === 'CodecTypes')
+      .map((imp) => imp.alias)
+      .join(' & ');
+    const operationTypes = operationTypeImports
+      .filter((imp) => imp.named === 'OperationTypes')
+      .map((imp) => imp.alias)
+      .join(' & ');
 
     const storageType = this.generateStorageType(storage);
     const modelsType = this.generateModelsType(models, storage, parameterizedRenderers);

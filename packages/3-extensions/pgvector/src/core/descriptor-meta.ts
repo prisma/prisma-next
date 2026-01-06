@@ -38,10 +38,16 @@ export const pgvectorPackMeta = {
         named: 'CodecTypes',
         alias: 'PgVectorTypes',
       },
+      typeImports: [
+        {
+          package: '@prisma-next/extension-pgvector/codec-types',
+          named: 'Vector',
+          alias: 'Vector',
+        },
+      ],
       // Parameterized codec renderers for type emission.
       // The renderer template produces precise TypeScript types like Vector<1536>
       // when columns have typeParams with a `length` property.
-      // Note: The Vector<N> type import is deferred to Phase 6.
       parameterized: {
         [pgvectorTypeId]: 'Vector<{{length}}>',
       },

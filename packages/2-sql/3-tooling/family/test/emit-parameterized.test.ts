@@ -97,6 +97,13 @@ function createMockExtensionWithParameterizedRenderer(
           named: 'CodecTypes',
           alias: `${id.charAt(0).toUpperCase() + id.slice(1)}CodecTypes`,
         },
+        typeImports: [
+          {
+            package: `@prisma-next/extension-${id}/codec-types`,
+            named: 'Vector',
+            alias: 'Vector',
+          },
+        ],
         parameterized: {
           [codecId]: (params, ctx) => renderer(params, ctx),
         },
@@ -169,6 +176,16 @@ describe('emit parameterized codecs integration', () => {
 
     // Verify the parameterized renderer produces the correct type
     expect(result.contractDts).toContain('readonly vector: Vector<1536>');
+
+    // Verify the emitted contract imports the type used by the renderer
+    expect(result.contractDts).toContain(
+      "import type { Vector } from '@prisma-next/extension-pgvector/codec-types';",
+    );
+
+    // Extra type-only imports must not be intersected into `export type CodecTypes = ...`
+    expect(result.contractDts).toContain(
+      'export type CodecTypes = PgCodecTypes & PgvectorCodecTypes;',
+    );
   });
 
   it('emits typesImport from parameterized codecs in contract.d.ts', async () => {
