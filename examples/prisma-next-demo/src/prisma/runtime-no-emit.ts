@@ -1,5 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import pgvectorDescriptor from '@prisma-next/extension-pgvector/runtime';
 import sqlFamily from '@prisma-next/family-sql/runtime';
 import {
   budgets,
@@ -32,7 +33,7 @@ export function getRuntime(): Runtime {
       target: postgresTarget,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensionPacks: [],
+      extensionPacks: [pgvectorDescriptor],
     });
 
     // Create runtime using family instance
@@ -61,7 +62,7 @@ export function getRuntime(): Runtime {
       contract,
       target: postgresTarget,
       adapter: postgresAdapter,
-      extensionPacks: [],
+      extensionPacks: [pgvectorDescriptor],
     });
   }
   return runtime;

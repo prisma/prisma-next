@@ -7,8 +7,13 @@ import { type createRuntime, createRuntimeContext } from '@prisma-next/sql-runti
 import { createDevDatabase, type DevDatabase, timeouts } from '@prisma-next/test-utils';
 import type { Pool } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { contract as noEmitContract } from '../prisma/contract';
 import type { Contract } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
+import {
+  closeRuntime as closeNoEmitRuntime,
+  getRuntime as getNoEmitRuntime,
+} from '../src/prisma/runtime-no-emit';
 import { getUserById as getUserByIdNoEmit } from '../src/queries/get-user-by-id-no-emit';
 import { getUsers as getUsersNoEmit } from '../src/queries/get-users-no-emit';
 import { ormGetUserById } from '../src/queries/orm-get-user-by-id';
@@ -255,10 +260,63 @@ describe('ORM integration tests', () => {
     const emptyPage = await ormGetUsersBackward(1, 3, runtime);
     expect(emptyPage).toHaveLength(0);
   });
+});
 
-  describe('no-emit mode (TypeScript contract)', () => {
-    it('getUsers returns users with selected fields', async () => {
-      await seedTestData(runtime, {
+describe('No-emit mode integration tests (TypeScript contract)', () => {
+  let devDb: DevDatabase;
+
+  beforeEach(async () => {
+    devDb = await createDevDatabase();
+    // Initialize with the TypeScript-built contract (no-emit mode)
+    await initTestDatabase({ connection: devDb.connectionString, contractIR: noEmitContract });
+    // Set DATABASE_URL for no-emit runtime
+    process.env['DATABASE_URL'] = devDb.connectionString;
+  }, timeouts.spinUpPpgDev);
+
+  afterEach(async () => {
+    await closeNoEmitRuntime();
+    await devDb.close();
+  });
+
+  /**
+   * Seeds test data using the no-emit runtime.
+   */
+  async function seedNoEmitTestData(data: { users?: string[] }): Promise<{ userIds: number[] }> {
+    const runtime = getNoEmitRuntime();
+    const context = createContext(noEmitContract);
+    const tables = schema(context).tables;
+    const userTable = tables['user']!;
+
+    const userIds: number[] = [];
+
+    if (data.users) {
+      for (let i = 0; i < data.users.length; i++) {
+        const email = data.users[i]!;
+        const id = i + 1;
+        const createdAt = new Date();
+
+        const plan = sql({ context })
+          .insert(userTable, {
+            id: param('id'),
+            email: param('email'),
+            createdAt: param('createdAt'),
+          })
+          .returning(userTable.columns['id']!)
+          .build({ params: { id, email, createdAt } });
+
+        for await (const row of runtime.execute(plan)) {
+          userIds.push((row as { id: number }).id);
+        }
+      }
+    }
+
+    return { userIds };
+  }
+
+  it(
+    'getUsers returns users with selected fields',
+    async () => {
+      await seedNoEmitTestData({
         users: ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
       });
 
@@ -270,10 +328,14 @@ describe('ORM integration tests', () => {
         email: expect.any(String),
         createdAt: expect.anything(),
       });
-    });
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-    it('getUserById returns single user by ID', async () => {
-      await seedTestData(runtime, { users: ['alice@example.com'] });
+  it(
+    'getUserById returns single user by ID',
+    async () => {
+      await seedNoEmitTestData({ users: ['alice@example.com'] });
 
       const user = await getUserByIdNoEmit(1);
 
@@ -283,14 +345,19 @@ describe('ORM integration tests', () => {
         email: 'alice@example.com',
         createdAt: expect.anything(),
       });
-    });
+    },
+    timeouts.spinUpPpgDev,
+  );
 
-    it('getUserById returns null for non-existent user', async () => {
-      await seedTestData(runtime, { users: ['alice@example.com'] });
+  it(
+    'getUserById returns null for non-existent user',
+    async () => {
+      await seedNoEmitTestData({ users: ['alice@example.com'] });
 
       const user = await getUserByIdNoEmit(999);
 
       expect(user).toBeNull();
-    });
-  });
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
