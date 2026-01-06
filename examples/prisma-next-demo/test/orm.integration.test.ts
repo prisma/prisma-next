@@ -9,6 +9,8 @@ import type { Pool } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
+import { getUserById as getUserByIdNoEmit } from '../src/queries/get-user-by-id-no-emit';
+import { getUsers as getUsersNoEmit } from '../src/queries/get-users-no-emit';
 import { ormGetUserById } from '../src/queries/orm-get-user-by-id';
 import { ormGetUsers } from '../src/queries/orm-get-users';
 import { ormGetUsersWithPosts as ormGetUsersWithPostsInclude } from '../src/queries/orm-includes';
@@ -252,5 +254,43 @@ describe('ORM integration tests', () => {
 
     const emptyPage = await ormGetUsersBackward(1, 3, runtime);
     expect(emptyPage).toHaveLength(0);
+  });
+
+  describe('no-emit mode (TypeScript contract)', () => {
+    it('getUsers returns users with selected fields', async () => {
+      await seedTestData(runtime, {
+        users: ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
+      });
+
+      const users = await getUsersNoEmit(2);
+
+      expect(users).toHaveLength(2);
+      expect(users[0]).toMatchObject({
+        id: expect.any(Number),
+        email: expect.any(String),
+        createdAt: expect.anything(),
+      });
+    });
+
+    it('getUserById returns single user by ID', async () => {
+      await seedTestData(runtime, { users: ['alice@example.com'] });
+
+      const user = await getUserByIdNoEmit(1);
+
+      expect(user).not.toBeNull();
+      expect(user).toMatchObject({
+        id: 1,
+        email: 'alice@example.com',
+        createdAt: expect.anything(),
+      });
+    });
+
+    it('getUserById returns null for non-existent user', async () => {
+      await seedTestData(runtime, { users: ['alice@example.com'] });
+
+      const user = await getUserByIdNoEmit(999);
+
+      expect(user).toBeNull();
+    });
   });
 });
