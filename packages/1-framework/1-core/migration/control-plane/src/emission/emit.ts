@@ -1,5 +1,6 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TargetFamilyHook, ValidationContext } from '@prisma-next/contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { format } from 'prettier';
 import { canonicalizeContract } from './canonicalization';
 import { computeCoreHash, computeProfileHash } from './hashing';
@@ -54,10 +55,10 @@ export async function emit(
   validateCoreStructure(ir);
 
   const ctx: ValidationContext = {
-    ...(operationRegistry ? { operationRegistry } : {}),
-    ...(codecTypeImports ? { codecTypeImports } : {}),
-    ...(operationTypeImports ? { operationTypeImports } : {}),
-    ...(extensionIds ? { extensionIds } : {}),
+    ...ifDefined('operationRegistry', operationRegistry),
+    ...ifDefined('codecTypeImports', codecTypeImports),
+    ...ifDefined('operationTypeImports', operationTypeImports),
+    ...ifDefined('extensionIds', extensionIds),
   };
   targetFamily.validateTypes(ir, ctx);
 

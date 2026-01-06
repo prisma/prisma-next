@@ -189,19 +189,6 @@ export interface ValidationContext {
 }
 
 /**
- * Options for generating contract types.
- */
-export interface GenerateContractTypesOptions {
-  readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-  readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
-  /**
-   * Parameterized codec descriptors for rendering precise types.
-   * Map of codecId → descriptor.
-   */
-  readonly parameterizedCodecs?: Map<string, ParameterizedCodecDescriptor>;
-}
-
-/**
  * Context for rendering parameterized types during contract.d.ts generation.
  * Passed to type renderers so they can reference CodecTypes by name.
  */
