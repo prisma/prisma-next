@@ -11,6 +11,7 @@ import type {
   SqlStorage,
   StorageColumn,
   StorageTable,
+  StorageTypeInstance,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import { type } from 'arktype';
@@ -24,6 +25,14 @@ const StorageColumnSchema = type.declare<StorageColumn>().type({
   nativeType: 'string',
   codecId: 'string',
   nullable: 'boolean',
+  'typeParams?': 'Record<string, unknown>',
+  'typeRef?': 'string',
+});
+
+const StorageTypeInstanceSchema = type.declare<StorageTypeInstance>().type({
+  codecId: 'string',
+  nativeType: 'string',
+  typeParams: 'Record<string, unknown>',
 });
 
 const PrimaryKeySchema = type.declare<PrimaryKey>().type({
@@ -62,6 +71,7 @@ const StorageTableSchema = type.declare<StorageTable>().type({
 
 const StorageSchema = type.declare<SqlStorage>().type({
   tables: type({ '[string]': StorageTableSchema }),
+  'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
 
 const ModelFieldSchema = type.declare<ModelField>().type({
