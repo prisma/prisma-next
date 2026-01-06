@@ -260,8 +260,8 @@ describe('parameterized types', () => {
       expect(error.category).toBe('RUNTIME');
       expect(error.severity).toBe('error');
       expect(error.details).toBeDefined();
-      expect(error.details?.codecId).toBe('pg/vector@1');
-      expect(error.details?.typeName).toBe('InvalidVector');
+      expect(error.details?.['codecId']).toBe('pg/vector@1');
+      expect(error.details?.['typeName']).toBe('InvalidVector');
     });
 
     it('rejects missing required typeParams with stable error code', () => {
@@ -550,8 +550,8 @@ describe('parameterized types', () => {
       expect(error.code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
       expect(error.category).toBe('RUNTIME');
       expect(error.severity).toBe('error');
-      expect(error.details?.tableName).toBe('test');
-      expect(error.details?.columnName).toBe('embedding');
+      expect(error.details?.['tableName']).toBe('test');
+      expect(error.details?.['columnName']).toBe('embedding');
     });
   });
 });
