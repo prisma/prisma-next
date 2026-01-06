@@ -1,4 +1,4 @@
-import type { OperationManifest, TypesImportSpec } from './types';
+import type { OperationManifest, ParameterizedCodecDescriptor, TypesImportSpec } from './types';
 
 // ============================================================================
 // Type Renderer Types (for parameterized codec emission)
@@ -180,6 +180,11 @@ export interface ComponentMetadata {
       readonly targetId: string;
       readonly nativeType?: string;
     }>;
+    /**
+     * Parameterized codec descriptors for codecs that support type parameters.
+     * These enable precise TypeScript types for columns with typeParams.
+     */
+    readonly parameterizedCodecs?: ReadonlyArray<ParameterizedCodecDescriptor>;
   };
 
   /** Operation manifests for building operation registries */

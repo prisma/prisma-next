@@ -271,3 +271,81 @@ export interface OperationManifest {
   readonly lowering: LoweringSpecManifest;
   readonly capabilities?: ReadonlyArray<string>;
 }
+
+// ============================================================================
+// Parameterized Codec Descriptor Types
+// ============================================================================
+//
+// Types for codecs that support type parameters (e.g., Vector<1536>, Decimal<2>).
+// These enable precise TypeScript types for parameterized columns without
+// coupling the SQL family emitter to specific adapter codec IDs.
+//
+// ============================================================================
+
+/**
+ * Context passed to type renderer functions during contract.d.ts generation.
+ * Provides access to names used in the generated contract for proper references.
+ */
+export interface RenderTypeContext {
+  /** The name of the Contract type being generated (typically 'Contract') */
+  readonly contractTypeName: string;
+  /** The name of the merged CodecTypes map (typically 'CodecTypes') */
+  readonly codecTypesName: string;
+}
+
+/**
+ * Declarative type renderer that produces a TypeScript type expression.
+ *
+ * Renderers can be:
+ * - A template string with `{{paramName}}` placeholders (e.g., `Vector<{{length}}>`)
+ * - A function that receives typeParams and context and returns a type expression
+ *
+ * Templates are preferred for simple cases as they are JSON-serializable.
+ * Functions are used when complex logic is needed.
+ */
+export type TypeRenderer =
+  | string
+  | ((params: Record<string, unknown>, ctx: RenderTypeContext) => string);
+
+/**
+ * Descriptor for a codec that supports type parameters.
+ *
+ * Parameterized codecs allow columns to carry additional metadata (typeParams)
+ * that affects the generated TypeScript types. For example:
+ * - A vector codec can use `{ length: 1536 }` to generate `Vector<1536>`
+ * - A decimal codec can use `{ precision: 10, scale: 2 }` to generate `Decimal<10, 2>`
+ *
+ * The SQL family emitter uses these descriptors to generate precise types
+ * without hard-coding knowledge of specific codec IDs.
+ *
+ * @example
+ * ```typescript
+ * const vectorCodecDescriptor: ParameterizedCodecDescriptor = {
+ *   codecId: 'pg/vector@1',
+ *   outputTypeRenderer: 'Vector<{{length}}>',
+ *   // Optional: paramsSchema for runtime validation
+ * };
+ * ```
+ */
+export interface ParameterizedCodecDescriptor {
+  /** The codec ID this descriptor applies to (e.g., 'pg/vector@1') */
+  readonly codecId: string;
+
+  /**
+   * Renderer for the output (read) type.
+   * Can be a template string or function.
+   */
+  readonly outputTypeRenderer: TypeRenderer;
+
+  /**
+   * Optional renderer for the input (write) type.
+   * If not provided, outputTypeRenderer is used for both.
+   */
+  readonly inputTypeRenderer?: TypeRenderer;
+
+  /**
+   * Optional import spec for types used by this codec's renderers.
+   * The emitter will add this import to contract.d.ts.
+   */
+  readonly typesImport?: TypesImportSpec;
+}
