@@ -360,7 +360,7 @@ describe('parameterized types', () => {
       });
     });
 
-    it('stores raw typeParams when no init hook is provided', () => {
+    it('stores full type instance when no init hook is provided', () => {
       const vectorParamsSchema = arktype({
         length: 'number',
       });
@@ -413,8 +413,12 @@ describe('parameterized types', () => {
         extensionPacks: [extensionDescriptor],
       });
 
-      // Without init hook, stores the validated typeParams
-      expect(context.types?.['Vector1536']).toEqual({ length: 1536 });
+      // Without init hook, stores the full type instance (matches contract typing)
+      expect(context.types?.['Vector1536']).toEqual({
+        codecId: 'pg/vector@1',
+        nativeType: 'vector',
+        typeParams: { length: 1536 },
+      });
     });
   });
 

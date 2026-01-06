@@ -257,7 +257,14 @@ function collectParameterizedCodecDescriptors(
 
 /**
  * Initializes type helpers from storage.types using codec descriptors.
- * Validates typeParams and calls init hooks if provided.
+ *
+ * For each named type instance in `storage.types`:
+ * - If a codec descriptor exists with an `init` hook: calls the hook and stores the result
+ * - Otherwise: stores the full type instance metadata directly (codecId, nativeType, typeParams)
+ *
+ * This matches the typing in `ExtractSchemaTypes<Contract>` which extracts
+ * `Contract['storage']['types']` directly, ensuring runtime values match static types
+ * when no init hook transforms the value.
  */
 function initializeTypeHelpers(
   storageTypes: Record<string, StorageTypeInstance> | undefined,
@@ -278,15 +285,16 @@ function initializeTypeHelpers(
         typeName,
       });
 
-      // Call init hook if provided, otherwise store validated params
+      // Call init hook if provided, otherwise store full type instance
       if (descriptor.init) {
         helpers[typeName] = descriptor.init(validatedParams);
       } else {
-        helpers[typeName] = validatedParams;
+        // No init hook: expose full type instance metadata (matches contract typing)
+        helpers[typeName] = typeInstance;
       }
     } else {
-      // No descriptor found - store raw typeParams (no validation)
-      helpers[typeName] = typeInstance.typeParams;
+      // No descriptor found: expose full type instance (no validation possible)
+      helpers[typeName] = typeInstance;
     }
   }
 

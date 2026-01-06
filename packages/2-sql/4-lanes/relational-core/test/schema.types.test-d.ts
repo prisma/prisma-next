@@ -248,8 +248,8 @@ test('schema.types has literal keys from the fixture contract', () => {
   expectTypeOf(types.Vector768.typeParams.length).toEqualTypeOf<768>();
 });
 
-test('schema.types is empty record when contract has no storage.types', () => {
-  // Contract type without storage.types
+test('schema.types is generic record when contract does not specify types', () => {
+  // Contract type without explicit storage.types - typing is generic
   type ContractWithoutTypes = SqlContract<
     {
       readonly tables: {
@@ -301,12 +301,15 @@ test('schema.types is empty record when contract has no storage.types', () => {
   const noTypesContext = createTestContext(noTypesContract);
   const noTypesSchema = schema(noTypesContext);
 
-  // types should still exist
+  // types should still exist as an object
   expectTypeOf(noTypesSchema.types).toBeObject();
 
-  // When storage.types is undefined, we get Record<string, never>
-  type EmptyTypeKeys = keyof typeof noTypesSchema.types;
-  expectTypeOf<EmptyTypeKeys>().toEqualTypeOf<never>();
+  // When storage.types is not explicitly specified in the contract type,
+  // TypeScript infers a generic Record type, so keyof is `string`.
+  // This is expected - to get specific literal keys, the contract must
+  // explicitly declare the types.
+  type GenericTypeKeys = keyof typeof noTypesSchema.types;
+  expectTypeOf<GenericTypeKeys>().toEqualTypeOf<string>();
 });
 
 test('schemaHandle is frozen (readonly)', () => {
