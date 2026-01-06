@@ -44,10 +44,10 @@ describe('codec factory', () => {
       targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string) => wire,
-      meta: { description: 'Test codec with metadata' },
+      meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
     });
 
-    expect(testCodec.meta).toEqual({ description: 'Test codec with metadata' });
+    expect(testCodec.meta).toEqual({ db: { sql: { postgres: { nativeType: 'text' } } } });
   });
 
   it('creates codec without meta property', () => {
