@@ -257,7 +257,7 @@ describe('extractParameterizedRenderers', () => {
     expect(renderers.size).toBe(0);
   });
 
-  it('extracts and normalizes template-based renderers', () => {
+  it('extracts and normalizes structured template renderers', () => {
     const descriptors: TestDescriptor[] = [
       {
         kind: 'extension',
@@ -297,7 +297,40 @@ describe('extractParameterizedRenderers', () => {
     expect(result).toBe('Vector<1536>');
   });
 
-  it('extracts function-based renderers', () => {
+  it('extracts and normalizes raw string template renderers', () => {
+    const descriptors: TestDescriptor[] = [
+      {
+        kind: 'extension',
+        id: 'pgvector',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@prisma-next/extension-pgvector/codec-types',
+              named: 'CodecTypes',
+              alias: 'VectorTypes',
+            },
+            parameterized: {
+              // Raw string form - most common authoring format
+              'pg/vector@1': 'Vector<{{length}}>',
+            },
+          },
+        },
+        create: () => ({ familyId: 'sql' as const, targetId: 'postgres' as const }),
+      },
+    ];
+
+    const renderers = extractParameterizedRenderers(descriptors);
+
+    expect(renderers.size).toBe(1);
+    const renderer = renderers.get('pg/vector@1');
+    const result = renderer?.render({ length: 1536 }, { codecTypesName: 'CodecTypes' });
+    expect(result).toBe('Vector<1536>');
+  });
+
+  it('extracts and normalizes raw function renderers', () => {
     const descriptors: TestDescriptor[] = [
       {
         kind: 'extension',
@@ -313,6 +346,41 @@ describe('extractParameterizedRenderers', () => {
               alias: 'TestTypes',
             },
             parameterized: {
+              // Raw function form - for complex rendering logic
+              'test/custom@1': (params, ctx) =>
+                `Custom<${params.precision}, ${ctx.codecTypesName}>`,
+            },
+          },
+        },
+        create: () => ({ familyId: 'sql' as const, targetId: 'postgres' as const }),
+      },
+    ];
+
+    const renderers = extractParameterizedRenderers(descriptors);
+
+    expect(renderers.size).toBe(1);
+    const renderer = renderers.get('test/custom@1');
+    const result = renderer?.render({ precision: 10 }, { codecTypesName: 'CodecTypes' });
+    expect(result).toBe('Custom<10, CodecTypes>');
+  });
+
+  it('extracts structured function-based renderers', () => {
+    const descriptors: TestDescriptor[] = [
+      {
+        kind: 'extension',
+        id: 'test-ext',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@test/codec-types',
+              named: 'CodecTypes',
+              alias: 'TestTypes',
+            },
+            parameterized: {
+              // Structured function form with kind discriminator
               'test/custom@1': {
                 kind: 'function',
                 render: (params, ctx) => `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
