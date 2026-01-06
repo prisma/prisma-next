@@ -3,12 +3,15 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "description": "Plan helpers, diagnostics, and shared errors for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -16,7 +19,8 @@
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -25,17 +29,20 @@
     "src"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./errors": {
-      "types": "./dist/exports/errors.d.ts",
-      "import": "./dist/exports/errors.js"
-    },
-    "./types": {
-      "types": "./dist/exports/types.d.ts",
-      "import": "./dist/exports/types.js"
+    ".": "./src/index.ts",
+    "./errors": "./src/exports/errors.ts",
+    "./types": "./src/exports/types.ts",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./errors": "./dist/exports/errors.mjs",
+      "./types": "./dist/exports/types.mjs",
+      "./package.json": "./package.json"
     }
   }
 }

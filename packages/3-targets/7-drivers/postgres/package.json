@@ -3,11 +3,14 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -29,10 +32,11 @@
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
     "@types/pg": "catalog:",
     "@types/pg-cursor": "^2.4.6",
     "pg-mem": "^3.0.5",
-    "tsup": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -41,13 +45,15 @@
     "src"
   ],
   "exports": {
-    "./control": {
-      "types": "./dist/exports/control.d.ts",
-      "import": "./dist/exports/control.js"
-    },
-    "./runtime": {
-      "types": "./dist/exports/runtime.d.ts",
-      "import": "./dist/exports/runtime.js"
+    "./control": "./src/exports/control.ts",
+    "./runtime": "./src/exports/runtime.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      "./control": "./dist/control.mjs",
+      "./runtime": "./dist/runtime.mjs",
+      "./package.json": "./package.json"
     }
   }
 }

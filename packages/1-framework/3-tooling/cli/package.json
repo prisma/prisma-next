@@ -3,15 +3,18 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "files": [
     "dist",
     "src"
   ],
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -43,51 +46,38 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
     "@types/node": "catalog:",
-    "tsup": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "exports": {
-    ".": {
-      "types": "./dist/exports/index.d.ts",
-      "import": "./dist/exports/index.js"
-    },
-    "./config-types": {
-      "types": "./dist/exports/config-types.d.ts",
-      "import": "./dist/exports/config-types.js"
-    },
-    "./commands/db-init": {
-      "types": "./dist/commands/db-init.d.ts",
-      "import": "./dist/commands/db-init.js"
-    },
-    "./commands/db-introspect": {
-      "types": "./dist/commands/db-introspect.d.ts",
-      "import": "./dist/commands/db-introspect.js"
-    },
-    "./commands/db-schema-verify": {
-      "types": "./dist/commands/db-schema-verify.d.ts",
-      "import": "./dist/commands/db-schema-verify.js"
-    },
-    "./commands/db-sign": {
-      "types": "./dist/commands/db-sign.d.ts",
-      "import": "./dist/commands/db-sign.js"
-    },
-    "./commands/db-verify": {
-      "types": "./dist/commands/db-verify.d.ts",
-      "import": "./dist/commands/db-verify.js"
-    },
-    "./commands/contract-emit": {
-      "types": "./dist/commands/contract-emit.d.ts",
-      "import": "./dist/commands/contract-emit.js"
-    },
-    "./config-loader": {
-      "types": "./dist/config-loader.d.ts",
-      "import": "./dist/config-loader.js"
-    },
-    "./control-api": {
-      "types": "./dist/exports/control-api.d.ts",
-      "import": "./dist/exports/control-api.js"
+    "./commands/contract-emit": "./src/commands/contract-emit.ts",
+    "./commands/db-init": "./src/commands/db-init.ts",
+    "./commands/db-introspect": "./src/commands/db-introspect.ts",
+    "./commands/db-schema-verify": "./src/commands/db-schema-verify.ts",
+    "./commands/db-sign": "./src/commands/db-sign.ts",
+    "./commands/db-verify": "./src/commands/db-verify.ts",
+    "./config-loader": "./src/config-loader.ts",
+    ".": "./src/exports/index.ts",
+    "./config-types": "./src/exports/config-types.ts",
+    "./control-api": "./src/exports/control-api.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      "./commands/contract-emit": "./dist/commands/contract-emit.mjs",
+      "./commands/db-init": "./dist/commands/db-init.mjs",
+      "./commands/db-introspect": "./dist/commands/db-introspect.mjs",
+      "./commands/db-schema-verify": "./dist/commands/db-schema-verify.mjs",
+      "./commands/db-sign": "./dist/commands/db-sign.mjs",
+      "./commands/db-verify": "./dist/commands/db-verify.mjs",
+      "./config-loader": "./dist/config-loader.mjs",
+      ".": "./dist/exports/index.mjs",
+      "./config-types": "./dist/exports/config-types.mjs",
+      "./control-api": "./dist/exports/control-api.mjs",
+      "./package.json": "./package.json"
     }
   }
 }

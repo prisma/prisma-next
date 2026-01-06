@@ -3,12 +3,15 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "description": "SQL Schema IR types for schema introspection and verification",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -20,7 +23,8 @@
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -29,9 +33,16 @@
     "src"
   ],
   "exports": {
-    "./types": {
-      "types": "./dist/exports/types.d.ts",
-      "import": "./dist/exports/types.js"
+    ".": "./src/exports/types.ts",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/types.mjs",
+  "module": "./dist/types.mjs",
+  "types": "./dist/types.d.mts",
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/types.mjs",
+      "./package.json": "./package.json"
     }
   }
 }

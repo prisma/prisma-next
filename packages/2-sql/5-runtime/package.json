@@ -3,12 +3,15 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "description": "SQL runtime implementation for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -21,14 +24,15 @@
     "@prisma-next/runtime-executor": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
-    "@prisma-next/sql-relational-core": "workspace:*"
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
     "@types/pg": "catalog:",
     "pg": "catalog:",
-    "tsup": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -38,13 +42,18 @@
     "test"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/src/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./test/utils": {
-      "types": "./dist/test/utils.d.ts",
-      "import": "./dist/test/utils.js"
+    ".": "./src/index.ts",
+    "./test/utils": "./test/utils.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./test/utils": "./dist/test/utils.mjs",
+      "./package.json": "./package.json"
     }
-  }
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts"
 }

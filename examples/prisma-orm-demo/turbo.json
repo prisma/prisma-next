@@ -1,0 +1,17 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": [
+        "prisma/schema.prisma",
+        "prisma/contract.ts",
+        "package.json",
+        "tsconfig.json",
+        "prisma-next.config.ts",
+        "prisma.config.ts"
+      ],
+      "outputs": ["src/prisma-next/contract.json", "src/prisma-next/contract.d.ts"]
+    }
+  }
+}

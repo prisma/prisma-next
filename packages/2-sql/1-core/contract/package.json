@@ -3,12 +3,15 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "description": "SQL contract types, validators, and IR factories for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -21,7 +24,8 @@
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -30,21 +34,19 @@
     "src"
   ],
   "exports": {
-    "./types": {
-      "types": "./dist/exports/types.d.ts",
-      "import": "./dist/exports/types.js"
-    },
-    "./validators": {
-      "types": "./dist/exports/validators.d.ts",
-      "import": "./dist/exports/validators.js"
-    },
-    "./factories": {
-      "types": "./dist/exports/factories.d.ts",
-      "import": "./dist/exports/factories.js"
-    },
-    "./pack-types": {
-      "types": "./dist/exports/pack-types.d.ts",
-      "import": "./dist/exports/pack-types.js"
+    "./factories": "./src/exports/factories.ts",
+    "./pack-types": "./src/exports/pack-types.ts",
+    "./types": "./src/exports/types.ts",
+    "./validators": "./src/exports/validators.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      "./factories": "./dist/factories.mjs",
+      "./pack-types": "./dist/pack-types.mjs",
+      "./types": "./dist/types.mjs",
+      "./validators": "./dist/validators.mjs",
+      "./package.json": "./package.json"
     }
   }
 }

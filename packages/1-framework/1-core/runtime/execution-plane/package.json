@@ -3,12 +3,15 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "description": "Execution/runtime plane descriptor and instance types for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -21,7 +24,8 @@
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -30,13 +34,15 @@
     "src"
   ],
   "exports": {
-    "./types": {
-      "types": "./dist/exports/types.d.ts",
-      "import": "./dist/exports/types.js"
-    },
-    "./framework-components": {
-      "types": "./dist/exports/framework-components.d.ts",
-      "import": "./dist/exports/framework-components.js"
+    "./framework-components": "./src/exports/framework-components.ts",
+    "./types": "./src/exports/types.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      "./framework-components": "./dist/framework-components.mjs",
+      "./types": "./dist/types.mjs",
+      "./package.json": "./package.json"
     }
   }
 }

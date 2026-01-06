@@ -3,18 +3,24 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "description": "Shared utility functions for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist coverage .tmp-output"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -23,21 +29,19 @@
     "src"
   ],
   "exports": {
-    "./array-equal": {
-      "types": "./dist/exports/array-equal.d.ts",
-      "import": "./dist/exports/array-equal.js"
-    },
-    "./defined": {
-      "types": "./dist/exports/defined.d.ts",
-      "import": "./dist/exports/defined.js"
-    },
-    "./result": {
-      "types": "./dist/exports/result.d.ts",
-      "import": "./dist/exports/result.js"
-    },
-    "./redact-db-url": {
-      "types": "./dist/exports/redact-db-url.d.ts",
-      "import": "./dist/exports/redact-db-url.js"
+    "./array-equal": "./src/exports/array-equal.ts",
+    "./defined": "./src/exports/defined.ts",
+    "./redact-db-url": "./src/exports/redact-db-url.ts",
+    "./result": "./src/exports/result.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      "./array-equal": "./dist/array-equal.mjs",
+      "./defined": "./dist/defined.mjs",
+      "./redact-db-url": "./dist/redact-db-url.mjs",
+      "./result": "./dist/result.mjs",
+      "./package.json": "./package.json"
     }
   }
 }

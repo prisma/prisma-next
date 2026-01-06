@@ -5,8 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "scripts": {
-    "build": "tsup --config tsup.config.ts",
-    "test": "vitest run --passWithNoTests",
+    "build": "tsdown",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -14,33 +13,30 @@
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
     "@prisma/dev": "catalog:",
     "@types/pg": "catalog:",
     "pg": "catalog:",
-    "tsup": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "exports": {
-    ".": {
-      "types": "./dist/exports/index.d.ts",
-      "import": "./dist/exports/index.js"
-    },
-    "./column-descriptors": {
-      "types": "./dist/exports/column-descriptors.d.ts",
-      "import": "./dist/exports/column-descriptors.js"
-    },
-    "./operation-descriptors": {
-      "types": "./dist/exports/operation-descriptors.d.ts",
-      "import": "./dist/exports/operation-descriptors.js"
-    },
-    "./timeouts": {
-      "types": "./dist/exports/timeouts.d.ts",
-      "import": "./dist/exports/timeouts.js"
-    },
-    "./typed-expectations": {
-      "types": "./dist/exports/typed-expectations.d.ts",
-      "import": "./dist/exports/typed-expectations.js"
+    "./column-descriptors": "./src/column-descriptors.ts",
+    ".": "./src/exports/index.ts",
+    "./operation-descriptors": "./src/operation-descriptors.ts",
+    "./timeouts": "./src/timeouts.ts",
+    "./typed-expectations": "./src/typed-expectations.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      "./column-descriptors": "./dist/column-descriptors.mjs",
+      ".": "./dist/exports/index.mjs",
+      "./operation-descriptors": "./dist/operation-descriptors.mjs",
+      "./timeouts": "./dist/timeouts.mjs",
+      "./typed-expectations": "./dist/typed-expectations.mjs",
+      "./package.json": "./package.json"
     }
   }
 }

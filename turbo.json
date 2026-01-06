@@ -3,7 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "package.json", "tsconfig.json", "tsup.config.ts"],
+      "inputs": ["src/**", "package.json", "tsconfig.json", "tsdown.config.ts"],
       "outputs": ["dist/**"]
     },
     "dev": {
@@ -12,12 +12,12 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "dist/**"],
+      "inputs": ["src/**", "test/**"],
       "env": ["TEST_TIMEOUT_MULTIPLIER"]
     },
     "test:coverage": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "dist/**"],
+      "inputs": ["src/**", "test/**"],
       "outputs": ["coverage/**"],
       "env": ["TEST_TIMEOUT_MULTIPLIER"]
     },

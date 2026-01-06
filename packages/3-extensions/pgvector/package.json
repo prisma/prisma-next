@@ -4,10 +4,10 @@
   "type": "module",
   "sideEffects": false,
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -33,39 +33,36 @@
     "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "files": [
     "dist",
     "src"
   ],
   "exports": {
-    "./package.json": "./package.json",
-    "./control": {
-      "types": "./dist/exports/control.d.ts",
-      "import": "./dist/exports/control.js"
-    },
-    "./runtime": {
-      "types": "./dist/exports/runtime.d.ts",
-      "import": "./dist/exports/runtime.js"
-    },
-    "./pack": {
-      "types": "./dist/exports/pack.d.ts",
-      "import": "./dist/exports/pack.js"
-    },
-    "./codec-types": {
-      "types": "./dist/exports/codec-types.d.ts",
-      "import": "./dist/exports/codec-types.js"
-    },
-    "./column-types": {
-      "types": "./dist/exports/column-types.d.ts",
-      "import": "./dist/exports/column-types.js"
-    },
-    "./operation-types": {
-      "types": "./dist/exports/operation-types.d.ts",
-      "import": "./dist/exports/operation-types.js"
+    "./codec-types": "./src/exports/codec-types.ts",
+    "./column-types": "./src/exports/column-types.ts",
+    "./control": "./src/exports/control.ts",
+    "./operation-types": "./src/exports/operation-types.ts",
+    "./pack": "./src/exports/pack.ts",
+    "./runtime": "./src/exports/runtime.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      "./codec-types": "./dist/codec-types.mjs",
+      "./column-types": "./dist/column-types.mjs",
+      "./control": "./dist/control.mjs",
+      "./operation-types": "./dist/operation-types.mjs",
+      "./pack": "./dist/pack.mjs",
+      "./runtime": "./dist/runtime.mjs",
+      "./package.json": "./package.json"
     }
   }
 }

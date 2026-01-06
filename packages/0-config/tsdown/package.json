@@ -1,0 +1,26 @@
+{
+  "name": "@prisma-next/tsdown",
+  "type": "module",
+  "private": true,
+  "sideEffects": false,
+  "version": "0.0.0",
+  "description": "Base tsdown configuration for the monorepo",
+  "license": "MIT",
+  "files": [
+    "./index.ts"
+  ],
+  "devDependencies": {
+    "@prisma-next/tsconfig": "workspace:*",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  },
+  "scripts": {
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./index.ts"
+  }
+}
