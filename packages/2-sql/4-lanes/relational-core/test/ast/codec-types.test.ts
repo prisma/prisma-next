@@ -37,6 +37,29 @@ describe('codec factory', () => {
 
     expect(testCodec.targetTypes).toEqual(['int4', 'int8']);
   });
+
+  it('creates codec with meta property', () => {
+    const testCodec = codec({
+      typeId: 'test/with-meta@1',
+      targetTypes: ['text'],
+      encode: (value: string) => value,
+      decode: (wire: string) => wire,
+      meta: { description: 'Test codec with metadata' },
+    });
+
+    expect(testCodec.meta).toEqual({ description: 'Test codec with metadata' });
+  });
+
+  it('creates codec without meta property', () => {
+    const testCodec = codec({
+      typeId: 'test/no-meta@1',
+      targetTypes: ['text'],
+      encode: (value: string) => value,
+      decode: (wire: string) => wire,
+    });
+
+    expect(testCodec.meta).toBeUndefined();
+  });
 });
 
 describe('CodecRegistry', () => {

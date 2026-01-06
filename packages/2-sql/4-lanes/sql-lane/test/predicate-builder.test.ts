@@ -107,4 +107,76 @@ describe('buildWhereExpr', () => {
     expect(result.expr).toEqual(createBinaryExpr('eq', userIdCol, userIdCol));
     expect(result.paramName).toBe('');
   });
+
+  it('throws when left column references unknown table', () => {
+    const binary = {
+      kind: 'binary' as const,
+      op: 'eq' as const,
+      left: createColumnRef('nonexistent', 'id'),
+      right: param('userId'),
+    };
+
+    expect(() =>
+      buildWhereExpr(
+        contract,
+        binary as ReturnType<typeof userColumns.id.eq>,
+        { userId: 1 },
+        [],
+        [],
+      ),
+    ).toThrow('Unknown table nonexistent');
+  });
+
+  it('throws when left column references unknown column', () => {
+    const binary = {
+      kind: 'binary' as const,
+      op: 'eq' as const,
+      left: createColumnRef('user', 'nonexistent'),
+      right: param('userId'),
+    };
+
+    expect(() =>
+      buildWhereExpr(
+        contract,
+        binary as ReturnType<typeof userColumns.id.eq>,
+        { userId: 1 },
+        [],
+        [],
+      ),
+    ).toThrow('Unknown column nonexistent');
+  });
+
+  it('throws when parameter value is missing', () => {
+    const binary = userColumns.id.eq(param('missingParam'));
+
+    expect(() => buildWhereExpr(contract, binary, {}, [], [])).toThrow(
+      'Missing value for parameter missingParam',
+    );
+  });
+
+  it('throws when right column references unknown table', () => {
+    const binary = {
+      kind: 'binary' as const,
+      op: 'eq' as const,
+      left: userColumns.id.toExpr(),
+      right: { kind: 'column', toExpr: () => createColumnRef('nonexistent', 'id') },
+    };
+
+    expect(() =>
+      buildWhereExpr(contract, binary as ReturnType<typeof userColumns.id.eq>, {}, [], []),
+    ).toThrow('Unknown table nonexistent');
+  });
+
+  it('throws when right column references unknown column', () => {
+    const binary = {
+      kind: 'binary' as const,
+      op: 'eq' as const,
+      left: userColumns.id.toExpr(),
+      right: { kind: 'column', toExpr: () => createColumnRef('user', 'nonexistent') },
+    };
+
+    expect(() =>
+      buildWhereExpr(contract, binary as ReturnType<typeof userColumns.id.eq>, {}, [], []),
+    ).toThrow('Unknown column nonexistent');
+  });
 });
