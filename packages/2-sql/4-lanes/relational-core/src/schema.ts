@@ -303,13 +303,14 @@ type ExtractSchemaTables<
 
 /**
  * Extracts the types registry shape from a contract.
- * Each key is a type name from storage.types, value is unknown (runtime-resolved).
+ * Each key is a type name from storage.types, and the value preserves the
+ * literal type from the contract (including codecId, nativeType, and typeParams).
  * Returns an empty object type {} when storage.types is undefined.
  */
 type ExtractSchemaTypes<Contract extends SqlContract<SqlStorage>> =
   Contract['storage']['types'] extends infer Types
     ? Types extends Record<string, unknown>
-      ? { readonly [TypeName in keyof Types]: unknown }
+      ? { readonly [TypeName in keyof Types]: Types[TypeName] }
       : Record<string, never>
     : Record<string, never>;
 

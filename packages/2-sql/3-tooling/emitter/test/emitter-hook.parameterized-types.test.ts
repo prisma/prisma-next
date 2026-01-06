@@ -506,4 +506,127 @@ describe('sql-target-family-hook parameterized type emission', () => {
       expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
     });
   });
+
+  describe('storage.types emission', () => {
+    it('emits storage.types with literal types', () => {
+      const ir = createContractIR({
+        storage: {
+          tables: {
+            document: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            Vector1536: {
+              codecId: 'pg/vector@1',
+              nativeType: 'vector',
+              typeParams: { length: 1536 },
+            },
+            Vector768: {
+              codecId: 'pg/vector@1',
+              nativeType: 'vector',
+              typeParams: { length: 768 },
+            },
+          },
+        },
+      });
+
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+
+      // Verify storage.types is emitted with literal types
+      expect(types).toContain('readonly types:');
+      expect(types).toContain(
+        "readonly Vector1536: { readonly codecId: 'pg/vector@1'; readonly nativeType: 'vector'; readonly typeParams: { readonly length: 1536 } }",
+      );
+      expect(types).toContain(
+        "readonly Vector768: { readonly codecId: 'pg/vector@1'; readonly nativeType: 'vector'; readonly typeParams: { readonly length: 768 } }",
+      );
+    });
+
+    it('handles empty storage.types', () => {
+      const ir = createContractIR({
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {},
+        },
+      });
+
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+
+      // Should emit empty types object
+      expect(types).toContain('readonly types: Record<string, never>');
+    });
+
+    it('handles undefined storage.types (no types key)', () => {
+      const ir = createContractIR({
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      });
+
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+
+      // Should handle missing types gracefully - either omit or emit empty
+      // Check it doesn't error and produces valid output
+      expect(types).toContain('export type Contract = SqlContract<');
+    });
+
+    it('emits typeParams with nested objects', () => {
+      const ir = createContractIR({
+        storage: {
+          tables: {
+            data: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            ComplexType: {
+              codecId: 'custom/type@1',
+              nativeType: 'custom',
+              typeParams: { a: 1, b: 'hello', c: true },
+            },
+          },
+        },
+      });
+
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+
+      expect(types).toContain('readonly ComplexType:');
+      expect(types).toContain(
+        "readonly typeParams: { readonly a: 1; readonly b: 'hello'; readonly c: true }",
+      );
+    });
+  });
 });
