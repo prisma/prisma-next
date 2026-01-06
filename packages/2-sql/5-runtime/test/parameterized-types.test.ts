@@ -237,17 +237,34 @@ describe('parameterized types', () => {
         },
       });
 
-      expect(() =>
+      let thrownError: unknown;
+      try {
         createRuntimeContext({
           contract,
           target: createTestTargetDescriptor(),
           adapter: createTestAdapterDescriptor(),
           extensionPacks: [createVectorExtensionDescriptor()],
-        }),
-      ).toThrow(/RUNTIME\.TYPE_PARAMS_INVALID|must be a number/i);
+        });
+      } catch (e) {
+        thrownError = e;
+      }
+
+      expect(thrownError).toBeDefined();
+      const error = thrownError as {
+        code?: string;
+        category?: string;
+        severity?: string;
+        details?: Record<string, unknown>;
+      };
+      expect(error.code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
+      expect(error.category).toBe('RUNTIME');
+      expect(error.severity).toBe('error');
+      expect(error.details).toBeDefined();
+      expect(error.details?.codecId).toBe('pg/vector@1');
+      expect(error.details?.typeName).toBe('InvalidVector');
     });
 
-    it('rejects missing required typeParams', () => {
+    it('rejects missing required typeParams with stable error code', () => {
       const contract = createTestContract({
         types: {
           InvalidVector: {
@@ -258,14 +275,23 @@ describe('parameterized types', () => {
         },
       });
 
-      expect(() =>
+      let thrownError: unknown;
+      try {
         createRuntimeContext({
           contract,
           target: createTestTargetDescriptor(),
           adapter: createTestAdapterDescriptor(),
           extensionPacks: [createVectorExtensionDescriptor()],
-        }),
-      ).toThrow(/RUNTIME\.TYPE_PARAMS_INVALID|length.*missing/i);
+        });
+      } catch (e) {
+        thrownError = e;
+      }
+
+      expect(thrownError).toBeDefined();
+      const error = thrownError as { code?: string; category?: string; severity?: string };
+      expect(error.code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
+      expect(error.category).toBe('RUNTIME');
+      expect(error.severity).toBe('error');
     });
   });
 
@@ -451,7 +477,7 @@ describe('parameterized types', () => {
       expect(context.contract).toBe(contract);
     });
 
-    it('rejects invalid inline column typeParams', () => {
+    it('rejects invalid inline column typeParams with stable error code', () => {
       const vectorParamsSchema = arktype({
         length: 'number',
       });
@@ -498,14 +524,30 @@ describe('parameterized types', () => {
         },
       });
 
-      expect(() =>
+      let thrownError: unknown;
+      try {
         createRuntimeContext({
           contract,
           target: createTestTargetDescriptor(),
           adapter: createTestAdapterDescriptor(),
           extensionPacks: [extensionDescriptor],
-        }),
-      ).toThrow(/RUNTIME\.TYPE_PARAMS_INVALID|must be a number/i);
+        });
+      } catch (e) {
+        thrownError = e;
+      }
+
+      expect(thrownError).toBeDefined();
+      const error = thrownError as {
+        code?: string;
+        category?: string;
+        severity?: string;
+        details?: Record<string, unknown>;
+      };
+      expect(error.code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
+      expect(error.category).toBe('RUNTIME');
+      expect(error.severity).toBe('error');
+      expect(error.details?.tableName).toBe('test');
+      expect(error.details?.columnName).toBe('embedding');
     });
   });
 });

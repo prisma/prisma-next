@@ -148,16 +148,51 @@ export interface CreateRuntimeContextOptions<
 }
 
 // ============================================================================
-// Runtime Error Helpers
+// Runtime Error Types and Helpers
 // ============================================================================
 
-interface RuntimeError extends Error {
-  code: string;
-  category: string;
-  severity: string;
-  details?: Record<string, unknown>;
+/**
+ * Structured error thrown by the SQL runtime.
+ *
+ * Aligns with the repository's error envelope convention:
+ * - `code`: Stable error code for programmatic handling (e.g., `RUNTIME.TYPE_PARAMS_INVALID`)
+ * - `category`: Error source category (`RUNTIME`)
+ * - `severity`: Error severity level (`error`)
+ * - `details`: Optional structured details for debugging
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   createRuntimeContext({ ... });
+ * } catch (e) {
+ *   if ((e as RuntimeError).code === 'RUNTIME.TYPE_PARAMS_INVALID') {
+ *     console.error('Invalid type parameters:', (e as RuntimeError).details);
+ *   }
+ * }
+ * ```
+ */
+export interface RuntimeError extends Error {
+  /** Stable error code for programmatic handling (e.g., `RUNTIME.TYPE_PARAMS_INVALID`) */
+  readonly code: string;
+  /** Error source category */
+  readonly category: 'RUNTIME';
+  /** Error severity level */
+  readonly severity: 'error';
+  /** Optional structured details for debugging */
+  readonly details?: Record<string, unknown>;
 }
 
+/**
+ * Creates a RuntimeError for invalid type parameters.
+ *
+ * Error code: `RUNTIME.TYPE_PARAMS_INVALID`
+ *
+ * Thrown when:
+ * - `storage.types` entries have typeParams that fail codec schema validation
+ * - Column inline typeParams fail codec schema validation
+ *
+ * @internal
+ */
 function runtimeTypeParamsInvalid(
   message: string,
   details?: Record<string, unknown>,
@@ -166,8 +201,8 @@ function runtimeTypeParamsInvalid(
   Object.defineProperty(error, 'name', { value: 'RuntimeError', configurable: true });
   return Object.assign(error, {
     code: 'RUNTIME.TYPE_PARAMS_INVALID',
-    category: 'RUNTIME',
-    severity: 'error',
+    category: 'RUNTIME' as const,
+    severity: 'error' as const,
     details,
   });
 }
