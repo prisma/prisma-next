@@ -279,27 +279,26 @@ describe('schema', () => {
       );
     });
 
-    it.each(operators)(
-      '%s creates binary builder when comparing with ExpressionSource (another column)',
-      (op) => {
-        const adapter = createStubAdapter();
-        const context = createTestContext(contract, adapter);
-        const tables = schema(context).tables;
-        const idColumn = tables.user.columns.id;
-        const emailColumn = tables.user.columns.email;
+    it.each(
+      operators,
+    )('%s creates binary builder when comparing with ExpressionSource (another column)', (op) => {
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const tables = schema(context).tables;
+      const idColumn = tables.user.columns.id;
+      const emailColumn = tables.user.columns.email;
 
-        const method = idColumn[op];
-        // Pass another ColumnBuilder as ExpressionSource
-        const binary = method.call(idColumn, emailColumn);
+      const method = idColumn[op];
+      // Pass another ColumnBuilder as ExpressionSource
+      const binary = method.call(idColumn, emailColumn);
 
-        expect(binary).toMatchObject({
-          kind: 'binary',
-          op,
-          left: { kind: 'col', table: 'user', column: 'id' },
-          right: emailColumn, // ExpressionSource is stored in right
-        });
-      },
-    );
+      expect(binary).toMatchObject({
+        kind: 'binary',
+        op,
+        left: { kind: 'col', table: 'user', column: 'id' },
+        right: emailColumn, // ExpressionSource is stored in right
+      });
+    });
   });
 
   it('column builder asc creates order builder', () => {
