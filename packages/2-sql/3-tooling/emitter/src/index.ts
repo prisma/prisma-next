@@ -1,6 +1,8 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   GenerateContractTypesOptions,
+  TypeRenderContext,
+  TypeRenderEntry,
   TypesImportSpec,
   ValidationContext,
 } from '@prisma-next/contract/types';
@@ -10,8 +12,31 @@ import type {
   SqlStorage,
   StorageColumn,
   StorageTable,
+  StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { assertDefined } from '@prisma-next/utils/assertions';
+
+/**
+ * Resolves the typeParams for a column, either from inline typeParams or from typeRef.
+ * Returns undefined if no typeParams are available.
+ */
+function resolveColumnTypeParams(
+  column: StorageColumn,
+  storage: SqlStorage,
+): Record<string, unknown> | undefined {
+  // Inline typeParams take precedence
+  if (column.typeParams && Object.keys(column.typeParams).length > 0) {
+    return column.typeParams;
+  }
+  // Check typeRef
+  if (column.typeRef && storage.types) {
+    const typeInstance = storage.types[column.typeRef] as StorageTypeInstance | undefined;
+    if (typeInstance?.typeParams) {
+      return typeInstance.typeParams;
+    }
+  }
+  return undefined;
+}
 
 export const sqlTargetFamilyHook = {
   id: 'sql',
@@ -203,11 +228,13 @@ export const sqlTargetFamilyHook = {
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
     options?: GenerateContractTypesOptions,
   ): string {
+    const parameterizedRenderers = options?.parameterizedRenderers;
+    const parameterizedTypeImports = options?.parameterizedTypeImports;
+    const storage = ir.storage as SqlStorage;
+    const models = ir.models as Record<string, ModelDefinition>;
+
     // Collect imports from codec types, operation types, and parameterized type imports
     const allImports = [...codecTypeImports, ...operationTypeImports];
-
-    // Add parameterized type imports (if any)
-    const parameterizedTypeImports = options?.parameterizedTypeImports;
     if (parameterizedTypeImports) {
       allImports.push(...parameterizedTypeImports);
     }
@@ -225,19 +252,13 @@ export const sqlTargetFamilyHook = {
     }
 
     const importLines = uniqueImports.map((imp) => {
-      // Omit redundant "as Alias" when named === alias
-      if (imp.named === imp.alias) {
-        return `import type { ${imp.named} } from '${imp.package}';`;
-      }
-      return `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`;
+      // Simplify import when named === alias (e.g., `import type { Vector }` instead of `{ Vector as Vector }`)
+      const importClause = imp.named === imp.alias ? imp.named : `${imp.named} as ${imp.alias}`;
+      return `import type { ${importClause} } from '${imp.package}';`;
     });
 
     const codecTypes = codecTypeImports.map((imp) => imp.alias).join(' & ');
     const operationTypes = operationTypeImports.map((imp) => imp.alias).join(' & ');
-
-    const storage = ir.storage as SqlStorage;
-    const models = ir.models as Record<string, ModelDefinition>;
-    const parameterizedRenderers = options?.parameterizedRenderers;
 
     const storageType = this.generateStorageType(storage);
     const modelsType = this.generateModelsType(models, storage, parameterizedRenderers);
@@ -323,49 +344,18 @@ export type Relations = Contract['relations'];
     return `{ readonly tables: { ${tables.join('; ')} } }`;
   },
 
-  /**
-   * Renders the TypeScript type for a column.
-   * Uses parameterized renderer if column has typeParams and renderer exists.
-   * Falls back to CodecTypes['codecId']['output'] for scalar codecs.
-   */
-  renderColumnType(
-    column: StorageColumn,
-    storage: SqlStorage,
-    parameterizedRenderers?: GenerateContractTypesOptions['parameterizedRenderers'],
-  ): string {
-    const codecId = column.codecId;
-
-    // Check for typeRef - use the referenced type instance's params
-    if (column.typeRef && storage.types) {
-      const typeInstance = storage.types[column.typeRef];
-      if (typeInstance) {
-        const renderer = parameterizedRenderers?.get(typeInstance.codecId);
-        if (renderer) {
-          return renderer.render(typeInstance.typeParams, { codecTypesName: 'CodecTypes' });
-        }
-      }
-    }
-
-    // Check for inline typeParams
-    if (column.typeParams) {
-      const renderer = parameterizedRenderers?.get(codecId);
-      if (renderer) {
-        return renderer.render(column.typeParams, { codecTypesName: 'CodecTypes' });
-      }
-    }
-
-    // Default: scalar codec type
-    return `CodecTypes['${codecId}']['output']`;
-  },
-
   generateModelsType(
     models: Record<string, ModelDefinition> | undefined,
     storage: SqlStorage,
-    parameterizedRenderers?: GenerateContractTypesOptions['parameterizedRenderers'],
+    parameterizedRenderers?: Map<string, TypeRenderEntry>,
   ): string {
     if (!models) {
       return 'Record<string, never>';
     }
+
+    const renderCtx: TypeRenderContext = {
+      codecTypesName: 'CodecTypes',
+    };
 
     const modelTypes: string[] = [];
     for (const [modelName, model] of Object.entries(models)) {
@@ -381,10 +371,12 @@ export type Relations = Contract['relations'];
             continue;
           }
 
-          const baseType = this.renderColumnType(column, storage, parameterizedRenderers);
-          const nullable = column.nullable ?? false;
-          const jsType = nullable ? `${baseType} | null` : baseType;
-
+          const jsType = this.generateColumnType(
+            column,
+            storage,
+            parameterizedRenderers,
+            renderCtx,
+          );
           fields.push(`readonly ${fieldName}: ${jsType}`);
         }
       } else {
@@ -420,6 +412,37 @@ export type Relations = Contract['relations'];
     }
 
     return `{ ${modelTypes.join('; ')} }`;
+  },
+
+  /**
+   * Generates the TypeScript type expression for a column.
+   * Uses parameterized renderer if the column has typeParams and a matching renderer exists,
+   * otherwise falls back to CodecTypes[codecId]['output'].
+   */
+  generateColumnType(
+    column: StorageColumn,
+    storage: SqlStorage,
+    parameterizedRenderers: Map<string, TypeRenderEntry> | undefined,
+    renderCtx: TypeRenderContext,
+  ): string {
+    const typeParams = resolveColumnTypeParams(column, storage);
+    const nullable = column.nullable ?? false;
+    let baseType: string;
+
+    if (typeParams && parameterizedRenderers) {
+      const renderer = parameterizedRenderers.get(column.codecId);
+      if (renderer) {
+        baseType = renderer.render(typeParams, renderCtx);
+      } else {
+        // No renderer for this codecId, fall back to standard lookup
+        baseType = `CodecTypes['${column.codecId}']['output']`;
+      }
+    } else {
+      // No typeParams, use standard codec lookup
+      baseType = `CodecTypes['${column.codecId}']['output']`;
+    }
+
+    return nullable ? `${baseType} | null` : baseType;
   },
 
   generateRelationsType(relations: Record<string, unknown> | undefined): string {
