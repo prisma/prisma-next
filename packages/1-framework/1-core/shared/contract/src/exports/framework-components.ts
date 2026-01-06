@@ -16,11 +16,21 @@ export type {
   ExtensionPackRef,
   FamilyDescriptor,
   FamilyInstance,
+  // Type renderers for parameterized codec emission
+  NormalizedTypeRenderer,
   PackRefBase,
+  RenderTypeContext,
   TargetBoundComponentDescriptor,
   TargetDescriptor,
   TargetInstance,
   TargetPackRef,
+  TypeRenderer,
+  TypeRendererFunction,
+  TypeRendererTemplate,
 } from '../framework-components';
 
-export { checkContractComponentRequirements } from '../framework-components';
+export {
+  checkContractComponentRequirements,
+  interpolateTypeTemplate,
+  normalizeRenderer,
+} from '../framework-components';
