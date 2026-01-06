@@ -1,10 +1,9 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   GenerateContractTypesOptions,
-  ParameterizedCodecDescriptor,
   TargetFamilyHook,
+  TypeRenderEntry,
   TypesImportSpec,
-  ValidationContext,
 } from '@prisma-next/contract/types';
 import type { EmitOptions } from '@prisma-next/core-control-plane/emission';
 import { emit } from '@prisma-next/core-control-plane/emission';
@@ -15,7 +14,7 @@ import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (ir: ContractIR, _ctx: ValidationContext) => {
+  validateTypes: (ir: ContractIR) => {
     const storage = ir.storage as
       | { tables?: Record<string, { columns?: Record<string, { codecId?: string }> }> }
       | undefined;
@@ -650,7 +649,7 @@ export type Contract = unknown;
     expect(result.contractDts).toBeDefined();
   });
 
-  it('passes parameterizedCodecs to generateContractTypes options', async () => {
+  it('passes parameterizedRenderers to generateContractTypes options', async () => {
     const ir = createContractIR({
       storage: {
         tables: {},
@@ -673,18 +672,13 @@ export type Contract = unknown;
       },
     };
 
-    const vectorDescriptor: ParameterizedCodecDescriptor = {
+    const vectorRenderer: TypeRenderEntry = {
       codecId: 'pg/vector@1',
-      outputTypeRenderer: 'Vector<{{length}}>',
-      typesImport: {
-        package: '@prisma-next/extension-pgvector/vector-types',
-        named: 'Vector',
-        alias: 'Vector',
-      },
+      render: (params) => `Vector<${params['length']}>`,
     };
 
-    const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-    parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
+    const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+    parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
     const options: EmitOptions = {
       outputDir: '',
@@ -692,63 +686,18 @@ export type Contract = unknown;
       codecTypeImports: [],
       operationTypeImports: [],
       extensionIds: [],
-      parameterizedCodecs,
+      parameterizedRenderers,
     };
 
     await emit(ir, options, mockHookCapturingOptions);
 
     expect(receivedOptions).toBeDefined();
-    expect(receivedOptions?.parameterizedCodecs).toBeDefined();
-    expect(receivedOptions?.parameterizedCodecs?.size).toBe(1);
-    expect(receivedOptions?.parameterizedCodecs?.get('pg/vector@1')).toEqual(vectorDescriptor);
-  });
+    expect(receivedOptions?.parameterizedRenderers).toBeDefined();
+    expect(receivedOptions?.parameterizedRenderers?.size).toBe(1);
 
-  it('passes parameterizedCodecs to ValidationContext', async () => {
-    const ir = createContractIR({
-      storage: {
-        tables: {},
-      },
-    });
-
-    let receivedCtx: ValidationContext | undefined;
-
-    const mockHookCapturingContext: TargetFamilyHook = {
-      id: 'sql',
-      validateTypes: (_ir, ctx) => {
-        receivedCtx = ctx;
-      },
-      validateStructure: () => {},
-      generateContractTypes: () => {
-        return `// Generated contract types
-export type CodecTypes = Record<string, never>;
-export type LaneCodecTypes = CodecTypes;
-export type Contract = unknown;
-`;
-      },
-    };
-
-    const vectorDescriptor: ParameterizedCodecDescriptor = {
-      codecId: 'pg/vector@1',
-      outputTypeRenderer: 'Vector<{{length}}>',
-    };
-
-    const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-    parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
-
-    const options: EmitOptions = {
-      outputDir: '',
-      operationRegistry: createOperationRegistry(),
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-      parameterizedCodecs,
-    };
-
-    await emit(ir, options, mockHookCapturingContext);
-
-    expect(receivedCtx).toBeDefined();
-    expect(receivedCtx?.parameterizedCodecs).toBeDefined();
-    expect(receivedCtx?.parameterizedCodecs?.size).toBe(1);
-    expect(receivedCtx?.parameterizedCodecs?.get('pg/vector@1')).toEqual(vectorDescriptor);
+    const entry = receivedOptions?.parameterizedRenderers?.get('pg/vector@1');
+    expect(entry).toBeDefined();
+    expect(entry?.codecId).toBe('pg/vector@1');
+    expect(entry?.render({ length: 1536 }, { codecTypesName: 'CodecTypes' })).toBe('Vector<1536>');
   });
 });
