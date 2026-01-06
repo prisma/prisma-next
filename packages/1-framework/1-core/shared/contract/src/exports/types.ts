@@ -12,6 +12,8 @@ export type {
   ExecutionPlan,
   Expr,
   FieldType,
+  // Type generation options for parameterized codecs
+  GenerateContractTypesOptions,
   OperationManifest,
   ParamDescriptor,
   PlanMeta,
@@ -19,6 +21,8 @@ export type {
   ResultType,
   Source,
   TargetFamilyHook,
+  TypeRenderContext,
+  TypeRenderEntry,
   TypesImportSpec,
   ValidationContext,
 } from '../types';

@@ -43,7 +43,13 @@ export async function emit(
   options: EmitOptions,
   targetFamily: TargetFamilyHook,
 ): Promise<EmitResult> {
-  const { operationRegistry, codecTypeImports, operationTypeImports, extensionIds } = options;
+  const {
+    operationRegistry,
+    codecTypeImports,
+    operationTypeImports,
+    extensionIds,
+    parameterizedRenderers,
+  } = options;
 
   validateCoreStructure(ir);
 
@@ -101,6 +107,7 @@ export async function emit(
     ir,
     codecTypeImports ?? [],
     operationTypeImports ?? [],
+    parameterizedRenderers ? { parameterizedRenderers } : undefined,
   );
   const contractDts = await format(contractDtsRaw, {
     parser: 'typescript',
