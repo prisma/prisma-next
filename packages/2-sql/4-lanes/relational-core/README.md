@@ -97,7 +97,7 @@ flowchart TD
 - **`@prisma-next/contract`**: Core contract types
 - **`@prisma-next/plan`**: Plan error helpers (`planInvalid`, `planUnsupported`) and `RuntimeError` type
 - **`@prisma-next/runtime`**: Runtime context types (TODO: Slice 6 will clean this up)
-- **`@prisma-next/sql-target`**: SQL contract types, adapter interfaces
+- **`@prisma-next/sql-contract`**: SQL contract types (via `@prisma-next/sql-contract/types`)
 
 **Note**: This package does not depend on specific adapters (e.g., `@prisma-next/adapter-postgres`). Test fixtures define `CodecTypes` inline to remain adapter-agnostic and avoid cyclic dependencies.
 

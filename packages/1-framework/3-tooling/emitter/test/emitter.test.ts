@@ -21,14 +21,8 @@ const mockSqlHook: TargetFamilyHook = {
       return;
     }
 
-    const referencedNamespaces = new Set<string>();
-    const extensions = ir.extensions as Record<string, unknown> | undefined;
-    if (extensions) {
-      for (const namespace of Object.keys(extensions)) {
-        referencedNamespaces.add(namespace);
-      }
-    }
-
+    // Only validate codec ID format (ns/name@version)
+    // Namespace validation removed - codecs can use any namespace
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
     for (const [tableName, table] of Object.entries(storage.tables)) {
@@ -42,16 +36,6 @@ const mockSqlHook: TargetFamilyHook = {
           throw new Error(
             `Column "${colName}" in table "${tableName}" has invalid codecId format "${col.codecId}". Expected format: ns/name@version`,
           );
-        }
-
-        const match = col.codecId.match(typeIdRegex);
-        if (match?.[1]) {
-          const namespace = match[1];
-          if (!referencedNamespaces.has(namespace)) {
-            throw new Error(
-              `Column "${colName}" in table "${tableName}" uses codecId "${col.codecId}" from namespace "${namespace}" which is not referenced in contract.extensions`,
-            );
-          }
         }
       }
     }
@@ -103,9 +87,9 @@ describe('emitter', () => {
             },
           },
         },
-        extensions: {
+        extensionPacks: {
           postgres: {
-            version: '15.0.0',
+            version: '0.0.1',
           },
           pg: {},
         },
@@ -137,7 +121,8 @@ describe('emitter', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('validates type IDs come from referenced extensions', async () => {
+  it('does not validate codec namespaces against extensions', async () => {
+    // Namespace validation removed - codecs can use any namespace
     const ir = createContractIR({
       storage: {
         tables: {
@@ -163,7 +148,10 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
+    // Should succeed - namespace validation removed
+    const result = await emit(ir, options, mockSqlHook);
+    expect(result.contractJson).toBeDefined();
+    expect(result.contractDts).toBeDefined();
   });
 
   it('validates type ID format', async () => {
@@ -255,7 +243,8 @@ describe('emitter', () => {
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have target');
   });
 
-  it('throws error when extension pack is missing from extensions', async () => {
+  it('emits contract even when extension pack namespace does not match extensionIds', async () => {
+    // Adapter-provided codecs (pg/int4@1) don't need to be in contract.extensionPacks
     const ir = createContractIR({
       storage: {
         tables: {
@@ -277,14 +266,17 @@ describe('emitter', () => {
       operationRegistry,
       codecTypeImports: [],
       operationTypeImports: [],
-      extensionIds: [],
+      extensionIds: [], // No extensions, but codec still works
     };
 
-    // validateTypes runs before validateExtensions, so it will throw about type ID first
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
+    // Should succeed - adapter-provided codecs don't need to be in contract.extensionPacks
+    const result = await emit(ir, options, mockSqlHook);
+    expect(result.contractJson).toBeDefined();
+    expect(result.contractDts).toBeDefined();
   });
 
-  it('handles missing extensions field', async () => {
+  it('handles missing extensionPacks field', async () => {
+    // Namespace validation removed - codecs can use any namespace
     const ir = createContractIR({
       storage: {
         tables: {
@@ -309,11 +301,14 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    // validateTypes runs before validateExtensions, so it will throw about type ID first
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
+    // Should succeed - namespace validation removed
+    const result = await emit(ir, options, mockSqlHook);
+    expect(result.contractJson).toBeDefined();
+    expect(result.contractDts).toBeDefined();
   });
 
   it('handles empty packs array', async () => {
+    // Namespace validation removed - codecs can use any namespace
     const ir = createContractIR({
       storage: {
         tables: {
@@ -338,7 +333,10 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow();
+    // Should succeed - namespace validation removed
+    const result = await emit(ir, options, mockSqlHook);
+    expect(result.contractJson).toBeDefined();
+    expect(result.contractDts).toBeDefined();
   });
 
   it('throws error when schemaVersion is missing', async () => {
@@ -462,9 +460,9 @@ describe('emitter', () => {
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have relations');
   });
 
-  it('throws error when extensions is missing', async () => {
+  it('throws error when extension packs are missing', async () => {
     const ir = createContractIR({
-      extensions: undefined as unknown as Record<string, unknown>,
+      extensionPacks: undefined as unknown as Record<string, unknown>,
     }) as ContractIR;
 
     const operationRegistry = createOperationRegistry();
@@ -476,12 +474,14 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have extensions');
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'ContractIR must have extensionPacks',
+    );
   });
 
-  it('throws error when extensions is not an object', async () => {
+  it('throws error when extension packs are not an object', async () => {
     const ir = createContractIR({
-      extensions: 'not-an-object' as unknown as Record<string, unknown>,
+      extensionPacks: 'not-an-object' as unknown as Record<string, unknown>,
     }) as ContractIR;
 
     const operationRegistry = createOperationRegistry();
@@ -493,7 +493,9 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have extensions');
+    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow(
+      'ContractIR must have extensionPacks',
+    );
   });
 
   it('throws error when capabilities is missing', async () => {
@@ -602,7 +604,8 @@ describe('emitter', () => {
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have sources');
   });
 
-  it('throws error when extension pack is missing from extensions', async () => {
+  it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {
+    // extensionIds includes adapters/targets which are not in contract.extensionPacks
     const ir = createContractIR({
       storage: {
         tables: {},
@@ -636,11 +639,12 @@ export type Contract = unknown;
       operationRegistry: createOperationRegistry(),
       codecTypeImports: [],
       operationTypeImports: [],
-      extensionIds: ['missing-pack'],
+      extensionIds: ['postgres'], // Adapter ID, not an extension
     };
 
-    await expect(emit(ir, options, mockHookNoTypeValidation)).rejects.toThrow(
-      'Extension "missing-pack" must appear in contract.extensions.missing-pack',
-    );
+    // Should succeed - extensionIds can include adapters/targets
+    const result = await emit(ir, options, mockHookNoTypeValidation);
+    expect(result.contractJson).toBeDefined();
+    expect(result.contractDts).toBeDefined();
   });
 });

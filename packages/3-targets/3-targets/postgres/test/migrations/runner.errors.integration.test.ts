@@ -16,6 +16,7 @@ import {
   createTestDatabase,
   executeStatement,
   familyInstance,
+  frameworkComponents,
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
@@ -68,12 +69,12 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('SCHEMA_VERIFY_FAILED');
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
 
         await expectNoMarkerOrLedgerWrites(driver!);
       },
@@ -93,13 +94,13 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('PRECHECK_FAILED');
-          expect(result.failure.summary).toMatch(/precheck/i);
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('PRECHECK_FAILED');
+        expect(failure.summary).toMatch(/precheck/i);
 
         await expectNoMarkerOrLedgerWrites(driver!);
       },
@@ -137,13 +138,13 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
-          expect(result.failure.summary).toMatch(/does not match plan origin/i);
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+        expect(failure.summary).toMatch(/does not match plan origin/i);
 
         const markerRow = await driver!.query<{ core_hash: string; profile_hash: string }>(
           'select core_hash, profile_hash from prisma_contract.marker where id = $1',
@@ -209,12 +210,12 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('SCHEMA_VERIFY_FAILED');
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
 
         await expectNoMarkerOrLedgerWrites(driver!);
 
@@ -274,14 +275,14 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.failure.code).toBe('POSTCHECK_FAILED');
-          expect(result.failure.summary).toMatch(/table\.test_table/i);
-          expect(result.failure.summary).toMatch(/postcheck/i);
-        }
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('POSTCHECK_FAILED');
+        expect(failure.summary).toMatch(/table\.test_table/i);
+        expect(failure.summary).toMatch(/postcheck/i);
 
         // Verify table was rolled back
         const tableRow = await driver!.query<{ exists: boolean }>(
@@ -291,6 +292,156 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
         // Verify no marker/ledger writes
         await expectNoMarkerOrLedgerWrites(driver!);
+      },
+    );
+  });
+
+  describe('when an operation execute step fails with SQL error', () => {
+    it(
+      'fails with EXECUTION_FAILED error and includes normalized error metadata',
+      { timeout: testTimeout },
+      async () => {
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+        // Create a plan with SQL that will fail (syntax error)
+        const planWithInvalidSql = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [
+            {
+              id: 'table.user',
+              label: 'Create user table with invalid SQL',
+              summary: 'The execute SQL has a syntax error',
+              operationClass: 'additive',
+              target: {
+                id: 'postgres',
+                details: {
+                  schema: 'public',
+                  objectType: 'table',
+                  name: 'user',
+                },
+              },
+              precheck: [],
+              execute: [
+                {
+                  description: 'create user table with invalid SQL',
+                  sql: 'CREATE TABLE "user" (id INVALID_TYPE PRIMARY KEY)',
+                },
+              ],
+              postcheck: [],
+            },
+          ],
+        });
+
+        const result = await runner.execute({
+          plan: planWithInvalidSql,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+
+        expect(result.ok).toBe(false);
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('EXECUTION_FAILED');
+        expect(failure.summary).toMatch(/Operation table\.user failed during execution/i);
+        expect(failure.meta).toMatchObject({
+          operationId: 'table.user',
+          stepDescription: 'create user table with invalid SQL',
+          sql: 'CREATE TABLE "user" (id INVALID_TYPE PRIMARY KEY)',
+        });
+        // Normalized error metadata should include sqlState
+        expect(failure.meta?.['sqlState']).toBe('42704'); // undefined_object
+
+        await expectNoMarkerOrLedgerWrites(driver!);
+
+        // Verify table was not created (rolled back)
+        const tableRow = await driver!.query<{ exists: boolean }>(
+          `select to_regclass('public."user"') is not null as exists`,
+        );
+        expect(tableRow.rows[0]?.exists).toBe(false);
+      },
+    );
+
+    it(
+      'includes constraint violation metadata when SQL fails with constraint error',
+      { timeout: testTimeout },
+      async () => {
+        // NOTE: This test intentionally creates the table outside the migration plan
+        // to test error handling for DML failures (INSERT/UPDATE/DELETE) during migration
+        // execution, rather than DDL errors (CREATE TABLE/ALTER TABLE). Other tests in
+        // this file focus on DDL errors where the migration creates schema objects.
+        await driver!.query(`
+          CREATE TABLE "user" (
+            id uuid PRIMARY KEY,
+            email text NOT NULL,
+            CONSTRAINT user_email_unique UNIQUE (email)
+          )
+        `);
+
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+        // Create a plan that tries to insert duplicate email (will fail with constraint violation)
+        const planWithConstraintViolation = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [
+            {
+              id: 'insert.duplicate',
+              label: 'Insert duplicate email',
+              summary: 'Tries to insert a duplicate email which violates unique constraint',
+              operationClass: 'additive',
+              target: {
+                id: 'postgres',
+                details: {
+                  schema: 'public',
+                  objectType: 'table',
+                  name: 'user',
+                },
+              },
+              precheck: [],
+              execute: [
+                {
+                  description: 'insert first user',
+                  sql: `INSERT INTO "user" (id, email) VALUES ('00000000-0000-0000-0000-000000000001', 'test@example.com')`,
+                },
+                {
+                  description: 'insert duplicate email',
+                  sql: `INSERT INTO "user" (id, email) VALUES ('00000000-0000-0000-0000-000000000002', 'test@example.com')`,
+                },
+              ],
+              postcheck: [],
+            },
+          ],
+        });
+
+        const result = await runner.execute({
+          plan: planWithConstraintViolation,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+
+        expect(result.ok).toBe(false);
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('EXECUTION_FAILED');
+        expect(failure.meta).toMatchObject({
+          operationId: 'insert.duplicate',
+          stepDescription: 'insert duplicate email',
+          sqlState: '23505', // Unique violation SQLSTATE
+          constraint: 'user_email_unique',
+          table: 'user',
+          // PostgreSQL does not include column property for unique constraint violations
+        });
+
+        // Verify transaction was rolled back (no rows inserted)
+        const countRow = await driver!.query<{ count: string }>(
+          'SELECT count(*)::text as count FROM "user"',
+        );
+        expect(countRow.rows[0]?.count).toBe('0');
       },
     );
   });

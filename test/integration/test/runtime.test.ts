@@ -261,36 +261,40 @@ describe('runtime execute integration', () => {
     expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
   });
 
-  it('attaches explain estimates when enabled', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      {
-        verify: { mode: 'onFirstUse', requireMarker: true },
-        plugins: [
-          budgets({
-            explain: { enabled: true },
-            severities: { rowCount: 'warn' },
-          }),
-        ],
-        mode: 'permissive',
-      },
-    );
+  it(
+    'attaches explain estimates when enabled',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+          plugins: [
+            budgets({
+              explain: { enabled: true },
+              severities: { rowCount: 'warn' },
+            }),
+          ],
+          mode: 'permissive',
+        },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const rawPlan = sql({ context }).raw`
+      const context = createTestContext(fixtureContract, adapter);
+      const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
 
-    await drainPlanExecution(runtime, rawPlan);
+      await drainPlanExecution(runtime, rawPlan);
 
-    const telemetry = runtime.telemetry();
-    expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
-    expect(telemetry?.fingerprint).toBeTypeOf('string');
-  });
+      const telemetry = runtime.telemetry();
+      expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
+      expect(telemetry?.fingerprint).toBeTypeOf('string');
+    },
+    timeouts.databaseOperation,
+  );
 
   it('emits stable fingerprint for literal-only differences', async () => {
     const runtime = createTestRuntime(

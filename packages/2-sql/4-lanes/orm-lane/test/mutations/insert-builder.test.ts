@@ -45,6 +45,8 @@ describe('insert builder', () => {
       codecTypes: {},
       operationTypes: {},
     },
+    capabilities: {},
+    extensionPacks: {},
     meta: {},
     sources: {},
   };

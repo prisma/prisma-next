@@ -383,14 +383,15 @@ export type ComputeColumnJsType<
 /**
  * Extracts the inferred JsType carried by a ColumnBuilder.
  */
-type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> = CB extends ColumnBuilder<
-  infer _ColumnName extends string,
-  infer _ColumnMeta extends StorageColumn,
-  infer JsType,
-  infer _Ops
->
-  ? JsType
-  : never;
+type ExtractJsTypeFromColumnBuilder<CB extends AnyColumnBuilder> =
+  CB extends ColumnBuilder<
+    infer _ColumnName extends string,
+    infer _ColumnMeta extends StorageColumn,
+    infer JsType,
+    infer _Ops
+  >
+    ? JsType
+    : never;
 
 export type InferProjectionRow<P extends Record<string, AnyColumnBuilder>> = {
   [K in keyof P]: ExtractJsTypeFromColumnBuilder<P[K]>;

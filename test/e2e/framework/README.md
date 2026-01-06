@@ -16,7 +16,6 @@ This package is located at `test/e2e/framework/` (not in `packages/`) as it is a
 
 ## Scripts
 - `pnpm test` (from `test/e2e/framework/`) — run the test suite (requires repo build first)
-- `pnpm test:coverage` (from `test/e2e/framework/`) — run tests with coverage (requires repo build first)
 - `pnpm gen-contract` (from `test/e2e/framework/`) — regenerate committed fixture artifacts from `test/fixtures/contract.ts`
 
 ## Architecture
@@ -112,5 +111,5 @@ const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 await emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, expectedContractJsonPath);
 ```
 
-**Note**: These utilities are local to the e2e-tests package and depend on `@prisma-next/sql-query` and `@prisma-next/sql-target`. They are not exported from `@prisma-next/test-utils` to avoid circular dependencies.
+**Note**: These utilities are local to the e2e-tests package and depend on `@prisma-next/sql-lane` and `@prisma-next/sql-contract`. They are not exported from `@prisma-next/test-utils` to avoid circular dependencies.
 

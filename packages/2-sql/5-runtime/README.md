@@ -28,8 +28,7 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 ## Dependencies
 
 - `@prisma-next/runtime-executor` - Target-neutral execution engine
-- `@prisma-next/sql-contract` - SQL contract types
-- `@prisma-next/sql-target` - SQL family interfaces (legacy transitional package)
+- `@prisma-next/sql-contract` - SQL contract types (via `@prisma-next/sql-contract/types`)
 - `@prisma-next/operations` - Operation registry
 
 ## Usage

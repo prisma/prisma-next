@@ -1,5 +1,6 @@
 ---
 description: When writing tests
+globs: ["**/*.test.ts", "**/*.test-d.ts", "test/**", "packages/**/test/**", "examples/**/test/**"]
 alwaysApply: false
 ---
 
@@ -101,6 +102,6 @@ try {
 
 ## Related Patterns
 
-- `.cursor/rules/testing-guide.mdc`: Testing best practices
+- `docs/Testing Guide.md`: Testing best practices
 - `test/utils/README.md`: Test database utilities documentation
 - `packages/extensions/pgvector/README.md`: pgvector extension documentation

@@ -49,6 +49,12 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/2-sql/1-core/errors/**",
+      "domain": "sql",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/2-sql/2-authoring/**",
       "domain": "sql",
       "layer": "authoring",

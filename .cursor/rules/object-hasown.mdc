@@ -1,7 +1,7 @@
 ---
 description: Use Object.hasOwn() instead of hasOwnProperty()
-globs: ["**/*.ts", "**/*.tsx"]
-alwaysApply: true
+globs: ["packages/**/*.ts", "packages/**/*.tsx", "examples/**/*.ts", "examples/**/*.tsx", "test/**/*.ts", "test/**/*.tsx"]
+alwaysApply: false
 ---
 
 # Use Object.hasOwn() Instead of hasOwnProperty()

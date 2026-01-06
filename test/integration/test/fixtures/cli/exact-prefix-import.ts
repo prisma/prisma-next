@@ -1,11 +1,12 @@
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
 import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 
 // Minimal stub CodecTypes for test fixtures (CLI doesn't need full type inference)
 type CodecTypes = Record<string, never>;
 
 const contractObj = defineContract<CodecTypes>()
-  .target('postgres')
+  .target(postgresPack)
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })
@@ -19,7 +20,7 @@ export const contract = {
   ...contractObj,
   extensions: {
     postgres: {
-      version: '15.0.0',
+      version: '0.0.1',
     },
     pg: {},
   },

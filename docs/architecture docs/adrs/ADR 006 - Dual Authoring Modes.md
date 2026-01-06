@@ -48,7 +48,7 @@
 - Errors surface inline in terminal and editor
 
 #### CI
-- Explicit `prisma-next emit` step required
+- Explicit `prisma-next contract emit` step required
 - Pipeline verifies determinism by re-emitting and checking hashes
 
 ### Back-generation

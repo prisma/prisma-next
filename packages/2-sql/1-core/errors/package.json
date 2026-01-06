@@ -1,0 +1,34 @@
+{
+  "name": "@prisma-next/sql-errors",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Normalized SQL driver error types for Prisma Next",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist coverage .tmp-output"
+  },
+  "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/exports/index.d.ts",
+      "import": "./dist/exports/index.js"
+    }
+  }
+}

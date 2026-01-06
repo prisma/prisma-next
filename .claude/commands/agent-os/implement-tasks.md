@@ -41,6 +41,7 @@ Instruct the subagent to:
 2. Analyze patterns in the codebase according to its built-in workflow
 3. Implement the assigned task group according to requirements and standards
 4. Update `agent-os/specs/[this-spec]/tasks.md` to mark completed tasks with `- [x]`
+5. Make logical git commits as you go so the PR reads as a small story (explicit staging, focused commits, messages explain why)
 
 ### PHASE 3: Produce the final verification report
 

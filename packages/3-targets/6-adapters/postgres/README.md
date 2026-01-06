@@ -10,9 +10,7 @@ PostgreSQL adapter for Prisma Next.
 
 ## Overview
 
-The PostgreSQL adapter implements the adapter SPI for PostgreSQL databases. It provides SQL lowering, capability discovery, codec definitions, and error mapping for PostgreSQL-specific behavior.
-
-This package is an extension pack that extends Prisma Next with PostgreSQL-specific capabilities. It includes a manifest declaring its capabilities and codec types, and provides the adapter implementation that lowers SQL ASTs to PostgreSQL dialect SQL.
+The PostgreSQL adapter implements the adapter SPI for PostgreSQL databases. It provides SQL lowering, capability discovery, codec definitions, and error mapping for PostgreSQL-specific behavior. It also exports both control-plane and runtime-plane adapter descriptors for config wiring.
 
 ## Purpose
 
@@ -30,7 +28,7 @@ Provide PostgreSQL-specific adapter implementation, codecs, and capabilities. En
   - Wire format to JavaScript type decoding
   - JavaScript type to wire format encoding
 - **Codec Types**: Export TypeScript types for PostgreSQL codecs
-- **Extension Pack**: Provide manifest declaring capabilities and codec types
+- **Descriptors**: Provide adapter descriptors declaring capabilities and codec type imports
 
 **Non-goals:**
 - Transport/pooling management (drivers)
@@ -42,8 +40,8 @@ Provide PostgreSQL-specific adapter implementation, codecs, and capabilities. En
 This package spans multiple planes:
 
 - **Shared plane** (`src/core/**`): Core adapter implementation, codecs, and types that can be imported by both migration and runtime planes
-- **Migration plane** (`src/exports/cli.ts`): CLI entry point that exports `AdapterDescriptor` for config files
-- **Runtime plane** (`src/exports/runtime.ts`): Runtime entry point for DB-connected commands (future)
+- **Migration plane** (`src/exports/control.ts`): Control-plane entry point that exports the adapter descriptor for config files
+- **Runtime plane** (`src/exports/runtime.ts`): Runtime-plane entry point that exports the runtime adapter descriptor
 
 ```mermaid
 flowchart TD
@@ -64,8 +62,9 @@ flowchart TD
         PG[(PostgreSQL)]
     end
 
-    subgraph "Extension Pack"
-        MANIFEST[Manifest]
+    subgraph "Descriptors"
+        CONTROL[Control Descriptor]
+        RUNTIME_DESC[Runtime Descriptor]
         CODECTYPES[Codec Types]
     end
 
@@ -76,7 +75,8 @@ flowchart TD
     ADAPTER --> CAPS
     ADAPTER --> DRIVER
     DRIVER --> PG
-    MANIFEST --> RT
+    CONTROL --> RT
+    RUNTIME_DESC --> RT
     CODECTYPES --> RT
     CODECS --> CODECTYPES
 ```
@@ -105,14 +105,12 @@ flowchart TD
 
 ### Exports (`src/exports/`)
 
-**CLI Entry Point (`cli.ts`)**
-- Exports `AdapterDescriptor` for CLI config
-- Loads adapter manifest from `packs/manifest.json`
+**Control Entry Point (`control.ts`)**
+- Exports the control-plane adapter descriptor for CLI config
 - Used by `prisma-next.config.ts` to declare the adapter
 
 **Runtime Entry Point (`runtime.ts`)**
-- Placeholder for future DB-connected commands
-- Will export runtime factory functions
+- Exports the runtime-plane adapter descriptor
 
 **Adapter Export (`adapter.ts`)**
 - Re-exports `createPostgresAdapter` from core
@@ -124,12 +122,6 @@ flowchart TD
 **Types Export (`types.ts`)**
 - Re-exports PostgreSQL-specific types
 
-### Manifest (`packs/manifest.json`)
-
-- Extension pack manifest
-- Declares capabilities and codec types import
-- Provides canonical scalar map for type canonicalization
-
 ## Dependencies
 
 - **`@prisma-next/sql-contract`**: SQL contract types
@@ -138,18 +130,18 @@ flowchart TD
 
 ## Related Subsystems
 
-- **[Adapters & Targets](../../docs/architecture%20docs/subsystems/5.%20Adapters%20&%20Targets.md)**: Detailed adapter specification
-- **[Ecosystem Extensions & Packs](../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20&%20Packs.md)**: Extension pack model
+- **[Adapters & Targets](../../../../docs/architecture%20docs/subsystems/5.%20Adapters%20&%20Targets.md)**: Detailed adapter specification
+- **[Ecosystem Extensions & Packs](../../../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20&%20Packs.md)**: Extension pack model
 
 ## Related ADRs
 
-- [ADR 005 - Thin Core Fat Targets](../../docs/architecture%20docs/adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md)
-- [ADR 016 - Adapter SPI for Lowering](../../docs/architecture%20docs/adrs/ADR%20016%20-%20Adapter%20SPI%20for%20Lowering.md)
-- [ADR 030 - Result decoding & codecs registry](../../docs/architecture%20docs/adrs/ADR%20030%20-%20Result%20decoding%20&%20codecs%20registry.md)
-- [ADR 065 - Adapter capability schema & negotiation v1](../../docs/architecture%20docs/adrs/ADR%20065%20-%20Adapter%20capability%20schema%20&%20negotiation%20v1.md)
-- [ADR 068 - Error mapping to RuntimeError](../../docs/architecture%20docs/adrs/ADR%20068%20-%20Error%20mapping%20to%20RuntimeError.md)
-- [ADR 112 - Target Extension Packs](../../docs/architecture%20docs/adrs/ADR%20112%20-%20Target%20Extension%20Packs.md)
-- [ADR 114 - Extension codecs & branded types](../../docs/architecture%20docs/adrs/ADR%20114%20-%20Extension%20codecs%20&%20branded%20types.md)
+- [ADR 005 - Thin Core Fat Targets](../../../../docs/architecture%20docs/adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md)
+- [ADR 016 - Adapter SPI for Lowering](../../../../docs/architecture%20docs/adrs/ADR%20016%20-%20Adapter%20SPI%20for%20Lowering.md)
+- [ADR 030 - Result decoding & codecs registry](../../../../docs/architecture%20docs/adrs/ADR%20030%20-%20Result%20decoding%20&%20codecs%20registry.md)
+- [ADR 065 - Adapter capability schema & negotiation v1](../../../../docs/architecture%20docs/adrs/ADR%20065%20-%20Adapter%20capability%20schema%20&%20negotiation%20v1.md)
+- [ADR 068 - Error mapping to RuntimeError](../../../../docs/architecture%20docs/adrs/ADR%20068%20-%20Error%20mapping%20to%20RuntimeError.md)
+- [ADR 112 - Target Extension Packs](../../../../docs/architecture%20docs/adrs/ADR%20112%20-%20Target%20Extension%20Packs.md)
+- [ADR 114 - Extension codecs & branded types](../../../../docs/architecture%20docs/adrs/ADR%20114%20-%20Extension%20codecs%20&%20branded%20types.md)
 
 ## Usage
 
@@ -191,12 +183,12 @@ The adapter declares the following PostgreSQL capabilities:
 
 **Important**: Capabilities must be declared in **both** places:
 
-1. **`packs/manifest.json`**: Capabilities are read by the CLI during emission and included in the contract
-2. **`src/core/adapter.ts`**: The `defaultCapabilities` constant is used at runtime via `adapter.profile.capabilities`
+1. **Adapter descriptor** (`src/exports/control.ts` and `src/exports/runtime.ts`): Capabilities are read during emission and included in the contract
+2. **Runtime adapter code** (`src/core/adapter.ts`): The `defaultCapabilities` constant is used at runtime via `adapter.profile.capabilities`
 
-The capabilities in the manifest must match the capabilities in code. If they don't match, the contract won't include the capabilities, causing runtime capability checks to fail.
+The capabilities on the descriptor must match the capabilities in code. If they don't match, emitted contracts and runtime capability checks will diverge.
 
-See `.cursor/rules/adapter-capability-declaration.mdc` for detailed guidelines.
+See `docs/reference/capabilities.md` and `docs/architecture docs/subsystems/5. Adapters & Targets.md` for details.
 
 ## includeMany Support
 
@@ -254,6 +246,6 @@ DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id", "user"."email"
 - `./adapter`: Adapter implementation (`createPostgresAdapter`)
 - `./codec-types`: PostgreSQL codec types (`CodecTypes`, `dataTypes`)
 - `./types`: PostgreSQL-specific types
-- `./cli`: CLI entry point (`AdapterDescriptor`)
-- `./runtime`: Runtime entry point (placeholder for future)
+- `./control`: Control-plane entry point (adapter descriptor)
+- `./runtime`: Runtime-plane entry point (runtime adapter descriptor)
 

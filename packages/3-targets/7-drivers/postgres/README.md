@@ -74,7 +74,7 @@ flowchart TD
 
 ## Dependencies
 
-- **`@prisma-next/sql-target`**: Driver SPI and SQL types
+- **`@prisma-next/sql-contract`**: SQL contract types (via `@prisma-next/sql-contract/types`)
 
 ## Related Subsystems
 

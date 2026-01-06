@@ -1,21 +1,9 @@
-import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import type {
-  ControlAdapterDescriptor,
-  ControlDriverDescriptor,
-  ControlExtensionDescriptor,
   ControlFamilyDescriptor,
+  ControlPlaneStack,
 } from '@prisma-next/core-control-plane/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './instance';
-import type { SqlControlTargetDescriptor } from './migrations/types';
-
-/**
- * SQL family manifest.
- */
-const sqlFamilyManifest: ExtensionPackManifest = {
-  id: 'sql',
-  version: '0.0.1',
-};
 
 /**
  * SQL family descriptor implementation.
@@ -27,19 +15,19 @@ export class SqlFamilyDescriptor
   readonly kind = 'family' as const;
   readonly id = 'sql';
   readonly familyId = 'sql' as const;
-  readonly manifest = sqlFamilyManifest;
+  readonly version = '0.0.1';
   readonly hook = sqlTargetFamilyHook;
 
-  create<TTargetId extends string, TTargetDetails = Record<string, never>>(options: {
-    readonly target: SqlControlTargetDescriptor<TTargetId, TTargetDetails>;
-    readonly adapter: ControlAdapterDescriptor<'sql', TTargetId>;
-    readonly driver: ControlDriverDescriptor<'sql', TTargetId>;
-    readonly extensions: readonly ControlExtensionDescriptor<'sql', TTargetId>[];
-  }): SqlControlFamilyInstance {
+  create<TTargetId extends string>(
+    stack: ControlPlaneStack<'sql', TTargetId>,
+  ): SqlControlFamilyInstance {
+    // Note: driver is not passed here because SqlFamilyInstance operations
+    // (validate, emit, etc.) don't require DB connectivity. Commands that
+    // need the driver (verify, introspect) get it directly from the stack.
     return createSqlFamilyInstance({
-      target: options.target,
-      adapter: options.adapter,
-      extensions: options.extensions,
+      target: stack.target,
+      adapter: stack.adapter,
+      extensionPacks: stack.extensionPacks,
     });
   }
 }

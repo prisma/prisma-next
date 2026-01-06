@@ -10,7 +10,7 @@ This package contains the SQL-specific TypeScript contract authoring surface for
 - **Layer**: authoring
 - **Plane**: migration
 
-**Note**: SQL authoring may depend on SQL targets layer (e.g., `@prisma-next/sql-contract-types`) within the same domain.
+**Note**: SQL authoring may depend on SQL core layer (e.g., `@prisma-next/sql-contract/types`) within the same domain.
 
 ## Overview
 
@@ -21,7 +21,7 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 
 ## Responsibilities
 
-- **SQL Contract Builder**: Provides the `defineContract()` builder API for creating SQL contracts programmatically with type safety
+- **SQL Contract Builder**: Provides the `defineContract()` builder API for creating SQL contracts programmatically with type safety, including pack-ref based `.target()` and `.extensionPacks()` helpers
 - **SQL Contract Validation**: Implements SQL-specific contract validation (`validateContractStructure`, `validateContractLogic`, `validateContract`) and normalization
 - **SQL Contract JSON Schema**: Provides JSON schema for validating contract structure in IDEs and tooling
 - **Composition Layer**: Composes the target-agnostic builder core from `@prisma-next/contract-authoring` with SQL-specific types and validation logic
@@ -54,20 +54,44 @@ This package is part of the package layering architecture:
 ```typescript
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
-
+import postgresPack from '@prisma-next/target-postgres/pack';
+import pgvector from '@prisma-next/extension-pgvector/pack';
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 
 const contract = defineContract<CodecTypes>()
-  .target('postgres')
+  .target(postgresPack)
+  .extensionPacks({ pgvector })
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })
       .column('email', { type: textColumn, nullable: false })
-      .primaryKey(['id']),
+      .primaryKey(['id'], 'user_pkey')           // Named primary key
+      .unique(['email'], 'user_email_unique')    // Named unique constraint
+      .index(['email'], 'user_email_idx'),       // Named index
+  )
+  .table('post', (t) =>
+    t
+      .column('id', { type: int4Column, nullable: false })
+      .column('userId', { type: int4Column, nullable: false })
+      .column('title', { type: textColumn, nullable: false })
+      .primaryKey(['id'])
+      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey'),  // Named FK
   )
   .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
+  .model('Post', 'post', (m) => m.field('id', 'id').field('userId', 'userId').field('title', 'title'))
   .build();
 ```
+
+#### Table Builder Methods
+
+The table builder supports the following constraint methods:
+
+| Method | Description |
+|--------|-------------|
+| `.primaryKey(columns, name?)` | Define primary key with optional name |
+| `.unique(columns, name?)` | Add unique constraint with optional name |
+| `.index(columns, name?)` | Add index with optional name |
+| `.foreignKey(columns, references, name?)` | Add foreign key with optional name |
 
 ### Validating Contracts
 

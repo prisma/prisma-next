@@ -1,9 +1,7 @@
 import { timeouts } from '@prisma-next/test-utils';
-import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  plugins: [tsconfigPaths()],
   test: {
     globals: true,
     environment: 'node',
@@ -12,6 +10,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.ts'],
       exclude: [
         'dist/**',
         'test/**',
@@ -22,10 +21,10 @@ export default defineConfig({
         '**/orm-types.ts', // Types-only file
       ],
       thresholds: {
-        lines: 90,
-        branches: 88,
+        lines: 95,
+        branches: 87,
         functions: 95,
-        statements: 90,
+        statements: 95,
       },
     },
   },

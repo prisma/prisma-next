@@ -1,60 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { ControlAdapterDescriptor } from '@prisma-next/core-control-plane/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import { type } from 'arktype';
 import { PostgresControlAdapter } from '../core/control-adapter';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const TypesImportSpecSchema = type({
-  package: 'string',
-  named: 'string',
-  alias: 'string',
-});
-
-const StorageTypeMetadataSchema = type({
-  typeId: 'string',
-  familyId: 'string',
-  targetId: 'string',
-  'nativeType?': 'string',
-});
-
-const ExtensionPackManifestSchema = type({
-  id: 'string',
-  version: 'string',
-  'targets?': type({ '[string]': type({ 'minVersion?': 'string' }) }),
-  'capabilities?': 'Record<string, unknown>',
-  'types?': type({
-    'codecTypes?': type({
-      import: TypesImportSpecSchema,
-    }),
-    'operationTypes?': type({
-      import: TypesImportSpecSchema,
-    }),
-    'storage?': StorageTypeMetadataSchema.array(),
-  }),
-  'operations?': 'unknown[]',
-});
-
-/**
- * Loads the adapter manifest from packs/manifest.json.
- */
-function loadAdapterManifest(): ExtensionPackManifest {
-  const manifestPath = join(__dirname, '../../packs/manifest.json');
-  const manifestJson = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-
-  const result = ExtensionPackManifestSchema(manifestJson);
-  if (result instanceof type.errors) {
-    const messages = result.map((p: { message: string }) => p.message).join('; ');
-    throw new Error(`Invalid adapter manifest structure at ${manifestPath}: ${messages}`);
-  }
-
-  return result as ExtensionPackManifest;
-}
+import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
 
 /**
  * Postgres adapter descriptor for CLI config.
@@ -64,11 +11,7 @@ const postgresAdapterDescriptor: ControlAdapterDescriptor<
   'postgres',
   SqlControlAdapter<'postgres'>
 > = {
-  kind: 'adapter',
-  familyId: 'sql',
-  targetId: 'postgres',
-  id: 'postgres',
-  manifest: loadAdapterManifest(),
+  ...postgresAdapterDescriptorMeta,
   create(): SqlControlAdapter<'postgres'> {
     return new PostgresControlAdapter();
   },

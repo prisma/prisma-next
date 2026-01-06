@@ -1,7 +1,7 @@
 ---
 description: Directory layout rules for SQL family vs concrete targets
-globs:
-alwaysApply: true
+globs: ["packages/**", "architecture.config.json"]
+alwaysApply: false
 ---
 
 # Directory Layout — Numbered Prefixes, Domains, Layers, and Planes
@@ -91,5 +91,5 @@ Use subpath globs in `architecture.config.json` to map those files to their resp
 ## Notes
 
 - Avoid placing SQL family internals under `packages/3-targets/**`. Likewise, avoid placing concrete target code under `packages/2-sql/**`.
-- When moving existing code to conform, update `architecture.config.json`, `tsconfig.base.json` path aliases, and docs alongside the move.
+- When moving existing code to conform, update `architecture.config.json`, `tsconfig.base.json` project references, and docs alongside the move.
 - The numbered prefixes make dependency direction visually obvious when browsing the filesystem.

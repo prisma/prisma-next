@@ -6,31 +6,31 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
-    "lint:fix": "biome check --write . --config-path ../../../biome.json",
-    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../biome.json",
-    "emit": "prisma-next emit",
-    "clean": "node ../../../scripts/clean.mjs"
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "emit": "prisma-next contract emit",
+    "clean": "rm -rf dist coverage .tmp-output"
   },
   "devDependencies": {
-    "vitest": "^2.1.1",
-    "typescript": "^5.9.3",
-    "vite-tsconfig-paths": "^5.1.4",
-    "@types/node": "^20.11.30",
-    "@types/pg": "^8.11.10",
-    "pg": "^8.11.5"
+    "@prisma-next/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "pg": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/integration-tests": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
-    "@prisma-next/sql-runtime": "workspace:*",
-    "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
-    "@prisma-next/adapter-postgres": "workspace:*",
-    "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*"
   }

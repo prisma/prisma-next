@@ -58,6 +58,8 @@ describe('plan assembly', () => {
       codecTypes: {},
       operationTypes: {},
     },
+    capabilities: {},
+    extensionPacks: {},
     meta: {},
     sources: {},
   };

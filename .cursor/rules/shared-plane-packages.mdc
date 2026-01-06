@@ -1,7 +1,7 @@
 ---
 description: Pattern for creating shared plane packages that serve both migration and runtime planes
-globs:
-alwaysApply: true
+globs: ["packages/**", "architecture.config.json"]
+alwaysApply: false
 ---
 
 # Shared Plane Packages

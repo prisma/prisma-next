@@ -227,7 +227,7 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContract(c)).not.toThrow();
     });
 
-    it('accepts optional extensions', () => {
+    it('accepts optional extension packs', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
@@ -236,10 +236,10 @@ describe('SQL contract validators', () => {
         target: 'postgres',
         coreHash: 'sha256:abc123',
         storage: s,
-        extensions: {
+        extensionPacks: {
           postgres: {
             id: 'postgres',
-            version: '15.0.0',
+            version: '0.0.1',
           },
         },
       });

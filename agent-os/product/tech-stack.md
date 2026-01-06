@@ -85,7 +85,7 @@
 
 ### Testing
 - **Test Framework:** Vitest 2.1+ (ESM-native)
-- **Coverage:** @vitest/coverage-v8 for code coverage
+- **Coverage:** @vitest/coverage-v8 v4 for code coverage
 - **Test Organization:** Single-threaded execution for database tests
 - **Integration Tests:** Real PostgreSQL in Docker
 - **E2E Tests:** Full CLI workflow tests with contract emission and migration

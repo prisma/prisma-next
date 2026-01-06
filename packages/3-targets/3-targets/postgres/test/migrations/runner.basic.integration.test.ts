@@ -8,6 +8,7 @@ import {
   createTestDatabase,
   emptySchema,
   familyInstance,
+  frameworkComponents,
   type PostgresControlDriver,
   postgresTargetDescriptor,
   resetDatabase,
@@ -52,6 +53,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           contract,
           schema: emptySchema,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
         expect(result.kind).toBe('success');
         if (result.kind !== 'success') {
@@ -63,6 +65,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
         expect(executeResult.ok).toBe(true);
         if (executeResult.ok) {
@@ -109,6 +112,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           contract,
           schema: emptySchema,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
         if (initialPlan.kind !== 'success') {
           throw new Error('expected initial planner success');
@@ -118,6 +122,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
 
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -132,6 +137,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           driver: driver!,
           destinationContract: contract,
           policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
         });
         expect(emptyPlanResult.ok).toBe(true);
         if (emptyPlanResult.ok) {

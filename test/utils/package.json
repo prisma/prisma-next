@@ -7,20 +7,19 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "test": "vitest run --passWithNoTests",
-    "lint": "biome check . --config-path ../../biome.json --error-on-warnings",
-    "lint:fix": "biome check --write . --config-path ../../biome.json",
-    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../biome.json",
-    "clean": "node ../../scripts/clean.mjs"
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist coverage .tmp-output"
   },
-  "dependencies": {},
   "devDependencies": {
+    "@prisma-next/tsconfig": "workspace:*",
     "@prisma/dev": "catalog:",
-    "get-port": "^7.1.0",
-    "pg": "^8.11.5",
-    "@types/pg": "^8.11.10",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.1"
+    "@types/pg": "catalog:",
+    "pg": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "exports": {
     ".": {

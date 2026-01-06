@@ -12,7 +12,7 @@ export default defineConfig({
   target: postgres,
   driver: postgresDriver,
   adapter: postgresAdapter,
-  extensions: [pgvector],
+  extensionPacks: [pgvector],
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',
@@ -20,6 +20,6 @@ export default defineConfig({
   },
   db: {
     // biome-ignore lint/style/noNonNullAssertion: loaded from .env
-    url: process.env['DATABASE_URL']!,
+    connection: process.env['DATABASE_URL']!,
   },
 });

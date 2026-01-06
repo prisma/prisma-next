@@ -10,7 +10,13 @@ import type {
   PrimaryKey,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import type { SqlForeignKeyIR, SqlIndexIR, SqlUniqueIR } from '@prisma-next/sql-schema-ir/types';
+import type {
+  SqlForeignKeyIR,
+  SqlIndexIR,
+  SqlSchemaIR,
+  SqlUniqueIR,
+} from '@prisma-next/sql-schema-ir/types';
+import type { ComponentDatabaseDependency } from '../migrations/types';
 
 /**
  * Compares two arrays of strings for equality (order-sensitive).
@@ -27,9 +33,71 @@ export function arraysEqual(a: readonly string[], b: readonly string[]): boolean
   return true;
 }
 
+// ============================================================================
+// Semantic Satisfaction Predicates
+// ============================================================================
+// These predicates implement the "stronger satisfies weaker" logic for storage
+// objects. They are used by both verification and migration planning to ensure
+// consistent behavior across the control plane.
+
+/**
+ * Checks if a unique constraint requirement is satisfied by the given columns.
+ *
+ * Semantic satisfaction: a unique constraint requirement can be satisfied by:
+ * - A unique constraint with the same columns, OR
+ * - A unique index with the same columns
+ *
+ * @param uniques - The unique constraints in the schema table
+ * @param indexes - The indexes in the schema table
+ * @param columns - The columns required by the unique constraint
+ * @returns true if the requirement is satisfied
+ */
+export function isUniqueConstraintSatisfied(
+  uniques: readonly SqlUniqueIR[],
+  indexes: readonly SqlIndexIR[],
+  columns: readonly string[],
+): boolean {
+  // Check for matching unique constraint
+  const hasConstraint = uniques.some((unique) => arraysEqual(unique.columns, columns));
+  if (hasConstraint) {
+    return true;
+  }
+  // Check for matching unique index (semantic satisfaction)
+  return indexes.some((index) => index.unique && arraysEqual(index.columns, columns));
+}
+
+/**
+ * Checks if an index requirement is satisfied by the given columns.
+ *
+ * Semantic satisfaction: a non-unique index requirement can be satisfied by:
+ * - Any index (unique or non-unique) with the same columns, OR
+ * - A unique constraint with the same columns (stronger satisfies weaker)
+ *
+ * @param indexes - The indexes in the schema table
+ * @param uniques - The unique constraints in the schema table
+ * @param columns - The columns required by the index
+ * @returns true if the requirement is satisfied
+ */
+export function isIndexSatisfied(
+  indexes: readonly SqlIndexIR[],
+  uniques: readonly SqlUniqueIR[],
+  columns: readonly string[],
+): boolean {
+  // Check for any matching index (unique or non-unique)
+  const hasMatchingIndex = indexes.some((index) => arraysEqual(index.columns, columns));
+  if (hasMatchingIndex) {
+    return true;
+  }
+  // Check for matching unique constraint (semantic satisfaction)
+  return uniques.some((unique) => arraysEqual(unique.columns, columns));
+}
+
 /**
  * Verifies primary key matches between contract and schema.
  * Returns 'pass' or 'fail'.
+ *
+ * Uses semantic satisfaction: identity is based on (table + kind + columns).
+ * Name differences are ignored by default (names are for DDL/diagnostics, not identity).
  */
 export function verifyPrimaryKey(
   contractPK: PrimaryKey,
@@ -58,18 +126,8 @@ export function verifyPrimaryKey(
     return 'fail';
   }
 
-  // Compare name if both are modeled
-  if (contractPK.name && schemaPK.name && contractPK.name !== schemaPK.name) {
-    issues.push({
-      kind: 'primary_key_mismatch',
-      table: tableName,
-      indexOrConstraint: contractPK.name,
-      expected: contractPK.name,
-      actual: schemaPK.name,
-      message: `Table "${tableName}" has primary key name mismatch: expected "${contractPK.name}", got "${schemaPK.name}"`,
-    });
-    return 'fail';
-  }
+  // Name differences are ignored for semantic satisfaction.
+  // Names are persisted for deterministic DDL and diagnostics but are not identity.
 
   return 'pass';
 }
@@ -77,6 +135,9 @@ export function verifyPrimaryKey(
 /**
  * Verifies foreign keys match between contract and schema.
  * Returns verification nodes for the tree.
+ *
+ * Uses semantic satisfaction: identity is based on (table + columns + referenced table + referenced columns).
+ * Name differences are ignored by default (names are for DDL/diagnostics, not identity).
  */
 export function verifyForeignKeys(
   contractFKs: readonly ForeignKey[],
@@ -118,40 +179,19 @@ export function verifyForeignKeys(
         children: [],
       });
     } else {
-      // Compare name if both are modeled
-      if (contractFK.name && matchingFK.name && contractFK.name !== matchingFK.name) {
-        issues.push({
-          kind: 'foreign_key_mismatch',
-          table: tableName,
-          indexOrConstraint: contractFK.name,
-          expected: contractFK.name,
-          actual: matchingFK.name,
-          message: `Table "${tableName}" has foreign key name mismatch: expected "${contractFK.name}", got "${matchingFK.name}"`,
-        });
-        nodes.push({
-          status: 'fail',
-          kind: 'foreignKey',
-          name: `foreignKey(${contractFK.columns.join(', ')})`,
-          contractPath: fkPath,
-          code: 'foreign_key_mismatch',
-          message: 'Foreign key name mismatch',
-          expected: contractFK.name,
-          actual: matchingFK.name,
-          children: [],
-        });
-      } else {
-        nodes.push({
-          status: 'pass',
-          kind: 'foreignKey',
-          name: `foreignKey(${contractFK.columns.join(', ')})`,
-          contractPath: fkPath,
-          code: '',
-          message: '',
-          expected: undefined,
-          actual: undefined,
-          children: [],
-        });
-      }
+      // Name differences are ignored for semantic satisfaction.
+      // Names are persisted for deterministic DDL and diagnostics but are not identity.
+      nodes.push({
+        status: 'pass',
+        kind: 'foreignKey',
+        name: `foreignKey(${contractFK.columns.join(', ')})`,
+        contractPath: fkPath,
+        code: '',
+        message: '',
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
     }
   }
 
@@ -193,10 +233,18 @@ export function verifyForeignKeys(
 /**
  * Verifies unique constraints match between contract and schema.
  * Returns verification nodes for the tree.
+ *
+ * Uses semantic satisfaction: identity is based on (table + kind + columns).
+ * A unique constraint requirement can be satisfied by either:
+ * - A unique constraint with the same columns, or
+ * - A unique index with the same columns
+ *
+ * Name differences are ignored by default (names are for DDL/diagnostics, not identity).
  */
 export function verifyUniqueConstraints(
   contractUniques: readonly UniqueConstraint[],
   schemaUniques: readonly SqlUniqueIR[],
+  schemaIndexes: readonly SqlIndexIR[],
   tableName: string,
   tablePath: string,
   issues: SchemaIssue[],
@@ -207,11 +255,18 @@ export function verifyUniqueConstraints(
   // Check each contract unique exists in schema
   for (const contractUnique of contractUniques) {
     const uniquePath = `${tablePath}.uniques[${contractUnique.columns.join(',')}]`;
+
+    // First check for a matching unique constraint
     const matchingUnique = schemaUniques.find((u) =>
       arraysEqual(u.columns, contractUnique.columns),
     );
 
-    if (!matchingUnique) {
+    // If no matching constraint, check for a unique index with the same columns
+    const matchingUniqueIndex =
+      !matchingUnique &&
+      schemaIndexes.find((idx) => idx.unique && arraysEqual(idx.columns, contractUnique.columns));
+
+    if (!matchingUnique && !matchingUniqueIndex) {
       issues.push({
         kind: 'unique_constraint_mismatch',
         table: tableName,
@@ -230,44 +285,19 @@ export function verifyUniqueConstraints(
         children: [],
       });
     } else {
-      // Compare name if both are modeled
-      if (
-        contractUnique.name &&
-        matchingUnique.name &&
-        contractUnique.name !== matchingUnique.name
-      ) {
-        issues.push({
-          kind: 'unique_constraint_mismatch',
-          table: tableName,
-          indexOrConstraint: contractUnique.name,
-          expected: contractUnique.name,
-          actual: matchingUnique.name,
-          message: `Table "${tableName}" has unique constraint name mismatch: expected "${contractUnique.name}", got "${matchingUnique.name}"`,
-        });
-        nodes.push({
-          status: 'fail',
-          kind: 'unique',
-          name: `unique(${contractUnique.columns.join(', ')})`,
-          contractPath: uniquePath,
-          code: 'unique_constraint_mismatch',
-          message: 'Unique constraint name mismatch',
-          expected: contractUnique.name,
-          actual: matchingUnique.name,
-          children: [],
-        });
-      } else {
-        nodes.push({
-          status: 'pass',
-          kind: 'unique',
-          name: `unique(${contractUnique.columns.join(', ')})`,
-          contractPath: uniquePath,
-          code: '',
-          message: '',
-          expected: undefined,
-          actual: undefined,
-          children: [],
-        });
-      }
+      // Name differences are ignored for semantic satisfaction.
+      // Names are persisted for deterministic DDL and diagnostics but are not identity.
+      nodes.push({
+        status: 'pass',
+        kind: 'unique',
+        name: `unique(${contractUnique.columns.join(', ')})`,
+        contractPath: uniquePath,
+        code: '',
+        message: '',
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
     }
   }
 
@@ -305,10 +335,18 @@ export function verifyUniqueConstraints(
 /**
  * Verifies indexes match between contract and schema.
  * Returns verification nodes for the tree.
+ *
+ * Uses semantic satisfaction: identity is based on (table + kind + columns).
+ * A non-unique index requirement can be satisfied by either:
+ * - A non-unique index with the same columns, or
+ * - A unique index with the same columns (stronger satisfies weaker)
+ *
+ * Name differences are ignored by default (names are for DDL/diagnostics, not identity).
  */
 export function verifyIndexes(
   contractIndexes: readonly Index[],
   schemaIndexes: readonly SqlIndexIR[],
+  schemaUniques: readonly SqlUniqueIR[],
   tableName: string,
   tablePath: string,
   issues: SchemaIssue[],
@@ -319,11 +357,18 @@ export function verifyIndexes(
   // Check each contract index exists in schema
   for (const contractIndex of contractIndexes) {
     const indexPath = `${tablePath}.indexes[${contractIndex.columns.join(',')}]`;
-    const matchingIndex = schemaIndexes.find(
-      (idx) => arraysEqual(idx.columns, contractIndex.columns) && idx.unique === false,
+
+    // Check for any matching index (unique or non-unique)
+    // A unique index can satisfy a non-unique index requirement (stronger satisfies weaker)
+    const matchingIndex = schemaIndexes.find((idx) =>
+      arraysEqual(idx.columns, contractIndex.columns),
     );
 
-    if (!matchingIndex) {
+    // Also check if a unique constraint satisfies the index requirement
+    const matchingUniqueConstraint =
+      !matchingIndex && schemaUniques.find((u) => arraysEqual(u.columns, contractIndex.columns));
+
+    if (!matchingIndex && !matchingUniqueConstraint) {
       issues.push({
         kind: 'index_mismatch',
         table: tableName,
@@ -342,40 +387,19 @@ export function verifyIndexes(
         children: [],
       });
     } else {
-      // Compare name if both are modeled
-      if (contractIndex.name && matchingIndex.name && contractIndex.name !== matchingIndex.name) {
-        issues.push({
-          kind: 'index_mismatch',
-          table: tableName,
-          indexOrConstraint: contractIndex.name,
-          expected: contractIndex.name,
-          actual: matchingIndex.name,
-          message: `Table "${tableName}" has index name mismatch: expected "${contractIndex.name}", got "${matchingIndex.name}"`,
-        });
-        nodes.push({
-          status: 'fail',
-          kind: 'index',
-          name: `index(${contractIndex.columns.join(', ')})`,
-          contractPath: indexPath,
-          code: 'index_mismatch',
-          message: 'Index name mismatch',
-          expected: contractIndex.name,
-          actual: matchingIndex.name,
-          children: [],
-        });
-      } else {
-        nodes.push({
-          status: 'pass',
-          kind: 'index',
-          name: `index(${contractIndex.columns.join(', ')})`,
-          contractPath: indexPath,
-          code: '',
-          message: '',
-          expected: undefined,
-          actual: undefined,
-          children: [],
-        });
-      }
+      // Name differences are ignored for semantic satisfaction.
+      // Names are persisted for deterministic DDL and diagnostics but are not identity.
+      nodes.push({
+        status: 'pass',
+        kind: 'index',
+        name: `index(${contractIndex.columns.join(', ')})`,
+        contractPath: indexPath,
+        code: '',
+        message: '',
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
     }
   }
 
@@ -416,82 +440,46 @@ export function verifyIndexes(
 }
 
 /**
- * Verifies required extensions exist in schema.
- * Extracts extension names from contract.extensions (keys) and compares with schemaIR.extensions.
- * Filters out the target name (e.g., 'postgres') as it's not an extension.
+ * Verifies database dependencies are installed using component-owned verification hooks.
+ * Each dependency provides a pure verifyDatabaseDependencyInstalled function that checks
+ * whether the dependency is satisfied based on the in-memory schema IR (no DB I/O).
+ *
  * Returns verification nodes for the tree.
  */
-export function verifyExtensions(
-  contractExtensions: Record<string, unknown> | undefined,
-  schemaExtensions: readonly string[],
-  contractTarget: string,
+export function verifyDatabaseDependencies(
+  dependencies: ReadonlyArray<ComponentDatabaseDependency<unknown>>,
+  schema: SqlSchemaIR,
   issues: SchemaIssue[],
-  _strict: boolean,
 ): SchemaVerificationNode[] {
   const nodes: SchemaVerificationNode[] = [];
 
-  if (!contractExtensions) {
-    return nodes;
-  }
+  for (const dependency of dependencies) {
+    const depIssues = dependency.verifyDatabaseDependencyInstalled(schema);
+    const depPath = `dependencies.${dependency.id}`;
 
-  // Extract extension names from contract (keys of extensions object)
-  // Filter out the target name - it's not an extension (e.g., 'postgres' is the target, not an extension)
-  const contractExtensionNames = Object.keys(contractExtensions).filter(
-    (name) => name !== contractTarget,
-  );
-
-  // Check each contract extension exists in schema
-  // Extension names in contract may differ from database extension names
-  // (e.g., contract has 'pgvector' but database has 'vector')
-  // We need to match more flexibly - try exact match, then check if either contains the other
-  for (const extName of contractExtensionNames) {
-    const extPath = `extensions.${extName}`;
-    // Normalize extension names for comparison (remove common prefixes like 'pg')
-    const normalizedExtName = extName.toLowerCase().replace(/^pg/, '');
-    const matchingExt = schemaExtensions.find((e) => {
-      const normalizedE = e.toLowerCase();
-      // Exact match
-      if (normalizedE === normalizedExtName || normalizedE === extName.toLowerCase()) {
-        return true;
-      }
-      // Check if one contains the other (e.g., 'pgvector' contains 'vector', 'vector' is in 'pgvector')
-      if (normalizedE.includes(normalizedExtName) || normalizedExtName.includes(normalizedE)) {
-        return true;
-      }
-      return false;
-    });
-
-    // Map extension names to descriptive labels
-    const extensionLabels: Record<string, string> = {
-      pg: 'database is postgres',
-      pgvector: 'vector extension is enabled',
-      vector: 'vector extension is enabled',
-    };
-    const extensionLabel = extensionLabels[extName] ?? `extension "${extName}" is enabled`;
-
-    if (!matchingExt) {
-      issues.push({
-        kind: 'extension_missing',
-        table: '',
-        message: `Extension "${extName}" is missing from database`,
-      });
+    if (depIssues.length > 0) {
+      // Dependency is not satisfied
+      issues.push(...depIssues);
+      const issuesMessage = depIssues.map((i) => i.message).join('; ');
+      const nodeMessage = issuesMessage ? `${dependency.id}: ${issuesMessage}` : dependency.id;
       nodes.push({
         status: 'fail',
-        kind: 'extension',
-        name: extensionLabel,
-        contractPath: extPath,
-        code: 'extension_missing',
-        message: `Extension "${extName}" is missing`,
+        kind: 'databaseDependency',
+        name: dependency.label,
+        contractPath: depPath,
+        code: 'dependency_missing',
+        message: nodeMessage,
         expected: undefined,
         actual: undefined,
         children: [],
       });
     } else {
+      // Dependency is satisfied
       nodes.push({
         status: 'pass',
-        kind: 'extension',
-        name: extensionLabel,
-        contractPath: extPath,
+        kind: 'databaseDependency',
+        name: dependency.label,
+        contractPath: depPath,
         code: '',
         message: '',
         expected: undefined,
@@ -500,9 +488,6 @@ export function verifyExtensions(
       });
     }
   }
-
-  // In strict mode, we don't check for extra extensions (they're allowed)
-  // Extensions are additive - having extra extensions doesn't break the contract
 
   return nodes;
 }

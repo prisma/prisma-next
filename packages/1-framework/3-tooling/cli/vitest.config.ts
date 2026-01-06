@@ -1,18 +1,15 @@
 import { timeouts } from '@prisma-next/test-utils';
-import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  plugins: [tsconfigPaths()],
   test: {
     globals: true,
     environment: 'node',
+    // Note: do not change to 'threads', it will cause the failure
+    // `TypeError: process.chdir() is not supported in workers`.
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 1,
+    isolate: false,
     testTimeout: timeouts.default,
     hookTimeout: timeouts.default,
     env: {
@@ -49,9 +46,12 @@ export default defineConfig({
         // Exclude spinner utility - UI/UX code that's hard to test meaningfully
         'src/utils/spinner.ts',
         // Exclude defensive error handling branches that are hard to test meaningfully
-        'src/pack-loading.ts', // Non-Error exception handling (lines 12, 20)
         'src/api/emit-contract.ts', // Non-Error exception handling (lines 104-105)
         'src/load-ts-contract.ts', // Bundle content undefined and non-Error exceptions (lines 170-171, 211)
+        // Control API is tested via integration tests (test/integration/test/control-api.test.ts).
+        // Unit tests with mocked components only test orchestration wiring, not real behavior.
+        // Coverage is measured in integration tests, not package-level coverage.
+        'src/control-api/**',
       ],
       thresholds: {
         lines: 95,

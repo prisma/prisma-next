@@ -27,7 +27,7 @@ export function getPrismaNextRuntime(): Runtime {
       target: postgresTarget,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensions: [],
+      extensionPacks: [],
     });
 
     // Create runtime using family instance
@@ -41,7 +41,6 @@ export function getPrismaNextRuntime(): Runtime {
         mode: 'onFirstUse',
         requireMarker: false,
       },
-      extensions: [],
       plugins: [
         budgets({
           maxRows: 10_000,

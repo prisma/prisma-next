@@ -1,7 +1,7 @@
 ---
 description: Type inference patterns for includeMany feature
-globs: ["packages/sql/**"]
-alwaysApply: true
+globs: ["packages/2-sql/**", "packages/sql/**", "examples/**", "test/**"]
+alwaysApply: false
 ---
 
 # includeMany Type Inference Patterns

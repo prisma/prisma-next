@@ -82,17 +82,21 @@ describe('ast/predicate', () => {
       });
     });
 
-    it.each(['eq', 'neq', 'gt', 'lt', 'gte', 'lte'] as const)(
-      'creates binary expr with %s operator',
-      (op) => {
-        const left = createColumnRef('user', 'id');
-        const right = createColumnRef('post', 'userId');
-        const binaryExpr = createBinaryExpr(op, left, right);
+    it.each([
+      'eq',
+      'neq',
+      'gt',
+      'lt',
+      'gte',
+      'lte',
+    ] as const)('creates binary expr with %s operator', (op) => {
+      const left = createColumnRef('user', 'id');
+      const right = createColumnRef('post', 'userId');
+      const binaryExpr = createBinaryExpr(op, left, right);
 
-        expect(binaryExpr.op).toBe(op);
-        expect(binaryExpr.right.kind).toBe('col');
-      },
-    );
+      expect(binaryExpr.op).toBe(op);
+      expect(binaryExpr.right.kind).toBe('col');
+    });
 
     it('creates binary expr with operation expr and column ref on the right', () => {
       const left = createTestOperationExpr(createColumnRef('user', 'email'));

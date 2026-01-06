@@ -19,7 +19,7 @@ This package provides the ORM query builder that compiles model-based queries to
 - `@prisma-next/plan` - Plan helpers and error utilities
 - `@prisma-next/runtime` - Runtime context for adapter access
 - `@prisma-next/sql-relational-core` - Schema and column builders
-- `@prisma-next/sql-target` - SQL contract types and AST definitions
+- `@prisma-next/sql-contract` - SQL contract types (via `@prisma-next/sql-contract/types`)
 
 ## Exports
 
@@ -81,4 +81,4 @@ src/
 ## Related Packages
 
 - `@prisma-next/sql-relational-core` - Provides schema and column builders used by this package
-- `@prisma-next/sql-target` - Defines SQL contract types and AST structures
+- `@prisma-next/sql-contract` - Defines SQL contract types (via `@prisma-next/sql-contract/types`)

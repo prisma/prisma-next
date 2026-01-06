@@ -1,4 +1,5 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
@@ -22,7 +23,7 @@ async function withIntrospection<T>(
       target: postgres,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensions: [],
+      extensionPacks: [],
     });
 
     const schemaIR = await familyInstance.introspect({ driver });
@@ -208,10 +209,12 @@ describe('family instance introspect', () => {
           target: postgres,
           adapter: adapterWithInvalidCreate,
           driver: postgresDriver,
-          extensions: [],
+          extensionPacks: [],
         });
 
-        const mockDriver = {
+        const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+          familyId: 'sql',
+          targetId: 'postgres',
           query: async () => ({ rows: [] }),
           close: async () => {},
         };

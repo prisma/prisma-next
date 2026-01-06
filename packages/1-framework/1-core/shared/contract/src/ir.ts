@@ -19,7 +19,7 @@ export interface ContractIR<
   readonly models: TModels;
   readonly relations: TRelations;
   readonly storage: TStorage;
-  readonly extensions: Record<string, unknown>;
+  readonly extensionPacks: Record<string, unknown>;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly meta: Record<string, unknown>;
   readonly sources: Record<string, unknown>;
@@ -52,23 +52,23 @@ export function irHeader(opts: {
 
 /**
  * Creates the meta portion of a ContractIR.
- * Contains capabilities, extensions, meta, and sources with empty object defaults.
+ * Contains capabilities, extensionPacks, meta, and sources with empty object defaults.
  * If a field is explicitly `undefined`, it will be omitted (for testing validation).
  */
 export function irMeta(opts?: {
   capabilities?: Record<string, Record<string, boolean>> | undefined;
-  extensions?: Record<string, unknown> | undefined;
+  extensionPacks?: Record<string, unknown> | undefined;
   meta?: Record<string, unknown> | undefined;
   sources?: Record<string, unknown> | undefined;
 }): {
   readonly capabilities: Record<string, Record<string, boolean>>;
-  readonly extensions: Record<string, unknown>;
+  readonly extensionPacks: Record<string, unknown>;
   readonly meta: Record<string, unknown>;
   readonly sources: Record<string, unknown>;
 } {
   return {
     capabilities: opts?.capabilities ?? {},
-    extensions: opts?.extensions ?? {},
+    extensionPacks: opts?.extensionPacks ?? {},
     meta: opts?.meta ?? {},
     sources: opts?.sources ?? {},
   };
@@ -92,7 +92,7 @@ export function contractIR<
   };
   meta: {
     readonly capabilities: Record<string, Record<string, boolean>>;
-    readonly extensions: Record<string, unknown>;
+    readonly extensionPacks: Record<string, unknown>;
     readonly meta: Record<string, unknown>;
     readonly sources: Record<string, unknown>;
   };

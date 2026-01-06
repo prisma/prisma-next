@@ -1,7 +1,7 @@
 ---
 description: How to resolve cyclic dependencies when moving types or refactoring packages
-globs:
-alwaysApply: true
+globs: ["packages/**/package.json"]
+alwaysApply: false
 ---
 
 # Resolving Cyclic Dependencies

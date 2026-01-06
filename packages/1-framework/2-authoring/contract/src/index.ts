@@ -3,14 +3,17 @@ export type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
   ContractBuilderState,
+  ForeignKeyDef,
+  IndexDef,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
+  UniqueConstraintDef,
 } from './builder-state';
 
 export { ContractBuilder, defineContract } from './contract-builder';
 export { ModelBuilder } from './model-builder';
-export { TableBuilder } from './table-builder';
+export { createTable, TableBuilder } from './table-builder';
 
 export type {
   BuildModelFields,

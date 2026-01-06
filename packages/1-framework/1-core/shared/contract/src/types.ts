@@ -1,19 +1,16 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { ContractIR } from './ir';
 
-// Shared header and neutral types
-// Note: Fields like targetFamily accept string to work with JSON imports,
-// which don't preserve literal types. Runtime validation ensures correct values
 export interface ContractBase {
   readonly schemaVersion: string;
   readonly target: string;
   readonly targetFamily: string;
   readonly coreHash: string;
   readonly profileHash?: string;
-  readonly capabilities?: Record<string, Record<string, boolean>>;
-  readonly extensions?: Record<string, unknown>;
-  readonly meta?: Record<string, unknown>;
-  readonly sources?: Record<string, Source>;
+  readonly capabilities: Record<string, Record<string, boolean>>;
+  readonly extensionPacks: Record<string, unknown>;
+  readonly meta: Record<string, unknown>;
+  readonly sources: Record<string, Source>;
 }
 
 export interface FieldType {
@@ -134,11 +131,8 @@ export interface ExecutionPlan<Row = unknown, Ast = unknown> {
  * SqlQueryPlan includes a phantom `_Row` property to preserve the generic parameter
  * for type extraction.
  */
-export type ResultType<P> = P extends ExecutionPlan<infer R, unknown>
-  ? R
-  : P extends { readonly _Row?: infer R }
-    ? R
-    : never;
+export type ResultType<P> =
+  P extends ExecutionPlan<infer R, unknown> ? R : P extends { readonly _Row?: infer R } ? R : never;
 
 /**
  * Type guard to check if a contract is a Document contract
@@ -196,7 +190,7 @@ export interface TargetFamilyHook {
   readonly id: string;
 
   /**
-   * Validates that all type IDs in the contract come from referenced extensions.
+   * Validates that all type IDs in the contract come from referenced extension packs.
    * @param ir - Contract IR to validate
    * @param ctx - Validation context with operation registry and extension IDs
    */
@@ -245,31 +239,4 @@ export interface OperationManifest {
   readonly returns: ReturnSpecManifest;
   readonly lowering: LoweringSpecManifest;
   readonly capabilities?: ReadonlyArray<string>;
-}
-
-export interface ExtensionPackManifest {
-  readonly id: string;
-  readonly version: string;
-  readonly targets?: Record<string, { readonly minVersion?: string }>;
-  readonly capabilities?: Record<string, unknown>;
-  readonly types?: {
-    readonly codecTypes?: {
-      readonly import: TypesImportSpec;
-    };
-    readonly operationTypes?: {
-      readonly import: TypesImportSpec;
-    };
-    readonly storage?: readonly {
-      readonly typeId: string;
-      readonly familyId: string;
-      readonly targetId: string;
-      readonly nativeType?: string;
-    }[];
-  };
-  readonly operations?: ReadonlyArray<OperationManifest>;
-}
-
-export interface ExtensionPack {
-  readonly manifest: ExtensionPackManifest;
-  readonly path: string;
 }

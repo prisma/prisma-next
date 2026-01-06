@@ -2,10 +2,11 @@
   "name": "prisma-next",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.22.0",
+  "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo watch build --filter='./packages/**' --continue=dependencies-successful --output-logs=new-only",
+    "dev:all": "turbo watch build --continue=dependencies-successful --output-logs=new-only",
     "format": "pnpm biome format --write .",
     "test": "turbo run test --continue",
     "test:all": "pnpm test:packages && pnpm test:examples && pnpm test:integration && pnpm test:e2e",
@@ -23,6 +24,8 @@
     "lint:examples": "turbo run lint --filter='./examples/**'",
     "lint:deps": "depcruise --config dependency-cruiser.config.mjs packages",
     "lint:rules": "node scripts/validate-rules.mjs",
+    "lint:rules:footprint": "node scripts/rules-footprint.mjs --check",
+    "rules:footprint": "node scripts/rules-footprint.mjs",
     "lint:docs": "node scripts/validate-package-readmes.mjs",
     "typecheck": "turbo run typecheck",
     "typecheck:all": "turbo run typecheck --include-examples",
@@ -32,19 +35,21 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.0.6",
+    "@biomejs/biome": "2.3.11",
     "@changesets/cli": "^2.27.8",
-    "@types/node": "^24.7.2",
-    "@vitest/coverage-v8": "^2.1.1",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "^4.0.16",
     "dependency-cruiser": "^16.3.3",
+    "gray-matter": "catalog:",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
     "turbo": "^2.6.1",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.1"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,jsonc}": [

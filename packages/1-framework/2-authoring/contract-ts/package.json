@@ -5,19 +5,21 @@
   "sideEffects": false,
   "description": "TypeScript authoring surface for Prisma Next (future)",
   "scripts": {
-    "build": "tsup --config tsup.config.ts",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
-    "lint:fix": "biome check --write . --config-path ../../../../biome.json",
-    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../../biome.json",
-    "clean": "node ../../../../scripts/clean.mjs"
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist coverage .tmp-output"
   },
   "devDependencies": {
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3"
+    "@prisma-next/tsconfig": "workspace:*",
+    "tsup": "catalog:",
+    "typescript": "catalog:"
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "exports": {
     ".": {

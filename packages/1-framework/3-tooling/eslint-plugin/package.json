@@ -12,21 +12,26 @@
     "query-builder"
   ],
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --emitDeclarationOnly",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
-    "lint:fix": "biome check --write . --config-path ../../../../biome.json",
-    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../../biome.json",
-    "clean": "node ../../../../scripts/clean.mjs"
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist coverage .tmp-output"
   },
   "dependencies": {
     "@typescript-eslint/types": "^8.0.0",
@@ -38,13 +43,14 @@
     "@prisma-next/sql-lane": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
-    "@typescript-eslint/parser": "^8.0.0",
+    "@prisma-next/tsconfig": "workspace:*",
     "@types/eslint": "^9.0.0",
-    "@types/node": "^20.0.0",
+    "@types/node": "catalog:",
+    "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.1"
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@typescript-eslint/parser": "^8.0.0",

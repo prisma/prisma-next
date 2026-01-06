@@ -48,6 +48,8 @@ describe('delete builder', () => {
       codecTypes: {},
       operationTypes: {},
     },
+    capabilities: {},
+    extensionPacks: {},
     meta: {},
     sources: {},
   };

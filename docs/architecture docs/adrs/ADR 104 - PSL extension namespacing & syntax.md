@@ -59,7 +59,7 @@ model Place {
 
 ### Mapping to the data contract
 
-- All extension data is emitted under `contract.extensions.<ns>` and never mixed into core tables unless explicitly mapped by the pack's schema
+- All extension data is emitted under `contract.extensionPacks.<ns>` and never mixed into core tables unless explicitly mapped by the pack's schema
 - Core storage mapping remains under `tables.*` with standard columns, constraints, and indexes
 - Extension-specific column metadata may be referenced by core nodes via stable references, e.g. a column `meta.ext.pgvector = { dim: 1536, distance: "cosine" }` when the pack declares such links in its schema
 
@@ -86,7 +86,7 @@ model Place {
       }
     }
   },
-  "extensions": {
+  "extensionPacks": {
     "pgvector": {
       "version": "1.2.0",
       "columns": {
@@ -110,9 +110,9 @@ model Place {
 
 ### Versioning model
 
-- Versions are pinned in `extensions { <ns> = "<semver>" }`
+- Versions are pinned in `extensionPacks { <ns> = "<semver>" }`
 - Attributes omit version for readability and are validated against the pinned pack version
-- The emitter records the version under `contract.extensions.<ns>.version`
+- The emitter records the version under `contract.extensionPacks.<ns>.version`
 - Version changes are reflected in the contract hash and capability surface
 
 ### Determinism and canonicalization

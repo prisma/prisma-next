@@ -20,6 +20,15 @@ export interface CliErrorEnvelope {
 }
 
 /**
+ * Minimal conflict data structure expected by CLI output.
+ */
+export interface CliErrorConflict {
+  readonly kind: string;
+  readonly summary: string;
+  readonly why?: string;
+}
+
+/**
  * Structured CLI error that contains all information needed for error envelopes.
  * Call sites throw these errors with full context.
  */
@@ -85,6 +94,23 @@ export class CliStructuredError extends Error {
       docsUrl: this.docsUrl,
     };
   }
+
+  /**
+   * Type guard to check if an error is a CliStructuredError.
+   * Uses duck-typing to work across module boundaries where instanceof may fail.
+   */
+  static is(error: unknown): error is CliStructuredError {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+    const candidate = error as CliStructuredError;
+    return (
+      candidate.name === 'CliStructuredError' &&
+      typeof candidate.code === 'string' &&
+      (candidate.domain === 'CLI' || candidate.domain === 'RTM') &&
+      typeof candidate.toEnvelope === 'function'
+    );
+  }
 }
 
 // ============================================================================
@@ -135,7 +161,7 @@ export function errorContractValidationFailed(
   return new CliStructuredError('4003', 'Contract validation failed', {
     domain: 'CLI',
     why: reason,
-    fix: 'Check your contract file for errors',
+    fix: 'Re-run `prisma-next contract emit`, or fix the contract file and try again',
     docsUrl: 'https://prisma-next.dev/docs/contracts',
     ...(options?.where ? { where: options.where } : {}),
   });
@@ -148,24 +174,29 @@ export function errorFileNotFound(
   filePath: string,
   options?: {
     readonly why?: string;
+    readonly fix?: string;
+    readonly docsUrl?: string;
   },
 ): CliStructuredError {
   return new CliStructuredError('4004', 'File not found', {
     domain: 'CLI',
     why: options?.why ?? `File not found: ${filePath}`,
-    fix: 'Check that the file path is correct',
+    fix: options?.fix ?? 'Check that the file path is correct',
     where: { path: filePath },
+    ...(options?.docsUrl ? { docsUrl: options.docsUrl } : {}),
   });
 }
 
 /**
- * Database URL is required but not provided.
+ * Database connection is required but not provided.
  */
-export function errorDatabaseUrlRequired(options?: { readonly why?: string }): CliStructuredError {
-  return new CliStructuredError('4005', 'Database URL is required', {
+export function errorDatabaseConnectionRequired(options?: {
+  readonly why?: string;
+}): CliStructuredError {
+  return new CliStructuredError('4005', 'Database connection is required', {
     domain: 'CLI',
-    why: options?.why ?? 'Database URL is required for db verify',
-    fix: 'Provide --db flag or config.db.url in prisma-next.config.ts',
+    why: options?.why ?? 'Database connection is required for this command',
+    fix: 'Provide `--db <url>` or set `db: { connection: "postgres://…" }` in prisma-next.config.ts',
   });
 }
 
@@ -198,14 +229,57 @@ export function errorFamilyReadMarkerSqlRequired(options?: {
 }
 
 /**
+ * JSON output format not supported.
+ */
+export function errorJsonFormatNotSupported(options: {
+  readonly command: string;
+  readonly format: string;
+  readonly supportedFormats: readonly string[];
+}): CliStructuredError {
+  return new CliStructuredError('4008', 'Unsupported JSON format', {
+    domain: 'CLI',
+    why: `The ${options.command} command does not support --json ${options.format}`,
+    fix: `Use --json ${options.supportedFormats.join(' or ')}, or omit --json for human output`,
+    meta: {
+      command: options.command,
+      format: options.format,
+      supportedFormats: options.supportedFormats,
+    },
+  });
+}
+
+/**
  * Driver is required for DB-connected commands but not provided.
  */
 export function errorDriverRequired(options?: { readonly why?: string }): CliStructuredError {
   return new CliStructuredError('4010', 'Driver is required for DB-connected commands', {
     domain: 'CLI',
-    why: options?.why ?? 'Config.driver is required for db verify',
-    fix: 'Add driver to prisma-next.config.ts',
-    docsUrl: 'https://prisma-next.dev/docs/cli/db-verify',
+    why: options?.why ?? 'Config.driver is required for DB-connected commands',
+    fix: 'Add a control-plane driver to prisma-next.config.ts (e.g. import a driver descriptor and set `driver: postgresDriver`)',
+    docsUrl: 'https://prisma-next.dev/docs/cli/config',
+  });
+}
+
+/**
+ * Contract requires extension packs that are not provided by config descriptors.
+ */
+export function errorContractMissingExtensionPacks(options: {
+  readonly missingExtensionPacks: readonly string[];
+  readonly providedComponentIds: readonly string[];
+}): CliStructuredError {
+  const missing = [...options.missingExtensionPacks].sort();
+  return new CliStructuredError('4011', 'Missing extension packs in config', {
+    domain: 'CLI',
+    why:
+      missing.length === 1
+        ? `Contract requires extension pack '${missing[0]}', but CLI config does not provide a matching descriptor.`
+        : `Contract requires extension packs ${missing.map((p) => `'${p}'`).join(', ')}, but CLI config does not provide matching descriptors.`,
+    fix: 'Add the missing extension descriptors to `extensions` in prisma-next.config.ts',
+    docsUrl: 'https://prisma-next.dev/docs/cli/config',
+    meta: {
+      missingExtensionPacks: missing,
+      providedComponentIds: [...options.providedComponentIds].sort(),
+    },
   });
 }
 
@@ -213,11 +287,7 @@ export function errorDriverRequired(options?: { readonly why?: string }): CliStr
  * Migration planning failed due to conflicts.
  */
 export function errorMigrationPlanningFailed(options: {
-  readonly conflicts: readonly {
-    readonly kind: string;
-    readonly summary: string;
-    readonly why?: string;
-  }[];
+  readonly conflicts: readonly CliErrorConflict[];
   readonly why?: string;
 }): CliStructuredError {
   // Build "why" from conflict summaries - these contain the actual problem description
@@ -251,7 +321,7 @@ export function errorTargetMigrationNotSupported(options?: {
   return new CliStructuredError('4021', 'Target does not support migrations', {
     domain: 'CLI',
     why: options?.why ?? 'The configured target does not provide migration planner/runner',
-    fix: 'Ensure you are using a target that supports migrations',
+    fix: 'Select a target that provides migrations (it must export `target.migrations` for db init)',
     docsUrl: 'https://prisma-next.dev/docs/cli/db-init',
   });
 }

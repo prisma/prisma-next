@@ -4,6 +4,12 @@
 
 Prisma Next supports target extensions like pgvector and PostGIS. Schema evolution for these features requires migration operations that understand extension types, indexes, operator families, and catalog state. We need a first-class way to plan and run extension-aware migrations with safety guarantees, deterministic names, and parity between local and hosted preflight.
 
+## Update (v1 implementation)
+
+For v1, database-side prerequisites required by components (for example enabling `CREATE EXTENSION …`) are modeled as **component-owned database dependencies** declared on framework component descriptors and verified via pure schema-IR hooks. This avoids hardcoding ecosystem knowledge in targets and avoids inferring prerequisites from `contract.extensionPacks`.
+
+See [ADR 154 — Component-owned database dependencies](ADR%20154%20-%20Component-owned%20database%20dependencies.md).
+
 ## Problem
 
 - Extensions introduce nonstandard DDL and catalog requirements that generic ops cannot capture safely

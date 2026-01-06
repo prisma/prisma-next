@@ -5,24 +5,28 @@
   "sideEffects": false,
   "description": "Shared utility functions for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../../../biome.json --error-on-warnings",
-    "clean": "node ../../../../../scripts/clean.mjs"
+    "lint": "biome check . --error-on-warnings",
+    "clean": "rm -rf dist coverage .tmp-output"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^2.1.1",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
-    "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^2.1.1"
+    "@prisma-next/tsconfig": "workspace:*",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "exports": {
+    "./array-equal": {
+      "types": "./dist/exports/array-equal.d.ts",
+      "import": "./dist/exports/array-equal.js"
+    },
     "./defined": {
       "types": "./dist/exports/defined.d.ts",
       "import": "./dist/exports/defined.js"
@@ -30,6 +34,10 @@
     "./result": {
       "types": "./dist/exports/result.d.ts",
       "import": "./dist/exports/result.js"
+    },
+    "./redact-db-url": {
+      "types": "./dist/exports/redact-db-url.d.ts",
+      "import": "./dist/exports/redact-db-url.js"
     }
   }
 }

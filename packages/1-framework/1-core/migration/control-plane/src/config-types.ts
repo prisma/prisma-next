@@ -11,8 +11,9 @@ import type {
 
 /**
  * Type alias for CLI driver instances.
+ * Uses string for both family and target IDs for maximum flexibility.
  */
-export type CliDriver = ControlDriverInstance;
+export type CliDriver = ControlDriverInstance<string, string>;
 
 /**
  * Contract configuration specifying source and artifact locations.
@@ -42,23 +43,40 @@ export interface ContractConfig {
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ * @template TConnection - The driver connection input type (defaults to `unknown` for config flexibility)
  */
 export interface PrismaNextConfig<
   TFamilyId extends string = string,
   TTargetId extends string = string,
+  TConnection = unknown,
 > {
   readonly family: ControlFamilyDescriptor<TFamilyId>;
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
-  readonly extensions?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+  readonly extensionPacks?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
   /**
    * Driver descriptor for DB-connected CLI commands.
    * Required for DB-connected commands (e.g., db verify).
    * Optional for commands that don't need database access (e.g., emit).
+   * The driver's connection type matches the TConnection config parameter.
    */
-  readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId>;
+  readonly driver?: ControlDriverDescriptor<
+    TFamilyId,
+    TTargetId,
+    ControlDriverInstance<TFamilyId, TTargetId>,
+    TConnection
+  >;
+  /**
+   * Database connection configuration.
+   * The connection type is driver-specific (e.g., URL string for Postgres).
+   */
   readonly db?: {
-    readonly url?: string;
+    /**
+     * Driver-specific connection input.
+     * For Postgres: a connection string (URL).
+     * For other drivers: may be a structured object.
+     */
+    readonly connection?: TConnection;
   };
   /**
    * Contract configuration. Specifies source and artifact locations.
@@ -85,7 +103,7 @@ const PrismaNextConfigSchema = type({
   family: 'unknown', // ControlFamilyDescriptor - validated separately
   target: 'unknown', // ControlTargetDescriptor - validated separately
   adapter: 'unknown', // ControlAdapterDescriptor - validated separately
-  'extensions?': 'unknown[]',
+  'extensionPacks?': 'unknown[]',
   'driver?': 'unknown', // ControlDriverDescriptor - validated separately (optional)
   'db?': 'unknown',
   'contract?': ContractConfigSchema,

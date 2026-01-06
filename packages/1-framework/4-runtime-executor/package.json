@@ -5,14 +5,14 @@
   "sideEffects": false,
   "description": "Target-agnostic execution engine for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../biome.json --error-on-warnings",
-    "lint:fix": "biome check --write . --config-path ../../../biome.json",
-    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../biome.json",
-    "clean": "node ../../../scripts/clean.mjs"
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist coverage .tmp-output"
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
@@ -20,14 +20,16 @@
     "arktype": "^2.1.25"
   },
   "devDependencies": {
-    "@prisma/dev": "catalog:",
     "@prisma-next/test-utils": "workspace:*",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.1"
+    "@prisma-next/tsconfig": "workspace:*",
+    "@prisma/dev": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "exports": {
     ".": {

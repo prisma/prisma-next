@@ -1,7 +1,9 @@
+import { assertRuntimeContractRequirementsSatisfied } from '@prisma-next/core-execution-plane/framework-components';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeDriverDescriptor,
-  RuntimeExtensionDescriptor,
+  RuntimeDriverInstance,
+  RuntimeFamilyDescriptor,
   RuntimeFamilyInstance,
   RuntimeTargetDescriptor,
 } from '@prisma-next/core-execution-plane/types';
@@ -13,8 +15,26 @@ import type {
   SelectAst,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
-import type { Runtime, RuntimeContext, RuntimeOptions } from '@prisma-next/sql-runtime';
-import { createRuntime, createRuntimeContext, type Extension } from '@prisma-next/sql-runtime';
+import type {
+  Runtime,
+  RuntimeOptions,
+  SqlRuntimeAdapterInstance,
+  SqlRuntimeExtensionDescriptor,
+} from '@prisma-next/sql-runtime';
+import { createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+
+/**
+ * SQL runtime driver instance type.
+ * Combines identity properties with SQL-specific behavior methods.
+ */
+export type SqlRuntimeDriverInstance<TTargetId extends string = string> = RuntimeDriverInstance<
+  'sql',
+  TTargetId
+> &
+  SqlDriver;
+
+// Re-export SqlRuntimeAdapterInstance from sql-runtime for consumers
+export type { SqlRuntimeAdapterInstance } from '@prisma-next/sql-runtime';
 
 /**
  * SQL runtime family instance interface.
@@ -22,13 +42,15 @@ import { createRuntime, createRuntimeContext, type Extension } from '@prisma-nex
  */
 export interface SqlRuntimeFamilyInstance extends RuntimeFamilyInstance<'sql'> {
   /**
-   * Creates a SQL runtime from contract, adapter, driver, and extensions.
+   * Creates a SQL runtime from contract, driver options, and verification settings.
+   *
+   * Extension packs are routed through composition (at instance creation time),
+   * not through this method. This aligns with control-plane composition patterns.
    *
    * @param options - Runtime creation options
    * @param options.contract - SQL contract
    * @param options.driverOptions - Driver options (e.g., PostgresDriverOptions)
    * @param options.verify - Runtime verification options
-   * @param options.extensions - Optional extensions (Extension objects, not descriptors)
    * @param options.plugins - Optional plugins
    * @param options.mode - Optional runtime mode
    * @param options.log - Optional log instance
@@ -38,7 +60,6 @@ export interface SqlRuntimeFamilyInstance extends RuntimeFamilyInstance<'sql'> {
     readonly contract: TContract;
     readonly driverOptions: unknown;
     readonly verify: RuntimeVerifyOptions;
-    readonly extensions?: readonly Extension[];
     readonly plugins?: readonly Plugin<
       TContract,
       Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
@@ -51,17 +72,27 @@ export interface SqlRuntimeFamilyInstance extends RuntimeFamilyInstance<'sql'> {
 
 /**
  * Creates a SQL runtime family instance from runtime descriptors.
+ *
+ * Routes the same framework composition as control-plane:
+ * family, target, adapter, driver, extensionPacks (all as descriptors with IDs).
  */
-export function createSqlRuntimeFamilyInstance(options: {
-  readonly target: RuntimeTargetDescriptor<'sql', string>;
-  readonly adapter: RuntimeAdapterDescriptor<'sql', string>;
-  readonly driver: RuntimeDriverDescriptor<'sql', string>;
-  readonly extensions: readonly RuntimeExtensionDescriptor<'sql', string>[];
+export function createSqlRuntimeFamilyInstance<TTargetId extends string>(options: {
+  readonly family: RuntimeFamilyDescriptor<'sql'>;
+  readonly target: RuntimeTargetDescriptor<'sql', TTargetId>;
+  readonly adapter: RuntimeAdapterDescriptor<
+    'sql',
+    TTargetId,
+    SqlRuntimeAdapterInstance<TTargetId>
+  >;
+  readonly driver: RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>;
+  readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
 }): SqlRuntimeFamilyInstance {
   const {
+    family: familyDescriptor,
+    target: targetDescriptor,
     adapter: adapterDescriptor,
     driver: driverDescriptor,
-    extensions: extensionDescriptors,
+    extensionPacks: extensionDescriptors = [],
   } = options;
 
   return {
@@ -70,7 +101,6 @@ export function createSqlRuntimeFamilyInstance(options: {
       readonly contract: TContract;
       readonly driverOptions: unknown;
       readonly verify: RuntimeVerifyOptions;
-      readonly extensions?: readonly Extension[];
       readonly plugins?: readonly Plugin<
         TContract,
         Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
@@ -79,41 +109,28 @@ export function createSqlRuntimeFamilyInstance(options: {
       readonly mode?: 'strict' | 'permissive';
       readonly log?: Log;
     }): Runtime {
-      const adapterInstance = adapterDescriptor.create();
-      const driverInstance = driverDescriptor.create(runtimeOptions.driverOptions);
-
-      const extensionInstances = extensionDescriptors.map((ext) => ext.create());
-
-      const descriptorExtensions: Extension[] = extensionInstances.map((ext) => {
-        const extension: Extension = {};
-        if ('codecs' in ext && typeof ext.codecs === 'function') {
-          extension.codecs =
-            ext.codecs as () => import('@prisma-next/sql-relational-core/ast').CodecRegistry;
-        }
-        if ('operations' in ext && typeof ext.operations === 'function') {
-          extension.operations =
-            ext.operations as () => readonly import('@prisma-next/sql-operations').SqlOperationSignature[];
-        }
-        return extension;
+      // Validate contract requirements against provided descriptors
+      assertRuntimeContractRequirementsSatisfied({
+        contract: runtimeOptions.contract,
+        family: familyDescriptor,
+        target: targetDescriptor,
+        adapter: adapterDescriptor,
+        extensionPacks: extensionDescriptors,
       });
 
-      const extensions = [...descriptorExtensions, ...(runtimeOptions.extensions ?? [])];
+      // Create driver instance
+      const driverInstance = driverDescriptor.create(runtimeOptions.driverOptions);
 
-      const adapter = adapterInstance as unknown as Adapter<
-        SelectAst,
-        SqlContract<SqlStorage>,
-        LoweredStatement
-      >;
-
-      const context = createRuntimeContext({
+      // Create context via descriptor-first API
+      const context = createRuntimeContext<TContract, TTargetId>({
         contract: runtimeOptions.contract,
-        adapter,
-        extensions,
-      }) as RuntimeContext<TContract>;
+        target: targetDescriptor,
+        adapter: adapterDescriptor,
+        extensionPacks: extensionDescriptors,
+      });
 
       const runtimeOptions_: RuntimeOptions<TContract> = {
-        adapter,
-        driver: driverInstance as SqlDriver,
+        driver: driverInstance,
         verify: runtimeOptions.verify,
         context,
         ...(runtimeOptions.plugins ? { plugins: runtimeOptions.plugins } : {}),

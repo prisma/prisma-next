@@ -4,19 +4,20 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
-import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
 import { createContractIR } from '@prisma-next/emitter/test/utils';
 import {
-  assembleOperationRegistryFromPacks,
-  extractCodecTypeImportsFromPacks,
-  extractExtensionIdsFromPacks,
-  extractOperationTypeImportsFromPacks,
+  assembleOperationRegistry,
+  convertOperationManifest,
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { getSqlDescriptorBundle } from '../utils/framework-components';
 
 const execFileAsync = promisify(execFile);
 
@@ -74,8 +75,8 @@ describe('contract.d.ts imports resolution', () => {
     'generates contract.d.ts with all imports resolving correctly',
     async () => {
       const ir = createContractIR({
-        extensions: {
-          postgres: { version: '15.0.0' },
+        extensionPacks: {
+          postgres: { version: '0.0.1' },
           pg: {},
         },
         models: {
@@ -130,14 +131,11 @@ describe('contract.d.ts imports resolution', () => {
         },
       });
 
-      const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
-        [],
-      );
-      const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-      const extensionIds = extractExtensionIdsFromPacks(packs);
+      const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const codecTypeImports = extractCodecTypeImports(descriptors);
+      const operationTypeImports = extractOperationTypeImports(descriptors);
+      const extensionIds = extractExtensionIds(adapter, target, extensions);
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,
@@ -233,8 +231,8 @@ type UserIdColumn = UserColumns['id'];
     'generated contract.d.ts can be imported and used in TypeScript',
     async () => {
       const ir = createContractIR({
-        extensions: {
-          postgres: { version: '15.0.0' },
+        extensionPacks: {
+          postgres: { version: '0.0.1' },
           pg: {},
         },
         models: {
@@ -263,14 +261,11 @@ type UserIdColumn = UserColumns['id'];
         },
       });
 
-      const packs = loadExtensionPacks(
-        join(__dirname, '../../../packages/3-targets/6-adapters/postgres'),
-        [],
-      );
-      const operationRegistry = assembleOperationRegistryFromPacks(packs);
-      const codecTypeImports = extractCodecTypeImportsFromPacks(packs);
-      const operationTypeImports = extractOperationTypeImportsFromPacks(packs);
-      const extensionIds = extractExtensionIdsFromPacks(packs);
+      const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
+      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const codecTypeImports = extractCodecTypeImports(descriptors);
+      const operationTypeImports = extractOperationTypeImports(descriptors);
+      const extensionIds = extractExtensionIds(adapter, target, extensions);
       const options: EmitOptions = {
         outputDir: testDir,
         operationRegistry,

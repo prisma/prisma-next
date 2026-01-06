@@ -1,4 +1,4 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
@@ -9,6 +9,7 @@ import {
   ensureTableStatement,
   writeContractMarker,
 } from '@prisma-next/sql-runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -41,6 +42,10 @@ const testContract: SqlContract<SqlStorage> = {
     codecTypes: {},
     operationTypes: {},
   },
+  capabilities: {},
+  extensionPacks: {},
+  meta: {},
+  sources: {},
 };
 
 // Shared query module that accepts a client with used methods
@@ -95,15 +100,14 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
     // Validate and canonicalize the contract (converts bare scalars to canonical type IDs)
     const validatedContract = validateContract(testContract);
 
-    const adapter = createPostgresAdapter();
     const context = createRuntimeContext({
       contract: validatedContract,
-      adapter,
-      extensions: [],
+      target: postgresTarget,
+      adapter: postgresAdapter,
+      extensionPacks: [],
     });
 
     const runtime = createRuntime({
-      adapter,
       driver,
       context,
       verify: {

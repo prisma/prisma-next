@@ -1,8 +1,17 @@
+import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
 import type { ColumnTypeDescriptor } from '../src/builder-state';
 import { ContractBuilder, defineContract } from '../src/contract-builder';
 
 const intColumn: ColumnTypeDescriptor = { codecId: 'test/int@1', nativeType: 'int4' };
+const postgresPack: TargetPackRef<'sql', 'postgres'> = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+  capabilities: {},
+};
 
 describe('ContractBuilder', () => {
   it('creates builder with defineContract', () => {
@@ -12,7 +21,7 @@ describe('ContractBuilder', () => {
 
   it('manages target state', () => {
     const builder = defineContract();
-    const withTarget = builder.target('postgres');
+    const withTarget = builder.target(postgresPack);
     expect(withTarget).toBeInstanceOf(ContractBuilder);
     expect(withTarget).not.toBe(builder);
   });
@@ -31,13 +40,6 @@ describe('ContractBuilder', () => {
     const withModel = builder.model('User', 'user', (m) => m.field('id', 'id'));
     expect(withModel).toBeInstanceOf(ContractBuilder);
     expect(withModel).not.toBe(builder);
-  });
-
-  it('manages extensions state', () => {
-    const builder = defineContract();
-    const withExtensions = builder.extensions({ postgres: {} });
-    expect(withExtensions).toBeInstanceOf(ContractBuilder);
-    expect(withExtensions).not.toBe(builder);
   });
 
   it('manages capabilities state', () => {

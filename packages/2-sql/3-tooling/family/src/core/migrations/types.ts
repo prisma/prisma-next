@@ -4,8 +4,11 @@
  * These types extend the canonical migration types from the framework control plane
  * with SQL-specific fields for execution (precheck SQL, execute SQL, etc.).
  */
+
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   ControlDriverInstance,
+  ControlExtensionDescriptor,
   ControlTargetDescriptor,
   ControlTargetInstance,
   MigrationOperationPolicy,
@@ -14,9 +17,11 @@ import type {
   MigrationPlannerFailureResult,
   MigrationPlannerSuccessResult,
   MigrationPlanOperation,
+  MigrationRunnerExecutionChecks,
   MigrationRunnerFailure,
   MigrationRunnerSuccessValue,
   OperationContext,
+  SchemaIssue,
 } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -24,6 +29,75 @@ import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
+
+// ============================================================================
+// Component Database Dependencies
+// ============================================================================
+
+/**
+ * A single database dependency declared by a framework component.
+ * Uses SqlMigrationPlanOperation so we inherit the existing precheck/execute/postcheck contract.
+ *
+ * Database dependencies allow components (extensions, adapters) to declare what database-side
+ * persistence structures they require (e.g., Postgres extensions, schemas, functions).
+ * The planner emits these as migration operations, and the verifier uses the pure verification
+ * hook to check satisfaction against the schema IR.
+ */
+export interface ComponentDatabaseDependency<TTargetDetails> {
+  /** Stable identifier for the dependency (e.g. 'postgres.extension.vector') */
+  readonly id: string;
+  /** Human label for output (e.g. 'Enable vector extension') */
+  readonly label: string;
+  /**
+   * Operations that install/ensure the dependency.
+   * Use SqlMigrationPlanOperation so we inherit the existing precheck/execute/postcheck contract.
+   */
+  readonly install: readonly SqlMigrationPlanOperation<TTargetDetails>[];
+  /**
+   * Pure verification hook: checks whether this dependency is already installed
+   * based on the in-memory schema IR (no DB I/O).
+   *
+   * This must return structured issues suitable for CLI and tree output, not just a boolean.
+   */
+  readonly verifyDatabaseDependencyInstalled: (schema: SqlSchemaIR) => readonly SchemaIssue[];
+}
+
+/**
+ * Database dependencies declared by a framework component.
+ */
+export interface ComponentDatabaseDependencies<TTargetDetails> {
+  /**
+   * Dependencies required for db init.
+   * Future: update dependencies can be added later (e.g. widening/destructive).
+   */
+  readonly init?: readonly ComponentDatabaseDependency<TTargetDetails>[];
+}
+
+/**
+ * Minimal structural type implemented by any descriptor that can expose
+ * component-owned database dependencies. Targets/adapters typically omit
+ * the property, while extensions provide dependency metadata.
+ */
+export interface DatabaseDependencyProvider {
+  readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
+}
+
+// ============================================================================
+// SQL Control Extension Descriptor
+// ============================================================================
+
+/**
+ * SQL-specific extension descriptor with optional database dependencies.
+ * Extends the core ControlExtensionDescriptor with SQL-specific metadata.
+ *
+ * Database dependencies are attached to the descriptor (not the instance) because
+ * they are declarative metadata that planner/verifier need without constructing instances.
+ */
+export interface SqlControlExtensionDescriptor<TTargetId extends string>
+  extends ControlExtensionDescriptor<'sql', TTargetId> {
+  /** Optional database dependencies this extension requires. */
+  readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
+}
 
 // ============================================================================
 // SQL-Specific Plan Types
@@ -50,8 +124,7 @@ export interface SqlMigrationPlanOperationTarget<TTargetDetails> {
  * A single SQL migration operation with SQL-specific fields.
  * Extends the core MigrationPlanOperation with SQL execution details.
  */
-export interface SqlMigrationPlanOperation<TTargetDetails = Record<string, never>>
-  extends MigrationPlanOperation {
+export interface SqlMigrationPlanOperation<TTargetDetails> extends MigrationPlanOperation {
   /** Optional detailed explanation of what this operation does and why. */
   readonly summary?: string;
   readonly target: SqlMigrationPlanOperationTarget<TTargetDetails>;
@@ -73,7 +146,7 @@ export interface SqlMigrationPlanContractInfo {
  * A SQL migration plan with SQL-specific fields.
  * Extends the core MigrationPlan with origin tracking and metadata.
  */
-export interface SqlMigrationPlan<TTargetDetails = Record<string, never>> extends MigrationPlan {
+export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
   /**
    * Origin contract identity that the plan expects the database to currently be at.
    * If omitted, the runner treats the origin as "no marker present" (empty database),
@@ -146,7 +219,7 @@ export interface SqlPlannerFailureResult extends Omit<MigrationPlannerFailureRes
 /**
  * Union type for SQL planner results.
  */
-export type SqlPlannerResult<TTargetDetails = Record<string, never>> =
+export type SqlPlannerResult<TTargetDetails> =
   | SqlPlannerSuccessResult<TTargetDetails>
   | SqlPlannerFailureResult;
 
@@ -158,13 +231,19 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
+  /**
+   * Active framework components participating in this composition.
+   * SQL targets can interpret this list to derive database dependencies.
+   * All components must have matching familyId ('sql') and targetId.
+   */
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**
  * SQL migration planner interface.
  * Extends the core MigrationPlanner with SQL-specific types.
  */
-export interface SqlMigrationPlanner<TTargetDetails = Record<string, never>> {
+export interface SqlMigrationPlanner<TTargetDetails> {
   plan(options: SqlMigrationPlannerPlanOptions): SqlPlannerResult<TTargetDetails>;
 }
 
@@ -175,7 +254,7 @@ export interface SqlMigrationPlanner<TTargetDetails = Record<string, never>> {
 /**
  * Callbacks for SQL migration runner execution.
  */
-export interface SqlMigrationRunnerExecuteCallbacks<TTargetDetails = Record<string, never>> {
+export interface SqlMigrationRunnerExecuteCallbacks<TTargetDetails> {
   onOperationStart?(operation: SqlMigrationPlanOperation<TTargetDetails>): void;
   onOperationComplete?(operation: SqlMigrationPlanOperation<TTargetDetails>): void;
 }
@@ -183,9 +262,9 @@ export interface SqlMigrationRunnerExecuteCallbacks<TTargetDetails = Record<stri
 /**
  * Options for SQL migration runner execution.
  */
-export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string, never>> {
+export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
   readonly plan: SqlMigrationPlan<TTargetDetails>;
-  readonly driver: ControlDriverInstance;
+  readonly driver: ControlDriverInstance<'sql', string>;
   /**
    * Destination contract IR.
    * Must correspond to `plan.destination` and is used for schema verification and marker/ledger writes.
@@ -200,6 +279,17 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails = Record<string
   readonly strictVerification?: boolean;
   readonly callbacks?: SqlMigrationRunnerExecuteCallbacks<TTargetDetails>;
   readonly context?: OperationContext;
+  /**
+   * Execution-time checks configuration.
+   * All checks default to `true` (enabled) when omitted.
+   */
+  readonly executionChecks?: MigrationRunnerExecutionChecks;
+  /**
+   * Active framework components participating in this composition.
+   * SQL targets can interpret this list to derive database dependencies.
+   * All components must have matching familyId ('sql') and targetId.
+   */
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**
@@ -241,7 +331,7 @@ export type SqlMigrationRunnerResult = Result<
  * SQL migration runner interface.
  * Extends the core MigrationRunner with SQL-specific types.
  */
-export interface SqlMigrationRunner<TTargetDetails = Record<string, never>> {
+export interface SqlMigrationRunner<TTargetDetails> {
   execute(
     options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
   ): Promise<SqlMigrationRunnerResult>;
@@ -255,10 +345,8 @@ export interface SqlMigrationRunner<TTargetDetails = Record<string, never>> {
  * SQL control target descriptor with migration support.
  * Extends the core ControlTargetDescriptor with SQL-specific migration methods.
  */
-export interface SqlControlTargetDescriptor<
-  TTargetId extends string,
-  TTargetDetails = Record<string, never>,
-> extends ControlTargetDescriptor<
+export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDetails>
+  extends ControlTargetDescriptor<
     'sql',
     TTargetId,
     ControlTargetInstance<'sql', TTargetId>,

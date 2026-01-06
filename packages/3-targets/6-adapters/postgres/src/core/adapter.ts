@@ -33,6 +33,11 @@ const defaultCapabilities = Object.freeze({
 });
 
 class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, PostgresLoweredStatement> {
+  // These fields make the adapter instance structurally compatible with
+  // RuntimeAdapterInstance<'sql', 'postgres'> without introducing a runtime-plane dependency.
+  readonly familyId = 'sql' as const;
+  readonly targetId = 'postgres' as const;
+
   readonly profile: AdapterProfile<'postgres'>;
   private readonly codecRegistry = (() => {
     const registry = createCodecRegistry();

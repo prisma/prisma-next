@@ -41,9 +41,9 @@ type ContractWithPartialCapabilities = SqlContract<SqlStorage> & {
   };
 };
 
-type ContractWithoutCapabilitiesField = SqlContract<SqlStorage> & {
+type ContractWithEmptyCapabilities = SqlContract<SqlStorage> & {
   readonly target: 'postgres';
-  readonly capabilities?: never;
+  readonly capabilities: Record<string, never>;
 };
 
 test('HasIncludeManyCapabilities correctly identifies contracts with capabilities', () => {
@@ -61,8 +61,8 @@ test('HasIncludeManyCapabilities rejects contracts with partial capabilities', (
   expectTypeOf<Result>().toEqualTypeOf<false>();
 });
 
-test('HasIncludeManyCapabilities rejects contracts without capabilities field', () => {
-  type Result = HasIncludeManyCapabilities<ContractWithoutCapabilitiesField>;
+test('HasIncludeManyCapabilities rejects contracts with empty capabilities', () => {
+  type Result = HasIncludeManyCapabilities<ContractWithEmptyCapabilities>;
   expectTypeOf<Result>().toEqualTypeOf<false>();
 });
 

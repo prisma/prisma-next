@@ -84,7 +84,7 @@ Prisma Next supports three adoption paths:
 **Process:**
 - Connect to database with read-only credentials
 - Inspect schema (table definitions, columns, types, constraints)
-- Optionally detect indexes, triggers, custom types, extensions
+- Optionally detect indexes, triggers, custom types, and database-side prerequisites surfaced by schema IR (e.g., Postgres extensions)
 - Generate contract JSON representation
 
 **Output:** Contract that can be used as H0
@@ -93,7 +93,7 @@ Prisma Next supports three adoption paths:
 - May miss application-level invariants (e.g., "email must be unique within tenant")
 - Cannot automatically infer policies or data classifications
 - May not detect custom constraint logic implemented in triggers or stored procedures
-- Extension usage may need manual annotation
+- Database-side prerequisites required by components (e.g., enabling a Postgres extension) are not inferred from `contract.extensionPacks`. They are modeled as component-owned database dependencies declared by configured components and verified via pure schema-IR hooks.
 
 **Post-Introspection Validation:**
 - Manual review of generated contract

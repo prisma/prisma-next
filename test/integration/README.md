@@ -45,7 +45,7 @@ The `*.e2e.test.ts` files in this directory are **in-process CLI tests** that:
 - Mock `process.exit` and `console.log` to capture output
 - Run commands via `command.parseAsync()` in the same Node process
 
-**Note**: These are named "e2e" for historical reasons but are really integration tests. True subprocess E2E tests (which spawn the CLI as a separate process) should use the pattern in `cli.emit-cli-process.e2e.test.ts` and ideally live in `test/e2e/framework/`. See task 7.2 in `agent-os/specs/2025-12-05-db-init-command/tasks.md` for cleanup plans.
+**Note**: These are named "e2e" for historical reasons but are really integration tests. True subprocess E2E tests (which spawn the CLI as a separate process) should use the pattern in `cli.emit-cli-process.e2e.test.ts` and ideally live in `test/e2e/framework/`.
 
 ## Dependencies
 
@@ -57,8 +57,8 @@ This package depends on all packages under test via workspace protocol:
 - `@prisma-next/emitter` - Contract emission
 - `@prisma-next/runtime` - Execution runtime
 - `@prisma-next/sql-contract-ts` - SQL contract authoring (for integration tests)
-- `@prisma-next/sql-query` - Query builders
-- `@prisma-next/sql-target` - SQL family (legacy transitional package; see `@prisma-next/sql-*` packages)
+- `@prisma-next/sql-query` - Query builders (legacy; prefer `@prisma-next/sql-lane` and `@prisma-next/sql-relational-core`)
+- `@prisma-next/sql-contract` - SQL contract types (canonical source: `@prisma-next/sql-contract/types`)
 
 ## Location
 
@@ -69,9 +69,6 @@ This package is located at `test/integration/` (not in `packages/`) as it is a t
 ```bash
 # Run all integration tests (from test/integration/)
 cd test/integration && pnpm test
-
-# Run tests with coverage
-cd test/integration && pnpm test:coverage
 ```
 
 Tests automatically depend on builds of target packages via Turborepo.

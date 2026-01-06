@@ -1,3 +1,4 @@
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
@@ -30,6 +31,7 @@ describe('verifySqlSchema - constraints', () => {
         schema,
         strict: false,
         typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
       });
 
       expect(result.ok).toBe(false);
@@ -73,6 +75,7 @@ describe('verifySqlSchema - constraints', () => {
         schema,
         strict: false,
         typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
       });
 
       expect(result.ok).toBe(false);
@@ -110,6 +113,7 @@ describe('verifySqlSchema - constraints', () => {
         schema,
         strict: false,
         typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
       });
 
       expect(result.ok).toBe(false);
@@ -147,6 +151,7 @@ describe('verifySqlSchema - constraints', () => {
         schema,
         strict: false,
         typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
       });
 
       expect(result.ok).toBe(false);
@@ -161,21 +166,52 @@ describe('verifySqlSchema - constraints', () => {
 
   describe('extension missing', () => {
     it('returns extension_missing issue when required extension is not in schema', () => {
-      const contract = createTestContract(
-        { user: createContractTable({ id: { nativeType: 'int4', nullable: false } }) },
-        { pgvector: {} },
-      );
+      const contract = createTestContract({
+        user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
+      });
 
       const schema = createTestSchemaIR(
         { user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }) },
         [], // No extensions
       );
 
+      const frameworkComponents = [
+        {
+          kind: 'extension',
+          id: 'pgvector',
+          familyId: 'sql',
+          targetId: 'postgres',
+          version: '0.0.0',
+          databaseDependencies: {
+            init: [
+              {
+                id: 'postgres.extension.vector',
+                label: 'Enable vector extension',
+                install: [],
+                verifyDatabaseDependencyInstalled: (s: SqlSchemaIR) => {
+                  if (!s.extensions.includes('vector')) {
+                    return [
+                      {
+                        kind: 'extension_missing',
+                        table: '',
+                        message: 'Extension "vector" is missing from database',
+                      },
+                    ];
+                  }
+                  return [];
+                },
+              },
+            ],
+          },
+        } as const,
+      ];
+
       const result = verifySqlSchema({
         contract,
         schema,
         strict: false,
         typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents,
       });
 
       expect(result.ok).toBe(false);

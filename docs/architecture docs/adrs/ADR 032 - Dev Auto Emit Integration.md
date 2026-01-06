@@ -18,7 +18,7 @@
 
 - Dev time hot emit for PSL-first and TS-first authoring modes
 - Support monorepos with pnpm/yarn workspaces and multiple apps sharing one contract
-- CI support via a headless `prisma-next emit --check` that reuses the same invalidation and caching logic
+- CI support via a headless `prisma-next contract emit --check` that reuses the same invalidation and caching logic
 - Not in scope: production packaging of artifacts into registries or remote caches
 
 ## Inputs that trigger invalidation
@@ -148,7 +148,7 @@ export default defineConfig({
 ## Migration path
 
 - Replaces `prisma generate` in dev loops
-- CI can call `prisma-next emit --check` to ensure artifacts match sources
+- CI can call `prisma-next contract emit --check` to ensure artifacts match sources
 - Legacy users can continue to commit artifacts to VCS or switch to virtual modules
 
 ## Open questions

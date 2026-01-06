@@ -56,11 +56,12 @@ export function createContractFile(testDir: string): string {
     contractPath,
     `import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
 
 type CodecTypes = Record<string, never>;
 
 const contractObj = defineContract<CodecTypes>()
-  .target('postgres')
+  .target(postgresPack)
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })
@@ -72,12 +73,7 @@ const contractObj = defineContract<CodecTypes>()
 
 export const contract = {
   ...contractObj,
-  extensions: {
-    postgres: {
-      version: '15.0.0',
-    },
-    pg: {},
-  },
+  extensions: {},
 };
 `,
     'utf-8',

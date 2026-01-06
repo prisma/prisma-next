@@ -1,7 +1,7 @@
 ---
 description: PostgreSQL LATERAL and json_agg rendering patterns
-globs: ["packages/sql/**"]
-alwaysApply: true
+globs: ["packages/3-targets/**", "packages/2-sql/**"]
+alwaysApply: false
 ---
 
 # PostgreSQL LATERAL Join Patterns

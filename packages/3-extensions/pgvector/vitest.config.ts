@@ -1,9 +1,7 @@
 import { timeouts } from '@prisma-next/test-utils';
-import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  plugins: [tsconfigPaths()],
   test: {
     globals: true,
     environment: 'node',
@@ -22,6 +20,12 @@ export default defineConfig({
         '**/exports/**',
         '**/types.ts',
       ],
+      thresholds: {
+        lines: 95,
+        branches: 90,
+        functions: 95,
+        statements: 95,
+      },
     },
   },
 });

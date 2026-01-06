@@ -389,7 +389,7 @@ describe('validateContract normalization', () => {
     expect(contract.relations).toEqual({});
   });
 
-  it('normalizes missing extensions', () => {
+  it('normalizes missing extensionPacks', () => {
     const contractInput = {
       schemaVersion: '1',
       target: 'postgres',
@@ -411,7 +411,7 @@ describe('validateContract normalization', () => {
       },
     };
     const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
-    expect(contract.extensions).toEqual({});
+    expect(contract.extensionPacks).toEqual({});
   });
 
   it('normalizes missing capabilities', () => {

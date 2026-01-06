@@ -355,24 +355,24 @@ describe('SQL contract factories', () => {
       expect(c.capabilities).toEqual(capabilities);
     });
 
-    it('creates contract with extensions', () => {
+    it('creates contract with extension packs', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
-      const extensions = {
+      const extensionPacks = {
         postgres: {
           id: 'postgres',
-          version: '15.0.0',
+          version: '0.0.1',
         },
       };
       const c = contract({
         target: 'postgres',
         coreHash: 'sha256:abc123',
         storage: s,
-        extensions,
+        extensionPacks,
       });
-      expect(c.extensions).toEqual(extensions);
+      expect(c.extensionPacks).toEqual(extensionPacks);
     });
 
     it('creates contract with meta', () => {

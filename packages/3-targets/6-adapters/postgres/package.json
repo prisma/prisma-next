@@ -4,17 +4,18 @@
   "type": "module",
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
-    "build": "tsup --config tsup.config.ts",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
-    "lint:fix": "biome check --write . --config-path ../../../biome.json",
-    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../biome.json",
-    "clean": "node ../../../../scripts/clean.mjs"
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist coverage .tmp-output"
   },
   "dependencies": {
     "@prisma-next/cli": "workspace:*",
@@ -23,8 +24,8 @@
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
-    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
@@ -32,9 +33,10 @@
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.1"
+    "@prisma-next/tsconfig": "workspace:*",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "exports": {
     "./package.json": "./package.json",

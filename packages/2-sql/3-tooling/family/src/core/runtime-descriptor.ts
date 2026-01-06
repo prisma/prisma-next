@@ -1,4 +1,3 @@
-import type { ExtensionPackManifest } from '@prisma-next/contract/pack-manifest-types';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeDriverDescriptor,
@@ -6,15 +5,12 @@ import type {
   RuntimeFamilyDescriptor,
   RuntimeTargetDescriptor,
 } from '@prisma-next/core-execution-plane/types';
-import { createSqlRuntimeFamilyInstance, type SqlRuntimeFamilyInstance } from './runtime-instance';
-
-/**
- * SQL family manifest for runtime plane.
- */
-const sqlFamilyManifest: ExtensionPackManifest = {
-  id: 'sql',
-  version: '0.0.1',
-};
+import {
+  createSqlRuntimeFamilyInstance,
+  type SqlRuntimeAdapterInstance,
+  type SqlRuntimeDriverInstance,
+  type SqlRuntimeFamilyInstance,
+} from './runtime-instance';
 
 /**
  * SQL runtime family descriptor implementation.
@@ -26,19 +22,24 @@ export class SqlRuntimeFamilyDescriptor
   readonly kind = 'family' as const;
   readonly id = 'sql';
   readonly familyId = 'sql' as const;
-  readonly manifest = sqlFamilyManifest;
+  readonly version = '0.0.1';
 
   create<TTargetId extends string>(options: {
     readonly target: RuntimeTargetDescriptor<'sql', TTargetId>;
-    readonly adapter: RuntimeAdapterDescriptor<'sql', TTargetId>;
-    readonly driver: RuntimeDriverDescriptor<'sql', TTargetId>;
-    readonly extensions: readonly RuntimeExtensionDescriptor<'sql', TTargetId>[];
+    readonly adapter: RuntimeAdapterDescriptor<
+      'sql',
+      TTargetId,
+      SqlRuntimeAdapterInstance<TTargetId>
+    >;
+    readonly driver: RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>;
+    readonly extensionPacks: readonly RuntimeExtensionDescriptor<'sql', TTargetId>[];
   }): SqlRuntimeFamilyInstance {
     return createSqlRuntimeFamilyInstance({
+      family: this,
       target: options.target,
       adapter: options.adapter,
       driver: options.driver,
-      extensions: options.extensions,
+      extensionPacks: options.extensionPacks,
     });
   }
 }

@@ -2,9 +2,10 @@
  * Shared helpers for family.schema-verify tests.
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ControlExtensionDescriptor } from '@prisma-next/core-control-plane/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import sql from '@prisma-next/family-sql/control';
+import sql, { type SqlControlFamilyInstance } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import postgres from '@prisma-next/target-postgres/control';
@@ -18,6 +19,7 @@ export { postgresAdapter, postgresDriver, sql, postgres };
 export { validateContract };
 export type { SqlContract, SqlStorage };
 export { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+export { default as postgresPack } from '@prisma-next/target-postgres/pack';
 export { timeouts, withClient };
 export { pgvector } from './family.schema-verify.extensions';
 
@@ -49,16 +51,16 @@ export function useDevDatabase(): { getConnectionString: () => string } {
 }
 
 /**
- * Creates a family instance for testing.
+ * Creates a SQL control-plane family instance for testing.
  */
 export function createFamilyInstance(
   extensions: readonly ControlExtensionDescriptor<'sql', 'postgres'>[] = [],
-) {
+): SqlControlFamilyInstance {
   return sql.create({
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensions,
+    extensionPacks: extensions,
   });
 }
 
@@ -91,11 +93,17 @@ export async function runSchemaVerify(
   return withDriver(connectionString, async (driver) => {
     const familyInstance = createFamilyInstance(options.extensions);
     const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+    const frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>> = [
+      postgres,
+      postgresAdapter,
+      ...(options.extensions ?? []),
+    ];
     return familyInstance.schemaVerify({
       driver,
       contractIR: validatedContract,
       strict: options.strict ?? false,
       context: { contractPath: './contract.json' },
+      frameworkComponents,
     });
   });
 }

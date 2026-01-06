@@ -13,6 +13,7 @@ import type {
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { readMarker } from '@prisma-next/family-sql/verify';
+import { SqlQueryError } from '@prisma-next/sql-errors';
 import type { Result } from '@prisma-next/utils/result';
 import { ok, okVoid } from '@prisma-next/utils/result';
 import type { PostgresPlanTargetDetails } from './planner';
@@ -139,6 +140,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         strict: options.strictVerification ?? true,
         context: options.context ?? {},
         typeMetadataRegistry: this.family.typeMetadataRegistry,
+        frameworkComponents: options.frameworkComponents,
       });
       if (!schemaVerifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
@@ -170,28 +172,39 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
   ): Promise<Result<ApplyPlanSuccessValue, SqlMigrationRunnerFailure>> {
+    const checks = options.executionChecks;
+    const runPrechecks = checks?.prechecks !== false; // Default true
+    const runPostchecks = checks?.postchecks !== false; // Default true
+    const runIdempotency = checks?.idempotencyChecks !== false; // Default true
+
     let operationsExecuted = 0;
     const executedOperations: Array<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> = [];
     for (const operation of options.plan.operations) {
       options.callbacks?.onOperationStart?.(operation);
       try {
-        const postcheckAlreadySatisfied = await this.expectationsAreSatisfied(
-          driver,
-          operation.postcheck,
-        );
-        if (postcheckAlreadySatisfied) {
-          executedOperations.push(this.createPostcheckPreSatisfiedSkipRecord(operation));
-          continue;
+        // Idempotency probe: only run if both postchecks and idempotency checks are enabled
+        if (runPostchecks && runIdempotency) {
+          const postcheckAlreadySatisfied = await this.expectationsAreSatisfied(
+            driver,
+            operation.postcheck,
+          );
+          if (postcheckAlreadySatisfied) {
+            executedOperations.push(this.createPostcheckPreSatisfiedSkipRecord(operation));
+            continue;
+          }
         }
 
-        const precheckResult = await this.runExpectationSteps(
-          driver,
-          operation.precheck,
-          operation,
-          'precheck',
-        );
-        if (!precheckResult.ok) {
-          return precheckResult;
+        // Prechecks: only run if enabled
+        if (runPrechecks) {
+          const precheckResult = await this.runExpectationSteps(
+            driver,
+            operation.precheck,
+            operation,
+            'precheck',
+          );
+          if (!precheckResult.ok) {
+            return precheckResult;
+          }
         }
 
         const executeResult = await this.runExecuteSteps(driver, operation.execute, operation);
@@ -199,14 +212,17 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
           return executeResult;
         }
 
-        const postcheckResult = await this.runExpectationSteps(
-          driver,
-          operation.postcheck,
-          operation,
-          'postcheck',
-        );
-        if (!postcheckResult.ok) {
-          return postcheckResult;
+        // Postchecks: only run if enabled
+        if (runPostchecks) {
+          const postcheckResult = await this.runExpectationSteps(
+            driver,
+            operation.postcheck,
+            operation,
+            'postcheck',
+          );
+          if (!postcheckResult.ok) {
+            return postcheckResult;
+          }
         }
 
         executedOperations.push(operation);
@@ -260,19 +276,29 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     for (const step of steps) {
       try {
         await driver.query(step.sql);
-      } catch (error) {
-        return runnerFailure(
-          'EXECUTION_FAILED',
-          `Operation ${operation.id} failed during execution: ${step.description}`,
-          {
-            why: error instanceof Error ? error.message : String(error),
-            meta: {
-              operationId: operation.id,
-              stepDescription: step.description,
-              sql: step.sql,
+      } catch (error: unknown) {
+        // Catch SqlQueryError and include normalized metadata
+        if (SqlQueryError.is(error)) {
+          return runnerFailure(
+            'EXECUTION_FAILED',
+            `Operation ${operation.id} failed during execution: ${step.description}`,
+            {
+              why: error.message,
+              meta: {
+                operationId: operation.id,
+                stepDescription: step.description,
+                sql: step.sql,
+                sqlState: error.sqlState,
+                constraint: error.constraint,
+                table: error.table,
+                column: error.column,
+                detail: error.detail,
+              },
             },
-          },
-        );
+          );
+        }
+        // Let SqlConnectionError and other errors propagate (fail-fast)
+        throw error;
       }
     }
     return okVoid();

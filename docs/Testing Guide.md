@@ -531,7 +531,7 @@ const ir: ContractIR = {
 
 **Why?** Factory functions ensure all required fields are present with proper defaults, making tests more maintainable and less error-prone.
 
-**Note:** The `capabilities` field in `ContractIR` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`. When creating `ExtensionPack` objects, both `manifest` and `path` properties are required.
+**Note:** The `capabilities` field in `ContractIR` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`. Extension pack metadata is represented as a simple object map (`contract.extensionPacks`) keyed by descriptor ID—there is no manifest/path wrapper in tests.
 
 See `.cursor/rules/use-contract-ir-factories.mdc` for detailed guidelines.
 
@@ -677,7 +677,7 @@ expect(err).toBeUndefined();
 // ANTI-PATTERN: Conditional expectations
 it('processes user data', () => {
   const result = processUser(input);
-  
+
   if (result.status === 'success') {
     expect(result.data).toBeDefined();
     expect(result.data.email).toBe('test@example.com');
@@ -1014,5 +1014,5 @@ pnpm --filter @prisma-next/sql-runtime typecheck
 - **Test Descriptions:** `.cursor/rules/omit-should-in-tests.mdc`
 - **Type Testing:** `.cursor/rules/vitest-expect-typeof.mdc`
 - **TypeScript Patterns:** `.cursor/rules/typescript-patterns.mdc` (DRY Test Patterns section)
-- **Agent Onboarding:** `AGENT_ONBOARDING.md` (Testing section)
+- **Agent Reference:** `AGENTS.md`
 

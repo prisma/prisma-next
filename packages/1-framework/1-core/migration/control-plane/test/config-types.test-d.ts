@@ -24,7 +24,7 @@ const sqlFamilyDescriptor: ControlFamilyDescriptor<'sql'> = {
   familyId: 'sql',
   manifest: { id: 'sql', version: '0.0.1' },
   hook: mockHook,
-  create: () => ({
+  create: (_stack) => ({
     familyId: 'sql',
   }),
 };
@@ -34,7 +34,7 @@ const postgresTargetDescriptor: ControlTargetDescriptor<'sql', 'postgres'> = {
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  manifest: { id: 'postgres', version: '1.0.0' },
+  manifest: { id: 'postgres', version: '0.0.1' },
   create: () => ({
     familyId: 'sql',
     targetId: 'postgres',
@@ -46,7 +46,7 @@ const postgresAdapterDescriptor: ControlAdapterDescriptor<'sql', 'postgres'> = {
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  manifest: { id: 'postgres', version: '1.0.0' },
+  manifest: { id: 'postgres', version: '0.0.1' },
   create: () => ({
     familyId: 'sql',
     targetId: 'postgres',
@@ -58,7 +58,7 @@ const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres'> = {
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  manifest: { id: 'postgres', version: '1.0.0' },
+  manifest: { id: 'postgres', version: '0.0.1' },
   create: async () => ({
     targetId: 'postgres',
     query: async () => ({ rows: [] }),
@@ -71,7 +71,7 @@ const postgresExtensionDescriptor: ControlExtensionDescriptor<'sql', 'postgres'>
   id: 'pgvector',
   familyId: 'sql',
   targetId: 'postgres',
-  manifest: { id: 'pgvector', version: '1.0.0' },
+  manifest: { id: 'pgvector', version: '0.0.1' },
   create: () => ({
     familyId: 'sql',
     targetId: 'postgres',
@@ -84,11 +84,11 @@ test('accepts compatible Control*Descriptor types', () => {
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
     driver: postgresDriverDescriptor,
-    extensions: [postgresExtensionDescriptor],
+    extensionPacks: [postgresExtensionDescriptor],
   };
 
   const result = defineConfig(config);
-  expectTypeOf(result).toMatchTypeOf<PrismaNextConfig<'sql', 'postgres'>>();
+  expectTypeOf(result).toExtend<PrismaNextConfig<'sql', 'postgres'>>();
 });
 
 test('rejects mismatched targetId in target', () => {
@@ -97,7 +97,7 @@ test('rejects mismatched targetId in target', () => {
     id: 'mysql',
     familyId: 'sql',
     targetId: 'mysql',
-    manifest: { id: 'mysql', version: '1.0.0' },
+    manifest: { id: 'mysql', version: '0.0.1' },
     create: () => ({
       familyId: 'sql',
       targetId: 'mysql',
@@ -120,7 +120,7 @@ test('rejects mismatched targetId in adapter', () => {
     id: 'mysql',
     familyId: 'sql',
     targetId: 'mysql',
-    manifest: { id: 'mysql', version: '1.0.0' },
+    manifest: { id: 'mysql', version: '0.0.1' },
     create: () => ({
       familyId: 'sql',
       targetId: 'mysql',
@@ -143,7 +143,7 @@ test('rejects mismatched targetId in driver', () => {
     id: 'mysql',
     familyId: 'sql',
     targetId: 'mysql',
-    manifest: { id: 'mysql', version: '1.0.0' },
+    manifest: { id: 'mysql', version: '0.0.1' },
     create: async () => ({
       targetId: 'mysql',
       query: async () => ({ rows: [] }),
@@ -168,7 +168,7 @@ test('rejects mismatched targetId in extension', () => {
     id: 'mysql-extension',
     familyId: 'sql',
     targetId: 'mysql',
-    manifest: { id: 'mysql-extension', version: '1.0.0' },
+    manifest: { id: 'mysql-extension', version: '0.0.1' },
     create: () => ({
       familyId: 'sql',
       targetId: 'mysql',
@@ -180,7 +180,7 @@ test('rejects mismatched targetId in extension', () => {
     family: sqlFamilyDescriptor,
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
-    extensions: [mysqlExtensionDescriptor], // Wrong targetId
+    extensionPacks: [mysqlExtensionDescriptor], // Wrong targetId
   };
 
   void config;

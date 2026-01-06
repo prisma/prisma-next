@@ -3,7 +3,7 @@ import type { PostgresDriverOptions } from '@prisma-next/driver-postgres/runtime
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import sqlFamily from '@prisma-next/family-sql/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { Extension, Log, Plugin, Runtime } from '@prisma-next/sql-runtime';
+import type { Log, Plugin, Runtime, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Client } from 'pg';
@@ -13,7 +13,7 @@ export interface CreateTestRuntimeOptions {
     mode: 'onFirstUse' | 'startup' | 'always';
     requireMarker?: boolean;
   };
-  readonly extensions?: readonly Extension[];
+  readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<string>[];
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
@@ -43,7 +43,7 @@ export function createTestRuntime(
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensions: [],
+    extensionPacks: options?.extensionPacks ?? [],
   });
 
   // Create runtime using family instance
@@ -51,7 +51,6 @@ export function createTestRuntime(
     contract,
     driverOptions,
     verify,
-    ...(options?.extensions ? { extensions: options.extensions } : {}),
     ...(options?.plugins ? { plugins: options.plugins } : {}),
     ...(options?.mode ? { mode: options.mode } : {}),
     ...(options?.log ? { log: options.log } : {}),

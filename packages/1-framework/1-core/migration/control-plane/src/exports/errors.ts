@@ -1,15 +1,17 @@
-export type { CliErrorEnvelope } from '../errors';
+export type { CliErrorConflict, CliErrorEnvelope } from '../errors';
 export {
   CliStructuredError,
   errorConfigFileNotFound,
   errorConfigValidation,
   errorContractConfigMissing,
+  errorContractMissingExtensionPacks,
   errorContractValidationFailed,
-  errorDatabaseUrlRequired,
+  errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
   errorHashMismatch,
+  errorJsonFormatNotSupported,
   errorMarkerMissing,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,

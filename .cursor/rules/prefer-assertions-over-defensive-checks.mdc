@@ -1,7 +1,7 @@
 ---
 description: Prefer assertions over defensive checks when data is guaranteed to be valid
-globs: ["**/*.ts"]
-alwaysApply: true
+globs: ["packages/**/*.ts", "test/**/*.ts", "examples/**/*.ts"]
+alwaysApply: false
 ---
 
 # Prefer Assertions Over Defensive Checks
@@ -220,5 +220,5 @@ for (const [tableName, table] of Object.entries(storage.tables)) {
 
 - `.cursor/rules/use-ast-factories.mdc`: Use factory functions for AST nodes
 - `.cursor/rules/typescript-patterns.mdc`: TypeScript best practices
-- `.cursor/rules/testing-guide.mdc`: Testing best practices
+- `docs/Testing Guide.md`: Testing best practices
 - `.cursor/rules/arktype-usage.mdc`: Arktype validation patterns

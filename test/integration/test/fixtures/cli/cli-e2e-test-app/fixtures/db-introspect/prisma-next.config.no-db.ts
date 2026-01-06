@@ -5,7 +5,7 @@ import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
 import { contract } from './contract';
 
-// This config does not include db.url
+// This config does not include db.connection
 export default defineConfig({
   family: sql,
   target: postgres,
@@ -17,5 +17,5 @@ export default defineConfig({
     output: 'output/contract.json',
     types: 'output/contract.d.ts',
   },
-  // db.url is missing
+  // db.connection is missing
 });

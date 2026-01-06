@@ -69,11 +69,8 @@ Descriptors:
 export interface ControlFamilyDescriptor<
   TFamilyId extends string,
   TFamilyInstance extends ControlFamilyInstance<TFamilyId> = ControlFamilyInstance<TFamilyId>,
-> {
-  readonly kind: 'family';
-  readonly id: string;
+> extends ComponentDescriptor<'family'> {
   readonly familyId: TFamilyId;
-  readonly manifest: ExtensionPackManifest;
   readonly hook: TargetFamilyHook;
   create<TTargetId extends string>(options: {
     readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
@@ -90,12 +87,9 @@ export interface ControlTargetDescriptor<
     TFamilyId,
     TTargetId
   >,
-> {
-  readonly kind: 'target';
-  readonly id: string;
+> extends ComponentDescriptor<'target'> {
   readonly familyId: TFamilyId;
   readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
   create(): TTargetInstance;
 }
 
@@ -106,12 +100,9 @@ export interface ControlAdapterDescriptor<
     TFamilyId,
     TTargetId
   >,
-> {
-  readonly kind: 'adapter';
-  readonly id: string;
+> extends ComponentDescriptor<'adapter'> {
   readonly familyId: TFamilyId;
   readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
   create(): TAdapterInstance;
 }
 
@@ -119,12 +110,9 @@ export interface ControlDriverDescriptor<
   TFamilyId extends string,
   TTargetId extends string,
   TDriverInstance extends ControlDriverInstance<TTargetId> = ControlDriverInstance<TTargetId>,
-> {
-  readonly kind: 'driver';
-  readonly id: string;
+> extends ComponentDescriptor<'driver'> {
   readonly familyId: TFamilyId;
   readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
   create(url: string): Promise<TDriverInstance>;
 }
 
@@ -135,15 +123,21 @@ export interface ControlExtensionDescriptor<
     TFamilyId,
     TTargetId
   >,
-> {
-  readonly kind: 'extension';
-  readonly id: string;
+> extends ComponentDescriptor<'extension'> {
   readonly familyId: TFamilyId;
   readonly targetId: TTargetId;
-  readonly manifest: ExtensionPackManifest;
   create(): TExtensionInstance;
 }
 ```
+
+Note: All control-plane descriptors extend `ComponentDescriptor<Kind>` which provides:
+- `kind`: Discriminator literal
+- `id`: Unique identifier
+- `version`: Component version (semver)
+- `targets?`: Target compatibility metadata
+- `capabilities?`: Capability declarations
+- `types?`: Type import specifications for contract.d.ts
+- `operations?`: Operation manifests for building registries
 
 Notes:
 

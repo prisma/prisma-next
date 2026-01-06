@@ -8,9 +8,7 @@ export default defineConfig({
   outDir: 'dist',
   format: ['esm'],
   sourcemap: true,
-  dts: {
-    resolve: true,
-  },
+  dts: false,
   clean: true,
   target: 'es2022',
   minify: false,

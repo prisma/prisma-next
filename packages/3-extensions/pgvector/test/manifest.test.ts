@@ -1,30 +1,20 @@
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { loadExtensionPackManifest } from '@prisma-next/cli/pack-loading';
 import { describe, expect, it } from 'vitest';
+import { pgvectorExtensionDescriptor } from '../src/exports/control';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-describe('pgvector manifest', () => {
-  it('loads and validates manifest structure', () => {
-    const packPath = join(__dirname, '..');
-    const manifest = loadExtensionPackManifest(packPath);
-
-    expect(manifest.id).toBe('pgvector');
-    expect(manifest.version).toBe('1.0.0');
-    expect(manifest.targets?.['postgres']?.minVersion).toBe('12');
-    const postgresCapabilities = manifest.capabilities?.['postgres'] as
+describe('pgvector descriptor', () => {
+  it('has correct metadata', () => {
+    expect(pgvectorExtensionDescriptor.id).toBe('pgvector');
+    expect(pgvectorExtensionDescriptor.version).toBe('0.0.1');
+    expect(pgvectorExtensionDescriptor.familyId).toBe('sql');
+    expect(pgvectorExtensionDescriptor.targetId).toBe('postgres');
+    const postgresCapabilities = pgvectorExtensionDescriptor.capabilities?.['postgres'] as
       | Record<string, unknown>
       | undefined;
     expect(postgresCapabilities?.['pgvector/cosine']).toBe(true);
   });
 
   it('has codec types import', () => {
-    const packPath = join(__dirname, '..');
-    const manifest = loadExtensionPackManifest(packPath);
-
-    expect(manifest.types?.codecTypes?.import).toEqual({
+    expect(pgvectorExtensionDescriptor.types?.codecTypes?.import).toEqual({
       package: '@prisma-next/extension-pgvector/codec-types',
       named: 'CodecTypes',
       alias: 'PgVectorTypes',
@@ -32,10 +22,7 @@ describe('pgvector manifest', () => {
   });
 
   it('has operation types import', () => {
-    const packPath = join(__dirname, '..');
-    const manifest = loadExtensionPackManifest(packPath);
-
-    expect(manifest.types?.operationTypes?.import).toEqual({
+    expect(pgvectorExtensionDescriptor.types?.operationTypes?.import).toEqual({
       package: '@prisma-next/extension-pgvector/operation-types',
       named: 'OperationTypes',
       alias: 'PgVectorOperationTypes',
@@ -43,13 +30,11 @@ describe('pgvector manifest', () => {
   });
 
   it('has cosineDistance operation', () => {
-    const packPath = join(__dirname, '..');
-    const manifest = loadExtensionPackManifest(packPath);
+    const operations = pgvectorExtensionDescriptor.operations;
+    expect(operations).toBeDefined();
+    expect(operations?.length).toBeGreaterThan(0);
 
-    expect(manifest.operations).toBeDefined();
-    expect(manifest.operations?.length).toBeGreaterThan(0);
-
-    const cosineDistanceOp = manifest.operations?.find(
+    const cosineDistanceOp = operations?.find(
       (op: { for: string; method: string }) =>
         op.for === 'pg/vector@1' && op.method === 'cosineDistance',
     );

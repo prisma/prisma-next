@@ -94,7 +94,7 @@ packages/
 - Target families are encoded via prefixes (e.g., `sql-`), producing names like `@prisma-next/sql-lane`, regardless of nested folders.
 - Adapters/drivers retain conventional names (`@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`) and are located under `packages/3-targets/**` as separate packages (target, adapter, driver).
 - Layers are for dependency direction, not naming; only `runtime-core` carries its layer in the name for clarity.
-- See also: `docs/reference/Package Naming and Path Aliases.md` for concrete path→package mappings and tsconfig alias examples.
+- See also: `docs/reference/Package Naming Conventions.md` for concrete path→package mappings.
 
 ## Consequences
 
@@ -113,14 +113,14 @@ packages/
 
 ## Migration Plan (High-Level)
 
-1) ✅  Scaffold the new folder skeleton and path aliases; add import guardrails and CI checks.
+1) ✅  Scaffold the new folder skeleton; add import guardrails and CI checks.
 2) ✅  Extract `contract-authoring` out of `@prisma-next/sql-query` into `packages/1-framework/2-authoring/contract`.
 3) ✅  Stand up `lanes/relational-core` and move schema/column builders and operation attachment there.
 4) ✅  Split lanes into `sql-lane` and `orm-lane`; keep tests with their respective packages.
 5) ✅ Restructure `sql-target` under `sql/tooling` and keep a curated entrypoint for adapters. **Complete**
 6) ✅ Extract `framework/runtime-core` and move SQL-specific execution into `sql/sql-runtime`. **Complete**
 7) ✅ Remove legacy re-exports; no external consumers means we can delete transitional shims once internal callsites are updated. **Complete** - `@prisma-next/sql-query` removed in Slice 7.
-8) ✅ Move pack assembly from framework CLI to family-provided helpers. **Complete** (Briefs 20 & 21, Decouple-Framework-CLI-from-SQL) - Generic assembly logic (looping over descriptors) moved to `packages/1-framework/3-tooling/cli/src/pack-loading.ts`. Family-specific conversion delegated to `family.convertOperationManifest()`. Contract validation also decoupled via `family.validateContractIR()` hook. All CLI→SQL dependency exceptions removed. `@prisma-next/sql-tooling-assembly` package removed.
+8) ✅ Move pack assembly from framework CLI to family-provided helpers. **Complete** (Briefs 20 & 21, Decouple-Framework-CLI-from-SQL) - Generic assembly logic (looping over descriptors) lives in `packages/2-sql/3-tooling/family/src/core/assembly.ts`. Family-specific conversion delegated to `family.convertOperationManifest()`. Contract validation also decoupled via `family.validateContractIR()` hook. All CLI→SQL dependency exceptions removed. `@prisma-next/sql-tooling-assembly` package removed.
 9) ✅ Migrate Postgres adapter from SQL domain to Targets domain. **Complete** (Briefs: Separate-Dialect-Adapter-Driver, Migrate-Postgres-Adapter-to-Targets-Domain) - Adapter, target, and driver are now separate packages under `packages/3-targets/**` with multi-plane entrypoints.
 
 ## Alternatives Considered

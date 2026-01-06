@@ -66,11 +66,11 @@ describe('canonicalization', () => {
         tables: expect.anything(),
       },
     });
-    // Required top-level fields (capabilities, extensions, meta, relations, sources) are preserved even when empty
+    // Required top-level fields (capabilities, extensionPacks, meta, relations, sources) are preserved even when empty
     // because they are required by ContractIR and needed for round-trip tests
     expect(parsed).toMatchObject({
       capabilities: expect.anything(),
-      extensions: expect.anything(),
+      extensionPacks: expect.anything(),
       meta: expect.anything(),
       relations: expect.anything(),
       sources: expect.anything(),
@@ -171,17 +171,17 @@ describe('canonicalization', () => {
 
   it('sorts extension namespaces lexicographically', () => {
     const ir = createContractIR({
-      extensions: {
-        pgvector: { version: '1.0.0' },
-        postgres: { version: '15.0.0' },
-        another: { version: '1.0.0' },
+      extensionPacks: {
+        pgvector: { version: '0.0.1' },
+        postgres: { version: '0.0.1' },
+        another: { version: '0.0.1' },
       },
     });
 
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
-    const extensions = parsed['extensions'] as Record<string, unknown>;
-    const extensionKeys = Object.keys(extensions);
+    const extensionPacks = parsed['extensionPacks'] as Record<string, unknown>;
+    const extensionKeys = Object.keys(extensionPacks);
     expect(extensionKeys).toEqual(['another', 'pgvector', 'postgres']);
   });
 

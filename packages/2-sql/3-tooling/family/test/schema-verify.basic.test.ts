@@ -30,6 +30,7 @@ describe('verifySqlSchema - basic', () => {
         schema,
         strict: false,
         typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
       });
 
       expect(result.ok).toBe(true);
@@ -52,6 +53,7 @@ describe('verifySqlSchema - basic', () => {
         schema,
         strict: false,
         typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
       });
 
       expect(result.ok).toBe(false);
@@ -85,6 +87,7 @@ describe('verifySqlSchema - basic', () => {
         schema,
         strict: false,
         typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
       });
 
       expect(result.ok).toBe(false);
@@ -117,6 +120,7 @@ describe('verifySqlSchema - basic', () => {
         schema,
         strict: false,
         typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
       });
 
       expect(result.ok).toBe(false);
@@ -151,6 +155,7 @@ describe('verifySqlSchema - basic', () => {
         schema,
         strict: false,
         typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
       });
 
       expect(result.ok).toBe(false);

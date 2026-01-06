@@ -4,17 +4,18 @@
   "type": "module",
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
-    "build": "tsup --config tsup.config.ts",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
-    "lint:fix": "biome check --write . --config-path ../../../../biome.json",
-    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../../biome.json",
-    "clean": "node ../../../../scripts/clean.mjs"
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist coverage .tmp-output"
   },
   "bin": {
     "prisma-next": "./dist/cli.js"
@@ -41,24 +42,20 @@
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
-    "@types/node": "^20.0.0",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
-    "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^2.1.1"
+    "@prisma-next/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/exports/index.d.ts",
+      "import": "./dist/exports/index.js"
     },
     "./config-types": {
-      "types": "./dist/config-types.d.ts",
-      "import": "./dist/config-types.js"
-    },
-    "./pack-loading": {
-      "types": "./dist/pack-loading.d.ts",
-      "import": "./dist/pack-loading.js"
+      "types": "./dist/exports/config-types.d.ts",
+      "import": "./dist/exports/config-types.js"
     },
     "./commands/db-init": {
       "types": "./dist/commands/db-init.d.ts",
@@ -87,6 +84,10 @@
     "./config-loader": {
       "types": "./dist/config-loader.d.ts",
       "import": "./dist/config-loader.js"
+    },
+    "./control-api": {
+      "types": "./dist/exports/control-api.d.ts",
+      "import": "./dist/exports/control-api.js"
     }
   }
 }

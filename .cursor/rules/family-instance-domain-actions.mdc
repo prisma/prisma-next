@@ -1,6 +1,7 @@
 ---
 description: Family instance domain action implementation patterns
-alwaysApply: true
+globs: ["packages/**"]
+alwaysApply: false
 ---
 
 # Family Instance Domain Actions

@@ -1,7 +1,7 @@
 ---
 description: When you use validateContract()
-globs: ["packages/sql/**"]
-alwaysApply: true
+globs: ["packages/2-sql/**", "packages/sql/**", "examples/**", "test/**"]
+alwaysApply: false
 ---
 # validateContract Usage Pattern
 

@@ -150,7 +150,7 @@ From a dev’s point of view, the flow looks like this.
 ### Initial setup
 
 - Define contract via PSL/TS.
-- `prisma-next emit` produces `contract.json` plus `.d.ts`.
+- `prisma-next contract emit` produces `contract.json` plus `.d.ts`.
 - Provision a DB and write the initial marker (via migrations or `db update` on an empty DB).
 
 ### Local evolution

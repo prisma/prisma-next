@@ -49,7 +49,7 @@ describe('emitter factories', () => {
       const meta = irMeta({});
       expect(meta).toEqual({
         capabilities: {},
-        extensions: {},
+        extensionPacks: {},
         meta: {},
         sources: {},
       });
@@ -70,24 +70,24 @@ describe('emitter factories', () => {
           lateral: true,
         },
       });
-      expect(meta.extensions).toEqual({});
+      expect(meta.extensionPacks).toEqual({});
       expect(meta.meta).toEqual({});
       expect(meta.sources).toEqual({});
     });
 
-    it('creates meta with extensions', () => {
+    it('creates meta with extension packs', () => {
       const meta = irMeta({
-        extensions: {
+        extensionPacks: {
           postgres: {
             id: 'postgres',
-            version: '15.0.0',
+            version: '0.0.1',
           },
         },
       });
-      expect(meta.extensions).toEqual({
+      expect(meta.extensionPacks).toEqual({
         postgres: {
           id: 'postgres',
-          version: '15.0.0',
+          version: '0.0.1',
         },
       });
     });
@@ -127,8 +127,8 @@ describe('emitter factories', () => {
         capabilities: {
           postgres: { returning: true },
         },
-        extensions: {
-          postgres: { id: 'postgres', version: '15.0.0' },
+        extensionPacks: {
+          postgres: { id: 'postgres', version: '0.0.1' },
         },
         meta: { generated: true },
         sources: { userView: { kind: 'view' } },
@@ -136,8 +136,8 @@ describe('emitter factories', () => {
       expect(meta.capabilities).toEqual({
         postgres: { returning: true },
       });
-      expect(meta.extensions).toEqual({
-        postgres: { id: 'postgres', version: '15.0.0' },
+      expect(meta.extensionPacks).toEqual({
+        postgres: { id: 'postgres', version: '0.0.1' },
       });
       expect(meta.meta).toEqual({ generated: true });
       expect(meta.sources).toEqual({ userView: { kind: 'view' } });
@@ -178,7 +178,7 @@ describe('emitter factories', () => {
       expect(ir.capabilities).toEqual({
         postgres: { returning: true },
       });
-      expect(ir.extensions).toEqual({});
+      expect(ir.extensionPacks).toEqual({});
       expect(ir.meta).toEqual({});
       expect(ir.sources).toEqual({});
     });
@@ -219,8 +219,8 @@ describe('emitter factories', () => {
         capabilities: {
           postgres: { returning: true },
         },
-        extensions: {
-          postgres: { id: 'postgres', version: '15.0.0' },
+        extensionPacks: {
+          postgres: { id: 'postgres', version: '0.0.1' },
         },
         meta: { generated: true },
         sources: { userView: { kind: 'view' } },
@@ -240,8 +240,8 @@ describe('emitter factories', () => {
       expect(ir.capabilities).toEqual({
         postgres: { returning: true },
       });
-      expect(ir.extensions).toEqual({
-        postgres: { id: 'postgres', version: '15.0.0' },
+      expect(ir.extensionPacks).toEqual({
+        postgres: { id: 'postgres', version: '0.0.1' },
       });
       expect(ir.meta).toEqual({ generated: true });
       expect(ir.sources).toEqual({ userView: { kind: 'view' } });

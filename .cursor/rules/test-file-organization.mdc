@@ -1,7 +1,7 @@
 ---
 description: Test file organization and splitting guidelines
-globs: ["**/*.test.ts", "**/*.spec.ts"]
-alwaysApply: true
+globs: ["**/*.test.ts", "**/*.test-d.ts", "test/**", "packages/**/test/**", "examples/**/test/**"]
+alwaysApply: false
 ---
 
 # Test File Organization

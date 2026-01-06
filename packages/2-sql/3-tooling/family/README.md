@@ -15,6 +15,7 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Planner & Runner SPI**: Owns the `MigrationPlanner` / `MigrationRunner` interfaces plus the `SqlControlTargetDescriptor` helper so targets can expose planners and runners (e.g., Postgres init planner/runner)
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlTargetFamilyHook`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
+- **Component Database Dependencies**: Consumes database dependencies declared by framework components (target/adapter/extension packs). Callers pass the active `frameworkComponents` list into planning/execution/verification; SQL layers structurally narrow to components that declare `databaseDependencies` and use their pure verification hooks (no fuzzy matching against `contract.extensionPacks`).
 
 ## Usage
 
@@ -42,15 +43,23 @@ const verifyResult = await familyInstance.verify({ driver, contractIR, ... });
 const emitResult = await familyInstance.emitContract({ contractIR: rawContract }); // Handles stripping mappings and validation internally
 
 // Targets that implement SqlControlTargetDescriptor can build planners
-const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-const planResult = planner.plan({ contract: sqlContract, schema, policy });
+const planner = postgresTargetDescriptor.migrations.createPlanner(familyInstance);
+// frameworkComponents should include the active target, adapter, and any extension descriptors so
+// planner/runner can resolve database dependencies declared by those components.
+const planResult = planner.plan({
+  contract: sqlContract,
+  schema,
+  policy,
+  frameworkComponents: [postgresTargetDescriptor, postgresAdapterDescriptor, pgVectorExtensionDescriptor],
+});
 
 // Targets also provide runners for executing plans
-const runner = postgresTargetDescriptor.createRunner(familyInstance);
+const runner = postgresTargetDescriptor.migrations.createRunner(familyInstance);
 const executeResult = await runner.execute({
   plan: planResult.plan,
   driver,
   destinationContract: sqlContract,
+  frameworkComponents: [postgresTargetDescriptor, postgresAdapterDescriptor, pgVectorExtensionDescriptor],
 });
 
 // executeResult is a Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>
@@ -121,4 +130,16 @@ The runner returns structured errors with the following codes:
 
 **Dependents:**
 - CLI configuration files import this package to register the SQL family
+
+## How to debug `db init`
+
+- **CLI orchestration**: `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`
+- **Planner/runner SPI types**: `packages/2-sql/3-tooling/family/src/core/migrations/types.ts`
+- **Pure schema verifier (used by planner + runner)**: `@prisma-next/family-sql/schema-verify` (source: `packages/2-sql/3-tooling/family/src/core/schema-verify/`)
+- **Postgres implementation**:
+  - Planner: `packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts`
+  - Runner: `packages/3-targets/3-targets/postgres/src/core/migrations/runner.ts`
+- **Tests**:
+  - CLI integration: `test/integration/test/cli.db-init.e2e.test.ts`
+  - Target unit/integration: `packages/3-targets/3-targets/postgres/test/migrations/*`
 

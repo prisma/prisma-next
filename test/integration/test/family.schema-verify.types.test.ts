@@ -9,6 +9,9 @@ import {
   findNodeByStatusAndCode,
   int4Column,
   pgvector,
+  postgres,
+  postgresAdapter,
+  postgresPack,
   runSchemaVerify,
   type SqlContract,
   type SqlStorage,
@@ -40,7 +43,7 @@ describe('family instance schemaVerify - types', () => {
       'returns ok=false with type_mismatch issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -79,7 +82,7 @@ describe('family instance schemaVerify - types', () => {
       'returns ok=false with nullability_mismatch issue',
       async () => {
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -152,7 +155,7 @@ describe('family instance schemaVerify - types', () => {
         });
 
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -191,7 +194,7 @@ describe('family instance schemaVerify - types', () => {
         // Create a contract with a type ID that doesn't exist in the registry
         // We'll use a fake type ID to simulate missing metadata
         const contract = defineContract<CodecTypes>()
-          .target('postgres')
+          .target(postgresPack)
           .table('user', (t) =>
             t
               .column('id', { type: int4Column, nullable: false })
@@ -230,6 +233,7 @@ describe('family instance schemaVerify - types', () => {
             contractIR: validatedContract,
             strict: false,
             context: { contractPath: './contract.json' },
+            frameworkComponents: [postgres, postgresAdapter],
           });
 
           // Should have warnings for missing metadata, but not fail

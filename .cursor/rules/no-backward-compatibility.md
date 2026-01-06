@@ -1,7 +1,7 @@
 ---
 description: Do not add backward-compatibility shims or migration scaffolding
-globs:
-alwaysApply: true
+globs: ["packages/**"]
+alwaysApply: false
 ---
 
 # No Backward Compatibility or Migration Paths

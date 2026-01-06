@@ -1,7 +1,7 @@
 ---
 description: Guidelines for moving packages and updating relative paths
-globs:
-alwaysApply: true
+globs: ["packages/**/package.json", "packages/**/tsconfig.json", "test/**/tsconfig.json", "tsconfig.base.json", "pnpm-workspace.yaml"]
+alwaysApply: false
 ---
 
 # Moving Packages
@@ -20,18 +20,7 @@ When moving packages to new locations, you must update all relative paths that r
 
 ### Common Paths to Update
 
-1. **`tsconfig.json`** - `extends` path to `tsconfig.base.json`
-   - From `packages/1-framework/3-tooling/cli/` → `../../../../tsconfig.base.json` (4 levels)
-   - From `packages/1-framework/1-core/shared/plan/` → `../../../../../tsconfig.base.json` (5 levels)
-   - From `packages/2-sql/4-lanes/orm-lane/` → `../../../../tsconfig.base.json` (4 levels)
-   - From `test/integration/` → `../../tsconfig.base.json` (2 levels)
-
-2. **`package.json`** - Script paths:
-   - `biome.json` config path
-   - `scripts/clean.mjs` path
-   - Any other root-level script references
-
-3. **Test files** - Paths to other packages:
+1. **Test files** - Paths to other packages:
    - Extension pack manifests (e.g., `packages/sql/runtime/adapters/postgres/packs/manifest.json`)
    - Fixture paths
    - Import paths in test utilities
@@ -58,39 +47,17 @@ const packs = loadExtensionPacks(join(__dirname, '../../../packages/3-targets/6-
 - `../../../` → root
 - `../../../packages/3-targets/` → `packages/3-targets/`
 
-### Moving within `packages/`
-
-**Before** (from `packages/2-sql/4-lanes/sql-lane/`):
-```json
-{
-  "scripts": {
-    "lint": "biome check . --config-path ../../../../biome.json"
-  }
-}
-```
-
-**After** (from `packages/2-sql/5-runtime/`):
-```json
-{
-  "scripts": {
-    "lint": "biome check . --config-path ../../../biome.json"
-  }
-}
-```
-
 ## Checklist When Moving Packages
 
-1. **Update `tsconfig.json`** - `extends` path to `tsconfig.base.json` (count directory depth to root)
-2. **Update `package.json`** - All script paths (`biome.json`, `clean.mjs`, etc.) based on new depth
-3. **Update test files** - Paths to other packages, fixtures, manifests
-4. **Update `pnpm-workspace.yaml`** - Add/remove package globs if needed
-5. **Update `architecture.config.json`** - Add/remove package entries
+1. **Update test files** - Paths to other packages, fixtures, manifests
+2. **Update `pnpm-workspace.yaml`** - Add/remove package globs if needed
+3. **Update `architecture.config.json`** - Add/remove package entries
    - For multi-plane packages, add separate globs for each plane (see `.cursor/rules/multi-plane-packages.mdc`)
-6. **Update `tsconfig.base.json`** - Update path mappings and project references
-7. **Update `dependency-cruiser.config.mjs`** - Update exclude patterns if needed
-8. **Update CI workflows** - Update any hardcoded paths
-9. **Update documentation** - READMEs, AGENTS.md, etc.
-10. **Update relative paths in source files** - Manifest paths, import paths, etc.
+4. **Update `tsconfig.base.json`** - Update project references
+5. **Update `dependency-cruiser.config.mjs`** - Update exclude patterns if needed
+6. **Update CI workflows** - Update any hardcoded paths
+7. **Update documentation** - READMEs, AGENTS.md, etc.
+8. **Update relative paths in source files** - Manifest paths, import paths, etc.
 
 ## Verification
 
@@ -117,22 +84,6 @@ const packs = loadExtensionPacks(join(__dirname, '../../sql/runtime/adapters/pos
 // Updated path after moving to test/
 const packs = loadExtensionPacks(join(__dirname, '../../../packages/3-targets/6-adapters/postgres'), []);
 // This resolves to packages/3-targets/6-adapters/postgres (correct!)
-```
-
-**❌ WRONG: Assuming same depth**
-```typescript
-// Assuming 4 levels up works for all packages
-const path = join(__dirname, '../../../../biome.json');
-// Wrong if package is at packages/3-extensions/pgvector/ (only 3 levels)
-```
-
-**✅ CORRECT: Calculate depth for each package**
-```typescript
-// Calculate based on actual location
-// From packages/1-framework/1-core/shared/plan/ = 5 levels up
-const path = join(__dirname, '../../../../../biome.json');
-// From packages/3-extensions/pgvector/ = 3 levels up
-const path = join(__dirname, '../../../biome.json');
 ```
 
 ## Test Packages Special Case

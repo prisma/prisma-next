@@ -5,23 +5,24 @@
   "sideEffects": false,
   "description": "Postgres target pack for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts",
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "biome check . --config-path ../../../../biome.json --error-on-warnings",
-    "lint:fix": "biome check --write . --config-path ../../../biome.json",
-    "lint:fix:unsafe": "biome check --write --unsafe . --config-path ../../../biome.json",
-    "clean": "node ../../../../scripts/clean.mjs"
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/sql-contract": "workspace:*",
-    "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-errors": "workspace:*",
+    "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "arktype": "^2.0.0"
   },
@@ -29,13 +30,14 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
-    "vite-tsconfig-paths": "^5.1.4",
-    "tsup": "^8.3.0",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.1"
+    "@prisma-next/tsconfig": "workspace:*",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "files": [
     "dist",
+    "src",
     "packs"
   ],
   "exports": {
@@ -46,6 +48,10 @@
     "./runtime": {
       "types": "./dist/exports/runtime.d.ts",
       "import": "./dist/exports/runtime.js"
+    },
+    "./pack": {
+      "types": "./dist/exports/pack.d.ts",
+      "import": "./dist/exports/pack.js"
     }
   }
 }

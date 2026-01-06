@@ -1,25 +1,6 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "lib": ["ES2022"],
-    "strict": true,
-    "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "baseUrl": "."
-  },
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": ["@prisma-next/tsconfig/base"],
   "references": [
     { "path": "./packages/1-framework/1-core/shared/contract" },
     { "path": "./packages/1-framework/1-core/shared/operations" },
@@ -39,6 +20,7 @@
     { "path": "./packages/1-framework/4-runtime-executor" },
 
     { "path": "./packages/2-sql/1-core/contract" },
+    { "path": "./packages/2-sql/1-core/errors" },
     { "path": "./packages/2-sql/1-core/operations" },
     { "path": "./packages/2-sql/1-core/schema-ir" },
 

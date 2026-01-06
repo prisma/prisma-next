@@ -1,26 +1,24 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
-import type {
-  FamilyInstance,
-  MigrationPlan,
-  MigrationPlannerResult,
-  MigrationPlanOperation,
-  MigrationRunnerResult,
-} from '@prisma-next/core-control-plane/types';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
+import { createControlClient } from '../control-api/client';
+import type { DbInitFailure } from '../control-api/types';
 import {
-  errorDatabaseUrlRequired,
+  CliStructuredError,
+  errorContractValidationFailed,
+  errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
+  errorJsonFormatNotSupported,
   errorMigrationPlanningFailed,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
-import { parseGlobalFlags } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   type DbInitResult,
   formatCommandHelp,
@@ -29,9 +27,8 @@ import {
   formatDbInitPlanOutput,
   formatStyledHeader,
 } from '../utils/output';
-import { performAction } from '../utils/result';
+import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
-import { withSpinner } from '../utils/spinner';
 
 interface DbInitOptions {
   readonly db?: string;
@@ -49,16 +46,262 @@ interface DbInitOptions {
   readonly 'no-color'?: boolean;
 }
 
+/**
+ * Maps a DbInitFailure to a CliStructuredError for consistent error handling.
+ */
+function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
+  if (failure.code === 'PLANNING_FAILED') {
+    return errorMigrationPlanningFailed({ conflicts: failure.conflicts ?? [] });
+  }
+
+  if (failure.code === 'MARKER_ORIGIN_MISMATCH') {
+    const mismatchParts: string[] = [];
+    if (
+      failure.marker?.coreHash !== failure.destination?.coreHash &&
+      failure.marker?.coreHash &&
+      failure.destination?.coreHash
+    ) {
+      mismatchParts.push(
+        `coreHash (marker: ${failure.marker.coreHash}, destination: ${failure.destination.coreHash})`,
+      );
+    }
+    if (
+      failure.marker?.profileHash !== failure.destination?.profileHash &&
+      failure.marker?.profileHash &&
+      failure.destination?.profileHash
+    ) {
+      mismatchParts.push(
+        `profileHash (marker: ${failure.marker.profileHash}, destination: ${failure.destination.profileHash})`,
+      );
+    }
+
+    return errorRuntime(
+      `Existing contract marker does not match plan destination.${mismatchParts.length > 0 ? ` Mismatch in ${mismatchParts.join(' and ')}.` : ''}`,
+      {
+        why: 'Database has an existing contract marker that does not match the target contract',
+        fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
+        meta: {
+          code: 'MARKER_ORIGIN_MISMATCH',
+          ...(failure.marker?.coreHash ? { markerCoreHash: failure.marker.coreHash } : {}),
+          ...(failure.destination?.coreHash
+            ? { destinationCoreHash: failure.destination.coreHash }
+            : {}),
+          ...(failure.marker?.profileHash ? { markerProfileHash: failure.marker.profileHash } : {}),
+          ...(failure.destination?.profileHash
+            ? { destinationProfileHash: failure.destination.profileHash }
+            : {}),
+        },
+      },
+    );
+  }
+
+  if (failure.code === 'RUNNER_FAILED') {
+    return errorRuntime(failure.summary, {
+      why: failure.why ?? 'Migration runner failed',
+      fix: 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`',
+      meta: {
+        code: 'RUNNER_FAILED',
+        ...(failure.meta ?? {}),
+      },
+    });
+  }
+
+  // Exhaustive check - TypeScript will error if a new code is added but not handled
+  const exhaustive: never = failure.code;
+  throw new Error(`Unhandled DbInitFailure code: ${exhaustive}`);
+}
+
+/**
+ * Executes the db init command and returns a structured Result.
+ */
+async function executeDbInitCommand(
+  options: DbInitOptions,
+  flags: GlobalFlags,
+  startTime: number,
+): Promise<Result<DbInitResult, CliStructuredError>> {
+  // Load config
+  const config = await loadConfig(options.config);
+  const configPath = options.config
+    ? relative(process.cwd(), resolve(options.config))
+    : 'prisma-next.config.ts';
+  const contractPathAbsolute = config.contract?.output
+    ? resolve(config.contract.output)
+    : resolve('src/prisma/contract.json');
+  const contractPath = relative(process.cwd(), contractPathAbsolute);
+
+  // Output header
+  if (flags.json !== 'object' && !flags.quiet) {
+    const details: Array<{ label: string; value: string }> = [
+      { label: 'config', value: configPath },
+      { label: 'contract', value: contractPath },
+    ];
+    if (options.db) {
+      details.push({ label: 'database', value: options.db });
+    }
+    if (options.plan) {
+      details.push({ label: 'mode', value: 'plan (dry run)' });
+    }
+    const header = formatStyledHeader({
+      command: 'db init',
+      description: 'Bootstrap a database to match the current contract',
+      url: 'https://pris.ly/db-init',
+      details,
+      flags,
+    });
+    console.log(header);
+  }
+
+  // Load contract file
+  let contractJsonContent: string;
+  try {
+    contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
+  } catch (error) {
+    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+      return notOk(
+        errorFileNotFound(contractPathAbsolute, {
+          why: `Contract file not found at ${contractPathAbsolute}`,
+          fix: `Run \`prisma-next contract emit\` to generate ${contractPath}, or update \`config.contract.output\` in ${configPath}`,
+        }),
+      );
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  }
+
+  let contractJson: Record<string, unknown>;
+  try {
+    contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  } catch (error) {
+    return notOk(
+      errorContractValidationFailed(
+        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        { where: { path: contractPathAbsolute } },
+      ),
+    );
+  }
+
+  // Resolve database connection (--db flag or config.db.connection)
+  const dbConnection = options.db ?? config.db?.connection;
+  if (!dbConnection) {
+    return notOk(
+      errorDatabaseConnectionRequired({
+        why: `Database connection is required for db init (set db.connection in ${configPath}, or pass --db <url>)`,
+      }),
+    );
+  }
+
+  // Check for driver
+  if (!config.driver) {
+    return notOk(errorDriverRequired({ why: 'Config.driver is required for db init' }));
+  }
+
+  // Check target supports migrations via the migrations capability
+  if (!config.target.migrations) {
+    return notOk(
+      errorTargetMigrationNotSupported({
+        why: `Target "${config.target.id}" does not support migrations`,
+      }),
+    );
+  }
+
+  // Create control client
+  const client = createControlClient({
+    family: config.family,
+    target: config.target,
+    adapter: config.adapter,
+    driver: config.driver,
+    extensionPacks: config.extensionPacks ?? [],
+  });
+
+  // Create progress adapter
+  const onProgress = createProgressAdapter({ flags });
+
+  try {
+    // Call dbInit with connection and progress callback
+    // Connection happens inside dbInit with a 'connect' progress span
+    const result = await client.dbInit({
+      contractIR: contractJson,
+      mode: options.plan ? 'plan' : 'apply',
+      connection: dbConnection,
+      onProgress,
+    });
+
+    // Handle failures by mapping to CLI structured error
+    if (!result.ok) {
+      return notOk(mapDbInitFailure(result.failure));
+    }
+
+    // Convert success result to CLI output format
+    const profileHash = result.value.marker?.profileHash;
+    const dbInitResult: DbInitResult = {
+      ok: true,
+      mode: result.value.mode,
+      plan: {
+        targetId: config.target.targetId,
+        destination: {
+          coreHash: result.value.marker?.coreHash ?? '',
+          ...(profileHash ? { profileHash } : {}),
+        },
+        operations: result.value.plan.operations.map((op) => ({
+          id: op.id,
+          label: op.label,
+          operationClass: op.operationClass,
+        })),
+      },
+      ...(result.value.execution
+        ? {
+            execution: {
+              operationsPlanned: result.value.execution.operationsPlanned,
+              operationsExecuted: result.value.execution.operationsExecuted,
+            },
+          }
+        : {}),
+      ...(result.value.marker
+        ? {
+            marker: {
+              coreHash: result.value.marker.coreHash,
+              ...(result.value.marker.profileHash
+                ? { profileHash: result.value.marker.profileHash }
+                : {}),
+            },
+          }
+        : {}),
+      summary: result.value.summary,
+      timings: { total: Date.now() - startTime },
+    };
+
+    return ok(dbInitResult);
+  } catch (error) {
+    // Driver already throws CliStructuredError for connection failures
+    // Use static type guard to work across module boundaries
+    if (CliStructuredError.is(error)) {
+      return notOk(error);
+    }
+
+    // Wrap unexpected errors
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Unexpected error during db init: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  } finally {
+    await client.close();
+  }
+}
+
 export function createDbInitCommand(): Command {
   const command = new Command('init');
   setCommandDescriptions(
     command,
     'Bootstrap a database to match the current contract and write the contract marker',
     'Initializes a database to match your emitted contract using additive-only operations.\n' +
-      'Creates tables, columns, indexes, and constraints defined in your contract.\n' +
-      'Writes a contract marker to track the database state. This operation is idempotent.\n' +
-      '\n' +
-      'Currently supports empty databases only. Use --plan to preview changes without applying.',
+      'Creates any missing tables, columns, indexes, and constraints defined in your contract.\n' +
+      'Leaves existing compatible structures in place, surfaces conflicts when destructive changes\n' +
+      'would be required, and writes a contract marker to track the database state. Use --plan to\n' +
+      'preview changes without applying.',
   );
   command
     .configureHelp({
@@ -70,7 +313,7 @@ export function createDbInitCommand(): Command {
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--plan', 'Preview planned operations without applying', false)
-    .option('--json [format]', 'Output as JSON (object or ndjson)', false)
+    .option('--json [format]', 'Output as JSON (object)', false)
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
     .option('-vv, --trace', 'Trace output: deep internals, stack traces')
@@ -81,224 +324,21 @@ export function createDbInitCommand(): Command {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
-      const result = await performAction(async () => {
-        // Load config
-        const config = await loadConfig(options.config);
-        const configPath = options.config
-          ? relative(process.cwd(), resolve(options.config))
-          : 'prisma-next.config.ts';
-        const contractPathAbsolute = config.contract?.output
-          ? resolve(config.contract.output)
-          : resolve('src/prisma/contract.json');
-        const contractPath = relative(process.cwd(), contractPathAbsolute);
-
-        // Output header
-        if (flags.json !== 'object' && !flags.quiet) {
-          const details: Array<{ label: string; value: string }> = [
-            { label: 'config', value: configPath },
-            { label: 'contract', value: contractPath },
-          ];
-          if (options.db) {
-            details.push({ label: 'database', value: options.db });
-          }
-          if (options.plan) {
-            details.push({ label: 'mode', value: 'plan (dry run)' });
-          }
-          const header = formatStyledHeader({
+      // Validate JSON format option
+      if (flags.json === 'ndjson') {
+        const result = notOk(
+          errorJsonFormatNotSupported({
             command: 'db init',
-            description: 'Bootstrap a database to match the current contract',
-            url: 'https://pris.ly/db-init',
-            details,
-            flags,
-          });
-          console.log(header);
-        }
+            format: 'ndjson',
+            supportedFormats: ['object'],
+          }),
+        );
+        const exitCode = handleResult(result, flags);
+        process.exit(exitCode);
+      }
 
-        // Load contract file
-        let contractJsonContent: string;
-        try {
-          contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
-        } catch (error) {
-          if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-            throw errorFileNotFound(contractPathAbsolute, {
-              why: `Contract file not found at ${contractPathAbsolute}`,
-            });
-          }
-          throw errorUnexpected(error instanceof Error ? error.message : String(error), {
-            why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
-          });
-        }
+      const result = await executeDbInitCommand(options, flags, startTime);
 
-        let contractJson: Record<string, unknown>;
-        try {
-          contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-        } catch (error) {
-          throw errorUnexpected(error instanceof Error ? error.message : String(error), {
-            why: `Failed to parse contract JSON at ${contractPathAbsolute}: ${error instanceof Error ? error.message : String(error)}`,
-          });
-        }
-
-        // Resolve database URL
-        const dbUrl = options.db ?? config.db?.url;
-        if (!dbUrl) {
-          throw errorDatabaseUrlRequired({ why: 'Database URL is required for db init' });
-        }
-
-        // Check for driver
-        if (!config.driver) {
-          throw errorDriverRequired({ why: 'Config.driver is required for db init' });
-        }
-        const driverDescriptor = config.driver;
-
-        // Check target supports migrations via the migrations capability
-        if (!config.target.migrations) {
-          throw errorTargetMigrationNotSupported({
-            why: `Target "${config.target.id}" does not support migrations`,
-          });
-        }
-        const migrations = config.target.migrations;
-
-        // Create driver
-        const driver = await withSpinner(() => driverDescriptor.create(dbUrl), {
-          message: 'Connecting to database...',
-          flags,
-        });
-
-        try {
-          // Create family instance
-          const familyInstance = config.family.create({
-            target: config.target,
-            adapter: config.adapter,
-            driver: driverDescriptor,
-            extensions: config.extensions ?? [],
-          });
-          const typedFamilyInstance = familyInstance as FamilyInstance<string>;
-
-          // Validate contract
-          const contractIR = typedFamilyInstance.validateContractIR(contractJson) as ContractIR;
-
-          // Create planner and runner from target migrations capability
-          const planner = migrations.createPlanner(familyInstance);
-          const runner = migrations.createRunner(familyInstance);
-
-          // Introspect live schema
-          const schemaIR = await withSpinner(() => typedFamilyInstance.introspect({ driver }), {
-            message: 'Introspecting database schema...',
-            flags,
-          });
-
-          // Policy for init mode (additive only)
-          const policy = { allowedOperationClasses: ['additive'] as const };
-
-          // Plan migration
-          const plannerResult: MigrationPlannerResult = await withSpinner(
-            async () =>
-              planner.plan({
-                contract: contractIR,
-                schema: schemaIR,
-                policy,
-              }),
-            {
-              message: 'Planning migration...',
-              flags,
-            },
-          );
-
-          if (plannerResult.kind === 'failure') {
-            throw errorMigrationPlanningFailed({ conflicts: plannerResult.conflicts });
-          }
-
-          const migrationPlan: MigrationPlan = plannerResult.plan;
-
-          // Plan mode - don't execute
-          if (options.plan) {
-            const dbInitResult: DbInitResult = {
-              ok: true,
-              mode: 'plan',
-              plan: {
-                targetId: migrationPlan.targetId,
-                destination: migrationPlan.destination,
-                operations: migrationPlan.operations.map((op) => ({
-                  id: op.id,
-                  label: op.label,
-                  operationClass: op.operationClass,
-                })),
-              },
-              summary: `Planned ${migrationPlan.operations.length} operation(s)`,
-              timings: { total: Date.now() - startTime },
-            };
-            return dbInitResult;
-          }
-
-          // Apply mode - execute runner
-          const callbacks = {
-            onOperationStart: (op: MigrationPlanOperation) => {
-              if (!flags.quiet && flags.json !== 'object') {
-                console.log(`  → ${op.label}...`);
-              }
-            },
-            onOperationComplete: (_op: MigrationPlanOperation) => {
-              // Could log completion if needed
-            },
-          };
-
-          const runnerResult: MigrationRunnerResult = await withSpinner(
-            () =>
-              runner.execute({
-                plan: migrationPlan,
-                driver,
-                destinationContract: contractIR,
-                policy,
-                callbacks,
-              }),
-            {
-              message: 'Applying migration plan...',
-              flags,
-            },
-          );
-
-          if (!runnerResult.ok) {
-            throw errorRuntime(runnerResult.failure.summary, {
-              why:
-                runnerResult.failure.why ?? `Migration runner failed: ${runnerResult.failure.code}`,
-              meta: { code: runnerResult.failure.code },
-            });
-          }
-
-          const execution = runnerResult.value;
-
-          const dbInitResult: DbInitResult = {
-            ok: true,
-            mode: 'apply',
-            plan: {
-              targetId: migrationPlan.targetId,
-              destination: migrationPlan.destination,
-              operations: migrationPlan.operations.map((op) => ({
-                id: op.id,
-                label: op.label,
-                operationClass: op.operationClass,
-              })),
-            },
-            execution: {
-              operationsPlanned: execution.operationsPlanned,
-              operationsExecuted: execution.operationsExecuted,
-            },
-            marker: migrationPlan.destination.profileHash
-              ? {
-                  coreHash: migrationPlan.destination.coreHash,
-                  profileHash: migrationPlan.destination.profileHash,
-                }
-              : { coreHash: migrationPlan.destination.coreHash },
-            summary: `Applied ${execution.operationsExecuted} operation(s), marker written`,
-            timings: { total: Date.now() - startTime },
-          };
-          return dbInitResult;
-        } finally {
-          await driver.close();
-        }
-      });
-
-      // Handle result
       const exitCode = handleResult(result, flags, (dbInitResult) => {
         if (flags.json === 'object') {
           console.log(formatDbInitJson(dbInitResult));

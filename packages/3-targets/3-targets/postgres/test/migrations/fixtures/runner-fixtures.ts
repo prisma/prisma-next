@@ -35,7 +35,7 @@ export const contract: SqlContract<SqlStorage> = {
     operationTypes: {},
   },
   capabilities: {},
-  extensions: {},
+  extensionPacks: {},
   meta: {},
   sources: {},
 };
@@ -49,8 +49,14 @@ export const familyInstance = sqlFamilyDescriptor.create({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   driver: postgresDriverDescriptor,
-  extensions: [],
+  extensionPacks: [],
 });
+
+export const frameworkComponents = [
+  postgresTargetDescriptor,
+  postgresAdapterDescriptor,
+  postgresDriverDescriptor,
+] as const;
 
 export const testTimeout = timeouts.spinUpPpgDev;
 
