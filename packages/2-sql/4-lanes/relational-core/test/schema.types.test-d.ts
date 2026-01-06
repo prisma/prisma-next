@@ -1,3 +1,8 @@
+import type {
+  SqlContract,
+  SqlMappings,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { expectTypeOf, test } from 'vitest';
 import { schema } from '../src/schema';
@@ -8,6 +13,34 @@ import { createTestContext } from './utils';
 const contract = validateContract<Contract>(contractJson);
 const context = createTestContext(contract);
 const schemaHandle = schema(context);
+
+// Contract type with storage.types for testing schema.types
+type ContractWithTypes = SqlContract<
+  {
+    readonly tables: {
+      readonly test: {
+        readonly columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+        };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly [];
+        readonly indexes: readonly [];
+        readonly foreignKeys: readonly [];
+      };
+    };
+    readonly types: {
+      readonly Vector1536: StorageTypeInstance;
+      readonly Vector768: StorageTypeInstance;
+    };
+  },
+  Record<string, never>,
+  Record<string, never>,
+  SqlMappings
+>;
 
 // These assignments MUST be at module level (not inside test blocks)
 // to trigger compile-time type checking. If these fail, the type tests will fail to compile.
@@ -73,4 +106,74 @@ test('schema extracts CodecTypes automatically from contract', () => {
   // Should still work correctly
   expectTypeOf(schemaHandle.tables).toHaveProperty('user');
   expectTypeOf(schemaHandle.tables.user.columns).toHaveProperty('id');
+});
+
+// =============================================================================
+// schema.types type tests
+// =============================================================================
+
+test('schema returns types property', () => {
+  // Verify schema returns types object
+  expectTypeOf(schemaHandle).toHaveProperty('types');
+  expectTypeOf(schemaHandle.types).toBeObject();
+});
+
+test('schema.types has literal keys from contract storage.types', () => {
+  // Create a contract with storage.types
+  const contractWithTypes: ContractWithTypes = {
+    schemaVersion: '1',
+    target: 'postgres',
+    targetFamily: 'sql',
+    coreHash: 'sha256:test',
+    storage: {
+      tables: {
+        test: {
+          columns: {
+            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+      types: {
+        Vector1536: {
+          codecId: 'pg/vector@1',
+          nativeType: 'vector',
+          typeParams: { length: 1536 },
+        },
+        Vector768: {
+          codecId: 'pg/vector@1',
+          nativeType: 'vector',
+          typeParams: { length: 768 },
+        },
+      },
+    },
+    models: {},
+    relations: {},
+    mappings: { codecTypes: {}, operationTypes: {} },
+    extensionPacks: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
+  };
+
+  const typesContext = createTestContext(contractWithTypes);
+  const typesSchema = schema(typesContext);
+
+  // Verify types has literal keys matching storage.types
+  type TypeKeys = keyof typeof typesSchema.types;
+  expectTypeOf<TypeKeys>().toEqualTypeOf<'Vector1536' | 'Vector768'>();
+
+  // Verify type helpers can be accessed with dot notation
+  expectTypeOf(typesSchema.types).toHaveProperty('Vector1536');
+  expectTypeOf(typesSchema.types).toHaveProperty('Vector768');
+});
+
+test('schema.types is accessible when contract has no storage.types', () => {
+  // The current contract has no storage.types, but schema.types should still be accessible
+  // as an empty record type
+  const types = schemaHandle.types;
+  expectTypeOf(types).toBeObject();
 });

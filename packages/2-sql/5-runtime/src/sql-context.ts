@@ -6,7 +6,7 @@ import type {
   RuntimeTargetDescriptor,
 } from '@prisma-next/core-execution-plane/types';
 import { createOperationRegistry } from '@prisma-next/operations';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type {
   Adapter,
@@ -15,7 +15,42 @@ import type {
   QueryAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type {
+  QueryLaneContext,
+  TypeHelperRegistry,
+} from '@prisma-next/sql-relational-core/query-lane-context';
+import type { Type } from 'arktype';
+import { type as arktype } from 'arktype';
+
+// ============================================================================
+// Runtime Parameterized Codec Descriptor Types
+// ============================================================================
+
+/**
+ * Runtime parameterized codec descriptor.
+ * Provides validation schema and optional init hook for codecs that support type parameters.
+ * Used at runtime to validate typeParams and create type helpers.
+ */
+export interface RuntimeParameterizedCodecDescriptor<
+  TParams = Record<string, unknown>,
+  THelper = unknown,
+> {
+  /** The codec ID this descriptor applies to (e.g., 'pg/vector@1') */
+  readonly codecId: string;
+
+  /**
+   * Arktype schema for validating typeParams.
+   * The schema is used to validate both storage.types entries and inline column typeParams.
+   */
+  readonly paramsSchema: Type<TParams>;
+
+  /**
+   * Optional init hook called during runtime context creation.
+   * Receives validated params and returns a helper object to be stored in context.types.
+   * If not provided, the validated params are stored directly.
+   */
+  readonly init?: (params: TParams) => THelper;
+}
 
 // ============================================================================
 // SQL Runtime Extension Types
@@ -34,6 +69,12 @@ export interface SqlRuntimeExtensionInstance<TTargetId extends string>
   codecs?(): CodecRegistry;
   /** Returns operations to register in the runtime context. */
   operations?(): ReadonlyArray<SqlOperationSignature>;
+  /**
+   * Returns parameterized codec descriptors for type validation and helper creation.
+   * Uses unknown for type parameters to allow any concrete descriptor types.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
+  parameterizedCodecs?(): ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
 }
 
 /**
@@ -68,11 +109,21 @@ export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = Runti
 // SQL Runtime Context
 // ============================================================================
 
+export type { TypeHelperRegistry };
+
 export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
   extends QueryLaneContext<TContract> {
   readonly adapter:
     | Adapter<QueryAst, TContract, LoweredStatement>
     | Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
+
+  /**
+   * Initialized type helpers from storage.types.
+   * Each entry corresponds to a named type instance in the contract's storage.types.
+   * The value is the result of calling the codec's init hook (if provided)
+   * or the validated typeParams (if no init hook).
+   */
+  readonly types?: TypeHelperRegistry;
 }
 
 /**
@@ -96,6 +147,137 @@ export interface CreateRuntimeContextOptions<
   readonly extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<TTargetId>>;
 }
 
+// ============================================================================
+// Runtime Error Helpers
+// ============================================================================
+
+interface RuntimeError extends Error {
+  code: string;
+  category: string;
+  severity: string;
+  details?: Record<string, unknown>;
+}
+
+function runtimeTypeParamsInvalid(
+  message: string,
+  details?: Record<string, unknown>,
+): RuntimeError {
+  const error = new Error(message) as RuntimeError;
+  Object.defineProperty(error, 'name', { value: 'RuntimeError', configurable: true });
+  return Object.assign(error, {
+    code: 'RUNTIME.TYPE_PARAMS_INVALID',
+    category: 'RUNTIME',
+    severity: 'error',
+    details,
+  });
+}
+
+// ============================================================================
+// Parameterized Type Validation
+// ============================================================================
+
+/**
+ * Validates typeParams against the codec's paramsSchema.
+ * @throws RuntimeError with code RUNTIME.TYPE_PARAMS_INVALID if validation fails
+ */
+function validateTypeParams(
+  typeParams: Record<string, unknown>,
+  codecDescriptor: RuntimeParameterizedCodecDescriptor,
+  context: { typeName?: string; tableName?: string; columnName?: string },
+): Record<string, unknown> {
+  const result = codecDescriptor.paramsSchema(typeParams);
+  if (result instanceof arktype.errors) {
+    const messages = result.map((p: { message: string }) => p.message).join('; ');
+    const locationInfo = context.typeName
+      ? `type '${context.typeName}'`
+      : `column '${context.tableName}.${context.columnName}'`;
+    throw runtimeTypeParamsInvalid(
+      `Invalid typeParams for ${locationInfo} (codecId: ${codecDescriptor.codecId}): ${messages}`,
+      { ...context, codecId: codecDescriptor.codecId, typeParams },
+    );
+  }
+  return result as Record<string, unknown>;
+}
+
+/**
+ * Collects parameterized codec descriptors from extension instances.
+ * Returns a map of codecId → descriptor for quick lookup.
+ */
+function collectParameterizedCodecDescriptors(
+  extensionInstances: ReadonlyArray<SqlRuntimeExtensionInstance<string>>,
+): Map<string, RuntimeParameterizedCodecDescriptor> {
+  const descriptors = new Map<string, RuntimeParameterizedCodecDescriptor>();
+
+  for (const extInstance of extensionInstances) {
+    const paramCodecs = extInstance.parameterizedCodecs?.();
+    if (paramCodecs) {
+      for (const descriptor of paramCodecs) {
+        descriptors.set(descriptor.codecId, descriptor);
+      }
+    }
+  }
+
+  return descriptors;
+}
+
+/**
+ * Initializes type helpers from storage.types using codec descriptors.
+ * Validates typeParams and calls init hooks if provided.
+ */
+function initializeTypeHelpers(
+  storageTypes: Record<string, StorageTypeInstance> | undefined,
+  codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
+): TypeHelperRegistry {
+  const helpers: TypeHelperRegistry = {};
+
+  if (!storageTypes) {
+    return helpers;
+  }
+
+  for (const [typeName, typeInstance] of Object.entries(storageTypes)) {
+    const descriptor = codecDescriptors.get(typeInstance.codecId);
+
+    if (descriptor) {
+      // Validate typeParams against the codec's schema
+      const validatedParams = validateTypeParams(typeInstance.typeParams, descriptor, {
+        typeName,
+      });
+
+      // Call init hook if provided, otherwise store validated params
+      if (descriptor.init) {
+        helpers[typeName] = descriptor.init(validatedParams);
+      } else {
+        helpers[typeName] = validatedParams;
+      }
+    } else {
+      // No descriptor found - store raw typeParams (no validation)
+      helpers[typeName] = typeInstance.typeParams;
+    }
+  }
+
+  return helpers;
+}
+
+/**
+ * Validates inline column typeParams across all tables.
+ * @throws RuntimeError with code RUNTIME.TYPE_PARAMS_INVALID if validation fails
+ */
+function validateColumnTypeParams(
+  storage: SqlStorage,
+  codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
+): void {
+  for (const [tableName, table] of Object.entries(storage.tables)) {
+    for (const [columnName, column] of Object.entries(table.columns)) {
+      if (column.typeParams) {
+        const descriptor = codecDescriptors.get(column.codecId);
+        if (descriptor) {
+          validateTypeParams(column.typeParams, descriptor, { tableName, columnName });
+        }
+      }
+    }
+  }
+}
+
 /**
  * Creates a SQL runtime context from descriptor-first composition.
  *
@@ -104,6 +286,7 @@ export interface CreateRuntimeContextOptions<
  * - The adapter instance (created from descriptor)
  * - Codec registry (populated from adapter + extension instances)
  * - Operation registry (populated from extension instances)
+ * - Types registry (initialized helpers from storage.types)
  *
  * @param options - Descriptor-first composition options
  * @returns RuntimeContext with registries wired from all components
@@ -128,9 +311,12 @@ export function createRuntimeContext<
     codecRegistry.register(codec);
   }
 
-  // Create extension instances and register their codecs/operations
+  // Create extension instances and collect their contributions
+  const extensionInstances: SqlRuntimeExtensionInstance<TTargetId>[] = [];
+
   for (const extDescriptor of extensionPacks ?? []) {
     const extInstance = extDescriptor.create();
+    extensionInstances.push(extInstance);
 
     const extCodecs = extInstance.codecs?.();
     if (extCodecs) {
@@ -147,10 +333,22 @@ export function createRuntimeContext<
     }
   }
 
+  // Collect parameterized codec descriptors from extensions
+  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(extensionInstances);
+
+  // Validate column typeParams if any descriptors are registered
+  if (parameterizedCodecDescriptors.size > 0) {
+    validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);
+  }
+
+  // Initialize type helpers from storage.types
+  const types = initializeTypeHelpers(contract.storage.types, parameterizedCodecDescriptors);
+
   return {
     contract,
     adapter: adapterInstance,
     operations: operationRegistry,
     codecs: codecRegistry,
+    types,
   };
 }

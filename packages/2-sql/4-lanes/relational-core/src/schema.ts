@@ -301,12 +301,29 @@ type ExtractSchemaTables<
     TableRef;
 };
 
+/**
+ * Extracts the types registry shape from a contract.
+ * Each key is a type name from storage.types, value is unknown (runtime-resolved).
+ * Returns an empty object type {} when storage.types is undefined.
+ */
+type ExtractSchemaTypes<Contract extends SqlContract<SqlStorage>> =
+  Contract['storage']['types'] extends infer Types
+    ? Types extends Record<string, unknown>
+      ? { readonly [TypeName in keyof Types]: unknown }
+      : Record<string, never>
+    : Record<string, never>;
+
 export type SchemaHandle<
   Contract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   CodecTypes extends CodecTypesType = CodecTypesType,
   Operations extends OperationTypes = Record<string, never>,
 > = {
   readonly tables: ExtractSchemaTables<Contract, CodecTypes, Operations>;
+  /**
+   * Initialized type helpers from storage.types.
+   * Each entry corresponds to a named type instance in the contract's storage.types.
+   */
+  readonly types: ExtractSchemaTypes<Contract>;
 };
 
 type SchemaReturnType<Contract extends SqlContract<SqlStorage>> = SchemaHandle<
@@ -329,12 +346,13 @@ type ToOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationType
  * Creates a schema handle for building SQL queries.
  *
  * @param context - Query lane context containing contract, codec and operation registries
- * @returns A schema handle with typed table builders
+ * @returns A schema handle with typed table builders and type helpers
  *
  * @example
  * ```typescript
  * const schemaHandle = schema<Contract>(context);
  * const userTable = schemaHandle.tables.user;
+ * const vectorType = schemaHandle.types.Vector1536;
  * ```
  */
 export function schema<Contract extends SqlContract<SqlStorage>>(
@@ -378,7 +396,10 @@ export function schema<Contract extends SqlContract<SqlStorage>>(
     ) as ExtractSchemaTables<Contract, CodecTypes, Operations>[typeof tableName];
   }
 
-  return Object.freeze({ tables }) as SchemaReturnType<Contract>;
+  // Get type helpers from context (populated by createRuntimeContext)
+  const types = (context.types ?? {}) as ExtractSchemaTypes<Contract>;
+
+  return Object.freeze({ tables, types }) as SchemaReturnType<Contract>;
 }
 
 export type { ColumnBuilderImpl as Column, TableBuilderImpl as Table };
