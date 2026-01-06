@@ -1,5 +1,7 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
+  GenerateContractTypesOptions,
+  ParameterizedCodecDescriptor,
   TargetFamilyHook,
   TypesImportSpec,
   ValidationContext,
@@ -646,5 +648,107 @@ export type Contract = unknown;
     const result = await emit(ir, options, mockHookNoTypeValidation);
     expect(result.contractJson).toBeDefined();
     expect(result.contractDts).toBeDefined();
+  });
+
+  it('passes parameterizedCodecs to generateContractTypes options', async () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {},
+      },
+    });
+
+    let receivedOptions: GenerateContractTypesOptions | undefined;
+
+    const mockHookCapturingOptions: TargetFamilyHook = {
+      id: 'sql',
+      validateTypes: () => {},
+      validateStructure: () => {},
+      generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports, options) => {
+        receivedOptions = options;
+        return `// Generated contract types
+export type CodecTypes = Record<string, never>;
+export type LaneCodecTypes = CodecTypes;
+export type Contract = unknown;
+`;
+      },
+    };
+
+    const vectorDescriptor: ParameterizedCodecDescriptor = {
+      codecId: 'pg/vector@1',
+      outputTypeRenderer: 'Vector<{{length}}>',
+      typesImport: {
+        package: '@prisma-next/extension-pgvector/vector-types',
+        named: 'Vector',
+        alias: 'Vector',
+      },
+    };
+
+    const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
+    parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
+
+    const options: EmitOptions = {
+      outputDir: '',
+      operationRegistry: createOperationRegistry(),
+      codecTypeImports: [],
+      operationTypeImports: [],
+      extensionIds: [],
+      parameterizedCodecs,
+    };
+
+    await emit(ir, options, mockHookCapturingOptions);
+
+    expect(receivedOptions).toBeDefined();
+    expect(receivedOptions?.parameterizedCodecs).toBeDefined();
+    expect(receivedOptions?.parameterizedCodecs?.size).toBe(1);
+    expect(receivedOptions?.parameterizedCodecs?.get('pg/vector@1')).toEqual(vectorDescriptor);
+  });
+
+  it('passes parameterizedCodecs to ValidationContext', async () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {},
+      },
+    });
+
+    let receivedCtx: ValidationContext | undefined;
+
+    const mockHookCapturingContext: TargetFamilyHook = {
+      id: 'sql',
+      validateTypes: (_ir, ctx) => {
+        receivedCtx = ctx;
+      },
+      validateStructure: () => {},
+      generateContractTypes: () => {
+        return `// Generated contract types
+export type CodecTypes = Record<string, never>;
+export type LaneCodecTypes = CodecTypes;
+export type Contract = unknown;
+`;
+      },
+    };
+
+    const vectorDescriptor: ParameterizedCodecDescriptor = {
+      codecId: 'pg/vector@1',
+      outputTypeRenderer: 'Vector<{{length}}>',
+    };
+
+    const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
+    parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
+
+    const options: EmitOptions = {
+      outputDir: '',
+      operationRegistry: createOperationRegistry(),
+      codecTypeImports: [],
+      operationTypeImports: [],
+      extensionIds: [],
+      parameterizedCodecs,
+    };
+
+    await emit(ir, options, mockHookCapturingContext);
+
+    expect(receivedCtx).toBeDefined();
+    expect(receivedCtx?.parameterizedCodecs).toBeDefined();
+    expect(receivedCtx?.parameterizedCodecs?.size).toBe(1);
+    expect(receivedCtx?.parameterizedCodecs?.get('pg/vector@1')).toEqual(vectorDescriptor);
   });
 });

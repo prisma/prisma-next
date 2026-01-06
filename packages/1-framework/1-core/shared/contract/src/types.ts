@@ -181,6 +181,24 @@ export interface ValidationContext {
   readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly operationTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds?: ReadonlyArray<string>;
+  /**
+   * Parameterized codec descriptors collected from adapters and extensions.
+   * Map of codecId → descriptor for quick lookup during type generation.
+   */
+  readonly parameterizedCodecs?: Map<string, ParameterizedCodecDescriptor>;
+}
+
+/**
+ * Options for generating contract types.
+ */
+export interface GenerateContractTypesOptions {
+  readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
+  readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
+  /**
+   * Parameterized codec descriptors for rendering precise types.
+   * Map of codecId → descriptor.
+   */
+  readonly parameterizedCodecs?: Map<string, ParameterizedCodecDescriptor>;
 }
 
 /**

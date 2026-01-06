@@ -203,6 +203,8 @@ export const sqlTargetFamilyHook = {
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
     options?: GenerateContractTypesOptions,
   ): string {
+    // Options are available for future use (e.g., parameterizedCodecs)
+    void options;
     const allImports = [...codecTypeImports, ...operationTypeImports];
     const importLines = allImports.map(
       (imp) => `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`,
