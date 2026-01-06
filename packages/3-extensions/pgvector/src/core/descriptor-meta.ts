@@ -1,23 +1,7 @@
 import type { ExtensionPackRef } from '@prisma-next/contract/framework-components';
-import type { ParameterizedCodecDescriptor } from '@prisma-next/contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 
 const pgvectorTypeId = 'pg/vector@1' as const;
-
-/**
- * Parameterized codec descriptor for the vector type.
- * Enables precise TypeScript types like `Vector<1536>` for vector columns
- * when they have typeParams with a `length` property.
- */
-const vectorCodecDescriptor: ParameterizedCodecDescriptor = {
-  codecId: pgvectorTypeId,
-  outputTypeRenderer: 'Vector<{{length}}>',
-  typesImport: {
-    package: '@prisma-next/extension-pgvector/vector-types',
-    named: 'Vector',
-    alias: 'Vector',
-  },
-};
 
 const cosineLowering = {
   targetFamily: 'sql',
@@ -54,6 +38,13 @@ export const pgvectorPackMeta = {
         named: 'CodecTypes',
         alias: 'PgVectorTypes',
       },
+      // Parameterized codec renderers for type emission.
+      // The renderer template produces precise TypeScript types like Vector<1536>
+      // when columns have typeParams with a `length` property.
+      // Note: The Vector<N> type import is deferred to Phase 6.
+      parameterized: {
+        [pgvectorTypeId]: 'Vector<{{length}}>',
+      },
     },
     operationTypes: {
       import: {
@@ -65,7 +56,6 @@ export const pgvectorPackMeta = {
     storage: [
       { typeId: pgvectorTypeId, familyId: 'sql', targetId: 'postgres', nativeType: 'vector' },
     ],
-    parameterizedCodecs: [vectorCodecDescriptor],
   },
   operations: [
     {
