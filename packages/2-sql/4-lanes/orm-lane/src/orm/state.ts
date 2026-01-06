@@ -1,7 +1,7 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
-  AnyColumnBuilder,
+  AnyExpressionSource,
   AnyOrderBuilder,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
@@ -28,7 +28,7 @@ export interface OrmIncludeState {
   childWhere: AnyBinaryBuilder | undefined;
   childOrderBy: AnyOrderBuilder | undefined;
   childLimit: number | undefined;
-  childProjection: Record<string, AnyColumnBuilder | boolean | NestedProjection> | undefined;
+  childProjection: Record<string, AnyExpressionSource | boolean | NestedProjection> | undefined;
   alias: string;
   relation: {
     to: string;
@@ -48,5 +48,5 @@ export interface OrmBuilderState {
   orderByExpr: AnyOrderBuilder | undefined;
   limitValue: number | undefined;
   offsetValue: number | undefined;
-  projection: Record<string, AnyColumnBuilder | boolean | NestedProjection> | undefined;
+  projection: Record<string, AnyExpressionSource | boolean | NestedProjection> | undefined;
 }

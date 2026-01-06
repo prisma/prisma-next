@@ -3,13 +3,13 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
-  AnyColumnBuilder,
+  AnyExpressionSource,
   AnyOrderBuilder,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
 import type { ProjectionState } from '../utils/state';
 
-export type ProjectionInput = Record<string, AnyColumnBuilder | boolean | NestedProjection>;
+export type ProjectionInput = Record<string, AnyExpressionSource | boolean | NestedProjection>;
 
 export interface MetaBuildArgs {
   readonly contract: SqlContract<SqlStorage>;

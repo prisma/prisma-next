@@ -32,13 +32,27 @@ export interface OperationExpr {
   readonly kind: 'operation';
   readonly method: string;
   readonly forTypeId: string;
-  readonly self: ColumnRef | OperationExpr;
-  readonly args: ReadonlyArray<ColumnRef | ParamRef | LiteralExpr | OperationExpr>;
+  readonly self: Expression;
+  readonly args: ReadonlyArray<Expression | ParamRef | LiteralExpr>;
   readonly returns: ReturnSpec;
   readonly lowering: SqlLoweringSpec;
 }
 
-export function isOperationExpr(expr: ColumnRef | OperationExpr): expr is OperationExpr {
+/**
+ * Unified expression type - the canonical AST representation for column references
+ * and operation expressions. This is what all builders convert to via toExpr().
+ */
+export type Expression = ColumnRef | OperationExpr;
+
+/**
+ * Interface for any builder that can produce an Expression.
+ * Implemented by ColumnBuilder and ExpressionBuilder.
+ */
+export interface ExpressionSource {
+  toExpr(): Expression;
+}
+
+export function isOperationExpr(expr: Expression): expr is OperationExpr {
   return expr.kind === 'operation';
 }
 
@@ -47,8 +61,8 @@ export type BinaryOp = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte';
 export interface BinaryExpr {
   readonly kind: 'bin';
   readonly op: BinaryOp;
-  readonly left: ColumnRef | OperationExpr;
-  readonly right: ColumnRef | ParamRef;
+  readonly left: Expression;
+  readonly right: Expression | ParamRef;
 }
 
 export interface ExistsExpr {
@@ -82,9 +96,9 @@ export interface IncludeAst {
     readonly table: TableRef;
     readonly on: JoinOnExpr;
     readonly where?: BinaryExpr | ExistsExpr;
-    readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
+    readonly orderBy?: ReadonlyArray<{ expr: Expression; dir: Direction }>;
     readonly limit?: number;
-    readonly project: ReadonlyArray<{ alias: string; expr: ColumnRef | OperationExpr }>;
+    readonly project: ReadonlyArray<{ alias: string; expr: Expression }>;
   };
 }
 
@@ -95,10 +109,10 @@ export interface SelectAst {
   readonly includes?: ReadonlyArray<IncludeAst>;
   readonly project: ReadonlyArray<{
     alias: string;
-    expr: ColumnRef | IncludeRef | OperationExpr | LiteralExpr;
+    expr: Expression | IncludeRef | LiteralExpr;
   }>;
   readonly where?: BinaryExpr | ExistsExpr;
-  readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
+  readonly orderBy?: ReadonlyArray<{ expr: Expression; dir: Direction }>;
   readonly limit?: number;
 }
 

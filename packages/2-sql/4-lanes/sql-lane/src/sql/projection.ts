@@ -1,6 +1,6 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
-import type { AnyColumnBuilder, NestedProjection } from '@prisma-next/sql-relational-core/types';
-import { isColumnBuilder } from '@prisma-next/sql-relational-core/utils/guards';
+import type { AnyExpressionSource, NestedProjection } from '@prisma-next/sql-relational-core/types';
+import { isExpressionSource } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
 import {
   errorAliasCollision,
@@ -47,14 +47,14 @@ export function flattenProjection(
   projection: NestedProjection,
   tracker: AliasTracker,
   currentPath: string[] = [],
-): { aliases: string[]; columns: AnyColumnBuilder[] } {
+): { aliases: string[]; columns: AnyExpressionSource[] } {
   const aliases: string[] = [];
-  const columns: AnyColumnBuilder[] = [];
+  const columns: AnyExpressionSource[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     const path = [...currentPath, key];
 
-    if (isColumnBuilder(value)) {
+    if (isExpressionSource(value)) {
       const alias = tracker.register(path);
       aliases.push(alias);
       columns.push(value);
@@ -77,7 +77,7 @@ export function buildProjectionState(
 ): ProjectionState {
   const tracker = new AliasTracker();
   const aliases: string[] = [];
-  const columns: (AnyColumnBuilder | null)[] = [];
+  const columns: AnyExpressionSource[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     if (value === true) {
@@ -86,12 +86,17 @@ export function buildProjectionState(
       if (!matchingInclude) {
         errorIncludeAliasNotFound(key);
       }
-      // For include references, we track the alias but use null as placeholder
+      // For include references, we track the alias but use a placeholder object
       // The actual handling happens in AST building where we create includeRef
-      // Using null instead of invalid ColumnBuilder avoids code smell
       aliases.push(key);
-      columns.push(null);
-    } else if (isColumnBuilder(value)) {
+      columns.push({
+        kind: 'column',
+        table: matchingInclude.table.name,
+        column: '',
+        columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
+        toExpr: () => ({ kind: 'col', table: matchingInclude.table.name, column: '' }),
+      } as AnyExpressionSource);
+    } else if (isExpressionSource(value)) {
       const alias = tracker.register([key]);
       aliases.push(alias);
       columns.push(value);

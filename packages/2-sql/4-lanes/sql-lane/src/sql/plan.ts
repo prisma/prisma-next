@@ -1,42 +1,72 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
+import type { Expression } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
-import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
+import type { AnyExpressionSource } from '@prisma-next/sql-relational-core/types';
 import {
   collectColumnRefs,
-  getColumnInfo,
-  getOperationExpr,
   isColumnBuilder,
+  isExpressionBuilder,
   isOperationExpr,
 } from '@prisma-next/sql-relational-core/utils/guards';
 import type { MetaBuildArgs } from '../types/internal';
 import { assertColumnBuilder } from '../utils/assertions';
 import { errorMissingColumnForAlias } from '../utils/errors';
 
+/**
+ * Extracts column references from an ExpressionSource (ColumnBuilder or ExpressionBuilder).
+ */
+function collectRefsFromExpressionSource(
+  source: AnyExpressionSource,
+  refsColumns: Map<string, { table: string; column: string }>,
+): void {
+  if (isExpressionBuilder(source)) {
+    // ExpressionBuilder has an OperationExpr - collect all column refs
+    const allRefs = collectColumnRefs(source.expr);
+    for (const ref of allRefs) {
+      refsColumns.set(`${ref.table}.${ref.column}`, {
+        table: ref.table,
+        column: ref.column,
+      });
+    }
+  } else if (isColumnBuilder(source)) {
+    // ColumnBuilder - use table and column directly
+    const col = source as unknown as { table: string; column: string };
+    refsColumns.set(`${col.table}.${col.column}`, {
+      table: col.table,
+      column: col.column,
+    });
+  }
+}
+
+/**
+ * Extracts column references from an Expression (AST node).
+ */
+function collectRefsFromExpression(
+  expr: Expression,
+  refsColumns: Map<string, { table: string; column: string }>,
+): void {
+  if (isOperationExpr(expr)) {
+    const allRefs = collectColumnRefs(expr);
+    for (const ref of allRefs) {
+      refsColumns.set(`${ref.table}.${ref.column}`, {
+        table: ref.table,
+        column: ref.column,
+      });
+    }
+  } else if (expr.kind === 'col') {
+    refsColumns.set(`${expr.table}.${expr.column}`, {
+      table: expr.table,
+      column: expr.column,
+    });
+  }
+}
+
 export function buildMeta(args: MetaBuildArgs): PlanMeta {
   const refsColumns = new Map<string, { table: string; column: string }>();
   const refsTables = new Set<string>([args.table.name]);
 
   for (const column of args.projection.columns) {
-    // Skip null columns (include placeholders)
-    if (!column) {
-      continue;
-    }
-    const operationExpr = getOperationExpr(column);
-    if (operationExpr) {
-      const allRefs = collectColumnRefs(operationExpr);
-      for (const ref of allRefs) {
-        refsColumns.set(`${ref.table}.${ref.column}`, {
-          table: ref.table,
-          column: ref.column,
-        });
-      }
-    } else {
-      refsColumns.set(`${column.table}.${column.column}`, {
-        table: column.table,
-        column: column.column,
-      });
-    }
+    collectRefsFromExpressionSource(column, refsColumns);
   }
 
   if (args.joins) {
@@ -81,42 +111,27 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
-        const colInfo = getColumnInfo(include.childWhere.left);
-        refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
-          table: colInfo.table,
-          column: colInfo.column,
-        });
-        // Handle right side of child WHERE clause
+        // childWhere.left is Expression (already converted at builder creation time)
+        collectRefsFromExpression(include.childWhere.left, refsColumns);
+        // Handle right side of child WHERE clause - can be ParamPlaceholder or ExpressionSource
         const childWhereRight = include.childWhere.right;
-        if (isColumnBuilder(childWhereRight)) {
-          const rightColInfo = getColumnInfo(childWhereRight);
-          refsColumns.set(`${rightColInfo.table}.${rightColInfo.column}`, {
-            table: rightColInfo.table,
-            column: rightColInfo.column,
-          });
+        if (isColumnBuilder(childWhereRight) || isExpressionBuilder(childWhereRight)) {
+          collectRefsFromExpressionSource(childWhereRight, refsColumns);
         }
       }
       // Add child ORDER BY columns if present
       if (include.childOrderBy) {
-        const orderBy = include.childOrderBy as unknown as {
-          expr?: AnyColumnBuilder | OperationExpr;
-        };
-        if (orderBy.expr) {
-          const colInfo = getColumnInfo(orderBy.expr);
-          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
-            table: colInfo.table,
-            column: colInfo.column,
-          });
-        }
+        // childOrderBy.expr is Expression (already converted at builder creation time)
+        collectRefsFromExpression(include.childOrderBy.expr, refsColumns);
       }
     }
   }
 
   if (args.where) {
-    const whereLeft = args.where.left;
-    // Check if whereLeft is an OperationExpr directly (not wrapped in ColumnBuilder)
-    if (isOperationExpr(whereLeft)) {
-      const allRefs = collectColumnRefs(whereLeft);
+    // args.where.left is Expression (already converted at builder creation time)
+    const leftExpr: Expression = args.where.left;
+    if (isOperationExpr(leftExpr)) {
+      const allRefs = collectColumnRefs(leftExpr);
       for (const ref of allRefs) {
         refsColumns.set(`${ref.table}.${ref.column}`, {
           table: ref.table,
@@ -124,56 +139,37 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         });
       }
     } else {
-      // Check if whereLeft is a ColumnBuilder with an _operationExpr property
-      const operationExpr = (whereLeft as { _operationExpr?: OperationExpr })._operationExpr;
-      if (operationExpr) {
-        const allRefs = collectColumnRefs(operationExpr);
-        for (const ref of allRefs) {
-          refsColumns.set(`${ref.table}.${ref.column}`, {
-            table: ref.table,
-            column: ref.column,
-          });
-        }
-      } else {
-        const colBuilder = assertColumnBuilder(whereLeft, 'where clause must be a ColumnBuilder');
-        refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
-          table: colBuilder.table,
-          column: colBuilder.column,
-        });
-      }
+      // leftExpr is ColumnRef
+      refsColumns.set(`${leftExpr.table}.${leftExpr.column}`, {
+        table: leftExpr.table,
+        column: leftExpr.column,
+      });
     }
 
-    // Handle right side of WHERE clause - can be ParamPlaceholder or AnyColumnBuilder
+    // Handle right side of WHERE clause - can be ParamPlaceholder or AnyExpressionSource
     const whereRight = args.where.right;
-    if (isColumnBuilder(whereRight)) {
-      const colInfo = getColumnInfo(whereRight);
-      refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
-        table: colInfo.table,
-        column: colInfo.column,
-      });
+    if (isColumnBuilder(whereRight) || isExpressionBuilder(whereRight)) {
+      collectRefsFromExpressionSource(whereRight, refsColumns);
     }
   }
 
   if (args.orderBy) {
-    const orderBy = args.orderBy as unknown as {
-      expr?: AnyColumnBuilder | OperationExpr;
-    };
-    const orderByExpr = orderBy.expr;
-    if (orderByExpr) {
-      if (isOperationExpr(orderByExpr)) {
-        const allRefs = collectColumnRefs(orderByExpr);
-        for (const ref of allRefs) {
-          refsColumns.set(`${ref.table}.${ref.column}`, {
-            table: ref.table,
-            column: ref.column,
-          });
-        }
-      } else {
-        refsColumns.set(`${orderByExpr.table}.${orderByExpr.column}`, {
-          table: orderByExpr.table,
-          column: orderByExpr.column,
+    // args.orderBy.expr is Expression (already converted at builder creation time)
+    const orderByExpr: Expression = args.orderBy.expr;
+    if (isOperationExpr(orderByExpr)) {
+      const allRefs = collectColumnRefs(orderByExpr);
+      for (const ref of allRefs) {
+        refsColumns.set(`${ref.table}.${ref.column}`, {
+          table: ref.table,
+          column: ref.column,
         });
       }
+    } else {
+      // orderByExpr is ColumnRef
+      refsColumns.set(`${orderByExpr.table}.${orderByExpr.column}`, {
+        table: orderByExpr.table,
+        column: orderByExpr.column,
+      });
     }
   }
 
@@ -191,13 +187,18 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         // This shouldn't happen if projection building is correct, but handle gracefully
         errorMissingColumnForAlias(alias, index);
       }
-
-      const operationExpr = getOperationExpr(column);
-      if (operationExpr) {
-        return [alias, `operation:${operationExpr.method}`];
+      // Check if column is an ExpressionBuilder (operation result)
+      if (isExpressionBuilder(column)) {
+        return [alias, `operation:${column.expr.method}`];
+      }
+      // column is ColumnBuilder
+      const col = column as unknown as { table?: string; column?: string };
+      if (!col.table || !col.column) {
+        // This is a placeholder column for an include - skip it
+        return [alias, `include:${alias}`];
       }
 
-      return [alias, `${column.table}.${column.column}`];
+      return [alias, `${col.table}.${col.column}`];
     }),
   );
 
@@ -213,15 +214,15 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column) {
       continue;
     }
-    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
+    if (isExpressionBuilder(column)) {
+      const operationExpr = column.expr;
       if (operationExpr.returns.kind === 'typeId') {
         projectionTypes[alias] = operationExpr.returns.type;
       } else if (operationExpr.returns.kind === 'builtin') {
         projectionTypes[alias] = operationExpr.returns.type;
       }
     } else {
-      // TypeScript can't narrow ColumnBuilder properly
+      // column is ColumnBuilder
       const col = column as unknown as { columnMeta?: { codecId: string } };
       const columnMeta = col.columnMeta;
       const codecId = columnMeta?.codecId;
@@ -243,14 +244,14 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column) {
       continue;
     }
-    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
+    if (isExpressionBuilder(column)) {
+      const operationExpr = column.expr;
       if (operationExpr.returns.kind === 'typeId') {
         projectionCodecs[alias] = operationExpr.returns.type;
       }
     } else {
       // Use columnMeta.codecId directly as typeId (already canonicalized)
-      // TypeScript can't narrow ColumnBuilder properly
+      // column is ColumnBuilder
       const col = column as unknown as { columnMeta?: { codecId: string } };
       const columnMeta = col.columnMeta;
       const codecId = columnMeta?.codecId;

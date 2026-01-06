@@ -1,12 +1,15 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
-  AnyColumnBuilder,
+  AnyExpressionSource,
   AnyOrderBuilder,
   JoinOnPredicate,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import { isColumnBuilder } from '@prisma-next/sql-relational-core/utils/guards';
+import {
+  isColumnBuilder,
+  isExpressionBuilder,
+} from '@prisma-next/sql-relational-core/utils/guards';
 import {
   errorAliasCollision,
   errorAliasPathEmpty,
@@ -18,10 +21,10 @@ import {
 
 export interface ProjectionState {
   readonly aliases: string[];
-  readonly columns: AnyColumnBuilder[];
+  readonly columns: AnyExpressionSource[];
 }
 
-export type ProjectionInput = Record<string, AnyColumnBuilder | boolean | NestedProjection>;
+export type ProjectionInput = Record<string, AnyExpressionSource | boolean | NestedProjection>;
 
 function generateAlias(path: string[]): string {
   if (path.length === 0) {
@@ -58,14 +61,14 @@ export function flattenProjection(
   projection: NestedProjection,
   tracker: AliasTracker,
   currentPath: string[] = [],
-): { aliases: string[]; columns: AnyColumnBuilder[] } {
+): { aliases: string[]; columns: AnyExpressionSource[] } {
   const aliases: string[] = [];
-  const columns: AnyColumnBuilder[] = [];
+  const columns: AnyExpressionSource[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     const path = [...currentPath, key];
 
-    if (isColumnBuilder(value)) {
+    if (isColumnBuilder(value) || isExpressionBuilder(value)) {
       const alias = tracker.register(path);
       aliases.push(alias);
       columns.push(value);
@@ -96,7 +99,7 @@ export function buildProjectionState(
 ): ProjectionState {
   const tracker = new AliasTracker();
   const aliases: string[] = [];
-  const columns: AnyColumnBuilder[] = [];
+  const columns: AnyExpressionSource[] = [];
 
   for (const [key, value] of Object.entries(projection)) {
     if (value === true) {
@@ -114,8 +117,11 @@ export function buildProjectionState(
           codecId: 'core/json@1',
           nullable: true,
         },
-      } as AnyColumnBuilder);
-    } else if (isColumnBuilder(value)) {
+        toExpr() {
+          return { kind: 'col', table: matchingInclude.table.name, column: '' };
+        },
+      } as AnyExpressionSource);
+    } else if (isColumnBuilder(value) || isExpressionBuilder(value)) {
       const alias = tracker.register([key]);
       aliases.push(alias);
       columns.push(value);

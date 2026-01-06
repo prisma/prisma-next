@@ -240,7 +240,7 @@ export function buildIncludeAst(
 
         return {
           alias,
-          expr: createColumnRef(column.table, column.column),
+          expr: column.toExpr(),
         };
       }),
     },

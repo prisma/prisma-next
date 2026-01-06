@@ -10,6 +10,8 @@ import type {
   BinaryOp,
   ColumnRef,
   Direction,
+  Expression,
+  ExpressionSource,
   OperationExpr,
   ParamRef,
   QueryAst,
@@ -22,13 +24,21 @@ export interface ParamPlaceholder {
   readonly name: string;
 }
 
+/**
+ * ValueSource represents any value that can appear in a comparison or as an argument.
+ * This includes:
+ * - ParamPlaceholder: A parameter placeholder (e.g., `param('userId')`)
+ * - ExpressionSource: Something that can be converted to an Expression (ColumnBuilder, ExpressionBuilder)
+ */
+export type ValueSource = ParamPlaceholder | ExpressionSource;
+
 export interface OrderBuilder<
-  ColumnName extends string = string,
-  ColumnMeta extends StorageColumn = StorageColumn,
-  JsType = unknown,
+  _ColumnName extends string = string,
+  _ColumnMeta extends StorageColumn = StorageColumn,
+  _JsType = unknown,
 > {
   readonly kind: 'order';
-  readonly expr: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
+  readonly expr: Expression;
   readonly dir: Direction;
 }
 
@@ -45,6 +55,7 @@ export function createOrderBuilder(
 /**
  * ColumnBuilder with optional operation methods based on the column's typeId.
  * When Operations is provided and the column's typeId matches, operation methods are included.
+ * Implements ExpressionSource to provide type-safe conversion to ColumnRef.
  */
 export type ColumnBuilder<
   ColumnName extends string = string,
@@ -56,20 +67,17 @@ export type ColumnBuilder<
   readonly table: string;
   readonly column: ColumnName;
   readonly columnMeta: ColumnMeta;
-  eq(value: ParamPlaceholder | AnyColumnBuilderBase): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  neq(
-    value: ParamPlaceholder | AnyColumnBuilderBase,
-  ): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  gt(value: ParamPlaceholder | AnyColumnBuilderBase): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  lt(value: ParamPlaceholder | AnyColumnBuilderBase): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  gte(
-    value: ParamPlaceholder | AnyColumnBuilderBase,
-  ): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
-  lte(
-    value: ParamPlaceholder | AnyColumnBuilderBase,
-  ): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  // Methods accept ValueSource (ParamPlaceholder or ExpressionSource)
+  eq(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  neq(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  gt(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  lt(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  gte(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
+  lte(value: ValueSource): BinaryBuilder<ColumnName, ColumnMeta, JsType>;
   asc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
   desc(): OrderBuilder<ColumnName, ColumnMeta, JsType>;
+  /** Converts this column builder to a ColumnRef expression */
+  toExpr(): ColumnRef;
   // Helper property for type extraction (not used at runtime)
   readonly __jsType: JsType;
 } & (ColumnMeta['codecId'] extends string
@@ -84,14 +92,47 @@ export type ColumnBuilder<
   : Record<string, never>);
 
 export interface BinaryBuilder<
-  ColumnName extends string = string,
-  ColumnMeta extends StorageColumn = StorageColumn,
-  JsType = unknown,
+  _ColumnName extends string = string,
+  _ColumnMeta extends StorageColumn = StorageColumn,
+  _JsType = unknown,
 > {
   readonly kind: 'binary';
   readonly op: BinaryOp;
-  readonly left: ColumnBuilder<ColumnName, ColumnMeta, JsType> | OperationExpr;
-  readonly right: ParamPlaceholder | AnyColumnBuilderBase;
+  readonly left: Expression;
+  readonly right: ValueSource;
+}
+
+// Forward declare AnyBinaryBuilder and AnyOrderBuilder for use in ExpressionBuilder
+export type AnyBinaryBuilder = BinaryBuilder;
+export type AnyOrderBuilder = OrderBuilder;
+
+/**
+ * ExpressionBuilder represents the result of an operation (e.g., col.distance(...)).
+ * Unlike ColumnBuilder (which represents a column), ExpressionBuilder represents
+ * an operation expression and provides the same DSL methods for chaining.
+ *
+ * Implements ExpressionSource to provide type-safe conversion to OperationExpr.
+ */
+export interface ExpressionBuilder<JsType = unknown> extends ExpressionSource {
+  readonly kind: 'expression';
+  readonly expr: OperationExpr;
+  readonly columnMeta: StorageColumn;
+
+  // Methods accept ValueSource (ParamPlaceholder or ExpressionSource)
+  eq(value: ValueSource): AnyBinaryBuilder;
+  neq(value: ValueSource): AnyBinaryBuilder;
+  gt(value: ValueSource): AnyBinaryBuilder;
+  lt(value: ValueSource): AnyBinaryBuilder;
+  gte(value: ValueSource): AnyBinaryBuilder;
+  lte(value: ValueSource): AnyBinaryBuilder;
+  asc(): AnyOrderBuilder;
+  desc(): AnyOrderBuilder;
+
+  /** Converts this expression builder to the underlying OperationExpr */
+  toExpr(): OperationExpr;
+
+  // Helper property for type extraction (not used at runtime)
+  readonly __jsType: JsType;
 }
 
 // Helper aliases for usage sites where the specific column parameters are irrelevant
@@ -108,14 +149,16 @@ export type AnyColumnBuilderBase = {
   readonly table: string;
   readonly column: string;
   readonly columnMeta: StorageColumn;
-  eq(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
-  neq(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
-  gt(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
-  lt(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
-  gte(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
-  lte(value: ParamPlaceholder | AnyColumnBuilderBase): AnyBinaryBuilder;
+  // Methods accept ValueSource (ParamPlaceholder or ExpressionSource)
+  eq(value: ValueSource): AnyBinaryBuilder;
+  neq(value: ValueSource): AnyBinaryBuilder;
+  gt(value: ValueSource): AnyBinaryBuilder;
+  lt(value: ValueSource): AnyBinaryBuilder;
+  gte(value: ValueSource): AnyBinaryBuilder;
+  lte(value: ValueSource): AnyBinaryBuilder;
   asc(): AnyOrderBuilder;
   desc(): AnyOrderBuilder;
+  toExpr(): ColumnRef;
   readonly __jsType: unknown;
   // Allow any operation methods (from conditional type)
   readonly [key: string]: unknown;
@@ -130,8 +173,12 @@ export type AnyColumnBuilder =
       any
     >
   | AnyColumnBuilderBase;
-export type AnyBinaryBuilder = BinaryBuilder<string, StorageColumn, unknown>;
-export type AnyOrderBuilder = OrderBuilder<string, StorageColumn, unknown>;
+
+/**
+ * Union type for any builder that can produce an Expression.
+ * Used in DSL method signatures where either a column or operation result can be passed.
+ */
+export type AnyExpressionSource = AnyColumnBuilder | ExpressionBuilder;
 
 export function isColumnBuilder(value: unknown): value is AnyColumnBuilder {
   return (
@@ -264,7 +311,7 @@ type OperationArgs<Args extends ReadonlyArray<ArgSpec>> = Args extends readonly 
   : [];
 
 type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
-  ? AnyColumnBuilder
+  ? AnyExpressionSource
   : Arg extends { kind: 'param' }
     ? ParamPlaceholder
     : Arg extends { kind: 'literal' }
@@ -273,25 +320,25 @@ type ArgToType<Arg extends ArgSpec> = Arg extends { kind: 'typeId' }
 
 /**
  * Maps operation return spec to return type.
- * - builtin types: ColumnBuilder with appropriate JsType (matches runtime behavior)
- * - typeId types: ColumnBuilder (for now, could be more specific in future)
+ * Operations return ExpressionBuilder, not ColumnBuilder, because the result
+ * represents an expression (OperationExpr) rather than a column reference.
  */
 type OperationReturn<
   Returns extends ReturnSpec,
-  ColumnName extends string,
-  ColumnMeta extends StorageColumn,
+  _ColumnName extends string,
+  _ColumnMeta extends StorageColumn,
   _JsType,
 > = Returns extends { kind: 'builtin'; type: infer T }
   ? T extends 'number'
-    ? ColumnBuilder<ColumnName, ColumnMeta, number>
+    ? ExpressionBuilder<number>
     : T extends 'boolean'
-      ? ColumnBuilder<ColumnName, ColumnMeta, boolean>
+      ? ExpressionBuilder<boolean>
       : T extends 'string'
-        ? ColumnBuilder<ColumnName, ColumnMeta, string>
-        : ColumnBuilder<ColumnName, ColumnMeta, unknown>
+        ? ExpressionBuilder<string>
+        : ExpressionBuilder<unknown>
   : Returns extends { kind: 'typeId' }
-    ? AnyColumnBuilder
-    : ColumnBuilder<ColumnName, ColumnMeta, unknown>;
+    ? ExpressionBuilder<unknown>
+    : ExpressionBuilder<unknown>;
 
 /**
  * Computes JavaScript type for a column at column creation time.
@@ -351,17 +398,18 @@ export type InferProjectionRow<P extends Record<string, AnyColumnBuilder>> = {
 };
 
 /**
- * Nested projection type - allows recursive nesting of ColumnBuilder or nested objects.
+ * Nested projection type - allows recursive nesting of ColumnBuilder, ExpressionBuilder, or nested objects.
  */
 export type NestedProjection = Record<
   string,
-  | AnyColumnBuilder
+  | AnyExpressionSource
   | Record<
       string,
-      | AnyColumnBuilder
+      | AnyExpressionSource
       | Record<
           string,
-          AnyColumnBuilder | Record<string, AnyColumnBuilder | Record<string, AnyColumnBuilder>>
+          | AnyExpressionSource
+          | Record<string, AnyExpressionSource | Record<string, AnyExpressionSource>>
         >
     >
 >;
@@ -384,17 +432,19 @@ type ExtractIncludeType<
  * by looking up the include alias in the Includes type map.
  */
 export type InferNestedProjectionRow<
-  P extends Record<string, AnyColumnBuilder | boolean | NestedProjection>,
+  P extends Record<string, AnyExpressionSource | boolean | NestedProjection>,
   CodecTypes extends Record<string, { readonly output: unknown }> = Record<string, never>,
   Includes extends Record<string, unknown> = Record<string, never>,
 > = {
-  [K in keyof P]: P[K] extends AnyColumnBuilder
-    ? ExtractJsTypeFromColumnBuilder<P[K]>
-    : P[K] extends true
-      ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
-      : P[K] extends NestedProjection
-        ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
-        : never;
+  [K in keyof P]: P[K] extends ExpressionBuilder<infer JsType>
+    ? JsType
+    : P[K] extends AnyColumnBuilder
+      ? ExtractJsTypeFromColumnBuilder<P[K]>
+      : P[K] extends true
+        ? Array<ExtractIncludeType<K & string, Includes>> // Include reference - infers Array<ChildShape> from Includes map
+        : P[K] extends NestedProjection
+          ? InferNestedProjectionRow<P[K], CodecTypes, Includes>
+          : never;
 };
 
 /**

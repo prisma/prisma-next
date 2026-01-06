@@ -1,17 +1,9 @@
-import type {
-  BinaryExpr,
-  BinaryOp,
-  ColumnRef,
-  ExistsExpr,
-  OperationExpr,
-  ParamRef,
-  SelectAst,
-} from './types';
+import type { BinaryExpr, BinaryOp, ExistsExpr, Expression, ParamRef, SelectAst } from './types';
 
 export function createBinaryExpr(
   op: BinaryOp,
-  left: ColumnRef | OperationExpr,
-  right: ColumnRef | ParamRef,
+  left: Expression,
+  right: Expression | ParamRef,
 ): BinaryExpr {
   return {
     kind: 'bin',

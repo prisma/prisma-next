@@ -229,7 +229,7 @@ describe('error functions', () => {
 
   it('errorInvalidProjectionValue throws PLAN.INVALID with path', () => {
     expect(() => errorInvalidProjectionValue(['user', 'id'])).toThrow(
-      'Invalid projection value at path user.id: expected ColumnBuilder or nested object',
+      'Invalid projection value at path user.id: expected ExpressionSource (ColumnBuilder or ExpressionBuilder) or nested object',
     );
     try {
       errorInvalidProjectionValue(['user', 'id']);

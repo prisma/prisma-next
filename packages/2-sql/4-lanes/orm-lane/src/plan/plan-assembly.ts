@@ -4,21 +4,22 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   BinaryExpr,
   ExistsExpr,
+  Expression,
   LoweredStatement,
-  OperationExpr,
   SelectAst,
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
 import type {
-  AnyColumnBuilder,
+  AnyExpressionSource,
   AnyOrderBuilder,
   BinaryBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import {
   collectColumnRefs,
-  getColumnInfo,
   getColumnMeta,
+  isColumnBuilder,
+  isExpressionBuilder,
   isOperationExpr,
 } from '@prisma-next/sql-relational-core/utils/guards';
 import type { IncludeState } from '../relations/include-plan';
@@ -35,29 +36,66 @@ export interface MetaBuildArgs {
   readonly paramCodecs?: Record<string, string>;
 }
 
-export function buildMeta(args: MetaBuildArgs): PlanMeta {
-  const refsColumns = new Map<string, { table: string; column: string }>();
-  const refsTables = new Set<string>([args.table.name]);
-
-  for (const column of args.projection.columns) {
-    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
-      const allRefs = collectColumnRefs(operationExpr);
-      for (const ref of allRefs) {
+/**
+ * Extracts column references from an ExpressionSource (ColumnBuilder or ExpressionBuilder).
+ * Skips entries with empty table or column names (e.g., placeholder columns for includes).
+ */
+function collectRefsFromExpressionSource(
+  source: AnyExpressionSource,
+  refsColumns: Map<string, { table: string; column: string }>,
+): void {
+  if (isExpressionBuilder(source)) {
+    const allRefs = collectColumnRefs(source.expr);
+    for (const ref of allRefs) {
+      // Skip empty table/column (placeholders for includes)
+      if (ref.table && ref.column) {
         refsColumns.set(`${ref.table}.${ref.column}`, {
           table: ref.table,
           column: ref.column,
         });
       }
-    } else {
-      const col = column as unknown as { table?: string; column?: string };
-      if (col.table && col.column) {
-        refsColumns.set(`${col.table}.${col.column}`, {
-          table: col.table,
-          column: col.column,
-        });
-      }
     }
+  } else if (isColumnBuilder(source)) {
+    const col = source as unknown as { table: string; column: string };
+    // Skip empty table/column (placeholders for includes)
+    if (col.table && col.column) {
+      refsColumns.set(`${col.table}.${col.column}`, {
+        table: col.table,
+        column: col.column,
+      });
+    }
+  }
+}
+
+/**
+ * Extracts column references from an Expression (AST node).
+ */
+function collectRefsFromExpression(
+  expr: Expression,
+  refsColumns: Map<string, { table: string; column: string }>,
+): void {
+  if (isOperationExpr(expr)) {
+    const allRefs = collectColumnRefs(expr);
+    for (const ref of allRefs) {
+      refsColumns.set(`${ref.table}.${ref.column}`, {
+        table: ref.table,
+        column: ref.column,
+      });
+    }
+  } else if (expr.kind === 'col') {
+    refsColumns.set(`${expr.table}.${expr.column}`, {
+      table: expr.table,
+      column: expr.column,
+    });
+  }
+}
+
+export function buildMeta(args: MetaBuildArgs): PlanMeta {
+  const refsColumns = new Map<string, { table: string; column: string }>();
+  const refsTables = new Set<string>([args.table.name]);
+
+  for (const column of args.projection.columns) {
+    collectRefsFromExpressionSource(column, refsColumns);
   }
 
   if (args.includes) {
@@ -85,32 +123,21 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         }
       }
       if (include.childWhere) {
-        const colInfo = getColumnInfo(include.childWhere.left);
-        refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
-          table: colInfo.table,
-          column: colInfo.column,
-        });
+        // childWhere.left is Expression (already converted at builder creation time)
+        collectRefsFromExpression(include.childWhere.left, refsColumns);
       }
       if (include.childOrderBy) {
-        const orderBy = include.childOrderBy as unknown as {
-          expr?: AnyColumnBuilder | OperationExpr;
-        };
-        if (orderBy.expr) {
-          const colInfo = getColumnInfo(orderBy.expr);
-          refsColumns.set(`${colInfo.table}.${colInfo.column}`, {
-            table: colInfo.table,
-            column: colInfo.column,
-          });
-        }
+        // childOrderBy.expr is Expression (already converted at builder creation time)
+        collectRefsFromExpression(include.childOrderBy.expr, refsColumns);
       }
     }
   }
 
   if (args.where) {
-    const whereLeft = args.where.left;
-    const operationExpr = (whereLeft as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
-      const allRefs = collectColumnRefs(operationExpr);
+    // args.where.left is Expression (already converted at builder creation time)
+    const leftExpr: Expression = args.where.left;
+    if (isOperationExpr(leftExpr)) {
+      const allRefs = collectColumnRefs(leftExpr);
       for (const ref of allRefs) {
         refsColumns.set(`${ref.table}.${ref.column}`, {
           table: ref.table,
@@ -118,39 +145,31 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
         });
       }
     } else {
-      const colBuilder = whereLeft as unknown as { table?: string; column?: string };
-      if (colBuilder.table && colBuilder.column) {
-        refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
-          table: colBuilder.table,
-          column: colBuilder.column,
-        });
-      }
+      // leftExpr is ColumnRef
+      refsColumns.set(`${leftExpr.table}.${leftExpr.column}`, {
+        table: leftExpr.table,
+        column: leftExpr.column,
+      });
     }
   }
 
   if (args.orderBy) {
-    const orderBy = args.orderBy as unknown as {
-      expr?: AnyColumnBuilder | OperationExpr;
-    };
-    const orderByExpr = orderBy.expr;
-    if (orderByExpr) {
-      if (isOperationExpr(orderByExpr)) {
-        const allRefs = collectColumnRefs(orderByExpr);
-        for (const ref of allRefs) {
-          refsColumns.set(`${ref.table}.${ref.column}`, {
-            table: ref.table,
-            column: ref.column,
-          });
-        }
-      } else {
-        const colBuilder = orderByExpr as unknown as { table?: string; column?: string };
-        if (colBuilder.table && colBuilder.column) {
-          refsColumns.set(`${colBuilder.table}.${colBuilder.column}`, {
-            table: colBuilder.table,
-            column: colBuilder.column,
-          });
-        }
+    // args.orderBy.expr is Expression (already converted at builder creation time)
+    const orderByExpr: Expression = args.orderBy.expr;
+    if (isOperationExpr(orderByExpr)) {
+      const allRefs = collectColumnRefs(orderByExpr);
+      for (const ref of allRefs) {
+        refsColumns.set(`${ref.table}.${ref.column}`, {
+          table: ref.table,
+          column: ref.column,
+        });
       }
+    } else {
+      // orderByExpr is ColumnRef
+      refsColumns.set(`${orderByExpr.table}.${orderByExpr.column}`, {
+        table: orderByExpr.table,
+        column: orderByExpr.column,
+      });
     }
   }
 
@@ -164,17 +183,13 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       if (!column) {
         throw planInvalid(`Missing column for alias ${alias} at index ${index}`);
       }
-      const col = column as unknown as {
-        table?: string;
-        column?: string;
-        _operationExpr?: OperationExpr;
-      };
+      if (isExpressionBuilder(column)) {
+        return [alias, `operation:${column.expr.method}`];
+      }
+      // column is ColumnBuilder
+      const col = column as unknown as { table?: string; column?: string };
       if (!col.table || !col.column) {
         return [alias, `include:${alias}`];
-      }
-      const operationExpr = col._operationExpr;
-      if (operationExpr) {
-        return [alias, `operation:${operationExpr.method}`];
       }
       return [alias, `${col.table}.${col.column}`];
     }),
@@ -190,8 +205,8 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!col) {
       continue;
     }
-    const operationExpr = (col as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
+    if (isExpressionBuilder(col)) {
+      const operationExpr = col.expr;
       if (operationExpr.returns.kind === 'typeId') {
         projectionTypes[alias] = operationExpr.returns.type;
       } else if (operationExpr.returns.kind === 'builtin') {
@@ -216,8 +231,8 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     if (!column) {
       continue;
     }
-    const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-    if (operationExpr) {
+    if (isExpressionBuilder(column)) {
+      const operationExpr = column.expr;
       if (operationExpr.returns.kind === 'typeId') {
         projectionCodecs[alias] = operationExpr.returns.type;
       }

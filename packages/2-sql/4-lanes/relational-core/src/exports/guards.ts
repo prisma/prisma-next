@@ -1,10 +1,15 @@
 export {
   collectColumnRefs,
+  expressionFromSource,
   extractBaseColumnRef,
   getColumnInfo,
   getColumnMeta,
   getOperationExpr,
   isColumnBuilder,
+  isExpressionBuilder,
+  isExpressionSource,
   isOperationExpr,
   isParamPlaceholder,
+  isValueSource,
+  toExpression,
 } from '../utils/guards';

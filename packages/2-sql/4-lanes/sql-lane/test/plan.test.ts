@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
@@ -9,14 +10,40 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import {
   type AnyBinaryBuilder,
   type AnyColumnBuilder,
+  type AnyExpressionSource,
   type AnyOrderBuilder,
   createOrderBuilder,
+  type ExpressionBuilder,
   type JoinOnPredicate,
 } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { buildMeta } from '../src/sql/plan';
 import type { Contract } from './fixtures/contract.d';
+
+/**
+ * Creates a mock ExpressionBuilder for testing.
+ */
+function createMockExpressionBuilder(
+  operationExpr: OperationExpr,
+  columnMeta: StorageColumn,
+): ExpressionBuilder {
+  return {
+    kind: 'expression' as const,
+    expr: operationExpr,
+    columnMeta,
+    eq: () => ({}) as unknown as AnyBinaryBuilder,
+    neq: () => ({}) as unknown as AnyBinaryBuilder,
+    gt: () => ({}) as unknown as AnyBinaryBuilder,
+    lt: () => ({}) as unknown as AnyBinaryBuilder,
+    gte: () => ({}) as unknown as AnyBinaryBuilder,
+    lte: () => ({}) as unknown as AnyBinaryBuilder,
+    asc: () => ({}) as unknown as AnyOrderBuilder,
+    desc: () => ({}) as unknown as AnyOrderBuilder,
+    toExpr: () => operationExpr,
+    __jsType: undefined as unknown,
+  };
+}
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -52,24 +79,18 @@ describe('buildMeta', () => {
       },
     };
 
-    const columnWithOp = {
-      kind: 'column' as const,
-      table: 'user',
-      column: 'id',
-      columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      eq: () => ({}) as unknown as AnyBinaryBuilder,
-      asc: () => ({}) as unknown as AnyOrderBuilder,
-      desc: () => ({}) as unknown as AnyOrderBuilder,
-      __jsType: undefined as unknown,
-      _operationExpr: operationExpr,
-    } as unknown as AnyColumnBuilder;
+    const expressionBuilder = createMockExpressionBuilder(operationExpr, {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
+    });
 
     const meta = buildMeta({
       contract,
       table: tableRef,
       projection: {
         aliases: ['normalized'],
-        columns: [columnWithOp],
+        columns: [expressionBuilder],
       },
       paramDescriptors: [],
     });
@@ -101,24 +122,18 @@ describe('buildMeta', () => {
       },
     };
 
-    const columnWithOp = {
-      kind: 'column' as const,
-      table: 'user',
-      column: 'id',
-      columnMeta: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-      eq: () => ({}) as unknown as AnyBinaryBuilder,
-      asc: () => ({}) as unknown as AnyOrderBuilder,
-      desc: () => ({}) as unknown as AnyOrderBuilder,
-      __jsType: undefined as unknown,
-      _operationExpr: operationExpr,
-    } as unknown as AnyColumnBuilder;
+    const expressionBuilder = createMockExpressionBuilder(operationExpr, {
+      nativeType: 'int4',
+      codecId: 'pg/int4@1',
+      nullable: false,
+    });
 
     const meta = buildMeta({
       contract,
       table: tableRef,
       projection: {
         aliases: ['distance'],
-        columns: [columnWithOp],
+        columns: [expressionBuilder],
       },
       paramDescriptors: [],
     });
@@ -157,7 +172,8 @@ describe('buildMeta', () => {
             table: 'post',
             column: '',
             columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
-          } as AnyColumnBuilder,
+            toExpr: () => ({ kind: 'col' as const, table: 'post', column: '' }),
+          } as AnyExpressionSource,
         ],
       },
       includes,
@@ -261,7 +277,8 @@ describe('buildMeta', () => {
             table: 'post',
             column: '',
             columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
-          } as AnyColumnBuilder,
+            toExpr: () => ({ kind: 'col' as const, table: 'post', column: '' }),
+          } as AnyExpressionSource,
         ],
       },
       includes: [

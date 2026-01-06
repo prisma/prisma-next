@@ -220,66 +220,78 @@ describe('@prisma-next/driver-postgres', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it('handles already connected client', async () => {
-    const db = newDb();
-    const { Client } = db.adapters.createPg();
-    const client = new Client();
+  it(
+    'handles already connected client',
+    async () => {
+      const db = newDb();
+      const { Client } = db.adapters.createPg();
+      const client = new Client();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { client: client as unknown as Client },
-    });
+      const driver = createPostgresDriverFromOptions({
+        connect: { client: client as unknown as Client },
+      });
 
-    cleanup = async () => {
+      cleanup = async () => {
+        await driver.close();
+      };
+
+      await driver.connect();
+      await driver.connect();
+
+      await driver.query('create table items(id serial primary key, name text)');
+      const result = await driver.query<{ id: number; name: string }>('select id, name from items');
+
+      expect(result.rows).toBeDefined();
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'skips connect when client is already connected',
+    async () => {
+      const db = newDb();
+      const { Client } = db.adapters.createPg();
+      const client = new Client();
+
+      // Connect the client first
+      await client.connect();
+
+      const driver = createPostgresDriverFromOptions({
+        connect: { client: client as unknown as Client },
+      });
+
+      cleanup = async () => {
+        await driver.close();
+      };
+
+      // acquireClient should detect client is already connected and skip connect()
+      await driver.query('create table items(id serial primary key, name text)');
+      const result = await driver.query<{ id: number; name: string }>('select id, name from items');
+
+      expect(result.rows).toBeDefined();
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'handles pool already ended when closing',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
+
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as Pool },
+      });
+
+      await driver.connect();
       await driver.close();
-    };
 
-    await driver.connect();
-    await driver.connect();
-
-    await driver.query('create table items(id serial primary key, name text)');
-    const result = await driver.query<{ id: number; name: string }>('select id, name from items');
-
-    expect(result.rows).toBeDefined();
-  });
-
-  it('skips connect when client is already connected', async () => {
-    const db = newDb();
-    const { Client } = db.adapters.createPg();
-    const client = new Client();
-
-    // Connect the client first
-    await client.connect();
-
-    const driver = createPostgresDriverFromOptions({
-      connect: { client: client as unknown as Client },
-    });
-
-    cleanup = async () => {
+      // Closing again should not throw (pool.ended check)
       await driver.close();
-    };
-
-    // acquireClient should detect client is already connected and skip connect()
-    await driver.query('create table items(id serial primary key, name text)');
-    const result = await driver.query<{ id: number; name: string }>('select id, name from items');
-
-    expect(result.rows).toBeDefined();
-  });
-
-  it('handles pool already ended when closing', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
-
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as Pool },
-    });
-
-    await driver.connect();
-    await driver.close();
-
-    // Closing again should not throw (pool.ended check)
-    await driver.close();
-  });
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it(
     'closes pool connection',

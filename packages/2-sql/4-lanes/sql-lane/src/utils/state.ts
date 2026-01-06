@@ -1,16 +1,14 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type {
   AnyBinaryBuilder,
-  AnyColumnBuilder,
+  AnyExpressionSource,
   AnyOrderBuilder,
   JoinOnPredicate,
 } from '@prisma-next/sql-relational-core/types';
 
 export interface ProjectionState {
   readonly aliases: string[];
-  // columns can be null for include placeholders (when alias matches an include)
-  // This maintains array alignment but avoids creating invalid ColumnBuilders
-  readonly columns: (AnyColumnBuilder | null)[];
+  readonly columns: AnyExpressionSource[];
 }
 
 export interface JoinState {

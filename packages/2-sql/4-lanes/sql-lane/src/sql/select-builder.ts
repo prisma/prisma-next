@@ -11,7 +11,6 @@ import type {
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import {
-  createColumnRef,
   createJoinOnBuilder,
   createOrderByItem,
   createSelectAst,
@@ -31,9 +30,8 @@ import type {
   OrderBuilder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
-import { getOperationExpr } from '@prisma-next/sql-relational-core/utils/guards';
+import { isExpressionBuilder } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
-import { assertColumnBuilder } from '../utils/assertions';
 import { checkIncludeCapabilities } from '../utils/capabilities';
 import {
   errorChildProjectionEmpty,
@@ -41,7 +39,6 @@ import {
   errorIncludeAliasCollision,
   errorLimitMustBeNonNegativeInteger,
   errorMissingAlias,
-  errorMissingColumnForAlias,
   errorSelectMustBeCalled,
   errorSelfJoinNotSupported,
   errorUnknownTable,
@@ -320,15 +317,8 @@ export class SelectBuilderImpl<
     const orderByClause = this.state.orderBy
       ? (() => {
           const orderBy = this.state.orderBy as OrderBuilder<string, StorageColumn, unknown>;
-          const orderExpr = orderBy.expr;
-          const operationExpr = getOperationExpr(orderExpr);
-          const expr: ColumnRef | OperationExpr = operationExpr
-            ? operationExpr
-            : (() => {
-                const colBuilder = orderExpr as { table: string; column: string };
-                return createColumnRef(colBuilder.table, colBuilder.column);
-              })();
-          return [createOrderByItem(expr, orderBy.dir)];
+          // orderBy.expr is already an Expression (ColumnRef or OperationExpr)
+          return [createOrderByItem(orderBy.expr, orderBy.dir)];
         })()
       : undefined;
 
@@ -357,28 +347,19 @@ export class SelectBuilderImpl<
           alias,
           expr: { kind: 'includeRef', alias },
         });
-      } else {
-        // Not an include - column must not be null
-        if (!column) {
-          errorMissingColumnForAlias(alias, i);
-        }
-        // Check if this column has an operation expression
-        const operationExpr = (column as { _operationExpr?: OperationExpr })._operationExpr;
-        if (operationExpr) {
-          projectEntries.push({
-            alias,
-            expr: operationExpr,
-          });
-        } else {
-          // This is a regular column
-          // TypeScript can't narrow ColumnBuilder properly
-          const col = column as { table: string; column: string };
-          assertColumnBuilder(col, 'projection column');
-          projectEntries.push({
-            alias,
-            expr: createColumnRef(col.table, col.column),
-          });
-        }
+      } else if (column && isExpressionBuilder(column)) {
+        // This is an ExpressionBuilder (operation result) - use its expr
+        projectEntries.push({
+          alias,
+          expr: column.expr,
+        });
+      } else if (column) {
+        // This is a regular ColumnBuilder - use toExpr() to get ColumnRef
+        const columnRef = column.toExpr();
+        projectEntries.push({
+          alias,
+          expr: columnRef,
+        });
       }
     }
 
