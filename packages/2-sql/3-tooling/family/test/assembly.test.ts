@@ -20,6 +20,7 @@ function createMockTarget(
     version: '0.0.1',
     familyId: 'sql',
     targetId: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     ...overrides,
   };
 }
@@ -176,7 +177,7 @@ describe('extractParameterizedRenderers', () => {
             parameterized: {
               // Raw function form - for complex rendering logic
               'test/custom@1': (params, ctx) =>
-                `Custom<${params.precision}, ${ctx.codecTypesName}>`,
+                `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
             },
           },
         },
