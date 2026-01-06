@@ -353,9 +353,7 @@ export type Relations = Contract['relations'];
       return 'Record<string, never>';
     }
 
-    const renderCtx: TypeRenderContext = {
-      codecTypesName: 'CodecTypes',
-    };
+    const renderCtx: TypeRenderContext = { codecTypesName: 'CodecTypes' };
 
     const modelTypes: string[] = [];
     for (const [modelName, model] of Object.entries(models)) {

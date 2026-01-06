@@ -1,8 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type {
-  GenerateContractTypesOptions,
-  ParameterizedCodecDescriptor,
-} from '@prisma-next/contract/types';
+import type { TypeRenderEntry } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { sqlTargetFamilyHook } from '../src/index';
 
@@ -24,7 +21,7 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
 
 describe('sql-target-family-hook parameterized type emission', () => {
   describe('columns with typeParams', () => {
-    it('emits parameterized TS type via codec descriptor template renderer', () => {
+    it('emits parameterized TS type via normalized renderer', () => {
       const ir = createContractIR({
         models: {
           Document: {
@@ -57,33 +54,20 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const vectorDescriptor: ParameterizedCodecDescriptor = {
+      const vectorRenderer: TypeRenderEntry = {
         codecId: 'pg/vector@1',
-        outputTypeRenderer: 'Vector<{{length}}>',
-        typesImport: {
-          package: '@prisma-next/extension-pgvector/vector-types',
-          named: 'Vector',
-          alias: 'Vector',
-        },
+        render: (params) => `Vector<${params['length']}>`,
       };
 
-      const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-      parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
+      const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+      parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const options: GenerateContractTypesOptions = {
-        codecTypeImports: [],
-        operationTypeImports: [],
-        parameterizedCodecs,
-      };
-
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedRenderers,
+      });
 
       // Should use the parameterized renderer for the vector column
       expect(types).toContain('readonly embedding: Vector<1536>');
-      // Should add the types import from the descriptor
-      expect(types).toContain(
-        "import type { Vector } from '@prisma-next/extension-pgvector/vector-types';",
-      );
     });
 
     it('falls back to CodecTypes[codecId].output for columns without typeParams', () => {
@@ -112,21 +96,17 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const vectorDescriptor: ParameterizedCodecDescriptor = {
+      const vectorRenderer: TypeRenderEntry = {
         codecId: 'pg/vector@1',
-        outputTypeRenderer: 'Vector<{{length}}>',
+        render: (params) => `Vector<${params['length']}>`,
       };
 
-      const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-      parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
+      const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+      parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const options: GenerateContractTypesOptions = {
-        codecTypeImports: [],
-        operationTypeImports: [],
-        parameterizedCodecs,
-      };
-
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedRenderers,
+      });
 
       // int4 column should use the standard codec types lookup
       expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
@@ -163,26 +143,22 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const vectorDescriptor: ParameterizedCodecDescriptor = {
+      const vectorRenderer: TypeRenderEntry = {
         codecId: 'pg/vector@1',
-        outputTypeRenderer: 'Vector<{{length}}>',
+        render: (params) => `Vector<${params['length']}>`,
       };
 
-      const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-      parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
+      const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+      parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const options: GenerateContractTypesOptions = {
-        codecTypeImports: [],
-        operationTypeImports: [],
-        parameterizedCodecs,
-      };
-
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedRenderers,
+      });
 
       expect(types).toContain('readonly embedding: Vector<1536> | null');
     });
 
-    it('uses function renderer when outputTypeRenderer is a function', () => {
+    it('uses custom renderer logic for complex type generation', () => {
       const ir = createContractIR({
         models: {
           Data: {
@@ -213,25 +189,21 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const decimalDescriptor: ParameterizedCodecDescriptor = {
+      const decimalRenderer: TypeRenderEntry = {
         codecId: 'pg/decimal@1',
-        outputTypeRenderer: (params, _ctx) => {
-          const p = params.precision as number;
-          const s = params.scale as number;
+        render: (params) => {
+          const p = params['precision'] as number;
+          const s = params['scale'] as number;
           return `Decimal<${p}, ${s}>`;
         },
       };
 
-      const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-      parameterizedCodecs.set('pg/decimal@1', decimalDescriptor);
+      const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+      parameterizedRenderers.set('pg/decimal@1', decimalRenderer);
 
-      const options: GenerateContractTypesOptions = {
-        codecTypeImports: [],
-        operationTypeImports: [],
-        parameterizedCodecs,
-      };
-
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedRenderers,
+      });
 
       expect(types).toContain('readonly value: Decimal<10, 2>');
     });
@@ -276,21 +248,17 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const vectorDescriptor: ParameterizedCodecDescriptor = {
+      const vectorRenderer: TypeRenderEntry = {
         codecId: 'pg/vector@1',
-        outputTypeRenderer: 'Vector<{{length}}>',
+        render: (params) => `Vector<${params['length']}>`,
       };
 
-      const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-      parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
+      const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+      parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const options: GenerateContractTypesOptions = {
-        codecTypeImports: [],
-        operationTypeImports: [],
-        parameterizedCodecs,
-      };
-
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedRenderers,
+      });
 
       expect(types).toContain('readonly embedding: Vector<1536>');
     });
@@ -342,23 +310,21 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const vectorDescriptor: ParameterizedCodecDescriptor = {
+      const vectorRenderer: TypeRenderEntry = {
         codecId: 'pg/vector@1',
-        outputTypeRenderer: 'Vector<{{length}}>',
+        render: (params) => `Vector<${params['length']}>`,
       };
 
-      const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-      parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
-
-      const options: GenerateContractTypesOptions = {
-        codecTypeImports: [],
-        operationTypeImports: [],
-        parameterizedCodecs,
-      };
+      const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+      parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
       // Generate twice to ensure determinism
-      const types1 = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
-      const types2 = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
+      const types1 = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedRenderers,
+      });
+      const types2 = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedRenderers,
+      });
 
       // Output should be identical
       expect(types1).toBe(types2);
@@ -368,78 +334,10 @@ describe('sql-target-family-hook parameterized type emission', () => {
       expect(types1).toContain('readonly embedding2: Vector<384>');
       expect(types1).toContain('readonly embedding3: Vector<768>');
     });
-
-    it('deduplicates type imports from multiple parameterized columns', () => {
-      const ir = createContractIR({
-        models: {
-          Document: {
-            storage: { table: 'document' },
-            fields: {
-              embedding1: { column: 'embedding1' },
-              embedding2: { column: 'embedding2' },
-            },
-            relations: {},
-          },
-        },
-        storage: {
-          tables: {
-            document: {
-              columns: {
-                embedding1: {
-                  nativeType: 'vector(1536)',
-                  codecId: 'pg/vector@1',
-                  nullable: false,
-                  typeParams: { length: 1536 },
-                },
-                embedding2: {
-                  nativeType: 'vector(768)',
-                  codecId: 'pg/vector@1',
-                  nullable: false,
-                  typeParams: { length: 768 },
-                },
-              },
-              primaryKey: { columns: [] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-      });
-
-      const vectorDescriptor: ParameterizedCodecDescriptor = {
-        codecId: 'pg/vector@1',
-        outputTypeRenderer: 'Vector<{{length}}>',
-        typesImport: {
-          package: '@prisma-next/extension-pgvector/vector-types',
-          named: 'Vector',
-          alias: 'Vector',
-        },
-      };
-
-      const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-      parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
-
-      const options: GenerateContractTypesOptions = {
-        codecTypeImports: [],
-        operationTypeImports: [],
-        parameterizedCodecs,
-      };
-
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
-
-      // The import should appear only once, not twice
-      const importCount = (
-        types.match(
-          /import type { Vector } from '@prisma-next\/extension-pgvector\/vector-types';/g,
-        ) || []
-      ).length;
-      expect(importCount).toBe(1);
-    });
   });
 
   describe('edge cases', () => {
-    it('handles columns with typeParams but no matching parameterized codec', () => {
+    it('handles columns with typeParams but no matching renderer', () => {
       const ir = createContractIR({
         models: {
           Data: {
@@ -470,16 +368,12 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      // No parameterized codec registered for custom/type@1
-      const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
+      // No renderer registered for custom/type@1
+      const parameterizedRenderers = new Map<string, TypeRenderEntry>();
 
-      const options: GenerateContractTypesOptions = {
-        codecTypeImports: [],
-        operationTypeImports: [],
-        parameterizedCodecs,
-      };
-
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedRenderers,
+      });
 
       // Should fall back to standard codec types lookup
       expect(types).toContain("readonly value: CodecTypes['custom/type@1']['output']");
@@ -517,21 +411,17 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const vectorDescriptor: ParameterizedCodecDescriptor = {
+      const vectorRenderer: TypeRenderEntry = {
         codecId: 'pg/vector@1',
-        outputTypeRenderer: 'Vector<{{length}}>',
+        render: (params) => `Vector<${params['length']}>`,
       };
 
-      const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-      parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
+      const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+      parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const options: GenerateContractTypesOptions = {
-        codecTypeImports: [],
-        operationTypeImports: [],
-        parameterizedCodecs,
-      };
-
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedRenderers,
+      });
 
       // Should fall back to standard codec types lookup when typeRef doesn't resolve
       expect(types).toContain("readonly value: CodecTypes['pg/vector@1']['output']");
@@ -568,21 +458,17 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const vectorDescriptor: ParameterizedCodecDescriptor = {
+      const vectorRenderer: TypeRenderEntry = {
         codecId: 'pg/vector@1',
-        outputTypeRenderer: 'Vector<{{length}}>',
+        render: (params) => `Vector<${params['length']}>`,
       };
 
-      const parameterizedCodecs = new Map<string, ParameterizedCodecDescriptor>();
-      parameterizedCodecs.set('pg/vector@1', vectorDescriptor);
+      const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+      parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const options: GenerateContractTypesOptions = {
-        codecTypeImports: [],
-        operationTypeImports: [],
-        parameterizedCodecs,
-      };
-
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], options);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedRenderers,
+      });
 
       // Empty typeParams means "no params" - fall back to standard codec lookup
       expect(types).toContain("readonly value: CodecTypes['pg/vector@1']['output']");
