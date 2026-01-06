@@ -203,12 +203,37 @@ export const sqlTargetFamilyHook = {
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
     options?: GenerateContractTypesOptions,
   ): string {
-    // Options are available for future use (e.g., parameterizedCodecs)
-    void options;
+    // Collect imports from codec types and operation types
     const allImports = [...codecTypeImports, ...operationTypeImports];
-    const importLines = allImports.map(
-      (imp) => `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`,
-    );
+
+    // Add typesImport from parameterized codecs (if any)
+    const parameterizedCodecs = options?.parameterizedCodecs;
+    if (parameterizedCodecs) {
+      for (const descriptor of parameterizedCodecs.values()) {
+        if (descriptor.typesImport) {
+          allImports.push(descriptor.typesImport);
+        }
+      }
+    }
+
+    // Deduplicate imports by package+named (different aliases for same import are allowed)
+    const seenImports = new Set<string>();
+    const uniqueImports: TypesImportSpec[] = [];
+    for (const imp of allImports) {
+      const key = `${imp.package}::${imp.named}`;
+      if (!seenImports.has(key)) {
+        seenImports.add(key);
+        uniqueImports.push(imp);
+      }
+    }
+
+    const importLines = uniqueImports.map((imp) => {
+      // Omit redundant "as Alias" when named === alias
+      if (imp.named === imp.alias) {
+        return `import type { ${imp.named} } from '${imp.package}';`;
+      }
+      return `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`;
+    });
 
     const codecTypes = codecTypeImports.map((imp) => imp.alias).join(' & ');
     const operationTypes = operationTypeImports.map((imp) => imp.alias).join(' & ');
