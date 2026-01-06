@@ -9,6 +9,12 @@ import type { Pool } from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
+import { ormGetUserById } from '../src/queries/orm-get-user-by-id';
+import { ormGetUsers } from '../src/queries/orm-get-users';
+import { ormGetUsersWithPosts as ormGetUsersWithPostsInclude } from '../src/queries/orm-includes';
+import { ormGetUsersBackward, ormGetUsersByIdCursor } from '../src/queries/orm-pagination';
+import { ormGetUsersWithPosts as ormGetUsersWithPostsRelation } from '../src/queries/orm-relation-filters';
+import { ormCreateUser, ormDeleteUser, ormUpdateUser } from '../src/queries/orm-writes';
 import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
 import {
   pgvectorExtensionRuntimeDescriptor,
@@ -120,7 +126,6 @@ describe('ORM integration tests', () => {
       users: ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
     });
 
-    const { ormGetUsers } = await import('../src/queries/orm-get-users');
     const users = await ormGetUsers(2, runtime);
 
     expect(users).toHaveLength(2);
@@ -135,7 +140,6 @@ describe('ORM integration tests', () => {
   it('getUserById returns single user by ID', async () => {
     await seedTestData(runtime, { users: ['alice@example.com'] });
 
-    const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
     const user = await ormGetUserById(1, runtime);
 
     expect(user).not.toBeNull();
@@ -152,8 +156,7 @@ describe('ORM integration tests', () => {
       posts: [{ title: 'First Post', userIndex: 0 }],
     });
 
-    const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters');
-    const users = await ormGetUsersWithPosts(runtime);
+    const users = await ormGetUsersWithPostsRelation(runtime);
 
     expect(users.length).toBeGreaterThan(0);
     expect(users[0]).toMatchObject({
@@ -172,8 +175,7 @@ describe('ORM integration tests', () => {
       ],
     });
 
-    const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes');
-    const users = await ormGetUsersWithPosts(10, runtime);
+    const users = await ormGetUsersWithPostsInclude(10, runtime);
 
     expect(users.length).toBeGreaterThan(0);
     expect(users[0]).toMatchObject({
@@ -184,7 +186,6 @@ describe('ORM integration tests', () => {
   });
 
   it('writes: create() inserts a user', async () => {
-    const { ormCreateUser } = await import('../src/queries/orm-writes');
     const affectedRows = await ormCreateUser(
       { id: 1, email: 'alice@example.com', createdAt: new Date() },
       runtime,
@@ -196,7 +197,6 @@ describe('ORM integration tests', () => {
   it('writes: update() updates a user', async () => {
     await seedTestData(runtime, { users: ['alice@example.com'] });
 
-    const { ormUpdateUser } = await import('../src/queries/orm-writes');
     const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
 
     expect(affectedRows).toBe(1);
@@ -205,7 +205,6 @@ describe('ORM integration tests', () => {
   it('writes: delete() deletes a user', async () => {
     await seedTestData(runtime, { users: ['alice@example.com'] });
 
-    const { ormDeleteUser } = await import('../src/queries/orm-writes');
     const affectedRows = await ormDeleteUser(1, runtime);
 
     expect(affectedRows).toBe(1);
@@ -214,8 +213,6 @@ describe('ORM integration tests', () => {
   it('pagination: ormGetUsersByIdCursor returns paginated users with gt cursor', async () => {
     const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
     await seedTestData(runtime, { users: emails });
-
-    const { ormGetUsersByIdCursor } = await import('../src/queries/orm-pagination');
 
     const firstPage = await ormGetUsersByIdCursor(null, 3, runtime);
     expect(firstPage).toHaveLength(3);
@@ -240,8 +237,6 @@ describe('ORM integration tests', () => {
   it('pagination: ormGetUsersBackward returns users before cursor with lt operator', async () => {
     const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
     await seedTestData(runtime, { users: emails });
-
-    const { ormGetUsersBackward } = await import('../src/queries/orm-pagination');
 
     const page = await ormGetUsersBackward(8, 3, runtime);
     expect(page).toHaveLength(3);
