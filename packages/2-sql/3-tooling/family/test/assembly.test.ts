@@ -201,7 +201,9 @@ describe('extractParameterizedCodecs', () => {
     });
   });
 
-  it('preserves inputTypeRenderer when present', () => {
+  it('preserves inputTypeRenderer when present (reserved for future asymmetric codecs)', () => {
+    // inputTypeRenderer is reserved for future use when input/output types differ.
+    // This test verifies extraction preserves the field for forward compatibility.
     const target = createMockTarget();
     const adapter = createMockAdapter();
     const asymmetricCodec: ParameterizedCodecDescriptor = {

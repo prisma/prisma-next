@@ -300,8 +300,15 @@ export interface RenderTypeContext {
  * - A template string with `{{paramName}}` placeholders (e.g., `Vector<{{length}}>`)
  * - A function that receives typeParams and context and returns a type expression
  *
- * Templates are preferred for simple cases as they are JSON-serializable.
- * Functions are used when complex logic is needed.
+ * **Prefer template strings** for most cases:
+ * - Templates are JSON-serializable (safe for pack-ref metadata)
+ * - Templates can be statically analyzed by tooling
+ *
+ * Function renderers are allowed but have tradeoffs:
+ * - Require runtime execution during emission (the emitter runs code)
+ * - Not JSON-serializable (can't be stored in contract.json)
+ * - The emitted artifacts (contract.json, contract.d.ts) still contain no
+ *   executable code - this constraint applies to outputs, not the emission process
  */
 export type TypeRenderer =
   | string
@@ -334,12 +341,20 @@ export interface ParameterizedCodecDescriptor {
   /**
    * Renderer for the output (read) type.
    * Can be a template string or function.
+   *
+   * This is the primary renderer used by SQL emission to generate
+   * model field types in contract.d.ts.
    */
   readonly outputTypeRenderer: TypeRenderer;
 
   /**
    * Optional renderer for the input (write) type.
    * If not provided, outputTypeRenderer is used for both.
+   *
+   * **Reserved for future use**: Currently, SQL emission only uses
+   * outputTypeRenderer. This field is defined for future support of
+   * asymmetric codecs where input and output types differ (e.g., a
+   * codec that accepts `string | number` but always returns `number`).
    */
   readonly inputTypeRenderer?: TypeRenderer;
 
