@@ -7,12 +7,12 @@ export type StorageColumn = {
   /**
    * Opaque, codec-owned JS/type parameters.
    * The codec that owns `codecId` defines the shape and semantics.
-   * Mutually exclusive with `typeRef` in v1.
+   * Mutually exclusive with `typeRef`.
    */
   readonly typeParams?: Record<string, unknown>;
   /**
    * Reference to a named type instance in `storage.types`.
-   * Mutually exclusive with `typeParams` in v1.
+   * Mutually exclusive with `typeParams`.
    */
   readonly typeRef?: string;
 };
