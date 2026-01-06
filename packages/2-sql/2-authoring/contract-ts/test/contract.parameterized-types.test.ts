@@ -112,9 +112,9 @@ describe('validateContract parameterized type fields', () => {
       expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(/typeParams/);
     });
 
-    it('accepts array typeParams (arrays are objects in JS)', () => {
-      // Note: Arktype Record<string, unknown> accepts arrays since they're objects
-      // in JavaScript. This is technically valid, though semantically unusual.
+    it('rejects array typeParams (must be plain object)', () => {
+      // typeParams must be a plain object, not an array.
+      // Arrays are objects in JS but are not valid for typeParams.
       const input = {
         ...baseContractInput,
         storage: {
@@ -137,9 +137,46 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      // Arrays pass Record<string, unknown> validation
-      const result = validateContract<SqlContract<SqlStorage>>(input);
-      expect(result.storage.tables.User.columns.id.typeParams).toEqual([1, 2, 3]);
+      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(
+        /must be a plain object, not an array/,
+      );
+    });
+
+    it('rejects typeParams when typeRef is also present (mutually exclusive)', () => {
+      const input = {
+        ...baseContractInput,
+        storage: {
+          tables: {
+            Embedding: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                vector: {
+                  nativeType: 'vector(1536)',
+                  codecId: 'pg/vector@1',
+                  nullable: false,
+                  typeParams: { length: 1536 },
+                  typeRef: 'Vector1536',
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            Vector1536: {
+              codecId: 'pg/vector@1',
+              nativeType: 'vector(1536)',
+              typeParams: { length: 1536 },
+            },
+          },
+        },
+      };
+
+      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(
+        /typeParams and typeRef.*mutually exclusive/,
+      );
     });
   });
 
@@ -204,6 +241,73 @@ describe('validateContract parameterized type fields', () => {
       };
 
       expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(/typeRef/);
+    });
+
+    it('rejects typeRef pointing to non-existent storage.types key', () => {
+      const input = {
+        ...baseContractInput,
+        storage: {
+          tables: {
+            Embedding: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                vector: {
+                  nativeType: 'vector(1536)',
+                  codecId: 'pg/vector@1',
+                  nullable: false,
+                  typeRef: 'NonExistent',
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          // storage.types doesn't have 'NonExistent'
+          types: {
+            Vector1536: {
+              codecId: 'pg/vector@1',
+              nativeType: 'vector(1536)',
+              typeParams: { length: 1536 },
+            },
+          },
+        },
+      };
+
+      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(
+        /references non-existent type instance "NonExistent"/,
+      );
+    });
+
+    it('rejects typeRef when storage.types is missing', () => {
+      const input = {
+        ...baseContractInput,
+        storage: {
+          tables: {
+            Embedding: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                vector: {
+                  nativeType: 'vector(1536)',
+                  codecId: 'pg/vector@1',
+                  nullable: false,
+                  typeRef: 'Vector1536',
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          // no storage.types defined
+        },
+      };
+
+      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(
+        /references non-existent type instance "Vector1536"/,
+      );
     });
   });
 
@@ -323,6 +427,26 @@ describe('validateContract parameterized type fields', () => {
       };
 
       expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(/types/);
+    });
+
+    it('rejects array typeParams in type instance', () => {
+      const input = {
+        ...baseContractInput,
+        storage: {
+          ...baseContractInput.storage,
+          types: {
+            Vector1536: {
+              codecId: 'pg/vector@1',
+              nativeType: 'vector(1536)',
+              typeParams: [1536],
+            },
+          },
+        },
+      };
+
+      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(
+        /must be a plain object, not an array/,
+      );
     });
   });
 });

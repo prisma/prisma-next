@@ -204,6 +204,45 @@ export function computeMappings(
 function validateContractLogic(structurallyValidatedContract: SqlContract<SqlStorage>): void {
   const { storage, models } = structurallyValidatedContract;
   const tableNames = new Set(Object.keys(storage.tables));
+  const typeInstanceNames = new Set(Object.keys(storage.types ?? {}));
+
+  // Validate storage.types if present
+  if (storage.types) {
+    for (const [typeName, typeInstance] of Object.entries(storage.types)) {
+      // Validate typeParams is not an array (arrays are objects in JS but not valid here)
+      if (Array.isArray(typeInstance.typeParams)) {
+        throw new Error(
+          `Type instance "${typeName}" has invalid typeParams: must be a plain object, not an array`,
+        );
+      }
+    }
+  }
+
+  // Validate columns in all tables
+  for (const [tableName, table] of Object.entries(storage.tables)) {
+    for (const [columnName, column] of Object.entries(table.columns)) {
+      // Validate typeParams and typeRef are mutually exclusive
+      if (column.typeParams !== undefined && column.typeRef !== undefined) {
+        throw new Error(
+          `Column "${columnName}" in table "${tableName}" has both typeParams and typeRef; these are mutually exclusive`,
+        );
+      }
+
+      // Validate typeParams is not an array (arrays are objects in JS but not valid here)
+      if (column.typeParams !== undefined && Array.isArray(column.typeParams)) {
+        throw new Error(
+          `Column "${columnName}" in table "${tableName}" has invalid typeParams: must be a plain object, not an array`,
+        );
+      }
+
+      // Validate typeRef points to an existing storage.types key
+      if (column.typeRef !== undefined && !typeInstanceNames.has(column.typeRef)) {
+        throw new Error(
+          `Column "${columnName}" in table "${tableName}" references non-existent type instance "${column.typeRef}" (not found in storage.types)`,
+        );
+      }
+    }
+  }
 
   // Validate models
   for (const [modelName, modelUnknown] of Object.entries(models)) {
