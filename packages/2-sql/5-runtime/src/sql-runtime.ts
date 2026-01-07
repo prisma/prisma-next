@@ -50,7 +50,13 @@ export interface Runtime {
   operations(): OperationRegistry;
 }
 
-export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
+export type {
+  ExecutionPlan,
+  OperationRegistry,
+  RuntimeTelemetryEvent,
+  RuntimeVerifyOptions,
+  TelemetryOutcome,
+};
 
 class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
   implements Runtime

@@ -1,3 +1,4 @@
+export type { InferNestedProjectionRow } from '@prisma-next/sql-relational-core/types';
 export { orm } from '../orm.ts';
 export type {
   IncludeAccumulator,
