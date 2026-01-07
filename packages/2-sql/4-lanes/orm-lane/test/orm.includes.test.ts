@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 import type { RelationFilter } from '../src/orm/state.ts';
 import { orm } from '../src/orm.ts';
 import { buildExistsSubqueries, combineWhereClauses } from '../src/relations/include-plan.ts';
-import type { Contract as RelationsContract } from './fixtures/contract-with-relations.d.js';
+import type { Contract as RelationsContract } from './fixtures/contract-with-relations.d.ts';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

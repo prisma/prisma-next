@@ -13,7 +13,7 @@ import {
   flattenProjection,
   generateAlias,
 } from '../src/sql/projection.ts';
-import type { Contract } from './fixtures/contract.d.js';
+import type { Contract } from './fixtures/contract.d.ts';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

@@ -1,11 +1,11 @@
 import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
 import type { ModelColumnAccessor, OrmModelBuilder, OrmRegistry } from '../src/orm-types.ts';
-import type { CodecTypes, Contract } from './fixtures/contract.d.js';
+import type { CodecTypes, Contract } from './fixtures/contract.d.ts';
 import type {
   CodecTypes as CodecTypesWithRelations,
   Contract as ContractWithRelations,
-} from './fixtures/contract-with-relations.d.js';
+} from './fixtures/contract-with-relations.d.ts';
 
 // Helper type to get OrmRegistry type for a contract
 type OrmRegistryFor<TContract extends SqlContract<SqlStorage>> = OrmRegistry<

@@ -195,17 +195,15 @@ type UserIdColumn = UserColumns['id'];
           esModuleInterop: true,
           skipLibCheck: true,
           resolveJsonModule: true,
+          allowImportingTsExtensions: true,
           types: [],
           baseUrl: '.',
           paths: {
             '@prisma-next/sql-contract/types': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types.d.ts`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/types.d.mts`,
             ],
-            '@prisma-next/sql-contract/types/*': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types/*`,
-            ],
-            '@prisma-next/adapter-postgres/*': [
-              `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/exports/*`,
+            '@prisma-next/adapter-postgres/codec-types': [
+              `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/codec-types.d.mts`,
             ],
           },
         },
@@ -328,23 +326,18 @@ type CodecIntType = CodecTypes['pg/int4@1'];
           esModuleInterop: true,
           skipLibCheck: true,
           resolveJsonModule: true,
+          allowImportingTsExtensions: true,
           types: [],
           baseUrl: '.',
           paths: {
-            '@prisma-next/sql-contract-ts/*': [
-              `${relativeToWorkspace}/packages/2-sql/2-authoring/contract-ts/dist/exports/*.d.ts`,
+            '@prisma-next/sql-contract-ts/contract': [
+              `${relativeToWorkspace}/packages/2-sql/2-authoring/contract-ts/dist/contract.d.mts`,
             ],
             '@prisma-next/sql-contract/types': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types.d.ts`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/types.d.mts`,
             ],
-            '@prisma-next/sql-contract/types/*': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/*`,
-            ],
-            '@prisma-next/adapter-postgres/*': [
-              `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/exports/*`,
-            ],
-            '@prisma-next/sql-query/*': [
-              `${relativeToWorkspace}/packages/sql-query/dist/exports/*.d.ts`,
+            '@prisma-next/adapter-postgres/codec-types': [
+              `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/codec-types.d.mts`,
             ],
           },
         },

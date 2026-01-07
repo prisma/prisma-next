@@ -10,7 +10,7 @@ import { createOrderBuilder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { buildIncludeAst, IncludeChildBuilderImpl } from '../src/sql/include-builder.ts';
-import type { Contract } from './fixtures/contract.d.js';
+import type { Contract } from './fixtures/contract.d.ts';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

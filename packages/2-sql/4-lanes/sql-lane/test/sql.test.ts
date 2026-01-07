@@ -11,7 +11,7 @@ import type { ColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder.ts';
-import type { CodecTypes, Contract } from './fixtures/contract.d.js';
+import type { CodecTypes, Contract } from './fixtures/contract.d.ts';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

@@ -19,7 +19,7 @@ import {
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { buildMeta } from '../src/sql/plan.ts';
-import type { Contract } from './fixtures/contract.d.js';
+import type { Contract } from './fixtures/contract.d.ts';
 
 /**
  * Creates a mock ExpressionBuilder for testing.

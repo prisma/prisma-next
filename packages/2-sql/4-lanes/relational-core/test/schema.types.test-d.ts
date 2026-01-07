@@ -1,7 +1,7 @@
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { expectTypeOf, test } from 'vitest';
 import { schema } from '../src/schema.ts';
-import type { Contract } from './fixtures/contract.d.js';
+import type { Contract } from './fixtures/contract.d.ts';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 import { createTestContext } from './utils.ts';
 

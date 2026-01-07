@@ -10,7 +10,7 @@ import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { orm } from '../src/orm.ts';
-import type { Contract } from './fixtures/contract.d.js';
+import type { Contract } from './fixtures/contract.d.ts';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

@@ -6,7 +6,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder.ts';
-import type { CodecTypes } from './fixtures/contract.d.js';
+import type { CodecTypes } from './fixtures/contract.d.ts';
 
 // Type aliases for common column types
 type Int4Column = {
