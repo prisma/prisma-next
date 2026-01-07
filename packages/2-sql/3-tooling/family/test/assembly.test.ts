@@ -165,9 +165,7 @@ describe('extractParameterizedRenderers', () => {
 
     const renderers = extractParameterizedRenderers(descriptors);
 
-    expect(renderers.size).toBe(2);
-    expect(renderers.has('pg/numeric@1')).toBe(true);
-    expect(renderers.has('pg/vector@1')).toBe(true);
+    expect(Array.from(renderers.keys())).toEqual(['pg/numeric@1', 'pg/vector@1']);
   });
 
   it('throws error for duplicate codecId across descriptors', () => {
@@ -257,5 +255,40 @@ describe('extractParameterizedRenderers', () => {
     const result = renderer?.render({ length: 256 }, { codecTypesName: 'MyCodecTypes' });
 
     expect(result).toBe("MyCodecTypes['test/custom@1']['output'] & { length: 256 }");
+  });
+
+  it('throws error for missing template parameter', () => {
+    const descriptors: TestDescriptor[] = [
+      {
+        kind: 'extension',
+        id: 'test-ext',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@test/codec-types',
+              named: 'CodecTypes',
+              alias: 'TestTypes',
+            },
+            parameterized: {
+              'test/vector@1': {
+                kind: 'template',
+                template: 'Vector<{{length}}>',
+              },
+            },
+          },
+        },
+        create: () => ({ familyId: 'sql' as const, targetId: 'postgres' as const }),
+      },
+    ];
+
+    const renderers = extractParameterizedRenderers(descriptors);
+    const renderer = renderers.get('test/vector@1')!;
+
+    expect(() => renderer.render({}, { codecTypesName: 'CodecTypes' })).toThrow(
+      /Missing template parameter "length" in template "Vector<\{\{length\}\}>"/,
+    );
   });
 });
