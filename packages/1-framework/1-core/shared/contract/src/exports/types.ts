@@ -20,7 +20,6 @@ export type {
   ParameterizedCodecDescriptor,
   PlanMeta,
   PlanRefs,
-  RenderTypeContext,
   ResultType,
   Source,
   TargetFamilyHook,

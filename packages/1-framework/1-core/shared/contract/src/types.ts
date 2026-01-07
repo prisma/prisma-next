@@ -1,4 +1,5 @@
 import type { OperationRegistry } from '@prisma-next/operations';
+import type { RenderTypeContext } from './framework-components';
 import type { ContractIR } from './ir';
 
 export interface ContractBase {
@@ -282,16 +283,8 @@ export interface OperationManifest {
 //
 // ============================================================================
 
-/**
- * Context passed to type renderer functions during contract.d.ts generation.
- * Provides access to names used in the generated contract for proper references.
- */
-export interface RenderTypeContext {
-  /** The name of the Contract type being generated (typically 'Contract') */
-  readonly contractTypeName: string;
-  /** The name of the merged CodecTypes map (typically 'CodecTypes') */
-  readonly codecTypesName: string;
-}
+// Re-export RenderTypeContext so it's available alongside TypeRenderer
+export type { RenderTypeContext };
 
 /**
  * Declarative type renderer that produces a TypeScript type expression.
