@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { col, contract, model, storage, table } from '../src/factories';
-import { validateModel, validateSqlContract, validateStorage } from '../src/validators';
+import { col, contract, model, storage, table } from '../src/factories.ts';
+import { validateModel, validateSqlContract, validateStorage } from '../src/validators.ts';
 
 describe('SQL contract validators', () => {
   describe('validateStorage', () => {

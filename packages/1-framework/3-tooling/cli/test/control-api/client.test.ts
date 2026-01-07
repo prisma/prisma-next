@@ -11,8 +11,8 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import { createControlClient } from '../../src/control-api/client';
-import type { ControlProgressEvent } from '../../src/control-api/types';
+import { createControlClient } from '../../src/control-api/client.ts';
+import type { ControlProgressEvent } from '../../src/control-api/types.ts';
 
 function createMockComponents() {
   const mockDriver = {

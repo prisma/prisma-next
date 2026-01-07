@@ -9,11 +9,11 @@ export type {
   RelationDefinition,
   TableBuilderState,
   UniqueConstraintDef,
-} from './builder-state';
+} from './builder-state.ts';
 
-export { ContractBuilder, defineContract } from './contract-builder';
-export { ModelBuilder } from './model-builder';
-export { createTable, TableBuilder } from './table-builder';
+export { ContractBuilder, defineContract } from './contract-builder.ts';
+export { ModelBuilder } from './model-builder.ts';
+export { createTable, TableBuilder } from './table-builder.ts';
 
 export type {
   BuildModelFields,
@@ -27,4 +27,4 @@ export type {
   ExtractModelRelations,
   ExtractPrimaryKey,
   Mutable,
-} from './types';
+} from './types.ts';

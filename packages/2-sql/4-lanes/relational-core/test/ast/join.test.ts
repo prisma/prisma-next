@@ -5,11 +5,11 @@ import {
   textColumn as textColumnType,
 } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createTableRef } from '../../src/ast/common';
-import { createJoin, createJoinOnBuilder, createJoinOnExpr } from '../../src/ast/join';
-import type { JoinOnExpr, TableRef } from '../../src/ast/types';
-import { schema } from '../../src/schema';
-import { createStubAdapter, createTestContext } from '../utils';
+import { createColumnRef, createTableRef } from '../../src/ast/common.ts';
+import { createJoin, createJoinOnBuilder, createJoinOnExpr } from '../../src/ast/join.ts';
+import type { JoinOnExpr, TableRef } from '../../src/ast/types.ts';
+import { schema } from '../../src/schema.ts';
+import { createStubAdapter, createTestContext } from '../utils.ts';
 
 type TestContract = SqlContract<
   {

@@ -1,9 +1,9 @@
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { expectTypeOf, test } from 'vitest';
-import { schema } from '../src/schema';
-import type { Contract } from './fixtures/contract.d';
+import { schema } from '../src/schema.ts';
+import type { Contract } from './fixtures/contract.d.ts';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
-import { createTestContext } from './utils';
+import { createTestContext } from './utils.ts';
 
 const contract = validateContract<Contract>(contractJson);
 const context = createTestContext(contract);

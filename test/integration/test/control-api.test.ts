@@ -12,7 +12,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createIntegrationTestDir } from './utils/cli-test-helpers';
+import { createIntegrationTestDir } from './utils/cli-test-helpers.ts';
 
 // ============================================================================
 // Test Fixtures

@@ -14,4 +14,4 @@ export type {
   StorageColumn,
   StorageTable,
   UniqueConstraint,
-} from '../types';
+} from '../types.ts';

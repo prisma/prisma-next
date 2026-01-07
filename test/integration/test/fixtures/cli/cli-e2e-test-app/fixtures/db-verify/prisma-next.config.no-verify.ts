@@ -4,7 +4,7 @@ import type { ControlFamilyDescriptor } from '@prisma-next/core-control-plane/ty
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import postgres from '@prisma-next/target-postgres/control';
-import { contract } from './contract';
+import { contract } from './contract.ts';
 
 // Create family descriptor without create method
 // This tests validation that requires create method

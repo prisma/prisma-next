@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compact } from '../../src/ast/util';
+import { compact } from '../../src/ast/util.ts';
 
 describe('ast/util', () => {
   describe('compact', () => {

@@ -19,7 +19,7 @@ import {
   pgvectorExtensionRuntimeDescriptor,
   postgresAdapterRuntimeDescriptor,
   postgresTargetRuntimeDescriptor,
-} from './framework-components';
+} from './framework-components.ts';
 
 export interface TestControlClientOptions {
   readonly connection: string;

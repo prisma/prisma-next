@@ -10,7 +10,7 @@ import type {
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
 import { notOk, ok } from '@prisma-next/utils/result';
-import type { DbInitResult, DbInitSuccess, OnControlProgress } from '../types';
+import type { DbInitResult, DbInitSuccess, OnControlProgress } from '../types.ts';
 
 /**
  * Options for executing dbInit operation.

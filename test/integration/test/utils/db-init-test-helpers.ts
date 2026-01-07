@@ -1,7 +1,7 @@
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { setupTestDirectoryFromFixtures } from './cli-test-helpers';
-import { executeCommand, setupDbTestFixture } from './cli-test-helpers';
+import type { setupTestDirectoryFromFixtures } from './cli-test-helpers.ts';
+import { executeCommand, setupDbTestFixture } from './cli-test-helpers.ts';
 
 export type DbInitTestSetup = ReturnType<typeof setupTestDirectoryFromFixtures>;
 

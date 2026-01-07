@@ -1,6 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import { evaluateRawGuardrails } from '../guardrails/raw';
-import type { Plugin, PluginContext } from './types';
+import { evaluateRawGuardrails } from '../guardrails/raw.ts';
+import type { Plugin, PluginContext } from './types.ts';
 
 export interface LintsOptions {
   readonly severities?: {

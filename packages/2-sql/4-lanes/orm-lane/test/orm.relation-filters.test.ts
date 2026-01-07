@@ -8,8 +8,8 @@ import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { orm } from '../src/orm';
-import type { Contract } from './fixtures/contract-with-relations.d';
+import { orm } from '../src/orm.ts';
+import type { Contract } from './fixtures/contract-with-relations.d.ts';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

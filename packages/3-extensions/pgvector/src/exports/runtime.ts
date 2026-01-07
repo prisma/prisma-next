@@ -5,8 +5,8 @@ import type {
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeExtensionInstance,
 } from '@prisma-next/sql-runtime';
-import { codecDefinitions } from '../core/codecs';
-import { pgvectorPackMeta, pgvectorRuntimeOperation } from '../core/descriptor-meta';
+import { codecDefinitions } from '../core/codecs.ts';
+import { pgvectorPackMeta, pgvectorRuntimeOperation } from '../core/descriptor-meta.ts';
 
 /**
  * pgvector SQL runtime extension instance.

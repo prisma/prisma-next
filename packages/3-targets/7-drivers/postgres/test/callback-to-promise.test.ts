@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { callbackToPromise } from '../src/callback-to-promise';
+import { callbackToPromise } from '../src/callback-to-promise.ts';
 
 describe('callbackToPromise', () => {
   it('resolves with result on success', async () => {

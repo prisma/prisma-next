@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
+import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema.ts';
 import {
   createContractTable,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
   emptyTypeMetadataRegistry,
-} from './schema-verify.helpers';
+} from './schema-verify.helpers.ts';
 
 describe('verifySqlSchema - strict mode', () => {
   it('detects extra tables in schema when strict is true', () => {

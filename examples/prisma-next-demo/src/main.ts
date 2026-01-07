@@ -1,12 +1,12 @@
 import 'dotenv/config';
-import { closeRuntime, getRuntime } from './prisma/runtime';
-import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
-import { getUserById } from './queries/get-user-by-id';
-import { getUserPosts } from './queries/get-user-posts';
-import { getUsers } from './queries/get-users';
-import { getUsersWithPosts } from './queries/get-users-with-posts';
-import { ormGetUsersBackward, ormGetUsersByIdCursor } from './queries/orm-pagination';
-import { similaritySearch } from './queries/similarity-search';
+import { closeRuntime, getRuntime } from './prisma/runtime.ts';
+import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded.ts';
+import { getUserById } from './queries/get-user-by-id.ts';
+import { getUserPosts } from './queries/get-user-posts.ts';
+import { getUsers } from './queries/get-users.ts';
+import { getUsersWithPosts } from './queries/get-users-with-posts.ts';
+import { ormGetUsersBackward, ormGetUsersByIdCursor } from './queries/orm-pagination.ts';
+import { similaritySearch } from './queries/similarity-search.ts';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;

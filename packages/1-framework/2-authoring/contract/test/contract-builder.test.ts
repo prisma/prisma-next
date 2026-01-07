@@ -1,7 +1,7 @@
 import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
-import type { ColumnTypeDescriptor } from '../src/builder-state';
-import { ContractBuilder, defineContract } from '../src/contract-builder';
+import type { ColumnTypeDescriptor } from '../src/builder-state.ts';
+import { ContractBuilder, defineContract } from '../src/contract-builder.ts';
 
 const intColumn: ColumnTypeDescriptor = { codecId: 'test/int@1', nativeType: 'int4' };
 const postgresPack: TargetPackRef<'sql', 'postgres'> = {

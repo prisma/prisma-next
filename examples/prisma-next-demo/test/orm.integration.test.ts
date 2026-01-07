@@ -6,14 +6,14 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { type createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../src/prisma/contract.d';
+import type { Contract } from '../src/prisma/contract.d.ts';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
-import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
+import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client.ts';
 import {
   pgvectorExtensionRuntimeDescriptor,
   postgresAdapterRuntimeDescriptor,
   postgresTargetRuntimeDescriptor,
-} from './utils/framework-components';
+} from './utils/framework-components.ts';
 
 // Use the emitted JSON contract which has the real computed hashes
 const contract = validateContract<Contract>(contractJson);
@@ -111,7 +111,7 @@ describe('ORM integration tests', () => {
           });
 
           process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUsers } = await import('../src/queries/orm-get-users');
+          const { ormGetUsers } = await import('../src/queries/orm-get-users.ts');
           const users = await ormGetUsers(2, runtime);
 
           expect(users).toHaveLength(2);
@@ -140,7 +140,7 @@ describe('ORM integration tests', () => {
           await seedTestData(runtime, contract, { users: ['alice@example.com'] });
 
           process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
+          const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id.ts');
           const user = await ormGetUserById(1, runtime);
 
           expect(user).not.toBeNull();
@@ -171,7 +171,7 @@ describe('ORM integration tests', () => {
           });
 
           process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters');
+          const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters.ts');
           const users = await ormGetUsersWithPosts(runtime);
 
           expect(users.length).toBeGreaterThan(0);
@@ -205,7 +205,7 @@ describe('ORM integration tests', () => {
           });
 
           process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes');
+          const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes.ts');
           const users = await ormGetUsersWithPosts(10, runtime);
 
           expect(users.length).toBeGreaterThan(0);
@@ -231,7 +231,7 @@ describe('ORM integration tests', () => {
 
         try {
           process.env['DATABASE_URL'] = connectionString;
-          const { ormCreateUser } = await import('../src/queries/orm-writes');
+          const { ormCreateUser } = await import('../src/queries/orm-writes.ts');
           const affectedRows = await ormCreateUser(
             { id: 1, email: 'alice@example.com', createdAt: new Date() },
             runtime,
@@ -257,7 +257,7 @@ describe('ORM integration tests', () => {
           await seedTestData(runtime, contract, { users: ['alice@example.com'] });
 
           process.env['DATABASE_URL'] = connectionString;
-          const { ormUpdateUser } = await import('../src/queries/orm-writes');
+          const { ormUpdateUser } = await import('../src/queries/orm-writes.ts');
           const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
 
           expect(affectedRows).toBe(1);
@@ -280,7 +280,7 @@ describe('ORM integration tests', () => {
           await seedTestData(runtime, contract, { users: ['alice@example.com'] });
 
           process.env['DATABASE_URL'] = connectionString;
-          const { ormDeleteUser } = await import('../src/queries/orm-writes');
+          const { ormDeleteUser } = await import('../src/queries/orm-writes.ts');
           const affectedRows = await ormDeleteUser(1, runtime);
 
           expect(affectedRows).toBe(1);
@@ -304,7 +304,7 @@ describe('ORM integration tests', () => {
           await seedTestData(runtime, contract, { users: emails });
 
           process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUsersByIdCursor } = await import('../src/queries/orm-pagination');
+          const { ormGetUsersByIdCursor } = await import('../src/queries/orm-pagination.ts');
 
           const firstPage = await ormGetUsersByIdCursor(null, 3, runtime);
           expect(firstPage).toHaveLength(3);
@@ -344,7 +344,7 @@ describe('ORM integration tests', () => {
           await seedTestData(runtime, contract, { users: emails });
 
           process.env['DATABASE_URL'] = connectionString;
-          const { ormGetUsersBackward } = await import('../src/queries/orm-pagination');
+          const { ormGetUsersBackward } = await import('../src/queries/orm-pagination.ts');
 
           const page = await ormGetUsersBackward(8, 3, runtime);
           expect(page).toHaveLength(3);

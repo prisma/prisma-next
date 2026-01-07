@@ -11,7 +11,7 @@ import {
   postgresTargetDescriptor,
   resetDatabase,
   testTimeout,
-} from './fixtures/runner-fixtures';
+} from './fixtures/runner-fixtures.ts';
 
 /**
  * Integration tests for schema verification after runner execution.

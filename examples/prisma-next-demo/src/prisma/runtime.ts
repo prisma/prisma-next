@@ -11,7 +11,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
-import type { Contract } from './contract.d';
+import type { Contract } from './contract.d.ts';
 import contractJson from './contract.json' with { type: 'json' };
 
 let runtime: Runtime | undefined;

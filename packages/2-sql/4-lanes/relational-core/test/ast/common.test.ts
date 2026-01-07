@@ -5,8 +5,8 @@ import {
   createOperationExpr,
   createParamRef,
   createTableRef,
-} from '../../src/ast/common';
-import type { OperationExpr } from '../../src/ast/types';
+} from '../../src/ast/common.ts';
+import type { OperationExpr } from '../../src/ast/types.ts';
 
 describe('ast/common', () => {
   describe('createTableRef', () => {

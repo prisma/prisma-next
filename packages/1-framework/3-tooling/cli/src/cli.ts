@@ -1,13 +1,13 @@
 import { Command } from 'commander';
-import { createContractEmitCommand } from './commands/contract-emit';
-import { createDbInitCommand } from './commands/db-init';
-import { createDbIntrospectCommand } from './commands/db-introspect';
-import { createDbSchemaVerifyCommand } from './commands/db-schema-verify';
-import { createDbSignCommand } from './commands/db-sign';
-import { createDbVerifyCommand } from './commands/db-verify';
-import { setCommandDescriptions } from './utils/command-helpers';
-import { parseGlobalFlags } from './utils/global-flags';
-import { formatCommandHelp, formatRootHelp } from './utils/output';
+import { createContractEmitCommand } from './commands/contract-emit.ts';
+import { createDbInitCommand } from './commands/db-init.ts';
+import { createDbIntrospectCommand } from './commands/db-introspect.ts';
+import { createDbSchemaVerifyCommand } from './commands/db-schema-verify.ts';
+import { createDbSignCommand } from './commands/db-sign.ts';
+import { createDbVerifyCommand } from './commands/db-verify.ts';
+import { setCommandDescriptions } from './utils/command-helpers.ts';
+import { parseGlobalFlags } from './utils/global-flags.ts';
+import { formatCommandHelp, formatRootHelp } from './utils/output.ts';
 
 const program = new Command();
 

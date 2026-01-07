@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ifDefined } from '../src/defined';
+import { ifDefined } from '../src/defined.ts';
 
 describe('ifDefined', () => {
   it('returns object with key/value when value is defined', () => {

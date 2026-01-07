@@ -1,1 +1,1 @@
-export { parseContractMarkerRow, readMarker, readMarkerSql } from '../core/verify';
+export { parseContractMarkerRow, readMarker, readMarkerSql } from '../core/verify.ts';

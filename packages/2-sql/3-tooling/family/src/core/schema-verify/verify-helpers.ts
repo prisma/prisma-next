@@ -16,7 +16,7 @@ import type {
   SqlSchemaIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import type { ComponentDatabaseDependency } from '../migrations/types';
+import type { ComponentDatabaseDependency } from '../migrations/types.ts';
 
 /**
  * Compares two arrays of strings for equality (order-sensitive).

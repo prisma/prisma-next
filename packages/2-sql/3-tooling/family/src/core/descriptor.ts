@@ -3,7 +3,7 @@ import type {
   ControlPlaneStack,
 } from '@prisma-next/core-control-plane/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './instance';
+import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './instance.ts';
 
 /**
  * SQL family descriptor implementation.

@@ -3,7 +3,7 @@ import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef } from '@prisma-next/sql-relational-core/ast';
 import type { OrderBuilder } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
-import { buildChildOrderByClause, buildOrderByClause } from '../../src/selection/ordering';
+import { buildChildOrderByClause, buildOrderByClause } from '../../src/selection/ordering.ts';
 
 describe('ordering', () => {
   describe('buildOrderByClause', () => {

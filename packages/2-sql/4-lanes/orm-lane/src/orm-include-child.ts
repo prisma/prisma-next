@@ -9,7 +9,7 @@ import type {
   InferNestedProjectionRow,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import type { ModelColumnAccessor, OrmBuilderOptions } from './orm-types';
+import type { ModelColumnAccessor, OrmBuilderOptions } from './orm-types.ts';
 
 export interface OrmIncludeChildBuilder<
   TContract extends SqlContract<SqlStorage>,

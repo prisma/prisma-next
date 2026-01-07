@@ -7,4 +7,4 @@
  * Runtime codec implementations are provided by the extension's codec registry.
  */
 
-export type { CodecTypes } from '../core/codecs';
+export type { CodecTypes } from '../core/codecs.ts';

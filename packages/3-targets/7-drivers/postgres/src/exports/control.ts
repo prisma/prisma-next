@@ -6,8 +6,8 @@ import type {
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { Client } from 'pg';
-import { postgresDriverDescriptorMeta } from '../core/descriptor-meta';
-import { normalizePgError } from '../normalize-error';
+import { postgresDriverDescriptorMeta } from '../core/descriptor-meta.ts';
+import { normalizePgError } from '../normalize-error.ts';
 
 /**
  * Postgres control driver instance for control-plane operations.

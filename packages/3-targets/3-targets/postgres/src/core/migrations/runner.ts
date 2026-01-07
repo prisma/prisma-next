@@ -16,7 +16,7 @@ import { readMarker } from '@prisma-next/family-sql/verify';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import type { Result } from '@prisma-next/utils/result';
 import { ok, okVoid } from '@prisma-next/utils/result';
-import type { PostgresPlanTargetDetails } from './planner';
+import type { PostgresPlanTargetDetails } from './planner.ts';
 import {
   buildLedgerInsertStatement,
   buildWriteMarkerStatements,
@@ -24,7 +24,7 @@ import {
   ensureMarkerTableStatement,
   ensurePrismaContractSchemaStatement,
   type SqlStatement,
-} from './statement-builders';
+} from './statement-builders.ts';
 
 interface RunnerConfig {
   readonly defaultSchema: string;

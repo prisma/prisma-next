@@ -11,4 +11,4 @@ export type {
   SelectAst,
   StorageColumn,
   StorageTable,
-} from '../core/types';
+} from '../core/types.ts';

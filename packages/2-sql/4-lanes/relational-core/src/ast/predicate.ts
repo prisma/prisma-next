@@ -1,4 +1,4 @@
-import type { BinaryExpr, BinaryOp, ExistsExpr, Expression, ParamRef, SelectAst } from './types';
+import type { BinaryExpr, BinaryOp, ExistsExpr, Expression, ParamRef, SelectAst } from './types.ts';
 
 export function createBinaryExpr(
   op: BinaryOp,

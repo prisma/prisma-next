@@ -22,8 +22,8 @@ import type {
   AnyOrderBuilder,
   BinaryBuilder,
 } from '@prisma-next/sql-relational-core/types';
-import type { IncludeState } from '../relations/include-plan';
-import type { ProjectionState } from '../selection/projection';
+import type { IncludeState } from '../relations/include-plan.ts';
+import type { ProjectionState } from '../selection/projection.ts';
 
 export interface MetaBuildArgs {
   readonly contract: SqlContract<SqlStorage>;

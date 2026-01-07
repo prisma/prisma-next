@@ -11,6 +11,6 @@ export {
   isIndexSatisfied,
   isUniqueConstraintSatisfied,
   verifyDatabaseDependencies,
-} from '../core/schema-verify/verify-helpers';
-export type { VerifySqlSchemaOptions } from '../core/schema-verify/verify-sql-schema';
-export { verifySqlSchema } from '../core/schema-verify/verify-sql-schema';
+} from '../core/schema-verify/verify-helpers.ts';
+export type { VerifySqlSchemaOptions } from '../core/schema-verify/verify-sql-schema.ts';
+export { verifySqlSchema } from '../core/schema-verify/verify-sql-schema.ts';

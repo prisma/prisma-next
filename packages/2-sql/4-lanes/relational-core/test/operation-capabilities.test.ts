@@ -3,8 +3,8 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import { vectorColumn as vectorColumnType } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { schema } from '../src/schema';
-import { createStubAdapter, createTestContext } from './utils';
+import { schema } from '../src/schema.ts';
+import { createStubAdapter, createTestContext } from './utils.ts';
 
 describe('Operation capability gating', () => {
   it('exposes operation with required capability when capability is present', () => {

@@ -1,5 +1,5 @@
-import type { BinaryExpr, ColumnRef, DeleteAst, TableRef } from './types';
-import { compact } from './util';
+import type { BinaryExpr, ColumnRef, DeleteAst, TableRef } from './types.ts';
+import { compact } from './util.ts';
 
 export interface CreateDeleteAstOptions {
   readonly table: TableRef;

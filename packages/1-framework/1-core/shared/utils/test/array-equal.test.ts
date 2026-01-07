@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isArrayEqual } from '../src/array-equal';
+import { isArrayEqual } from '../src/array-equal.ts';
 
 describe('isArrayEqual', () => {
   it('returns true for equal arrays', () => {

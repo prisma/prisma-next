@@ -1,4 +1,4 @@
-import { ifDefined } from './defined';
+import { ifDefined } from './defined.ts';
 
 /**
  * Minimal metadata extracted from a database URL for logging or error output.

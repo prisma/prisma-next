@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
-import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate';
-import { createSelectAst } from '../../src/ast/select';
-import type { ColumnRef, OperationExpr, SelectAst } from '../../src/ast/types';
+import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common.ts';
+import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate.ts';
+import { createSelectAst } from '../../src/ast/select.ts';
+import type { ColumnRef, OperationExpr, SelectAst } from '../../src/ast/types.ts';
 
 function createTestOperationExpr(self: ColumnRef): OperationExpr {
   return {

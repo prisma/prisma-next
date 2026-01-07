@@ -1,3 +1,3 @@
-export * from './exports/factories';
-export * from './exports/types';
-export * from './exports/validators';
+export * from './exports/factories.ts';
+export * from './exports/types.ts';
+export * from './exports/validators.ts';

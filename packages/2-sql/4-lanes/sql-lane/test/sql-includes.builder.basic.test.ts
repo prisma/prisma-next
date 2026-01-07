@@ -6,7 +6,7 @@ import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { sql } from '../src/sql/builder';
+import { sql } from '../src/sql/builder.ts';
 
 // Define CodecTypes type for contract mappings
 type CodecTypes = Record<string, { readonly output: unknown }>;

@@ -1,1 +1,1 @@
-export { ifDefined } from '../defined';
+export { ifDefined } from '../defined.ts';

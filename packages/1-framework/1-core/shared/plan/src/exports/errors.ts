@@ -1,1 +1,1 @@
-export { planInvalid, planUnsupported } from '../errors';
+export { planInvalid, planUnsupported } from '../errors.ts';

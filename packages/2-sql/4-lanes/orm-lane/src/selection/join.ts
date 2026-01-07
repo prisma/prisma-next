@@ -1,5 +1,5 @@
 import type { JoinOnExpr } from '@prisma-next/sql-relational-core/ast';
-import { createColumnRef, createJoinOnExpr } from '../utils/ast';
+import { createColumnRef, createJoinOnExpr } from '../utils/ast.ts';
 
 export function buildJoinOnExpr(
   parentTableName: string,

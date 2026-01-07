@@ -17,8 +17,12 @@ import type {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relational-core/ast';
-import { codecDefinitions } from './codecs';
-import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
+import { codecDefinitions } from './codecs.ts';
+import type {
+  PostgresAdapterOptions,
+  PostgresContract,
+  PostgresLoweredStatement,
+} from './types.ts';
 
 const VECTOR_CODEC_ID = 'pg/vector@1' as const;
 

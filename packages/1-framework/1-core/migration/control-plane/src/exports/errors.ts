@@ -1,4 +1,4 @@
-export type { CliErrorConflict, CliErrorEnvelope } from '../errors';
+export type { CliErrorConflict, CliErrorEnvelope } from '../errors.ts';
 export {
   CliStructuredError,
   errorConfigFileNotFound,
@@ -19,4 +19,4 @@ export {
   errorTargetMigrationNotSupported,
   errorTargetMismatch,
   errorUnexpected,
-} from '../errors';
+} from '../errors.ts';

@@ -11,7 +11,7 @@ import type {
   InferNestedProjectionRow,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import type { OrmIncludeChildBuilder } from './orm-include-child';
+import type { OrmIncludeChildBuilder } from './orm-include-child.ts';
 
 export interface OrmBuilderOptions<TContract extends SqlContract<SqlStorage>> {
   readonly context: QueryLaneContext<TContract>;

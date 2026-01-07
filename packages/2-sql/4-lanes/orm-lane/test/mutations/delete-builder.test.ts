@@ -5,9 +5,9 @@ import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
-import { buildDeletePlan } from '../../src/mutations/delete-builder';
-import type { OrmContext } from '../../src/orm/context';
-import type { ModelColumnAccessor } from '../../src/orm-types';
+import { buildDeletePlan } from '../../src/mutations/delete-builder.ts';
+import type { OrmContext } from '../../src/orm/context.ts';
+import type { ModelColumnAccessor } from '../../src/orm-types.ts';
 
 describe('delete builder', () => {
   const int4Column: StorageColumn = { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false };

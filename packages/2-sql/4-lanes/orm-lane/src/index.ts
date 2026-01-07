@@ -1,5 +1,5 @@
-export { orm } from './orm';
-export { OrmModelBuilderImpl } from './orm/builder';
+export { OrmModelBuilderImpl } from './orm/builder.ts';
+export { orm } from './orm.ts';
 export type {
   ModelColumnAccessor,
   OrmBuilderOptions,
@@ -8,4 +8,4 @@ export type {
   OrmRelationAccessor,
   OrmRelationFilterBuilder,
   OrmWhereProperty,
-} from './orm-types';
+} from './orm-types.ts';

@@ -1,6 +1,6 @@
-import { getPrisma } from './prisma/client';
-import { createUser } from './queries/create-user';
-import { readUserById } from './queries/read-user';
+import { getPrisma } from './prisma/client.ts';
+import { createUser } from './queries/create-user.ts';
+import { readUserById } from './queries/read-user.ts';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;

@@ -1,6 +1,6 @@
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { int4Column, textColumn } from '@prisma-next/test-utils/column-descriptors';
-import { postgresPack } from '../helpers/postgres-pack';
+import { postgresPack } from '../helpers/postgres-pack.ts';
 
 // Minimal stub CodecTypes for test fixtures (CLI doesn't need full type inference)
 type CodecTypes = Record<string, never>;

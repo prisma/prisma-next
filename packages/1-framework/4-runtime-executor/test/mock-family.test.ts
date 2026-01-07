@@ -1,9 +1,9 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { describe, expect, it } from 'vitest';
-import type { Plugin } from '../src/plugins/types';
-import { createRuntimeCore } from '../src/runtime-core';
-import type { MarkerReader, MarkerStatement, RuntimeFamilyAdapter } from '../src/runtime-spi';
+import type { Plugin } from '../src/plugins/types.ts';
+import { createRuntimeCore } from '../src/runtime-core.ts';
+import type { MarkerReader, MarkerStatement, RuntimeFamilyAdapter } from '../src/runtime-spi.ts';
 
 interface MockContract {
   readonly target: string;

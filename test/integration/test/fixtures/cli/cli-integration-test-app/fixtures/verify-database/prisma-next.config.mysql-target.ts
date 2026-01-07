@@ -3,7 +3,7 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
-import { contract } from './contract';
+import { contract } from './contract.ts';
 
 // This config uses postgres target but we'll manually modify the emitted contract
 // to have mysql target to test target mismatch

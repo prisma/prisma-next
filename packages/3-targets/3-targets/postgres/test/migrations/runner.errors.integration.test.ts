@@ -1,13 +1,13 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner';
+import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner.ts';
 import {
   buildWriteMarkerStatements,
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
   ensurePrismaContractSchemaStatement,
-} from '../../src/core/migrations/statement-builders';
-import { expectNoMarkerOrLedgerWrites } from '../utils/dbAssertions';
+} from '../../src/core/migrations/statement-builders.ts';
+import { expectNoMarkerOrLedgerWrites } from '../utils/dbAssertions.ts';
 import {
   contract,
   createDriver,
@@ -22,7 +22,7 @@ import {
   resetDatabase,
   testTimeout,
   toPlanContractInfo,
-} from './fixtures/runner-fixtures';
+} from './fixtures/runner-fixtures.ts';
 
 describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>;

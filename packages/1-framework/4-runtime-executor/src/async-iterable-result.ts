@@ -1,4 +1,4 @@
-import { runtimeError } from './errors';
+import { runtimeError } from './errors.ts';
 
 /**
  * Custom async iterable result that extends AsyncIterable with a toArray() method.

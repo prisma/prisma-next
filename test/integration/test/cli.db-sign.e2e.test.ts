@@ -11,7 +11,7 @@ import {
   setupDbTestFixture,
   setupTestDirectoryFromFixtures,
   withTempDir,
-} from './utils/cli-test-helpers';
+} from './utils/cli-test-helpers.ts';
 
 // Fixture subdirectory for db-sign e2e tests
 const fixtureSubdir = 'db-sign';

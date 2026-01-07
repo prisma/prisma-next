@@ -4,16 +4,16 @@ import type { ColumnRef, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { BuildOptions, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
-import type { OrmContext } from '../orm/context';
-import { createInsertAst, createParamRef, createTableRef } from '../utils/ast';
+import type { OrmContext } from '../orm/context.ts';
+import { createInsertAst, createParamRef, createTableRef } from '../utils/ast.ts';
 import {
   assertColumnExists,
   assertParameterExists,
   errorCreateRequiresFields,
   errorModelNotFound,
   errorUnknownTable,
-} from '../utils/errors';
-import { createParamDescriptor } from '../utils/param-descriptor';
+} from '../utils/errors.ts';
+import { createParamDescriptor } from '../utils/param-descriptor.ts';
 
 export function convertModelFieldsToColumns<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,

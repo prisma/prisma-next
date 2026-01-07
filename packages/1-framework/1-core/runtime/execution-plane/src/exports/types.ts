@@ -9,4 +9,4 @@ export type {
   RuntimeFamilyInstance,
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
-} from '../types';
+} from '../types.ts';

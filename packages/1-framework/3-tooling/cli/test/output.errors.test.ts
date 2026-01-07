@@ -1,8 +1,8 @@
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import type { CliErrorConflict, CliErrorEnvelope } from '../src/utils/cli-errors';
-import { parseGlobalFlags } from '../src/utils/global-flags';
-import { formatErrorOutput } from '../src/utils/output';
+import type { CliErrorConflict, CliErrorEnvelope } from '../src/utils/cli-errors.ts';
+import { parseGlobalFlags } from '../src/utils/global-flags.ts';
+import { formatErrorOutput } from '../src/utils/output.ts';
 
 const baseError: CliErrorEnvelope = {
   code: 'PN-CLI-4020',

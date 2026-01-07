@@ -12,8 +12,8 @@ import type {
 
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
-import { sql } from '../src/sql/builder';
-import type { CodecTypes, Contract } from './fixtures/contract.d';
+import { sql } from '../src/sql/builder.ts';
+import type { CodecTypes, Contract } from './fixtures/contract.d.ts';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 // Helper to simulate execute signature (runtime accepts both ExecutionPlan and SqlQueryPlan)

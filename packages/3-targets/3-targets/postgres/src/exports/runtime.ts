@@ -2,7 +2,7 @@ import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
 } from '@prisma-next/core-execution-plane/types';
-import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
+import { postgresTargetDescriptorMeta } from '../core/descriptor-meta.ts';
 
 /**
  * Postgres runtime target instance interface.

@@ -1,6 +1,6 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { describe, expect, it } from 'vitest';
-import { sqlTargetFamilyHook } from '../src/index';
+import { sqlTargetFamilyHook } from '../src/index.ts';
 
 function createContractIR(overrides: Partial<ContractIR>): ContractIR {
   return {

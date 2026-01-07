@@ -31,8 +31,8 @@ import type {
   OrderBuilder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
-import type { ProjectionInput } from '../types/internal';
-import { checkIncludeCapabilities } from '../utils/capabilities';
+import type { ProjectionInput } from '../types/internal.ts';
+import { checkIncludeCapabilities } from '../utils/capabilities.ts';
 import {
   errorChildProjectionEmpty,
   errorFromMustBeCalled,
@@ -42,17 +42,17 @@ import {
   errorSelectMustBeCalled,
   errorSelfJoinNotSupported,
   errorUnknownTable,
-} from '../utils/errors';
-import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state';
+} from '../utils/errors.ts';
+import type { BuilderState, IncludeState, JoinState, ProjectionState } from '../utils/state.ts';
 import {
   buildIncludeAst,
   type IncludeChildBuilder,
   IncludeChildBuilderImpl,
-} from './include-builder';
-import { buildJoinAst } from './join-builder';
-import { buildMeta } from './plan';
-import { buildWhereExpr } from './predicate-builder';
-import { buildProjectionState } from './projection';
+} from './include-builder.ts';
+import { buildJoinAst } from './join-builder.ts';
+import { buildMeta } from './plan.ts';
+import { buildWhereExpr } from './predicate-builder.ts';
+import { buildProjectionState } from './projection.ts';
 
 export class SelectBuilderImpl<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,

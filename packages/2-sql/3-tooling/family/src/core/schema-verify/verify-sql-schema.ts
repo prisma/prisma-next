@@ -14,9 +14,9 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { ComponentDatabaseDependency } from '../migrations/types';
+import type { ComponentDatabaseDependency } from '../migrations/types.ts';
 import {
   computeCounts,
   verifyDatabaseDependencies,
@@ -24,7 +24,7 @@ import {
   verifyIndexes,
   verifyPrimaryKey,
   verifyUniqueConstraints,
-} from './verify-helpers';
+} from './verify-helpers.ts';
 
 /**
  * Options for the pure schema verification function.

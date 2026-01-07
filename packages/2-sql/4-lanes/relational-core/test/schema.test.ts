@@ -5,12 +5,12 @@ import {
   textColumn as textColumnType,
 } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { BinaryOp } from '../src/ast/types';
-import { param } from '../src/param';
-import type { SchemaHandle } from '../src/schema';
-import { schema } from '../src/schema';
-import type { OperationTypes } from '../src/types';
-import { createStubAdapter, createTestContext } from './utils';
+import type { BinaryOp } from '../src/ast/types.ts';
+import { param } from '../src/param.ts';
+import type { SchemaHandle } from '../src/schema.ts';
+import { schema } from '../src/schema.ts';
+import type { OperationTypes } from '../src/types.ts';
+import { createStubAdapter, createTestContext } from './utils.ts';
 
 type TestContract = SqlContract<
   {

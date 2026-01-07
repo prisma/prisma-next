@@ -27,10 +27,10 @@ import {
   errorChildProjectionMustBeSpecified,
   errorLimitMustBeNonNegativeInteger,
   errorMissingColumnForAlias,
-} from '../utils/errors';
-import type { IncludeState, ProjectionState } from '../utils/state';
-import { buildWhereExpr } from './predicate-builder';
-import { buildProjectionState } from './projection';
+} from '../utils/errors.ts';
+import type { IncludeState, ProjectionState } from '../utils/state.ts';
+import { buildWhereExpr } from './predicate-builder.ts';
+import { buildProjectionState } from './projection.ts';
 
 export interface IncludeChildBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,

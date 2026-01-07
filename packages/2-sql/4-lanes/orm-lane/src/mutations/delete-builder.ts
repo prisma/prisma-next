@@ -2,11 +2,11 @@ import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { AnyBinaryBuilder, BuildOptions } from '@prisma-next/sql-relational-core/types';
-import type { OrmContext } from '../orm/context';
-import type { ModelColumnAccessor } from '../orm-types';
-import { buildWhereExpr } from '../selection/predicates';
-import { createDeleteAst, createTableRef } from '../utils/ast';
-import { errorFailedToBuildWhereClause, errorModelNotFound } from '../utils/errors';
+import type { OrmContext } from '../orm/context.ts';
+import type { ModelColumnAccessor } from '../orm-types.ts';
+import { buildWhereExpr } from '../selection/predicates.ts';
+import { createDeleteAst, createTableRef } from '../utils/ast.ts';
+import { errorFailedToBuildWhereClause, errorModelNotFound } from '../utils/errors.ts';
 
 export function buildDeletePlan<
   TContract extends SqlContract<SqlStorage>,

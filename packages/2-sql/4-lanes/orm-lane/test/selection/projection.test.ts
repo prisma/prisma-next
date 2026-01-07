@@ -7,7 +7,7 @@ import {
   buildProjectionState,
   flattenProjection,
   type ProjectionInput,
-} from '../../src/selection/projection';
+} from '../../src/selection/projection.ts';
 
 function createMockColumnBuilder(
   table: string,

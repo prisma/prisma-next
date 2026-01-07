@@ -14,7 +14,7 @@ import {
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getSqlDescriptorBundle } from '../utils/framework-components';
+import { getSqlDescriptorBundle } from '../utils/framework-components.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = resolve(__dirname, '../../../packages/1-framework/3-tooling/cli/test/fixtures');

@@ -1,15 +1,15 @@
 // @ts-nocheck FIXME: this module is all broken without a clear path to fixing.
 
 import { expectTypeOf, test } from 'vitest';
-import type { PrismaNextConfig } from '../src/config-types';
-import { defineConfig } from '../src/config-types';
+import type { PrismaNextConfig } from '../src/config-types.ts';
+import { defineConfig } from '../src/config-types.ts';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
-} from '../src/types';
+} from '../src/types.ts';
 
 // Type-level tests for defineConfig compatibility enforcement
 

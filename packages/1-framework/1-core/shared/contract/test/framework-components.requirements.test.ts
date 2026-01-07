@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkContractComponentRequirements } from '../src/framework-components';
+import { checkContractComponentRequirements } from '../src/framework-components.ts';
 
 describe('checkContractComponentRequirements', () => {
   it('returns empty result when requirements are satisfied', () => {

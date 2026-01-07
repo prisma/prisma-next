@@ -16,9 +16,9 @@ import type {
 } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import type { IncludeState } from '../../src/relations/include-plan';
-import type { ProjectionState } from '../../src/selection/projection';
-import { buildProjectionItems, buildSelectAst } from '../../src/selection/select-builder';
+import type { IncludeState } from '../../src/relations/include-plan.ts';
+import type { ProjectionState } from '../../src/selection/projection.ts';
+import { buildProjectionItems, buildSelectAst } from '../../src/selection/select-builder.ts';
 
 function createTestContract(): SqlContract<SqlStorage> {
   return {

@@ -10,7 +10,7 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner.ts';
 
 describe('PostgresMigrationPlanner - semantic satisfaction', () => {
   const planner = createPostgresMigrationPlanner();

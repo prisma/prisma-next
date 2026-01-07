@@ -9,7 +9,7 @@ import {
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
-} from './utils/cli-test-helpers';
+} from './utils/cli-test-helpers.ts';
 
 // Fixture subdirectory for emit tests
 const fixtureSubdir = 'emit';

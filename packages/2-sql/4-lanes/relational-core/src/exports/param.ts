@@ -1,2 +1,2 @@
-export type { Parameter } from '../param';
-export { param } from '../param';
+export type { Parameter } from '../param.ts';
+export { param } from '../param.ts';

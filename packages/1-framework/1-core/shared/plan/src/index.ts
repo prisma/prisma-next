@@ -1,2 +1,2 @@
-export * from './exports/errors';
-export * from './exports/types';
+export * from './exports/errors.ts';
+export * from './exports/types.ts';

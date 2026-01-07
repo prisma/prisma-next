@@ -21,7 +21,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createIntegrationTestDir } from './utils/cli-test-helpers';
+import { createIntegrationTestDir } from './utils/cli-test-helpers.ts';
 
 /**
  * Creates a test contract for testing.

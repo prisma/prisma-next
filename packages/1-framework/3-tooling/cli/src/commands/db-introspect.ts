@@ -3,25 +3,25 @@ import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view
 import type { IntrospectSchemaResult } from '@prisma-next/core-control-plane/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { loadConfig } from '../config-loader';
-import { createControlClient } from '../control-api/client';
+import { loadConfig } from '../config-loader.ts';
+import { createControlClient } from '../control-api/client.ts';
 import {
   CliStructuredError,
   errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorJsonFormatNotSupported,
   errorUnexpected,
-} from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+} from '../utils/cli-errors.ts';
+import { setCommandDescriptions } from '../utils/command-helpers.ts';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags.ts';
 import {
   formatCommandHelp,
   formatIntrospectJson,
   formatIntrospectOutput,
   formatStyledHeader,
-} from '../utils/output';
-import { createProgressAdapter } from '../utils/progress-adapter';
-import { handleResult } from '../utils/result-handler';
+} from '../utils/output.ts';
+import { createProgressAdapter } from '../utils/progress-adapter.ts';
+import { handleResult } from '../utils/result-handler.ts';
 
 interface DbIntrospectOptions {
   readonly db?: string;

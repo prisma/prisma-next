@@ -12,7 +12,7 @@ export default defineConfig({
   extensions: [],
   contract: {
     source: async () => {
-      const { contract } = await import('./contract');
+      const { contract } = await import('./contract.ts');
       return contract;
     },
     output: '{{OUTPUT_DIR}}/contract.json',

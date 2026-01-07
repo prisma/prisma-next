@@ -1,6 +1,6 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { CodecRegistry } from './ast/codec-types';
+import type { CodecRegistry } from './ast/codec-types.ts';
 
 /**
  * Minimal context interface for SQL query lanes.

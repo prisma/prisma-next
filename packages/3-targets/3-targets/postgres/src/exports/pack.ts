@@ -1,5 +1,5 @@
 import type { TargetPackRef } from '@prisma-next/contract/framework-components';
-import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
+import { postgresTargetDescriptorMeta } from '../core/descriptor-meta.ts';
 
 const postgresPack: TargetPackRef<'sql', 'postgres'> = postgresTargetDescriptorMeta;
 

@@ -1,9 +1,9 @@
 import { type ServerOptions, startPrismaDevServer } from '@prisma/dev';
 import { Client } from 'pg';
 
-export * from '../column-descriptors';
-export * from '../operation-descriptors';
-export * from '../timeouts';
+export * from '../column-descriptors.ts';
+export * from '../operation-descriptors.ts';
+export * from '../timeouts.ts';
 
 function normalizeConnectionString(raw: string): string {
   const url = new URL(raw);

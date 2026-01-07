@@ -5,9 +5,9 @@ import type {
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
-} from './builder-state';
-import { ModelBuilder } from './model-builder';
-import { createTable, TableBuilder } from './table-builder';
+} from './builder-state.ts';
+import { ModelBuilder } from './model-builder.ts';
+import { createTable, TableBuilder } from './table-builder.ts';
 
 export class ContractBuilder<
   Target extends string | undefined = undefined,

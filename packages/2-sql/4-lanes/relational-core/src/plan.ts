@@ -1,6 +1,6 @@
 import type { ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
-import type { QueryAst } from './ast/types';
+import type { QueryAst } from './ast/types.ts';
 
 /**
  * SQL query plan produced by lanes before lowering.

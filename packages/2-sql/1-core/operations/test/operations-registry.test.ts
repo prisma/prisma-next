@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createSqlOperationRegistry, register, type SqlOperationSignature } from '../src/index';
+import { createSqlOperationRegistry, register, type SqlOperationSignature } from '../src/index.ts';
 
 describe('SQL OperationRegistry', () => {
   it('registers operation with SQL lowering spec', () => {

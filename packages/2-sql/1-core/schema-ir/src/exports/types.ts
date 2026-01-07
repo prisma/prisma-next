@@ -9,4 +9,4 @@ export type {
   SqlTypeMetadata,
   SqlTypeMetadataRegistry,
   SqlUniqueIR,
-} from '../types';
+} from '../types.ts';

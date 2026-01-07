@@ -12,7 +12,7 @@ import {
   postgresTargetDescriptor,
   resetDatabase,
   testTimeout,
-} from './fixtures/runner-fixtures';
+} from './fixtures/runner-fixtures.ts';
 
 describe.sequential('PostgresMigrationPlanner - integration (existing schemas)', () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>;

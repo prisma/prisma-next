@@ -7,7 +7,7 @@ import {
   executeCommand,
   setupCommandMocks,
   setupIntegrationTestDirectoryFromFixtures,
-} from './utils/cli-test-helpers';
+} from './utils/cli-test-helpers.ts';
 
 // Fixture subdirectory for emit-command tests
 const fixtureSubdir = 'emit-command';

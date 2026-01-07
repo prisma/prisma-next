@@ -5,7 +5,7 @@ import type {
   IndexDef,
   TableBuilderState,
   UniqueConstraintDef,
-} from './builder-state';
+} from './builder-state.ts';
 
 interface TableBuilderInternalState<
   Name extends string,

@@ -13,8 +13,8 @@ import type {
 } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ContractMarkerRecord, TargetFamilyHook } from '@prisma-next/contract/types';
-import type { TargetMigrationsCapability } from './migrations';
-import type { CoreSchemaView } from './schema-view';
+import type { TargetMigrationsCapability } from './migrations.ts';
+import type { CoreSchemaView } from './schema-view.ts';
 
 // Re-export migration types for convenience
 export type {
@@ -33,7 +33,7 @@ export type {
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
   TargetMigrationsCapability,
-} from './migrations';
+} from './migrations.ts';
 
 // ============================================================================
 // Control*Instance Base Interfaces (ADR 151)

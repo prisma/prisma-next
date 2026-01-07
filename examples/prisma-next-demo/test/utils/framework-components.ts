@@ -9,4 +9,4 @@ export {
   postgresAdapterRuntimeDescriptor,
   postgresTargetRuntimeDescriptor,
   type SqlDescriptorBundle,
-} from '../../../../test/integration/utils/framework-components';
+} from '../../../../test/integration/utils/framework-components.ts';

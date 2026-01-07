@@ -10,8 +10,8 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
-import { executeDbInit } from './operations/db-init';
+import { assertFrameworkComponentsCompatible } from '../utils/framework-components.ts';
+import { executeDbInit } from './operations/db-init.ts';
 import type {
   ControlClient,
   ControlClientOptions,
@@ -23,7 +23,7 @@ import type {
   SchemaVerifyOptions,
   SignOptions,
   VerifyOptions,
-} from './types';
+} from './types.ts';
 
 /**
  * Creates a programmatic control client for Prisma Next operations.

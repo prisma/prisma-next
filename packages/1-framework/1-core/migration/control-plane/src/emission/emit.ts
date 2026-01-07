@@ -1,9 +1,9 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TargetFamilyHook, ValidationContext } from '@prisma-next/contract/types';
 import { format } from 'prettier';
-import { canonicalizeContract } from './canonicalization';
-import { computeCoreHash, computeProfileHash } from './hashing';
-import type { EmitOptions, EmitResult } from './types';
+import { canonicalizeContract } from './canonicalization.ts';
+import { computeCoreHash, computeProfileHash } from './hashing.ts';
+import type { EmitOptions, EmitResult } from './types.ts';
 
 function validateCoreStructure(ir: ContractIR): void {
   if (!ir.targetFamily) {

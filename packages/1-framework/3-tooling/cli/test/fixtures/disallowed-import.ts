@@ -3,7 +3,7 @@ import { int4Column, textColumn } from '@prisma-next/test-utils/column-descripto
 // @ts-expect-error - This import is intentionally disallowed for testing
 // biome-ignore lint/correctness/noUnusedImports: Intentionally unused for testing disallowed imports
 import { something } from 'some-other-package';
-import { postgresPack } from '../helpers/postgres-pack';
+import { postgresPack } from '../helpers/postgres-pack.ts';
 
 export const contract = defineContract<Record<string, never>>()
   .target(postgresPack)

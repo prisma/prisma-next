@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SqlConnectionError, type SqlDriverError, SqlQueryError } from '../src/errors';
+import { SqlConnectionError, type SqlDriverError, SqlQueryError } from '../src/errors.ts';
 
 /**
  * Test error class for verifying is() predicate rejects other error types.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ModelBuilder } from '../src/model-builder';
+import { ModelBuilder } from '../src/model-builder.ts';
 
 describe('ModelBuilder', () => {
   it('builds model state with fields', () => {

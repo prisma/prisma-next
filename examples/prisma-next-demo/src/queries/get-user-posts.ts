@@ -1,8 +1,8 @@
 import type { ResultType } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
-import { sql, tables } from '../prisma/query';
-import { getRuntime } from '../prisma/runtime';
-import { collect } from './utils';
+import { sql, tables } from '../prisma/query.ts';
+import { getRuntime } from '../prisma/runtime.ts';
+import { collect } from './utils.ts';
 
 export async function getUserPosts(userId: number) {
   const runtime = getRuntime();

@@ -1,8 +1,8 @@
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { setupCommandMocks, withTempDir } from './utils/cli-test-helpers';
-import { runDbInit, setupDbInitFixture } from './utils/db-init-test-helpers';
+import { setupCommandMocks, withTempDir } from './utils/cli-test-helpers.ts';
+import { runDbInit, setupDbInitFixture } from './utils/db-init-test-helpers.ts';
 
 // Fixture subdirectory for db-init e2e tests
 const fixtureSubdir = 'db-init';

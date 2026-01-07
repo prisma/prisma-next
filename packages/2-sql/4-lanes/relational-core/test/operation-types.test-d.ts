@@ -1,6 +1,6 @@
 import type { CombinedTestOperations, PgVectorOperations } from '@prisma-next/test-utils';
 import { expectTypeOf, test } from 'vitest';
-import type { OperationsForTypeId } from '../src/exports/types';
+import type { OperationsForTypeId } from '../src/exports/types.ts';
 
 test('defines type-level operation registry', () => {
   // Type check: PgVectorOperations extends OperationTypes

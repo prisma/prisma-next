@@ -4,7 +4,7 @@ import { Pool as PgPool } from 'pg';
 import { newDb } from 'pg-mem';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createPostgresDriver, createPostgresDriverFromOptions } from '../src/postgres-driver';
+import { createPostgresDriver, createPostgresDriverFromOptions } from '../src/postgres-driver.ts';
 
 describe('@prisma-next/driver-postgres', () => {
   let cleanup: (() => Promise<void>) | undefined;

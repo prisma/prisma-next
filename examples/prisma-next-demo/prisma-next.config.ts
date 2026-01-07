@@ -5,7 +5,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
-import { contract } from './prisma/contract';
+import { contract } from './prisma/contract.ts';
 
 export default defineConfig({
   family: sql,

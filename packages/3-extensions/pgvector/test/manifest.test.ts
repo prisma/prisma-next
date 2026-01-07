@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pgvectorExtensionDescriptor } from '../src/exports/control';
+import { pgvectorExtensionDescriptor } from '../src/exports/control.ts';
 
 describe('pgvector descriptor', () => {
   it('has correct metadata', () => {
@@ -52,12 +52,12 @@ describe('pgvector descriptor', () => {
   it('codec types are importable', async () => {
     // Verify the codec types module can be imported (type-only export)
     // Type-only exports don't exist at runtime, so we just verify the import succeeds
-    await expect(import('../src/exports/codec-types')).resolves.toBeDefined();
+    await expect(import('../src/exports/codec-types.ts')).resolves.toBeDefined();
   });
 
   it('operation types are importable', async () => {
     // Verify the operation types module can be imported (type-only export)
     // Type-only exports don't exist at runtime, so we just verify the import succeeds
-    await expect(import('../src/exports/operation-types')).resolves.toBeDefined();
+    await expect(import('../src/exports/operation-types.ts')).resolves.toBeDefined();
   });
 });

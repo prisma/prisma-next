@@ -5,7 +5,7 @@ import {
   createJoinOnExpr,
   createTableRef,
 } from '@prisma-next/sql-relational-core/ast';
-import type { JoinState } from '../utils/state';
+import type { JoinState } from '../utils/state.ts';
 
 export function buildJoinAst(join: JoinState): JoinAst {
   // TypeScript can't narrow ColumnBuilder properly, so we assert

@@ -1,5 +1,5 @@
-import type { PrismaNextConfig } from './config-types';
-import { errorConfigValidation } from './errors';
+import type { PrismaNextConfig } from './config-types.ts';
+import { errorConfigValidation } from './errors.ts';
 
 /**
  * Validates that the config has the required structure.

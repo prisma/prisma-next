@@ -1,6 +1,6 @@
 import type { PgVectorOperations } from '@prisma-next/test-utils';
 import { expectTypeOf, test } from 'vitest';
-import type { ColumnBuilder } from '../src/types';
+import type { ColumnBuilder } from '../src/types.ts';
 
 test('ColumnBuilder includes operation methods when operations are provided', () => {
   type TestColumnBuilder = ColumnBuilder<

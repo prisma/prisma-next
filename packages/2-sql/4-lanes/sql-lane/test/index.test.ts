@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import * as indexExports from '../src/index';
+import * as indexExports from '../src/index.ts';
 
 describe('index exports', () => {
   it('exports all expected types and functions', () => {

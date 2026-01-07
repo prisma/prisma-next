@@ -1,5 +1,5 @@
-import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef, TableRef } from './types';
-import { compact } from './util';
+import type { ColumnRef, LiteralExpr, OperationExpr, ParamRef, TableRef } from './types.ts';
+import { compact } from './util.ts';
 
 export function createTableRef(name: string): TableRef {
   return {

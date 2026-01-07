@@ -6,7 +6,7 @@ import type {
 } from '@prisma-next/runtime-executor';
 import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { readContractMarker } from './sql-marker';
+import { readContractMarker } from './sql-marker.ts';
 
 class SqlMarkerReader implements MarkerReader {
   readMarkerStatement(): MarkerStatement {

@@ -1,7 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
-import { contract } from './contract';
+import { contract } from './contract.ts';
 
 // This config does not include driver
 // Manually create config without defineConfig to bypass validation (testing error case)

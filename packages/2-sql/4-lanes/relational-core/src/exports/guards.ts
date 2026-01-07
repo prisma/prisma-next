@@ -12,4 +12,4 @@ export {
   isParamPlaceholder,
   isValueSource,
   toExpression,
-} from '../utils/guards';
+} from '../utils/guards.ts';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type NotOk, notOk, type Ok, ok, okVoid } from '../src/result';
+import { type NotOk, notOk, type Ok, ok, okVoid } from '../src/result.ts';
 
 describe('result', () => {
   describe('ok()', () => {

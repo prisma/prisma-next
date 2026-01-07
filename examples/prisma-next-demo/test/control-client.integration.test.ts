@@ -8,9 +8,9 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../src/prisma/contract.d';
+import type { Contract } from '../src/prisma/contract.d.ts';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
-import { createDemoControlClient, initTestDatabase } from './utils/control-client';
+import { createDemoControlClient, initTestDatabase } from './utils/control-client.ts';
 
 // Use the emitted JSON contract which has the real computed hashes
 const contract = validateContract<Contract>(contractJson);

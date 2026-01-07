@@ -20,7 +20,7 @@ import type {
   SqlMigrationRunnerFailure,
   SqlMigrationRunnerSuccessValue,
   SqlPlannerConflict,
-} from '../src/core/migrations/types';
+} from '../src/core/migrations/types.ts';
 
 // Note: SqlMigrationOperationClass is the same as core MigrationOperationClass (no SQL-specific extension)
 

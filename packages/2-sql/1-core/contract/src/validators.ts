@@ -12,7 +12,7 @@ import type {
   StorageColumn,
   StorageTable,
   UniqueConstraint,
-} from './types';
+} from './types.ts';
 
 const StorageColumnSchema = type.declare<StorageColumn>().type({
   nativeType: 'string',

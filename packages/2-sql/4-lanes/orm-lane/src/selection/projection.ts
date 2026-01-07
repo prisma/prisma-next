@@ -14,7 +14,7 @@ import {
   errorInvalidProjectionKey,
   errorInvalidProjectionValue,
   errorProjectionEmpty,
-} from '../utils/errors';
+} from '../utils/errors.ts';
 
 export interface ProjectionState {
   readonly aliases: string[];

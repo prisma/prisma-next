@@ -12,8 +12,8 @@ import {
   buildProjectionState,
   flattenProjection,
   generateAlias,
-} from '../src/sql/projection';
-import type { Contract } from './fixtures/contract.d';
+} from '../src/sql/projection.ts';
+import type { Contract } from './fixtures/contract.d.ts';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

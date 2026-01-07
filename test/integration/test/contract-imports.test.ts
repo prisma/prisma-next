@@ -17,7 +17,7 @@ import {
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getSqlDescriptorBundle } from '../utils/framework-components';
+import { getSqlDescriptorBundle } from '../utils/framework-components.ts';
 
 const execFileAsync = promisify(execFile);
 

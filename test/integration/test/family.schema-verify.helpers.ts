@@ -21,7 +21,7 @@ export type { SqlContract, SqlStorage };
 export { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 export { default as postgresPack } from '@prisma-next/target-postgres/pack';
 export { timeouts, withClient };
-export { pgvector } from './family.schema-verify.extensions';
+export { pgvector } from './family.schema-verify.extensions.ts';
 
 /**
  * Sets up a shared dev database for schema verification tests.

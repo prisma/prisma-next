@@ -25,7 +25,7 @@ import {
   errorUnknownColumn,
   errorUnknownTable,
   errorUpdateRequiresFields,
-} from '../../src/utils/errors';
+} from '../../src/utils/errors.ts';
 
 describe('error functions', () => {
   it('errorModelNotFound throws with correct message', () => {

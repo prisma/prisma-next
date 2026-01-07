@@ -21,7 +21,7 @@ import {
   validateContract,
   withClient,
   withDriver,
-} from './family.schema-verify.helpers';
+} from './family.schema-verify.helpers.ts';
 
 describe('family instance schemaVerify - types', () => {
   const { getConnectionString } = useDevDatabase();

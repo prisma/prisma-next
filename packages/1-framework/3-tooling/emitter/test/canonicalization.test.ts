@@ -1,6 +1,6 @@
 import { canonicalizeContract } from '@prisma-next/core-control-plane/emission';
 import { describe, expect, it } from 'vitest';
-import { createContractIR } from './utils';
+import { createContractIR } from './utils.ts';
 
 describe('canonicalization', () => {
   it('orders top-level sections correctly', () => {

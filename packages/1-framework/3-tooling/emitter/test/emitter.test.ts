@@ -9,7 +9,7 @@ import { emit } from '@prisma-next/core-control-plane/emission';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createContractIR } from './utils';
+import { createContractIR } from './utils.ts';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',

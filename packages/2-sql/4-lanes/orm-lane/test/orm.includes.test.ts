@@ -16,10 +16,10 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { orm } from '../src/orm';
-import type { RelationFilter } from '../src/orm/state';
-import { buildExistsSubqueries, combineWhereClauses } from '../src/relations/include-plan';
-import type { Contract as RelationsContract } from './fixtures/contract-with-relations.d';
+import type { RelationFilter } from '../src/orm/state.ts';
+import { orm } from '../src/orm.ts';
+import { buildExistsSubqueries, combineWhereClauses } from '../src/relations/include-plan.ts';
+import type { Contract as RelationsContract } from './fixtures/contract-with-relations.d.ts';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

@@ -1,6 +1,6 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner';
+import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner.ts';
 import {
   contract,
   createDriver,
@@ -13,7 +13,7 @@ import {
   resetDatabase,
   testTimeout,
   toPlanContractInfo,
-} from './fixtures/runner-fixtures';
+} from './fixtures/runner-fixtures.ts';
 
 describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>;

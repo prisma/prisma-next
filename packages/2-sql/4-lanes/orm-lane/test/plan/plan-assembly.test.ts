@@ -14,9 +14,9 @@ import type {
   ExpressionBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
-import { buildMeta, createPlan, createPlanWithExists } from '../../src/plan/plan-assembly';
-import type { IncludeState } from '../../src/relations/include-plan';
-import type { ProjectionState } from '../../src/selection/projection';
+import { buildMeta, createPlan, createPlanWithExists } from '../../src/plan/plan-assembly.ts';
+import type { IncludeState } from '../../src/relations/include-plan.ts';
+import type { ProjectionState } from '../../src/selection/projection.ts';
 
 describe('plan assembly', () => {
   const contract: SqlContract<SqlStorage> = {

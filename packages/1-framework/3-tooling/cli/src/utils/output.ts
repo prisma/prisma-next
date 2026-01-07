@@ -26,9 +26,9 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import type { CliErrorConflict, CliErrorEnvelope } from './cli-errors';
-import { getLongDescription } from './command-helpers';
-import type { GlobalFlags } from './global-flags';
+import type { CliErrorConflict, CliErrorEnvelope } from './cli-errors.ts';
+import { getLongDescription } from './command-helpers.ts';
+import type { GlobalFlags } from './global-flags.ts';
 
 // ============================================================================
 // Helper Functions

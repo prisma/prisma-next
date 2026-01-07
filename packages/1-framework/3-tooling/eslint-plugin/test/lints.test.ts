@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LintTestRunner } from './utils';
+import { LintTestRunner } from './utils.ts';
 
 describe('ESLint Plugin Rule Validation', () => {
   const runner = new LintTestRunner(__dirname);

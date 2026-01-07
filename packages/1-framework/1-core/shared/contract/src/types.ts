@@ -1,5 +1,5 @@
 import type { OperationRegistry } from '@prisma-next/operations';
-import type { ContractIR } from './ir';
+import type { ContractIR } from './ir.ts';
 
 export interface ContractBase {
   readonly schemaVersion: string;

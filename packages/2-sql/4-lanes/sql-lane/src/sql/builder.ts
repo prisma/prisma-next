@@ -7,14 +7,19 @@ import type {
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import { createJoinOnBuilder } from '@prisma-next/sql-relational-core/ast';
 import type { ParamPlaceholder, SqlBuilderOptions } from '@prisma-next/sql-relational-core/types';
-import { createRawFactory } from '../raw';
-import type { SelectBuilder } from '../types/public';
-import { DeleteBuilderImpl, InsertBuilderImpl, UpdateBuilderImpl } from './mutation-builder';
-import { SelectBuilderImpl } from './select-builder';
+import { createRawFactory } from '../raw.ts';
+import type { SelectBuilder } from '../types/public.ts';
+import { DeleteBuilderImpl, InsertBuilderImpl, UpdateBuilderImpl } from './mutation-builder.ts';
+import { SelectBuilderImpl } from './select-builder.ts';
 
 export { createJoinOnBuilder };
-export type { DeleteBuilder, InsertBuilder, SelectBuilder, UpdateBuilder } from '../types/public';
-export type { IncludeChildBuilder } from './include-builder';
+export type {
+  DeleteBuilder,
+  InsertBuilder,
+  SelectBuilder,
+  UpdateBuilder,
+} from '../types/public.ts';
+export type { IncludeChildBuilder } from './include-builder.ts';
 
 export function sql<
   TContract extends SqlContract<SqlStorage>,

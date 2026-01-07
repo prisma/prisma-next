@@ -13,7 +13,7 @@ import {
   timeouts,
   useDevDatabase,
   withClient,
-} from './family.schema-verify.helpers';
+} from './family.schema-verify.helpers.ts';
 
 describe('family instance schemaVerify - modes', () => {
   const { getConnectionString } = useDevDatabase();

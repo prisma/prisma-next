@@ -1,4 +1,4 @@
-import type { ModelBuilderState, RelationDefinition } from './builder-state';
+import type { ModelBuilderState, RelationDefinition } from './builder-state.ts';
 
 export class ModelBuilder<
   Name extends string,

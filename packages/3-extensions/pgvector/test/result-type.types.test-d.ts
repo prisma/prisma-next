@@ -7,8 +7,8 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
-import pgvectorDescriptor from '../src/exports/runtime';
-import type { CodecTypes } from '../src/types/codec-types';
+import pgvectorDescriptor from '../src/exports/runtime.ts';
+import type { CodecTypes } from '../src/types/codec-types.ts';
 
 // Define contract types with vector columns
 type ContractWithNullableVector = SqlContract<

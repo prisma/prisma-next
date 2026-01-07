@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
-import { createJoin, createJoinOnExpr } from '../../src/ast/join';
-import { createOrderByItem } from '../../src/ast/order';
-import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate';
-import { createSelectAst } from '../../src/ast/select';
+import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common.ts';
+import { createJoin, createJoinOnExpr } from '../../src/ast/join.ts';
+import { createOrderByItem } from '../../src/ast/order.ts';
+import { createBinaryExpr, createExistsExpr } from '../../src/ast/predicate.ts';
+import { createSelectAst } from '../../src/ast/select.ts';
 import type {
   BinaryExpr,
   ColumnRef,
@@ -12,7 +12,7 @@ import type {
   OperationExpr,
   SelectAst,
   TableRef,
-} from '../../src/ast/types';
+} from '../../src/ast/types.ts';
 
 describe('ast/select', () => {
   describe('createSelectAst', () => {

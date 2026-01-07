@@ -6,7 +6,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
-import type { Contract } from '../prisma/contract.d';
+import type { Contract } from '../prisma/contract.d.ts';
 import contractJson from '../prisma/contract.json' with { type: 'json' };
 
 /**

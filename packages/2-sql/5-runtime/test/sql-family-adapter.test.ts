@@ -1,7 +1,7 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { SqlFamilyAdapter } from '../src/sql-family-adapter';
+import { SqlFamilyAdapter } from '../src/sql-family-adapter.ts';
 
 // Minimal test contract
 const testContract: SqlContract<SqlStorage> = {

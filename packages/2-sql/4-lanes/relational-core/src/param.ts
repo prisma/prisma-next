@@ -1,5 +1,5 @@
 import { planInvalid } from '@prisma-next/plan';
-import type { ParamPlaceholder } from './types';
+import type { ParamPlaceholder } from './types.ts';
 
 export type Parameter = ParamPlaceholder;
 

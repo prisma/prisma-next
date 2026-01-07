@@ -7,7 +7,7 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import { parseGlobalFlags } from '../src/utils/global-flags';
+import { parseGlobalFlags } from '../src/utils/global-flags.ts';
 import {
   formatIntrospectJson,
   formatIntrospectOutput,
@@ -15,7 +15,7 @@ import {
   formatSchemaVerifyOutput,
   formatSignJson,
   formatSignOutput,
-} from '../src/utils/output';
+} from '../src/utils/output.ts';
 
 describe('formatIntrospectOutput', () => {
   const createSchemaView = (): CoreSchemaView => ({

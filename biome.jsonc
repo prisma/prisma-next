@@ -29,7 +29,8 @@
     "rules": {
       "recommended": true,
       "correctness": {
-        "noUnusedVariables": "error"
+        "noUnusedVariables": "error",
+        "useImportExtensions": "error"
       },
       "suspicious": {
         "noExplicitAny": "error"
@@ -78,7 +79,7 @@
       }
     },
     {
-      "includes": ["**/*.config.ts", "**/vitest.config.ts", "**/tsup.config.ts"],
+      "includes": ["**/*.config.ts", "**/vitest.config.ts", "**/tsdown.config.ts"],
       "linter": {
         "rules": {
           "suspicious": {

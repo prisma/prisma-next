@@ -22,7 +22,7 @@ import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
-import { getSqlDescriptorBundle } from '../utils/framework-components';
+import { getSqlDescriptorBundle } from '../utils/framework-components.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = resolve(__dirname, '../../../packages/1-framework/3-tooling/cli/test/fixtures');

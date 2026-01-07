@@ -7,7 +7,7 @@ import type {
   AnyOrderBuilder,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import type { ProjectionState } from '../utils/state';
+import type { ProjectionState } from '../utils/state.ts';
 
 export type ProjectionInput = Record<string, AnyExpressionSource | boolean | NestedProjection>;
 

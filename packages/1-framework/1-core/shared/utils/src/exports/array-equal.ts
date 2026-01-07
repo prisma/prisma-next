@@ -1,1 +1,1 @@
-export { isArrayEqual } from '../array-equal';
+export { isArrayEqual } from '../array-equal.ts';

@@ -1,13 +1,13 @@
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
+import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema.ts';
 import {
   createContractTable,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
   emptyTypeMetadataRegistry,
-} from './schema-verify.helpers';
+} from './schema-verify.helpers.ts';
 
 describe('verifySqlSchema - constraints', () => {
   describe('primary key mismatch', () => {

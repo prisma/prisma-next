@@ -10,7 +10,7 @@ import {
   type SqlRuntimeAdapterInstance,
   type SqlRuntimeDriverInstance,
   type SqlRuntimeFamilyInstance,
-} from './runtime-instance';
+} from './runtime-instance.ts';
 
 /**
  * SQL runtime family descriptor implementation.

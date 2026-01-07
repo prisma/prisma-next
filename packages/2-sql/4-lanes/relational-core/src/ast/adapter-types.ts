@@ -1,4 +1,4 @@
-import type { CodecRegistry } from './codec-types';
+import type { CodecRegistry } from './codec-types.ts';
 
 export type AdapterTarget = string;
 

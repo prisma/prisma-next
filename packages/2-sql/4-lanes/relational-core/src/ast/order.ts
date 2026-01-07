@@ -1,4 +1,4 @@
-import type { ColumnRef, Direction, OperationExpr } from './types';
+import type { ColumnRef, Direction, OperationExpr } from './types.ts';
 
 export function createOrderByItem(
   expr: ColumnRef | OperationExpr,

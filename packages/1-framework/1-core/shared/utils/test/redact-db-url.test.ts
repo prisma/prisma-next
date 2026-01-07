@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { redactDatabaseUrl } from '../src/redact-db-url';
+import { redactDatabaseUrl } from '../src/redact-db-url.ts';
 
 describe('redactDatabaseUrl', () => {
   it('extracts host, port, database, and username', () => {

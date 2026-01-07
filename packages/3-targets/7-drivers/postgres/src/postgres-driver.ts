@@ -13,8 +13,8 @@ import type {
 } from 'pg';
 import { Pool } from 'pg';
 import Cursor from 'pg-cursor';
-import { callbackToPromise } from './callback-to-promise';
-import { isAlreadyConnectedError, isPostgresError, normalizePgError } from './normalize-error';
+import { callbackToPromise } from './callback-to-promise.ts';
+import { isAlreadyConnectedError, isPostgresError, normalizePgError } from './normalize-error.ts';
 
 export type QueryResult<T extends QueryResultRow = QueryResultRow> = PgQueryResult<T>;
 

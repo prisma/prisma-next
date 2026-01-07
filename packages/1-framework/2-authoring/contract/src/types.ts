@@ -3,7 +3,7 @@ import type {
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
-} from './builder-state';
+} from './builder-state.ts';
 
 export type BuildStorageColumn<Nullable extends boolean, Type extends string> = {
   readonly nativeType: string;

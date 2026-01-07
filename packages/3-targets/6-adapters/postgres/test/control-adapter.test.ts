@@ -1,6 +1,6 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import { PostgresControlAdapter } from '../src/core/control-adapter';
+import { PostgresControlAdapter } from '../src/core/control-adapter.ts';
 
 describe('PostgresControlAdapter', () => {
   it('has correct familyId and targetId', () => {

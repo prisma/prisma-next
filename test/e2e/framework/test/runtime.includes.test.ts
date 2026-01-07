@@ -16,8 +16,8 @@ import {
 import { type DevDatabase, timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { Contract } from './fixtures/generated/contract.d';
-import { loadContractFromDisk } from './utils';
+import type { Contract } from './fixtures/generated/contract.d.ts';
+import { loadContractFromDisk } from './utils.ts';
 
 // Extend Contract type with capabilities for includeMany support
 type ContractWithCapabilities = Contract & {

@@ -7,10 +7,10 @@ import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
-import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
-import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
-import { createPostgresMigrationPlanner } from '../core/migrations/planner';
-import { createPostgresMigrationRunner } from '../core/migrations/runner';
+import { postgresTargetDescriptorMeta } from '../core/descriptor-meta.ts';
+import type { PostgresPlanTargetDetails } from '../core/migrations/planner.ts';
+import { createPostgresMigrationPlanner } from '../core/migrations/planner.ts';
+import { createPostgresMigrationRunner } from '../core/migrations/runner.ts';
 
 /**
  * Postgres target descriptor for CLI config.

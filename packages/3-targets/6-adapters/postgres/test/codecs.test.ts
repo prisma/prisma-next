@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { codecDefinitions } from '../src/core/codecs';
+import { codecDefinitions } from '../src/core/codecs.ts';
 
 describe('adapter-postgres codecs', () => {
   describe('timestamp codec', () => {

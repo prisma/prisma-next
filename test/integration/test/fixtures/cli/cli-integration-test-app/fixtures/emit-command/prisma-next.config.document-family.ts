@@ -1,6 +1,6 @@
 import { defineConfig } from '@prisma-next/cli/config-types';
 import type { ControlFamilyInstance } from '@prisma-next/core-control-plane/types';
-import { contract } from './invalid-contract-document';
+import { contract } from './invalid-contract-document.ts';
 
 // Create a config with document family (which doesn't exist, but we'll test the error)
 const mockHook = {

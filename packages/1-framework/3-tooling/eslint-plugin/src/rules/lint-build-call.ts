@@ -5,7 +5,7 @@ import {
   extractCallChain,
   getTypeScriptServices,
   isPrismaNextQueryBuildCall,
-} from '../utils';
+} from '../utils.ts';
 
 const DEFAULT_OPTIONS = {
   requireLimit: true,

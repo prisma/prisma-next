@@ -12,7 +12,7 @@ import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { CodecTypes, Contract } from './fixtures/contract.d';
+import type { CodecTypes, Contract } from './fixtures/contract.d.ts';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
 
 describe('builder integration', () => {

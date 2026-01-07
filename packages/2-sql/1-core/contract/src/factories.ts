@@ -12,7 +12,7 @@ import type {
   StorageColumn,
   StorageTable,
   UniqueConstraint,
-} from './types';
+} from './types.ts';
 
 /**
  * Creates a StorageColumn with nativeType and codecId.

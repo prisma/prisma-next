@@ -1,8 +1,8 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import type { ParamPlaceholder, RawFactory } from '@prisma-next/sql-relational-core/types';
-import type { DeleteBuilder, InsertBuilder, UpdateBuilder } from '../sql/mutation-builder';
-import type { SelectBuilderImpl } from '../sql/select-builder';
+import type { DeleteBuilder, InsertBuilder, UpdateBuilder } from '../sql/mutation-builder.ts';
+import type { SelectBuilderImpl } from '../sql/select-builder.ts';
 
 export type { TableRef } from '@prisma-next/sql-relational-core/ast';
 export type {
@@ -32,5 +32,5 @@ export type SelectBuilder<
   delete(table: TableRef): DeleteBuilder<TContract, CodecTypes>;
 };
 
-export type { IncludeChildBuilder } from '../sql/include-builder';
-export type { DeleteBuilder, InsertBuilder, UpdateBuilder } from '../sql/mutation-builder';
+export type { IncludeChildBuilder } from '../sql/include-builder.ts';
+export type { DeleteBuilder, InsertBuilder, UpdateBuilder } from '../sql/mutation-builder.ts';

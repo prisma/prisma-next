@@ -1,7 +1,7 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
 import { isExpressionSource } from '@prisma-next/sql-relational-core/guards';
 import type { AnyExpressionSource, NestedProjection } from '@prisma-next/sql-relational-core/types';
-import type { ProjectionInput } from '../types/internal';
+import type { ProjectionInput } from '../types/internal.ts';
 import {
   errorAliasCollision,
   errorAliasPathEmpty,
@@ -9,8 +9,8 @@ import {
   errorInvalidProjectionKey,
   errorInvalidProjectionValue,
   errorProjectionEmpty,
-} from '../utils/errors';
-import type { IncludeState, ProjectionState } from '../utils/state';
+} from '../utils/errors.ts';
+import type { IncludeState, ProjectionState } from '../utils/state.ts';
 
 export function generateAlias(path: string[]): string {
   if (path.length === 0) {

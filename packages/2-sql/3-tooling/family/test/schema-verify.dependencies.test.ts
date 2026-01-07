@@ -1,15 +1,15 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
-import type { ComponentDatabaseDependency } from '../src/core/migrations/types';
-import { verifyDatabaseDependencies } from '../src/core/schema-verify/verify-helpers';
-import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
+import type { ComponentDatabaseDependency } from '../src/core/migrations/types.ts';
+import { verifyDatabaseDependencies } from '../src/core/schema-verify/verify-helpers.ts';
+import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema.ts';
 import {
   createContractTable,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
   emptyTypeMetadataRegistry,
-} from './schema-verify.helpers';
+} from './schema-verify.helpers.ts';
 
 /**
  * Creates a test database dependency that checks for a specific extension.

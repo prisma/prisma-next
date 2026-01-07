@@ -1,10 +1,10 @@
 import { Command } from 'commander';
 import { describe, expect, it } from 'vitest';
-import { createContractEmitCommand } from '../src/commands/contract-emit';
-import { createDbIntrospectCommand } from '../src/commands/db-introspect';
-import { createDbVerifyCommand } from '../src/commands/db-verify';
-import { parseGlobalFlags } from '../src/utils/global-flags';
-import { formatCommandHelp, formatRootHelp } from '../src/utils/output';
+import { createContractEmitCommand } from '../src/commands/contract-emit.ts';
+import { createDbIntrospectCommand } from '../src/commands/db-introspect.ts';
+import { createDbVerifyCommand } from '../src/commands/db-verify.ts';
+import { parseGlobalFlags } from '../src/utils/global-flags.ts';
+import { formatCommandHelp, formatRootHelp } from '../src/utils/output.ts';
 
 describe('help text snapshots', () => {
   it('formats root help', () => {

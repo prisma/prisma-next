@@ -3,9 +3,9 @@ import type {
   RuntimeDriverInstance,
 } from '@prisma-next/core-execution-plane/types';
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
-import { postgresDriverDescriptorMeta } from '../core/descriptor-meta';
-import type { PostgresDriverOptions } from '../postgres-driver';
-import { createPostgresDriverFromOptions } from '../postgres-driver';
+import { postgresDriverDescriptorMeta } from '../core/descriptor-meta.ts';
+import type { PostgresDriverOptions } from '../postgres-driver.ts';
+import { createPostgresDriverFromOptions } from '../postgres-driver.ts';
 
 /**
  * Postgres runtime driver instance interface.
@@ -34,5 +34,5 @@ export type {
   CreatePostgresDriverOptions,
   PostgresDriverOptions,
   QueryResult,
-} from '../postgres-driver';
-export { createPostgresDriver, createPostgresDriverFromOptions } from '../postgres-driver';
+} from '../postgres-driver.ts';
+export { createPostgresDriver, createPostgresDriverFromOptions } from '../postgres-driver.ts';

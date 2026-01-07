@@ -1,5 +1,8 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { errorIncludeCapabilitiesNotTrue, errorIncludeRequiresCapabilities } from '../utils/errors';
+import {
+  errorIncludeCapabilitiesNotTrue,
+  errorIncludeRequiresCapabilities,
+} from '../utils/errors.ts';
 
 export function checkIncludeCapabilities(contract: SqlContract<SqlStorage>): void {
   const target = contract.target;

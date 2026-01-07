@@ -20,17 +20,17 @@ import type {
   BuildOptions,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import { checkIncludeCapabilities } from '../orm/capabilities';
-import type { OrmIncludeState, RelationFilter } from '../orm/state';
-import { buildJoinOnExpr } from '../selection/join';
-import { buildChildOrderByClause } from '../selection/ordering';
-import { buildWhereExpr } from '../selection/predicates';
+import { checkIncludeCapabilities } from '../orm/capabilities.ts';
+import type { OrmIncludeState, RelationFilter } from '../orm/state.ts';
+import { buildJoinOnExpr } from '../selection/join.ts';
+import { buildChildOrderByClause } from '../selection/ordering.ts';
+import { buildWhereExpr } from '../selection/predicates.ts';
 import {
   buildProjectionState,
   type ProjectionInput,
   type ProjectionState,
-} from '../selection/projection';
-import { createColumnRef, createSelectAst } from '../utils/ast';
+} from '../selection/projection.ts';
+import { createColumnRef, createSelectAst } from '../utils/ast.ts';
 import {
   errorChildProjectionEmpty,
   errorChildProjectionMustBeSpecified,
@@ -41,7 +41,7 @@ import {
   errorModelNotFound,
   errorMultiColumnJoinsNotSupported,
   errorTableNotFound,
-} from '../utils/errors';
+} from '../utils/errors.ts';
 
 export interface IncludeState {
   readonly alias: string;

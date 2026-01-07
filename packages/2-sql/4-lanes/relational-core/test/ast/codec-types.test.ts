@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { codec, createCodecRegistry, defineCodecs } from '../../src/ast/codec-types';
+import { codec, createCodecRegistry, defineCodecs } from '../../src/ast/codec-types.ts';
 
 describe('codec factory', () => {
   it('creates codec with id, targetTypes, encode, and decode', () => {

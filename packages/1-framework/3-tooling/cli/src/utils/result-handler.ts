@@ -1,7 +1,7 @@
 import type { Result } from '@prisma-next/utils/result';
-import type { CliStructuredError } from './cli-errors';
-import type { GlobalFlags } from './global-flags';
-import { formatErrorJson, formatErrorOutput } from './output';
+import type { CliStructuredError } from './cli-errors.ts';
+import type { GlobalFlags } from './global-flags.ts';
+import { formatErrorJson, formatErrorOutput } from './output.ts';
 
 /**
  * Processes a CLI command result, handling both success and error cases.

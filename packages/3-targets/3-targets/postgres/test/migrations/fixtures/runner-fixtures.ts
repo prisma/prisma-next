@@ -4,9 +4,9 @@ import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sq
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
-import type { PostgresPlanTargetDetails } from '../../../src/core/migrations/planner';
-import type { SqlStatement } from '../../../src/core/migrations/statement-builders';
-import postgresTargetDescriptor from '../../../src/exports/control';
+import type { PostgresPlanTargetDetails } from '../../../src/core/migrations/planner.ts';
+import type { SqlStatement } from '../../../src/core/migrations/statement-builders.ts';
+import postgresTargetDescriptor from '../../../src/exports/control.ts';
 
 export const contract: SqlContract<SqlStorage> = {
   schemaVersion: '1',

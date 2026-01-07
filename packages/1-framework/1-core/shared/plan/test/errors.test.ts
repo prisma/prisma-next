@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planInvalid, planUnsupported } from '../src/errors';
+import { planInvalid, planUnsupported } from '../src/errors.ts';
 
 describe('planInvalid', () => {
   it('creates error with message', () => {

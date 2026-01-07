@@ -14,8 +14,8 @@ import {
 import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { Contract } from './fixtures/generated/contract.d';
-import { loadContractFromDisk } from './utils';
+import type { Contract } from './fixtures/generated/contract.d.ts';
+import { loadContractFromDisk } from './utils.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

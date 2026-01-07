@@ -19,7 +19,7 @@ import type {
   ParamPlaceholder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
-import { checkReturningCapability } from '../utils/capabilities';
+import { checkReturningCapability } from '../utils/capabilities.ts';
 import {
   errorFailedToBuildWhereClause,
   errorMissingParameter,
@@ -27,10 +27,10 @@ import {
   errorUnknownTable,
   errorWhereMustBeCalledForDelete,
   errorWhereMustBeCalledForUpdate,
-} from '../utils/errors';
-import type { ProjectionState } from '../utils/state';
-import { buildMeta } from './plan';
-import { buildWhereExpr } from './predicate-builder';
+} from '../utils/errors.ts';
+import type { ProjectionState } from '../utils/state.ts';
+import { buildMeta } from './plan.ts';
+import { buildWhereExpr } from './predicate-builder.ts';
 
 export interface InsertBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,

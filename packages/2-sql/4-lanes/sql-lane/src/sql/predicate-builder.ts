@@ -13,7 +13,7 @@ import {
   errorMissingParameter,
   errorUnknownColumn,
   errorUnknownTable,
-} from '../utils/errors';
+} from '../utils/errors.ts';
 
 export interface BuildWhereExprResult {
   expr: BinaryExpr;

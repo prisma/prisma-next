@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ControlProgressEvent } from '../../src/control-api/types';
-import { createProgressAdapter } from '../../src/utils/progress-adapter';
+import type { ControlProgressEvent } from '../../src/control-api/types.ts';
+import { createProgressAdapter } from '../../src/utils/progress-adapter.ts';
 
 describe('progress adapter', () => {
   it('is no-op when quiet flag is set', () => {

@@ -6,11 +6,11 @@ import {
   vectorColumn as vectorColumnType,
 } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { attachOperationsToColumnBuilder } from '../src/operations-registry';
-import { param } from '../src/param';
-import { ColumnBuilderImpl, schema } from '../src/schema';
-import type { ColumnBuilder } from '../src/types';
-import { createStubAdapter, createTestContext } from './utils';
+import { attachOperationsToColumnBuilder } from '../src/operations-registry.ts';
+import { param } from '../src/param.ts';
+import { ColumnBuilderImpl, schema } from '../src/schema.ts';
+import type { ColumnBuilder } from '../src/types.ts';
+import { createStubAdapter, createTestContext } from './utils.ts';
 
 type TestContract = SqlContract<
   {

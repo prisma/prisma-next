@@ -5,9 +5,9 @@ import type { InferNestedProjectionRow } from '@prisma-next/sql-relational-core/
 
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
-import { orm } from '../src/orm';
-import type { IncludeAccumulator } from '../src/orm-types';
-import type { Contract } from './fixtures/contract-with-relations.d';
+import { orm } from '../src/orm.ts';
+import type { IncludeAccumulator } from '../src/orm-types.ts';
+import type { Contract } from './fixtures/contract-with-relations.d.ts';
 import contractJson from './fixtures/contract-with-relations.json' with { type: 'json' };
 
 test('ResultType extracts Row type from ORM findMany plan', () => {

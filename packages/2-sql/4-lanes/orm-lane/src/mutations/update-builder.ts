@@ -3,10 +3,10 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ColumnRef, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { AnyBinaryBuilder, BuildOptions } from '@prisma-next/sql-relational-core/types';
-import type { OrmContext } from '../orm/context';
-import type { ModelColumnAccessor } from '../orm-types';
-import { buildWhereExpr } from '../selection/predicates';
-import { createParamRef, createTableRef, createUpdateAst } from '../utils/ast';
+import type { OrmContext } from '../orm/context.ts';
+import type { ModelColumnAccessor } from '../orm-types.ts';
+import { buildWhereExpr } from '../selection/predicates.ts';
+import { createParamRef, createTableRef, createUpdateAst } from '../utils/ast.ts';
 import {
   assertColumnExists,
   assertParameterExists,
@@ -14,9 +14,9 @@ import {
   errorModelNotFound,
   errorUnknownTable,
   errorUpdateRequiresFields,
-} from '../utils/errors';
-import { createParamDescriptor } from '../utils/param-descriptor';
-import { convertModelFieldsToColumns } from './insert-builder';
+} from '../utils/errors.ts';
+import { createParamDescriptor } from '../utils/param-descriptor.ts';
+import { convertModelFieldsToColumns } from './insert-builder.ts';
 
 export function buildUpdatePlan<
   TContract extends SqlContract<SqlStorage>,

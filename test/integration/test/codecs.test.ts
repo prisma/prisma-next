@@ -13,7 +13,7 @@ import {
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestRuntime, setupTestDatabase } from './utils';
+import { createTestRuntime, setupTestDatabase } from './utils.ts';
 
 const makeColumn = (nativeType: string, codecId: string, nullable: boolean): StorageColumn => ({
   nativeType,

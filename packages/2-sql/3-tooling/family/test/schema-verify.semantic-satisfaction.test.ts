@@ -7,14 +7,14 @@
  * - Stronger objects can satisfy weaker requirements (e.g., unique index satisfies non-unique index)
  */
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
+import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema.ts';
 import {
   createContractTable,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
   emptyTypeMetadataRegistry,
-} from './schema-verify.helpers';
+} from './schema-verify.helpers.ts';
 
 describe('verifySqlSchema - semantic satisfaction', () => {
   describe('primary key', () => {

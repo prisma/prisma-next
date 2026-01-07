@@ -15,8 +15,8 @@ import {
 } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from './fixtures/generated/contract.d';
-import { loadContractFromDisk } from './utils';
+import type { Contract } from './fixtures/generated/contract.d.ts';
+import { loadContractFromDisk } from './utils.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

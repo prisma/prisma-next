@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
-import { createDeleteAst } from '../../src/ast/delete';
-import { createBinaryExpr } from '../../src/ast/predicate';
-import type { BinaryExpr, ColumnRef, TableRef } from '../../src/ast/types';
+import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common.ts';
+import { createDeleteAst } from '../../src/ast/delete.ts';
+import { createBinaryExpr } from '../../src/ast/predicate.ts';
+import type { BinaryExpr, ColumnRef, TableRef } from '../../src/ast/types.ts';
 
 describe('ast/delete', () => {
   describe('createDeleteAst', () => {

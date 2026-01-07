@@ -4,7 +4,7 @@ import {
 } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ControlPlaneStack } from '@prisma-next/core-control-plane/types';
-import { errorConfigValidation, errorContractMissingExtensionPacks } from './cli-errors';
+import { errorConfigValidation, errorContractMissingExtensionPacks } from './cli-errors.ts';
 
 /**
  * Asserts that all framework components are compatible with the expected family and target.

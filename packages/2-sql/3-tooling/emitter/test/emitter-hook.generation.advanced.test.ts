@@ -8,8 +8,8 @@ import { describe, expect, it } from 'vitest';
 import {
   extractCodecTypeImports,
   extractOperationTypeImports,
-} from '../../family/src/core/assembly';
-import { sqlTargetFamilyHook } from '../src/index';
+} from '../../family/src/core/assembly.ts';
+import { sqlTargetFamilyHook } from '../src/index.ts';
 
 type TestDescriptor =
   | ControlTargetDescriptor<'sql', string>

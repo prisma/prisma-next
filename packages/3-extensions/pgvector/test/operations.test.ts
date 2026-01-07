@@ -1,7 +1,7 @@
 import { createOperationRegistry } from '@prisma-next/operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import pgvectorDescriptor from '../src/exports/runtime';
+import pgvectorDescriptor from '../src/exports/runtime.ts';
 
 describe('pgvector operations', () => {
   it('descriptor has correct metadata', () => {

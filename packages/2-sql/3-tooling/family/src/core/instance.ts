@@ -33,10 +33,10 @@ import {
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
-} from './assembly';
-import type { SqlControlAdapter } from './control-adapter';
-import { verifySqlSchema } from './schema-verify/verify-sql-schema';
-import { collectSupportedCodecTypeIds, readMarker } from './verify';
+} from './assembly.ts';
+import type { SqlControlAdapter } from './control-adapter.ts';
+import { verifySqlSchema } from './schema-verify/verify-sql-schema.ts';
+import { collectSupportedCodecTypeIds, readMarker } from './verify.ts';
 
 /**
  * Converts an OperationManifest (descriptor declarative data) to a SqlOperationSignature.

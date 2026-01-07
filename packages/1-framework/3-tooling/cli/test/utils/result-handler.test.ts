@@ -1,7 +1,7 @@
 import { notOk, ok } from '@prisma-next/utils/result';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { errorConfigFileNotFound, errorMarkerMissing } from '../../src/utils/cli-errors';
-import { handleResult } from '../../src/utils/result-handler';
+import { errorConfigFileNotFound, errorMarkerMissing } from '../../src/utils/cli-errors.ts';
+import { handleResult } from '../../src/utils/result-handler.ts';
 
 describe('result handler', () => {
   beforeEach(() => {

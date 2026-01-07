@@ -4,7 +4,7 @@ import type {
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { pgvectorPackMeta } from '../core/descriptor-meta';
+import { pgvectorPackMeta } from '../core/descriptor-meta.ts';
 
 /**
  * Pure verification hook: checks whether the 'vector' extension is installed

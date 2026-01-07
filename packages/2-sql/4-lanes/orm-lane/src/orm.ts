@@ -1,7 +1,7 @@
 import { planInvalid } from '@prisma-next/plan';
 import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { OrmModelBuilderImpl } from './orm/builder';
-import type { OrmBuilderOptions, OrmRegistry } from './orm-types';
+import { OrmModelBuilderImpl } from './orm/builder.ts';
+import type { OrmBuilderOptions, OrmRegistry } from './orm-types.ts';
 
 type ModelName<TContract extends SqlContract<SqlStorage>> = keyof TContract['models'] & string;
 
@@ -48,4 +48,4 @@ export type {
   OrmRelationAccessor,
   OrmRelationFilterBuilder,
   OrmWhereProperty,
-} from './orm-types';
+} from './orm-types.ts';

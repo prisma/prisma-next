@@ -5,8 +5,8 @@ import {
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
-} from './utils/cli-test-helpers';
-import { runDbInit, setupDbInitFixture } from './utils/db-init-test-helpers';
+} from './utils/cli-test-helpers.ts';
+import { runDbInit, setupDbInitFixture } from './utils/db-init-test-helpers.ts';
 
 const fixtureSubdir = 'db-init';
 

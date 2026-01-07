@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertContractRequirementsSatisfied,
   assertFrameworkComponentsCompatible,
-} from '../../src/utils/framework-components';
+} from '../../src/utils/framework-components.ts';
 
 describe('assertFrameworkComponentsCompatible', () => {
   type TestComponent = {

@@ -1,4 +1,4 @@
-import { getPrisma } from '../prisma/client';
+import { getPrisma } from '../prisma/client.ts';
 
 export async function readUserById(id: string) {
   const prisma = await getPrisma();

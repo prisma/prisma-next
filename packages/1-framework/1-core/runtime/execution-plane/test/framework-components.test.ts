@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { assertRuntimeContractRequirementsSatisfied } from '../src/framework-components';
+import { assertRuntimeContractRequirementsSatisfied } from '../src/framework-components.ts';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeExtensionDescriptor,
   RuntimeFamilyDescriptor,
   RuntimeTargetDescriptor,
-} from '../src/types';
+} from '../src/types.ts';
 
 describe('assertRuntimeContractRequirementsSatisfied', () => {
   const family: RuntimeFamilyDescriptor<'sql'> = {

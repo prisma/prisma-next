@@ -8,8 +8,8 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
-import type { RuntimeContext } from '../src/sql-context';
-import { createRuntime } from '../src/sql-runtime';
+import type { RuntimeContext } from '../src/sql-context.ts';
+import { createRuntime } from '../src/sql-runtime.ts';
 
 // Minimal test contract
 const testContract: SqlContract<SqlStorage> = {

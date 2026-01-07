@@ -7,7 +7,7 @@ import type {
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
-} from './types';
+} from './types.ts';
 
 /**
  * Type alias for CLI driver instances.

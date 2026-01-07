@@ -1,6 +1,6 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { orm } from '../prisma/query';
-import { collect } from './utils';
+import { orm } from '../prisma/query.ts';
+import { collect } from './utils.ts';
 
 export async function ormGetUsers(limit: number, runtime: Runtime) {
   const plan = orm

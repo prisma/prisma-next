@@ -85,7 +85,7 @@ export class LintTestRunner {
    * Create ESLint instance with plugin configuration
    */
   async createESLint(testDir: string, customRuleOptions?: unknown[]): Promise<ESLint> {
-    const plugin = await import('../src/index.js');
+    const plugin = await import('../src/index.ts');
 
     return new ESLint({
       overrideConfigFile: true,

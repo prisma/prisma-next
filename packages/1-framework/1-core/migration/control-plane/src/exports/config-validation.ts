@@ -1,1 +1,1 @@
-export { validateConfig } from '../config-validation';
+export { validateConfig } from '../config-validation.ts';

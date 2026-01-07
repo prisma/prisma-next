@@ -4,7 +4,7 @@ import {
   errorIncludeRequiresCapabilities,
   errorReturningCapabilityNotTrue,
   errorReturningRequiresCapability,
-} from './errors';
+} from './errors.ts';
 
 export function checkIncludeCapabilities(contract: SqlContract<SqlStorage>): void {
   const target = contract.target;

@@ -1,11 +1,11 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { OperationRegistry } from '@prisma-next/operations';
-import { AsyncIterableResult } from './async-iterable-result';
-import { runtimeError } from './errors';
-import { computeSqlFingerprint } from './fingerprint';
-import { parseContractMarkerRow } from './marker';
-import type { Log, Plugin, PluginContext } from './plugins/types';
-import type { RuntimeFamilyAdapter } from './runtime-spi';
+import { AsyncIterableResult } from './async-iterable-result.ts';
+import { runtimeError } from './errors.ts';
+import { computeSqlFingerprint } from './fingerprint.ts';
+import { parseContractMarkerRow } from './marker.ts';
+import type { Log, Plugin, PluginContext } from './plugins/types.ts';
+import type { RuntimeFamilyAdapter } from './runtime-spi.ts';
 
 export interface RuntimeVerifyOptions {
   readonly mode: 'onFirstUse' | 'startup' | 'always';

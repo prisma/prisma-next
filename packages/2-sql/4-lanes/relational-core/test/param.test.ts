@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { param } from '../src/param';
+import { param } from '../src/param.ts';
 
 describe('param', () => {
   it('creates parameter with valid name', () => {

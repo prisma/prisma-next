@@ -3,12 +3,12 @@ import {
   createMigrationPlan,
   plannerFailure,
   plannerSuccess,
-} from '../src/core/migrations/plan-helpers';
+} from '../src/core/migrations/plan-helpers.ts';
 import type {
   SqlMigrationPlan,
   SqlMigrationPlanOperation,
   SqlPlannerConflict,
-} from '../src/core/migrations/types';
+} from '../src/core/migrations/types.ts';
 
 type TestTargetDetails = { readonly schema: string };
 

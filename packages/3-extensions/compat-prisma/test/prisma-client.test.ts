@@ -13,7 +13,7 @@ import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PrismaClient } from '../src/prisma-client';
+import { PrismaClient } from '../src/prisma-client.ts';
 
 const testContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',

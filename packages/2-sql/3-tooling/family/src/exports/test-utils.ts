@@ -7,5 +7,5 @@ export {
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
-} from '../core/assembly';
-export { convertOperationManifest } from '../core/instance';
+} from '../core/assembly.ts';
+export { convertOperationManifest } from '../core/instance.ts';

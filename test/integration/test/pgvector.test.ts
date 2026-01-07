@@ -8,7 +8,10 @@ import {
 import { createOperationRegistry } from '@prisma-next/operations';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../utils/framework-components';
+import {
+  getSqlDescriptorBundle,
+  pgvectorExtensionDescriptor,
+} from '../utils/framework-components.ts';
 
 describe('pgvector extension pack integration', () => {
   it('exposes pgvector descriptor metadata', () => {

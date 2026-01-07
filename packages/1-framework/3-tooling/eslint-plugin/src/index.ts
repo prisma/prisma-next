@@ -1,5 +1,5 @@
 import { name, version } from '../package.json';
-import { lintBuildCall } from './rules/lint-build-call';
+import { lintBuildCall } from './rules/lint-build-call.ts';
 
 // Plugin metadata
 const PLUGIN_META = {

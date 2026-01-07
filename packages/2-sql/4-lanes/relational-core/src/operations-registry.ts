@@ -10,7 +10,7 @@ import type {
   LiteralExpr,
   OperationExpr,
   ParamRef,
-} from './ast/types';
+} from './ast/types.ts';
 import type {
   AnyBinaryBuilder,
   AnyOrderBuilder,
@@ -18,8 +18,8 @@ import type {
   ExpressionBuilder,
   OperationTypes,
   ParamPlaceholder,
-} from './types';
-import { isParamPlaceholder } from './utils/guards';
+} from './types.ts';
+import { isParamPlaceholder } from './utils/guards.ts';
 
 /**
  * Type guard to check if a value is an ExpressionSource (has toExpr method).

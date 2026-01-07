@@ -8,9 +8,9 @@ import {
   isOperationExpr,
 } from '@prisma-next/sql-relational-core/guards';
 import type { AnyExpressionSource } from '@prisma-next/sql-relational-core/types';
-import type { MetaBuildArgs } from '../types/internal';
-import { assertColumnBuilder } from '../utils/assertions';
-import { errorMissingColumnForAlias } from '../utils/errors';
+import type { MetaBuildArgs } from '../types/internal.ts';
+import { assertColumnBuilder } from '../utils/assertions.ts';
+import { errorMissingColumnForAlias } from '../utils/errors.ts';
 
 /**
  * Extracts column references from an ExpressionSource (ColumnBuilder or ExpressionBuilder).

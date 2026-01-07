@@ -6,9 +6,9 @@ import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { rawOptions as exportedRawOptions, sql as exportedSql } from '../src/exports/sql';
-import { rawOptions } from '../src/raw';
-import { sql } from '../src/sql/builder';
+import { rawOptions as exportedRawOptions, sql as exportedSql } from '../src/exports/sql.ts';
+import { rawOptions } from '../src/raw.ts';
+import { sql } from '../src/sql/builder.ts';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

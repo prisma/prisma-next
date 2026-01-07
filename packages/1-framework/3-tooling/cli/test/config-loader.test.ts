@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadConfig } from '../src/config-loader';
+import { loadConfig } from '../src/config-loader.ts';
 
 describe('config loader', () => {
   let testDir: string;

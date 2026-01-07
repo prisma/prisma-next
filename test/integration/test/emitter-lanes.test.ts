@@ -23,7 +23,7 @@ import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
-import { getSqlDescriptorBundle } from '../utils/framework-components';
+import { getSqlDescriptorBundle } from '../utils/framework-components.ts';
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {
   return {

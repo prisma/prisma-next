@@ -19,7 +19,7 @@ import {
   errorTargetMigrationNotSupported,
   errorTargetMismatch,
   errorUnexpected,
-} from '../src/errors';
+} from '../src/errors.ts';
 
 describe('CliStructuredError', () => {
   it('creates error with all properties', () => {

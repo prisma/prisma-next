@@ -1,1 +1,1 @@
-export { validateModel, validateSqlContract, validateStorage } from '../validators';
+export { validateModel, validateSqlContract, validateStorage } from '../validators.ts';

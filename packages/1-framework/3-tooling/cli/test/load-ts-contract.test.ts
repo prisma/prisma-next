@@ -2,7 +2,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { loadContractFromTs } from '../src/load-ts-contract';
+import { loadContractFromTs } from '../src/load-ts-contract.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, 'fixtures');

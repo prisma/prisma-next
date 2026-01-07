@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OrmModelBuilderImpl, orm } from '../src/index';
+import { OrmModelBuilderImpl, orm } from '../src/index.ts';
 
 describe('index exports', () => {
   it('exports orm function', () => {

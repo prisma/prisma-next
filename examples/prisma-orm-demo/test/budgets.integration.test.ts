@@ -7,9 +7,9 @@ import { type createRuntime, createRuntimeContext } from '@prisma-next/sql-runti
 import postgresTargetRuntime from '@prisma-next/target-postgres/runtime';
 import { withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../src/prisma-next/contract.d';
+import type { Contract } from '../src/prisma-next/contract.d.ts';
 import contractJson from '../src/prisma-next/contract.json' with { type: 'json' };
-import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
+import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client.ts';
 
 // Use the emitted JSON contract which has the real computed hashes
 const contract = validateContract<Contract>(contractJson);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createParamDescriptor } from '../../src/utils/param-descriptor';
+import { createParamDescriptor } from '../../src/utils/param-descriptor.ts';
 
 describe('param-descriptor', () => {
   describe('createParamDescriptor', () => {

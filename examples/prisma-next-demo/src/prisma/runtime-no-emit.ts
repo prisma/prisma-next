@@ -9,7 +9,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
-import { contract } from '../../prisma/contract';
+import { contract } from '../../prisma/contract.ts';
 
 let runtime: Runtime | undefined;
 let context: RuntimeContext<typeof contract> | undefined;

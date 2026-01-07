@@ -5,7 +5,7 @@ import type {
   RuntimeExtensionDescriptor,
   RuntimeFamilyDescriptor,
   RuntimeTargetDescriptor,
-} from './types';
+} from './types.ts';
 
 /**
  * Asserts that runtime component descriptors satisfy contract requirements.

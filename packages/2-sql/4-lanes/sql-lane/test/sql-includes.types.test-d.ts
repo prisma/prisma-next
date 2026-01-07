@@ -8,7 +8,7 @@ import type {
 } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { expectTypeOf, test } from 'vitest';
-import { sql } from '../src/sql/builder';
+import { sql } from '../src/sql/builder.ts';
 
 // Test contracts with different capability configurations
 type ContractWithCapabilities = SqlContract<SqlStorage> & {

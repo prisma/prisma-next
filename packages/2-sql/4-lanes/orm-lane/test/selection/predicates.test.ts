@@ -7,7 +7,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { buildWhereExpr } from '../../src/selection/predicates';
+import { buildWhereExpr } from '../../src/selection/predicates.ts';
 
 describe('predicates', () => {
   const int4ColumnMeta: StorageColumn = {

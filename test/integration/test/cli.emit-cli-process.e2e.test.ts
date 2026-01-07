@@ -8,7 +8,7 @@ import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers';
+import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const execFileAsync = promisify(execFile);

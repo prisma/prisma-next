@@ -1,4 +1,4 @@
-import type { OperationManifest, TypesImportSpec } from './types';
+import type { OperationManifest, TypesImportSpec } from './types.ts';
 
 // ============================================================================
 // Framework Component Descriptor Base Types

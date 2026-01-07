@@ -3,9 +3,9 @@ import type {
   RuntimeAdapterInstance,
 } from '@prisma-next/core-execution-plane/types';
 import type { Adapter, QueryAst } from '@prisma-next/sql-relational-core/ast';
-import { createPostgresAdapter } from '../core/adapter';
-import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
-import type { PostgresContract, PostgresLoweredStatement } from '../core/types';
+import { createPostgresAdapter } from '../core/adapter.ts';
+import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta.ts';
+import type { PostgresContract, PostgresLoweredStatement } from '../core/types.ts';
 
 /**
  * SQL runtime adapter interface for Postgres.

@@ -16,7 +16,7 @@ export type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
 // Client factory
-export { createControlClient } from '../control-api/client';
+export { createControlClient } from '../control-api/client.ts';
 
 // CLI-specific types
 export type {
@@ -43,4 +43,4 @@ export type {
   SchemaVerifyOptions,
   SignOptions,
   VerifyOptions,
-} from '../control-api/types';
+} from '../control-api/types.ts';

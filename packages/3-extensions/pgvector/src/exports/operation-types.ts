@@ -4,4 +4,4 @@
  * Re-export from types module for public API.
  */
 
-export type { OperationTypes } from '../types/operation-types';
+export type { OperationTypes } from '../types/operation-types.ts';

@@ -1,4 +1,4 @@
-export { orm } from '../orm';
+export { orm } from '../orm.ts';
 export type {
   IncludeAccumulator,
   ModelColumnAccessor,
@@ -9,4 +9,4 @@ export type {
   OrmRelationAccessor,
   OrmRelationFilterBuilder,
   OrmWhereProperty,
-} from '../orm-types';
+} from '../orm-types.ts';

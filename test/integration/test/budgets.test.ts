@@ -13,7 +13,7 @@ import {
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestRuntime, setupTestDatabase } from './utils';
+import { createTestRuntime, setupTestDatabase } from './utils.ts';
 
 const textColumn: StorageColumn = { nativeType: 'text', codecId: 'pg/text@1', nullable: false };
 

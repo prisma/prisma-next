@@ -7,9 +7,9 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
-import type { BinaryOp, ColumnRef, ExpressionSource, TableRef } from './ast/types';
-import { attachOperationsToColumnBuilder } from './operations-registry';
-import type { QueryLaneContext } from './query-lane-context';
+import type { BinaryOp, ColumnRef, ExpressionSource, TableRef } from './ast/types.ts';
+import { attachOperationsToColumnBuilder } from './operations-registry.ts';
+import type { QueryLaneContext } from './query-lane-context.ts';
 import type {
   BinaryBuilder,
   CodecTypes as CodecTypesType,
@@ -19,7 +19,7 @@ import type {
   OperationTypes,
   OrderBuilder,
   ParamPlaceholder,
-} from './types';
+} from './types.ts';
 
 type TableColumns<Table extends { columns: Record<string, StorageColumn> }> = Table['columns'];
 

@@ -1,1 +1,1 @@
-export { attachOperationsToColumnBuilder } from '../operations-registry';
+export { attachOperationsToColumnBuilder } from '../operations-registry.ts';

@@ -15,9 +15,9 @@ import type {
   OperationExpr,
   ParamRef,
   QueryAst,
-} from './ast/types';
-import type { SqlQueryPlan } from './plan';
-import type { QueryLaneContext } from './query-lane-context';
+} from './ast/types.ts';
+import type { SqlQueryPlan } from './plan.ts';
+import type { QueryLaneContext } from './query-lane-context.ts';
 
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';

@@ -14,8 +14,8 @@ import {
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { Contract } from './fixtures/contract.d';
-import { createTestRuntime, setupTestDatabase } from './utils';
+import type { Contract } from './fixtures/contract.d.ts';
+import { createTestRuntime, setupTestDatabase } from './utils.ts';
 
 const fixtureContract = loadContractFixture();
 const adapter = createPostgresAdapter();

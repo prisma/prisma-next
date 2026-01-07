@@ -4,7 +4,7 @@ import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import contract from '../prisma-next/contract.json' with { type: 'json' };
 
-import { getPrismaNextRuntime } from '../prisma-next/runtime';
+import { getPrismaNextRuntime } from '../prisma-next/runtime.ts';
 
 let legacyPrisma: LegacyPrismaClient | undefined;
 let compatPrisma: CompatPrismaClient | undefined;

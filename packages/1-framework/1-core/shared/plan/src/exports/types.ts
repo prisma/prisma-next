@@ -1,1 +1,1 @@
-export type { RuntimeError } from '../types';
+export type { RuntimeError } from '../types.ts';

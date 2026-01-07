@@ -19,12 +19,12 @@ import type {
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { decodeRow } from './codecs/decoding';
-import { encodeParams } from './codecs/encoding';
-import { validateCodecRegistryCompleteness } from './codecs/validation';
-import { lowerSqlPlan } from './lower-sql-plan';
-import type { RuntimeContext } from './sql-context';
-import { SqlFamilyAdapter } from './sql-family-adapter';
+import { decodeRow } from './codecs/decoding.ts';
+import { encodeParams } from './codecs/encoding.ts';
+import { validateCodecRegistryCompleteness } from './codecs/validation.ts';
+import { lowerSqlPlan } from './lower-sql-plan.ts';
+import type { RuntimeContext } from './sql-context.ts';
+import { SqlFamilyAdapter } from './sql-family-adapter.ts';
 
 export interface RuntimeOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,

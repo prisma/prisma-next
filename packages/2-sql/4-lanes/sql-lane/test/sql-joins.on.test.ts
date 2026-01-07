@@ -3,7 +3,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { createJoinOnBuilder } from '../src/sql/builder';
+import { createJoinOnBuilder } from '../src/sql/builder.ts';
 
 // Define a fully-typed contract type for this test
 type ContractWithPosts = SqlContract<

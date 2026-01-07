@@ -3,12 +3,12 @@ import { dirname, relative, resolve } from 'node:path';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { loadConfig } from '../config-loader';
-import { createControlClient } from '../control-api/client';
-import type { EmitContractSource, EmitFailure } from '../control-api/types';
-import { CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { loadConfig } from '../config-loader.ts';
+import { createControlClient } from '../control-api/client.ts';
+import type { EmitContractSource, EmitFailure } from '../control-api/types.ts';
+import { CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors.ts';
+import { setCommandDescriptions } from '../utils/command-helpers.ts';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags.ts';
 import {
   type EmitContractResult,
   formatCommandHelp,
@@ -16,9 +16,9 @@ import {
   formatEmitOutput,
   formatStyledHeader,
   formatSuccessMessage,
-} from '../utils/output';
-import { createProgressAdapter } from '../utils/progress-adapter';
-import { handleResult } from '../utils/result-handler';
+} from '../utils/output.ts';
+import { createProgressAdapter } from '../utils/progress-adapter.ts';
+import { handleResult } from '../utils/result-handler.ts';
 
 interface ContractEmitOptions {
   readonly config?: string;

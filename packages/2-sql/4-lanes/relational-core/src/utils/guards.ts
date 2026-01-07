@@ -6,14 +6,14 @@ import type {
   LiteralExpr,
   OperationExpr,
   ParamRef,
-} from '../ast/types';
+} from '../ast/types.ts';
 import type {
   AnyColumnBuilder,
   AnyExpressionSource,
   ExpressionBuilder,
   ParamPlaceholder,
   ValueSource,
-} from '../types';
+} from '../types.ts';
 
 /**
  * Helper to extract columnMeta from a ColumnBuilder or ExpressionBuilder.

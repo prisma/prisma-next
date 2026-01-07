@@ -1,8 +1,8 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
-import { createRuntime } from '../src/exports';
-import { createStubAdapter, createTestContext, createTestContract } from './utils';
+import { createRuntime } from '../src/exports/index.ts';
+import { createStubAdapter, createTestContext, createTestContract } from './utils.ts';
 
 // Mock driver that implements SqlDriver interface
 class MockDriver {

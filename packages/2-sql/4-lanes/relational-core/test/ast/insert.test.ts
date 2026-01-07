@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common';
-import { createInsertAst } from '../../src/ast/insert';
-import type { ColumnRef, ParamRef, TableRef } from '../../src/ast/types';
+import { createColumnRef, createParamRef, createTableRef } from '../../src/ast/common.ts';
+import { createInsertAst } from '../../src/ast/insert.ts';
+import type { ColumnRef, ParamRef, TableRef } from '../../src/ast/types.ts';
 
 describe('ast/insert', () => {
   describe('createInsertAst', () => {

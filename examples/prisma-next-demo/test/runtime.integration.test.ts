@@ -10,14 +10,14 @@ import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-r
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../src/prisma/contract.d';
+import type { Contract } from '../src/prisma/contract.d.ts';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
-import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
+import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client.ts';
 import {
   pgvectorExtensionRuntimeDescriptor,
   postgresAdapterRuntimeDescriptor,
   postgresTargetRuntimeDescriptor,
-} from './utils/framework-components';
+} from './utils/framework-components.ts';
 
 // Use the emitted JSON contract which has the real computed hashes
 const contract = validateContract<Contract>(contractJson);

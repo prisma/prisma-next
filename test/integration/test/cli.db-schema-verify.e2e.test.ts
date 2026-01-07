@@ -10,7 +10,7 @@ import {
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
-} from './utils/cli-test-helpers';
+} from './utils/cli-test-helpers.ts';
 
 // Fixture subdirectory for db-schema-verify e2e tests
 const fixtureSubdir = 'db-schema-verify';

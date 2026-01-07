@@ -1,6 +1,6 @@
 import ora from 'ora';
-import type { ControlProgressEvent, OnControlProgress } from '../control-api/types';
-import type { GlobalFlags } from './global-flags';
+import type { ControlProgressEvent, OnControlProgress } from '../control-api/types.ts';
+import type { GlobalFlags } from './global-flags.ts';
 
 /**
  * Options for creating a progress adapter.

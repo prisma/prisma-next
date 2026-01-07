@@ -8,12 +8,12 @@ import {
 } from '@prisma-next/sql-relational-core/guards';
 import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
 import type { BinaryBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
-import { createBinaryExpr, createParamRef } from '../utils/ast';
+import { createBinaryExpr, createParamRef } from '../utils/ast.ts';
 import {
   errorFailedToBuildWhereClause,
   errorMissingParameter,
   errorUnknownTable,
-} from '../utils/errors';
+} from '../utils/errors.ts';
 
 export function buildWhereExpr(
   where: BinaryBuilder,

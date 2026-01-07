@@ -1,1 +1,1 @@
-export { assertRuntimeContractRequirementsSatisfied } from '../framework-components';
+export { assertRuntimeContractRequirementsSatisfied } from '../framework-components.ts';

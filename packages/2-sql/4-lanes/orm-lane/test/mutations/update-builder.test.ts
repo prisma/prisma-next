@@ -6,9 +6,9 @@ import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { AnyBinaryBuilder } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
-import { buildUpdatePlan } from '../../src/mutations/update-builder';
-import type { OrmContext } from '../../src/orm/context';
-import type { ModelColumnAccessor } from '../../src/orm-types';
+import { buildUpdatePlan } from '../../src/mutations/update-builder.ts';
+import type { OrmContext } from '../../src/orm/context.ts';
+import type { ModelColumnAccessor } from '../../src/orm-types.ts';
 
 describe('update builder', () => {
   const contract: SqlContract<SqlStorage> = {

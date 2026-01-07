@@ -26,7 +26,7 @@ import {
   errorUnknownTable,
   errorWhereMustBeCalledForDelete,
   errorWhereMustBeCalledForUpdate,
-} from '../../src/utils/errors';
+} from '../../src/utils/errors.ts';
 
 describe('error functions', () => {
   it('errorAliasPathEmpty throws PLAN.INVALID', () => {

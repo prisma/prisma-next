@@ -5,7 +5,7 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { computeMappings, normalizeContract, validateContract } from '../src/contract';
+import { computeMappings, normalizeContract, validateContract } from '../src/contract.ts';
 
 describe('validateContract normalization', () => {
   it('normalizes missing nullable in columns', () => {

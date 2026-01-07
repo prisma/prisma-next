@@ -9,8 +9,8 @@ import type {
   OperationExpr,
   SelectAst,
   TableRef,
-} from './types';
-import { compact } from './util';
+} from './types.ts';
+import { compact } from './util.ts';
 
 export interface CreateSelectAstOptions {
   readonly from: TableRef;

@@ -2,6 +2,7 @@
 // Document family types
 // Plan types - target-family agnostic execution types
 // Emitter types (moved from @prisma-next/emitter)
+
 export type {
   ContractBase,
   ContractMarkerRecord,
@@ -21,6 +22,6 @@ export type {
   TargetFamilyHook,
   TypesImportSpec,
   ValidationContext,
-} from '../types';
+} from '../types.ts';
 // Type guards
-export { isDocumentContract } from '../types';
+export { isDocumentContract } from '../types.ts';

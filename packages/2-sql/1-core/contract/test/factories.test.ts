@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { col, contract, fk, index, model, pk, storage, table, unique } from '../src/factories';
+import { col, contract, fk, index, model, pk, storage, table, unique } from '../src/factories.ts';
 
 describe('SQL contract factories', () => {
   describe('col', () => {

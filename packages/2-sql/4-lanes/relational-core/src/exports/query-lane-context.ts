@@ -1,1 +1,1 @@
-export * from '../query-lane-context';
+export * from '../query-lane-context.ts';

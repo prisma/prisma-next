@@ -1,1 +1,1 @@
-export type { CoreSchemaView, SchemaNodeKind, SchemaTreeNode } from '../schema-view';
+export type { CoreSchemaView, SchemaNodeKind, SchemaTreeNode } from '../schema-view.ts';

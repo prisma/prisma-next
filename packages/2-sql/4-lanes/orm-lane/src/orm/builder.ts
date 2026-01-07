@@ -15,12 +15,12 @@ import type {
   NestedProjection,
   OrderBuilder,
 } from '@prisma-next/sql-relational-core/types';
-import { buildDeletePlan } from '../mutations/delete-builder';
-import { buildInsertPlan } from '../mutations/insert-builder';
-import { buildUpdatePlan } from '../mutations/update-builder';
-import type { OrmIncludeChildBuilder } from '../orm-include-child';
-import { OrmIncludeChildBuilderImpl } from '../orm-include-child';
-import { OrmRelationFilterBuilderImpl } from '../orm-relation-filter';
+import { buildDeletePlan } from '../mutations/delete-builder.ts';
+import { buildInsertPlan } from '../mutations/insert-builder.ts';
+import { buildUpdatePlan } from '../mutations/update-builder.ts';
+import type { OrmIncludeChildBuilder } from '../orm-include-child.ts';
+import { OrmIncludeChildBuilderImpl } from '../orm-include-child.ts';
+import { OrmRelationFilterBuilderImpl } from '../orm-relation-filter.ts';
 import type {
   IncludeAccumulator,
   ModelColumnAccessor,
@@ -29,21 +29,21 @@ import type {
   OrmModelBuilder,
   OrmRelationFilterBuilder,
   OrmWhereProperty,
-} from '../orm-types';
-import { buildMeta, type MetaBuildArgs } from '../plan/plan-assembly';
+} from '../orm-types.ts';
+import { buildMeta, type MetaBuildArgs } from '../plan/plan-assembly.ts';
 import {
   buildExistsSubqueries,
   buildIncludeAsts,
   combineWhereClauses,
-} from '../relations/include-plan';
-import { buildOrderByClause } from '../selection/ordering';
-import { buildWhereExpr } from '../selection/predicates';
-import { buildProjectionState, type ProjectionInput } from '../selection/projection';
-import { buildProjectionItems, buildSelectAst } from '../selection/select-builder';
-import { createTableRef } from '../utils/ast';
-import { errorModelNotFound, errorTableNotFound, errorUnknownTable } from '../utils/errors';
-import { createOrmContext } from './context';
-import type { OrmIncludeState, RelationFilter } from './state';
+} from '../relations/include-plan.ts';
+import { buildOrderByClause } from '../selection/ordering.ts';
+import { buildWhereExpr } from '../selection/predicates.ts';
+import { buildProjectionState, type ProjectionInput } from '../selection/projection.ts';
+import { buildProjectionItems, buildSelectAst } from '../selection/select-builder.ts';
+import { createTableRef } from '../utils/ast.ts';
+import { errorModelNotFound, errorTableNotFound, errorUnknownTable } from '../utils/errors.ts';
+import { createOrmContext } from './context.ts';
+import type { OrmIncludeState, RelationFilter } from './state.ts';
 
 export class OrmModelBuilderImpl<
   TContract extends SqlContract<SqlStorage>,

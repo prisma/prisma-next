@@ -13,7 +13,7 @@ import type {
   SqlPlannerConflict,
   SqlPlannerFailureResult,
   SqlPlannerSuccessResult,
-} from './types';
+} from './types.ts';
 
 const readOnlyEmptyObject: Record<string, never> = Object.freeze({});
 

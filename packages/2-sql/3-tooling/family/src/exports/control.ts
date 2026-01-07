@@ -1,4 +1,4 @@
-import { SqlFamilyDescriptor } from '../core/descriptor';
+import { SqlFamilyDescriptor } from '../core/descriptor.ts';
 
 // Re-export core types from canonical source
 export type {
@@ -11,15 +11,15 @@ export type {
   MigrationPlanOperation,
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
-export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/instance';
+export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/instance.ts';
 export {
   createMigrationPlan,
   plannerFailure,
   plannerSuccess,
   runnerFailure,
   runnerSuccess,
-} from '../core/migrations/plan-helpers';
-export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
+} from '../core/migrations/plan-helpers.ts';
+export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies.ts';
 // SQL-specific types
 export type {
   ComponentDatabaseDependencies,
@@ -47,7 +47,7 @@ export type {
   SqlPlannerFailureResult,
   SqlPlannerResult,
   SqlPlannerSuccessResult,
-} from '../core/migrations/types';
+} from '../core/migrations/types.ts';
 
 /**
  * SQL family descriptor for control plane (CLI/config).

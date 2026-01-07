@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { validateConfig } from '../src/config-validation';
-import { CliStructuredError } from '../src/errors';
+import { validateConfig } from '../src/config-validation.ts';
+import { CliStructuredError } from '../src/errors.ts';
 
 type CreateValidConfigOverrides = Record<string, unknown> & {
   family?: Record<string, unknown>;

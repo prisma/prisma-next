@@ -1,5 +1,5 @@
-import type { BinaryExpr, ColumnRef, ParamRef, TableRef, UpdateAst } from './types';
-import { compact } from './util';
+import type { BinaryExpr, ColumnRef, ParamRef, TableRef, UpdateAst } from './types.ts';
+import { compact } from './util.ts';
 
 export interface CreateUpdateAstOptions {
   readonly table: TableRef;

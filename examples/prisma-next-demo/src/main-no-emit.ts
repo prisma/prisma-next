@@ -1,9 +1,9 @@
 import 'dotenv/config';
-import { closeRuntime } from './prisma/runtime-no-emit';
-import { getUserById } from './queries/get-user-by-id-no-emit';
-import { getUserPosts } from './queries/get-user-posts-no-emit';
-import { getUsers } from './queries/get-users-no-emit';
-import { getUsersWithPosts } from './queries/get-users-with-posts-no-emit';
+import { closeRuntime } from './prisma/runtime-no-emit.ts';
+import { getUserById } from './queries/get-user-by-id-no-emit.ts';
+import { getUserPosts } from './queries/get-user-posts-no-emit.ts';
+import { getUsers } from './queries/get-users-no-emit.ts';
+import { getUsersWithPosts } from './queries/get-users-with-posts-no-emit.ts';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;

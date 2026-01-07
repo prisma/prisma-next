@@ -1,7 +1,7 @@
 import { access } from 'node:fs/promises';
 import { SqlConnectionError, SqlQueryError } from '@prisma-next/sql-errors';
 import { describe, expect, it } from 'vitest';
-import { isPostgresError, normalizePgError } from '../src/normalize-error';
+import { isPostgresError, normalizePgError } from '../src/normalize-error.ts';
 
 describe('normalizePgError', () => {
   describe('Postgres SQLSTATE errors', () => {

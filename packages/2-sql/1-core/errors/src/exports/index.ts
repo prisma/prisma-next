@@ -1,1 +1,1 @@
-export { SqlConnectionError, SqlQueryError } from '../errors';
+export { SqlConnectionError, SqlQueryError } from '../errors.ts';

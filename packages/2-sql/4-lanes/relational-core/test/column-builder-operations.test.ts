@@ -6,10 +6,10 @@ import {
   vectorColumn as vectorColumnType,
 } from '@prisma-next/test-utils/column-descriptors';
 import { describe, expect, it } from 'vitest';
-import type { OperationExpr } from '../src/ast/types';
-import { param } from '../src/param';
-import { schema } from '../src/schema';
-import { createStubAdapter, createTestContext } from './utils';
+import type { OperationExpr } from '../src/ast/types.ts';
+import { param } from '../src/param.ts';
+import { schema } from '../src/schema.ts';
+import { createStubAdapter, createTestContext } from './utils.ts';
 
 describe('ColumnBuilder operations', () => {
   const contract = validateContract({

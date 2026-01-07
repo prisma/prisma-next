@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { errorDriverRequired, errorFamilyReadMarkerSqlRequired } from '../src/utils/cli-errors';
+import { errorDriverRequired, errorFamilyReadMarkerSqlRequired } from '../src/utils/cli-errors.ts';
 
 describe('CliStructuredError.toEnvelope()', () => {
   it('converts driver required error to envelope with PN-CLI-4010', () => {

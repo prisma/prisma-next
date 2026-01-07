@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers';
+import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers.ts';
 
 // Fixture subdirectory for emit-contract tests
 const fixtureSubdir = 'emit-contract';

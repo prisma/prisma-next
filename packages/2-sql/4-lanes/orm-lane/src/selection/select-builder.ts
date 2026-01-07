@@ -9,10 +9,10 @@ import type {
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { isExpressionBuilder } from '@prisma-next/sql-relational-core/guards';
-import type { IncludeState } from '../relations/include-plan';
-import { createSelectAst, createTableRef } from '../utils/ast';
-import { errorInvalidColumn, errorMissingAlias, errorMissingColumn } from '../utils/errors';
-import type { ProjectionState } from './projection';
+import type { IncludeState } from '../relations/include-plan.ts';
+import { createSelectAst, createTableRef } from '../utils/ast.ts';
+import { errorInvalidColumn, errorMissingAlias, errorMissingColumn } from '../utils/errors.ts';
+import type { ProjectionState } from './projection.ts';
 
 export function buildProjectionItems(
   projectionState: ProjectionState,

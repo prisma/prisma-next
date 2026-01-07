@@ -5,19 +5,19 @@ import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
-import type { SqlStatement } from '../src/exports';
+import type { SqlStatement } from '../src/exports/index.ts';
 import {
   type createRuntime,
   createRuntimeContext,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
-} from '../src/exports';
+} from '../src/exports/index.ts';
 import type {
   RuntimeContext,
   SqlRuntimeAdapterInstance,
   SqlRuntimeExtensionDescriptor,
-} from '../src/sql-context';
+} from '../src/sql-context.ts';
 
 /**
  * Executes a plan and collects all results into an array.

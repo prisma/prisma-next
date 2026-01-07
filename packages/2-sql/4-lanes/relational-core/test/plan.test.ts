@@ -1,7 +1,7 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { augmentDescriptorWithColumnMeta } from '../src/plan';
+import { augmentDescriptorWithColumnMeta } from '../src/plan.ts';
 
 describe('plan', () => {
   describe('augmentDescriptorWithColumnMeta', () => {

@@ -7,7 +7,7 @@ import {
   createRuntimeContext,
   type SqlRuntimeExtensionDescriptor,
   type SqlRuntimeExtensionInstance,
-} from '../src/sql-context';
+} from '../src/sql-context.ts';
 
 // Minimal test contract
 const testContract: SqlContract<SqlStorage> = {

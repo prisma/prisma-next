@@ -35,4 +35,4 @@ export type {
   TargetMigrationsCapability,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '../types';
+} from '../types.ts';

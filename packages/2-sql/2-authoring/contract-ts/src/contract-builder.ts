@@ -24,7 +24,7 @@ import type {
   SqlMappings,
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
-import { computeMappings } from './contract';
+import { computeMappings } from './contract.ts';
 
 /**
  * Type-level mappings structure for contracts built via `defineContract()`.

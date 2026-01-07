@@ -1,7 +1,7 @@
 import { planInvalid } from '@prisma-next/plan';
-import type { AnyColumnBuilder, JoinOnBuilder, JoinOnPredicate } from '../types';
-import { isColumnBuilder } from '../types';
-import type { ColumnRef, JoinAst, JoinOnExpr, TableRef } from './types';
+import type { AnyColumnBuilder, JoinOnBuilder, JoinOnPredicate } from '../types.ts';
+import { isColumnBuilder } from '../types.ts';
+import type { ColumnRef, JoinAst, JoinOnExpr, TableRef } from './types.ts';
 
 export function createJoin(
   joinType: 'inner' | 'left' | 'right' | 'full',

@@ -1,1 +1,1 @@
-export { computeMappings, validateContract } from '../contract';
+export { computeMappings, validateContract } from '../contract.ts';

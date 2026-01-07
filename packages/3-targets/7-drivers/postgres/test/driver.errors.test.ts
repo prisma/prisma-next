@@ -3,7 +3,7 @@ import type { Client, Pool } from 'pg';
 import { newDb } from 'pg-mem';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createPostgresDriverFromOptions } from '../src/postgres-driver';
+import { createPostgresDriverFromOptions } from '../src/postgres-driver.ts';
 
 describe('@prisma-next/driver-postgres', () => {
   let cleanup: (() => Promise<void>) | undefined;

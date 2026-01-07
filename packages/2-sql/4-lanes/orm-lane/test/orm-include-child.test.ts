@@ -5,8 +5,8 @@ import { param } from '@prisma-next/sql-relational-core/param';
 import type { AnyBinaryBuilder, AnyOrderBuilder } from '@prisma-next/sql-relational-core/types';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { OrmIncludeChildBuilderImpl } from '../src/orm-include-child';
-import type { OrmBuilderOptions } from '../src/orm-types';
+import { OrmIncludeChildBuilderImpl } from '../src/orm-include-child.ts';
+import type { OrmBuilderOptions } from '../src/orm-types.ts';
 
 describe('orm-include-child', () => {
   const int4ColumnMeta: StorageColumn = {

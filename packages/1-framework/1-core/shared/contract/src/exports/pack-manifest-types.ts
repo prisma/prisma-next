@@ -3,4 +3,4 @@ export type {
   LoweringSpecManifest,
   OperationManifest,
   ReturnSpecManifest,
-} from '../types';
+} from '../types.ts';

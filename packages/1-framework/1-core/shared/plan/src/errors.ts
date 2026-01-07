@@ -1,4 +1,4 @@
-import type { RuntimeError } from './types';
+import type { RuntimeError } from './types.ts';
 
 export function planInvalid(
   message: string,

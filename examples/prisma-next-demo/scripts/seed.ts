@@ -9,9 +9,9 @@ import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { schema, sql } from '../src/prisma/query';
-import { closeRuntime, getRuntime } from '../src/prisma/runtime';
-import { createDemoControlClient } from '../test/utils/control-client';
+import { schema, sql } from '../src/prisma/query.ts';
+import { closeRuntime, getRuntime } from '../src/prisma/runtime.ts';
+import { createDemoControlClient } from '../test/utils/control-client.ts';
 
 async function collectRows<P extends ExecutionPlan | SqlQueryPlan<unknown>>(
   plan: P,

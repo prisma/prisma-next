@@ -1,8 +1,8 @@
 import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import { describe, expect, it } from 'vitest';
-import { defineContract } from '../src/contract-builder';
-import type { CodecTypes } from './fixtures/contract.d';
-import { columnDescriptor } from './helpers/column-descriptor';
+import { defineContract } from '../src/contract-builder.ts';
+import type { CodecTypes } from './fixtures/contract.d.ts';
+import { columnDescriptor } from './helpers/column-descriptor.ts';
 
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');

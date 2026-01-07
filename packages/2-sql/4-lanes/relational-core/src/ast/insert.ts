@@ -1,5 +1,5 @@
-import type { ColumnRef, InsertAst, ParamRef, TableRef } from './types';
-import { compact } from './util';
+import type { ColumnRef, InsertAst, ParamRef, TableRef } from './types.ts';
+import { compact } from './util.ts';
 
 export interface CreateInsertAstOptions {
   readonly table: TableRef;

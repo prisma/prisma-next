@@ -3,7 +3,7 @@ import type {
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import { createControlPlaneStack } from '../src/stack';
+import { createControlPlaneStack } from '../src/stack.ts';
 
 describe('createControlPlaneStack', () => {
   it('defaults driver to undefined and extensionPacks to []', () => {

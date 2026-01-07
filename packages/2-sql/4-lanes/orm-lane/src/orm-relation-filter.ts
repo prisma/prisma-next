@@ -3,7 +3,11 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { AnyBinaryBuilder, AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
-import type { ModelColumnAccessor, OrmBuilderOptions, OrmRelationFilterBuilder } from './orm-types';
+import type {
+  ModelColumnAccessor,
+  OrmBuilderOptions,
+  OrmRelationFilterBuilder,
+} from './orm-types.ts';
 
 export class OrmRelationFilterBuilderImpl<
   TContract extends SqlContract<SqlStorage>,

@@ -1,1 +1,1 @@
-export type { StorageTypeMetadata } from '../pack-types';
+export type { StorageTypeMetadata } from '../pack-types.ts';

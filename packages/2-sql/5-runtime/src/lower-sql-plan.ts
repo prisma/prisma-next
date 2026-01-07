@@ -1,6 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { RuntimeContext } from './sql-context';
+import type { RuntimeContext } from './sql-context.ts';
 
 /**
  * Lowers a SQL query plan to an executable Plan by calling the adapter's lower method.

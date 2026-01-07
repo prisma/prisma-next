@@ -6,8 +6,8 @@ import type {
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import { executeDbInit } from '../../src/control-api/operations/db-init';
-import type { ControlProgressEvent } from '../../src/control-api/types';
+import { executeDbInit } from '../../src/control-api/operations/db-init.ts';
+import type { ControlProgressEvent } from '../../src/control-api/types.ts';
 
 describe('executeDbInit progress emission', () => {
   it('emits expected span events in plan mode', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contractIR, irHeader, irMeta } from '../src/ir';
+import { contractIR, irHeader, irMeta } from '../src/ir.ts';
 
 describe('irHeader', () => {
   it('creates header with required fields', () => {

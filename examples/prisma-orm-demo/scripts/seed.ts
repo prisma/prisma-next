@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { getPrisma } from '../src/prisma/client';
+import { getPrisma } from '../src/prisma/client.ts';
 
 async function main() {
   // Seed script uses Prisma Client based on USE_COMPAT env var (defaults to legacy)

@@ -2,9 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { loadConfig } from '../config-loader';
-import { createControlClient } from '../control-api/client';
-import type { DbInitFailure } from '../control-api/types';
+import { loadConfig } from '../config-loader.ts';
+import { createControlClient } from '../control-api/client.ts';
+import type { DbInitFailure } from '../control-api/types.ts';
 import {
   CliStructuredError,
   errorContractValidationFailed,
@@ -16,9 +16,9 @@ import {
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
-} from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
-import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+} from '../utils/cli-errors.ts';
+import { setCommandDescriptions } from '../utils/command-helpers.ts';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags.ts';
 import {
   type DbInitResult,
   formatCommandHelp,
@@ -26,9 +26,9 @@ import {
   formatDbInitJson,
   formatDbInitPlanOutput,
   formatStyledHeader,
-} from '../utils/output';
-import { createProgressAdapter } from '../utils/progress-adapter';
-import { handleResult } from '../utils/result-handler';
+} from '../utils/output.ts';
+import { createProgressAdapter } from '../utils/progress-adapter.ts';
+import { handleResult } from '../utils/result-handler.ts';
 
 interface DbInitOptions {
   readonly db?: string;

@@ -1,4 +1,4 @@
-import { SqlRuntimeFamilyDescriptor } from '../core/runtime-descriptor';
+import { SqlRuntimeFamilyDescriptor } from '../core/runtime-descriptor.ts';
 
 /**
  * SQL runtime family descriptor for execution/runtime plane.

@@ -1,4 +1,4 @@
-import { pgvectorPackMeta } from '../core/descriptor-meta';
+import { pgvectorPackMeta } from '../core/descriptor-meta.ts';
 
 const pgvectorPack = pgvectorPackMeta;
 

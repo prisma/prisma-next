@@ -8,4 +8,4 @@ export {
   storage,
   table,
   unique,
-} from '../factories';
+} from '../factories.ts';

@@ -9,8 +9,8 @@ import { param } from '@prisma-next/sql-relational-core/param';
 import type { RuntimeContext } from '@prisma-next/sql-runtime';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
-import { orm } from '../src/orm';
-import type { Contract } from './fixtures/contract.d';
+import { orm } from '../src/orm.ts';
+import type { Contract } from './fixtures/contract.d.ts';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

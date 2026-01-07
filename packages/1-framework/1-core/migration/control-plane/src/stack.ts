@@ -4,7 +4,7 @@ import type {
   ControlExtensionDescriptor,
   ControlPlaneStack,
   ControlTargetDescriptor,
-} from './types';
+} from './types.ts';
 
 /**
  * Creates a ControlPlaneStack from component descriptors.
