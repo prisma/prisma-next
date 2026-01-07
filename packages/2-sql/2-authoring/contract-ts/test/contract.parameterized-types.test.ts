@@ -2,6 +2,13 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { validateContract } from '../src/contract';
 
+/**
+ * Concrete contract type for these tests. Using the generic SqlContract<SqlStorage>
+ * breaks type inference because JSON imports lose literal types. This concrete type
+ * provides sufficient structure for validateContract to narrow correctly.
+ */
+type TestContract = SqlContract<SqlStorage>;
+
 describe('validateContract parameterized type fields', () => {
   const baseContractInput = {
     schemaVersion: '1',
@@ -49,7 +56,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<SqlContract<SqlStorage>>(input);
+      const result = validateContract<TestContract>(input);
       const vectorCol = result.storage.tables['Embedding']?.columns['vector'];
       expect(vectorCol?.typeParams).toEqual({ length: 1536 });
     });
@@ -77,12 +84,12 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<SqlContract<SqlStorage>>(input);
+      const result = validateContract<TestContract>(input);
       expect(result.storage.tables['User']?.columns['id']?.typeParams).toEqual({});
     });
 
     it('accepts column without typeParams (optional field)', () => {
-      const result = validateContract<SqlContract<SqlStorage>>(baseContractInput);
+      const result = validateContract<TestContract>(baseContractInput);
       expect(result.storage.tables['User']?.columns['id']?.typeParams).toBeUndefined();
     });
 
@@ -109,7 +116,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(/typeParams/);
+      expect(() => validateContract<TestContract>(input)).toThrow(/typeParams/);
     });
 
     it('rejects array typeParams (must be plain object)', () => {
@@ -137,7 +144,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(
+      expect(() => validateContract<TestContract>(input)).toThrow(
         /must be a plain object, not an array/,
       );
     });
@@ -174,7 +181,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(
+      expect(() => validateContract<TestContract>(input)).toThrow(
         /typeParams and typeRef.*mutually exclusive/,
       );
     });
@@ -212,7 +219,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<SqlContract<SqlStorage>>(input);
+      const result = validateContract<TestContract>(input);
       const vectorCol = result.storage.tables['Embedding']?.columns['vector'];
       expect(vectorCol?.typeRef).toBe('Vector1536');
     });
@@ -240,7 +247,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(/typeRef/);
+      expect(() => validateContract<TestContract>(input)).toThrow(/typeRef/);
     });
 
     it('rejects typeRef pointing to non-existent storage.types key', () => {
@@ -275,7 +282,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(
+      expect(() => validateContract<TestContract>(input)).toThrow(
         /references non-existent type instance "NonExistent"/,
       );
     });
@@ -305,7 +312,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(
+      expect(() => validateContract<TestContract>(input)).toThrow(
         /references non-existent type instance "Vector1536"/,
       );
     });
@@ -327,7 +334,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<SqlContract<SqlStorage>>(input);
+      const result = validateContract<TestContract>(input);
       expect(result.storage.types).toEqual({
         Vector1536: {
           codecId: 'pg/vector@1',
@@ -357,12 +364,12 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      const result = validateContract<SqlContract<SqlStorage>>(input);
+      const result = validateContract<TestContract>(input);
       expect(Object.keys(result.storage.types!)).toHaveLength(2);
     });
 
     it('accepts storage without types (optional field)', () => {
-      const result = validateContract<SqlContract<SqlStorage>>(baseContractInput);
+      const result = validateContract<TestContract>(baseContractInput);
       expect(result.storage.types).toBeUndefined();
     });
 
@@ -380,7 +387,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(/codecId/);
+      expect(() => validateContract<TestContract>(input)).toThrow(/codecId/);
     });
 
     it('rejects type instance missing nativeType', () => {
@@ -397,7 +404,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(/nativeType/);
+      expect(() => validateContract<TestContract>(input)).toThrow(/nativeType/);
     });
 
     it('rejects type instance missing typeParams', () => {
@@ -414,7 +421,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(/typeParams/);
+      expect(() => validateContract<TestContract>(input)).toThrow(/typeParams/);
     });
 
     it('rejects non-object storage.types', () => {
@@ -426,7 +433,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(/types/);
+      expect(() => validateContract<TestContract>(input)).toThrow(/types/);
     });
 
     it('rejects array typeParams in type instance', () => {
@@ -444,7 +451,7 @@ describe('validateContract parameterized type fields', () => {
         },
       };
 
-      expect(() => validateContract<SqlContract<SqlStorage>>(input)).toThrow(
+      expect(() => validateContract<TestContract>(input)).toThrow(
         /must be a plain object, not an array/,
       );
     });
