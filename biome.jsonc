@@ -9,6 +9,7 @@
     "includes": [
       "**",
       "!**/dist",
+      "!**/dist-*",
       "!**/coverage",
       "!**/node_modules",
       "!**/.prisma",
@@ -78,7 +79,7 @@
       }
     },
     {
-      "includes": ["**/*.config.ts", "**/vitest.config.ts", "**/tsup.config.ts"],
+      "includes": ["**/*.config.ts"],
       "linter": {
         "rules": {
           "suspicious": {

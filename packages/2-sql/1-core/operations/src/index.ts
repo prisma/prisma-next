@@ -14,10 +14,10 @@ export interface SqlOperationSignature extends CoreOperationSignature {
   readonly lowering: SqlLoweringSpec;
 }
 
-export type SqlOperationRegistry = OperationRegistry;
+export type SqlOperationRegistry = OperationRegistry<SqlOperationSignature>;
 
 export function createSqlOperationRegistry(): SqlOperationRegistry {
-  return createOperationRegistry() as SqlOperationRegistry;
+  return createOperationRegistry<SqlOperationSignature>();
 }
 
 export function register(registry: SqlOperationRegistry, signature: SqlOperationSignature): void {

@@ -33,13 +33,13 @@ export function irHeader(opts: {
   target: string;
   targetFamily: string;
   coreHash: string;
-  profileHash?: string;
+  profileHash?: string | undefined;
 }): {
   readonly schemaVersion: string;
   readonly target: string;
   readonly targetFamily: string;
   readonly coreHash: string;
-  readonly profileHash?: string;
+  readonly profileHash?: string | undefined;
 } {
   return {
     schemaVersion: '1',
@@ -88,7 +88,7 @@ export function contractIR<
     readonly target: string;
     readonly targetFamily: string;
     readonly coreHash: string;
-    readonly profileHash?: string;
+    readonly profileHash?: string | undefined;
   };
   meta: {
     readonly capabilities: Record<string, Record<string, boolean>>;
