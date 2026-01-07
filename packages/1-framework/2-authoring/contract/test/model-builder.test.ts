@@ -49,6 +49,7 @@ describe('ModelBuilder', () => {
         toTable: 'post',
         cardinality: '1:N',
         on: {
+          // @ts-expect-error Testing invalid input that TypeScript would reject
           parentTable: 'wrong',
           parentColumns: ['id'],
           childTable: 'post',

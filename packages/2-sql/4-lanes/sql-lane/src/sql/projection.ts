@@ -1,6 +1,6 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
+import { isExpressionSource } from '@prisma-next/sql-relational-core/guards';
 import type { AnyExpressionSource, NestedProjection } from '@prisma-next/sql-relational-core/types';
-import { isExpressionSource } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
 import {
   errorAliasCollision,

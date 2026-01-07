@@ -24,7 +24,7 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
     models: {},
     relations: {},
     storage: { tables: {} },
-    extensions: {},
+    extensionPacks: {},
     capabilities: {},
     meta: {},
     sources: {},
@@ -232,6 +232,12 @@ describe('sql-target-family-hook', () => {
             },
           },
         },
+        create() {
+          return {
+            familyId: 'sql',
+            targetId: 'postgres',
+          };
+        },
       },
     ];
 
@@ -296,6 +302,12 @@ describe('sql-target-family-hook', () => {
               alias: 'TestTypes',
             },
           },
+        },
+        create() {
+          return {
+            familyId: 'sql',
+            targetId: 'postgres',
+          };
         },
       },
     ];
@@ -630,6 +642,12 @@ describe('sql-target-family-hook', () => {
             },
           },
         },
+        create() {
+          return {
+            familyId: 'sql',
+            targetId: 'postgres',
+          };
+        },
       },
       {
         kind: 'extension',
@@ -645,6 +663,12 @@ describe('sql-target-family-hook', () => {
               alias: 'ExtensionTypes',
             },
           },
+        },
+        create() {
+          return {
+            familyId: 'sql',
+            targetId: 'postgres',
+          };
         },
       },
     ];
@@ -665,6 +689,12 @@ describe('sql-target-family-hook', () => {
         familyId: 'sql',
         targetId: 'postgres',
         version: '0.0.1',
+        create() {
+          return {
+            familyId: 'sql',
+            targetId: 'postgres',
+          };
+        },
       },
     ];
 
@@ -697,6 +727,12 @@ describe('sql-target-family-hook', () => {
               alias: 'TestOps',
             },
           },
+        },
+        create() {
+          return {
+            familyId: 'sql',
+            targetId: 'postgres',
+          };
         },
       },
     ];

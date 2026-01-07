@@ -10,18 +10,18 @@ import type {
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
-import type {
-  AnyExpressionSource,
-  AnyOrderBuilder,
-  BinaryBuilder,
-} from '@prisma-next/sql-relational-core/types';
 import {
   collectColumnRefs,
   getColumnMeta,
   isColumnBuilder,
   isExpressionBuilder,
   isOperationExpr,
-} from '@prisma-next/sql-relational-core/utils/guards';
+} from '@prisma-next/sql-relational-core/guards';
+import type {
+  AnyExpressionSource,
+  AnyOrderBuilder,
+  BinaryBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import type { IncludeState } from '../relations/include-plan';
 import type { ProjectionState } from '../selection/projection';
 

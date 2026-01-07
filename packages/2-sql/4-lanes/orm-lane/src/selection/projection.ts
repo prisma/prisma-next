@@ -1,4 +1,5 @@
 import type { TableRef } from '@prisma-next/sql-relational-core/ast';
+import { isColumnBuilder, isExpressionBuilder } from '@prisma-next/sql-relational-core/guards';
 import type {
   AnyBinaryBuilder,
   AnyExpressionSource,
@@ -6,10 +7,6 @@ import type {
   JoinOnPredicate,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import {
-  isColumnBuilder,
-  isExpressionBuilder,
-} from '@prisma-next/sql-relational-core/utils/guards';
 import {
   errorAliasCollision,
   errorAliasPathEmpty,

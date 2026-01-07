@@ -11,8 +11,8 @@
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/main.ts",
     "start:no-emit": "tsx src/main-no-emit.ts",
-    "test": "vitest run --config vitest.config.ts",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings"
   },
   "dependencies": {

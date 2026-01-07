@@ -10,6 +10,7 @@ import type {
   TableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
+import { isExpressionBuilder } from '@prisma-next/sql-relational-core/guards';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
@@ -19,7 +20,6 @@ import type {
   BuildOptions,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
-import { isExpressionBuilder } from '@prisma-next/sql-relational-core/utils/guards';
 import { checkIncludeCapabilities } from '../orm/capabilities';
 import type { OrmIncludeState, RelationFilter } from '../orm/state';
 import { buildJoinOnExpr } from '../selection/join';

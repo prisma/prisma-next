@@ -1,13 +1,13 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { BinaryExpr, Expression, ParamRef } from '@prisma-next/sql-relational-core/ast';
-import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
-import type { BinaryBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
 import {
   isColumnBuilder,
   isExpressionBuilder,
   isParamPlaceholder,
-} from '@prisma-next/sql-relational-core/utils/guards';
+} from '@prisma-next/sql-relational-core/guards';
+import { augmentDescriptorWithColumnMeta } from '@prisma-next/sql-relational-core/plan';
+import type { BinaryBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
 import { createBinaryExpr, createParamRef } from '../utils/ast';
 import {
   errorFailedToBuildWhereClause,

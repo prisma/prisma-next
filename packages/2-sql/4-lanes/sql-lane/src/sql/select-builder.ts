@@ -16,6 +16,7 @@ import {
   createSelectAst,
   createTableRef,
 } from '@prisma-next/sql-relational-core/ast';
+import { isExpressionBuilder } from '@prisma-next/sql-relational-core/guards';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
@@ -30,7 +31,6 @@ import type {
   OrderBuilder,
   SqlBuilderOptions,
 } from '@prisma-next/sql-relational-core/types';
-import { isExpressionBuilder } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
 import { checkIncludeCapabilities } from '../utils/capabilities';
 import {

@@ -5,14 +5,14 @@ import {
   createLiteralExpr,
   createParamRef,
 } from '@prisma-next/sql-relational-core/ast';
-import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import {
   collectColumnRefs,
   extractBaseColumnRef,
   getColumnInfo,
   isColumnBuilder,
   isOperationExpr,
-} from '@prisma-next/sql-relational-core/utils/guards';
+} from '@prisma-next/sql-relational-core/guards';
+import type { AnyColumnBuilder } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
 
 describe('guards', () => {

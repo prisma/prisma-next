@@ -24,7 +24,7 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
     models: {},
     relations: {},
     storage: { tables: {} },
-    extensions: {},
+    extensionPacks: {},
     capabilities: {},
     meta: {},
     sources: {},
@@ -520,6 +520,7 @@ describe('sql-target-family-hook', () => {
   });
 
   it('generates contract types with undefined models', () => {
+    // @ts-expect-error testing undefined models
     const ir = createContractIR({
       models: undefined,
       storage: {

@@ -9,9 +9,29 @@
         "package.json",
         "tsconfig.json",
         "prisma-next.config.ts",
-        "prisma.config.ts"
+        "prisma.config.ts",
+        "$TURBO_ROOT$/packages/0-config/tsconfig/base.json"
       ],
       "outputs": ["src/prisma-next/contract.json", "src/prisma-next/contract.d.ts"]
+    },
+    "lint": {
+      "dependsOn": ["^build", "build"],
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "prisma.config.ts",
+        "prisma-next.config.ts",
+        "prisma/contract.ts"
+      ]
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "build"],
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "prisma.config.ts",
+        "prisma-next.config.ts",
+        "prisma/contract.ts",
+        "prisma/schema.prisma"
+      ]
     }
   }
 }

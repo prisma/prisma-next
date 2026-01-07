@@ -3,7 +3,14 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "package.json", "tsconfig.json", "tsdown.config.ts"],
+      "inputs": [
+        "src/**",
+        "package.json",
+        "tsconfig.json",
+        "tsdown.config.ts",
+        "$TURBO_ROOT$/packages/0-config/tsconfig/base.json",
+        "$TURBO_ROOT$/packages/0-config/tsdown/index.ts"
+      ],
       "outputs": ["dist/**"]
     },
     "dev": {
@@ -12,21 +19,45 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**"],
+      "inputs": ["src/**", "test/**", "vitest.config.ts"],
       "env": ["TEST_TIMEOUT_MULTIPLIER"]
     },
     "test:coverage": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**"],
+      "inputs": ["src/**", "test/**", "vitest.config.ts"],
       "outputs": ["coverage/**"],
       "env": ["TEST_TIMEOUT_MULTIPLIER"]
     },
     "typecheck": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "tsconfig.json"]
+      "inputs": [
+        "src/**",
+        "test/**",
+        "scripts/**",
+        "tsconfig.json",
+        "package.json",
+        "tsdown.config.ts",
+        "vitest.config.ts",
+        "$TURBO_ROOT$/packages/0-config/tsconfig/base.json",
+        "$TURBO_ROOT$/packages/0-config/tsdown/index.ts"
+      ]
     },
     "lint": {
-      "inputs": ["src/**", "test/**"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "scripts/**",
+        "tsconfig.json",
+        "package.json",
+        "turbo.json",
+        "tsdown.config.ts",
+        "vitest.config.ts",
+        "biome.jsonc",
+        "$TURBO_ROOT$/packages/0-config/tsconfig/base.json",
+        "$TURBO_ROOT$/packages/0-config/tsdown/index.ts",
+        "$TURBO_ROOT$/biome.jsonc"
+      ]
     },
     "clean": {
       "cache": false

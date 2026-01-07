@@ -247,7 +247,9 @@ describe('Config Errors', () => {
     expect(error.why).toContain('Summary 2');
     expect(error.fix).toContain('Fix 1');
     expect(error.fix).toContain('Fix 2');
-    expect(error.meta?.conflicts).toEqual(conflicts);
+    expect(
+      (error.meta as Parameters<typeof errorMigrationPlanningFailed>[0] | undefined)?.conflicts,
+    ).toEqual(conflicts);
   });
 
   it('errorMigrationPlanningFailed with custom why', () => {
@@ -286,9 +288,16 @@ describe('Config Errors', () => {
     expect(error.why).toContain('db verify');
     expect(error.why).toContain('unknown');
     expect(error.fix).toContain('compact or detailed');
-    expect(error.meta?.command).toBe('db verify');
-    expect(error.meta?.format).toBe('unknown');
-    expect(error.meta?.supportedFormats).toEqual(['compact', 'detailed']);
+    expect(
+      (error.meta as Parameters<typeof errorJsonFormatNotSupported>[0] | undefined)?.command,
+    ).toBe('db verify');
+    expect(
+      (error.meta as Parameters<typeof errorJsonFormatNotSupported>[0] | undefined)?.format,
+    ).toBe('unknown');
+    expect(
+      (error.meta as Parameters<typeof errorJsonFormatNotSupported>[0] | undefined)
+        ?.supportedFormats,
+    ).toEqual(['compact', 'detailed']);
   });
 
   it('errorContractMissingExtensionPacks with single pack', () => {
@@ -302,9 +311,15 @@ describe('Config Errors', () => {
     expect(error.why).toContain("'pgvector'");
     // Single pack uses singular "pack" not plural "packs"
     expect(error.why).toContain('extension pack');
-    expect(error.meta?.missingExtensionPacks).toEqual(['pgvector']);
+    expect(
+      (error.meta as Parameters<typeof errorContractMissingExtensionPacks>[0] | undefined)
+        ?.missingExtensionPacks,
+    ).toEqual(['pgvector']);
     // providedComponentIds are sorted alphabetically
-    expect(error.meta?.providedComponentIds).toEqual(['postgres', 'postgres-adapter']);
+    expect(
+      (error.meta as Parameters<typeof errorContractMissingExtensionPacks>[0] | undefined)
+        ?.providedComponentIds,
+    ).toEqual(['postgres', 'postgres-adapter']);
   });
 
   it('errorContractMissingExtensionPacks with multiple packs', () => {
@@ -315,7 +330,10 @@ describe('Config Errors', () => {
     expect(error.code).toBe('4011');
     expect(error.why).toContain("'pgvector'");
     expect(error.why).toContain("'uuid-ossp'");
-    expect(error.meta?.missingExtensionPacks).toEqual(['pgvector', 'uuid-ossp']);
+    expect(
+      (error.meta as Parameters<typeof errorContractMissingExtensionPacks>[0] | undefined)
+        ?.missingExtensionPacks,
+    ).toEqual(['pgvector', 'uuid-ossp']);
   });
 
   it('errorConfigValidation creates correct error', () => {
@@ -353,8 +371,12 @@ describe('Runtime Errors', () => {
 
   it('errorHashMismatch with expected and actual', () => {
     const error = errorHashMismatch({ expected: 'hash1', actual: 'hash2' });
-    expect(error.meta?.expected).toBe('hash1');
-    expect(error.meta?.actual).toBe('hash2');
+    expect((error.meta as Parameters<typeof errorHashMismatch>[0] | undefined)?.expected).toBe(
+      'hash1',
+    );
+    expect((error.meta as Parameters<typeof errorHashMismatch>[0] | undefined)?.actual).toBe(
+      'hash2',
+    );
   });
 
   it('errorHashMismatch with custom why', () => {
@@ -369,8 +391,12 @@ describe('Runtime Errors', () => {
     expect(error.domain).toBe('RTM');
     expect(error.why).toContain('postgres');
     expect(error.why).toContain('mysql');
-    expect(error.meta?.expected).toBe('postgres');
-    expect(error.meta?.actual).toBe('mysql');
+    expect(
+      (error.meta as { expected: Parameters<typeof errorTargetMismatch>[0] } | undefined)?.expected,
+    ).toBe('postgres');
+    expect(
+      (error.meta as { actual: Parameters<typeof errorTargetMismatch>[0] } | undefined)?.actual,
+    ).toBe('mysql');
   });
 
   it('errorTargetMismatch with custom why', () => {

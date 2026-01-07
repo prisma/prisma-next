@@ -11,7 +11,7 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
     models: {},
     relations: {},
     storage: { tables: {} },
-    extensions: {},
+    extensionPacks: {},
     capabilities: {},
     meta: {},
     sources: {},
@@ -22,7 +22,7 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
 describe('sql-target-family-hook', () => {
   it('validates types from referenced extensions', () => {
     const ir = createContractIR({
-      extensions: {
+      extensionPacks: {
         postgres: {
           version: '0.0.1',
         },

@@ -13,6 +13,7 @@ import {
   createOrderByItem,
   createTableRef,
 } from '@prisma-next/sql-relational-core/ast';
+import { extractBaseColumnRef, isOperationExpr } from '@prisma-next/sql-relational-core/guards';
 import type {
   AnyBinaryBuilder,
   AnyOrderBuilder,
@@ -22,10 +23,6 @@ import type {
   NestedProjection,
   OrderBuilder,
 } from '@prisma-next/sql-relational-core/types';
-import {
-  extractBaseColumnRef,
-  isOperationExpr,
-} from '@prisma-next/sql-relational-core/utils/guards';
 import {
   errorChildProjectionMustBeSpecified,
   errorLimitMustBeNonNegativeInteger,

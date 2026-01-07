@@ -25,22 +25,21 @@ export interface ContractIR<
   readonly sources: Record<string, unknown>;
 }
 
+export interface ContractIRHeader
+  extends Pick<ContractIR, 'schemaVersion' | 'target' | 'targetFamily'> {
+  readonly coreHash: string;
+  readonly profileHash?: string;
+}
+
 /**
  * Creates the header portion of a ContractIR.
  * Contains schema version, target, target family, core hash, and optional profile hash.
  */
-export function irHeader(opts: {
-  target: string;
-  targetFamily: string;
-  coreHash: string;
-  profileHash?: string;
-}): {
-  readonly schemaVersion: string;
-  readonly target: string;
-  readonly targetFamily: string;
-  readonly coreHash: string;
-  readonly profileHash?: string;
-} {
+export function irHeader(
+  opts: Omit<ContractIRHeader, 'profileHash' | 'schemaVersion'> & {
+    readonly profileHash?: ContractIRHeader['profileHash'];
+  },
+): ContractIRHeader {
   return {
     schemaVersion: '1',
     target: opts.target,

@@ -33,15 +33,17 @@
     "src"
   ],
   "exports": {
-    ".": "./src/exports/types.ts",
+    ".": "./src/index.ts",
+    "./types": "./src/exports/types.ts",
     "./package.json": "./package.json"
   },
-  "main": "./dist/types.mjs",
-  "module": "./dist/types.mjs",
-  "types": "./dist/types.d.mts",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "publishConfig": {
     "exports": {
-      ".": "./dist/types.mjs",
+      ".": "./dist/index.mjs",
+      "./types": "./dist/exports/types.mjs",
       "./package.json": "./package.json"
     }
   }

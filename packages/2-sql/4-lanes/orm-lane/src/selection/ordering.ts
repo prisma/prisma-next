@@ -1,10 +1,7 @@
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { ColumnRef, Direction, OperationExpr } from '@prisma-next/sql-relational-core/ast';
+import { extractBaseColumnRef, isOperationExpr } from '@prisma-next/sql-relational-core/guards';
 import type { AnyOrderBuilder, OrderBuilder } from '@prisma-next/sql-relational-core/types';
-import {
-  extractBaseColumnRef,
-  isOperationExpr,
-} from '@prisma-next/sql-relational-core/utils/guards';
 import { createColumnRef, createOrderByItem } from '../utils/ast';
 
 export function buildOrderByClause(orderBy: AnyOrderBuilder | undefined):

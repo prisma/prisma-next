@@ -20,7 +20,7 @@ describe('SQL OperationRegistry', () => {
     register(registry, signature);
     const operations = registry.byType('pg/vector@1');
     expect(operations).toHaveLength(1);
-    expect(operations[0]?.lowering).toEqual({
+    expect((operations[0] as SqlOperationSignature)?.lowering).toEqual({
       targetFamily: 'sql',
       strategy: 'infix',
       // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
@@ -45,6 +45,6 @@ describe('SQL OperationRegistry', () => {
 
     register(registry, signature);
     const operations = registry.byType('pg/vector@1');
-    expect(operations[0]?.lowering.strategy).toBe('function');
+    expect((operations[0] as SqlOperationSignature)?.lowering.strategy).toBe('function');
   });
 });

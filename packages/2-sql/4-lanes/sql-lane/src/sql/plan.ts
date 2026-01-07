@@ -1,13 +1,13 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type { Expression } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
-import type { AnyExpressionSource } from '@prisma-next/sql-relational-core/types';
 import {
   collectColumnRefs,
   isColumnBuilder,
   isExpressionBuilder,
   isOperationExpr,
-} from '@prisma-next/sql-relational-core/utils/guards';
+} from '@prisma-next/sql-relational-core/guards';
+import type { AnyExpressionSource } from '@prisma-next/sql-relational-core/types';
 import type { MetaBuildArgs } from '../types/internal';
 import { assertColumnBuilder } from '../utils/assertions';
 import { errorMissingColumnForAlias } from '../utils/errors';
