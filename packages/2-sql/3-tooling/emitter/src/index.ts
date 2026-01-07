@@ -11,6 +11,7 @@ import type {
   StorageColumn,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
+import { assertDefined } from '@prisma-next/utils/assertions';
 
 export const sqlTargetFamilyHook = {
   id: 'sql',
@@ -69,10 +70,9 @@ export const sqlTargetFamilyHook = {
           throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
         }
 
-        const table = storage.tables[tableName];
-        if (!table) {
-          throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
-        }
+        // Table existence guaranteed by Set.has() check above
+        const table: StorageTable = storage.tables[tableName]!;
+        assertDefined(table, `Model "${modelName}" references non-existent table "${tableName}"`);
 
         if (!table.primaryKey) {
           throw new Error(`Model "${modelName}" table "${tableName}" is missing a primary key`);
@@ -173,12 +173,12 @@ export const sqlTargetFamilyHook = {
           );
         }
 
-        const referencedTable = storage.tables[fk.references.table];
-        if (!referencedTable) {
-          throw new Error(
-            `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
-          );
-        }
+        // Table existence guaranteed by Set.has() check above
+        const referencedTable: StorageTable = storage.tables[fk.references.table]!;
+        assertDefined(
+          referencedTable,
+          `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+        );
 
         const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
         for (const colName of fk.references.columns) {

@@ -1,3 +1,4 @@
+import type { NormalizedTypeRenderer } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   ControlAdapterDescriptor,
@@ -709,5 +710,102 @@ describe('sql-target-family-hook', () => {
     expect(operationImports).toEqual([
       { package: '@test/adapter/operation-types', named: 'OperationTypes', alias: 'TestOps' },
     ]);
+  });
+
+  it('renders column type using inline typeParams with parameterized renderer', () => {
+    const ir = createContractIR({
+      models: {
+        Embedding: {
+          storage: { table: 'embedding' },
+          fields: {
+            id: { column: 'id' },
+            vector: { column: 'vector' },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          embedding: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              vector: {
+                nativeType: 'vector(1536)',
+                codecId: 'pg/vector@1',
+                nullable: false,
+                typeParams: { length: 1536 },
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const parameterizedRenderers = new Map<string, NormalizedTypeRenderer>();
+    parameterizedRenderers.set('pg/vector@1', {
+      codecId: 'pg/vector@1',
+      render: (params, ctx) =>
+        `${ctx.codecTypesName}['pg/vector@1']['output'] & { length: ${params['length']} }`,
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], { parameterizedRenderers });
+
+    expect(types).toContain("CodecTypes['pg/vector@1']['output'] & { length: 1536 }");
+  });
+
+  it('renders column type using typeRef with parameterized renderer', () => {
+    const ir = createContractIR({
+      models: {
+        Embedding: {
+          storage: { table: 'embedding' },
+          fields: {
+            id: { column: 'id' },
+            vector: { column: 'vector' },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          embedding: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              vector: {
+                nativeType: 'vector(1536)',
+                codecId: 'pg/vector@1',
+                nullable: false,
+                typeRef: 'Vector1536',
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+        types: {
+          Vector1536: {
+            codecId: 'pg/vector@1',
+            nativeType: 'vector(1536)',
+            typeParams: { length: 1536 },
+          },
+        },
+      },
+    });
+
+    const parameterizedRenderers = new Map<string, NormalizedTypeRenderer>();
+    parameterizedRenderers.set('pg/vector@1', {
+      codecId: 'pg/vector@1',
+      render: (params, ctx) =>
+        `${ctx.codecTypesName}['pg/vector@1']['output'] & { length: ${params['length']} }`,
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], { parameterizedRenderers });
+
+    expect(types).toContain("CodecTypes['pg/vector@1']['output'] & { length: 1536 }");
   });
 });
