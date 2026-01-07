@@ -303,6 +303,7 @@ packages/
       relational-core/   # schema + column builders, operation attachment
       sql-lane/          # relational DSL + raw lane
       orm-lane/          # ORM builder, includes, relation filters
+      query-builder/     # query builder lane
     5-runtime/           # SQL runtime implementing the runtime SPI
   3-targets/             # Domain 3: Targets
     3-targets/

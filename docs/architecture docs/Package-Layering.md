@@ -92,6 +92,7 @@ The SQL domain (`packages/2-sql/`) contains SQL-specific packages organized by l
 |   |-- relational-core/ → @prisma-next/sql-relational-core
 |   |-- sql-lane/      → @prisma-next/sql-lane
 |   |-- orm-lane/      → @prisma-next/sql-orm-lane
+|   |-- query-builder/ → @prisma-next/sql-lane-query-builder
 |-- 5-runtime (runtime plane)
     |-- → @prisma-next/sql-runtime
 ```
@@ -237,6 +238,7 @@ Lanes consume targets and relational-core helpers to produce AST plans. Packages
 - `packages/2-sql/4-lanes/relational-core/` → `@prisma-next/sql-relational-core` – shared schema/column builders, operation attachment, AST factories
 - `packages/2-sql/4-lanes/sql-lane/` → `@prisma-next/sql-lane` – SQL DSL + raw lane (Phase 1 refactor keeps API stable while using shared factories)
 - `packages/2-sql/4-lanes/orm-lane/` → `@prisma-next/sql-orm-lane` – ORM builder (Phase 1 removes dependency on `sql-lane`)
+- `packages/2-sql/4-lanes/query-builder/` → `@prisma-next/sql-lane-query-builder` – Query builder lane
 
 ### Runtime Layer
 
@@ -305,6 +307,7 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/2-sql/4-lanes/relational-core/` | `@prisma-next/sql-relational-core` |
 | `packages/2-sql/4-lanes/sql-lane/` | `@prisma-next/sql-lane` |
 | `packages/2-sql/4-lanes/orm-lane/` | `@prisma-next/sql-orm-lane` |
+| `packages/2-sql/4-lanes/query-builder/` | `@prisma-next/sql-lane-query-builder` |
 | `packages/2-sql/5-runtime/` | `@prisma-next/sql-runtime` |
 | `packages/3-targets/3-targets/postgres/` | `@prisma-next/target-postgres` |
 | `packages/3-targets/6-adapters/postgres/` | `@prisma-next/adapter-postgres` |

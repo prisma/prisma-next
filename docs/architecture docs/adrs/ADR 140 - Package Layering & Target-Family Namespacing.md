@@ -42,6 +42,7 @@ packages/
     relational-core/     (schema + column builders, operation attachment, AST types)
     sql-lane/            (relational DSL + raw lane)
     orm-lane/            (ORM builder, includes, relation filters)
+    query-builder/       (query builder lane)
   runtime/
     core/                (target-agnostic runtime kernel: verification, plugins, SPI)
   sql/
