@@ -1,9 +1,6 @@
-import type {
-  ControlAdapterDescriptor,
-  ControlTargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
 import { createControlPlaneStack } from '../src/stack';
+import type { ControlAdapterDescriptor, ControlTargetDescriptor } from '../src/types';
 
 describe('createControlPlaneStack', () => {
   it('defaults driver to undefined and extensionPacks to []', () => {
