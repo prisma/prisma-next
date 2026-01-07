@@ -75,6 +75,8 @@ export interface NormalizedTypeRenderer {
 /**
  * Interpolates a template string with params values.
  * Used internally by normalizeRenderer to compile templates to functions.
+ *
+ * @throws Error if a placeholder key is not found in params (except 'CodecTypes')
  */
 export function interpolateTypeTemplate(
   template: string,
@@ -84,7 +86,13 @@ export function interpolateTypeTemplate(
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
     if (key === 'CodecTypes') return ctx.codecTypesName;
     const value = params[key];
-    return value !== undefined ? String(value) : '';
+    if (value === undefined) {
+      throw new Error(
+        `Missing template parameter "${key}" in template "${template}". ` +
+          `Available params: ${Object.keys(params).join(', ') || '(none)'}`,
+      );
+    }
+    return String(value);
   });
 }
 
