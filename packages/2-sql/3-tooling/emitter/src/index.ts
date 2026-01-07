@@ -70,8 +70,7 @@ export const sqlTargetFamilyHook = {
           throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
         }
 
-        // Table existence guaranteed by Set.has() check above
-        const table: StorageTable = storage.tables[tableName]!;
+        const table: StorageTable | undefined = storage.tables[tableName];
         assertDefined(table, `Model "${modelName}" references non-existent table "${tableName}"`);
 
         if (!table.primaryKey) {
