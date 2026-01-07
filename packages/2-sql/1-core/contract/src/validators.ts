@@ -15,13 +15,21 @@ import type {
   UniqueConstraint,
 } from './types';
 
-const StorageColumnSchema = type.declare<StorageColumn>().type({
-  nativeType: 'string',
-  codecId: 'string',
-  nullable: 'boolean',
-  'typeParams?': 'Record<string, unknown>',
-  'typeRef?': 'string',
-});
+const StorageColumnSchema = type
+  .declare<StorageColumn>()
+  .type({
+    nativeType: 'string',
+    codecId: 'string',
+    nullable: 'boolean',
+    'typeParams?': 'Record<string, unknown>',
+    'typeRef?': 'string',
+  })
+  .narrow((col, ctx) => {
+    if (col.typeParams !== undefined && col.typeRef !== undefined) {
+      return ctx.mustBe('a column with either typeParams or typeRef, not both');
+    }
+    return true;
+  });
 
 const StorageTypeInstanceSchema = type.declare<StorageTypeInstance>().type({
   codecId: 'string',
