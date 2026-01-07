@@ -64,8 +64,7 @@ describe('pgvector descriptor', () => {
   describe('parameterized codec renderers', () => {
     it('has parameterized renderers in codecTypes', () => {
       const parameterized = pgvectorExtensionDescriptor.types?.codecTypes?.parameterized;
-      expect(parameterized).toBeDefined();
-      expect(Object.keys(parameterized ?? {})).toContain('pg/vector@1');
+      expect(parameterized).toHaveProperty('pg/vector@1');
     });
 
     it('vector codec has template renderer', () => {
