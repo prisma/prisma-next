@@ -1,5 +1,12 @@
 import type { ContractBase } from '@prisma-next/contract/types';
 
+/**
+ * A column definition in storage.
+ *
+ * `typeParams` is optional because most columns use non-parameterized types.
+ * Columns with parameterized types can either inline `typeParams` or reference
+ * a named {@link StorageTypeInstance} via `typeRef`.
+ */
 export type StorageColumn = {
   readonly nativeType: string;
   readonly codecId: string;
@@ -55,6 +62,11 @@ export type StorageTable = {
  * A named, parameterized type instance.
  * These are registered in `storage.types` for reuse across columns
  * and to enable ergonomic schema surfaces like `schema.types.MyType`.
+ *
+ * Unlike {@link StorageColumn}, `typeParams` is required here because
+ * `StorageTypeInstance` exists specifically to define reusable parameterized types.
+ * A type instance without parameters would be redundant—columns can reference
+ * the codec directly via `codecId`.
  */
 export type StorageTypeInstance = {
   readonly codecId: string;

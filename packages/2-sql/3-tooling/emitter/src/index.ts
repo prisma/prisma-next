@@ -173,7 +173,7 @@ export const sqlTargetFamilyHook = {
         }
 
         // Table existence guaranteed by Set.has() check above
-        const referencedTable: StorageTable = storage.tables[fk.references.table]!;
+        const referencedTable: StorageTable | undefined = storage.tables[fk.references.table];
         assertDefined(
           referencedTable,
           `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
