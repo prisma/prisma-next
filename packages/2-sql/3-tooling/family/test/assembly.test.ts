@@ -96,7 +96,7 @@ describe('extractParameterizedRenderers', () => {
             parameterized: {
               'test/custom@1': {
                 kind: 'function',
-                render: (params, ctx) => `Custom<${params.precision}, ${ctx.codecTypesName}>`,
+                render: (params, ctx) => `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
               },
             },
           },

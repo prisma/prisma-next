@@ -50,8 +50,8 @@ describe('validateContract parameterized type fields', () => {
       };
 
       const result = validateContract<SqlContract<SqlStorage>>(input);
-      const vectorCol = result.storage.tables.Embedding.columns.vector;
-      expect(vectorCol.typeParams).toEqual({ length: 1536 });
+      const vectorCol = result.storage.tables['Embedding']?.columns['vector'];
+      expect(vectorCol?.typeParams).toEqual({ length: 1536 });
     });
 
     it('accepts column with empty typeParams object', () => {
@@ -78,12 +78,12 @@ describe('validateContract parameterized type fields', () => {
       };
 
       const result = validateContract<SqlContract<SqlStorage>>(input);
-      expect(result.storage.tables.User.columns.id.typeParams).toEqual({});
+      expect(result.storage.tables['User']?.columns['id']?.typeParams).toEqual({});
     });
 
     it('accepts column without typeParams (optional field)', () => {
       const result = validateContract<SqlContract<SqlStorage>>(baseContractInput);
-      expect(result.storage.tables.User.columns.id.typeParams).toBeUndefined();
+      expect(result.storage.tables['User']?.columns['id']?.typeParams).toBeUndefined();
     });
 
     it('rejects non-object typeParams', () => {
@@ -213,8 +213,8 @@ describe('validateContract parameterized type fields', () => {
       };
 
       const result = validateContract<SqlContract<SqlStorage>>(input);
-      const vectorCol = result.storage.tables.Embedding.columns.vector;
-      expect(vectorCol.typeRef).toBe('Vector1536');
+      const vectorCol = result.storage.tables['Embedding']?.columns['vector'];
+      expect(vectorCol?.typeRef).toBe('Vector1536');
     });
 
     it('rejects non-string typeRef', () => {
