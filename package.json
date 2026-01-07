@@ -50,14 +50,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,jsonc}": [
-      "biome format --write",
-      "biome check --write"
-    ],
-    "*.{ts,tsx,js,jsx}": [
-      "node scripts/lint-deps-focused.mjs"
-    ]
   }
 }

@@ -5,7 +5,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { createSqlContext } from '../src/sql/context.ts';
-import type { Contract } from './fixtures/contract.d.ts';
+import type { Contract } from './fixtures/contract.d.js';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

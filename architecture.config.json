@@ -215,7 +215,13 @@
     "shared": {
       "allow": ["shared"],
       "forbid": ["migration", "runtime"],
-      "exceptions": []
+      "exceptions": [
+        {
+          "from": "packages/2-sql/3-tooling/family/src/core/**",
+          "to": "packages/1-framework/1-core/migration/**",
+          "reason": "SQL tooling family shared plane needs to import migration types for schema verification and migration planning"
+        }
+      ]
     },
     "migration": {
       "allow": ["shared", "migration"],
