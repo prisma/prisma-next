@@ -436,20 +436,9 @@ export const sqlTargetFamilyHook = {
   ): string {
     const typeParams = resolveColumnTypeParams(column, storage);
     const nullable = column.nullable ?? false;
-    let baseType: string;
-
-    if (typeParams && parameterizedRenderers) {
-      const renderer = parameterizedRenderers.get(column.codecId);
-      if (renderer) {
-        baseType = renderer.render(typeParams, renderCtx);
-      } else {
-        // No renderer for this codecId, fall back to standard lookup
-        baseType = `CodecTypes['${column.codecId}']['output']`;
-      }
-    } else {
-      // No typeParams, use standard codec lookup
-      baseType = `CodecTypes['${column.codecId}']['output']`;
-    }
+    const fallbackType = `CodecTypes['${column.codecId}']['output']`;
+    const renderer = typeParams && parameterizedRenderers?.get(column.codecId);
+    const baseType = renderer ? renderer.render(typeParams, renderCtx) : fallbackType;
 
     return nullable ? `${baseType} | null` : baseType;
   },
