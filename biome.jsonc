@@ -14,7 +14,8 @@
       "!**/node_modules",
       "!**/.prisma",
       "!**/*.d.ts",
-      "!**/contract.json"
+      "!**/contract.json",
+      "!**/base.js"
     ]
   },
   "formatter": {
