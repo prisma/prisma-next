@@ -628,5 +628,190 @@ describe('sql-target-family-hook parameterized type emission', () => {
         "readonly typeParams: { readonly a: 1; readonly b: 'hello'; readonly c: true }",
       );
     });
+
+    it('emits typeParams with arrays', () => {
+      const ir = createContractIR({
+        storage: {
+          tables: {
+            data: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            ArrayType: {
+              codecId: 'custom/type@1',
+              nativeType: 'custom',
+              typeParams: { items: [1, 2, 3] },
+            },
+          },
+        },
+      });
+
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+
+      expect(types).toContain('readonly ArrayType:');
+      expect(types).toContain('readonly typeParams: { readonly items: readonly [1, 2, 3] }');
+    });
+
+    it('emits typeParams with nested objects inside objects', () => {
+      const ir = createContractIR({
+        storage: {
+          tables: {
+            data: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            NestedType: {
+              codecId: 'custom/type@1',
+              nativeType: 'custom',
+              typeParams: { config: { depth: 5, enabled: true } },
+            },
+          },
+        },
+      });
+
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+
+      expect(types).toContain('readonly NestedType:');
+      expect(types).toContain(
+        'readonly typeParams: { readonly config: { readonly depth: 5; readonly enabled: true } }',
+      );
+    });
+
+    it('emits typeParams with null values', () => {
+      const ir = createContractIR({
+        storage: {
+          tables: {
+            data: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            NullableType: {
+              codecId: 'custom/type@1',
+              nativeType: 'custom',
+              typeParams: { value: null },
+            },
+          },
+        },
+      });
+
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+
+      expect(types).toContain('readonly NullableType:');
+      expect(types).toContain('readonly typeParams: { readonly value: null }');
+    });
+
+    it('emits typeParams with undefined values', () => {
+      const ir = createContractIR({
+        storage: {
+          tables: {
+            data: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            UndefinedType: {
+              codecId: 'custom/type@1',
+              nativeType: 'custom',
+              typeParams: { value: undefined },
+            },
+          },
+        },
+      });
+
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+
+      expect(types).toContain('readonly UndefinedType:');
+      expect(types).toContain('readonly typeParams: { readonly value: undefined }');
+    });
+  });
+
+  describe('parameterizedTypeImports option', () => {
+    it('includes parameterizedTypeImports in generated imports', () => {
+      const ir = createContractIR({
+        storage: {
+          tables: {
+            data: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      });
+
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+        parameterizedTypeImports: [
+          { package: '@custom/types', named: 'Vector', alias: 'Vector' },
+          { package: '@custom/types', named: 'Matrix', alias: 'Matrix' },
+        ],
+      });
+
+      expect(types).toContain("import type { Vector } from '@custom/types';");
+      expect(types).toContain("import type { Matrix } from '@custom/types';");
+    });
+
+    it('deduplicates imports when parameterizedTypeImports overlaps with codecTypeImports', () => {
+      const ir = createContractIR({
+        storage: {
+          tables: {
+            data: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      });
+
+      const types = sqlTargetFamilyHook.generateContractTypes(
+        ir,
+        [{ package: '@custom/types', named: 'Vector', alias: 'Vector' }],
+        [],
+        {
+          parameterizedTypeImports: [
+            { package: '@custom/types', named: 'Vector', alias: 'Vector' },
+          ],
+        },
+      );
+
+      // Should only have one Vector import, not two
+      const vectorImportMatches = types.match(/import type \{ Vector \}/g);
+      expect(vectorImportMatches?.length).toBe(1);
+    });
   });
 });
