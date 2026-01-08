@@ -2,6 +2,7 @@ packages:
   - packages/**
   - examples/*
   - test/**
+  - '!**/dist-*'
 
 allowBuilds:
   '@prisma/client@6.18.0': true
@@ -17,6 +18,7 @@ catalog:
   '@types/pg': 8.16.0
   gray-matter: ^4.0.3
   pg: 8.16.3
+  tsdown: 0.18.4
   tsup: 8.5.1
   typescript: 5.9.3
   vitest: 4.0.16

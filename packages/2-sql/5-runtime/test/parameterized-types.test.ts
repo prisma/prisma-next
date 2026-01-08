@@ -250,18 +250,15 @@ describe('parameterized types', () => {
       }
 
       expect(thrownError).toBeDefined();
-      const error = thrownError as {
-        code?: string;
-        category?: string;
-        severity?: string;
-        details?: Record<string, unknown>;
-      };
-      expect(error.code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
-      expect(error.category).toBe('RUNTIME');
-      expect(error.severity).toBe('error');
-      expect(error.details).toBeDefined();
-      expect(error.details?.['codecId']).toBe('pg/vector@1');
-      expect(error.details?.['typeName']).toBe('InvalidVector');
+      expect(thrownError).toMatchObject({
+        code: 'RUNTIME.TYPE_PARAMS_INVALID',
+        category: 'RUNTIME',
+        severity: 'error',
+        details: {
+          codecId: 'pg/vector@1',
+          typeName: 'InvalidVector',
+        },
+      });
     });
 
     it('rejects missing required typeParams with stable error code', () => {
@@ -288,10 +285,11 @@ describe('parameterized types', () => {
       }
 
       expect(thrownError).toBeDefined();
-      const error = thrownError as { code?: string; category?: string; severity?: string };
-      expect(error.code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
-      expect(error.category).toBe('RUNTIME');
-      expect(error.severity).toBe('error');
+      expect(thrownError).toMatchObject({
+        code: 'RUNTIME.TYPE_PARAMS_INVALID',
+        category: 'RUNTIME',
+        severity: 'error',
+      });
     });
   });
 
@@ -541,17 +539,15 @@ describe('parameterized types', () => {
       }
 
       expect(thrownError).toBeDefined();
-      const error = thrownError as {
-        code?: string;
-        category?: string;
-        severity?: string;
-        details?: Record<string, unknown>;
-      };
-      expect(error.code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
-      expect(error.category).toBe('RUNTIME');
-      expect(error.severity).toBe('error');
-      expect(error.details?.['tableName']).toBe('test');
-      expect(error.details?.['columnName']).toBe('embedding');
+      expect(thrownError).toMatchObject({
+        code: 'RUNTIME.TYPE_PARAMS_INVALID',
+        category: 'RUNTIME',
+        severity: 'error',
+        details: {
+          tableName: 'test',
+          columnName: 'embedding',
+        },
+      });
     });
   });
 });

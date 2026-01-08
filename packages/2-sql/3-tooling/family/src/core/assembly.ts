@@ -144,11 +144,10 @@ export function extractParameterizedRenderers(
   const owners = new Map<string, string>(); // codecId -> descriptor.id for error messages
 
   for (const descriptor of descriptors) {
-    const parameterized = descriptor.types?.codecTypes?.parameterized as
-      | Record<string, TypeRenderer>
-      | undefined;
-    if (!parameterized) continue;
+    const codecTypes = descriptor.types?.codecTypes;
+    if (!codecTypes?.parameterized) continue;
 
+    const parameterized: Record<string, TypeRenderer> = codecTypes.parameterized;
     for (const [codecId, renderer] of Object.entries(parameterized)) {
       const existingOwner = owners.get(codecId);
       if (existingOwner !== undefined) {

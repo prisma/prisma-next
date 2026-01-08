@@ -7,7 +7,9 @@
       "Bash(cat:*)",
       "Skill(bumping-biome)",
       "Bash(pnpm list:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Skill(tsdown-package)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

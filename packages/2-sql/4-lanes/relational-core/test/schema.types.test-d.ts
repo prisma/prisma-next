@@ -19,7 +19,7 @@ type ContractWithTypes = SqlContract<
           readonly id: {
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
-            nullable: false;
+            readonly nullable: false;
           };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };

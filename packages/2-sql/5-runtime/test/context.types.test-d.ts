@@ -50,7 +50,7 @@ test('RuntimeContext preserves contract type parameter', () => {
 
   // Verify we can access storage.types through the context's contract
   type ContractStorageTypes = RuntimeContext<TestContract>['contract']['storage']['types'];
-  expectTypeOf<ContractStorageTypes>().toMatchTypeOf<
+  expectTypeOf<ContractStorageTypes>().toExtend<
     | {
         readonly Vector1536: {
           readonly codecId: 'pg/vector@1';
@@ -65,6 +65,6 @@ test('RuntimeContext preserves contract type parameter', () => {
 test('RuntimeContext accepts generic SqlContract', () => {
   // Verify RuntimeContext defaults work
   type DefaultContext = RuntimeContext;
-  expectTypeOf<DefaultContext['contract']>().toMatchTypeOf<SqlContract<SqlStorage>>();
+  expectTypeOf<DefaultContext['contract']>().toExtend<SqlContract<SqlStorage>>();
   expectTypeOf<DefaultContext['types']>().toEqualTypeOf<TypeHelperRegistry | undefined>();
 });

@@ -1,3 +1,4 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TypeRenderEntry, TypeRenderer, TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
@@ -105,10 +106,29 @@ function createMockExtensionWithParameterizedRenderer(
           },
         ],
         parameterized: {
-          [codecId]: (params, ctx) => renderer(params, ctx),
+          [codecId]: renderer,
         },
       },
     },
+  };
+}
+
+function createTestContractIR(
+  overrides: Partial<ContractIR> & { coreHash?: string } = {},
+): ContractIR & { coreHash?: string } {
+  return {
+    schemaVersion: '1',
+    targetFamily: 'sql',
+    target: 'postgres',
+    coreHash: 'sha256:placeholder',
+    models: {},
+    relations: {},
+    storage: { tables: {} },
+    extensionPacks: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
+    ...overrides,
   };
 }
 
@@ -130,11 +150,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Create a contract IR with a column using the parameterized codec
-    const contractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      coreHash: 'sha256:placeholder',
+    const contractIR = createTestContractIR({
       models: {
         Embedding: {
           storage: { table: 'embedding' },
@@ -145,7 +161,6 @@ describe('emit parameterized codecs integration', () => {
           relations: {},
         },
       },
-      relations: {},
       storage: {
         tables: {
           embedding: {
@@ -166,10 +181,7 @@ describe('emit parameterized codecs integration', () => {
         },
       },
       extensionPacks: { pgvector: { version: '0.0.1' } },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     // Emit the contract
     const result = await familyInstance.emitContract({ contractIR });
@@ -212,11 +224,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Create a contract IR with a column using the parameterized codec
-    const contractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      coreHash: 'sha256:placeholder',
+    const contractIR = createTestContractIR({
       models: {
         Embedding: {
           storage: { table: 'embedding' },
@@ -227,7 +235,6 @@ describe('emit parameterized codecs integration', () => {
           relations: {},
         },
       },
-      relations: {},
       storage: {
         tables: {
           embedding: {
@@ -248,10 +255,7 @@ describe('emit parameterized codecs integration', () => {
         },
       },
       extensionPacks: { pgvector: { version: '0.0.1' } },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     // Emit the contract
     const result = await familyInstance.emitContract({ contractIR });
@@ -278,11 +282,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Contract with columns WITHOUT typeParams
-    const contractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      coreHash: 'sha256:placeholder',
+    const contractIR = createTestContractIR({
       models: {
         User: {
           storage: { table: 'user' },
@@ -293,7 +293,6 @@ describe('emit parameterized codecs integration', () => {
           relations: {},
         },
       },
-      relations: {},
       storage: {
         tables: {
           user: {
@@ -308,11 +307,7 @@ describe('emit parameterized codecs integration', () => {
           },
         },
       },
-      extensionPacks: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = await familyInstance.emitContract({ contractIR });
 
@@ -338,11 +333,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Contract with column using a different codecId (no renderer exists)
-    const contractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      coreHash: 'sha256:placeholder',
+    const contractIR = createTestContractIR({
       models: {
         Data: {
           storage: { table: 'data' },
@@ -352,7 +343,6 @@ describe('emit parameterized codecs integration', () => {
           relations: {},
         },
       },
-      relations: {},
       storage: {
         tables: {
           data: {
@@ -371,11 +361,7 @@ describe('emit parameterized codecs integration', () => {
           },
         },
       },
-      extensionPacks: {},
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = await familyInstance.emitContract({ contractIR });
 
@@ -428,11 +414,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Create a contract IR with columns using both parameterized codecs
-    const contractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      coreHash: 'sha256:placeholder',
+    const contractIR = createTestContractIR({
       models: {
         Data: {
           storage: { table: 'data' },
@@ -444,7 +426,6 @@ describe('emit parameterized codecs integration', () => {
           relations: {},
         },
       },
-      relations: {},
       storage: {
         tables: {
           data: {
@@ -471,10 +452,7 @@ describe('emit parameterized codecs integration', () => {
         },
       },
       extensionPacks: { pgvector: { version: '0.0.1' } },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = await familyInstance.emitContract({ contractIR });
 
@@ -527,11 +505,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Contract with columns using BOTH parameterized codecs from the same package
-    const contractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      coreHash: 'sha256:placeholder',
+    const contractIR = createTestContractIR({
       models: {
         VectorData: {
           storage: { table: 'vector_data' },
@@ -543,7 +517,6 @@ describe('emit parameterized codecs integration', () => {
           relations: {},
         },
       },
-      relations: {},
       storage: {
         tables: {
           vector_data: {
@@ -570,10 +543,7 @@ describe('emit parameterized codecs integration', () => {
         },
       },
       extensionPacks: { pgvector: { version: '0.0.1' } },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = await familyInstance.emitContract({ contractIR });
 

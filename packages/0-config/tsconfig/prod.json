@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Production",
+  "extends": ["./base.json"],
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+
+    // see `base.json`'s `outDir` comment.
+    // this is a separate folder to avoid conflicts when someone runs `tsc` directly.
+    // so we could compare `tsc` outputs between prod and dev builds when needed.
+    "outDir": "${configDir}/dist-tsc-prod",
+    "rootDir": "${configDir}"
+  }
+}

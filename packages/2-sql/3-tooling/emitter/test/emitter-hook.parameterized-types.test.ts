@@ -593,8 +593,8 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
 
       // Should handle missing types gracefully - either omit or emit empty
-      // Check it doesn't error and produces valid output
-      expect(types).toContain('export type Contract = SqlContract<');
+      // When storage.types is undefined, should emit same as empty
+      expect(types).toContain('readonly types: Record<string, never>');
     });
 
     it('emits typeParams with nested objects', () => {

@@ -6,6 +6,7 @@
   "description": "Base tsconfig providing package for the monorepo",
   "license": "MIT",
   "files": [
-    "./base.json"
+    "base.json",
+    "prod.json"
   ]
 }

@@ -4,5 +4,9 @@
   "typescript.tsdk": "node_modules/typescript/lib",
   "[typescript]": {
     "editor.defaultFormatter": "biomejs.biome"
+  },
+  "files.associations": {
+    "**/packages/0-config/tsconfig/base.json": "jsonc",
+    "**/packages/0-config/tsconfig/prod.json": "jsonc"
   }
 }
