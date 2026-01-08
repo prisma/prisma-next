@@ -3,8 +3,8 @@
   "display": "Base",
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "strict": true,
     "exactOptionalPropertyTypes": true,
@@ -19,6 +19,11 @@
     "skipLibCheck": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+
+    // we don't use `tsc` to emit code. in case someone runs `tsc` without `--noEmit`
+    // instead of our build tools, having both emit to the same `dist` folder can
+    // cause hard to spot issues.
+    "outDir": "${configDir}/dist-tsc"
   }
 }

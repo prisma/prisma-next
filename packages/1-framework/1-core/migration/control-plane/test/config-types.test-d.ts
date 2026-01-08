@@ -20,21 +20,99 @@ const mockHook = {
 
 const sqlFamilyDescriptor: ControlFamilyDescriptor<'sql'> = {
   kind: 'family',
+  version: '1',
   id: 'sql',
   familyId: 'sql',
-  manifest: { id: 'sql', version: '0.0.1' },
   hook: mockHook,
   create: (_stack) => ({
     familyId: 'sql',
+    emitContract: async () => ({
+      contractDts: '',
+      contractJson: '{}',
+      coreHash: '',
+      profileHash: '',
+    }),
+    introspect: async () => ({}),
+    readMarkers: async () => ({}),
+    readMarker: async () => null,
+    schemaVerify: async () => ({
+      contract: {
+        coreHash: '',
+      },
+      ok: true,
+      schema: {
+        counts: {
+          models: 0,
+          enums: 0,
+          relations: 0,
+          fields: 0,
+          fail: 0,
+          pass: 0,
+          totalNodes: 0,
+          warn: 0,
+        },
+        issues: [],
+        root: {
+          models: [],
+          enums: [],
+          actual: '',
+          children: [],
+          code: '',
+          contractPath: '',
+          expected: '',
+          kind: '',
+          message: '',
+          name: '',
+          status: 'pass',
+        },
+      },
+      summary: '',
+      target: { expected: 'mysql' },
+      timings: { total: 0 },
+    }),
+    sign: async () => ({
+      contract: {
+        coreHash: '',
+      },
+      marker: {
+        created: true,
+        updated: true,
+      },
+      ok: true,
+      summary: '',
+      target: { expected: '' },
+      timings: { total: 0 },
+    }),
+    validateContractIR: () => ({
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      models: {},
+      relations: {},
+      schemaVersion: '1',
+      sources: {},
+      storage: {},
+      target: '',
+      targetFamily: '',
+    }),
+    verify: async () => ({
+      contract: {
+        coreHash: '',
+      },
+      ok: true,
+      summary: '',
+      target: { expected: '' },
+      timings: { total: 0 },
+    }),
   }),
 };
 
 const postgresTargetDescriptor: ControlTargetDescriptor<'sql', 'postgres'> = {
   kind: 'target',
+  version: '1',
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  manifest: { id: 'postgres', version: '0.0.1' },
   create: () => ({
     familyId: 'sql',
     targetId: 'postgres',
@@ -43,10 +121,10 @@ const postgresTargetDescriptor: ControlTargetDescriptor<'sql', 'postgres'> = {
 
 const postgresAdapterDescriptor: ControlAdapterDescriptor<'sql', 'postgres'> = {
   kind: 'adapter',
+  version: '1',
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  manifest: { id: 'postgres', version: '0.0.1' },
   create: () => ({
     familyId: 'sql',
     targetId: 'postgres',
@@ -55,23 +133,24 @@ const postgresAdapterDescriptor: ControlAdapterDescriptor<'sql', 'postgres'> = {
 
 const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres'> = {
   kind: 'driver',
+  version: '1',
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
-  manifest: { id: 'postgres', version: '0.0.1' },
   create: async () => ({
     targetId: 'postgres',
     query: async () => ({ rows: [] }),
     close: async () => {},
+    familyId: 'sql',
   }),
 };
 
 const postgresExtensionDescriptor: ControlExtensionDescriptor<'sql', 'postgres'> = {
   kind: 'extension',
+  version: '1',
   id: 'pgvector',
   familyId: 'sql',
   targetId: 'postgres',
-  manifest: { id: 'pgvector', version: '0.0.1' },
   create: () => ({
     familyId: 'sql',
     targetId: 'postgres',
@@ -94,20 +173,20 @@ test('accepts compatible Control*Descriptor types', () => {
 test('rejects mismatched targetId in target', () => {
   const mysqlTargetDescriptor: ControlTargetDescriptor<'sql', 'mysql'> = {
     kind: 'target',
+    version: '1',
     id: 'mysql',
     familyId: 'sql',
     targetId: 'mysql',
-    manifest: { id: 'mysql', version: '0.0.1' },
     create: () => ({
       familyId: 'sql',
       targetId: 'mysql',
     }),
   };
 
-  // @ts-expect-error - targetId mismatch: 'mysql' vs 'postgres'
   const config: PrismaNextConfig<'sql', 'postgres'> = {
     family: sqlFamilyDescriptor,
-    target: mysqlTargetDescriptor, // Wrong targetId
+    // @ts-expect-error - targetId mismatch: 'mysql' vs 'postgres'
+    target: mysqlTargetDescriptor,
     adapter: postgresAdapterDescriptor,
   };
 
@@ -117,21 +196,21 @@ test('rejects mismatched targetId in target', () => {
 test('rejects mismatched targetId in adapter', () => {
   const mysqlAdapterDescriptor: ControlAdapterDescriptor<'sql', 'mysql'> = {
     kind: 'adapter',
+    version: '1',
     id: 'mysql',
     familyId: 'sql',
     targetId: 'mysql',
-    manifest: { id: 'mysql', version: '0.0.1' },
     create: () => ({
       familyId: 'sql',
       targetId: 'mysql',
     }),
   };
 
-  // @ts-expect-error - targetId mismatch: 'mysql' vs 'postgres'
   const config: PrismaNextConfig<'sql', 'postgres'> = {
     family: sqlFamilyDescriptor,
     target: postgresTargetDescriptor,
-    adapter: mysqlAdapterDescriptor, // Wrong targetId
+    // @ts-expect-error - targetId mismatch: 'mysql' vs 'postgres'
+    adapter: mysqlAdapterDescriptor,
   };
 
   void config;
@@ -140,23 +219,24 @@ test('rejects mismatched targetId in adapter', () => {
 test('rejects mismatched targetId in driver', () => {
   const mysqlDriverDescriptor: ControlDriverDescriptor<'sql', 'mysql'> = {
     kind: 'driver',
+    version: '1',
     id: 'mysql',
     familyId: 'sql',
     targetId: 'mysql',
-    manifest: { id: 'mysql', version: '0.0.1' },
     create: async () => ({
       targetId: 'mysql',
       query: async () => ({ rows: [] }),
       close: async () => {},
+      familyId: 'sql',
     }),
   };
 
-  // @ts-expect-error - targetId mismatch: 'mysql' vs 'postgres'
   const config: PrismaNextConfig<'sql', 'postgres'> = {
     family: sqlFamilyDescriptor,
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
-    driver: mysqlDriverDescriptor, // Wrong targetId
+    // @ts-expect-error - targetId mismatch: 'mysql' vs 'postgres'
+    driver: mysqlDriverDescriptor,
   };
 
   void config;
@@ -165,22 +245,22 @@ test('rejects mismatched targetId in driver', () => {
 test('rejects mismatched targetId in extension', () => {
   const mysqlExtensionDescriptor: ControlExtensionDescriptor<'sql', 'mysql'> = {
     kind: 'extension',
+    version: '1',
     id: 'mysql-extension',
     familyId: 'sql',
     targetId: 'mysql',
-    manifest: { id: 'mysql-extension', version: '0.0.1' },
     create: () => ({
       familyId: 'sql',
       targetId: 'mysql',
     }),
   };
 
-  // @ts-expect-error - targetId mismatch: 'mysql' vs 'postgres'
   const config: PrismaNextConfig<'sql', 'postgres'> = {
     family: sqlFamilyDescriptor,
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
-    extensionPacks: [mysqlExtensionDescriptor], // Wrong targetId
+    // @ts-expect-error - targetId mismatch: 'mysql' vs 'postgres'
+    extensionPacks: [mysqlExtensionDescriptor],
   };
 
   void config;

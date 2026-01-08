@@ -15,15 +15,17 @@ export interface OperationSignature {
   readonly capabilities?: ReadonlyArray<string>;
 }
 
-export interface OperationRegistry {
-  register(op: OperationSignature): void;
-  byType(typeId: string): ReadonlyArray<OperationSignature>;
+export interface OperationRegistry<T extends OperationSignature = OperationSignature> {
+  register(op: T): void;
+  byType(typeId: string): ReadonlyArray<T>;
 }
 
-class OperationRegistryImpl implements OperationRegistry {
-  private readonly operations = new Map<string, OperationSignature[]>();
+class OperationRegistryImpl<T extends OperationSignature = OperationSignature>
+  implements OperationRegistry<T>
+{
+  private readonly operations = new Map<string, T[]>();
 
-  register(op: OperationSignature): void {
+  register(op: T): void {
     const existing = this.operations.get(op.forTypeId) ?? [];
     const duplicate = existing.find((existingOp) => existingOp.method === op.method);
     if (duplicate) {
@@ -35,13 +37,15 @@ class OperationRegistryImpl implements OperationRegistry {
     this.operations.set(op.forTypeId, existing);
   }
 
-  byType(typeId: string): ReadonlyArray<OperationSignature> {
+  byType(typeId: string): ReadonlyArray<T> {
     return this.operations.get(typeId) ?? [];
   }
 }
 
-export function createOperationRegistry(): OperationRegistry {
-  return new OperationRegistryImpl();
+export function createOperationRegistry<
+  T extends OperationSignature = OperationSignature,
+>(): OperationRegistry<T> {
+  return new OperationRegistryImpl<T>();
 }
 
 export function hasAllCapabilities(

@@ -12,7 +12,7 @@
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
-    "clean": "rm -rf dist coverage .tmp-output"
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
