@@ -1,4 +1,4 @@
-import type { ParameterizedCodecDescriptor } from '@prisma-next/contract/types';
+import type { TypeRenderer, TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
@@ -21,6 +21,7 @@ function createMockTarget(): ControlTargetDescriptor<'sql', 'postgres'> {
     version: '0.0.1',
     familyId: 'sql',
     targetId: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
   };
 }
 
@@ -44,9 +45,15 @@ function createMockAdapter(): ControlAdapterDescriptor<'sql', 'postgres'> {
   };
 }
 
+interface ParameterizedCodecConfig {
+  readonly codecId: string;
+  readonly renderer: TypeRenderer;
+  readonly typesImport?: TypesImportSpec;
+}
+
 function createMockExtensionWithParameterizedCodec(
   id: string,
-  parameterizedCodec: ParameterizedCodecDescriptor,
+  config: ParameterizedCodecConfig,
 ): ControlExtensionDescriptor<'sql', 'postgres'> {
   return {
     kind: 'extension',
@@ -56,17 +63,22 @@ function createMockExtensionWithParameterizedCodec(
     targetId: 'postgres',
     create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     types: {
-      parameterizedCodecs: [parameterizedCodec],
+      codecTypes: {
+        parameterized: {
+          [config.codecId]: config.renderer,
+        },
+        ...(config.typesImport ? { parameterizedImports: [config.typesImport] } : {}),
+      },
     },
   };
 }
 
 describe('emit parameterized codecs integration', () => {
-  it('emits typesImport from parameterizedCodecs in contract.d.ts', async () => {
-    // Create a parameterized codec descriptor with typesImport
-    const vectorCodec: ParameterizedCodecDescriptor = {
+  it('emits typesImport from parameterized codecs in contract.d.ts', async () => {
+    // Create a parameterized codec config with typesImport
+    const vectorCodecConfig: ParameterizedCodecConfig = {
       codecId: 'pg/vector@1',
-      outputTypeRenderer: 'Vector<{{length}}>',
+      renderer: 'Vector<{{length}}>',
       typesImport: {
         package: '@prisma-next/extension-pgvector/vector-types',
         named: 'Vector',
@@ -77,7 +89,7 @@ describe('emit parameterized codecs integration', () => {
     // Create family instance with the extension
     const target = createMockTarget();
     const adapter = createMockAdapter();
-    const extension = createMockExtensionWithParameterizedCodec('pgvector', vectorCodec);
+    const extension = createMockExtensionWithParameterizedCodec('pgvector', vectorCodecConfig);
 
     const familyInstance = createSqlFamilyInstance({
       target,
@@ -137,23 +149,14 @@ describe('emit parameterized codecs integration', () => {
   });
 
   it('collects typesImport from multiple parameterized codecs', async () => {
-    // Create multiple parameterized codec descriptors
-    const vectorCodec: ParameterizedCodecDescriptor = {
+    // Create multiple parameterized codec configs
+    const vectorCodecConfig: ParameterizedCodecConfig = {
       codecId: 'pg/vector@1',
-      outputTypeRenderer: 'Vector<{{length}}>',
+      renderer: 'Vector<{{length}}>',
       typesImport: {
         package: '@prisma-next/extension-pgvector/vector-types',
         named: 'Vector',
         alias: 'PgVector',
-      },
-    };
-    const decimalCodec: ParameterizedCodecDescriptor = {
-      codecId: 'pg/decimal@1',
-      outputTypeRenderer: 'Decimal<{{precision}}, {{scale}}>',
-      typesImport: {
-        package: '@prisma-next/adapter-postgres/decimal-types',
-        named: 'Decimal',
-        alias: 'PgDecimal',
       },
     };
 
@@ -168,11 +171,20 @@ describe('emit parameterized codecs integration', () => {
             named: 'CodecTypes',
             alias: 'PgCodecTypes',
           },
+          parameterized: {
+            'pg/decimal@1': 'Decimal<{{precision}}, {{scale}}>',
+          },
+          parameterizedImports: [
+            {
+              package: '@prisma-next/adapter-postgres/decimal-types',
+              named: 'Decimal',
+              alias: 'PgDecimal',
+            },
+          ],
         },
-        parameterizedCodecs: [decimalCodec],
       },
     };
-    const extension = createMockExtensionWithParameterizedCodec('pgvector', vectorCodec);
+    const extension = createMockExtensionWithParameterizedCodec('pgvector', vectorCodecConfig);
 
     const familyInstance = createSqlFamilyInstance({
       target,
@@ -241,26 +253,7 @@ describe('emit parameterized codecs integration', () => {
   });
 
   it('skips duplicate typesImport from same package', async () => {
-    // Same typesImport from two different codecs should only appear once
-    const vectorCodec1: ParameterizedCodecDescriptor = {
-      codecId: 'pg/vector@1',
-      outputTypeRenderer: 'Vector<{{length}}>',
-      typesImport: {
-        package: '@prisma-next/extension-pgvector/vector-types',
-        named: 'Vector',
-        alias: 'Vector',
-      },
-    };
-    const vectorCodec2: ParameterizedCodecDescriptor = {
-      codecId: 'pg/halfvec@1',
-      outputTypeRenderer: 'HalfVector<{{length}}>',
-      typesImport: {
-        package: '@prisma-next/extension-pgvector/vector-types',
-        named: 'HalfVector',
-        alias: 'HalfVector',
-      },
-    };
-
+    // Two different codecs with imports from the same package
     const target = createMockTarget();
     const adapter = createMockAdapter();
     const extension: ControlExtensionDescriptor<'sql', 'postgres'> = {
@@ -271,7 +264,24 @@ describe('emit parameterized codecs integration', () => {
       targetId: 'postgres',
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
       types: {
-        parameterizedCodecs: [vectorCodec1, vectorCodec2],
+        codecTypes: {
+          parameterized: {
+            'pg/vector@1': 'Vector<{{length}}>',
+            'pg/halfvec@1': 'HalfVector<{{length}}>',
+          },
+          parameterizedImports: [
+            {
+              package: '@prisma-next/extension-pgvector/vector-types',
+              named: 'Vector',
+              alias: 'Vector',
+            },
+            {
+              package: '@prisma-next/extension-pgvector/vector-types',
+              named: 'HalfVector',
+              alias: 'HalfVector',
+            },
+          ],
+        },
       },
     };
 
