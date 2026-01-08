@@ -98,7 +98,7 @@ function createMockExtensionWithParameterizedRenderer(
           alias: `${id.charAt(0).toUpperCase() + id.slice(1)}CodecTypes`,
         },
         parameterized: {
-          [codecId]: (params, ctx) => renderer(params, ctx),
+          [codecId]: renderer,
         },
       },
     },
