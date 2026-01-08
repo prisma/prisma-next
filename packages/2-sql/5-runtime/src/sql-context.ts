@@ -247,6 +247,11 @@ function collectParameterizedCodecDescriptors(
     const paramCodecs = extInstance.parameterizedCodecs?.();
     if (paramCodecs) {
       for (const descriptor of paramCodecs) {
+        if (descriptors.has(descriptor.codecId)) {
+          console.warn(
+            `Duplicate parameterized codec descriptor for codecId '${descriptor.codecId}' - using later registration`,
+          );
+        }
         descriptors.set(descriptor.codecId, descriptor);
       }
     }

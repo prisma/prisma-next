@@ -408,10 +408,15 @@ export const sqlTargetFamilyHook = {
       return 'undefined';
     }
     if (typeof value === 'string') {
-      return `'${value}'`;
+      // Escape backslashes first, then single quotes
+      const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      return `'${escaped}'`;
     }
     if (typeof value === 'number' || typeof value === 'boolean') {
       return String(value);
+    }
+    if (typeof value === 'bigint') {
+      return `${value}n`;
     }
     if (Array.isArray(value)) {
       const items = value.map((v) => this.serializeValue(v)).join(', ');
