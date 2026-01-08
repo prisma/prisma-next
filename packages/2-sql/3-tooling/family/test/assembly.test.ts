@@ -4,7 +4,55 @@ import type {
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import { extractParameterizedRenderers } from '../src/core/assembly';
+import {
+  extractCodecTypeImports,
+  extractExtensionIds,
+  extractParameterizedRenderers,
+} from '../src/core/assembly';
+
+// Minimal mock descriptors for testing
+function createMockTarget(
+  overrides: Partial<ControlTargetDescriptor<'sql', 'postgres'>> = {},
+): ControlTargetDescriptor<'sql', 'postgres'> {
+  return {
+    kind: 'target',
+    id: 'postgres',
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    ...overrides,
+  };
+}
+
+function createMockAdapter(
+  overrides: Partial<ControlAdapterDescriptor<'sql', 'postgres'>> = {},
+): ControlAdapterDescriptor<'sql', 'postgres'> {
+  return {
+    kind: 'adapter',
+    id: 'postgres',
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    ...overrides,
+  };
+}
+
+function createMockExtension(
+  id: string,
+  overrides: Partial<ControlExtensionDescriptor<'sql', 'postgres'>> = {},
+): ControlExtensionDescriptor<'sql', 'postgres'> {
+  return {
+    kind: 'extension',
+    id,
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    ...overrides,
+  };
+}
 
 type TestDescriptor =
   | ControlTargetDescriptor<'sql', string>
@@ -38,7 +86,7 @@ describe('extractParameterizedRenderers', () => {
     expect(renderers.size).toBe(0);
   });
 
-  it('extracts and normalizes template-based renderers', () => {
+  it('extracts and normalizes structured template renderers', () => {
     const descriptors: TestDescriptor[] = [
       {
         kind: 'extension',
@@ -78,7 +126,40 @@ describe('extractParameterizedRenderers', () => {
     expect(result).toBe('Vector<1536>');
   });
 
-  it('extracts function-based renderers', () => {
+  it('extracts and normalizes raw string template renderers', () => {
+    const descriptors: TestDescriptor[] = [
+      {
+        kind: 'extension',
+        id: 'pgvector',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@prisma-next/extension-pgvector/codec-types',
+              named: 'CodecTypes',
+              alias: 'VectorTypes',
+            },
+            parameterized: {
+              // Raw string form - most common authoring format
+              'pg/vector@1': 'Vector<{{length}}>',
+            },
+          },
+        },
+        create: () => ({ familyId: 'sql' as const, targetId: 'postgres' as const }),
+      },
+    ];
+
+    const renderers = extractParameterizedRenderers(descriptors);
+
+    expect(renderers.size).toBe(1);
+    const renderer = renderers.get('pg/vector@1');
+    const result = renderer?.render({ length: 1536 }, { codecTypesName: 'CodecTypes' });
+    expect(result).toBe('Vector<1536>');
+  });
+
+  it('extracts and normalizes raw function renderers', () => {
     const descriptors: TestDescriptor[] = [
       {
         kind: 'extension',
@@ -94,6 +175,41 @@ describe('extractParameterizedRenderers', () => {
               alias: 'TestTypes',
             },
             parameterized: {
+              // Raw function form - for complex rendering logic
+              'test/custom@1': (params, ctx) =>
+                `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
+            },
+          },
+        },
+        create: () => ({ familyId: 'sql' as const, targetId: 'postgres' as const }),
+      },
+    ];
+
+    const renderers = extractParameterizedRenderers(descriptors);
+
+    expect(renderers.size).toBe(1);
+    const renderer = renderers.get('test/custom@1');
+    const result = renderer?.render({ precision: 10 }, { codecTypesName: 'CodecTypes' });
+    expect(result).toBe('Custom<10, CodecTypes>');
+  });
+
+  it('extracts structured function-based renderers', () => {
+    const descriptors: TestDescriptor[] = [
+      {
+        kind: 'extension',
+        id: 'test-ext',
+        familyId: 'sql',
+        targetId: 'postgres',
+        version: '0.0.1',
+        types: {
+          codecTypes: {
+            import: {
+              package: '@test/codec-types',
+              named: 'CodecTypes',
+              alias: 'TestTypes',
+            },
+            parameterized: {
+              // Structured function form with kind discriminator
               'test/custom@1': {
                 kind: 'function',
                 render: (params, ctx) => `Custom<${params['precision']}, ${ctx.codecTypesName}>`,
@@ -290,5 +406,43 @@ describe('extractParameterizedRenderers', () => {
     expect(() => renderer.render({}, { codecTypesName: 'CodecTypes' })).toThrow(
       /Missing template parameter "length" in template "Vector<\{\{length\}\}>"/,
     );
+  });
+});
+
+describe('extractCodecTypeImports', () => {
+  it('extracts codec type imports from descriptors', () => {
+    const adapter = createMockAdapter({
+      types: {
+        codecTypes: {
+          import: {
+            package: '@prisma-next/adapter-postgres/codec-types',
+            named: 'CodecTypes',
+            alias: 'PgTypes',
+          },
+        },
+      },
+    });
+
+    const result = extractCodecTypeImports([adapter]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      package: '@prisma-next/adapter-postgres/codec-types',
+      named: 'CodecTypes',
+      alias: 'PgTypes',
+    });
+  });
+});
+
+describe('extractExtensionIds', () => {
+  it('extracts extension IDs in deterministic order', () => {
+    const target = createMockTarget();
+    const adapter = createMockAdapter();
+    const extension1 = createMockExtension('pgvector');
+    const extension2 = createMockExtension('postgis');
+
+    const result = extractExtensionIds(adapter, target, [extension1, extension2]);
+
+    expect(result).toEqual(['postgres', 'pgvector', 'postgis']);
   });
 });

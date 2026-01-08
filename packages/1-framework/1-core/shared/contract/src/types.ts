@@ -1,4 +1,5 @@
 import type { OperationRegistry } from '@prisma-next/operations';
+import type { RenderTypeContext } from './framework-components';
 import type { ContractIR } from './ir';
 
 export interface ContractBase {
@@ -270,4 +271,89 @@ export interface OperationManifest {
   readonly returns: ReturnSpecManifest;
   readonly lowering: LoweringSpecManifest;
   readonly capabilities?: ReadonlyArray<string>;
+}
+
+// ============================================================================
+// Parameterized Codec Descriptor Types
+// ============================================================================
+//
+// Types for codecs that support type parameters (e.g., Vector<1536>, Decimal<2>).
+// These enable precise TypeScript types for parameterized columns without
+// coupling the SQL family emitter to specific adapter codec IDs.
+//
+// ============================================================================
+
+// Re-export RenderTypeContext so it's available alongside TypeRenderer
+export type { RenderTypeContext };
+
+/**
+ * Declarative type renderer that produces a TypeScript type expression.
+ *
+ * Renderers can be:
+ * - A template string with `{{paramName}}` placeholders (e.g., `Vector<{{length}}>`)
+ * - A function that receives typeParams and context and returns a type expression
+ *
+ * **Prefer template strings** for most cases:
+ * - Templates are JSON-serializable (safe for pack-ref metadata)
+ * - Templates can be statically analyzed by tooling
+ *
+ * Function renderers are allowed but have tradeoffs:
+ * - Require runtime execution during emission (the emitter runs code)
+ * - Not JSON-serializable (can't be stored in contract.json)
+ * - The emitted artifacts (contract.json, contract.d.ts) still contain no
+ *   executable code - this constraint applies to outputs, not the emission process
+ */
+export type TypeRenderer =
+  | string
+  | ((params: Record<string, unknown>, ctx: RenderTypeContext) => string);
+
+/**
+ * Descriptor for a codec that supports type parameters.
+ *
+ * Parameterized codecs allow columns to carry additional metadata (typeParams)
+ * that affects the generated TypeScript types. For example:
+ * - A vector codec can use `{ length: 1536 }` to generate `Vector<1536>`
+ * - A decimal codec can use `{ precision: 10, scale: 2 }` to generate `Decimal<10, 2>`
+ *
+ * The SQL family emitter uses these descriptors to generate precise types
+ * without hard-coding knowledge of specific codec IDs.
+ *
+ * @example
+ * ```typescript
+ * const vectorCodecDescriptor: ParameterizedCodecDescriptor = {
+ *   codecId: 'pg/vector@1',
+ *   outputTypeRenderer: 'Vector<{{length}}>',
+ *   // Optional: paramsSchema for runtime validation
+ * };
+ * ```
+ */
+export interface ParameterizedCodecDescriptor {
+  /** The codec ID this descriptor applies to (e.g., 'pg/vector@1') */
+  readonly codecId: string;
+
+  /**
+   * Renderer for the output (read) type.
+   * Can be a template string or function.
+   *
+   * This is the primary renderer used by SQL emission to generate
+   * model field types in contract.d.ts.
+   */
+  readonly outputTypeRenderer: TypeRenderer;
+
+  /**
+   * Optional renderer for the input (write) type.
+   * If not provided, outputTypeRenderer is used for both.
+   *
+   * **Reserved for future use**: Currently, SQL emission only uses
+   * outputTypeRenderer. This field is defined for future support of
+   * asymmetric codecs where input and output types differ (e.g., a
+   * codec that accepts `string | number` but always returns `number`).
+   */
+  readonly inputTypeRenderer?: TypeRenderer;
+
+  /**
+   * Optional import spec for types used by this codec's renderers.
+   * The emitter will add this import to contract.d.ts.
+   */
+  readonly typesImport?: TypesImportSpec;
 }

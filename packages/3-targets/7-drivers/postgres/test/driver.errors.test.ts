@@ -15,23 +15,27 @@ describe('@prisma-next/driver-postgres', () => {
     }
   });
 
-  it('handles query errors', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+  it(
+    'handles query errors',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as Pool },
-    });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as Pool },
+      });
 
-    cleanup = async () => {
-      await driver.close();
-    };
+      cleanup = async () => {
+        await driver.close();
+      };
 
-    await driver.connect();
+      await driver.connect();
 
-    await expect(driver.query('select * from nonexistent_table')).rejects.toThrow();
-  });
+      await expect(driver.query('select * from nonexistent_table')).rejects.toThrow();
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it('throws error when neither pool nor client provided', () => {
     expect(() => {

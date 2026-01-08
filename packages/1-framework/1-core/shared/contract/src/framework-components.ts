@@ -24,7 +24,7 @@ export interface RenderTypeContext {
 }
 
 /**
- * A template-based type renderer.
+ * A template-based type renderer (structured form).
  * Uses mustache-style placeholders (e.g., `Vector<{{length}}>`) that are
  * replaced with typeParams values during rendering.
  *
@@ -58,10 +58,49 @@ export interface TypeRendererFunction {
 }
 
 /**
- * Union of author-friendly type renderer formats.
- * Templates are normalized to functions during pack assembly.
+ * A raw template string type renderer (convenience form).
+ * Shorthand for TypeRendererTemplate - just the template string without wrapper.
+ *
+ * @example
+ * ```ts
+ * 'Vector<{{length}}>'
+ * // Equivalent to: { kind: 'template', template: 'Vector<{{length}}>' }
+ * ```
  */
-export type TypeRenderer = TypeRendererTemplate | TypeRendererFunction;
+export type TypeRendererString = string;
+
+/**
+ * A raw function type renderer (convenience form).
+ * Shorthand for TypeRendererFunction - just the function without wrapper.
+ *
+ * @example
+ * ```ts
+ * (params, ctx) => `Vector<${params.length}>`
+ * // Equivalent to: { kind: 'function', render: ... }
+ * ```
+ */
+export type TypeRendererRawFunction = (
+  params: Record<string, unknown>,
+  ctx: RenderTypeContext,
+) => string;
+
+/**
+ * Union of type renderer formats.
+ *
+ * Supports both structured forms (with `kind` discriminator) and convenience forms:
+ * - `string` - Template string with `{{key}}` placeholders (manifest-safe, JSON-serializable)
+ * - `function` - Render function for full control (requires runtime execution)
+ * - `{ kind: 'template', template: string }` - Structured template form
+ * - `{ kind: 'function', render: fn }` - Structured function form
+ *
+ * Templates are normalized to functions during pack assembly.
+ * **Prefer template strings** for most cases - they are JSON-serializable.
+ */
+export type TypeRenderer =
+  | TypeRendererString
+  | TypeRendererRawFunction
+  | TypeRendererTemplate
+  | TypeRendererFunction;
 
 /**
  * Normalized type renderer - always a function after assembly.
@@ -99,13 +138,33 @@ export function interpolateTypeTemplate(
 /**
  * Normalizes a TypeRenderer to function form.
  * Called during pack assembly, not at emission time.
+ *
+ * Handles all TypeRenderer forms:
+ * - Raw string template: `'Vector<{{length}}>'`
+ * - Raw function: `(params, ctx) => ...`
+ * - Structured template: `{ kind: 'template', template: '...' }`
+ * - Structured function: `{ kind: 'function', render: fn }`
  */
 export function normalizeRenderer(codecId: string, renderer: TypeRenderer): NormalizedTypeRenderer {
+  // Handle raw string (template shorthand)
+  if (typeof renderer === 'string') {
+    return {
+      codecId,
+      render: (params, ctx) => interpolateTypeTemplate(renderer, params, ctx),
+    };
+  }
+
+  // Handle raw function (function shorthand)
+  if (typeof renderer === 'function') {
+    return { codecId, render: renderer };
+  }
+
+  // Handle structured function form
   if (renderer.kind === 'function') {
     return { codecId, render: renderer.render };
   }
 
-  // Compile template to function
+  // Handle structured template form
   const { template } = renderer;
   return {
     codecId,

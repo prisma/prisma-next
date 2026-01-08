@@ -65,7 +65,28 @@ describe('interpolateTypeTemplate', () => {
 });
 
 describe('normalizeRenderer', () => {
-  it('normalizes template renderer to function form', () => {
+  it('normalizes raw string template to function form', () => {
+    const renderer = normalizeRenderer('test@1', 'Vector<{{length}}>');
+
+    expect(renderer.codecId).toBe('test@1');
+    expect(renderer.render({ length: 1536 }, { codecTypesName: 'CodecTypes' })).toBe(
+      'Vector<1536>',
+    );
+  });
+
+  it('normalizes raw function to normalized form', () => {
+    const renderFn = (params: Record<string, unknown>, ctx: { codecTypesName: string }) =>
+      `Raw<${params['value']}, ${ctx.codecTypesName}>`;
+
+    const renderer = normalizeRenderer('test@1', renderFn);
+
+    expect(renderer.codecId).toBe('test@1');
+    expect(renderer.render({ value: 99 }, { codecTypesName: 'CodecTypes' })).toBe(
+      'Raw<99, CodecTypes>',
+    );
+  });
+
+  it('normalizes structured template renderer to function form', () => {
     const renderer = normalizeRenderer('test@1', {
       kind: 'template',
       template: 'Vector<{{length}}>',
@@ -77,7 +98,7 @@ describe('normalizeRenderer', () => {
     );
   });
 
-  it('passes through function renderer', () => {
+  it('normalizes structured function renderer', () => {
     const renderFn = (params: Record<string, unknown>, ctx: { codecTypesName: string }) =>
       `Custom<${params['value']}, ${ctx.codecTypesName}>`;
 

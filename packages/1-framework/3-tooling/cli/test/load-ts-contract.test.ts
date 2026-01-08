@@ -46,21 +46,29 @@ describe('loadContractFromTs', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('rejects missing contract export', async () => {
-    const contractPath = join(fixturesDir, 'invalid-export.ts');
+  it(
+    'rejects missing contract export',
+    async () => {
+      const contractPath = join(fixturesDir, 'invalid-export.ts');
 
-    await expect(loadContractFromTs(contractPath)).rejects.toThrow(
-      'Contract file must export a contract',
-    );
-  });
+      await expect(loadContractFromTs(contractPath)).rejects.toThrow(
+        'Contract file must export a contract',
+      );
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('rejects module with other exports but no contract', async () => {
-    const contractPath = join(fixturesDir, 'other-exports.ts');
+  it(
+    'rejects module with other exports but no contract',
+    async () => {
+      const contractPath = join(fixturesDir, 'other-exports.ts');
 
-    await expect(loadContractFromTs(contractPath)).rejects.toThrow(
-      'Contract file must export a contract',
-    );
-  });
+      await expect(loadContractFromTs(contractPath)).rejects.toThrow(
+        'Contract file must export a contract',
+      );
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'rejects empty module with no exports',
@@ -98,11 +106,15 @@ describe('loadContractFromTs', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('handles bundling errors', async () => {
-    const invalidPath = join(fixturesDir, 'nonexistent-file.ts');
+  it(
+    'handles bundling errors',
+    async () => {
+      const invalidPath = join(fixturesDir, 'nonexistent-file.ts');
 
-    await expect(loadContractFromTs(invalidPath)).rejects.toThrow();
-  });
+      await expect(loadContractFromTs(invalidPath)).rejects.toThrow();
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'rejects functions in contract export',
