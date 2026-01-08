@@ -183,6 +183,35 @@ export interface ValidationContext {
 }
 
 /**
+ * Context for rendering parameterized types during contract.d.ts generation.
+ * Passed to type renderers so they can reference CodecTypes by name.
+ */
+export interface TypeRenderContext {
+  readonly codecTypesName: string;
+}
+
+/**
+ * A normalized type renderer for parameterized codecs.
+ * This is the interface expected by TargetFamilyHook.generateContractTypes.
+ */
+export interface TypeRenderEntry {
+  readonly codecId: string;
+  readonly render: (params: Record<string, unknown>, ctx: TypeRenderContext) => string;
+}
+
+/**
+ * Additional options for generateContractTypes.
+ */
+export interface GenerateContractTypesOptions {
+  /**
+   * Normalized parameterized type renderers, keyed by codecId.
+   * When a column has typeParams and a renderer exists for its codecId,
+   * the renderer is called to produce the TypeScript type expression.
+   */
+  readonly parameterizedRenderers?: Map<string, TypeRenderEntry>;
+}
+
+/**
  * SPI interface for target family hooks that extend emission behavior.
  * Implemented by family-specific emitter hooks (e.g., SQL family).
  */
@@ -207,12 +236,14 @@ export interface TargetFamilyHook {
    * @param ir - Contract IR
    * @param codecTypeImports - Array of codec type import specs
    * @param operationTypeImports - Array of operation type import specs
+   * @param options - Additional options including parameterized type renderers
    * @returns Generated TypeScript type definitions as string
    */
   generateContractTypes(
     ir: ContractIR,
     codecTypeImports: ReadonlyArray<TypesImportSpec>,
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
+    options?: GenerateContractTypesOptions,
   ): string;
 }
 

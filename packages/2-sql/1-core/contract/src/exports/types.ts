@@ -13,5 +13,6 @@ export type {
   SqlStorage,
   StorageColumn,
   StorageTable,
+  StorageTypeInstance,
   UniqueConstraint,
 } from '../types';

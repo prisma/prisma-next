@@ -1,11 +1,17 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TypesImportSpec, ValidationContext } from '@prisma-next/contract/types';
+import type {
+  GenerateContractTypesOptions,
+  TypesImportSpec,
+  ValidationContext,
+} from '@prisma-next/contract/types';
 import type {
   ModelDefinition,
   ModelField,
   SqlStorage,
+  StorageColumn,
   StorageTable,
 } from '@prisma-next/sql-contract/types';
+import { assertDefined } from '@prisma-next/utils/assertions';
 
 export const sqlTargetFamilyHook = {
   id: 'sql',
@@ -64,10 +70,8 @@ export const sqlTargetFamilyHook = {
           throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
         }
 
-        const table = storage.tables[tableName];
-        if (!table) {
-          throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
-        }
+        const table: StorageTable | undefined = storage.tables[tableName];
+        assertDefined(table, `Model "${modelName}" references non-existent table "${tableName}"`);
 
         if (!table.primaryKey) {
           throw new Error(`Model "${modelName}" table "${tableName}" is missing a primary key`);
@@ -168,12 +172,12 @@ export const sqlTargetFamilyHook = {
           );
         }
 
-        const referencedTable = storage.tables[fk.references.table];
-        if (!referencedTable) {
-          throw new Error(
-            `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
-          );
-        }
+        // Table existence guaranteed by Set.has() check above
+        const referencedTable: StorageTable | undefined = storage.tables[fk.references.table];
+        assertDefined(
+          referencedTable,
+          `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+        );
 
         const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
         for (const colName of fk.references.columns) {
@@ -197,6 +201,7 @@ export const sqlTargetFamilyHook = {
     ir: ContractIR,
     codecTypeImports: ReadonlyArray<TypesImportSpec>,
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
+    options?: GenerateContractTypesOptions,
   ): string {
     const allImports = [...codecTypeImports, ...operationTypeImports];
     const importLines = allImports.map(
@@ -208,9 +213,10 @@ export const sqlTargetFamilyHook = {
 
     const storage = ir.storage as SqlStorage;
     const models = ir.models as Record<string, ModelDefinition>;
+    const parameterizedRenderers = options?.parameterizedRenderers;
 
     const storageType = this.generateStorageType(storage);
-    const modelsType = this.generateModelsType(models, storage);
+    const modelsType = this.generateModelsType(models, storage, parameterizedRenderers);
     const relationsType = this.generateRelationsType(ir.relations);
     const mappingsType = this.generateMappingsType(models, storage, codecTypes, operationTypes);
 
@@ -293,9 +299,45 @@ export type Relations = Contract['relations'];
     return `{ readonly tables: { ${tables.join('; ')} } }`;
   },
 
+  /**
+   * Renders the TypeScript type for a column.
+   * Uses parameterized renderer if column has typeParams and renderer exists.
+   * Falls back to CodecTypes['codecId']['output'] for scalar codecs.
+   */
+  renderColumnType(
+    column: StorageColumn,
+    storage: SqlStorage,
+    parameterizedRenderers?: GenerateContractTypesOptions['parameterizedRenderers'],
+  ): string {
+    const codecId = column.codecId;
+
+    // Check for typeRef - use the referenced type instance's params
+    if (column.typeRef && storage.types) {
+      const typeInstance = storage.types[column.typeRef];
+      if (typeInstance) {
+        const renderer = parameterizedRenderers?.get(typeInstance.codecId);
+        if (renderer) {
+          return renderer.render(typeInstance.typeParams, { codecTypesName: 'CodecTypes' });
+        }
+      }
+    }
+
+    // Check for inline typeParams
+    if (column.typeParams) {
+      const renderer = parameterizedRenderers?.get(codecId);
+      if (renderer) {
+        return renderer.render(column.typeParams, { codecTypesName: 'CodecTypes' });
+      }
+    }
+
+    // Default: scalar codec type
+    return `CodecTypes['${codecId}']['output']`;
+  },
+
   generateModelsType(
     models: Record<string, ModelDefinition> | undefined,
     storage: SqlStorage,
+    parameterizedRenderers?: GenerateContractTypesOptions['parameterizedRenderers'],
   ): string {
     if (!models) {
       return 'Record<string, never>';
@@ -315,11 +357,9 @@ export type Relations = Contract['relations'];
             continue;
           }
 
-          const typeId = column.codecId;
+          const baseType = this.renderColumnType(column, storage, parameterizedRenderers);
           const nullable = column.nullable ?? false;
-          const jsType = nullable
-            ? `CodecTypes['${typeId}']['output'] | null`
-            : `CodecTypes['${typeId}']['output']`;
+          const jsType = nullable ? `${baseType} | null` : baseType;
 
           fields.push(`readonly ${fieldName}: ${jsType}`);
         }

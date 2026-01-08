@@ -769,6 +769,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../1-core/contract
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/utils
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

@@ -27,6 +27,10 @@
       "types": "./dist/exports/array-equal.d.ts",
       "import": "./dist/exports/array-equal.js"
     },
+    "./assertions": {
+      "types": "./dist/exports/assertions.d.ts",
+      "import": "./dist/exports/assertions.js"
+    },
     "./defined": {
       "types": "./dist/exports/defined.d.ts",
       "import": "./dist/exports/defined.js"

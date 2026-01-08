@@ -1,3 +1,8 @@
+import type {
+  NormalizedTypeRenderer,
+  TypeRenderer,
+} from '@prisma-next/contract/framework-components';
+import { normalizeRenderer } from '@prisma-next/contract/framework-components';
 import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { TypesImportSpec } from '@prisma-next/contract/types';
 import type {
@@ -114,4 +119,46 @@ export function extractExtensionIds(
   }
 
   return ids;
+}
+
+/**
+ * Extracts and normalizes parameterized codec renderers from descriptors.
+ * Templates are compiled to functions at this layer.
+ *
+ * Throws an error if multiple descriptors provide a renderer for the same codecId.
+ * This is intentional - duplicate codecId is a hard error, not a silent override.
+ *
+ * @returns Map from codecId to normalized renderer
+ */
+export function extractParameterizedRenderers(
+  descriptors: ReadonlyArray<
+    | ControlTargetDescriptor<'sql', string>
+    | ControlAdapterDescriptor<'sql', string>
+    | ControlExtensionDescriptor<'sql', string>
+  >,
+): Map<string, NormalizedTypeRenderer> {
+  const renderers = new Map<string, NormalizedTypeRenderer>();
+  const owners = new Map<string, string>(); // codecId -> descriptor.id for error messages
+
+  for (const descriptor of descriptors) {
+    const codecTypes = descriptor.types?.codecTypes;
+    if (!codecTypes?.parameterized) continue;
+
+    const parameterized: Record<string, TypeRenderer> = codecTypes.parameterized;
+    for (const [codecId, renderer] of Object.entries(parameterized)) {
+      const existingOwner = owners.get(codecId);
+      if (existingOwner !== undefined) {
+        throw new Error(
+          `Duplicate parameterized renderer for codecId "${codecId}". ` +
+            `Descriptor "${descriptor.id}" conflicts with "${existingOwner}". ` +
+            'Each codecId can only have one renderer.',
+        );
+      }
+
+      renderers.set(codecId, normalizeRenderer(codecId, renderer));
+      owners.set(codecId, descriptor.id);
+    }
+  }
+
+  return renderers;
 }
