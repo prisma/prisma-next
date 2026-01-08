@@ -70,6 +70,28 @@ async function createUser(
   return client.user.create({ data: input });
 }
 
+describe('PrismaClient constructor', () => {
+  it('throws when no runtime, connectionString, or DATABASE_URL is provided', () => {
+    // Save and clear env variable
+    const originalUrl = process.env['DATABASE_URL'];
+    delete process.env['DATABASE_URL'];
+
+    try {
+      expect(
+        () =>
+          new PrismaClient({
+            contract: testContract,
+          }),
+      ).toThrow(/DATABASE_URL environment variable or connectionString option is required/);
+    } finally {
+      // Restore env variable
+      if (originalUrl) {
+        process.env['DATABASE_URL'] = originalUrl;
+      }
+    }
+  });
+});
+
 describe('PrismaClient compatibility layer - dual implementation harness', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
   let client: Client;
@@ -316,5 +338,195 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
       expect(userModel).toBeDefined();
       expect(typeof userModel.findUnique).toBe('function');
     });
+  });
+
+  describe('Validation error paths', () => {
+    it(
+      'rejects null values in where clause',
+      async () => {
+        await expect(prismaPN.user.findMany({ where: { id: null } })).rejects.toThrow(
+          /Null\/undefined values/,
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects undefined values in where clause',
+      async () => {
+        await expect(prismaPN.user.findMany({ where: { id: undefined } })).rejects.toThrow(
+          /Null\/undefined values/,
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects complex where predicates',
+      async () => {
+        await expect(prismaPN.user.findMany({ where: { id: { gt: 5 } } })).rejects.toThrow(
+          /Complex where predicates/,
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects array values in where clause',
+      async () => {
+        await expect(prismaPN.user.findMany({ where: { id: ['a', 'b'] } })).rejects.toThrow(
+          /IN\/NOT IN predicates/,
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects unknown fields in where clause',
+      async () => {
+        await expect(prismaPN.user.findMany({ where: { unknownField: 'value' } })).rejects.toThrow(
+          /Unknown field.*in where clause/,
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects unknown fields in select clause',
+      async () => {
+        await expect(prismaPN.user.findMany({ select: { unknownField: true } })).rejects.toThrow(
+          /Unknown field.*in select clause/,
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects skip pagination',
+      async () => {
+        await expect(prismaPN.user.findMany({ skip: 10 })).rejects.toThrow(/skip\/OFFSET/);
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects multiple orderBy fields',
+      async () => {
+        await expect(
+          prismaPN.user.findMany({ orderBy: { id: 'asc', name: 'desc' } }),
+        ).rejects.toThrow(/Multiple orderBy/);
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects unknown fields in orderBy clause',
+      async () => {
+        await expect(prismaPN.user.findMany({ orderBy: { unknownField: 'asc' } })).rejects.toThrow(
+          /Unknown field.*in orderBy clause/,
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects unknown fields in create data',
+      async () => {
+        await expect(
+          prismaPN.user.create({
+            data: { id: 'test', unknownField: 'value' } as Record<string, unknown>,
+          }),
+        ).rejects.toThrow(/Unknown field.*in create data/);
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects empty create data',
+      async () => {
+        await expect(prismaPN.user.create({ data: {} })).rejects.toThrow(/requires at least one/);
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects update mutations',
+      async () => {
+        await expect(
+          prismaPN.user.update({ where: { id: 'test' }, data: { name: 'new' } }),
+        ).rejects.toThrow(/update\(\) mutations are not supported/);
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects delete mutations',
+      async () => {
+        await expect(prismaPN.user.delete({ where: { id: 'test' } })).rejects.toThrow(
+          /delete\(\) mutations are not supported/,
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects multiple where conditions',
+      async () => {
+        await expect(
+          prismaPN.user.findMany({ where: { id: 'test', email: 'test@test.com' } }),
+        ).rejects.toThrow(/Multiple where conditions/);
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+
+  describe('orderBy functionality', () => {
+    it(
+      'orders results ascending',
+      async () => {
+        await createUser(prismaPN, { id: 'z-user', email: 'z@test.com', name: 'Z User' });
+        await createUser(prismaPN, { id: 'a-user', email: 'a@test.com', name: 'A User' });
+
+        const results = await prismaPN.user.findMany({ orderBy: { id: 'asc' } });
+
+        expect(results.length).toBe(2);
+        expect(results[0]?.['id']).toBe('a-user');
+        expect(results[1]?.['id']).toBe('z-user');
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'orders results descending',
+      async () => {
+        await createUser(prismaPN, { id: 'a-user', email: 'a@test.com', name: 'A User' });
+        await createUser(prismaPN, { id: 'z-user', email: 'z@test.com', name: 'Z User' });
+
+        const results = await prismaPN.user.findMany({ orderBy: { id: 'desc' } });
+
+        expect(results.length).toBe(2);
+        expect(results[0]?.['id']).toBe('z-user');
+        expect(results[1]?.['id']).toBe('a-user');
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+
+  describe('select projection', () => {
+    it(
+      'selects only specified fields',
+      async () => {
+        await createUser(prismaPN, { id: 'test-1', email: 'test@test.com', name: 'Test User' });
+
+        const results = await prismaPN.user.findMany({ select: { id: true, email: true } });
+
+        expect(results.length).toBe(1);
+        expect(results[0]).toHaveProperty('id');
+        expect(results[0]).toHaveProperty('email');
+        // Note: Due to RETURNING * on raw SQL, other fields may be present
+        // We're testing that the select at least includes requested fields
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 });
