@@ -203,29 +203,37 @@ export const sqlTargetFamilyHook = {
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
     options?: GenerateContractTypesOptions,
   ): string {
-    // Collect imports from codec types, operation types, and parameterized type imports
-    const allImports = [...codecTypeImports, ...operationTypeImports];
+    // Collect all type imports from three sources:
+    // 1. Codec type imports (from adapters, targets, and extensions)
+    // 2. Operation type imports (from adapters, targets, and extensions)
+    // 3. Parameterized type imports (for parameterized codec renderers, may contain duplicates)
+    const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
 
-    // Add parameterized type imports (if any)
     const parameterizedTypeImports = options?.parameterizedTypeImports;
     if (parameterizedTypeImports) {
       allImports.push(...parameterizedTypeImports);
     }
 
-    // Deduplicate imports by package+named. When duplicates occur, the first occurrence
-    // (and its alias) is kept; later duplicates with different aliases are silently ignored.
-    const seenImports = new Set<string>();
+    // Deduplicate imports by package+named to avoid duplicate import statements.
+    // Strategy: When the same package::named appears multiple times, keep the first
+    // occurrence (and its alias); later duplicates with different aliases are silently ignored.
+    //
+    // Note: uniqueImports must be an array (not a Set) because:
+    // - We need to preserve the full TypesImportSpec objects (package, named, alias)
+    // - We need to preserve insertion order (first occurrence wins)
+    // - seenImportKeys is a Set used only for O(1) duplicate detection
+    const seenImportKeys = new Set<string>();
     const uniqueImports: TypesImportSpec[] = [];
     for (const imp of allImports) {
       const key = `${imp.package}::${imp.named}`;
-      if (!seenImports.has(key)) {
-        seenImports.add(key);
+      if (!seenImportKeys.has(key)) {
+        seenImportKeys.add(key);
         uniqueImports.push(imp);
       }
     }
 
+    // Generate import statements, omitting redundant "as Alias" when named === alias
     const importLines = uniqueImports.map((imp) => {
-      // Omit redundant "as Alias" when named === alias
       if (imp.named === imp.alias) {
         return `import type { ${imp.named} } from '${imp.package}';`;
       }
