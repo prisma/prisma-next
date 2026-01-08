@@ -28,6 +28,18 @@ export type Contract = SqlContract<
         readonly foreignKeys: ReadonlyArray<never>;
       };
     };
+    readonly types: {
+      readonly Vector1536: {
+        readonly codecId: 'pg/vector@1';
+        readonly nativeType: 'vector';
+        readonly typeParams: { readonly length: 1536 };
+      };
+      readonly Vector768: {
+        readonly codecId: 'pg/vector@1';
+        readonly nativeType: 'vector';
+        readonly typeParams: { readonly length: 768 };
+      };
+    };
   },
   {
     readonly User: {

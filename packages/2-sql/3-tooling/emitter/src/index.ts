@@ -352,7 +352,84 @@ export const sqlTargetFamilyHook = {
       tables.push(`readonly ${tableName}: { ${tableParts.join('; ')} }`);
     }
 
-    return `{ readonly tables: { ${tables.join('; ')} } }`;
+    const typesType = this.generateStorageTypesType(storage.types);
+
+    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType} }`;
+  },
+
+  /**
+   * Generates the TypeScript type for storage.types with literal types.
+   * This preserves type params as literal values for precise typing.
+   */
+  generateStorageTypesType(types: SqlStorage['types']): string {
+    if (!types || Object.keys(types).length === 0) {
+      return 'Record<string, never>';
+    }
+
+    const typeEntries: string[] = [];
+    for (const [typeName, typeInstance] of Object.entries(types)) {
+      const codecId = `'${typeInstance.codecId}'`;
+      const nativeType = `'${typeInstance.nativeType}'`;
+      const typeParamsStr = this.serializeTypeParamsLiteral(typeInstance.typeParams);
+      typeEntries.push(
+        `readonly ${typeName}: { readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
+      );
+    }
+
+    return `{ ${typeEntries.join('; ')} }`;
+  },
+
+  /**
+   * Serializes a typeParams object to a TypeScript literal type.
+   * Converts { length: 1536 } to "{ readonly length: 1536 }".
+   */
+  serializeTypeParamsLiteral(params: Record<string, unknown>): string {
+    if (!params || Object.keys(params).length === 0) {
+      return 'Record<string, never>';
+    }
+
+    const entries: string[] = [];
+    for (const [key, value] of Object.entries(params)) {
+      const serialized = this.serializeValue(value);
+      entries.push(`readonly ${key}: ${serialized}`);
+    }
+
+    return `{ ${entries.join('; ')} }`;
+  },
+
+  /**
+   * Serializes a value to a TypeScript literal type expression.
+   */
+  serializeValue(value: unknown): string {
+    if (value === null) {
+      return 'null';
+    }
+    if (value === undefined) {
+      return 'undefined';
+    }
+    if (typeof value === 'string') {
+      // Escape backslashes first, then single quotes
+      const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      return `'${escaped}'`;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    if (typeof value === 'bigint') {
+      return `${value}n`;
+    }
+    if (Array.isArray(value)) {
+      const items = value.map((v) => this.serializeValue(v)).join(', ');
+      return `readonly [${items}]`;
+    }
+    if (typeof value === 'object') {
+      const entries: string[] = [];
+      for (const [k, v] of Object.entries(value)) {
+        entries.push(`readonly ${k}: ${this.serializeValue(v)}`);
+      }
+      return `{ ${entries.join('; ')} }`;
+    }
+    return 'unknown';
   },
 
   generateModelsType(

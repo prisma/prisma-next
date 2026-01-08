@@ -1029,6 +1029,9 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../4-lanes/relational-core
+      arktype:
+        specifier: ^2.1.26
+        version: 2.1.26
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
