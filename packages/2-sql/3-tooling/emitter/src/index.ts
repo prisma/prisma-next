@@ -203,17 +203,13 @@ export const sqlTargetFamilyHook = {
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
     options?: GenerateContractTypesOptions,
   ): string {
-    // Collect imports from codec types and operation types
+    // Collect imports from codec types, operation types, and parameterized type imports
     const allImports = [...codecTypeImports, ...operationTypeImports];
 
-    // Add typesImport from parameterized codecs (if any)
-    const parameterizedCodecs = options?.parameterizedCodecs;
-    if (parameterizedCodecs) {
-      for (const descriptor of parameterizedCodecs.values()) {
-        if (descriptor.typesImport) {
-          allImports.push(descriptor.typesImport);
-        }
-      }
+    // Add parameterized type imports (if any)
+    const parameterizedTypeImports = options?.parameterizedTypeImports;
+    if (parameterizedTypeImports) {
+      allImports.push(...parameterizedTypeImports);
     }
 
     // Deduplicate imports by package+named (different aliases for same import are allowed)
