@@ -162,3 +162,28 @@ export function extractParameterizedRenderers(
 
   return renderers;
 }
+
+/**
+ * Extracts parameterized type imports from descriptors for contract.d.ts generation.
+ * These are type imports needed by parameterized codec renderers.
+ *
+ * @returns Array of type import specs (may contain duplicates; caller should deduplicate)
+ */
+export function extractParameterizedTypeImports(
+  descriptors: ReadonlyArray<
+    | ControlTargetDescriptor<'sql', string>
+    | ControlAdapterDescriptor<'sql', string>
+    | ControlExtensionDescriptor<'sql', string>
+  >,
+): ReadonlyArray<TypesImportSpec> {
+  const imports: TypesImportSpec[] = [];
+
+  for (const descriptor of descriptors) {
+    const parameterizedImports = descriptor.types?.codecTypes?.parameterizedImports;
+    if (parameterizedImports) {
+      imports.push(...parameterizedImports);
+    }
+  }
+
+  return imports;
+}

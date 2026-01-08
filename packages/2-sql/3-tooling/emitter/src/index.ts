@@ -203,10 +203,42 @@ export const sqlTargetFamilyHook = {
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
     options?: GenerateContractTypesOptions,
   ): string {
-    const allImports = [...codecTypeImports, ...operationTypeImports];
-    const importLines = allImports.map(
-      (imp) => `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`,
-    );
+    // Collect all type imports from three sources:
+    // 1. Codec type imports (from adapters, targets, and extensions)
+    // 2. Operation type imports (from adapters, targets, and extensions)
+    // 3. Parameterized type imports (for parameterized codec renderers, may contain duplicates)
+    const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
+
+    const parameterizedTypeImports = options?.parameterizedTypeImports;
+    if (parameterizedTypeImports) {
+      allImports.push(...parameterizedTypeImports);
+    }
+
+    // Deduplicate imports by package+named to avoid duplicate import statements.
+    // Strategy: When the same package::named appears multiple times, keep the first
+    // occurrence (and its alias); later duplicates with different aliases are silently ignored.
+    //
+    // Note: uniqueImports must be an array (not a Set) because:
+    // - We need to preserve the full TypesImportSpec objects (package, named, alias)
+    // - We need to preserve insertion order (first occurrence wins)
+    // - seenImportKeys is a Set used only for O(1) duplicate detection
+    const seenImportKeys = new Set<string>();
+    const uniqueImports: TypesImportSpec[] = [];
+    for (const imp of allImports) {
+      const key = `${imp.package}::${imp.named}`;
+      if (!seenImportKeys.has(key)) {
+        seenImportKeys.add(key);
+        uniqueImports.push(imp);
+      }
+    }
+
+    // Generate import statements, omitting redundant "as Alias" when named === alias
+    const importLines = uniqueImports.map((imp) => {
+      if (imp.named === imp.alias) {
+        return `import type { ${imp.named} } from '${imp.package}';`;
+      }
+      return `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`;
+    });
 
     const codecTypes = codecTypeImports.map((imp) => imp.alias).join(' & ');
     const operationTypes = operationTypeImports.map((imp) => imp.alias).join(' & ');

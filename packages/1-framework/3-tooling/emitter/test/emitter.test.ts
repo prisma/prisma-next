@@ -1,8 +1,9 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
+  GenerateContractTypesOptions,
   TargetFamilyHook,
+  TypeRenderEntry,
   TypesImportSpec,
-  ValidationContext,
 } from '@prisma-next/contract/types';
 import type { EmitOptions } from '@prisma-next/core-control-plane/emission';
 import { emit } from '@prisma-next/core-control-plane/emission';
@@ -13,7 +14,7 @@ import { createContractIR } from './utils';
 
 const mockSqlHook: TargetFamilyHook = {
   id: 'sql',
-  validateTypes: (ir: ContractIR, _ctx: ValidationContext) => {
+  validateTypes: (ir: ContractIR) => {
     const storage = ir.storage as
       | { tables?: Record<string, { columns?: Record<string, { codecId?: string }> }> }
       | undefined;
@@ -646,5 +647,57 @@ export type Contract = unknown;
     const result = await emit(ir, options, mockHookNoTypeValidation);
     expect(result.contractJson).toBeDefined();
     expect(result.contractDts).toBeDefined();
+  });
+
+  it('passes parameterizedRenderers to generateContractTypes options', async () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {},
+      },
+    });
+
+    let receivedOptions: GenerateContractTypesOptions | undefined;
+
+    const mockHookCapturingOptions: TargetFamilyHook = {
+      id: 'sql',
+      validateTypes: () => {},
+      validateStructure: () => {},
+      generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports, options) => {
+        receivedOptions = options;
+        return `// Generated contract types
+export type CodecTypes = Record<string, never>;
+export type LaneCodecTypes = CodecTypes;
+export type Contract = unknown;
+`;
+      },
+    };
+
+    const vectorRenderer: TypeRenderEntry = {
+      codecId: 'pg/vector@1',
+      render: (params) => `Vector<${params['length']}>`,
+    };
+
+    const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+    parameterizedRenderers.set('pg/vector@1', vectorRenderer);
+
+    const options: EmitOptions = {
+      outputDir: '',
+      operationRegistry: createOperationRegistry(),
+      codecTypeImports: [],
+      operationTypeImports: [],
+      extensionIds: [],
+      parameterizedRenderers,
+    };
+
+    await emit(ir, options, mockHookCapturingOptions);
+
+    expect(receivedOptions).toBeDefined();
+    expect(receivedOptions?.parameterizedRenderers).toBeDefined();
+    expect(receivedOptions?.parameterizedRenderers?.size).toBe(1);
+
+    const entry = receivedOptions?.parameterizedRenderers?.get('pg/vector@1');
+    expect(entry).toBeDefined();
+    expect(entry?.codecId).toBe('pg/vector@1');
+    expect(entry?.render({ length: 1536 }, { codecTypesName: 'CodecTypes' })).toBe('Vector<1536>');
   });
 });

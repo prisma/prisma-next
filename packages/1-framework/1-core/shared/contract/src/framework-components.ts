@@ -222,7 +222,11 @@ export interface ComponentMetadata {
   /** Type imports for contract.d.ts generation */
   readonly types?: {
     readonly codecTypes?: {
-      readonly import: TypesImportSpec;
+      /**
+       * Base codec types import spec.
+       * Optional: adapters typically provide this, extensions usually don't.
+       */
+      readonly import?: TypesImportSpec;
       /**
        * Optional renderers for parameterized codecs owned by this component.
        * Key is codecId (e.g., 'pg/vector@1'), value is the type renderer.
@@ -231,6 +235,12 @@ export interface ComponentMetadata {
        * Duplicate codecId across descriptors is a hard error.
        */
       readonly parameterized?: Record<string, TypeRenderer>;
+      /**
+       * Optional type imports for parameterized codecs.
+       * These imports are added to contract.d.ts when parameterized renderers
+       * reference types from external packages.
+       */
+      readonly parameterizedImports?: ReadonlyArray<TypesImportSpec>;
     };
     readonly operationTypes?: { readonly import: TypesImportSpec };
     readonly storage?: ReadonlyArray<{
