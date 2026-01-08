@@ -5,6 +5,7 @@ import type {
   AnyBinaryBuilder,
   AnyExpressionSource,
   AnyOrderBuilder,
+  AnyUnaryBuilder,
   NestedProjection,
 } from '@prisma-next/sql-relational-core/types';
 import type { ProjectionState } from '../utils/state';
@@ -31,10 +32,10 @@ export interface MetaBuildArgs {
       readonly right: unknown;
     };
     readonly childProjection: ProjectionState;
-    readonly childWhere?: AnyBinaryBuilder;
+    readonly childWhere?: AnyBinaryBuilder | AnyUnaryBuilder;
     readonly childOrderBy?: AnyOrderBuilder;
   }>;
-  readonly where?: AnyBinaryBuilder;
+  readonly where?: AnyBinaryBuilder | AnyUnaryBuilder;
   readonly orderBy?: AnyOrderBuilder;
   readonly paramDescriptors: ParamDescriptor[];
   readonly paramCodecs?: Record<string, string>;

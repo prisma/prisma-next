@@ -11,7 +11,8 @@
       "fields": {
         "id": { "column": "id" },
         "email": { "column": "email" },
-        "createdAt": { "column": "createdAt" }
+        "createdAt": { "column": "createdAt" },
+        "deletedAt": { "column": "deletedAt" }
       },
       "relations": {}
     }
@@ -34,6 +35,11 @@
             "nativeType": "timestamptz",
             "codecId": "pg/timestamptz@1",
             "nullable": false
+          },
+          "deletedAt": {
+            "nativeType": "timestamptz",
+            "codecId": "pg/timestamptz@1",
+            "nullable": true
           }
         },
         "primaryKey": {
