@@ -12,6 +12,11 @@ export interface EmitOptions {
    * These are extracted from descriptors and normalized during assembly.
    */
   readonly parameterizedRenderers?: Map<string, TypeRenderEntry>;
+  /**
+   * Type imports for parameterized codecs.
+   * These are added to contract.d.ts alongside codec and operation type imports.
+   */
+  readonly parameterizedTypeImports?: ReadonlyArray<TypesImportSpec>;
 }
 
 export interface EmitResult {

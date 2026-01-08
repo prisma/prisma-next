@@ -215,6 +215,11 @@ export interface GenerateContractTypesOptions {
    * the renderer is called to produce the TypeScript type expression.
    */
   readonly parameterizedRenderers?: Map<string, TypeRenderEntry>;
+  /**
+   * Type imports for parameterized codecs.
+   * These are merged with codec and operation type imports in contract.d.ts.
+   */
+  readonly parameterizedTypeImports?: ReadonlyArray<TypesImportSpec>;
 }
 
 /**
