@@ -32,6 +32,7 @@
     { "path": "./packages/2-sql/4-lanes/relational-core" },
     { "path": "./packages/2-sql/4-lanes/sql-lane" },
     { "path": "./packages/2-sql/4-lanes/orm-lane" },
+    { "path": "./packages/2-sql/4-lanes/query-builder" },
 
     { "path": "./packages/2-sql/5-runtime" },
 
