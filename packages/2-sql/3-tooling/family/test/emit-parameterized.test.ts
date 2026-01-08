@@ -1,4 +1,4 @@
-import type { TypeRenderer, TypeRenderEntry, TypesImportSpec } from '@prisma-next/contract/types';
+import type { TypeRenderEntry, TypeRenderer, TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
