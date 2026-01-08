@@ -87,6 +87,7 @@ export type Contract = SqlContract<
         foreignKeys: readonly [];
       };
     };
+    readonly types: Record<string, never>;
   },
   {
     readonly User: {
