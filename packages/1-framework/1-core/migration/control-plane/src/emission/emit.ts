@@ -50,6 +50,7 @@ export async function emit(
     operationTypeImports,
     extensionIds,
     parameterizedRenderers,
+    parameterizedTypeImports,
   } = options;
 
   validateCoreStructure(ir);
@@ -104,11 +105,19 @@ export async function emit(
   };
   const contractJsonString = JSON.stringify(contractJsonWithMeta, null, 2);
 
+  const generateOptions =
+    parameterizedRenderers || parameterizedTypeImports
+      ? {
+          ...ifDefined('parameterizedRenderers', parameterizedRenderers),
+          ...ifDefined('parameterizedTypeImports', parameterizedTypeImports),
+        }
+      : undefined;
+
   const contractDtsRaw = targetFamily.generateContractTypes(
     ir,
     codecTypeImports ?? [],
     operationTypeImports ?? [],
-    parameterizedRenderers ? { parameterizedRenderers } : undefined,
+    generateOptions,
   );
   const contractDts = await format(contractDtsRaw, {
     parser: 'typescript',
