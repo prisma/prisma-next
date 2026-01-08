@@ -5,16 +5,17 @@
   "sideEffects": false,
   "description": "Shared utility functions for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check . --error-on-warnings",
-    "clean": "rm -rf dist coverage .tmp-output"
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -22,26 +23,15 @@
     "dist",
     "src"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "exports": {
-    "./array-equal": {
-      "types": "./dist/exports/array-equal.d.ts",
-      "import": "./dist/exports/array-equal.js"
-    },
-    "./assertions": {
-      "types": "./dist/exports/assertions.d.ts",
-      "import": "./dist/exports/assertions.js"
-    },
-    "./defined": {
-      "types": "./dist/exports/defined.d.ts",
-      "import": "./dist/exports/defined.js"
-    },
-    "./result": {
-      "types": "./dist/exports/result.d.ts",
-      "import": "./dist/exports/result.js"
-    },
-    "./redact-db-url": {
-      "types": "./dist/exports/redact-db-url.d.ts",
-      "import": "./dist/exports/redact-db-url.js"
-    }
+    "./array-equal": "./dist/array-equal.mjs",
+    "./assertions": "./dist/assertions.mjs",
+    "./defined": "./dist/defined.mjs",
+    "./redact-db-url": "./dist/redact-db-url.mjs",
+    "./result": "./dist/result.mjs",
+    "./package.json": "./package.json"
   }
 }
