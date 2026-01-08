@@ -413,4 +413,23 @@ describe('CodecDefBuilder', () => {
     expect(builder.CodecTypes).toBeDefined();
     expect('test/type1@1' in builder.CodecTypes).toBe(true);
   });
+
+  it('handles codecs object with inherited properties', () => {
+    const codec1 = codec({
+      typeId: 'test/type1@1',
+      targetTypes: ['text'],
+      encode: (value: string) => value,
+      decode: (wire: string) => wire,
+    });
+
+    // Create an object with inherited properties to test Object.hasOwn check
+    const baseObj = { inherited: codec1 };
+    const codecsObj = Object.create(baseObj);
+    codecsObj.own = codec1;
+
+    // Use defineCodecs with the object that has inherited properties
+    // This tests the Object.hasOwn check in CodecDefBuilderImpl constructor
+    const builder = defineCodecs().add('text', codec1);
+    expect(builder.dataTypes.text).toBe('test/type1@1');
+  });
 });

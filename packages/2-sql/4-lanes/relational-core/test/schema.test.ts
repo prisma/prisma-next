@@ -27,6 +27,11 @@ type TestContract = SqlContract<
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
+          readonly bio: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: true;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: readonly [];
@@ -62,6 +67,7 @@ describe('schema', () => {
           columns: {
             id: { ...int4ColumnType, nullable: false },
             email: { ...textColumnType, nullable: false },
+            bio: { ...textColumnType, nullable: true },
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -348,5 +354,31 @@ describe('schema', () => {
     // Access with number key
     const numberAccess = (userTable as unknown as Record<number, unknown>)[0];
     expect(numberAccess).toBeUndefined();
+  });
+
+  it('column builder isNull creates null check builder', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const bioColumn = tables.user.columns.bio;
+
+    const nullCheck = bioColumn.isNull();
+    expect(nullCheck).toMatchObject({
+      kind: 'nullCheck',
+      isNull: true,
+    });
+  });
+
+  it('column builder isNotNull creates null check builder', () => {
+    const adapter = createStubAdapter();
+    const context = createTestContext(contract, adapter);
+    const tables = schema(context).tables;
+    const bioColumn = tables.user.columns.bio;
+
+    const nullCheck = bioColumn.isNotNull();
+    expect(nullCheck).toMatchObject({
+      kind: 'nullCheck',
+      isNull: false,
+    });
   });
 });

@@ -1276,4 +1276,59 @@ describe('operations-registry', () => {
     // Operations should not be attached since registry has no operations for this codecId
     expect((result as unknown as { add?: unknown }).add).toBeUndefined();
   });
+
+  it('attachOperationsToColumnBuilder skips capability-gated operations when contractCapabilities is undefined', () => {
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter);
+    const tables = schema(context).tables;
+    const idColumn = tables.user.columns.id;
+
+    // Register an operation with capabilities requirement
+    const signature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'testOp',
+      args: [],
+      returns: { kind: 'builtin', type: 'number' },
+      capabilities: ['postgres.lateral'],
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: 'test()',
+      },
+    };
+    context.operations.register(signature);
+
+    // Call with undefined contractCapabilities - operation should be skipped
+    const result = attachOperationsToColumnBuilder(
+      idColumn as unknown as ColumnBuilder<string, StorageColumn, unknown, Record<string, never>>,
+      idColumn.columnMeta,
+      context.operations,
+      undefined, // contractCapabilities is undefined
+    );
+
+    // Operation should not be attached since contractCapabilities is undefined
+    expect((result as unknown as { testOp?: unknown }).testOp).toBeUndefined();
+  });
 });
