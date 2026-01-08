@@ -1,4 +1,5 @@
-import type { TypeRenderer, TypesImportSpec } from '@prisma-next/contract/types';
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { TypeRenderEntry, TypeRenderer, TypesImportSpec } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
@@ -10,8 +11,13 @@ import { createSqlFamilyInstance } from '../src/core/instance';
 /**
  * Integration tests for parameterized codec emission plumbing.
  *
- * These tests verify that parameterized codec descriptors flow correctly
+ * These tests verify that parameterized renderers flow correctly
  * from family instance creation through to contract emission.
+ *
+ * Key architecture notes:
+ * - Parameterized type renderers are defined in `types.codecTypes.parameterized`
+ * - Renderers are normalized to `TypeRenderEntry` by the assembly layer
+ * - Type imports for parameterized types are defined in `types.codecTypes.parameterizedImports`
  */
 
 function createMockTarget(): ControlTargetDescriptor<'sql', 'postgres'> {
@@ -21,7 +27,7 @@ function createMockTarget(): ControlTargetDescriptor<'sql', 'postgres'> {
     version: '0.0.1',
     familyId: 'sql',
     targetId: 'postgres',
-    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    create: () => ({ familyId: 'sql' as const, targetId: 'postgres' as const }),
   };
 }
 
@@ -73,7 +79,110 @@ function createMockExtensionWithParameterizedCodec(
   };
 }
 
+function createMockExtensionWithParameterizedRenderer(
+  id: string,
+  codecId: string,
+  renderer: TypeRenderEntry['render'],
+): ControlExtensionDescriptor<'sql', 'postgres'> {
+  return {
+    kind: 'extension',
+    id,
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
+    create: () => ({ familyId: 'sql', targetId: 'postgres' }),
+    types: {
+      codecTypes: {
+        import: {
+          package: `@prisma-next/extension-${id}/codec-types`,
+          named: 'CodecTypes',
+          alias: `${id.charAt(0).toUpperCase() + id.slice(1)}CodecTypes`,
+        },
+        parameterized: {
+          [codecId]: renderer,
+        },
+      },
+    },
+  };
+}
+
+function createTestContractIR(
+  overrides: Partial<ContractIR> & { coreHash?: string } = {},
+): ContractIR & { coreHash?: string } {
+  return {
+    schemaVersion: '1',
+    targetFamily: 'sql',
+    target: 'postgres',
+    coreHash: 'sha256:placeholder',
+    models: {},
+    relations: {},
+    storage: { tables: {} },
+    extensionPacks: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
+    ...overrides,
+  };
+}
+
 describe('emit parameterized codecs integration', () => {
+  it('emits parameterized type via renderer in contract.d.ts', async () => {
+    // Create an extension with a parameterized renderer
+    const target = createMockTarget();
+    const adapter = createMockAdapter();
+    const extension = createMockExtensionWithParameterizedRenderer(
+      'pgvector',
+      'pg/vector@1',
+      (params) => `Vector<${params['length']}>`,
+    );
+
+    const familyInstance = createSqlFamilyInstance({
+      target,
+      adapter,
+      extensionPacks: [extension],
+    });
+
+    // Create a contract IR with a column using the parameterized codec
+    const contractIR = createTestContractIR({
+      models: {
+        Embedding: {
+          storage: { table: 'embedding' },
+          fields: {
+            id: { column: 'id' },
+            vector: { column: 'vector' },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          embedding: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              vector: {
+                nativeType: 'vector(1536)',
+                codecId: 'pg/vector@1',
+                nullable: false,
+                typeParams: { length: 1536 },
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      extensionPacks: { pgvector: { version: '0.0.1' } },
+    });
+
+    // Emit the contract
+    const result = await familyInstance.emitContract({ contractIR });
+
+    // Verify the parameterized renderer produces the correct type
+    expect(result.contractDts).toContain('readonly vector: Vector<1536>');
+  });
+
   it('emits typesImport from parameterized codecs in contract.d.ts', async () => {
     // Create a parameterized codec config with typesImport
     const vectorCodecConfig: ParameterizedCodecConfig = {
@@ -98,11 +207,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Create a contract IR with a column using the parameterized codec
-    const contractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      coreHash: 'sha256:placeholder',
+    const contractIR = createTestContractIR({
       models: {
         Embedding: {
           storage: { table: 'embedding' },
@@ -113,7 +218,6 @@ describe('emit parameterized codecs integration', () => {
           relations: {},
         },
       },
-      relations: {},
       storage: {
         tables: {
           embedding: {
@@ -134,10 +238,7 @@ describe('emit parameterized codecs integration', () => {
         },
       },
       extensionPacks: { pgvector: { version: '0.0.1' } },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     // Emit the contract
     const result = await familyInstance.emitContract({ contractIR });
@@ -146,6 +247,109 @@ describe('emit parameterized codecs integration', () => {
     expect(result.contractDts).toContain(
       "import type { Vector as PgVector } from '@prisma-next/extension-pgvector/vector-types'",
     );
+  });
+
+  it('uses standard CodecTypes lookup for columns without typeParams', async () => {
+    const target = createMockTarget();
+    const adapter = createMockAdapter();
+    const extension = createMockExtensionWithParameterizedRenderer(
+      'pgvector',
+      'pg/vector@1',
+      (params) => `Vector<${params['length']}>`,
+    );
+
+    const familyInstance = createSqlFamilyInstance({
+      target,
+      adapter,
+      extensionPacks: [extension],
+    });
+
+    // Contract with columns WITHOUT typeParams
+    const contractIR = createTestContractIR({
+      models: {
+        User: {
+          storage: { table: 'user' },
+          fields: {
+            id: { column: 'id' },
+            name: { column: 'name' },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const result = await familyInstance.emitContract({ contractIR });
+
+    // Standard columns should use CodecTypes lookup
+    expect(result.contractDts).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
+    expect(result.contractDts).toContain("readonly name: CodecTypes['pg/text@1']['output']");
+  });
+
+  it('falls back to CodecTypes when no renderer exists for codecId', async () => {
+    const target = createMockTarget();
+    const adapter = createMockAdapter();
+    // Extension with renderer for pg/vector@1 only
+    const extension = createMockExtensionWithParameterizedRenderer(
+      'pgvector',
+      'pg/vector@1',
+      (params) => `Vector<${params['length']}>`,
+    );
+
+    const familyInstance = createSqlFamilyInstance({
+      target,
+      adapter,
+      extensionPacks: [extension],
+    });
+
+    // Contract with column using a different codecId (no renderer exists)
+    const contractIR = createTestContractIR({
+      models: {
+        Data: {
+          storage: { table: 'data' },
+          fields: {
+            value: { column: 'value' },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          data: {
+            columns: {
+              value: {
+                nativeType: 'custom_type',
+                codecId: 'custom/type@1',
+                nullable: false,
+                typeParams: { foo: 'bar' }, // Has typeParams but no renderer
+              },
+            },
+            primaryKey: { columns: [] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const result = await familyInstance.emitContract({ contractIR });
+
+    // Should fall back to standard CodecTypes lookup
+    expect(result.contractDts).toContain("readonly value: CodecTypes['custom/type@1']['output']");
   });
 
   it('collects typesImport from multiple parameterized codecs', async () => {
@@ -193,11 +397,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Create a contract IR with columns using both parameterized codecs
-    const contractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      coreHash: 'sha256:placeholder',
+    const contractIR = createTestContractIR({
       models: {
         Data: {
           storage: { table: 'data' },
@@ -209,7 +409,6 @@ describe('emit parameterized codecs integration', () => {
           relations: {},
         },
       },
-      relations: {},
       storage: {
         tables: {
           data: {
@@ -236,10 +435,7 @@ describe('emit parameterized codecs integration', () => {
         },
       },
       extensionPacks: { pgvector: { version: '0.0.1' } },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = await familyInstance.emitContract({ contractIR });
 
@@ -292,11 +488,7 @@ describe('emit parameterized codecs integration', () => {
     });
 
     // Contract with columns using BOTH parameterized codecs from the same package
-    const contractIR = {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      coreHash: 'sha256:placeholder',
+    const contractIR = createTestContractIR({
       models: {
         VectorData: {
           storage: { table: 'vector_data' },
@@ -308,7 +500,6 @@ describe('emit parameterized codecs integration', () => {
           relations: {},
         },
       },
-      relations: {},
       storage: {
         tables: {
           vector_data: {
@@ -335,10 +526,7 @@ describe('emit parameterized codecs integration', () => {
         },
       },
       extensionPacks: { pgvector: { version: '0.0.1' } },
-      capabilities: {},
-      meta: {},
-      sources: {},
-    };
+    });
 
     const result = await familyInstance.emitContract({ contractIR });
 
