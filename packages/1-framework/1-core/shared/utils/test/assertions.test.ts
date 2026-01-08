@@ -5,7 +5,6 @@ describe('assertDefined', () => {
   it('passes through defined values', () => {
     const value: string | undefined = 'hello';
     assertDefined(value, 'should not throw');
-    // After assertion, value is narrowed to string
     expect(value.length).toBe(5);
   });
 
@@ -15,8 +14,9 @@ describe('assertDefined', () => {
   });
 
   it('throws for null', () => {
+    const errorMessage = 'value was null';
     const value: string | null = null;
-    expect(() => assertDefined(value, 'value was null')).toThrow('value was null');
+    expect(() => assertDefined(value, errorMessage)).toThrow(errorMessage);
   });
 
   it('allows zero and empty string', () => {
