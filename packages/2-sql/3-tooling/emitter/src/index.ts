@@ -212,7 +212,8 @@ export const sqlTargetFamilyHook = {
       allImports.push(...parameterizedTypeImports);
     }
 
-    // Deduplicate imports by package+named (different aliases for same import are allowed)
+    // Deduplicate imports by package+named. When duplicates occur, the first occurrence
+    // (and its alias) is kept; later duplicates with different aliases are silently ignored.
     const seenImports = new Set<string>();
     const uniqueImports: TypesImportSpec[] = [];
     for (const imp of allImports) {
