@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { VECTOR_MAX_DIM } from '../src/core/constants';
 import { vector, vectorColumn } from '../src/exports/column-types';
 
 describe('pgvector column-types', () => {
@@ -60,11 +61,13 @@ describe('pgvector column-types', () => {
     });
 
     it('throws RangeError for invalid dimensions', () => {
-      const invalidInputs = [0, -1, 1.5, 16001];
+      const invalidInputs = [0, -1, 1.5, VECTOR_MAX_DIM + 1];
 
       for (const value of invalidInputs) {
         expect(() => vector(value as number)).toThrow(
-          new RangeError(`pgvector: dimension must be an integer in [1, 16000], got ${value}`),
+          new RangeError(
+            `pgvector: dimension must be an integer in [1, ${VECTOR_MAX_DIM}], got ${value}`,
+          ),
         );
       }
     });

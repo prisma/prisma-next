@@ -8,6 +8,7 @@ import type {
 } from '@prisma-next/sql-runtime';
 import { type as arktype } from 'arktype';
 import { codecDefinitions } from '../core/codecs';
+import { VECTOR_MAX_DIM } from '../core/constants';
 import { pgvectorPackMeta, pgvectorRuntimeOperation } from '../core/descriptor-meta';
 
 const vectorTypeId = 'pg/vector@1' as const;
@@ -18,8 +19,8 @@ const vectorParamsSchema = arktype({
   if (!Number.isInteger(length)) {
     return ctx.mustBe('an integer');
   }
-  if (length < 1 || length > 16000) {
-    return ctx.mustBe('in the range [1, 16000]');
+  if (length < 1 || length > VECTOR_MAX_DIM) {
+    return ctx.mustBe(`in the range [1, ${VECTOR_MAX_DIM}]`);
   }
   return true;
 });
