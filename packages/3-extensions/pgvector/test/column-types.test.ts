@@ -64,10 +64,9 @@ describe('pgvector column-types', () => {
       const invalidInputs = [0, -1, 1.5, VECTOR_MAX_DIM + 1];
 
       for (const value of invalidInputs) {
-        expect(() => vector(value as number)).toThrow(
-          new RangeError(
-            `pgvector: dimension must be an integer in [1, ${VECTOR_MAX_DIM}], got ${value}`,
-          ),
+        expect(() => vector(value as number)).toThrowError(RangeError);
+        expect(() => vector(value as number)).toThrowError(
+          `pgvector: dimension must be an integer in [1, ${VECTOR_MAX_DIM}], got ${value}`,
         );
       }
     });

@@ -6,14 +6,14 @@
  */
 
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
-import { VECTOR_MAX_DIM } from '../core/constants';
+import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from '../core/constants';
 
 /**
  * Static vector column descriptor without dimension.
  * Use `vector(N)` for dimensioned vectors that produce `vector(N)` DDL.
  */
 export const vectorColumn = {
-  codecId: 'pg/vector@1',
+  codecId: VECTOR_CODEC_ID,
   nativeType: 'vector',
 } as const satisfies ColumnTypeDescriptor;
 
@@ -39,7 +39,7 @@ export function vector<N extends number>(
     );
   }
   return {
-    codecId: 'pg/vector@1',
+    codecId: VECTOR_CODEC_ID,
     nativeType: `vector(${length})`,
     typeParams: { length },
   } as const;

@@ -8,10 +8,9 @@ import type {
 } from '@prisma-next/sql-runtime';
 import { type as arktype } from 'arktype';
 import { codecDefinitions } from '../core/codecs';
-import { VECTOR_MAX_DIM } from '../core/constants';
+import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from '../core/constants';
 import { pgvectorPackMeta, pgvectorRuntimeOperation } from '../core/descriptor-meta';
 
-const vectorTypeId = 'pg/vector@1' as const;
 const vectorParamsSchema = arktype({
   length: 'number',
 }).narrow((params, ctx) => {
@@ -24,6 +23,18 @@ const vectorParamsSchema = arktype({
   }
   return true;
 });
+
+/**
+ * Pre-allocated parameterized codec descriptors to avoid per-call allocations.
+ */
+const parameterizedCodecDescriptors = [
+  {
+    codecId: VECTOR_CODEC_ID,
+    paramsSchema: vectorParamsSchema,
+  },
+] as const satisfies ReadonlyArray<
+  RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
+>;
 
 /**
  * pgvector SQL runtime extension instance.
@@ -49,12 +60,7 @@ class PgVectorRuntimeExtensionInstance implements SqlRuntimeExtensionInstance<'p
   parameterizedCodecs(): ReadonlyArray<
     RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
   > {
-    return [
-      {
-        codecId: vectorTypeId,
-        paramsSchema: vectorParamsSchema,
-      },
-    ];
+    return parameterizedCodecDescriptors;
   }
 }
 

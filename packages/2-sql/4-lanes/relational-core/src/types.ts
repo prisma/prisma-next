@@ -321,6 +321,10 @@ type ExtractFieldValue<
  * Extracts the JavaScript type for a column from model mappings if available.
  * Returns `never` if the column maps to a ModelField object (which indicates
  * a relation that should fall through to codec-based type resolution).
+ *
+ * The check for ModelField uses `Exclude<keyof FieldValue, 'column'> extends never`
+ * to ensure we only skip pure `{ column: string }` marker objects, not richer
+ * object types that happen to include a `column` property.
  */
 type ExtractColumnJsTypeFromModels<
   Contract extends SqlContract<SqlStorage>,
@@ -331,10 +335,10 @@ type ExtractColumnJsTypeFromModels<
     ? ExtractColumnToField<Contract, TableName, ColumnName> extends infer FieldName
       ? FieldName extends string
         ? ExtractFieldValue<Contract, ModelName, FieldName> extends infer FieldValue
-          ? // Skip if FieldValue is a ModelField object ({ column: string })
-            // and fall through to codec-based type resolution
-            FieldValue extends { readonly column: string }
-            ? never
+          ? FieldValue extends { readonly column: string }
+            ? Exclude<keyof FieldValue, 'column'> extends never
+              ? never
+              : FieldValue
             : FieldValue
           : never
         : never
