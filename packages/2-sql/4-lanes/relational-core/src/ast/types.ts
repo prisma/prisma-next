@@ -71,6 +71,21 @@ export interface ExistsExpr {
   readonly subquery: SelectAst;
 }
 
+/**
+ * Unary expression for IS NULL / IS NOT NULL checks.
+ * Used in WHERE clauses to check for null values.
+ */
+export interface NullCheckExpr {
+  readonly kind: 'nullCheck';
+  readonly expr: Expression;
+  readonly isNull: boolean;
+}
+
+/**
+ * Union type for WHERE clause expressions.
+ */
+export type WhereExpr = BinaryExpr | ExistsExpr | NullCheckExpr;
+
 export type JoinOnExpr = {
   readonly kind: 'eqCol';
   readonly left: ColumnRef;
@@ -95,7 +110,7 @@ export interface IncludeAst {
   readonly child: {
     readonly table: TableRef;
     readonly on: JoinOnExpr;
-    readonly where?: BinaryExpr | ExistsExpr;
+    readonly where?: WhereExpr;
     readonly orderBy?: ReadonlyArray<{ expr: Expression; dir: Direction }>;
     readonly limit?: number;
     readonly project: ReadonlyArray<{ alias: string; expr: Expression }>;
@@ -111,7 +126,7 @@ export interface SelectAst {
     alias: string;
     expr: Expression | IncludeRef | LiteralExpr;
   }>;
-  readonly where?: BinaryExpr | ExistsExpr;
+  readonly where?: WhereExpr;
   readonly orderBy?: ReadonlyArray<{ expr: Expression; dir: Direction }>;
   readonly limit?: number;
 }
@@ -127,14 +142,14 @@ export interface UpdateAst {
   readonly kind: 'update';
   readonly table: TableRef;
   readonly set: Record<string, ColumnRef | ParamRef>;
-  readonly where: BinaryExpr;
+  readonly where: WhereExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 
 export interface DeleteAst {
   readonly kind: 'delete';
   readonly table: TableRef;
-  readonly where: BinaryExpr;
+  readonly where: WhereExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 

@@ -1,7 +1,6 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
-  BinaryExpr,
   ColumnRef,
   Direction,
   IncludeAst,
@@ -9,6 +8,7 @@ import type {
   JoinAst,
   OperationExpr,
   TableRef,
+  WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   createJoinOnBuilder,
@@ -21,6 +21,7 @@ import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-la
 import type {
   AnyBinaryBuilder,
   AnyOrderBuilder,
+  AnyUnaryBuilder,
   BinaryBuilder,
   BuildOptions,
   InferNestedProjectionRow,
@@ -29,6 +30,7 @@ import type {
   NestedProjection,
   OrderBuilder,
   SqlBuilderOptions,
+  UnaryBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import { isExpressionBuilder } from '@prisma-next/sql-relational-core/utils/guards';
 import type { ProjectionInput } from '../types/internal';
@@ -235,7 +237,9 @@ export class SelectBuilderImpl<
     );
   }
 
-  where(expr: AnyBinaryBuilder): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
+  where(
+    expr: AnyBinaryBuilder | AnyUnaryBuilder,
+  ): SelectBuilderImpl<TContract, Row, CodecTypes, Includes> {
     return new SelectBuilderImpl<TContract, Row, CodecTypes, Includes>(
       {
         context: this.context,
@@ -376,7 +380,7 @@ export class SelectBuilderImpl<
       joins?: ReadonlyArray<JoinAst>;
       includes?: ReadonlyArray<IncludeAst>;
       project: ReadonlyArray<{ alias: string; expr: ColumnRef | IncludeRef | OperationExpr }>;
-      where?: BinaryExpr;
+      where?: WhereExpr;
       orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
       limit?: number;
     });
@@ -397,7 +401,7 @@ export class SelectBuilderImpl<
       projection: ProjectionState;
       joins?: ReadonlyArray<JoinState>;
       includes?: ReadonlyArray<IncludeState>;
-      where?: BinaryBuilder;
+      where?: BinaryBuilder | UnaryBuilder;
       orderBy?: AnyOrderBuilder;
       paramDescriptors: ParamDescriptor[];
       paramCodecs?: Record<string, string>;

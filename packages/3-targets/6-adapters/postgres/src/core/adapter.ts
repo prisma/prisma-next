@@ -4,17 +4,18 @@ import type {
   BinaryExpr,
   ColumnRef,
   DeleteAst,
-  ExistsExpr,
   IncludeRef,
   InsertAst,
   JoinAst,
   LiteralExpr,
   LowererContext,
+  NullCheckExpr,
   OperationExpr,
   ParamRef,
   QueryAst,
   SelectAst,
   UpdateAst,
+  WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { codecDefinitions } from './codecs';
@@ -134,13 +135,23 @@ function renderProjection(ast: SelectAst, contract?: PostgresContract): string {
     .join(', ');
 }
 
-function renderWhere(expr: BinaryExpr | ExistsExpr, contract?: PostgresContract): string {
+function renderWhere(expr: WhereExpr, contract?: PostgresContract): string {
   if (expr.kind === 'exists') {
     const notKeyword = expr.not ? 'NOT ' : '';
     const subquery = renderSelect(expr.subquery, contract);
     return `${notKeyword}EXISTS (${subquery})`;
   }
+  if (expr.kind === 'nullCheck') {
+    return renderNullCheck(expr, contract);
+  }
   return renderBinary(expr, contract);
+}
+
+function renderNullCheck(expr: NullCheckExpr, contract?: PostgresContract): string {
+  const rendered = renderExpr(expr.expr as ColumnRef | OperationExpr, contract);
+  // Only wrap in parentheses if it's an operation expression
+  const renderedExpr = isOperationExpr(expr.expr) ? `(${rendered})` : rendered;
+  return expr.isNull ? `${renderedExpr} IS NULL` : `${renderedExpr} IS NOT NULL`;
 }
 
 function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
@@ -406,7 +417,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
     return `${column} = ${value}`;
   });
 
-  const whereClause = ` WHERE ${renderBinary(ast.where, contract)}`;
+  const whereClause = ` WHERE ${renderWhere(ast.where, contract)}`;
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';
@@ -416,7 +427,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
 
 function renderDelete(ast: DeleteAst, contract?: PostgresContract): string {
   const table = quoteIdentifier(ast.table.name);
-  const whereClause = ` WHERE ${renderBinary(ast.where, contract)}`;
+  const whereClause = ` WHERE ${renderWhere(ast.where, contract)}`;
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';

@@ -1,9 +1,9 @@
-import type { BinaryExpr, ColumnRef, DeleteAst, TableRef } from './types';
+import type { ColumnRef, DeleteAst, TableRef, WhereExpr } from './types';
 import { compact } from './util';
 
 export interface CreateDeleteAstOptions {
   readonly table: TableRef;
-  readonly where: BinaryExpr;
+  readonly where: WhereExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 

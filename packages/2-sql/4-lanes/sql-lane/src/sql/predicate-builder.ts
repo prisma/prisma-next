@@ -1,8 +1,22 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
-import type { BinaryExpr, Expression, ParamRef } from '@prisma-next/sql-relational-core/ast';
-import { createBinaryExpr, createParamRef } from '@prisma-next/sql-relational-core/ast';
-import type { BinaryBuilder, ParamPlaceholder } from '@prisma-next/sql-relational-core/types';
+import type {
+  Expression,
+  NullCheckExpr,
+  ParamRef,
+  WhereExpr,
+} from '@prisma-next/sql-relational-core/ast';
+import {
+  createBinaryExpr,
+  createNullCheckExpr,
+  createParamRef,
+} from '@prisma-next/sql-relational-core/ast';
+import type {
+  BinaryBuilder,
+  NullCheckBuilder,
+  ParamPlaceholder,
+  UnaryBuilder,
+} from '@prisma-next/sql-relational-core/types';
 import {
   isColumnBuilder,
   isExpressionBuilder,
@@ -16,18 +30,61 @@ import {
 } from '../utils/errors';
 
 export interface BuildWhereExprResult {
-  expr: BinaryExpr;
+  expr: WhereExpr;
   codecId: string | undefined;
   paramName: string;
 }
 
+/**
+ * Type guard to check if a builder is a NullCheckBuilder (unary).
+ */
+function isNullCheckBuilder(builder: BinaryBuilder | UnaryBuilder): builder is NullCheckBuilder {
+  return builder.kind === 'nullCheck';
+}
+
+/**
+ * Builds a NullCheckExpr from a NullCheckBuilder.
+ */
+function buildNullCheckExpr(
+  contract: SqlContract<SqlStorage>,
+  where: NullCheckBuilder,
+): NullCheckExpr {
+  const expr = where.expr;
+
+  // Validate column exists in contract if it's a ColumnRef
+  if (expr.kind === 'col') {
+    const { table, column } = expr;
+    const contractTable = contract.storage.tables[table];
+    if (!contractTable) {
+      errorUnknownTable(table);
+    }
+
+    const columnMeta: StorageColumn | undefined = contractTable.columns[column];
+    if (!columnMeta) {
+      errorUnknownColumn(column, table);
+    }
+  }
+
+  return createNullCheckExpr(expr, where.isNull);
+}
+
 export function buildWhereExpr(
   contract: SqlContract<SqlStorage>,
-  where: BinaryBuilder,
+  where: BinaryBuilder | UnaryBuilder,
   paramsMap: Record<string, unknown>,
   descriptors: ParamDescriptor[],
   values: unknown[],
 ): BuildWhereExprResult {
+  // Handle NullCheckBuilder (unary expression)
+  if (isNullCheckBuilder(where)) {
+    return {
+      expr: buildNullCheckExpr(contract, where),
+      codecId: undefined,
+      paramName: '',
+    };
+  }
+
+  // Handle BinaryBuilder (binary expression)
   let leftExpr: Expression;
   let codecId: string | undefined;
   let rightExpr: Expression | ParamRef;

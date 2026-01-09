@@ -1,4 +1,12 @@
-import type { BinaryExpr, BinaryOp, ExistsExpr, Expression, ParamRef, SelectAst } from './types';
+import type {
+  BinaryExpr,
+  BinaryOp,
+  ExistsExpr,
+  Expression,
+  NullCheckExpr,
+  ParamRef,
+  SelectAst,
+} from './types';
 
 export function createBinaryExpr(
   op: BinaryOp,
@@ -18,5 +26,13 @@ export function createExistsExpr(not: boolean, subquery: SelectAst): ExistsExpr 
     kind: 'exists',
     not,
     subquery,
+  };
+}
+
+export function createNullCheckExpr(expr: Expression, isNull: boolean): NullCheckExpr {
+  return {
+    kind: 'nullCheck',
+    expr,
+    isNull,
   };
 }

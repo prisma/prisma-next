@@ -1,11 +1,11 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
-  BinaryExpr,
   ColumnRef,
   IncludeAst,
   OperationExpr,
   TableRef,
+  WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   createColumnRef,
@@ -205,7 +205,7 @@ export function buildIncludeAst(
       })()
     : undefined;
 
-  let childWhere: BinaryExpr | undefined;
+  let childWhere: WhereExpr | undefined;
   if (include.childWhere) {
     const whereResult = buildWhereExpr(
       contract,

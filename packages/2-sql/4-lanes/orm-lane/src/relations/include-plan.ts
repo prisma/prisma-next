@@ -8,6 +8,7 @@ import type {
   OperationExpr,
   ParamRef,
   TableRef,
+  WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -308,9 +309,9 @@ export function buildExistsSubqueries(
 }
 
 export function combineWhereClauses(
-  mainWhere: BinaryExpr | ExistsExpr | undefined,
+  mainWhere: WhereExpr | undefined,
   existsExprs: ExistsExpr[],
-): BinaryExpr | ExistsExpr | undefined {
+): WhereExpr | undefined {
   if (existsExprs.length === 1) {
     return existsExprs[0];
   }

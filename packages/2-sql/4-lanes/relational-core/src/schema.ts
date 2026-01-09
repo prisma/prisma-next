@@ -15,6 +15,7 @@ import type {
   CodecTypes as CodecTypesType,
   ColumnBuilder,
   ComputeColumnJsType,
+  NullCheckBuilder,
   OperationTypeSignature,
   OperationTypes,
   OrderBuilder,
@@ -141,6 +142,30 @@ export class ColumnBuilderImpl<
       expr: this.toExpr(),
       dir: 'desc' as const,
     }) as OrderBuilder<ColumnName, ColumnMeta, JsType>;
+  }
+
+  /**
+   * Creates an IS NULL check for this column.
+   * Available on all columns at runtime, but typed to only be visible on nullable columns.
+   */
+  isNull(): NullCheckBuilder<ColumnName, ColumnMeta, JsType> {
+    return Object.freeze({
+      kind: 'nullCheck' as const,
+      expr: this.toExpr(),
+      isNull: true,
+    }) as NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
+  }
+
+  /**
+   * Creates an IS NOT NULL check for this column.
+   * Available on all columns at runtime, but typed to only be visible on nullable columns.
+   */
+  isNotNull(): NullCheckBuilder<ColumnName, ColumnMeta, JsType> {
+    return Object.freeze({
+      kind: 'nullCheck' as const,
+      expr: this.toExpr(),
+      isNull: false,
+    }) as NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
   }
 }
 
