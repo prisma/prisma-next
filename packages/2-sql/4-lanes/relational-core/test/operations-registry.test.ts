@@ -1320,15 +1320,13 @@ describe('operations-registry', () => {
     };
     context.operations.register(signature);
 
-    // Call with undefined contractCapabilities - operation should be skipped
     const result = attachOperationsToColumnBuilder(
-      idColumn as unknown as ColumnBuilder<string, StorageColumn, unknown, Record<string, never>>,
+      idColumn as never,
       idColumn.columnMeta,
       context.operations,
-      undefined, // contractCapabilities is undefined
+      undefined,
     );
 
-    // Operation should not be attached since contractCapabilities is undefined
-    expect((result as unknown as { testOp?: unknown }).testOp).toBeUndefined();
+    expect(result['testOp']).toBeUndefined();
   });
 });
