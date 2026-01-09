@@ -18,6 +18,9 @@ export type {
 // Client factory
 export { createControlClient } from '../control-api/client';
 
+// Standalone operations (for tooling that doesn't need full client)
+export { executeContractEmit } from '../control-api/operations/contract-emit';
+
 // CLI-specific types
 export type {
   ContractSourceLoader,
