@@ -17,7 +17,7 @@ import { createSqlFamilyInstance } from '../src/core/instance';
  * Key architecture notes:
  * - Parameterized type renderers are defined in `types.codecTypes.parameterized`
  * - Renderers are normalized to `TypeRenderEntry` by the assembly layer
- * - Type imports for parameterized types are defined in `types.codecTypes.parameterizedImports`
+ * - Type imports for parameterized types are defined in `types.codecTypes.typeImports`
  */
 
 function createMockTarget(): ControlTargetDescriptor<'sql', 'postgres'> {
@@ -73,7 +73,7 @@ function createMockExtensionWithParameterizedCodec(
         parameterized: {
           [config.codecId]: config.renderer,
         },
-        ...(config.typesImport ? { parameterizedImports: [config.typesImport] } : {}),
+        ...(config.typesImport ? { typeImports: [config.typesImport] } : {}),
       },
     },
   };
@@ -395,7 +395,7 @@ describe('emit parameterized codecs integration', () => {
           parameterized: {
             'pg/decimal@1': 'Decimal<{{precision}}, {{scale}}>',
           },
-          parameterizedImports: [
+          typeImports: [
             {
               package: '@prisma-next/adapter-postgres/decimal-types',
               named: 'Decimal',
@@ -482,7 +482,7 @@ describe('emit parameterized codecs integration', () => {
             'pg/vector@1': 'Vector<{{length}}>',
             'pg/halfvec@1': 'HalfVector<{{length}}>',
           },
-          parameterizedImports: [
+          typeImports: [
             {
               package: '@prisma-next/extension-pgvector/vector-types',
               named: 'Vector',

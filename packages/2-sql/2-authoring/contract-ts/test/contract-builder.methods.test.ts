@@ -248,3 +248,65 @@ describe('extensionPacks', () => {
     ).toThrow('builder target is "postgres"');
   });
 });
+
+describe('typeParams', () => {
+  const vectorColumn = columnDescriptor('pg/vector@1', 'vector(1536)');
+
+  it('includes typeParams in storage column when present in descriptor', () => {
+    const vectorWithParams = {
+      ...vectorColumn,
+      typeParams: { length: 1536 },
+    };
+
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('document', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('embedding', { type: vectorWithParams, nullable: false })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.document.columns.embedding).toMatchObject({
+      nativeType: 'vector(1536)',
+      codecId: 'pg/vector@1',
+      nullable: false,
+      typeParams: { length: 1536 },
+    });
+  });
+
+  it('includes typeParams in storage column when passed via options', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('document', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('embedding', {
+            type: vectorColumn,
+            nullable: false,
+            typeParams: { length: 768 },
+          })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.document.columns.embedding).toMatchObject({
+      nativeType: 'vector(1536)',
+      codecId: 'pg/vector@1',
+      nullable: false,
+      typeParams: { length: 768 },
+    });
+  });
+
+  it('omits typeParams when not provided', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) =>
+        t.column('id', { type: int4Column, nullable: false }).primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.user.columns.id).not.toHaveProperty('typeParams');
+  });
+});

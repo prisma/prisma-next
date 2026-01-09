@@ -233,7 +233,13 @@ type ExtractColumnJsTypeFromModels<
                   ? Models[TableToModel[TableName]] extends { readonly fields: infer Fields }
                     ? Fields extends Record<string, unknown>
                       ? ColumnToField[TableName][ColumnName] extends keyof Fields
-                        ? Fields[ColumnToField[TableName][ColumnName]]
+                        ? Fields[ColumnToField[TableName][ColumnName]] extends infer FieldValue
+                          ? // Skip if FieldValue is a ModelField object ({ column: string })
+                            // and fall through to codec-based type resolution
+                            FieldValue extends { readonly column: string }
+                            ? never
+                            : FieldValue
+                          : never
                         : never
                       : never
                     : never
