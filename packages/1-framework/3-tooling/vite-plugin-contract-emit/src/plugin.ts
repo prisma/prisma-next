@@ -46,9 +46,10 @@ export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginO
 
   function logError(message: string, error?: unknown) {
     if (logLevel === 'silent') return;
-    console.error(`[${PLUGIN_NAME}] ${message}`);
-    if (error && logLevel === 'debug') {
-      console.error(error);
+    const errorMessage = error instanceof Error ? error.message : error ? String(error) : '';
+    console.error(`[${PLUGIN_NAME}] ${message}${errorMessage ? ` ${errorMessage}` : ''}`);
+    if (error instanceof Error && error.stack && logLevel === 'debug') {
+      console.error(error.stack);
     }
   }
 
