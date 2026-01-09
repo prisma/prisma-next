@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    include: ['test/**/*.test.ts'],
     globals: true,
     environment: 'node',
     coverage: {
@@ -14,21 +15,15 @@ export default defineConfig({
         '**/*.test.ts',
         '**/*.test-d.ts',
         '**/*.config.ts',
-        '**/exports/**',
-        '**/errors.ts', // Re-export file
         '**/index.ts', // Re-export file
         '**/types.ts', // Types-only file
-        'src/utils/guards.ts', // Type guards tested indirectly through integration tests
-        'src/ast/adapter-types.ts', // Types-only file
-        'src/ast/driver-types.ts', // Types-only file
-        'src/ast/predicate.ts', // Simple factory functions tested indirectly through integration tests
-        'src/query-lane-context.ts', // Types-only file
+        '**/exports/**', // Re-export files
       ],
       thresholds: {
-        lines: 96,
-        branches: 91,
+        lines: 95,
+        branches: 95,
         functions: 95,
-        statements: 96,
+        statements: 95,
       },
     },
   },

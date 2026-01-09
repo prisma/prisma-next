@@ -3,6 +3,7 @@ import type {
   AnyBinaryBuilder,
   AnyExpressionSource,
   AnyOrderBuilder,
+  AnyUnaryBuilder,
   JoinOnPredicate,
 } from '@prisma-next/sql-relational-core/types';
 
@@ -22,7 +23,7 @@ export interface IncludeState {
   readonly table: TableRef;
   readonly on: JoinOnPredicate;
   readonly childProjection: ProjectionState;
-  readonly childWhere?: AnyBinaryBuilder;
+  readonly childWhere?: AnyBinaryBuilder | AnyUnaryBuilder;
   readonly childOrderBy?: AnyOrderBuilder;
   readonly childLimit?: number;
 }
@@ -32,7 +33,7 @@ export interface BuilderState {
   joins?: ReadonlyArray<JoinState>;
   includes?: ReadonlyArray<IncludeState>;
   projection?: ProjectionState;
-  where?: AnyBinaryBuilder;
+  where?: AnyBinaryBuilder | AnyUnaryBuilder;
   orderBy?: AnyOrderBuilder;
   limit?: number;
 }

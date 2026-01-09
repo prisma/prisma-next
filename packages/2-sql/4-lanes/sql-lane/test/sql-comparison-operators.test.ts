@@ -185,4 +185,136 @@ describe('sql comparison operators', () => {
       }).toThrow('Parameter placeholder or expression source required for column comparison');
     });
   });
+
+  describe('isNull operator', () => {
+    it('builds SELECT query with isNull filter on nullable column', () => {
+      const { id, deletedAt } = tables.user.columns;
+
+      const plan = sql({ context })
+        .from(tables.user)
+        .select({ id })
+        .where(deletedAt.isNull())
+        .build();
+
+      expect(plan.ast).toMatchObject({
+        kind: 'select',
+        where: {
+          kind: 'nullCheck',
+          expr: createColumnRef('user', 'deletedAt'),
+          isNull: true,
+        },
+      });
+    });
+
+    it('builds UPDATE query with isNull filter on nullable column', () => {
+      const { deletedAt } = tables.user.columns;
+
+      const plan = sql({ context })
+        .update(tables.user, { email: param('email') })
+        .where(deletedAt.isNull())
+        .build({ params: { email: 'test@example.com' } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'update',
+        where: {
+          kind: 'nullCheck',
+          expr: createColumnRef('user', 'deletedAt'),
+          isNull: true,
+        },
+      });
+    });
+
+    it('builds DELETE query with isNull filter on nullable column', () => {
+      const { deletedAt } = tables.user.columns;
+
+      const plan = sql({ context }).delete(tables.user).where(deletedAt.isNull()).build();
+
+      expect(plan.ast).toMatchObject({
+        kind: 'delete',
+        where: {
+          kind: 'nullCheck',
+          expr: createColumnRef('user', 'deletedAt'),
+          isNull: true,
+        },
+      });
+    });
+  });
+
+  describe('isNotNull operator', () => {
+    it('builds SELECT query with isNotNull filter on nullable column', () => {
+      const { id, deletedAt } = tables.user.columns;
+
+      const plan = sql({ context })
+        .from(tables.user)
+        .select({ id })
+        .where(deletedAt.isNotNull())
+        .build();
+
+      expect(plan.ast).toMatchObject({
+        kind: 'select',
+        where: {
+          kind: 'nullCheck',
+          expr: createColumnRef('user', 'deletedAt'),
+          isNull: false,
+        },
+      });
+    });
+
+    it('builds UPDATE query with isNotNull filter on nullable column', () => {
+      const { deletedAt } = tables.user.columns;
+
+      const plan = sql({ context })
+        .update(tables.user, { email: param('email') })
+        .where(deletedAt.isNotNull())
+        .build({ params: { email: 'test@example.com' } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'update',
+        where: {
+          kind: 'nullCheck',
+          expr: createColumnRef('user', 'deletedAt'),
+          isNull: false,
+        },
+      });
+    });
+
+    it('builds DELETE query with isNotNull filter on nullable column', () => {
+      const { deletedAt } = tables.user.columns;
+
+      const plan = sql({ context }).delete(tables.user).where(deletedAt.isNotNull()).build();
+
+      expect(plan.ast).toMatchObject({
+        kind: 'delete',
+        where: {
+          kind: 'nullCheck',
+          expr: createColumnRef('user', 'deletedAt'),
+          isNull: false,
+        },
+      });
+    });
+  });
+
+  describe('isNull/isNotNull type safety', () => {
+    it('isNull is only available on nullable columns at the type level', () => {
+      const { id, deletedAt } = tables.user.columns;
+
+      // Non-nullable column should not have isNull method at type level
+      // @ts-expect-error - id is not nullable, so isNull should not exist
+      expect(typeof id.isNull).toBe('function');
+
+      // Nullable column should have isNull method
+      expect(typeof deletedAt.isNull).toBe('function');
+    });
+
+    it('isNotNull is only available on nullable columns at the type level', () => {
+      const { id, deletedAt } = tables.user.columns;
+
+      // Non-nullable column should not have isNotNull method at type level
+      // @ts-expect-error - id is not nullable, so isNotNull should not exist
+      expect(typeof id.isNotNull).toBe('function');
+
+      // Nullable column should have isNotNull method
+      expect(typeof deletedAt.isNotNull).toBe('function');
+    });
+  });
 });

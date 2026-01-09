@@ -111,12 +111,19 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
       }
       // Add child WHERE columns if present
       if (include.childWhere) {
-        // childWhere.left is Expression (already converted at builder creation time)
-        collectRefsFromExpression(include.childWhere.left, refsColumns);
-        // Handle right side of child WHERE clause - can be ParamPlaceholder or ExpressionSource
-        const childWhereRight = include.childWhere.right;
-        if (isColumnBuilder(childWhereRight) || isExpressionBuilder(childWhereRight)) {
-          collectRefsFromExpressionSource(childWhereRight, refsColumns);
+        // Handle UnaryBuilder (e.g., NullCheckBuilder) - it only has 'expr' property
+        if (include.childWhere.kind === 'nullCheck') {
+          const expr: Expression = include.childWhere.expr;
+          collectRefsFromExpression(expr, refsColumns);
+        } else {
+          // BinaryBuilder - has 'left' and 'right' properties
+          // childWhere.left is Expression (already converted at builder creation time)
+          collectRefsFromExpression(include.childWhere.left, refsColumns);
+          // Handle right side of child WHERE clause - can be ParamPlaceholder or ExpressionSource
+          const childWhereRight = include.childWhere.right;
+          if (isColumnBuilder(childWhereRight) || isExpressionBuilder(childWhereRight)) {
+            collectRefsFromExpressionSource(childWhereRight, refsColumns);
+          }
         }
       }
       // Add child ORDER BY columns if present
@@ -128,28 +135,35 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
   }
 
   if (args.where) {
-    // args.where.left is Expression (already converted at builder creation time)
-    const leftExpr: Expression = args.where.left;
-    if (isOperationExpr(leftExpr)) {
-      const allRefs = collectColumnRefs(leftExpr);
-      for (const ref of allRefs) {
-        refsColumns.set(`${ref.table}.${ref.column}`, {
-          table: ref.table,
-          column: ref.column,
+    // Handle UnaryBuilder (e.g., NullCheckBuilder) - it only has 'expr' property
+    if (args.where.kind === 'nullCheck') {
+      const expr: Expression = args.where.expr;
+      collectRefsFromExpression(expr, refsColumns);
+    } else {
+      // BinaryBuilder - has 'left' and 'right' properties
+      // args.where.left is Expression (already converted at builder creation time)
+      const leftExpr: Expression = args.where.left;
+      if (isOperationExpr(leftExpr)) {
+        const allRefs = collectColumnRefs(leftExpr);
+        for (const ref of allRefs) {
+          refsColumns.set(`${ref.table}.${ref.column}`, {
+            table: ref.table,
+            column: ref.column,
+          });
+        }
+      } else {
+        // leftExpr is ColumnRef
+        refsColumns.set(`${leftExpr.table}.${leftExpr.column}`, {
+          table: leftExpr.table,
+          column: leftExpr.column,
         });
       }
-    } else {
-      // leftExpr is ColumnRef
-      refsColumns.set(`${leftExpr.table}.${leftExpr.column}`, {
-        table: leftExpr.table,
-        column: leftExpr.column,
-      });
-    }
 
-    // Handle right side of WHERE clause - can be ParamPlaceholder or AnyExpressionSource
-    const whereRight = args.where.right;
-    if (isColumnBuilder(whereRight) || isExpressionBuilder(whereRight)) {
-      collectRefsFromExpressionSource(whereRight, refsColumns);
+      // Handle right side of WHERE clause - can be ParamPlaceholder or AnyExpressionSource
+      const whereRight = args.where.right;
+      if (isColumnBuilder(whereRight) || isExpressionBuilder(whereRight)) {
+        collectRefsFromExpressionSource(whereRight, refsColumns);
+      }
     }
   }
 

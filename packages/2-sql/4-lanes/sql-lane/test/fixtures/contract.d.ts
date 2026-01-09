@@ -34,6 +34,11 @@ export type Contract = SqlContract<
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
           };
+          readonly deletedAt: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: true;
+          };
         };
         readonly primaryKey: { readonly columns: readonly ['id'] };
         readonly uniques: ReadonlyArray<never>;
@@ -49,6 +54,7 @@ export type Contract = SqlContract<
         readonly id: { readonly column: 'id' };
         readonly email: { readonly column: 'email' };
         readonly createdAt: { readonly column: 'createdAt' };
+        readonly deletedAt: { readonly column: 'deletedAt' };
       };
       readonly relations: Record<string, never>;
     };
@@ -62,6 +68,7 @@ export type Contract = SqlContract<
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
+        readonly deletedAt: 'deletedAt';
       };
     };
     readonly columnToField: {
@@ -69,12 +76,13 @@ export type Contract = SqlContract<
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
+        readonly deletedAt: 'deletedAt';
       };
     };
     readonly codecTypes: CodecTypes;
     readonly operationTypes: OperationTypes;
   }
->;;
+>;
 
 // Operation types (empty for now, can be extended by extension packs)
 export type OperationTypes = Record<string, never>;

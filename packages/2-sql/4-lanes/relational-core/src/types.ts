@@ -56,6 +56,8 @@ export function createOrderBuilder(
  * ColumnBuilder with optional operation methods based on the column's typeId.
  * When Operations is provided and the column's typeId matches, operation methods are included.
  * Implements ExpressionSource to provide type-safe conversion to ColumnRef.
+ *
+ * For nullable columns (ColumnMeta['nullable'] extends true), includes isNull() and isNotNull() methods.
  */
 export type ColumnBuilder<
   ColumnName extends string = string,
@@ -89,7 +91,10 @@ export type ColumnBuilder<
         JsType
       >
     : Record<string, never>
-  : Record<string, never>);
+  : Record<string, never>) &
+  (ColumnMeta['nullable'] extends true
+    ? NullableMethods<ColumnName, ColumnMeta, JsType>
+    : Record<string, never>);
 
 export interface BinaryBuilder<
   _ColumnName extends string = string,
@@ -102,9 +107,48 @@ export interface BinaryBuilder<
   readonly right: ValueSource;
 }
 
+/**
+ * Builder for IS NULL / IS NOT NULL checks.
+ * Used to build unary null check expressions in WHERE clauses.
+ */
+export interface NullCheckBuilder<
+  _ColumnName extends string = string,
+  _ColumnMeta extends StorageColumn = StorageColumn,
+  _JsType = unknown,
+> {
+  readonly kind: 'nullCheck';
+  readonly expr: Expression;
+  readonly isNull: boolean;
+}
+
+/**
+ * Union type for unary builders (currently just NullCheckBuilder).
+ * Extensible for future unary operators.
+ */
+export type UnaryBuilder = NullCheckBuilder;
+
 // Forward declare AnyBinaryBuilder and AnyOrderBuilder for use in ExpressionBuilder
 export type AnyBinaryBuilder = BinaryBuilder;
 export type AnyOrderBuilder = OrderBuilder;
+export type AnyUnaryBuilder = UnaryBuilder;
+
+/**
+ * Methods available only on nullable columns.
+ * These are conditionally added to ColumnBuilder when ColumnMeta['nullable'] is true.
+ * Note: Index signature is required for compatibility with AnyColumnBuilderBase's index signature.
+ */
+export interface NullableMethods<
+  ColumnName extends string = string,
+  ColumnMeta extends StorageColumn = StorageColumn,
+  JsType = unknown,
+> {
+  /** Creates an IS NULL check for this column */
+  isNull(): NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
+  /** Creates an IS NOT NULL check for this column */
+  isNotNull(): NullCheckBuilder<ColumnName, ColumnMeta, JsType>;
+  /** Index signature for compatibility with AnyColumnBuilderBase */
+  readonly [key: string]: unknown;
+}
 
 /**
  * ExpressionBuilder represents the result of an operation (e.g., col.distance(...)).
@@ -160,6 +204,9 @@ export type AnyColumnBuilderBase = {
   desc(): AnyOrderBuilder;
   toExpr(): ColumnRef;
   readonly __jsType: unknown;
+  // Optional nullable methods (present when columnMeta.nullable is true)
+  isNull?(): AnyUnaryBuilder;
+  isNotNull?(): AnyUnaryBuilder;
   // Allow any operation methods (from conditional type)
   readonly [key: string]: unknown;
 };

@@ -7,6 +7,8 @@ export default defineConfig({
     environment: 'node',
     include: ['test/**/*.test.ts'],
     testTimeout: timeouts.default,
-    hookTimeout: timeouts.default,
+    // Hook timeout needs to be higher than default (100ms) because beforeEach/afterEach
+    // hooks often perform filesystem operations (creating/cleaning test directories)
+    hookTimeout: timeouts.databaseOperation,
   },
 });

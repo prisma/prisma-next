@@ -1005,4 +1005,89 @@ describe('createPostgresAdapter', () => {
       expect(lowered.body.sql).toContain('ARRAY[');
     });
   });
+
+  describe('null check expressions', () => {
+    it('renders IS NULL in SELECT query', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+        where: {
+          kind: 'nullCheck',
+          expr: { kind: 'col', table: 'user', column: 'email' },
+          isNull: true,
+        },
+      };
+
+      const lowered = adapter.lower(ast, { contract, params: [] });
+
+      expect(lowered.body.sql).toBe(
+        'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."email" IS NULL',
+      );
+    });
+
+    it('renders IS NOT NULL in SELECT query', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: SelectAst = {
+        kind: 'select',
+        from: { kind: 'table', name: 'user' },
+        project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+        where: {
+          kind: 'nullCheck',
+          expr: { kind: 'col', table: 'user', column: 'email' },
+          isNull: false,
+        },
+      };
+
+      const lowered = adapter.lower(ast, { contract, params: [] });
+
+      expect(lowered.body.sql).toBe(
+        'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."email" IS NOT NULL',
+      );
+    });
+
+    it('renders IS NULL in UPDATE query', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: UpdateAst = {
+        kind: 'update',
+        table: { kind: 'table', name: 'user' },
+        set: {
+          email: { kind: 'param', index: 1, name: 'email' },
+        },
+        where: {
+          kind: 'nullCheck',
+          expr: { kind: 'col', table: 'user', column: 'createdAt' },
+          isNull: true,
+        },
+      };
+
+      const lowered = adapter.lower(ast, { contract, params: ['new@email.com'] });
+
+      expect(lowered.body.sql).toBe(
+        'UPDATE "user" SET "email" = $1 WHERE "user"."createdAt" IS NULL',
+      );
+    });
+
+    it('renders IS NOT NULL in DELETE query', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: DeleteAst = {
+        kind: 'delete',
+        table: { kind: 'table', name: 'user' },
+        where: {
+          kind: 'nullCheck',
+          expr: { kind: 'col', table: 'user', column: 'id' },
+          isNull: false,
+        },
+      };
+
+      const lowered = adapter.lower(ast, { contract, params: [] });
+
+      expect(lowered.body.sql).toBe('DELETE FROM "user" WHERE "user"."id" IS NOT NULL');
+    });
+  });
 });
