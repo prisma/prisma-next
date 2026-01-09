@@ -1,6 +1,178 @@
 import type { OperationManifest, TypesImportSpec } from './types';
 
 // ============================================================================
+// Type Renderer Types (for parameterized codec emission)
+// ============================================================================
+//
+// TypeRenderer supports author-friendly authoring (template strings) that are
+// normalized to functions during pack assembly. The emitter only receives
+// normalized (function-form) renderers.
+//
+// Lifecycle:
+//   1. Authoring: Descriptor author uses template string or function
+//   2. Assembly: Templates are compiled to functions via normalizeRenderer()
+//   3. Emission: Emitter calls normalized render functions
+//
+// ============================================================================
+
+/**
+ * Context passed to type renderers during contract.d.ts generation.
+ */
+export interface RenderTypeContext {
+  /** The name of the CodecTypes type alias (typically 'CodecTypes') */
+  readonly codecTypesName: string;
+}
+
+/**
+ * A template-based type renderer (structured form).
+ * Uses mustache-style placeholders (e.g., `Vector<{{length}}>`) that are
+ * replaced with typeParams values during rendering.
+ *
+ * @example
+ * ```ts
+ * { kind: 'template', template: 'Vector<{{length}}>' }
+ * // With typeParams { length: 1536 }, renders: 'Vector<1536>'
+ * ```
+ */
+export interface TypeRendererTemplate {
+  readonly kind: 'template';
+  /** Template string with `{{key}}` placeholders for typeParams values */
+  readonly template: string;
+}
+
+/**
+ * A function-based type renderer for full control over type expression generation.
+ *
+ * @example
+ * ```ts
+ * {
+ *   kind: 'function',
+ *   render: (params, ctx) => `Vector<${params.length}>`
+ * }
+ * ```
+ */
+export interface TypeRendererFunction {
+  readonly kind: 'function';
+  /** Render function that produces a TypeScript type expression */
+  readonly render: (params: Record<string, unknown>, ctx: RenderTypeContext) => string;
+}
+
+/**
+ * A raw template string type renderer (convenience form).
+ * Shorthand for TypeRendererTemplate - just the template string without wrapper.
+ *
+ * @example
+ * ```ts
+ * 'Vector<{{length}}>'
+ * // Equivalent to: { kind: 'template', template: 'Vector<{{length}}>' }
+ * ```
+ */
+export type TypeRendererString = string;
+
+/**
+ * A raw function type renderer (convenience form).
+ * Shorthand for TypeRendererFunction - just the function without wrapper.
+ *
+ * @example
+ * ```ts
+ * (params, ctx) => `Vector<${params.length}>`
+ * // Equivalent to: { kind: 'function', render: ... }
+ * ```
+ */
+export type TypeRendererRawFunction = (
+  params: Record<string, unknown>,
+  ctx: RenderTypeContext,
+) => string;
+
+/**
+ * Union of type renderer formats.
+ *
+ * Supports both structured forms (with `kind` discriminator) and convenience forms:
+ * - `string` - Template string with `{{key}}` placeholders (manifest-safe, JSON-serializable)
+ * - `function` - Render function for full control (requires runtime execution)
+ * - `{ kind: 'template', template: string }` - Structured template form
+ * - `{ kind: 'function', render: fn }` - Structured function form
+ *
+ * Templates are normalized to functions during pack assembly.
+ * **Prefer template strings** for most cases - they are JSON-serializable.
+ */
+export type TypeRenderer =
+  | TypeRendererString
+  | TypeRendererRawFunction
+  | TypeRendererTemplate
+  | TypeRendererFunction;
+
+/**
+ * Normalized type renderer - always a function after assembly.
+ * This is the form received by the emitter.
+ */
+export interface NormalizedTypeRenderer {
+  readonly codecId: string;
+  readonly render: (params: Record<string, unknown>, ctx: RenderTypeContext) => string;
+}
+
+/**
+ * Interpolates a template string with params values.
+ * Used internally by normalizeRenderer to compile templates to functions.
+ *
+ * @throws Error if a placeholder key is not found in params (except 'CodecTypes')
+ */
+export function interpolateTypeTemplate(
+  template: string,
+  params: Record<string, unknown>,
+  ctx: RenderTypeContext,
+): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
+    if (key === 'CodecTypes') return ctx.codecTypesName;
+    const value = params[key];
+    if (value === undefined) {
+      throw new Error(
+        `Missing template parameter "${key}" in template "${template}". ` +
+          `Available params: ${Object.keys(params).join(', ') || '(none)'}`,
+      );
+    }
+    return String(value);
+  });
+}
+
+/**
+ * Normalizes a TypeRenderer to function form.
+ * Called during pack assembly, not at emission time.
+ *
+ * Handles all TypeRenderer forms:
+ * - Raw string template: `'Vector<{{length}}>'`
+ * - Raw function: `(params, ctx) => ...`
+ * - Structured template: `{ kind: 'template', template: '...' }`
+ * - Structured function: `{ kind: 'function', render: fn }`
+ */
+export function normalizeRenderer(codecId: string, renderer: TypeRenderer): NormalizedTypeRenderer {
+  // Handle raw string (template shorthand)
+  if (typeof renderer === 'string') {
+    return {
+      codecId,
+      render: (params, ctx) => interpolateTypeTemplate(renderer, params, ctx),
+    };
+  }
+
+  // Handle raw function (function shorthand)
+  if (typeof renderer === 'function') {
+    return { codecId, render: renderer };
+  }
+
+  // Handle structured function form
+  if (renderer.kind === 'function') {
+    return { codecId, render: renderer.render };
+  }
+
+  // Handle structured template form
+  const { template } = renderer;
+  return {
+    codecId,
+    render: (params, ctx) => interpolateTypeTemplate(template, params, ctx),
+  };
+}
+
+// ============================================================================
 // Framework Component Descriptor Base Types
 // ============================================================================
 //
@@ -49,7 +221,27 @@ export interface ComponentMetadata {
 
   /** Type imports for contract.d.ts generation */
   readonly types?: {
-    readonly codecTypes?: { readonly import: TypesImportSpec };
+    readonly codecTypes?: {
+      /**
+       * Base codec types import spec.
+       * Optional: adapters typically provide this, extensions usually don't.
+       */
+      readonly import?: TypesImportSpec;
+      /**
+       * Optional renderers for parameterized codecs owned by this component.
+       * Key is codecId (e.g., 'pg/vector@1'), value is the type renderer.
+       *
+       * Templates are normalized to functions during pack assembly.
+       * Duplicate codecId across descriptors is a hard error.
+       */
+      readonly parameterized?: Record<string, TypeRenderer>;
+      /**
+       * Optional type imports for parameterized codecs.
+       * These imports are added to contract.d.ts when parameterized renderers
+       * reference types from external packages.
+       */
+      readonly parameterizedImports?: ReadonlyArray<TypesImportSpec>;
+    };
     readonly operationTypes?: { readonly import: TypesImportSpec };
     readonly storage?: ReadonlyArray<{
       readonly typeId: string;

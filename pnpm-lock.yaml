@@ -277,9 +277,12 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../../0-config/tsconfig
-      tsup:
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../../0-config/tsdown
+      tsdown:
         specifier: 'catalog:'
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+        version: 0.18.4(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -302,9 +305,12 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../../0-config/tsconfig
-      tsup:
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../../0-config/tsdown
+      tsdown:
         specifier: 'catalog:'
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+        version: 0.18.4(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -324,9 +330,12 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../../0-config/tsconfig
-      tsup:
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../../0-config/tsdown
+      tsdown:
         specifier: 'catalog:'
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+        version: 0.18.4(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -346,9 +355,12 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../../0-config/tsconfig
-      tsup:
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../../0-config/tsdown
+      tsdown:
         specifier: 'catalog:'
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+        version: 0.18.4(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -379,9 +391,12 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../../0-config/tsconfig
-      tsup:
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../../0-config/tsdown
+      tsdown:
         specifier: 'catalog:'
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+        version: 0.18.4(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -658,9 +673,12 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../0-config/tsconfig
-      tsup:
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
         specifier: 'catalog:'
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+        version: 0.18.4(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -686,9 +704,12 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../0-config/tsconfig
-      tsup:
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
         specifier: 'catalog:'
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+        version: 0.18.4(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -708,9 +729,12 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../0-config/tsconfig
-      tsup:
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
         specifier: 'catalog:'
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+        version: 0.18.4(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -769,6 +793,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../1-core/contract
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/utils
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -896,6 +923,24 @@ importers:
         specifier: 'catalog:'
         version: 4.0.16(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
 
+  packages/2-sql/4-lanes/query-builder:
+    devDependencies:
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.16(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
+
   packages/2-sql/4-lanes/relational-core:
     dependencies:
       '@prisma-next/contract':
@@ -1002,6 +1047,9 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../4-lanes/relational-core
+      arktype:
+        specifier: ^2.1.26
+        version: 2.1.26
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

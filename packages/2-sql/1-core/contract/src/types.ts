@@ -1,9 +1,27 @@
 import type { ContractBase } from '@prisma-next/contract/types';
 
+/**
+ * A column definition in storage.
+ *
+ * `typeParams` is optional because most columns use non-parameterized types.
+ * Columns with parameterized types can either inline `typeParams` or reference
+ * a named {@link StorageTypeInstance} via `typeRef`.
+ */
 export type StorageColumn = {
   readonly nativeType: string;
   readonly codecId: string;
   readonly nullable: boolean;
+  /**
+   * Opaque, codec-owned JS/type parameters.
+   * The codec that owns `codecId` defines the shape and semantics.
+   * Mutually exclusive with `typeRef`.
+   */
+  readonly typeParams?: Record<string, unknown>;
+  /**
+   * Reference to a named type instance in `storage.types`.
+   * Mutually exclusive with `typeParams`.
+   */
+  readonly typeRef?: string;
 };
 
 export type PrimaryKey = {
@@ -40,8 +58,29 @@ export type StorageTable = {
   readonly foreignKeys: ReadonlyArray<ForeignKey>;
 };
 
+/**
+ * A named, parameterized type instance.
+ * These are registered in `storage.types` for reuse across columns
+ * and to enable ergonomic schema surfaces like `schema.types.MyType`.
+ *
+ * Unlike {@link StorageColumn}, `typeParams` is required here because
+ * `StorageTypeInstance` exists specifically to define reusable parameterized types.
+ * A type instance without parameters would be redundant—columns can reference
+ * the codec directly via `codecId`.
+ */
+export type StorageTypeInstance = {
+  readonly codecId: string;
+  readonly nativeType: string;
+  readonly typeParams: Record<string, unknown>;
+};
+
 export type SqlStorage = {
   readonly tables: Record<string, StorageTable>;
+  /**
+   * Named type instances for parameterized/custom types.
+   * Columns can reference these via `typeRef`.
+   */
+  readonly types?: Record<string, StorageTypeInstance>;
 };
 
 export type ModelField = {

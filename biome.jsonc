@@ -9,11 +9,13 @@
     "includes": [
       "**",
       "!**/dist",
+      "!**/dist-*",
       "!**/coverage",
       "!**/node_modules",
       "!**/.prisma",
       "!**/*.d.ts",
-      "!**/contract.json"
+      "!**/contract.json",
+      "!**/base.js"
     ]
   },
   "formatter": {
@@ -78,7 +80,7 @@
       }
     },
     {
-      "includes": ["**/*.config.ts", "**/vitest.config.ts", "**/tsup.config.ts"],
+      "includes": ["**/*.config.ts"],
       "linter": {
         "rules": {
           "suspicious": {

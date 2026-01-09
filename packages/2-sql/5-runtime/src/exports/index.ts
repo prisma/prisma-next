@@ -16,9 +16,11 @@ export { lowerSqlPlan } from '../lower-sql-plan';
 export type {
   CreateRuntimeContextOptions,
   RuntimeContext,
+  RuntimeParameterizedCodecDescriptor,
   SqlRuntimeAdapterInstance,
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeExtensionInstance,
+  TypeHelperRegistry,
 } from '../sql-context';
 export { createRuntimeContext } from '../sql-context';
 export type { SqlStatement } from '../sql-marker';

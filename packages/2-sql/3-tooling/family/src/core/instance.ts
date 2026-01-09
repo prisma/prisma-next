@@ -33,6 +33,8 @@ import {
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
+  extractParameterizedRenderers,
+  extractParameterizedTypeImports,
 } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
 import { verifySqlSchema } from './schema-verify/verify-sql-schema';
@@ -404,11 +406,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   // Assembly functions only use manifest and id, so we can pass Control*Descriptor types directly
   const descriptors = [target, adapter, ...extensions];
 
-  // Assemble operation registry, type imports, and extension IDs
+  // Assemble operation registry, type imports, extension IDs, and parameterized renderers
   const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
   const extensionIds = extractExtensionIds(adapter, target, extensions);
+  const parameterizedRenderers = extractParameterizedRenderers(descriptors);
+  const parameterizedTypeImports = extractParameterizedTypeImports(descriptors);
 
   // Build type metadata registry from manifests
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
@@ -888,6 +892,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           codecTypeImports,
           operationTypeImports,
           extensionIds,
+          parameterizedRenderers,
+          parameterizedTypeImports,
         },
         sqlTargetFamilyHook,
       );

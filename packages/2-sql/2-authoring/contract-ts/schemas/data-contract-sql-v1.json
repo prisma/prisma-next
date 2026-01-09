@@ -79,6 +79,13 @@
           "additionalProperties": {
             "$ref": "#/$defs/StorageTable"
           }
+        },
+        "types": {
+          "type": "object",
+          "description": "Named type instances for parameterized/custom types (e.g., vectors, enums)",
+          "additionalProperties": {
+            "$ref": "#/$defs/StorageTypeInstance"
+          }
         }
       },
       "required": ["tables"]
@@ -128,19 +135,54 @@
     },
     "StorageColumn": {
       "type": "object",
-      "description": "Column definition with type and nullability",
+      "description": "Column definition with type, nullability, and optional parameterized type info",
       "additionalProperties": false,
       "properties": {
-        "type": {
+        "nativeType": {
           "type": "string",
-          "description": "Column type (e.g., 'text', 'int4', 'timestamptz', 'bool')"
+          "description": "Database-native type (e.g., 'text', 'int4', 'timestamptz', 'vector(1536)')"
+        },
+        "codecId": {
+          "type": "string",
+          "description": "Codec identifier for encoding/decoding (e.g., 'pg/text@1', 'pg/vector@1')"
         },
         "nullable": {
           "type": "boolean",
           "default": false,
           "description": "Whether the column allows NULL values"
+        },
+        "typeParams": {
+          "type": "object",
+          "description": "Opaque, codec-owned JS/type parameters (e.g., { length: 1536 } for vectors)",
+          "additionalProperties": true
+        },
+        "typeRef": {
+          "type": "string",
+          "description": "Reference to a named type instance in storage.types"
         }
-      }
+      },
+      "required": ["nativeType", "codecId", "nullable"]
+    },
+    "StorageTypeInstance": {
+      "type": "object",
+      "description": "Named, parameterized type instance for reuse across columns",
+      "additionalProperties": false,
+      "properties": {
+        "codecId": {
+          "type": "string",
+          "description": "Codec identifier for encoding/decoding"
+        },
+        "nativeType": {
+          "type": "string",
+          "description": "Database-native type"
+        },
+        "typeParams": {
+          "type": "object",
+          "description": "Codec-owned type parameters",
+          "additionalProperties": true
+        }
+      },
+      "required": ["codecId", "nativeType", "typeParams"]
     },
     "PrimaryKey": {
       "type": "object",

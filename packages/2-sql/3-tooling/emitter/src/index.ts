@@ -1,11 +1,42 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { TypesImportSpec, ValidationContext } from '@prisma-next/contract/types';
+import type {
+  GenerateContractTypesOptions,
+  TypeRenderContext,
+  TypeRenderEntry,
+  TypesImportSpec,
+  ValidationContext,
+} from '@prisma-next/contract/types';
 import type {
   ModelDefinition,
   ModelField,
   SqlStorage,
+  StorageColumn,
   StorageTable,
+  StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { assertDefined } from '@prisma-next/utils/assertions';
+
+/**
+ * Resolves the typeParams for a column, either from inline typeParams or from typeRef.
+ * Returns undefined if no typeParams are available.
+ */
+function resolveColumnTypeParams(
+  column: StorageColumn,
+  storage: SqlStorage,
+): Record<string, unknown> | undefined {
+  // Inline typeParams take precedence
+  if (column.typeParams && Object.keys(column.typeParams).length > 0) {
+    return column.typeParams;
+  }
+  // Check typeRef
+  if (column.typeRef && storage.types) {
+    const typeInstance = storage.types[column.typeRef] as StorageTypeInstance | undefined;
+    if (typeInstance?.typeParams) {
+      return typeInstance.typeParams;
+    }
+  }
+  return undefined;
+}
 
 export const sqlTargetFamilyHook = {
   id: 'sql',
@@ -64,10 +95,8 @@ export const sqlTargetFamilyHook = {
           throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
         }
 
-        const table = storage.tables[tableName];
-        if (!table) {
-          throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
-        }
+        const table: StorageTable | undefined = storage.tables[tableName];
+        assertDefined(table, `Model "${modelName}" references non-existent table "${tableName}"`);
 
         if (!table.primaryKey) {
           throw new Error(`Model "${modelName}" table "${tableName}" is missing a primary key`);
@@ -168,12 +197,12 @@ export const sqlTargetFamilyHook = {
           );
         }
 
-        const referencedTable = storage.tables[fk.references.table];
-        if (!referencedTable) {
-          throw new Error(
-            `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
-          );
-        }
+        // Table existence guaranteed by Set.has() check above
+        const referencedTable: StorageTable | undefined = storage.tables[fk.references.table];
+        assertDefined(
+          referencedTable,
+          `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+        );
 
         const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
         for (const colName of fk.references.columns) {
@@ -197,45 +226,78 @@ export const sqlTargetFamilyHook = {
     ir: ContractIR,
     codecTypeImports: ReadonlyArray<TypesImportSpec>,
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
+    options?: GenerateContractTypesOptions,
   ): string {
-    const allImports = [...codecTypeImports, ...operationTypeImports];
-    const importLines = allImports.map(
-      (imp) => `import type { ${imp.named} as ${imp.alias} } from '${imp.package}';`,
-    );
+    const parameterizedRenderers = options?.parameterizedRenderers;
+    const parameterizedTypeImports = options?.parameterizedTypeImports;
+    const storage = ir.storage as SqlStorage;
+    const models = ir.models as Record<string, ModelDefinition>;
+
+    // Collect all type imports from three sources:
+    // 1. Codec type imports (from adapters, targets, and extensions)
+    // 2. Operation type imports (from adapters, targets, and extensions)
+    // 3. Parameterized type imports (for parameterized codec renderers, may contain duplicates)
+    const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
+
+    if (parameterizedTypeImports) {
+      allImports.push(...parameterizedTypeImports);
+    }
+
+    // Deduplicate imports by package+named to avoid duplicate import statements.
+    // Strategy: When the same package::named appears multiple times, keep the first
+    // occurrence (and its alias); later duplicates with different aliases are silently ignored.
+    //
+    // Note: uniqueImports must be an array (not a Set) because:
+    // - We need to preserve the full TypesImportSpec objects (package, named, alias)
+    // - We need to preserve insertion order (first occurrence wins)
+    // - seenImportKeys is a Set used only for O(1) duplicate detection
+    const seenImportKeys = new Set<string>();
+    const uniqueImports: TypesImportSpec[] = [];
+    for (const imp of allImports) {
+      const key = `${imp.package}::${imp.named}`;
+      if (!seenImportKeys.has(key)) {
+        seenImportKeys.add(key);
+        uniqueImports.push(imp);
+      }
+    }
+
+    // Generate import statements, omitting redundant "as Alias" when named === alias
+    const importLines = uniqueImports.map((imp) => {
+      // Simplify import when named === alias (e.g., `import type { Vector }` instead of `{ Vector as Vector }`)
+      const importClause = imp.named === imp.alias ? imp.named : `${imp.named} as ${imp.alias}`;
+      return `import type { ${importClause} } from '${imp.package}';`;
+    });
 
     const codecTypes = codecTypeImports.map((imp) => imp.alias).join(' & ');
     const operationTypes = operationTypeImports.map((imp) => imp.alias).join(' & ');
 
-    const storage = ir.storage as SqlStorage;
-    const models = ir.models as Record<string, ModelDefinition>;
-
     const storageType = this.generateStorageType(storage);
-    const modelsType = this.generateModelsType(models, storage);
+    const modelsType = this.generateModelsType(models, storage, parameterizedRenderers);
     const relationsType = this.generateRelationsType(ir.relations);
     const mappingsType = this.generateMappingsType(models, storage, codecTypes, operationTypes);
 
     return `// ⚠️  GENERATED FILE - DO NOT EDIT
-// This file is automatically generated by 'prisma-next contract emit'.
-// To regenerate, run: prisma-next contract emit
-${importLines.join('\n')}
+  // This file is automatically generated by 'prisma-next contract emit'.
+  // To regenerate, run: prisma-next contract emit
+  ${importLines.join('\n')}
 
-import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-contract/types';
+  import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-contract/types';
 
-export type CodecTypes = ${codecTypes || 'Record<string, never>'};
-export type LaneCodecTypes = CodecTypes;
-export type OperationTypes = ${operationTypes || 'Record<string, never>'};
+  export type CodecTypes = ${codecTypes || 'Record<string, never>'};
+  export type LaneCodecTypes = CodecTypes;
+  export type OperationTypes = ${operationTypes || 'Record<string, never>'};
 
-export type Contract = SqlContract<
+  export type Contract = SqlContract<
   ${storageType},
   ${modelsType},
   ${relationsType},
   ${mappingsType}
->;
+  >;
 
-export type Tables = Contract['storage']['tables'];
-export type Models = Contract['models'];
-export type Relations = Contract['relations'];
-`;
+  export type Tables = Contract['storage']['tables'];
+  export type Models = Contract['models'];
+  export type Relations = Contract['relations'];
+  `;
   },
 
   generateStorageType(storage: SqlStorage): string {
@@ -290,16 +352,96 @@ export type Relations = Contract['relations'];
       tables.push(`readonly ${tableName}: { ${tableParts.join('; ')} }`);
     }
 
-    return `{ readonly tables: { ${tables.join('; ')} } }`;
+    const typesType = this.generateStorageTypesType(storage.types);
+
+    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType} }`;
+  },
+
+  /**
+   * Generates the TypeScript type for storage.types with literal types.
+   * This preserves type params as literal values for precise typing.
+   */
+  generateStorageTypesType(types: SqlStorage['types']): string {
+    if (!types || Object.keys(types).length === 0) {
+      return 'Record<string, never>';
+    }
+
+    const typeEntries: string[] = [];
+    for (const [typeName, typeInstance] of Object.entries(types)) {
+      const codecId = `'${typeInstance.codecId}'`;
+      const nativeType = `'${typeInstance.nativeType}'`;
+      const typeParamsStr = this.serializeTypeParamsLiteral(typeInstance.typeParams);
+      typeEntries.push(
+        `readonly ${typeName}: { readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
+      );
+    }
+
+    return `{ ${typeEntries.join('; ')} }`;
+  },
+
+  /**
+   * Serializes a typeParams object to a TypeScript literal type.
+   * Converts { length: 1536 } to "{ readonly length: 1536 }".
+   */
+  serializeTypeParamsLiteral(params: Record<string, unknown>): string {
+    if (!params || Object.keys(params).length === 0) {
+      return 'Record<string, never>';
+    }
+
+    const entries: string[] = [];
+    for (const [key, value] of Object.entries(params)) {
+      const serialized = this.serializeValue(value);
+      entries.push(`readonly ${key}: ${serialized}`);
+    }
+
+    return `{ ${entries.join('; ')} }`;
+  },
+
+  /**
+   * Serializes a value to a TypeScript literal type expression.
+   */
+  serializeValue(value: unknown): string {
+    if (value === null) {
+      return 'null';
+    }
+    if (value === undefined) {
+      return 'undefined';
+    }
+    if (typeof value === 'string') {
+      // Escape backslashes first, then single quotes
+      const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      return `'${escaped}'`;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    if (typeof value === 'bigint') {
+      return `${value}n`;
+    }
+    if (Array.isArray(value)) {
+      const items = value.map((v) => this.serializeValue(v)).join(', ');
+      return `readonly [${items}]`;
+    }
+    if (typeof value === 'object') {
+      const entries: string[] = [];
+      for (const [k, v] of Object.entries(value)) {
+        entries.push(`readonly ${k}: ${this.serializeValue(v)}`);
+      }
+      return `{ ${entries.join('; ')} }`;
+    }
+    return 'unknown';
   },
 
   generateModelsType(
     models: Record<string, ModelDefinition> | undefined,
     storage: SqlStorage,
+    parameterizedRenderers?: Map<string, TypeRenderEntry>,
   ): string {
     if (!models) {
       return 'Record<string, never>';
     }
+
+    const renderCtx: TypeRenderContext = { codecTypesName: 'CodecTypes' };
 
     const modelTypes: string[] = [];
     for (const [modelName, model] of Object.entries(models)) {
@@ -315,12 +457,12 @@ export type Relations = Contract['relations'];
             continue;
           }
 
-          const typeId = column.codecId;
-          const nullable = column.nullable ?? false;
-          const jsType = nullable
-            ? `CodecTypes['${typeId}']['output'] | null`
-            : `CodecTypes['${typeId}']['output']`;
-
+          const jsType = this.generateColumnType(
+            column,
+            storage,
+            parameterizedRenderers,
+            renderCtx,
+          );
           fields.push(`readonly ${fieldName}: ${jsType}`);
         }
       } else {
@@ -356,6 +498,26 @@ export type Relations = Contract['relations'];
     }
 
     return `{ ${modelTypes.join('; ')} }`;
+  },
+
+  /**
+   * Generates the TypeScript type expression for a column.
+   * Uses parameterized renderer if the column has typeParams and a matching renderer exists,
+   * otherwise falls back to CodecTypes[codecId]['output'].
+   */
+  generateColumnType(
+    column: StorageColumn,
+    storage: SqlStorage,
+    parameterizedRenderers: Map<string, TypeRenderEntry> | undefined,
+    renderCtx: TypeRenderContext,
+  ): string {
+    const typeParams = resolveColumnTypeParams(column, storage);
+    const nullable = column.nullable ?? false;
+    const fallbackType = `CodecTypes['${column.codecId}']['output']`;
+    const renderer = typeParams && parameterizedRenderers?.get(column.codecId);
+    const baseType = renderer ? renderer.render(typeParams, renderCtx) : fallbackType;
+
+    return nullable ? `${baseType} | null` : baseType;
   },
 
   generateRelationsType(relations: Record<string, unknown> | undefined): string {
