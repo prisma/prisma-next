@@ -27,10 +27,14 @@ export const vectorColumn = {
  *
  * @param length - The dimension of the vector (e.g., 1536 for OpenAI embeddings)
  * @returns A column type descriptor with `typeParams.length` set
+ * @throws {RangeError} If length is not an integer in the range [1, 16000]
  */
 export function vector<N extends number>(
   length: N,
 ): ColumnTypeDescriptor & { readonly typeParams: { readonly length: N } } {
+  if (!Number.isInteger(length) || length < 1 || length > 16000) {
+    throw new RangeError(`pgvector: dimension must be an integer in [1, 16000], got ${length}`);
+  }
   return {
     codecId: 'pg/vector@1',
     nativeType: `vector(${length})`,

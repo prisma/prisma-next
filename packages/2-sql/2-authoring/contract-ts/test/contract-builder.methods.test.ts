@@ -277,13 +277,15 @@ describe('typeParams', () => {
   });
 
   it('includes typeParams in storage column when passed via options', () => {
+    // nativeType comes from descriptor, typeParams from options - they're independent
+    const baseVectorColumn = columnDescriptor('pg/vector@1', 'vector');
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
       .table('document', (t) =>
         t
           .column('id', { type: int4Column, nullable: false })
           .column('embedding', {
-            type: vectorColumn,
+            type: baseVectorColumn,
             nullable: false,
             typeParams: { length: 768 },
           })
@@ -292,7 +294,7 @@ describe('typeParams', () => {
       .build();
 
     expect(contract.storage.tables.document.columns.embedding).toMatchObject({
-      nativeType: 'vector(1536)',
+      nativeType: 'vector',
       codecId: 'pg/vector@1',
       nullable: false,
       typeParams: { length: 768 },

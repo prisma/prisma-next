@@ -214,39 +214,81 @@ type ExtractCodecOutputType<
     : never
   : never;
 
-type ExtractColumnJsTypeFromModels<
+/**
+ * Extracts the model name for a given table from the contract mappings.
+ */
+type ExtractTableToModel<
+  Contract extends SqlContract<SqlStorage>,
+  TableName extends string,
+> = Contract['mappings'] extends {
+  readonly tableToModel: infer TableToModel;
+}
+  ? TableToModel extends Record<string, string>
+    ? TableName extends keyof TableToModel
+      ? TableToModel[TableName]
+      : never
+    : never
+  : never;
+
+/**
+ * Extracts the field name for a given table column from the contract mappings.
+ */
+type ExtractColumnToField<
   Contract extends SqlContract<SqlStorage>,
   TableName extends string,
   ColumnName extends string,
 > = Contract['mappings'] extends {
-  readonly tableToModel: infer TableToModel;
   readonly columnToField: infer ColumnToField;
 }
-  ? TableToModel extends Record<string, string>
-    ? ColumnToField extends Record<string, Record<string, string>>
-      ? TableName extends keyof TableToModel
-        ? TableName extends keyof ColumnToField
-          ? ColumnName extends keyof ColumnToField[TableName]
-            ? Contract['models'] extends infer Models
-              ? Models extends Record<string, unknown>
-                ? TableToModel[TableName] extends keyof Models
-                  ? Models[TableToModel[TableName]] extends { readonly fields: infer Fields }
-                    ? Fields extends Record<string, unknown>
-                      ? ColumnToField[TableName][ColumnName] extends keyof Fields
-                        ? Fields[ColumnToField[TableName][ColumnName]] extends infer FieldValue
-                          ? // Skip if FieldValue is a ModelField object ({ column: string })
-                            // and fall through to codec-based type resolution
-                            FieldValue extends { readonly column: string }
-                            ? never
-                            : FieldValue
-                          : never
-                        : never
-                      : never
-                    : never
-                  : never
-                : never
-              : never
+  ? ColumnToField extends Record<string, Record<string, string>>
+    ? TableName extends keyof ColumnToField
+      ? ColumnName extends keyof ColumnToField[TableName]
+        ? ColumnToField[TableName][ColumnName]
+        : never
+      : never
+    : never
+  : never;
+
+/**
+ * Extracts the field value type from a model's fields.
+ */
+type ExtractFieldValue<
+  Contract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = Contract['models'] extends infer Models
+  ? Models extends Record<string, unknown>
+    ? ModelName extends keyof Models
+      ? Models[ModelName] extends { readonly fields: infer Fields }
+        ? Fields extends Record<string, unknown>
+          ? FieldName extends keyof Fields
+            ? Fields[FieldName]
             : never
+          : never
+        : never
+      : never
+    : never
+  : never;
+
+/**
+ * Extracts the JavaScript type for a column from model mappings if available.
+ * Returns `never` if the column maps to a ModelField object (which indicates
+ * a relation that should fall through to codec-based type resolution).
+ */
+type ExtractColumnJsTypeFromModels<
+  Contract extends SqlContract<SqlStorage>,
+  TableName extends string,
+  ColumnName extends string,
+> = ExtractTableToModel<Contract, TableName> extends infer ModelName
+  ? ModelName extends string
+    ? ExtractColumnToField<Contract, TableName, ColumnName> extends infer FieldName
+      ? FieldName extends string
+        ? ExtractFieldValue<Contract, ModelName, FieldName> extends infer FieldValue
+          ? // Skip if FieldValue is a ModelField object ({ column: string })
+            // and fall through to codec-based type resolution
+            FieldValue extends { readonly column: string }
+            ? never
+            : FieldValue
           : never
         : never
       : never

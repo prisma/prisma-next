@@ -13,6 +13,15 @@ import { pgvectorPackMeta, pgvectorRuntimeOperation } from '../core/descriptor-m
 const vectorTypeId = 'pg/vector@1' as const;
 const vectorParamsSchema = arktype({
   length: 'number',
+}).narrow((params, ctx) => {
+  const { length } = params;
+  if (!Number.isInteger(length)) {
+    return ctx.mustBe('an integer');
+  }
+  if (length < 1 || length > 16000) {
+    return ctx.mustBe('in the range [1, 16000]');
+  }
+  return true;
 });
 
 /**

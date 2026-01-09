@@ -4,8 +4,10 @@ import { vector, vectorColumn } from '../src/exports/column-types';
 describe('pgvector column-types', () => {
   describe('vectorColumn (static)', () => {
     it('has correct codecId and nativeType', () => {
-      expect(vectorColumn.codecId).toBe('pg/vector@1');
-      expect(vectorColumn.nativeType).toBe('vector');
+      expect(vectorColumn).toMatchObject({
+        codecId: 'pg/vector@1',
+        nativeType: 'vector',
+      });
     });
 
     it('has no typeParams', () => {
@@ -14,41 +16,57 @@ describe('pgvector column-types', () => {
   });
 
   describe('vector() factory', () => {
-    it('creates descriptor with correct codecId', () => {
-      const descriptor = vector(1536);
-      expect(descriptor.codecId).toBe('pg/vector@1');
-    });
-
-    it('creates descriptor with dimensioned nativeType', () => {
-      const descriptor = vector(1536);
-      expect(descriptor.nativeType).toBe('vector(1536)');
-    });
-
     it('creates descriptor with typeParams.length', () => {
       const descriptor = vector(1536);
-      expect(descriptor.typeParams).toEqual({ length: 1536 });
+      expect(descriptor).toMatchObject({
+        codecId: 'pg/vector@1',
+        nativeType: 'vector(1536)',
+        typeParams: { length: 1536 },
+      });
     });
 
     it('preserves the dimension type parameter', () => {
       const descriptor768 = vector(768);
       const descriptor384 = vector(384);
 
-      expect(descriptor768.nativeType).toBe('vector(768)');
-      expect(descriptor768.typeParams.length).toBe(768);
+      expect(descriptor768).toMatchObject({
+        codecId: 'pg/vector@1',
+        nativeType: 'vector(768)',
+        typeParams: { length: 768 },
+      });
 
-      expect(descriptor384.nativeType).toBe('vector(384)');
-      expect(descriptor384.typeParams.length).toBe(384);
+      expect(descriptor384).toMatchObject({
+        codecId: 'pg/vector@1',
+        nativeType: 'vector(384)',
+        typeParams: { length: 384 },
+      });
     });
 
     it('works with OpenAI embedding dimensions', () => {
       const small = vector(1536);
       const large = vector(3072);
 
-      expect(small.nativeType).toBe('vector(1536)');
-      expect(small.typeParams).toEqual({ length: 1536 });
+      expect(small).toMatchObject({
+        codecId: 'pg/vector@1',
+        nativeType: 'vector(1536)',
+        typeParams: { length: 1536 },
+      });
 
-      expect(large.nativeType).toBe('vector(3072)');
-      expect(large.typeParams).toEqual({ length: 3072 });
+      expect(large).toMatchObject({
+        codecId: 'pg/vector@1',
+        nativeType: 'vector(3072)',
+        typeParams: { length: 3072 },
+      });
+    });
+
+    it('throws RangeError for invalid dimensions', () => {
+      const invalidInputs = [0, -1, 1.5, 16001];
+
+      for (const value of invalidInputs) {
+        expect(() => vector(value as number)).toThrow(
+          new RangeError(`pgvector: dimension must be an integer in [1, 16000], got ${value}`),
+        );
+      }
     });
   });
 });
