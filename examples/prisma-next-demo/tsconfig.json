@@ -1,7 +1,9 @@
 {
   "extends": ["@prisma-next/tsconfig/base"],
   "compilerOptions": {
-    "outDir": "dist"
+    "outDir": "dist",
+    "lib": ["ES2022", "DOM"],
+    "types": ["vite/client"]
   },
   "include": [
     "src/**/*.ts",

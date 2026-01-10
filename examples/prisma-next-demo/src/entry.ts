@@ -165,8 +165,9 @@ if (app) {
 
 if (import.meta.hot) {
   import.meta.hot.accept('./prisma/contract.json', (newContract) => {
-    if (app && newContract?.default) {
-      app.innerHTML = renderContract(newContract.default as Contract);
+    if (app && newContract) {
+      const mod = newContract as unknown as { default: unknown };
+      app.innerHTML = renderContract(mod.default as Contract);
     }
   });
 }
