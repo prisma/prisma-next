@@ -133,12 +133,8 @@ function renderContract(c: Contract): string {
 
   return `
     <div class="hash">
-      <span class="hash-label">Core Hash:</span>
+      <span class="hash-label">Contract Hash:</span>
       <span class="hash-value">${c.coreHash}</span>
-    </div>
-    <div class="hash">
-      <span class="hash-label">Profile Hash:</span>
-      <span class="hash-value">${c.profileHash}</span>
     </div>
     <div class="section">
       <div class="section-title">Target: ${c.target}</div>
