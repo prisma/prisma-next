@@ -16,16 +16,73 @@ interface Table {
   }>;
 }
 
+interface Model {
+  fields: Record<string, { column: string }>;
+  relations: Record<string, unknown>;
+  storage: { table: string };
+}
+
+interface Relation {
+  cardinality: string;
+  to: string;
+  on: { parentCols: string[]; childCols: string[] };
+}
+
 interface Contract {
   coreHash: string;
   profileHash: string;
   target: string;
+  models: Record<string, Model>;
   storage: { tables: Record<string, Table> };
+  relations: Record<string, Record<string, Relation>>;
   capabilities: Record<string, Record<string, boolean>>;
   extensionPacks: Record<string, unknown>;
 }
 
 function renderContract(c: Contract): string {
+  const models = Object.entries(c.models)
+    .map(([name, model]) => {
+      const tableName = model.storage.table;
+      const tableRelations = c.relations[tableName] ?? {};
+
+      const fields = Object.entries(model.fields)
+        .map(([fieldName, field]) => {
+          return `
+            <div class="column">
+              <span class="col-name">${fieldName}</span>
+              <span class="col-type">→ ${field.column}</span>
+            </div>
+          `;
+        })
+        .join('');
+
+      const relations = Object.entries(tableRelations)
+        .map(([relName, rel]) => {
+          const arrow = rel.cardinality === '1:N' ? '⇉' : '→';
+          return `
+            <div class="column">
+              <span class="col-name">${arrow} ${relName}</span>
+              <span class="col-type">${rel.cardinality} → ${rel.to}</span>
+            </div>
+          `;
+        })
+        .join('');
+
+      return `
+        <div class="table-card">
+          <div class="table-name">
+            🧩 ${name}
+            <span class="pk-badge">table: ${tableName}</span>
+          </div>
+          <div class="columns">
+            ${fields}
+            ${relations ? `<div style="border-top: 1px solid var(--border); margin: 0.5rem 0; padding-top: 0.5rem;">${relations}</div>` : ''}
+          </div>
+        </div>
+      `;
+    })
+    .join('');
+
   const tables = Object.entries(c.storage.tables)
     .map(([name, table]) => {
       const pk = table.primaryKey?.columns ?? [];
@@ -85,6 +142,10 @@ function renderContract(c: Contract): string {
     </div>
     <div class="section">
       <div class="section-title">Target: ${c.target}</div>
+    </div>
+    <div class="section">
+      <div class="section-title">Models</div>
+      ${models}
     </div>
     <div class="section">
       <div class="section-title">Tables</div>
