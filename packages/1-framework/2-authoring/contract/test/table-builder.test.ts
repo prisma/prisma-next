@@ -4,6 +4,11 @@ import { createTable } from '../src/table-builder';
 
 const intColumn: ColumnTypeDescriptor = { codecId: 'test/int@1', nativeType: 'int4' };
 const textColumn: ColumnTypeDescriptor = { codecId: 'test/text@1', nativeType: 'text' };
+const vectorColumn: ColumnTypeDescriptor = {
+  codecId: 'test/vector@1',
+  nativeType: 'vector(1536)',
+  typeParams: { length: 1536 },
+};
 
 describe('TableBuilder', () => {
   it('builds table state with columns', () => {
@@ -108,5 +113,72 @@ describe('TableBuilder', () => {
     const builder = createTable('user');
     const table = builder.column('id', { type: intColumn }).build();
     expect(table.columns.id.nullable).toBe(false);
+  });
+
+  it('stores typeParams from descriptor', () => {
+    const builder = createTable('document');
+    const table = builder
+      .column('id', { type: intColumn, nullable: false })
+      .column('embedding', { type: vectorColumn, nullable: false })
+      .primaryKey(['id'])
+      .build();
+
+    expect(table.columns.embedding).toEqual({
+      name: 'embedding',
+      type: 'test/vector@1',
+      nullable: false,
+      nativeType: 'vector(1536)',
+      typeParams: { length: 1536 },
+    });
+  });
+
+  it('stores typeParams from options', () => {
+    const builder = createTable('document');
+    const bareVectorColumn: ColumnTypeDescriptor = {
+      codecId: 'test/vector@1',
+      nativeType: 'vector',
+    };
+    const table = builder
+      .column('id', { type: intColumn, nullable: false })
+      .column('embedding', {
+        type: bareVectorColumn,
+        nullable: false,
+        typeParams: { length: 768 },
+      })
+      .primaryKey(['id'])
+      .build();
+
+    expect(table.columns.embedding).toEqual({
+      name: 'embedding',
+      type: 'test/vector@1',
+      nullable: false,
+      nativeType: 'vector',
+      typeParams: { length: 768 },
+    });
+  });
+
+  it('options typeParams overrides descriptor typeParams', () => {
+    const builder = createTable('document');
+    const table = builder
+      .column('id', { type: intColumn, nullable: false })
+      .column('embedding', {
+        type: vectorColumn,
+        nullable: false,
+        typeParams: { length: 384 },
+      })
+      .primaryKey(['id'])
+      .build();
+
+    expect(table.columns.embedding.typeParams).toEqual({ length: 384 });
+  });
+
+  it('omits typeParams when not provided', () => {
+    const builder = createTable('user');
+    const table = builder
+      .column('id', { type: intColumn, nullable: false })
+      .primaryKey(['id'])
+      .build();
+
+    expect(table.columns.id).not.toHaveProperty('typeParams');
   });
 });

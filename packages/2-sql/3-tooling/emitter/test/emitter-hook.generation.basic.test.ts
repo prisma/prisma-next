@@ -667,4 +667,76 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain("readonly vector: CodecTypes['pg/vector@1']['output']");
     expect(types).not.toContain('Vector<1536>');
   });
+
+  it('generates contract types with no operation type imports', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    // Pass empty operationTypeImports array to test filter/map on lines 278-279
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    expect(types).toContain('export type OperationTypes = Record<string, never>');
+  });
+
+  it('filters operation type imports to only OperationTypes', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    // Include operation type imports with different named values to test filter on line 278
+    const operationTypeImports = [
+      { package: '@test/ops', named: 'OperationTypes', alias: 'TestOps' },
+      { package: '@test/other', named: 'OtherTypes', alias: 'Other' },
+    ];
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], operationTypeImports);
+    // Only OperationTypes should be included in the intersection, not OtherTypes
+    // (OtherTypes will still be imported but not used in the OperationTypes type)
+    expect(types).toContain('export type OperationTypes = TestOps');
+    expect(types).not.toContain('export type OperationTypes = TestOps & Other');
+  });
+
+  it('serializes empty typeParams to Record<string, never>', () => {
+    const result = sqlTargetFamilyHook.serializeTypeParamsLiteral({});
+    expect(result).toBe('Record<string, never>');
+  });
+
+  it('serializes bigint values correctly', () => {
+    const result = sqlTargetFamilyHook.serializeValue(BigInt('12345678901234567890'));
+    expect(result).toBe('12345678901234567890n');
+  });
+
+  it('serializes unknown types as unknown', () => {
+    // Test with a function (not serializable)
+    const result = sqlTargetFamilyHook.serializeValue(() => {});
+    expect(result).toBe('unknown');
+
+    // Test with a symbol
+    const symbolResult = sqlTargetFamilyHook.serializeValue(Symbol('test'));
+    expect(symbolResult).toBe('unknown');
+  });
 });
