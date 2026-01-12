@@ -56,10 +56,11 @@ async function seedTestData(
         .insert(userTable, {
           id: param('id'),
           email: param('email'),
+          role: param('role'),
           createdAt: param('createdAt'),
         })
         .returning(userTable.columns['id']!)
-        .build({ params: { id, email, createdAt } });
+        .build({ params: { id, email, role: 'USER', createdAt } });
 
       for await (const row of runtime.execute(plan)) {
         userIds.push((row as { id: number }).id);

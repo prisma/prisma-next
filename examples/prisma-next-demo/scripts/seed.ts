@@ -60,12 +60,18 @@ async function main() {
   // Insert users
   const alicePlan = sql
     .insert(userTable, {
+      id: param('id'),
       email: param('email'),
+      role: param('role'),
+      createdAt: param('createdAt'),
     })
-    .returning(userColumns.id, userColumns.email)
+    .returning(userColumns.id, userColumns.email, userColumns.role)
     .build({
       params: {
+        id: 1,
         email: 'alice@example.com',
+        role: 'ADMIN',
+        createdAt: new Date(),
       },
     });
 
@@ -73,12 +79,18 @@ async function main() {
 
   const bobPlan = sql
     .insert(userTable, {
+      id: param('id'),
       email: param('email'),
+      role: param('role'),
+      createdAt: param('createdAt'),
     })
-    .returning(userColumns.id, userColumns.email)
+    .returning(userColumns.id, userColumns.email, userColumns.role)
     .build({
       params: {
+        id: 2,
         email: 'bob@example.com',
+        role: 'USER',
+        createdAt: new Date(),
       },
     });
 

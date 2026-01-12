@@ -11,6 +11,14 @@ import {
   plannerFailure,
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
+import {
+  arraysEqual,
+  extractEnumsFromContract,
+  isIndexSatisfied,
+  isUniqueConstraintSatisfied,
+  resolveColumnTypeParams,
+  verifySqlSchema,
+} from '@prisma-next/family-sql/schema-verify';
 import type {
   ForeignKey,
   SqlContract,
@@ -19,16 +27,6 @@ import type {
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import {
-  extractEnumsFromContract,
-  resolveColumnTypeParams,
-} from '../../../../../../2-sql/3-tooling/family/src/core/schema-verify/enum-helpers';
-import {
-  arraysEqual,
-  isIndexSatisfied,
-  isUniqueConstraintSatisfied,
-} from '../../../../../../2-sql/3-tooling/family/src/core/schema-verify/verify-helpers';
-import { verifySqlSchema } from '../../../../../../2-sql/3-tooling/family/src/core/schema-verify/verify-sql-schema';
 
 type OperationClass = 'extension' | 'enum' | 'table' | 'unique' | 'index' | 'foreignKey';
 
@@ -870,12 +868,19 @@ function sortDependencies(
   return [...dependencies].sort((a, b) => a.id.localeCompare(b.id));
 }
 
+function renderColumnType(column: StorageColumn): string {
+  if (column.codecId === 'pg/enum@1') {
+    return quoteIdentifier(column.nativeType);
+  }
+  return column.nativeType;
+}
+
 function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): string {
   const columnDefinitions = Object.entries(table.columns).map(
     ([columnName, column]: [string, StorageColumn]) => {
       const parts = [
         quoteIdentifier(columnName),
-        column.nativeType,
+        renderColumnType(column),
         column.nullable ? '' : 'NOT NULL',
       ].filter(Boolean);
       return parts.join(' ');
@@ -998,7 +1003,7 @@ function buildAddColumnSql(
 ): string {
   const parts = [
     `ALTER TABLE ${qualifiedTableName}`,
-    `ADD COLUMN ${quoteIdentifier(columnName)} ${column.nativeType}`,
+    `ADD COLUMN ${quoteIdentifier(columnName)} ${renderColumnType(column)}`,
     column.nullable ? '' : 'NOT NULL',
   ].filter(Boolean);
   return parts.join(' ');
@@ -1084,8 +1089,18 @@ function isAdditiveIssue(issue: SchemaIssue): boolean {
     case 'enum_values_mismatch': {
       const expected = issue.expected;
       const actual = issue.actual;
-      if (Array.isArray(expected) && Array.isArray(actual)) {
-        return isAppendOnlyEnum(actual as string[], expected as string[]);
+      const expectedValues = Array.isArray(expected)
+        ? expected
+        : typeof expected === 'string'
+          ? expected.split(',').map((v) => v.trim())
+          : undefined;
+      const actualValues = Array.isArray(actual)
+        ? actual
+        : typeof actual === 'string'
+          ? actual.split(',').map((v) => v.trim())
+          : undefined;
+      if (expectedValues && actualValues) {
+        return isAppendOnlyEnum(actualValues, expectedValues);
       }
       return false;
     }

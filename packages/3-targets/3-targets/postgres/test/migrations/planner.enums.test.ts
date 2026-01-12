@@ -1,8 +1,8 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../../../../../2-sql/3-tooling/family/src/core/schema-verify/verify-sql-schema';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 
 describe('PostgresMigrationPlanner - enums', () => {

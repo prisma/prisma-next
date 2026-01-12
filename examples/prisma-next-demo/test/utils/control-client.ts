@@ -65,6 +65,8 @@ export async function initTestDatabase(options: {
   try {
     const initResult = await client.dbInit({ contractIR: options.contractIR, mode: 'apply' });
     if (!initResult.ok) {
+      // Surface detailed failure diagnostics in test output to aid debugging.
+      console.error('dbInit failure detail', initResult.failure);
       throw new Error(`dbInit failed: ${initResult.failure.summary}`);
     }
   } finally {

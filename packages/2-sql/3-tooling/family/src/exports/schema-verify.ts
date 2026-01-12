@@ -7,6 +7,10 @@
  */
 
 export {
+  extractEnumsFromContract,
+  resolveColumnTypeParams,
+} from '../core/schema-verify/enum-helpers';
+export {
   arraysEqual,
   isIndexSatisfied,
   isUniqueConstraintSatisfied,

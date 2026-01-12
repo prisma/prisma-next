@@ -412,8 +412,8 @@ export interface SchemaIssue {
   readonly column?: string;
   readonly indexOrConstraint?: string;
   readonly enumName?: string;
-  readonly expected?: string;
-  readonly actual?: string;
+  readonly expected?: string | readonly string[];
+  readonly actual?: string | readonly string[];
   readonly message: string;
 }
 

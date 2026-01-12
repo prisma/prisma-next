@@ -5,7 +5,8 @@
   "sideEffects": false,
   "description": "SQL family descriptor for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "clean:artifacts": "rm -f \"src/**/*.d.ts\" \"src/**/*.d.ts.map\"",
+    "build": "pnpm -s clean:artifacts && tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
