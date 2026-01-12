@@ -52,5 +52,5 @@ jobs:
           echo "$PACKAGES" | tr ' ' '\n'
 
       - name: Publish to pkg.pr.new
-        run: pnpm pkg-pr-new publish --pnpm --comment=off ${{ steps.packages.outputs.list }}
+        run: pnpm dlx pkg-pr-new@0.0.40 publish --pnpm --comment=off ${{ steps.packages.outputs.list }}
 
