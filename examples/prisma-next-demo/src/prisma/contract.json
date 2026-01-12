@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:5c01f5eafa94d2009d0d2b299918b3429bdb33057498116dd4c9e4116217fec2",
+  "coreHash": "sha256:45d4e9fcbf56f9f8ba151028d73c92648d3307e1b1e8bab272a9feffd85ec5c4",
   "profileHash": "sha256:58a1990244c9a8cf20e2f77c60aa35d2f6ea9823f641b533a9e75abc8606819f",
   "models": {
     "Post": {
@@ -38,6 +38,9 @@
         },
         "id": {
           "column": "id"
+        },
+        "role": {
+          "column": "role"
         }
       },
       "relations": {},
@@ -72,7 +75,20 @@
             "nativeType": "int4"
           }
         },
-        "foreignKeys": [],
+        "foreignKeys": [
+          {
+            "columns": [
+              "userId"
+            ],
+            "name": "post_userId_fkey",
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "user"
+            }
+          }
+        ],
         "indexes": [],
         "primaryKey": {
           "columns": [
@@ -94,6 +110,17 @@
           "id": {
             "codecId": "pg/int4@1",
             "nativeType": "int4"
+          },
+          "role": {
+            "codecId": "pg/enum@1",
+            "nativeType": "Role",
+            "typeParams": {
+              "values": [
+                "USER",
+                "ADMIN",
+                "MODERATOR"
+              ]
+            }
           }
         },
         "foreignKeys": [],

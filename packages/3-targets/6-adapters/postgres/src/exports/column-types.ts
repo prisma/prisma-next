@@ -51,3 +51,31 @@ export const boolColumn: ColumnTypeDescriptor = {
   codecId: 'pg/bool@1',
   nativeType: 'bool',
 } as const;
+
+/**
+ * Factory for creating enum column descriptors.
+ *
+ * @example
+ * ```typescript
+ * .column('role', { type: enumColumn('Role', ['USER', 'ADMIN', 'MODERATOR'] as const), nullable: false })
+ * // Produces: nativeType: 'Role', codecId: 'pg/enum@1', typeParams: { values: ['USER', 'ADMIN', 'MODERATOR'] }
+ * // TypeScript type: 'USER' | 'ADMIN' | 'MODERATOR'
+ * ```
+ *
+ * @param enumName - The name of the enum type in the database (e.g., 'Role', 'Status')
+ * @param values - The ordered list of valid enum values as a const tuple
+ * @returns A column type descriptor with `typeParams.values` for union type inference
+ */
+export function enumColumn<Name extends string, Values extends readonly string[]>(
+  enumName: Name,
+  values: Values,
+): ColumnTypeDescriptor & {
+  readonly nativeType: Name;
+  readonly typeParams: { readonly values: Values };
+} {
+  return {
+    codecId: 'pg/enum@1',
+    nativeType: enumName,
+    typeParams: { values },
+  } as const;
+}

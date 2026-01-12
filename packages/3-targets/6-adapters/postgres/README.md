@@ -180,6 +180,7 @@ The adapter declares the following PostgreSQL capabilities:
 - **`lateral: true`** - Supports LATERAL joins for `includeMany` nested array includes
 - **`jsonAgg: true`** - Supports JSON aggregation functions (`json_agg`) for `includeMany`
 - **`returning: true`** - Supports RETURNING clauses for DML operations (INSERT, UPDATE, DELETE)
+- **`nativeEnums: true`** - Supports native PostgreSQL enums with `CREATE TYPE ... AS ENUM` and append-only `ALTER TYPE ... ADD VALUE`
 
 **Important**: Capabilities must be declared in **both** places:
 
@@ -189,6 +190,13 @@ The adapter declares the following PostgreSQL capabilities:
 The capabilities on the descriptor must match the capabilities in code. If they don't match, emitted contracts and runtime capability checks will diverge.
 
 See `docs/reference/capabilities.md` and `docs/architecture docs/subsystems/5. Adapters & Targets.md` for details.
+
+### Enum handling
+
+- Enum identity is the column `nativeType` (e.g., `Role`).
+- Migration planner emits `CREATE TYPE ... AS ENUM` before tables, appends new values with `ALTER TYPE ... ADD VALUE IF NOT EXISTS`, and (if unused) can drop extra enums.
+- Non-append changes (reorder/remove) are surfaced as conflicts.
+- For targets without native enums, the shared planner can fall back to CHECK constraints per column when `supportsNativeEnums` is disabled.
 
 ## includeMany Support
 

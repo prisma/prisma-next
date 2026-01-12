@@ -46,7 +46,15 @@ export function createTestSchemaIR(
  * Creates a minimal contract table for testing.
  */
 export function createContractTable(
-  columns: Record<string, { nativeType: string; codecId?: string; nullable: boolean }>,
+  columns: Record<
+    string,
+    {
+      nativeType: string;
+      codecId?: string;
+      nullable: boolean;
+      typeParams?: Record<string, unknown>;
+    }
+  >,
   options?: {
     primaryKey?: { columns: readonly string[]; name?: string };
     foreignKeys?: ReadonlyArray<{
@@ -66,6 +74,7 @@ export function createContractTable(
           nativeType: col.nativeType,
           codecId: col.codecId ?? `pg/${col.nativeType}@1`,
           nullable: col.nullable,
+          ...(col.typeParams ? { typeParams: col.typeParams } : {}),
         },
       ]),
     ),

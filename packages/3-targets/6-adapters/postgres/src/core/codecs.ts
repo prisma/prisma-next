@@ -174,6 +174,32 @@ const pgBoolCodec = codec<'pg/bool@1', boolean, boolean>({
   },
 });
 
+/**
+ * Generic codec for Postgres enum types.
+ * Enums are wire-encoded as strings and JS-typed as strings.
+ * The specific enum type name is provided via nativeType in the storage column.
+ *
+ * Type safety for enum values is provided at compile time via parameterizedOutput
+ * which derives the union type from typeParams.values in the contract.
+ */
+const pgEnumCodec = codec<'pg/enum@1', string, string>({
+  typeId: 'pg/enum@1',
+  targetTypes: [], // Enum types are dynamically determined by nativeType
+  encode: (value) => value,
+  decode: (wire) => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          // The actual enum type name is specified per-column via nativeType.
+          // This placeholder indicates it's an enum without specifying which one.
+          nativeType: 'enum',
+        },
+      },
+    },
+  },
+});
+
 // Build codec definitions using the builder DSL
 const codecs = defineCodecs()
   .add('text', pgTextCodec)
@@ -184,7 +210,8 @@ const codecs = defineCodecs()
   .add('float8', pgFloat8Codec)
   .add('timestamp', pgTimestampCodec)
   .add('timestamptz', pgTimestamptzCodec)
-  .add('bool', pgBoolCodec);
+  .add('bool', pgBoolCodec)
+  .add('enum', pgEnumCodec);
 
 // Export derived structures directly from codecs builder
 export const codecDefinitions = codecs.codecDefinitions;

@@ -17,7 +17,9 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { ComponentDatabaseDependency } from '../migrations/types';
+import { extractEnumsFromContract } from './enum-helpers';
 import {
+  arraysEqual,
   computeCounts,
   verifyDatabaseDependencies,
   verifyForeignKeys,
@@ -452,6 +454,113 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
         });
       }
     }
+  }
+
+  // Compare enums (contract-derived vs introspected schema enums)
+  const contractEnums = extractEnumsFromContract(contract);
+  const schemaEnums = schema.enums ?? {};
+  const enumNodes: SchemaVerificationNode[] = [];
+
+  for (const [enumName, contractValues] of Object.entries(contractEnums)) {
+    const schemaEnum = schemaEnums[enumName];
+
+    if (!schemaEnum) {
+      issues.push({
+        kind: 'enum_missing',
+        table: enumName,
+        enumName,
+        message: `Enum "${enumName}" is missing from database`,
+      });
+      enumNodes.push({
+        status: 'fail',
+        kind: 'enum',
+        name: `enum ${enumName}`,
+        contractPath: `storage.enums.${enumName}`,
+        code: 'enum_missing',
+        message: `Enum "${enumName}" is missing`,
+        expected: contractValues,
+        actual: undefined,
+        children: [],
+      });
+      continue;
+    }
+
+    if (!arraysEqual(contractValues, schemaEnum.values)) {
+      issues.push({
+        kind: 'enum_values_mismatch',
+        table: enumName,
+        enumName,
+        expected: contractValues,
+        actual: schemaEnum.values,
+        message: `Enum "${enumName}" has value mismatch: expected [${contractValues.join(', ')}], got [${schemaEnum.values.join(', ')}]`,
+      });
+      enumNodes.push({
+        status: 'fail',
+        kind: 'enum',
+        name: `enum ${enumName}`,
+        contractPath: `storage.enums.${enumName}`,
+        code: 'enum_values_mismatch',
+        message: 'Enum values mismatch',
+        expected: contractValues,
+        actual: schemaEnum.values,
+        children: [],
+      });
+    } else {
+      enumNodes.push({
+        status: 'pass',
+        kind: 'enum',
+        name: `enum ${enumName}`,
+        contractPath: `storage.enums.${enumName}`,
+        code: '',
+        message: '',
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
+    }
+  }
+
+  if (strict) {
+    for (const enumName of Object.keys(schemaEnums)) {
+      if (!contractEnums[enumName]) {
+        issues.push({
+          kind: 'extra_enum',
+          table: enumName,
+          enumName,
+          message: `Extra enum "${enumName}" found in database (not in contract)`,
+        });
+        enumNodes.push({
+          status: 'fail',
+          kind: 'enum',
+          name: `enum ${enumName}`,
+          contractPath: `storage.enums.${enumName}`,
+          code: 'extra_enum',
+          message: `Extra enum "${enumName}" found`,
+          expected: undefined,
+          actual: schemaEnums[enumName],
+          children: [],
+        });
+      }
+    }
+  }
+
+  if (enumNodes.length > 0) {
+    const enumsStatus = enumNodes.some((n) => n.status === 'fail')
+      ? 'fail'
+      : enumNodes.some((n) => n.status === 'warn')
+        ? 'warn'
+        : 'pass';
+    rootChildren.push({
+      status: enumsStatus,
+      kind: 'enums',
+      name: 'enums',
+      contractPath: 'storage.enums',
+      code: '',
+      message: '',
+      expected: undefined,
+      actual: undefined,
+      children: enumNodes,
+    });
   }
 
   // Validate that all extension packs declared in the contract are present in frameworkComponents

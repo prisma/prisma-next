@@ -3,6 +3,7 @@
 // To regenerate, run: prisma-next contract emit
 import type { CodecTypes as PgTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
+import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
 import type {
@@ -29,6 +30,11 @@ export type Contract = SqlContract<
           readonly email: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly role: {
+            readonly nativeType: 'Role';
+            readonly codecId: 'pg/enum@1';
             readonly nullable: false;
           };
           readonly createdAt: {
@@ -73,9 +79,16 @@ export type Contract = SqlContract<
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
         indexes: readonly [];
-        foreignKeys: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['userId'];
+            readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly name: 'post_userId_fkey';
+          },
+        ];
       };
     };
+    readonly types: Record<string, never>;
   },
   {
     readonly User: {
@@ -83,6 +96,7 @@ export type Contract = SqlContract<
       fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly email: CodecTypes['pg/text@1']['output'];
+        readonly role: 'USER' | 'ADMIN' | 'MODERATOR';
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       };
     };
@@ -126,6 +140,7 @@ export type Contract = SqlContract<
       readonly User: {
         readonly id: 'id';
         readonly email: 'email';
+        readonly role: 'role';
         readonly createdAt: 'createdAt';
       };
       readonly Post: {
@@ -140,6 +155,7 @@ export type Contract = SqlContract<
       readonly user: {
         readonly id: 'id';
         readonly email: 'email';
+        readonly role: 'role';
         readonly createdAt: 'createdAt';
       };
       readonly post: {

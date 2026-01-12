@@ -1,5 +1,6 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import {
+  enumColumn,
   int4Column,
   textColumn,
   timestamptzColumn,
@@ -12,12 +13,19 @@ import postgresPack from '@prisma-next/target-postgres/pack';
 
 type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
 
+/**
+ * Role enum for user authorization.
+ * Uses pg/enum@1 codec with union type inference from typeParams.values.
+ */
+const roleColumn = enumColumn('Role', ['USER', 'ADMIN', 'MODERATOR'] as const);
+
 export const contract = defineContract<AllCodecTypes>()
   .target(postgresPack)
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })
       .column('email', { type: textColumn, nullable: false })
+      .column('role', { type: roleColumn, nullable: false })
       .column('createdAt', { type: timestamptzColumn, nullable: false })
       .primaryKey(['id']),
   )
@@ -35,6 +43,7 @@ export const contract = defineContract<AllCodecTypes>()
     m
       .field('id', 'id')
       .field('email', 'email')
+      .field('role', 'role')
       .field('createdAt', 'createdAt')
       .relation('posts', {
         toModel: 'Post',
