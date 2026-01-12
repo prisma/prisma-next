@@ -67,5 +67,3 @@ jobs:
 
       - name: Publish packages
         run: pnpm -r publish --access public --tag ${{ steps.version.outputs.tag }} --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
