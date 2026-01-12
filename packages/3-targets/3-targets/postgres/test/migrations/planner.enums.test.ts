@@ -54,6 +54,33 @@ describe('PostgresMigrationPlanner - enums', () => {
     expect(result.plan.operations.map((op) => op.id)).toContain('enum.Role.add.ADMIN');
   });
 
+  it('plans enum drop when schema contains an unused enum missing from contract', () => {
+    const planner = createPostgresMigrationPlanner();
+    const schema: SqlSchemaIR = {
+      tables: {
+        user: buildSchemaTable(),
+      },
+      enums: {
+        Role: { name: 'Role', values: ['USER', 'ADMIN'] },
+        Extra: { name: 'Extra', values: ['A'] },
+      },
+      extensions: [],
+    };
+
+    const result = planner.plan({
+      contract,
+      schema,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [],
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      return;
+    }
+    expect(result.plan.operations.map((op) => op.id)).toContain('enum.Extra.drop');
+  });
+
   it('plans CHECK constraints when native enums are disabled', () => {
     const planner = createPostgresMigrationPlanner({ supportsNativeEnums: false });
     const schema: SqlSchemaIR = {

@@ -16,6 +16,7 @@ export default defineConfig({
         '**/*.d.ts',
         '**/*.config.ts',
         '**/exports/**',
+        'src/core/descriptor-meta.ts',
       ],
       reporter: ['text', 'html'],
       thresholds: {

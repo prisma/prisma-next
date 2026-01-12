@@ -115,6 +115,64 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       ],
     });
   });
+
+  it('sorts conflicts when multiple mismatches exist', () => {
+    const schema: SqlSchemaIR = {
+      tables: {
+        user: {
+          name: 'user',
+          columns: {
+            id: { name: 'id', nativeType: 'uuid', nullable: false },
+            email: { name: 'email', nativeType: 'uuid', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          foreignKeys: [],
+          indexes: [],
+        },
+        post: {
+          name: 'post',
+          columns: {
+            id: { name: 'id', nativeType: 'uuid', nullable: false },
+            userId: { name: 'userId', nativeType: 'uuid', nullable: false },
+            title: { name: 'title', nativeType: 'uuid', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          foreignKeys: [],
+          indexes: [],
+        },
+      },
+      extensions: [],
+    };
+
+    const result = planner.plan({
+      contract,
+      schema,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [],
+    });
+
+    expect(result.kind).toBe('failure');
+    if (result.kind !== 'failure') {
+      throw new Error('expected planner failure for non-additive conflicts');
+    }
+
+    // Two distinct type mismatches => comparator-based sorting should run
+    expect(result.conflicts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'typeMismatch',
+          location: { table: 'user', column: 'email' },
+        }),
+        expect.objectContaining({
+          kind: 'typeMismatch',
+          location: { table: 'post', column: 'title' },
+        }),
+      ]),
+    );
+    expect(result.conflicts).toHaveLength(2);
+  });
 });
 
 function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlContract<SqlStorage> {
