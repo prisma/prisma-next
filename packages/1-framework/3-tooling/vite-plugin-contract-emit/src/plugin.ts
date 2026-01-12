@@ -139,8 +139,8 @@ export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginO
       const queue = [absoluteConfigPath];
 
       while (queue.length > 0) {
-        const current = queue.shift()!;
-        if (visited.has(current)) continue;
+        const current = queue.shift();
+        if (current === undefined || visited.has(current)) continue;
         visited.add(current);
 
         const mod = viteServer.moduleGraph.getModuleById(current);
