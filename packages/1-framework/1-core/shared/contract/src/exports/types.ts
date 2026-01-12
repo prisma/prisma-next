@@ -1,5 +1,5 @@
 export type {
-  __Brand__,
+  $,
   Brand,
   ContractBase,
   ContractMarkerRecord,

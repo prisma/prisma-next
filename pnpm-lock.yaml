@@ -928,6 +928,9 @@ importers:
 
   packages/2-sql/4-lanes/query-builder:
     devDependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/contract
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../0-config/tsconfig
