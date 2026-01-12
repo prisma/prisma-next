@@ -57,6 +57,9 @@ export function extractCodecTypeImports(
     if (codecTypes?.import) {
       imports.push(codecTypes.import);
     }
+    if (codecTypes?.typeImports) {
+      imports.push(...codecTypes.typeImports);
+    }
   }
 
   return imports;
@@ -179,9 +182,9 @@ export function extractParameterizedTypeImports(
   const imports: TypesImportSpec[] = [];
 
   for (const descriptor of descriptors) {
-    const parameterizedImports = descriptor.types?.codecTypes?.parameterizedImports;
-    if (parameterizedImports) {
-      imports.push(...parameterizedImports);
+    const typeImports = descriptor.types?.codecTypes?.typeImports;
+    if (typeImports) {
+      imports.push(...typeImports);
     }
   }
 

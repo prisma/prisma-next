@@ -236,11 +236,14 @@ export interface ComponentMetadata {
        */
       readonly parameterized?: Record<string, TypeRenderer>;
       /**
-       * Optional type imports for parameterized codecs.
-       * These imports are added to contract.d.ts when parameterized renderers
-       * reference types from external packages.
+       * Optional additional type-only imports required by parameterized renderers.
+       *
+       * These imports are included in generated `contract.d.ts` but are NOT treated as
+       * codec type maps (i.e., they should not be intersected into `export type CodecTypes = ...`).
+       *
+       * Example: `Vector<N>` for pgvector renderers that emit `Vector<{{length}}>`
        */
-      readonly parameterizedImports?: ReadonlyArray<TypesImportSpec>;
+      readonly typeImports?: ReadonlyArray<TypesImportSpec>;
     };
     readonly operationTypes?: { readonly import: TypesImportSpec };
     readonly storage?: ReadonlyArray<{

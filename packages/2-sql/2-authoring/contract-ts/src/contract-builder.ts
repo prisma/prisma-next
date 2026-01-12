@@ -221,6 +221,7 @@ class SqlContractBuilder<
           codecId,
           nullable: (columnState.nullable ?? false) as ColumnDefs[keyof ColumnDefs]['nullable'] &
             boolean,
+          ...(columnState.typeParams ? { typeParams: columnState.typeParams } : {}),
         } as BuildStorageColumn<
           ColumnDefs[keyof ColumnDefs]['nullable'] & boolean,
           ColumnDefs[keyof ColumnDefs]['type']

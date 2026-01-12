@@ -8,7 +8,7 @@ This extension pack adds support for the `vector` data type and vector similarit
 
 ## Responsibilities
 
-- **Vector Codec**: Provides codec for `pg/vector@1` type ID mapping to `number[]` JavaScript type
+- **Vector Codec**: Provides codec for `pg/vector@1` mapping to `number[]` at runtime, and a `Vector<N>` type for dimensioned typing in `contract.d.ts`
 - **Vector Operations**: Registers vector similarity operations (e.g., `cosineDistance`) for use in queries
 - **CLI Integration**: Provides extension descriptor for `prisma-next.config.ts` configuration
 - **Runtime Extension**: Registers codecs and operations at runtime for vector column operations
@@ -135,12 +135,16 @@ type Row = ResultType<typeof plan>;
 
 ### Codec Types
 
-The extension provides a `CodecTypes` export mapping the `pg/vector@1` type ID to `number[]`:
+The extension provides:
+
+- `CodecTypes` mapping the `pg/vector@1` type ID to `number[]` (runtime representation)
+- `Vector<N>` type for dimensioned vector typing in emitted `contract.d.ts` and schema result types when the contract includes dimension metadata
 
 ```typescript
-import type { CodecTypes } from '@prisma-next/extension-pgvector/codec-types';
+import type { CodecTypes, Vector } from '@prisma-next/extension-pgvector/codec-types';
 
 // CodecTypes['pg/vector@1']['output'] = number[]
+// Vector<1536> is a branded number[] type used for dimensioned typing
 ```
 
 ### Operation Types

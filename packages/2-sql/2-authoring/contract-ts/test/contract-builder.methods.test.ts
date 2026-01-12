@@ -248,3 +248,94 @@ describe('extensionPacks', () => {
     ).toThrow('builder target is "postgres"');
   });
 });
+
+describe('typeParams', () => {
+  const testVectorColumn = columnDescriptor('pg/vector@1', 'vector(1536)');
+
+  it('includes typeParams in storage column when present in descriptor', () => {
+    const vectorWithParams = {
+      ...testVectorColumn,
+      typeParams: { length: 1536 },
+    };
+
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('document', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('embedding', { type: vectorWithParams, nullable: false })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.document.columns.embedding).toMatchObject({
+      nativeType: 'vector(1536)',
+      codecId: 'pg/vector@1',
+      nullable: false,
+      typeParams: { length: 1536 },
+    });
+  });
+
+  it('includes typeParams in storage column when passed via options', () => {
+    const vectorDescriptorWithoutParams = columnDescriptor('pg/vector@1', 'vector');
+    const columnOptionsWithParams = {
+      type: vectorDescriptorWithoutParams,
+      nullable: false,
+      typeParams: { length: 768 },
+    } as const;
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('document', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('embedding', columnOptionsWithParams)
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.document.columns.embedding).toMatchObject({
+      nativeType: 'vector',
+      codecId: 'pg/vector@1',
+      nullable: false,
+      typeParams: { length: 768 },
+    });
+  });
+
+  it('omits typeParams when not provided', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) =>
+        t.column('id', { type: int4Column, nullable: false }).primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.user.columns.id).not.toHaveProperty('typeParams');
+  });
+
+  it('prefers typeParams from options over descriptor', () => {
+    const vectorDescriptorWithParams = {
+      ...columnDescriptor('pg/vector@1', 'vector(1536)'),
+      typeParams: { length: 1536 },
+    };
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('document', (t) =>
+        t
+          .column('id', { type: int4Column, nullable: false })
+          .column('embedding', {
+            type: vectorDescriptorWithParams,
+            nullable: false,
+            typeParams: { length: 768 },
+          })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.document.columns.embedding).toMatchObject({
+      nativeType: 'vector(1536)',
+      codecId: 'pg/vector@1',
+      nullable: false,
+      typeParams: { length: 768 },
+    });
+  });
+});

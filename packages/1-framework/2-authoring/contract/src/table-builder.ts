@@ -86,6 +86,7 @@ export class TableBuilder<
     options: {
       type: Descriptor;
       nullable?: Nullable;
+      typeParams?: Record<string, unknown>;
     },
   ): TableBuilder<
     Name,
@@ -97,13 +98,15 @@ export class TableBuilder<
     PrimaryKey
   > {
     const nullable = (options.nullable ?? false) as Nullable extends true ? true : false;
-    const { codecId, nativeType } = options.type;
+    const { codecId, nativeType, typeParams: descriptorTypeParams } = options.type;
+    const typeParams = options.typeParams ?? descriptorTypeParams;
 
     const columnState = {
       name,
       nullable,
       type: codecId,
       nativeType,
+      ...(typeParams ? { typeParams } : {}),
     } as ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>;
     const newColumns = { ...this._columns, [name]: columnState } as Columns &
       Record<
