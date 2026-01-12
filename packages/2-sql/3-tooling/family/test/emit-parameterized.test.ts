@@ -17,7 +17,7 @@ import { createSqlFamilyInstance } from '../src/core/instance';
  * Key architecture notes:
  * - Parameterized type renderers are defined in `types.codecTypes.parameterized`
  * - Renderers are normalized to `TypeRenderEntry` by the assembly layer
- * - Type imports for parameterized types are defined in `types.codecTypes.parameterizedImports`
+ * - Type imports for parameterized types are defined in `types.codecTypes.typeImports`
  */
 
 function createMockTarget(): ControlTargetDescriptor<'sql', 'postgres'> {
@@ -73,7 +73,7 @@ function createMockExtensionWithParameterizedCodec(
         parameterized: {
           [config.codecId]: config.renderer,
         },
-        ...(config.typesImport ? { parameterizedImports: [config.typesImport] } : {}),
+        ...(config.typesImport ? { typeImports: [config.typesImport] } : {}),
       },
     },
   };
@@ -98,6 +98,13 @@ function createMockExtensionWithParameterizedRenderer(
           named: 'CodecTypes',
           alias: `${id.charAt(0).toUpperCase() + id.slice(1)}CodecTypes`,
         },
+        typeImports: [
+          {
+            package: `@prisma-next/extension-${id}/codec-types`,
+            named: 'Vector',
+            alias: 'Vector',
+          },
+        ],
         parameterized: {
           [codecId]: renderer,
         },
@@ -181,6 +188,16 @@ describe('emit parameterized codecs integration', () => {
 
     // Verify the parameterized renderer produces the correct type
     expect(result.contractDts).toContain('readonly vector: Vector<1536>');
+
+    // Verify the emitted contract imports the type used by the renderer
+    expect(result.contractDts).toContain(
+      "import type { Vector } from '@prisma-next/extension-pgvector/codec-types';",
+    );
+
+    // Extra type-only imports must not be intersected into `export type CodecTypes = ...`
+    expect(result.contractDts).toContain(
+      'export type CodecTypes = PgCodecTypes & PgvectorCodecTypes;',
+    );
   });
 
   it('emits typesImport from parameterized codecs in contract.d.ts', async () => {
@@ -378,7 +395,7 @@ describe('emit parameterized codecs integration', () => {
           parameterized: {
             'pg/decimal@1': 'Decimal<{{precision}}, {{scale}}>',
           },
-          parameterizedImports: [
+          typeImports: [
             {
               package: '@prisma-next/adapter-postgres/decimal-types',
               named: 'Decimal',
@@ -465,7 +482,7 @@ describe('emit parameterized codecs integration', () => {
             'pg/vector@1': 'Vector<{{length}}>',
             'pg/halfvec@1': 'HalfVector<{{length}}>',
           },
-          parameterizedImports: [
+          typeImports: [
             {
               package: '@prisma-next/extension-pgvector/vector-types',
               named: 'Vector',

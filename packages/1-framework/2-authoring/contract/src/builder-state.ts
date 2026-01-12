@@ -1,10 +1,15 @@
 /**
  * Column type descriptor containing both codec ID and native type.
  * Used when defining columns with descriptor objects instead of string IDs.
+ *
+ * For parameterized types (e.g., `vector(1536)`), the `typeParams` field
+ * carries codec-owned parameters that affect both TypeScript type generation
+ * and native DDL output.
  */
 export type ColumnTypeDescriptor = {
   readonly codecId: string;
   readonly nativeType: string;
+  readonly typeParams?: Record<string, unknown>;
 };
 
 export interface ColumnBuilderState<
@@ -16,6 +21,7 @@ export interface ColumnBuilderState<
   readonly nullable: Nullable;
   readonly type: Type;
   readonly nativeType: string;
+  readonly typeParams?: Record<string, unknown>;
 }
 
 /**

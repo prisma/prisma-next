@@ -262,6 +262,136 @@ type ExtractCodecOutputType<
   : never;
 
 /**
+ * Extracts the model name for a given table from the contract mappings.
+ */
+type ExtractTableToModel<
+  Contract extends SqlContract<SqlStorage>,
+  TableName extends string,
+> = Contract['mappings'] extends {
+  readonly tableToModel: infer TableToModel;
+}
+  ? TableToModel extends Record<string, string>
+    ? TableName extends keyof TableToModel
+      ? TableToModel[TableName]
+      : never
+    : never
+  : never;
+
+/**
+ * Extracts the field name for a given table column from the contract mappings.
+ */
+type ExtractColumnToField<
+  Contract extends SqlContract<SqlStorage>,
+  TableName extends string,
+  ColumnName extends string,
+> = Contract['mappings'] extends {
+  readonly columnToField: infer ColumnToField;
+}
+  ? ColumnToField extends Record<string, Record<string, string>>
+    ? TableName extends keyof ColumnToField
+      ? ColumnName extends keyof ColumnToField[TableName]
+        ? ColumnToField[TableName][ColumnName]
+        : never
+      : never
+    : never
+  : never;
+
+/**
+ * Extracts the field value type from a model's fields.
+ */
+type ExtractFieldValue<
+  Contract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = Contract['models'] extends infer Models
+  ? Models extends Record<string, unknown>
+    ? ModelName extends keyof Models
+      ? Models[ModelName] extends { readonly fields: infer Fields }
+        ? Fields extends Record<string, unknown>
+          ? FieldName extends keyof Fields
+            ? Fields[FieldName]
+            : never
+          : never
+        : never
+      : never
+    : never
+  : never;
+
+/**
+ * Extracts the JavaScript type for a column from model mappings if available.
+ * Returns `never` if the column maps to a ModelField object (which indicates
+ * a relation that should fall through to codec-based type resolution).
+ *
+ * The check for ModelField uses `Exclude<keyof FieldValue, 'column'> extends never`
+ * to ensure we only skip pure `{ column: string }` marker objects, not richer
+ * object types that happen to include a `column` property.
+ */
+type ExtractColumnJsTypeFromModels<
+  Contract extends SqlContract<SqlStorage>,
+  TableName extends string,
+  ColumnName extends string,
+> = ExtractTableToModel<Contract, TableName> extends infer ModelName
+  ? ModelName extends string
+    ? ExtractColumnToField<Contract, TableName, ColumnName> extends infer FieldName
+      ? FieldName extends string
+        ? ExtractFieldValue<Contract, ModelName, FieldName> extends infer FieldValue
+          ? FieldValue extends { readonly column: string }
+            ? Exclude<keyof FieldValue, 'column'> extends never
+              ? never
+              : FieldValue
+            : FieldValue
+          : never
+        : never
+      : never
+    : never
+  : never;
+
+/**
+ * Resolves type params for a column from either:
+ * - inline `columnMeta.typeParams`, or
+ * - `columnMeta.typeRef` (resolving into `contract.storage.types[typeRef].typeParams`).
+ */
+type ResolveColumnTypeParams<
+  Contract extends SqlContract<SqlStorage>,
+  ColumnMeta extends StorageColumn,
+> = ColumnMeta extends { typeParams: infer Params }
+  ? Params extends object
+    ? Params
+    : undefined
+  : ColumnMeta extends { typeRef: infer TypeRef extends string }
+    ? Contract['storage'] extends { types: infer Types }
+      ? Types extends Record<string, unknown>
+        ? TypeRef extends keyof Types
+          ? Types[TypeRef] extends { typeParams: infer Params }
+            ? Params extends object
+              ? Params
+              : undefined
+            : undefined
+          : undefined
+        : undefined
+      : undefined
+    : undefined;
+
+/**
+ * If a codec entry exposes a type-level parameterized output surface, compute the output type
+ * for a specific params object. Falls back to `never` if not supported.
+ *
+ * This enables lane typing to incorporate `columnMeta.typeParams` without branching on codec IDs
+ * in core lane code.
+ */
+type ExtractParameterizedCodecOutputType<
+  CodecId extends string,
+  Params,
+  CodecTypes extends Record<string, { readonly output: unknown }>,
+> = CodecId extends keyof CodecTypes
+  ? CodecTypes[CodecId] extends { readonly parameterizedOutput: infer Fn }
+    ? Fn extends (params: Params) => infer Out
+      ? Out
+      : never
+    : never
+  : never;
+
+/**
  * Type-level operation signature.
  * Represents an operation at the type level, similar to OperationSignature at runtime.
  */
@@ -402,23 +532,47 @@ type ColumnMetaTypeId<ColumnMeta> = ColumnMeta extends { codecId: infer CodecId 
     : never;
 
 export type ComputeColumnJsType<
-  _Contract extends SqlContract<SqlStorage>,
-  _TableName extends string,
-  _ColumnName extends string,
+  Contract extends SqlContract<SqlStorage>,
+  TableName extends string,
+  ColumnName extends string,
   ColumnMeta extends StorageColumn,
   CodecTypes extends Record<string, { readonly output: unknown }>,
-> = ColumnMeta extends { nullable: infer Nullable }
-  ? ColumnMetaTypeId<ColumnMeta> extends infer TypeId
-    ? TypeId extends string
-      ? ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
-        ? [CodecOutput] extends [never]
-          ? unknown // Codec not found in CodecTypes
-          : Nullable extends true
-            ? CodecOutput | null
-            : CodecOutput
+> = ExtractColumnJsTypeFromModels<Contract, TableName, ColumnName> extends infer FromModels
+  ? [FromModels] extends [never]
+    ? ColumnMeta extends { nullable: infer Nullable }
+      ? ColumnMetaTypeId<ColumnMeta> extends infer TypeId
+        ? TypeId extends string
+          ? ResolveColumnTypeParams<Contract, ColumnMeta> extends infer Params
+            ? Params extends object
+              ? ExtractParameterizedCodecOutputType<
+                  TypeId,
+                  Params,
+                  CodecTypes
+                > extends infer ParamOutput
+                ? [ParamOutput] extends [never]
+                  ? ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
+                    ? [CodecOutput] extends [never]
+                      ? unknown // Codec not found in CodecTypes
+                      : Nullable extends true
+                        ? CodecOutput | null
+                        : CodecOutput
+                    : unknown
+                  : Nullable extends true
+                    ? ParamOutput | null
+                    : ParamOutput
+                : unknown
+              : ExtractCodecOutputType<TypeId, CodecTypes> extends infer CodecOutput
+                ? [CodecOutput] extends [never]
+                  ? unknown // Codec not found in CodecTypes
+                  : Nullable extends true
+                    ? CodecOutput | null
+                    : CodecOutput
+                : unknown
+            : unknown
+          : unknown
         : unknown
       : unknown
-    : unknown
+    : FromModels
   : unknown;
 
 /**
