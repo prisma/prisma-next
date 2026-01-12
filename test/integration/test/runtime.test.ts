@@ -88,7 +88,7 @@ describe('runtime execute integration', () => {
   it('throws when marker hash mismatches contract', async () => {
     const mismatchedContract: SqlContract<SqlStorage> = {
       ...fixtureContract,
-      coreHash: 'sha256:mismatch',
+      coreHash: 'sha256:mismatch' as never,
     };
 
     const runtime = createTestRuntime(

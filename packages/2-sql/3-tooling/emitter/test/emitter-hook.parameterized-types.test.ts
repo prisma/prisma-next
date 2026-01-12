@@ -19,6 +19,8 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
   };
 }
 
+const testHashes = { coreHash: 'test-core-hash', profileHash: 'test-profile-hash' };
+
 describe('sql-target-family-hook parameterized type emission', () => {
   describe('columns with typeParams', () => {
     it('emits parameterized TS type via normalized renderer', () => {
@@ -62,7 +64,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const parameterizedRenderers = new Map<string, TypeRenderEntry>();
       parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedRenderers,
       });
 
@@ -104,7 +106,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const parameterizedRenderers = new Map<string, TypeRenderEntry>();
       parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedRenderers,
       });
 
@@ -151,7 +153,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const parameterizedRenderers = new Map<string, TypeRenderEntry>();
       parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedRenderers,
       });
 
@@ -201,7 +203,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const parameterizedRenderers = new Map<string, TypeRenderEntry>();
       parameterizedRenderers.set('pg/decimal@1', decimalRenderer);
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedRenderers,
       });
 
@@ -256,7 +258,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const parameterizedRenderers = new Map<string, TypeRenderEntry>();
       parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedRenderers,
       });
 
@@ -319,10 +321,10 @@ describe('sql-target-family-hook parameterized type emission', () => {
       parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
       // Generate twice to ensure determinism
-      const types1 = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types1 = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedRenderers,
       });
-      const types2 = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types2 = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedRenderers,
       });
 
@@ -371,7 +373,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       // No renderer registered for custom/type@1
       const parameterizedRenderers = new Map<string, TypeRenderEntry>();
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedRenderers,
       });
 
@@ -419,7 +421,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const parameterizedRenderers = new Map<string, TypeRenderEntry>();
       parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedRenderers,
       });
 
@@ -466,7 +468,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const parameterizedRenderers = new Map<string, TypeRenderEntry>();
       parameterizedRenderers.set('pg/vector@1', vectorRenderer);
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedRenderers,
       });
 
@@ -501,7 +503,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
       });
 
       // Call without options (4th parameter)
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
       expect(types).toContain("readonly id: CodecTypes['pg/int4@1']['output']");
     });
@@ -537,7 +539,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
       // Verify storage.types is emitted with literal types
       expect(types).toContain('readonly types:');
@@ -567,7 +569,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
       // Should emit empty types object
       expect(types).toContain('readonly types: Record<string, never>');
@@ -590,7 +592,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
       // Should handle missing types gracefully - either omit or emit empty
       // When storage.types is undefined, should emit same as empty
@@ -621,7 +623,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
       expect(types).toContain('readonly ComplexType:');
       expect(types).toContain(
@@ -653,7 +655,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
       expect(types).toContain('readonly ArrayType:');
       expect(types).toContain('readonly typeParams: { readonly items: readonly [1, 2, 3] }');
@@ -683,7 +685,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
       expect(types).toContain('readonly NestedType:');
       expect(types).toContain(
@@ -715,7 +717,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
       expect(types).toContain('readonly NullableType:');
       expect(types).toContain('readonly typeParams: { readonly value: null }');
@@ -745,7 +747,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
 
       expect(types).toContain('readonly UndefinedType:');
       expect(types).toContain('readonly typeParams: { readonly value: undefined }');
@@ -770,7 +772,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         },
       });
 
-      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], {
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
         parameterizedTypeImports: [
           { package: '@custom/types', named: 'Vector', alias: 'Vector' },
           { package: '@custom/types', named: 'Matrix', alias: 'Matrix' },
@@ -802,6 +804,7 @@ describe('sql-target-family-hook parameterized type emission', () => {
         ir,
         [{ package: '@custom/types', named: 'Vector', alias: 'Vector' }],
         [],
+        testHashes,
         {
           parameterizedTypeImports: [
             { package: '@custom/types', named: 'Vector', alias: 'Vector' },

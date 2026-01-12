@@ -243,17 +243,27 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
  * This helper allows tests to create contracts without depending on sql-query.
  */
 export function createTestContract<T extends SqlContract<SqlStorage>>(
-  contract: Partial<T> &
-    Omit<T, 'mappings' | 'capabilities' | 'extensionPacks' | 'meta' | 'sources'>,
+  contract: Partial<Omit<T, 'coreHash' | 'profileHash'>> & {
+    coreHash?: string | undefined;
+    profileHash?: string | undefined;
+  },
 ): T {
   return {
     ...contract,
+    schemaVersion: contract.schemaVersion ?? '1',
+    target: contract.target ?? 'postgres',
+    targetFamily: contract.targetFamily ?? 'sql',
+    storage: contract.storage ?? { tables: {} },
+    models: contract.models ?? {},
+    relations: contract.relations ?? {},
     mappings: contract.mappings ?? { codecTypes: {}, operationTypes: {} },
     capabilities: contract.capabilities ?? {},
     extensionPacks: contract.extensionPacks ?? {},
     meta: contract.meta ?? {},
     sources: contract.sources ?? {},
-  } as T;
+    coreHash: (contract.coreHash ?? 'sha256:testcore') satisfies string as never,
+    profileHash: (contract.profileHash ?? 'sha256:testprofile') satisfies string as never,
+  } satisfies SqlContract as never;
 }
 
 // Re-export generic utilities from test-utils

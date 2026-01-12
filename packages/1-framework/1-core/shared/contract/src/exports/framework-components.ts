@@ -19,7 +19,6 @@ export type {
   // Type renderers for parameterized codec emission
   NormalizedTypeRenderer,
   PackRefBase,
-  RenderTypeContext,
   TargetBoundComponentDescriptor,
   TargetDescriptor,
   TargetInstance,

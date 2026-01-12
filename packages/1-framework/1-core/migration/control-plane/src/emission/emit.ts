@@ -117,6 +117,7 @@ export async function emit(
     ir,
     codecTypeImports ?? [],
     operationTypeImports ?? [],
+    { coreHash, profileHash },
     generateOptions,
   );
   const contractDts = await format(contractDtsRaw, {

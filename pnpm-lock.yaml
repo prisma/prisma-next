@@ -797,6 +797,9 @@ importers:
         specifier: workspace:*
         version: link:../../../1-framework/1-core/shared/utils
     devDependencies:
+      '@prisma-next/core-control-plane':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/migration/control-plane
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils

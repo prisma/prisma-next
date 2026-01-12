@@ -8,7 +8,7 @@ const testContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   targetFamily: 'sql',
   target: 'postgres',
-  coreHash: 'sha256:test-hash',
+  coreHash: 'sha256:test-hash' as never,
   models: {},
   relations: {},
   storage: { tables: {} },

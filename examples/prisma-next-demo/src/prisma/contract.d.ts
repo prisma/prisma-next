@@ -3,14 +3,21 @@
 // To regenerate, run: prisma-next contract emit
 import type { CodecTypes as PgTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
+import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
+import type { CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
 import type {
   SqlContract,
   SqlStorage,
   SqlMappings,
   ModelDefinition,
 } from '@prisma-next/sql-contract/types';
+
+export type CoreHash =
+  CoreHashBase<'sha256:97998a9dc27b4ffdd7258e171236148b81c220a194d7adadbdb47ff28b476766'>;
+export type ProfileHash =
+  ProfileHashBase<'sha256:58a1990244c9a8cf20e2f77c60aa35d2f6ea9823f641b533a9e75abc8606819f'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -73,9 +80,16 @@ export type Contract = SqlContract<
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
         indexes: readonly [];
-        foreignKeys: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['userId'];
+            readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly name: 'post_userId_fkey';
+          },
+        ];
       };
     };
+    readonly types: Record<string, never>;
   },
   {
     readonly User: {
@@ -152,7 +166,9 @@ export type Contract = SqlContract<
     };
     codecTypes: PgTypes & PgVectorTypes;
     operationTypes: PgVectorOperationTypes;
-  }
+  },
+  CoreHash,
+  ProfileHash
 >;
 
 export type Tables = Contract['storage']['tables'];
