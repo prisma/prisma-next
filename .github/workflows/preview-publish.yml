@@ -43,6 +43,14 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      - name: Collect publishable packages
+        id: packages
+        run: |
+          PACKAGES=$(node scripts/list-publishable-packages.mjs)
+          echo "list=$PACKAGES" >> "$GITHUB_OUTPUT"
+          echo "Packages to publish:"
+          echo "$PACKAGES" | tr ' ' '\n'
+
       - name: Publish to pkg.pr.new
-        run: pnpm dlx pkg-pr-new publish
+        run: pnpm pkg-pr-new publish --pnpm --comment=off ${{ steps.packages.outputs.list }}
 
