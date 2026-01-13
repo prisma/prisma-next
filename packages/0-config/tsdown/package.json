@@ -6,10 +6,6 @@
   "version": "0.0.0",
   "description": "Base tsdown configuration for the monorepo",
   "license": "MIT",
-  "files": [
-    "./base.ts",
-    "./base.js"
-  ],
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
     "tsdown": "catalog:",
@@ -22,9 +18,6 @@
     "typecheck": "tsc --noEmit"
   },
   "exports": {
-    ".": {
-      "types": "./base.ts",
-      "import": "./base.ts"
-    }
+    ".": "./base.ts"
   }
 }
