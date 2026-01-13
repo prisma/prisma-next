@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "Plan helpers, diagnostics, and shared errors for Prisma Next",
   "scripts": {
-    "build": "tsdown --config-loader native",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",

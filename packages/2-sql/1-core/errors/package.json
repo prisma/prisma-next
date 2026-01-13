@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "Normalized SQL driver error types for Prisma Next",
   "scripts": {
-    "build": "tsdown --config-loader native",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",

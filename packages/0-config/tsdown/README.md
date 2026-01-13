@@ -10,17 +10,15 @@ We ship `esm` only by default. Bundle target is infered from your package. Outpu
 
 Your package needs to have:
 
-1. **Node.js 24+** - This package exposes TypeScript files directly without compilation. Node.js 24+ has native TypeScript support required for importing `.ts` files.
+1. `tsconfig.prod.json` - a TypeScript configuration file specific for bundling.
 
-2. `tsconfig.prod.json` - a TypeScript configuration file specific for bundling.
+2. `package.json#engines.node` - `tsdown` infers the bundling target based on this value. e.g. `{ "engines": { "node": ">=20" } }`
 
-3. `package.json#engines.node` - `tsdown` infers the bundling target based on this value. e.g. `{ "engines": { "node": ">=20" } }`
+3. `"tsdown": "catalog:"` in your packages `devDependencies`.
 
-4. `"tsdown": "catalog:"` in your packages `devDependencies`.
+4. `"build": "tsdown"` in your `package.json#scripts`.
 
-5. `"build": "tsdown --config-loader native"` in your `package.json#scripts`. The `--config-loader native` flag tells tsdown to use Node.js's native TypeScript support for loading config files.
-
-6. `"src"` and `"dist"` in your `package.json#files`.
+5. `"src"` and `"dist"` in your `package.json#files`.
 
 ## Usage
 
