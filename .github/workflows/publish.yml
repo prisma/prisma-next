@@ -45,11 +45,6 @@ jobs:
 
       - name: Determine version
         id: version
-        # Security: Inputs are safe from injection because:
-        # 1. They are passed via env: block and accessed as shell variables ($INPUT_VERSION),
-        #    not directly interpolated into the script
-        # 2. workflow_dispatch can only be triggered by users with write access
-        # 3. The job has `if: github.ref == 'refs/heads/main'` which restricts execution to main branch only
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           INPUT_VERSION: ${{ github.event.inputs.version }}
@@ -57,18 +52,35 @@ jobs:
         run: |
           if [ -n "$INPUT_VERSION" ]; then
             echo "Using provided version: $INPUT_VERSION"
-            echo "version=$INPUT_VERSION" >> $GITHUB_OUTPUT
-            echo "tag=$INPUT_TAG" >> $GITHUB_OUTPUT
+            # Validate version format (semantic versioning)
+            if ! echo "$INPUT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
+              echo "Error: Invalid version format. Must match semantic versioning (e.g., 1.0.0 or 1.0.0-beta.1)"
+              exit 1
+            fi
+            # Validate dist-tag format (alphanumeric, hyphen, underscore only)
+            if ! echo "$INPUT_TAG" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+              echo "Error: Invalid dist-tag format. Must contain only alphanumeric characters, hyphens, and underscores"
+              exit 1
+            fi
+            # Use heredoc to safely write to GITHUB_OUTPUT (prevents injection)
+            {
+              echo "version<<EOF"
+              echo "$INPUT_VERSION"
+              echo "EOF"
+              echo "tag<<EOF"
+              echo "$INPUT_TAG"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           else
             echo "No version provided, calculating..."
             node scripts/determine-version.ts
           fi
 
       - name: Set package versions
-        run: node scripts/set-version.ts ${{ steps.version.outputs.version }}
+        run: node scripts/set-version.ts "${{ steps.version.outputs.version }}"
 
       - name: Build packages
         run: pnpm build
 
       - name: Publish packages
-        run: pnpm -r publish --access public --tag ${{ steps.version.outputs.tag }} --no-git-checks
+        run: pnpm -r publish --access public --tag "${{ steps.version.outputs.tag }}" --no-git-checks

@@ -46,10 +46,15 @@ jobs:
         id: packages
         run: |
           PACKAGES=$(node scripts/list-publishable-packages.mjs)
-          echo "list=$PACKAGES" >> "$GITHUB_OUTPUT"
+          # Use heredoc to safely write to GITHUB_OUTPUT (prevents injection)
+          {
+            echo "list<<EOF"
+            echo "$PACKAGES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
           echo "Packages to publish:"
           echo "$PACKAGES" | tr ' ' '\n'
 
       - name: Publish to pkg.pr.new
         # Use https://github.com/stackblitz-labs/pkg.pr.new/tags to see the latest version available
-        run: pnpm dlx pkg-pr-new@0.0.62 publish --pnpm --comment=off ${{ steps.packages.outputs.list }}
+        run: pnpm dlx pkg-pr-new@0.0.62 publish --pnpm --comment=off "${{ steps.packages.outputs.list }}"
