@@ -1,39 +1,27 @@
 name: Publish to npm
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to publish (e.g., 0.1.0, 0.1.0-beta.1)"
-        required: true
+        description: "Version to publish (e.g., 0.1.0, 0.1.0-beta.1). Leave empty to auto-calculate."
+        required: false
         type: string
       dist-tag:
         description: "npm dist-tag (e.g., latest, dev, beta)"
         required: true
-        default: "dev"
-        type: string
-      ref:
-        description: "Git ref to publish from (branch, tag, or SHA)"
-        required: false
-        default: "main"
+        default: "latest"
         type: string
 
 concurrency:
-  group: npm-publish-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'main' }}
+  group: npm-publish
   cancel-in-progress: false
 
 jobs:
   publish:
-    name: Publish packages
+    name: Publish packages to npm
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       id-token: write
@@ -41,9 +29,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          ref: ${{ github.event.inputs.ref || github.ref }}
-          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
@@ -51,27 +36,51 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
-          node-version: 24
+          node-version-file: '.nvmrc'
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Determine version and tag
+      - name: Determine version
         id: version
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           INPUT_VERSION: ${{ github.event.inputs.version }}
           INPUT_TAG: ${{ github.event.inputs.dist-tag }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: node scripts/determine-version.ts
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            echo "Using provided version: $INPUT_VERSION"
+            # Validate version format (semantic versioning)
+            if ! echo "$INPUT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
+              echo "Error: Invalid version format. Must match semantic versioning (e.g., 1.0.0 or 1.0.0-beta.1)"
+              exit 1
+            fi
+            # Validate dist-tag format (alphanumeric, hyphen, underscore only)
+            if ! echo "$INPUT_TAG" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+              echo "Error: Invalid dist-tag format. Must contain only alphanumeric characters, hyphens, and underscores"
+              exit 1
+            fi
+            # Use heredoc to safely write to GITHUB_OUTPUT (prevents injection)
+            {
+              echo "version<<EOF"
+              echo "$INPUT_VERSION"
+              echo "EOF"
+              echo "tag<<EOF"
+              echo "$INPUT_TAG"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "No version provided, calculating..."
+            node scripts/determine-version.ts
+          fi
 
       - name: Set package versions
-        run: node scripts/set-version.ts ${{ steps.version.outputs.version }}
+        run: node scripts/set-version.ts "${{ steps.version.outputs.version }}"
 
       - name: Build packages
         run: pnpm build
 
       - name: Publish packages
-        run: pnpm -r publish --access public --tag ${{ steps.version.outputs.tag }} --no-git-checks
+        run: pnpm -r publish --access public --tag "${{ steps.version.outputs.tag }}" --no-git-checks
