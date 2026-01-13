@@ -10,15 +10,17 @@ We ship `esm` only by default. Bundle target is infered from your package. Outpu
 
 Your package needs to have:
 
-1. `tsconfig.prod.json` - a TypeScript configuration file specific for bundling.
+1. **Node.js 24+** - This package exposes TypeScript files directly without compilation. Node.js 24+ has native TypeScript support required for importing `.ts` files.
 
-2. `package.json#engines.node` - `tsdown` infers the bundling target based on this value. e.g. `{ "engines": { "node": ">=20" } }`
+2. `tsconfig.prod.json` - a TypeScript configuration file specific for bundling.
 
-3. `"tsdown": "catalog:"` in your packages `devDependencies`.
+3. `package.json#engines.node` - `tsdown` infers the bundling target based on this value. e.g. `{ "engines": { "node": ">=20" } }`
 
-4. `"build": "tsdown"` in your `package.json#scripts`.
+4. `"tsdown": "catalog:"` in your packages `devDependencies`.
 
-5. `"src"` and `"dist"` in your `package.json#files`.
+5. `"build": "tsdown --config-loader native"` in your `package.json#scripts`. The `--config-loader native` flag tells tsdown to use Node.js's native TypeScript support for loading config files.
+
+6. `"src"` and `"dist"` in your `package.json#files`.
 
 ## Usage
 
@@ -68,6 +70,6 @@ export default defineConfig({
 
 Rename `tsup.config.ts` to `tsdown.config.ts` - keep only `entry` property - should probably also transform it into an array of values.
 
-Replace `package.json#scripts.build` value with `"tsdown"`.
+Replace `package.json#scripts.build` value with `"tsdown --config-loader native"`.
 
 Run `pnpm build` at least once for `package.json#exports` and similar to be generated. Don't forget to push those changes!

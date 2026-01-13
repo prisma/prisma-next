@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "Target-neutral operation registry and capability helpers for Prisma Next",
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown --config-loader native",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "typecheck": "tsc --noEmit",
