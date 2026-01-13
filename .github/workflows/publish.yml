@@ -36,7 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
-          node-version: 24
+          node-version-file: '.nvmrc'
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
 
@@ -45,6 +45,11 @@ jobs:
 
       - name: Determine version
         id: version
+        # Security: Inputs are safe from injection because:
+        # 1. They are passed via env: block and accessed as shell variables ($INPUT_VERSION),
+        #    not directly interpolated into the script
+        # 2. workflow_dispatch can only be triggered by users with write access
+        # 3. The job has `if: github.ref == 'refs/heads/main'` which restricts execution to main branch only
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           INPUT_VERSION: ${{ github.event.inputs.version }}
