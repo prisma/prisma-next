@@ -68,6 +68,6 @@ export default defineConfig({
 
 Rename `tsup.config.ts` to `tsdown.config.ts` - keep only `entry` property - should probably also transform it into an array of values.
 
-Replace `package.json#scripts.build` value with `"tsdown --config-loader native"`.
+Replace `package.json#scripts.build` value with `"tsdown"`.
 
 Run `pnpm build` at least once for `package.json#exports` and similar to be generated. Don't forget to push those changes!
