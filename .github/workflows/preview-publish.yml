@@ -51,5 +51,5 @@ jobs:
           echo "$PACKAGES" | tr ' ' '\n'
 
       - name: Publish to pkg.pr.new
-        run: pnpm dlx pkg-pr-new@0.0.40 publish --pnpm --comment=off ${{ steps.packages.outputs.list }}
-
+        # Use https://github.com/stackblitz-labs/pkg.pr.new/tags to see the latest version available
+        run: pnpm dlx pkg-pr-new@0.0.62 publish --pnpm --comment=off ${{ steps.packages.outputs.list }}
