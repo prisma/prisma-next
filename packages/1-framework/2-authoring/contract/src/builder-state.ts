@@ -119,7 +119,6 @@ export interface ContractBuilderState<
   CoreHash extends string | undefined = string | undefined,
   ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
-  Enums extends Record<string, readonly string[]> = Record<never, never>,
 > {
   readonly target?: Target;
   readonly tables: Tables;
@@ -135,11 +134,6 @@ export interface ContractBuilderState<
    * Namespace format matches the extension pack ID (e.g., 'pgvector', not 'pgvector@1.0.0').
    */
   readonly extensionNamespaces?: readonly string[];
-  /**
-   * Enum type definitions keyed by enum name.
-   * Each enum maps to its ordered list of string values.
-   */
-  readonly enums?: Enums;
 }
 
 export interface ColumnBuilder<Name extends string, Nullable extends boolean, Type extends string> {

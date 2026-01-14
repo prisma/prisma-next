@@ -90,8 +90,8 @@ describe('schema verification - enums', () => {
     expect(result.schema.issues.length).toBe(0);
   });
 
-  it('extracts enums from explicit storage.enums definitions', () => {
-    const contractWithExplicitEnums = createTestContract({
+  it('extracts enums from storage.types definitions', () => {
+    const contractWithTypesEnums = createTestContract({
       user: createContractTable({
         id: { nativeType: 'int4', nullable: false },
         role: {
@@ -102,21 +102,31 @@ describe('schema verification - enums', () => {
         },
       }),
     });
-    // Add explicit enum definition
+    // Add named type instances for enums
     (
-      contractWithExplicitEnums.storage as { enums?: Record<string, { values: readonly string[] }> }
-    ).enums = {
-      Role: { values: ['USER', 'ADMIN', 'MODERATOR'] },
-      Status: { values: ['ACTIVE', 'INACTIVE'] },
+      contractWithTypesEnums.storage as {
+        types?: Record<string, { codecId: string; nativeType: string; typeParams: unknown }>;
+      }
+    ).types = {
+      Role: {
+        codecId: 'pg/enum@1',
+        nativeType: 'Role',
+        typeParams: { values: ['USER', 'ADMIN', 'MODERATOR'] },
+      },
+      Status: {
+        codecId: 'pg/enum@1',
+        nativeType: 'Status',
+        typeParams: { values: ['ACTIVE', 'INACTIVE'] },
+      },
     };
 
-    const extracted = extractEnumsFromContract(contractWithExplicitEnums);
-    // Explicit enums should be extracted
+    const extracted = extractEnumsFromContract(contractWithTypesEnums);
+    // Named type enums should be extracted
     expect(extracted['Role']).toEqual(['USER', 'ADMIN', 'MODERATOR']);
     expect(extracted['Status']).toEqual(['ACTIVE', 'INACTIVE']);
   });
 
-  it('prefers explicit enums over column-derived enums when both exist', () => {
+  it('prefers named type enums over column-derived enums when both exist', () => {
     const contractWithBoth = createTestContract({
       user: createContractTable({
         id: { nativeType: 'int4', nullable: false },
@@ -128,14 +138,21 @@ describe('schema verification - enums', () => {
         },
       }),
     });
-    // Add explicit enum definition with different values
-    (contractWithBoth.storage as { enums?: Record<string, { values: readonly string[] }> }).enums =
-      {
-        Role: { values: ['USER', 'ADMIN', 'MODERATOR'] }, // Explicit (different)
-      };
+    // Add named type instance with different values
+    (
+      contractWithBoth.storage as {
+        types?: Record<string, { codecId: string; nativeType: string; typeParams: unknown }>;
+      }
+    ).types = {
+      Role: {
+        codecId: 'pg/enum@1',
+        nativeType: 'Role',
+        typeParams: { values: ['USER', 'ADMIN', 'MODERATOR'] },
+      },
+    };
 
     const extracted = extractEnumsFromContract(contractWithBoth);
-    // Explicit enum should take precedence
+    // Named type enum should take precedence
     expect(extracted['Role']).toEqual(['USER', 'ADMIN', 'MODERATOR']);
   });
 });

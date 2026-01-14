@@ -18,12 +18,12 @@ import {
   TableBuilder,
 } from '@prisma-next/contract-authoring';
 import type {
-  EnumDefinition,
   ModelDefinition,
   ModelField,
   SqlContract,
   SqlMappings,
   SqlStorage,
+  StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { computeMappings } from './contract';
 
@@ -72,6 +72,16 @@ type BuildStorageTable<
   ? { readonly primaryKey: { readonly columns: PK; readonly name?: string } }
   : Record<string, never>);
 
+/**
+ * Type helper for building storage.types from enum definitions.
+ * Enums are stored as StorageTypeInstance entries with typeParams.values.
+ */
+type BuildEnumTypeInstance<Values extends readonly string[]> = {
+  readonly codecId: 'pg/enum@1';
+  readonly nativeType: string;
+  readonly typeParams: { readonly values: Values };
+};
+
 type BuildStorage<
   Tables extends Record<
     string,
@@ -93,10 +103,8 @@ type BuildStorage<
 } & (Enums extends Record<never, never>
   ? Record<string, never>
   : {
-      readonly enums: {
-        readonly [K in keyof Enums]: EnumDefinition & {
-          readonly values: Enums[K];
-        };
+      readonly types: {
+        readonly [K in keyof Enums]: BuildEnumTypeInstance<Enums[K]>;
       };
     });
 
@@ -281,23 +289,25 @@ class SqlContractBuilder<
       (storageTables as Mutable<BuildStorageTables<Tables>>)[tableName] = table;
     }
 
-    // Build enums from builder state
-    // Access enums directly from state (exists at runtime even if base class type doesn't include it)
+    // Build enum type instances from builder state
+    // Enums are stored as StorageTypeInstance entries in storage.types
     const enumsState = (this.state as unknown as { enums?: Enums }).enums;
-    const enumsEntries = enumsState
-      ? Object.entries(enumsState).map(([name, values]) => [
-          name,
-          { values: Object.freeze([...values]) as readonly string[] },
-        ])
-      : [];
-    const enums =
-      enumsEntries.length > 0
-        ? (Object.fromEntries(enumsEntries) as Record<string, EnumDefinition>)
-        : undefined;
+    const enumTypeInstances = enumsState
+      ? Object.fromEntries(
+          Object.entries(enumsState).map(([name, values]) => [
+            name,
+            {
+              codecId: 'pg/enum@1',
+              nativeType: name, // Enum name is the native type
+              typeParams: { values: Object.freeze([...values]) as readonly string[] },
+            } satisfies StorageTypeInstance,
+          ]),
+        )
+      : undefined;
 
     const storage = {
       tables: storageTables as BuildStorageTables<Tables>,
-      ...(enums ? { enums } : {}),
+      ...(enumTypeInstances ? { types: enumTypeInstances } : {}),
     } as BuildStorage<Tables, Enums>;
 
     // Build models - construct as partial first, then assert full type

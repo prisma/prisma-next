@@ -10,6 +10,7 @@ import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { ROLE_VALUES } from '../src/enums/role';
 
 type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
 
@@ -21,11 +22,11 @@ type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
  * 1. Explicitly via .enum() method (shown below)
  * 2. Implicitly via enumColumn() factory (alternative approach)
  */
-const roleColumn = enumColumn('Role', ['USER', 'ADMIN', 'MODERATOR'] as const);
+const roleColumn = enumColumn('Role', ROLE_VALUES);
 
 export const contract = defineContract<AllCodecTypes>()
   .target(postgresPack)
-  .enum('Role', ['USER', 'ADMIN', 'MODERATOR'] as const)
+  .enum('Role', ROLE_VALUES)
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })

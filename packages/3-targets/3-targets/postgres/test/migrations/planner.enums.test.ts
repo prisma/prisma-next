@@ -81,29 +81,6 @@ describe('PostgresMigrationPlanner - enums', () => {
     expect(result.plan.operations.map((op) => op.id)).toContain('enum.Extra.drop');
   });
 
-  it('plans CHECK constraints when native enums are disabled', () => {
-    const planner = createPostgresMigrationPlanner({ supportsNativeEnums: false });
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: buildSchemaTable(),
-      },
-      extensions: [],
-    };
-
-    const result = planner.plan({
-      contract,
-      schema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      return;
-    }
-    expect(result.plan.operations.map((op) => op.id)).toContain('enum.user.role.check');
-  });
-
   it('surfaces conflicts when enum changes are not append-only', () => {
     const planner = createPostgresMigrationPlanner();
     const schema: SqlSchemaIR = {
@@ -167,6 +144,13 @@ function createEnumContract(values: readonly string[]): SqlContract<SqlStorage> 
           uniques: [],
           indexes: [],
           foreignKeys: [],
+        },
+      },
+      types: {
+        Role: {
+          codecId: 'pg/enum@1',
+          nativeType: 'Role',
+          typeParams: { values: [...values] },
         },
       },
     },

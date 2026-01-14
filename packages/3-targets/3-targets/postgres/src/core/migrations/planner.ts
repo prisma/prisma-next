@@ -16,7 +16,6 @@ import {
   extractEnumsFromContract,
   isIndexSatisfied,
   isUniqueConstraintSatisfied,
-  resolveColumnTypeParams,
   verifySqlSchema,
 } from '@prisma-next/family-sql/schema-verify';
 import type {
@@ -60,13 +59,14 @@ export interface PostgresPlanTargetDetails {
 
 interface PlannerConfig {
   readonly defaultSchema: string;
-  readonly supportsNativeEnums: boolean;
 }
 
 const DEFAULT_PLANNER_CONFIG: PlannerConfig = {
   defaultSchema: 'public',
-  supportsNativeEnums: true,
 };
+
+// NOTE: For databases without native enum support (e.g., SQLite), implement
+// CHECK constraint-based enum enforcement in that target's migration planner.
 
 export function createPostgresMigrationPlanner(
   config: Partial<PlannerConfig> = {},
@@ -97,20 +97,13 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     // Build extension operations from component-owned database dependencies
     operations.push(...this.buildDatabaseDependencyOperations(options));
 
-    if (this.config.supportsNativeEnums) {
-      operations.push(...this.buildEnumOperations(options.contract, options.schema, schemaName));
-    }
+    // Build native enum operations (PostgreSQL supports CREATE TYPE ... AS ENUM)
+    operations.push(...this.buildEnumOperations(options.contract, options.schema, schemaName));
 
     operations.push(
       ...this.buildTableOperations(options.contract.storage.tables, options.schema, schemaName),
       ...this.buildColumnOperations(options.contract.storage.tables, options.schema, schemaName),
     );
-
-    if (!this.config.supportsNativeEnums) {
-      operations.push(
-        ...this.buildEnumCheckConstraintOperations(options.contract, options.schema, schemaName),
-      );
-    }
 
     operations.push(
       ...this.buildPrimaryKeyOperations(
@@ -286,73 +279,6 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         continue;
       }
       operations.push(this.buildDropEnumOperation(schemaName, enumName, schemaEnum.values));
-    }
-
-    return operations;
-  }
-
-  private buildEnumCheckConstraintOperations(
-    contract: SqlContract<SqlStorage>,
-    schema: SqlSchemaIR,
-    schemaName: string,
-  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    const schemaEnums = schema.enums ?? {};
-
-    for (const [tableName, table] of sortedEntries(contract.storage.tables)) {
-      for (const [columnName, column] of sortedEntries(table.columns)) {
-        const typeParams = resolveColumnTypeParams(column, contract.storage);
-        const values = typeParams?.['values'];
-        if (!Array.isArray(values) || values.some((v) => typeof v !== 'string')) {
-          continue;
-        }
-
-        // If schema enums already capture this definition, skip emitting a CHECK constraint.
-        const schemaEnum = schemaEnums[column.nativeType];
-        if (schemaEnum && arraysEqual(schemaEnum.values, values)) {
-          continue;
-        }
-
-        const constraintName = this.buildEnumConstraintName(tableName, columnName);
-        operations.push({
-          id: `enum.${tableName}.${columnName}.check`,
-          label: `Add enum check on ${tableName}.${columnName}`,
-          summary: `Adds CHECK constraint for enum ${column.nativeType} on ${tableName}.${columnName}`,
-          operationClass: 'additive',
-          target: {
-            id: 'postgres',
-            details: this.buildTargetDetails('enum', column.nativeType, schemaName, tableName),
-          },
-          precheck: [
-            {
-              description: `ensure CHECK constraint "${constraintName}" is missing`,
-              sql: constraintExistsCheck({
-                constraintName,
-                schema: schemaName,
-                exists: false,
-              }),
-            },
-          ],
-          execute: [
-            {
-              description: `add CHECK constraint "${constraintName}"`,
-              sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ADD CONSTRAINT ${quoteIdentifier(constraintName)}
-CHECK (${quoteIdentifier(columnName)} IN (${values.map(escapeEnumLiteral).join(', ')}))`,
-            },
-          ],
-          postcheck: [
-            {
-              description: `verify CHECK constraint "${constraintName}" exists`,
-              sql: constraintExistsCheck({
-                constraintName,
-                schema: schemaName,
-                exists: true,
-              }),
-            },
-          ],
-        });
-      }
     }
 
     return operations;
@@ -753,10 +679,6 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       name,
       ...(table ? { table } : {}),
     };
-  }
-
-  private buildEnumConstraintName(tableName: string, columnName: string): string {
-    return `${tableName}_${columnName}_enum_check`;
   }
 
   private classifySchema(options: PlannerOptionsWithComponents):

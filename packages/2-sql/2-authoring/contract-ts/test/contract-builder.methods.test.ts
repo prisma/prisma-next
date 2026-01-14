@@ -200,16 +200,22 @@ describe('contract builder methods', () => {
     expect(contract.capabilities).toEqual({ feature: { enabled: true } });
   });
 
-  it('defines enums explicitly', () => {
+  it('defines enums as type instances in storage.types', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
       .enum('Role', ['USER', 'ADMIN', 'MODERATOR'] as const)
       .enum('Status', ['PENDING', 'ACTIVE', 'INACTIVE'] as const)
       .build();
-    expect(contract.storage['enums']).toBeDefined();
-    expect(contract.storage['enums']?.['Role']).toEqual({ values: ['USER', 'ADMIN', 'MODERATOR'] });
-    expect(contract.storage['enums']?.['Status']).toEqual({
-      values: ['PENDING', 'ACTIVE', 'INACTIVE'],
+    expect(contract.storage['types']).toBeDefined();
+    expect(contract.storage['types']?.['Role']).toEqual({
+      codecId: 'pg/enum@1',
+      nativeType: 'Role',
+      typeParams: { values: ['USER', 'ADMIN', 'MODERATOR'] },
+    });
+    expect(contract.storage['types']?.['Status']).toEqual({
+      codecId: 'pg/enum@1',
+      nativeType: 'Status',
+      typeParams: { values: ['PENDING', 'ACTIVE', 'INACTIVE'] },
     });
   });
 
@@ -220,8 +226,16 @@ describe('contract builder methods', () => {
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .enum('Status', ['ACTIVE', 'INACTIVE'] as const)
       .build();
-    expect(contract.storage['enums']?.['Role']).toEqual({ values: ['USER', 'ADMIN'] });
-    expect(contract.storage['enums']?.['Status']).toEqual({ values: ['ACTIVE', 'INACTIVE'] });
+    expect(contract.storage['types']?.['Role']).toEqual({
+      codecId: 'pg/enum@1',
+      nativeType: 'Role',
+      typeParams: { values: ['USER', 'ADMIN'] },
+    });
+    expect(contract.storage['types']?.['Status']).toEqual({
+      codecId: 'pg/enum@1',
+      nativeType: 'Status',
+      typeParams: { values: ['ACTIVE', 'INACTIVE'] },
+    });
     expect(contract.storage.tables.user).toBeDefined();
   });
 });

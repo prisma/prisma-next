@@ -10,6 +10,7 @@ import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-r
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_ROLE } from '../src/enums/role';
 import type { Contract } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
@@ -67,7 +68,7 @@ async function seedTestData(
           createdAt: param('createdAt'),
         })
         .returning(userTable.columns['id']!)
-        .build({ params: { id, email, role: 'USER', createdAt } });
+        .build({ params: { id, email, role: DEFAULT_ROLE, createdAt } });
 
       type InsertedRow = ResultType<typeof plan>;
       for await (const row of runtime.execute(plan)) {

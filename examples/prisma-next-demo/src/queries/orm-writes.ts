@@ -1,15 +1,16 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
+import { DEFAULT_ROLE, type Role } from '../enums/role';
 import { orm } from '../prisma/query';
 
 export async function ormCreateUser(
-  data: { id: number; email: string; role?: 'USER' | 'ADMIN' | 'MODERATOR'; createdAt: Date },
+  data: { id: number; email: string; role?: Role; createdAt: Date },
   runtime: Runtime,
 ) {
   const plan = orm.user().create({
     id: data.id,
     email: data.email,
-    role: data.role ?? 'USER',
+    role: data.role ?? DEFAULT_ROLE,
     createdAt: data.createdAt,
   });
 

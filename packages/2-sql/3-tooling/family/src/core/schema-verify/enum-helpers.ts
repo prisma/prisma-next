@@ -22,19 +22,32 @@ export function resolveColumnTypeParams(
   return undefined;
 }
 
+/**
+ * Extracts enum definitions from a contract.
+ *
+ * Enums can be defined in two places:
+ * 1. Named type instances in `storage.types` with `pg/enum@1` codecId and `typeParams.values`
+ * 2. Inline column definitions with `typeParams.values`
+ *
+ * Named types in `storage.types` take precedence over inline column definitions.
+ */
 export function extractEnumsFromContract(contract: SqlContract<SqlStorage>): EnumMap {
   const enums: Record<string, string[]> = {};
   const storage = contract.storage;
 
-  // First, check explicit enum definitions in storage.enums
-  if (storage.enums) {
-    for (const [enumName, enumDef] of Object.entries(storage.enums)) {
-      enums[enumName] = [...enumDef.values];
+  // First, check named type instances in storage.types for enum types
+  if (storage.types) {
+    for (const [typeName, typeInstance] of Object.entries(storage.types)) {
+      // Check if this is an enum type (has typeParams.values array)
+      const values = typeInstance.typeParams?.['values'];
+      if (Array.isArray(values) && values.every((v) => typeof v === 'string')) {
+        enums[typeName] = [...values];
+      }
     }
   }
 
-  // Then, extract enums from columns (backward compatibility)
-  // Explicit enums take precedence, so we only add column-derived enums if they don't already exist
+  // Then, extract enums from column inline definitions
+  // Named types take precedence, so we only add column-derived enums if they don't already exist
   for (const table of Object.values(storage.tables)) {
     for (const column of Object.values(table.columns)) {
       const typeParams = resolveColumnTypeParams(column, storage);
@@ -47,14 +60,13 @@ export function extractEnumsFromContract(contract: SqlContract<SqlStorage>): Enu
       const enumName = column.nativeType;
       const existing = enums[enumName];
       if (existing) {
-        // Preserve first-seen definition (explicit enum takes precedence);
+        // Preserve first-seen definition (named type takes precedence);
         // mismatches will be caught in verification.
         if (!arraysEqual(existing, values)) {
-          // Keep existing (explicit) definition
           enums[enumName] = existing;
         }
       } else {
-        // No explicit enum found, use column-derived definition
+        // No named type found, use column-derived definition
         enums[enumName] = [...values];
       }
     }

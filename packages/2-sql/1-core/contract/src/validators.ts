@@ -1,6 +1,5 @@
 import { type } from 'arktype';
 import type {
-  EnumDefinition,
   ForeignKey,
   ForeignKeyReferences,
   Index,
@@ -36,11 +35,6 @@ const StorageTypeInstanceSchema = type.declare<StorageTypeInstance>().type({
   codecId: 'string',
   nativeType: 'string',
   typeParams: 'Record<string, unknown>',
-});
-
-const EnumDefinitionSchema = type.declare<EnumDefinition>().type({
-  values: type.string.array().readonly(),
-  'name?': 'string',
 });
 
 const PrimaryKeySchema = type.declare<PrimaryKey>().type({
@@ -80,7 +74,6 @@ const StorageTableSchema = type.declare<StorageTable>().type({
 const StorageSchema = type.declare<SqlStorage>().type({
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
-  'enums?': type({ '[string]': EnumDefinitionSchema }),
 });
 
 const ModelFieldSchema = type.declare<ModelField>().type({
