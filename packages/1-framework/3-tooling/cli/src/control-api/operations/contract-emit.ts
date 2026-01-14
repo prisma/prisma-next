@@ -1,9 +1,30 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import { loadConfig } from '../../config-loader';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
+
+/**
+ * Error thrown when contract emission is cancelled via AbortSignal.
+ * Callers can check error.name === 'ContractEmitCancelledError' to detect cancellation.
+ */
+export class ContractEmitCancelledError extends Error {
+  override readonly name = 'ContractEmitCancelledError' as const;
+
+  constructor() {
+    super('Contract emit was cancelled');
+  }
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (!signal?.aborted) return;
+  if (typeof signal.throwIfAborted === 'function') {
+    signal.throwIfAborted();
+  } else {
+    throw new ContractEmitCancelledError();
+  }
+}
 
 /**
  * Executes the contract emit operation.
@@ -20,6 +41,7 @@ import type { ContractEmitOptions, ContractEmitResult } from '../types';
  * @param options - Options including configPath and optional signal
  * @returns File paths and hashes of emitted artifacts
  * @throws If config loading fails, contract is invalid, or file I/O fails
+ * @throws ContractEmitCancelledError if cancelled via signal
  */
 export async function executeContractEmit(
   options: ContractEmitOptions,
@@ -27,17 +49,13 @@ export async function executeContractEmit(
   const { configPath, signal } = options;
 
   // Check for cancellation before starting
-  if (signal?.aborted) {
-    throw new Error('Contract emit was cancelled');
-  }
+  throwIfAborted(signal);
 
   // Load config using the existing config loader
   const config = await loadConfig(configPath);
 
   // Check for cancellation after config load
-  if (signal?.aborted) {
-    throw new Error('Contract emit was cancelled');
-  }
+  throwIfAborted(signal);
 
   // Validate contract config is present
   if (!config.contract) {
@@ -55,9 +73,14 @@ export async function executeContractEmit(
     });
   }
 
-  // Resolve artifact paths to absolute paths
-  const outputJsonPath = resolve(contractConfig.output);
-  const outputDtsPath = resolve(contractConfig.types);
+  // Resolve artifact paths relative to config file directory (unless already absolute)
+  const configDir = dirname(configPath);
+  const outputJsonPath = isAbsolute(contractConfig.output)
+    ? contractConfig.output
+    : resolve(configDir, contractConfig.output);
+  const outputDtsPath = isAbsolute(contractConfig.types)
+    ? contractConfig.types
+    : resolve(configDir, contractConfig.types);
 
   // Create control plane stack from config
   const stack = createControlPlaneStack({
@@ -69,9 +92,7 @@ export async function executeContractEmit(
   const familyInstance = config.family.create(stack);
 
   // Check for cancellation before emitting
-  if (signal?.aborted) {
-    throw new Error('Contract emit was cancelled');
-  }
+  throwIfAborted(signal);
 
   // Resolve contract source from config
   let contractRaw: unknown;
@@ -85,9 +106,7 @@ export async function executeContractEmit(
   const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });
 
   // Check for cancellation before writing files
-  if (signal?.aborted) {
-    throw new Error('Contract emit was cancelled');
-  }
+  throwIfAborted(signal);
 
   // Create directories if needed and write files
   mkdirSync(dirname(outputJsonPath), { recursive: true });

@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
-import { executeContractEmit } from '@prisma-next/cli/control-api';
+import { ContractEmitCancelledError, executeContractEmit } from '@prisma-next/cli/control-api';
 import type { Plugin, ViteDevServer } from 'vite';
 import type { PrismaVitePluginOptions } from './types';
 
@@ -79,15 +79,19 @@ export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginO
       log(`  → ${result.files.json}`, 'debug');
       log(`  → ${result.files.dts}`, 'debug');
 
-      // Clear any error overlay on success
+      // Update watched files to include any new transitive dependencies
       if (server) {
+        await updateWatchedFiles(server);
         server.ws.send({ type: 'full-reload' });
       }
 
       return result;
     } catch (error) {
       // Ignore cancellation errors
-      if (error instanceof Error && error.message.includes('cancelled')) {
+      if (
+        error instanceof ContractEmitCancelledError ||
+        (error instanceof Error && error.name === 'AbortError')
+      ) {
         log('Emit cancelled', 'debug');
         return null;
       }
@@ -127,16 +131,22 @@ export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginO
     }, debounceMs);
   }
 
+  function toViteModuleId(absolutePath: string): string {
+    return `/@fs${absolutePath}`;
+  }
+
   async function collectWatchedFiles(viteServer: ViteDevServer): Promise<Set<string>> {
     const files = new Set<string>();
 
     try {
       // Load the config module through Vite's SSR loader to populate the module graph
-      await viteServer.ssrLoadModule(absoluteConfigPath);
+      // Vite expects module IDs with /@fs/ prefix for absolute paths
+      const viteModuleId = toViteModuleId(absoluteConfigPath);
+      await viteServer.ssrLoadModule(viteModuleId);
 
       // Crawl the module graph starting from the config file
       const visited = new Set<string>();
-      const queue = [absoluteConfigPath];
+      const queue = [viteModuleId];
 
       while (queue.length > 0) {
         const current = queue.shift();
@@ -165,6 +175,41 @@ export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginO
     }
 
     return files;
+  }
+
+  async function updateWatchedFiles(viteServer: ViteDevServer): Promise<void> {
+    const newWatchedFiles = await collectWatchedFiles(viteServer);
+
+    // Find files to add and remove
+    const toAdd: string[] = [];
+    const toRemove: string[] = [];
+
+    for (const file of newWatchedFiles) {
+      if (!watchedFiles.has(file)) {
+        toAdd.push(file);
+      }
+    }
+
+    for (const file of watchedFiles) {
+      if (!newWatchedFiles.has(file)) {
+        toRemove.push(file);
+      }
+    }
+
+    // Update the watcher
+    for (const file of toAdd) {
+      viteServer.watcher.add(file);
+    }
+    for (const file of toRemove) {
+      viteServer.watcher.unwatch(file);
+    }
+
+    // Replace the watched files set
+    watchedFiles = newWatchedFiles;
+
+    if (toAdd.length > 0 || toRemove.length > 0) {
+      log(`Updated watched files: +${toAdd.length} -${toRemove.length}`, 'debug');
+    }
   }
 
   return {

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { executeContractEmit } from '../../src/control-api/operations/contract-emit';
+import {
+  ContractEmitCancelledError,
+  executeContractEmit,
+} from '../../src/control-api/operations/contract-emit';
 
 describe('executeContractEmit', () => {
   it('throws when configPath does not exist', async () => {
@@ -15,6 +18,10 @@ describe('executeContractEmit', () => {
         configPath: 'prisma-next.config.ts',
         signal: controller.signal,
       }),
-    ).rejects.toThrow('cancelled');
+    ).rejects.toSatisfy(
+      (error: unknown) =>
+        error instanceof ContractEmitCancelledError ||
+        (error instanceof Error && error.name === 'AbortError'),
+    );
   });
 });
