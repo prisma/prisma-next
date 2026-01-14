@@ -13,7 +13,7 @@ import type {
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ColumnDefault, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { ComponentDatabaseDependency } from '../migrations/types';
@@ -217,6 +217,33 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
           message: `Nullability mismatch: expected ${contractColumn.nullable ? 'nullable' : 'not null'}, got ${schemaColumn.nullable ? 'nullable' : 'not null'}`,
           expected: contractColumn.nullable,
           actual: schemaColumn.nullable,
+          children: [],
+        });
+        columnStatus = 'fail';
+      }
+
+      // Compare column default (additive semantics: missing contract default is OK, missing schema default is not)
+      // If the contract specifies a default, we expect the database to have one too.
+      // We don't compare the exact default expression since different DBs represent defaults differently.
+      if (contractColumn.default && !schemaColumn.default) {
+        // Contract expects a default but database doesn't have one
+        const defaultDescription = describeColumnDefault(contractColumn.default);
+        issues.push({
+          kind: 'default_missing',
+          table: tableName,
+          column: columnName,
+          expected: defaultDescription,
+          message: `Column "${tableName}"."${columnName}" should have default ${defaultDescription} but database has no default`,
+        });
+        columnChildren.push({
+          status: 'fail',
+          kind: 'default',
+          name: 'default',
+          contractPath: `${columnPath}.default`,
+          code: 'default_missing',
+          message: `Default missing: expected ${defaultDescription}`,
+          expected: defaultDescription,
+          actual: undefined,
           children: [],
         });
         columnStatus = 'fail';
@@ -585,4 +612,20 @@ function collectDependenciesFromFrameworkComponents<T extends string>(
     }
   }
   return dependencies;
+}
+
+/**
+ * Describes a column default for display purposes.
+ */
+function describeColumnDefault(columnDefault: ColumnDefault): string {
+  switch (columnDefault.kind) {
+    case 'literal':
+      return `literal(${JSON.stringify(columnDefault.value)})`;
+    case 'function':
+      return `${columnDefault.name}()`;
+    case 'sequence':
+      return `sequence(${columnDefault.name})`;
+    case 'dbGenerated':
+      return `dbGenerated(${columnDefault.expression})`;
+  }
 }

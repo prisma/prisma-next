@@ -1,5 +1,6 @@
 import { type } from 'arktype';
 import type {
+  ColumnDefault,
   ForeignKey,
   ForeignKeyReferences,
   Index,
@@ -15,6 +16,34 @@ import type {
   UniqueConstraint,
 } from './types';
 
+const ColumnDefaultLiteralSchema = type({
+  kind: "'literal'",
+  value: 'string | number | boolean',
+});
+
+const ColumnDefaultFunctionSchema = type({
+  kind: "'function'",
+  name: "'autoincrement' | 'now' | 'uuid' | 'cuid'",
+});
+
+const ColumnDefaultSequenceSchema = type({
+  kind: "'sequence'",
+  name: 'string',
+});
+
+const ColumnDefaultDbGeneratedSchema = type({
+  kind: "'dbGenerated'",
+  expression: 'string',
+});
+
+const ColumnDefaultSchema = type
+  .declare<ColumnDefault>()
+  .type(
+    ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionSchema)
+      .or(ColumnDefaultSequenceSchema)
+      .or(ColumnDefaultDbGeneratedSchema),
+  );
+
 const StorageColumnSchema = type
   .declare<StorageColumn>()
   .type({
@@ -23,6 +52,7 @@ const StorageColumnSchema = type
     nullable: 'boolean',
     'typeParams?': 'Record<string, unknown>',
     'typeRef?': 'string',
+    'default?': ColumnDefaultSchema,
   })
   .narrow((col, ctx) => {
     if (col.typeParams !== undefined && col.typeRef !== undefined) {

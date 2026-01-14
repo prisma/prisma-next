@@ -1,6 +1,7 @@
 export type {
   ColumnBuilder,
   ColumnBuilderState,
+  ColumnDefaultDef,
   ColumnTypeDescriptor,
   ContractBuilderState,
   ForeignKeyDef,

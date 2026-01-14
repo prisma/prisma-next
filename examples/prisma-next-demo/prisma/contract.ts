@@ -16,17 +16,33 @@ export const contract = defineContract<AllCodecTypes>()
   .target(postgresPack)
   .table('user', (t) =>
     t
-      .column('id', { type: int4Column, nullable: false })
+      .column('id', {
+        type: int4Column,
+        nullable: false,
+        default: { kind: 'function', name: 'autoincrement' },
+      })
       .column('email', { type: textColumn, nullable: false })
-      .column('createdAt', { type: timestamptzColumn, nullable: false })
+      .column('createdAt', {
+        type: timestamptzColumn,
+        nullable: false,
+        default: { kind: 'function', name: 'now' },
+      })
       .primaryKey(['id']),
   )
   .table('post', (t) =>
     t
-      .column('id', { type: int4Column, nullable: false })
+      .column('id', {
+        type: int4Column,
+        nullable: false,
+        default: { kind: 'function', name: 'autoincrement' },
+      })
       .column('title', { type: textColumn, nullable: false })
       .column('userId', { type: int4Column, nullable: false })
-      .column('createdAt', { type: timestamptzColumn, nullable: false })
+      .column('createdAt', {
+        type: timestamptzColumn,
+        nullable: false,
+        default: { kind: 'function', name: 'now' },
+      })
       .column('embedding', { type: vectorColumn, nullable: true })
       .primaryKey(['id'])
       .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey'),

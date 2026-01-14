@@ -1,4 +1,5 @@
 export type {
+  ColumnDefault,
   ExtractCodecTypes,
   ExtractOperationTypes,
   ForeignKey,

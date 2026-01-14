@@ -1,6 +1,21 @@
 import type { ContractBase } from '@prisma-next/contract/types';
 
 /**
+ * Column default value.
+ *
+ * Discriminated union representing different types of default values:
+ * - `literal`: Static value (string, number, boolean)
+ * - `function`: Database function (autoincrement, now, uuid, cuid)
+ * - `sequence`: Reference to a named sequence
+ * - `dbGenerated`: Raw database expression (escape hatch)
+ */
+export type ColumnDefault =
+  | { readonly kind: 'literal'; readonly value: string | number | boolean }
+  | { readonly kind: 'function'; readonly name: 'autoincrement' | 'now' | 'uuid' | 'cuid' }
+  | { readonly kind: 'sequence'; readonly name: string }
+  | { readonly kind: 'dbGenerated'; readonly expression: string };
+
+/**
  * A column definition in storage.
  *
  * `typeParams` is optional because most columns use non-parameterized types.
@@ -22,6 +37,11 @@ export type StorageColumn = {
    * Mutually exclusive with `typeParams`.
    */
   readonly typeRef?: string;
+  /**
+   * Default value for the column.
+   * Can be a literal value, database function, sequence reference, or raw expression.
+   */
+  readonly default?: ColumnDefault;
 };
 
 export type PrimaryKey = {

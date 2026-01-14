@@ -404,7 +404,8 @@ export interface SchemaIssue {
     | 'foreign_key_mismatch'
     | 'unique_constraint_mismatch'
     | 'index_mismatch'
-    | 'extension_missing';
+    | 'extension_missing'
+    | 'default_missing';
   readonly table: string;
   readonly column?: string;
   readonly indexOrConstraint?: string;

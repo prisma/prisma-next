@@ -222,6 +222,7 @@ class SqlContractBuilder<
           nullable: (columnState.nullable ?? false) as ColumnDefs[keyof ColumnDefs]['nullable'] &
             boolean,
           ...(columnState.typeParams ? { typeParams: columnState.typeParams } : {}),
+          ...(columnState.default ? { default: columnState.default } : {}),
         } as BuildStorageColumn<
           ColumnDefs[keyof ColumnDefs]['nullable'] & boolean,
           ColumnDefs[keyof ColumnDefs]['type']

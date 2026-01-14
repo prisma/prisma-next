@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:5c01f5eafa94d2009d0d2b299918b3429bdb33057498116dd4c9e4116217fec2",
+  "coreHash": "sha256:a9b196e378cc9f7ad2e3438824ef29b8b639cb678f996fb1d300a88b57bdd0d0",
   "profileHash": "sha256:58a1990244c9a8cf20e2f77c60aa35d2f6ea9823f641b533a9e75abc8606819f",
   "models": {
     "Post": {
@@ -52,6 +52,10 @@
         "columns": {
           "createdAt": {
             "codecId": "pg/timestamptz@1",
+            "default": {
+              "kind": "function",
+              "name": "now"
+            },
             "nativeType": "timestamptz"
           },
           "embedding": {
@@ -61,6 +65,10 @@
           },
           "id": {
             "codecId": "pg/int4@1",
+            "default": {
+              "kind": "function",
+              "name": "autoincrement"
+            },
             "nativeType": "int4"
           },
           "title": {
@@ -72,7 +80,20 @@
             "nativeType": "int4"
           }
         },
-        "foreignKeys": [],
+        "foreignKeys": [
+          {
+            "columns": [
+              "userId"
+            ],
+            "name": "post_userId_fkey",
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "user"
+            }
+          }
+        ],
         "indexes": [],
         "primaryKey": {
           "columns": [
@@ -85,6 +106,10 @@
         "columns": {
           "createdAt": {
             "codecId": "pg/timestamptz@1",
+            "default": {
+              "kind": "function",
+              "name": "now"
+            },
             "nativeType": "timestamptz"
           },
           "email": {
@@ -93,6 +118,10 @@
           },
           "id": {
             "codecId": "pg/int4@1",
+            "default": {
+              "kind": "function",
+              "name": "autoincrement"
+            },
             "nativeType": "int4"
           }
         },

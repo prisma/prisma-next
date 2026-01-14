@@ -1,5 +1,6 @@
 import type {
   ColumnBuilderState,
+  ColumnDefaultDef,
   ColumnTypeDescriptor,
   ForeignKeyDef,
   IndexDef,
@@ -87,6 +88,7 @@ export class TableBuilder<
       type: Descriptor;
       nullable?: Nullable;
       typeParams?: Record<string, unknown>;
+      default?: ColumnDefaultDef;
     },
   ): TableBuilder<
     Name,
@@ -107,6 +109,7 @@ export class TableBuilder<
       type: codecId,
       nativeType,
       ...(typeParams ? { typeParams } : {}),
+      ...(options.default ? { default: options.default } : {}),
     } as ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>;
     const newColumns = { ...this._columns, [name]: columnState } as Columns &
       Record<

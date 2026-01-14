@@ -18,6 +18,7 @@ import {
   verifySqlSchema,
 } from '@prisma-next/family-sql/schema-verify';
 import type {
+  ColumnDefault,
   ForeignKey,
   SqlContract,
   SqlStorage,
@@ -638,7 +639,8 @@ function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): s
     ([columnName, column]: [string, StorageColumn]) => {
       const parts = [
         quoteIdentifier(columnName),
-        column.nativeType,
+        buildColumnTypeSql(column),
+        buildColumnDefaultSql(column.default),
         column.nullable ? '' : 'NOT NULL',
       ].filter(Boolean);
       return parts.join(' ');
@@ -654,6 +656,81 @@ function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): s
 
   const allDefinitions = [...columnDefinitions, ...constraintDefinitions];
   return `CREATE TABLE ${qualifiedTableName} (\n  ${allDefinitions.join(',\n  ')}\n)`;
+}
+
+/**
+ * Builds the column type SQL, handling autoincrement as a special case.
+ * For autoincrement on int4/int8, we use SERIAL/BIGSERIAL types.
+ */
+function buildColumnTypeSql(column: StorageColumn): string {
+  const columnDefault = column.default;
+
+  // For autoincrement, use SERIAL/BIGSERIAL types instead of int4/int8
+  if (columnDefault?.kind === 'function' && columnDefault.name === 'autoincrement') {
+    if (column.nativeType === 'int4' || column.nativeType === 'integer') {
+      return 'SERIAL';
+    }
+    if (column.nativeType === 'int8' || column.nativeType === 'bigint') {
+      return 'BIGSERIAL';
+    }
+    if (column.nativeType === 'int2' || column.nativeType === 'smallint') {
+      return 'SMALLSERIAL';
+    }
+  }
+
+  return column.nativeType;
+}
+
+/**
+ * Builds the DEFAULT clause for a column definition.
+ * Returns empty string if no default is defined.
+ *
+ * Note: autoincrement is handled specially via SERIAL types, so we skip it here.
+ */
+function buildColumnDefaultSql(columnDefault: ColumnDefault | undefined): string {
+  if (!columnDefault) {
+    return '';
+  }
+
+  switch (columnDefault.kind) {
+    case 'literal':
+      return `DEFAULT ${escapeLiteralValue(columnDefault.value)}`;
+    case 'function':
+      switch (columnDefault.name) {
+        case 'autoincrement':
+          // Handled by SERIAL type, no explicit DEFAULT needed
+          return '';
+        case 'now':
+          return 'DEFAULT now()';
+        case 'uuid':
+          return 'DEFAULT gen_random_uuid()';
+        case 'cuid':
+          // CUID is typically generated application-side
+          // Use a placeholder that will fail if not overridden
+          return "DEFAULT ''";
+      }
+      break;
+    case 'sequence':
+      return `DEFAULT nextval('${escapeLiteral(columnDefault.name)}')`;
+    case 'dbGenerated':
+      return `DEFAULT ${columnDefault.expression}`;
+  }
+
+  return '';
+}
+
+/**
+ * Escapes a literal value for use in SQL.
+ */
+function escapeLiteralValue(value: string | number | boolean): string {
+  if (typeof value === 'string') {
+    return `'${escapeLiteral(value)}'`;
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'TRUE' : 'FALSE';
+  }
+  // number
+  return String(value);
 }
 
 function qualifyTableName(schema: string, table: string): string {
@@ -746,9 +823,12 @@ function buildAddColumnSql(
   columnName: string,
   column: StorageColumn,
 ): string {
+  const typeSql = buildColumnTypeSql(column);
+  const defaultSql = buildColumnDefaultSql(column.default);
   const parts = [
     `ALTER TABLE ${qualifiedTableName}`,
-    `ADD COLUMN ${quoteIdentifier(columnName)} ${column.nativeType}`,
+    `ADD COLUMN ${quoteIdentifier(columnName)} ${typeSql}`,
+    defaultSql,
     column.nullable ? '' : 'NOT NULL',
   ].filter(Boolean);
   return parts.join(' ');

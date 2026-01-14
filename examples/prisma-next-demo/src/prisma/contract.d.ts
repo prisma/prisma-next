@@ -3,6 +3,7 @@
 // To regenerate, run: prisma-next contract emit
 import type { CodecTypes as PgTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
+import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
 import type {
@@ -73,9 +74,16 @@ export type Contract = SqlContract<
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
         indexes: readonly [];
-        foreignKeys: readonly [];
+        foreignKeys: readonly [
+          {
+            readonly columns: readonly ['userId'];
+            readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly name: 'post_userId_fkey';
+          },
+        ];
       };
     };
+    readonly types: Record<string, never>;
   },
   {
     readonly User: {

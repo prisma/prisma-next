@@ -65,6 +65,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         character_maximum_length: number | null;
         numeric_precision: number | null;
         numeric_scale: number | null;
+        column_default: string | null;
       }>(
         `SELECT
            column_name,
@@ -73,7 +74,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            is_nullable,
            character_maximum_length,
            numeric_precision,
-           numeric_scale
+           numeric_scale,
+           column_default
          FROM information_schema.columns
          WHERE table_schema = $1
            AND table_name = $2
@@ -107,6 +109,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           name: colRow.column_name,
           nativeType,
           nullable: colRow.is_nullable === 'YES',
+          ...(colRow.column_default !== null ? { default: colRow.column_default } : {}),
         };
       }
 

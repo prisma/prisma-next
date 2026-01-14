@@ -12,6 +12,24 @@ export type ColumnTypeDescriptor = {
   readonly typeParams?: Record<string, unknown>;
 };
 
+/**
+ * Column default value definition for the builder.
+ *
+ * Discriminated union representing different types of default values:
+ * - `literal`: Static value (string, number, boolean)
+ * - `function`: Database function (autoincrement, now, uuid, cuid)
+ * - `sequence`: Reference to a named sequence
+ * - `dbGenerated`: Raw database expression (escape hatch)
+ *
+ * This type mirrors the `ColumnDefault` type in sql-contract to maintain
+ * framework layer independence while ensuring compatibility.
+ */
+export type ColumnDefaultDef =
+  | { readonly kind: 'literal'; readonly value: string | number | boolean }
+  | { readonly kind: 'function'; readonly name: 'autoincrement' | 'now' | 'uuid' | 'cuid' }
+  | { readonly kind: 'sequence'; readonly name: string }
+  | { readonly kind: 'dbGenerated'; readonly expression: string };
+
 export interface ColumnBuilderState<
   Name extends string,
   Nullable extends boolean,
@@ -22,6 +40,7 @@ export interface ColumnBuilderState<
   readonly type: Type;
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown>;
+  readonly default?: ColumnDefaultDef;
 }
 
 /**
