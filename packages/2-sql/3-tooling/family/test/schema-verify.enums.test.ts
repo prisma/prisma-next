@@ -89,4 +89,53 @@ describe('schema verification - enums', () => {
     expect(result.ok).toBe(true);
     expect(result.schema.issues.length).toBe(0);
   });
+
+  it('extracts enums from explicit storage.enums definitions', () => {
+    const contractWithExplicitEnums = createTestContract({
+      user: createContractTable({
+        id: { nativeType: 'int4', nullable: false },
+        role: {
+          nativeType: 'Role',
+          codecId: 'pg/enum@1',
+          nullable: false,
+          typeParams: { values: ['USER', 'ADMIN'] },
+        },
+      }),
+    });
+    // Add explicit enum definition
+    (
+      contractWithExplicitEnums.storage as { enums?: Record<string, { values: readonly string[] }> }
+    ).enums = {
+      Role: { values: ['USER', 'ADMIN', 'MODERATOR'] },
+      Status: { values: ['ACTIVE', 'INACTIVE'] },
+    };
+
+    const extracted = extractEnumsFromContract(contractWithExplicitEnums);
+    // Explicit enums should be extracted
+    expect(extracted['Role']).toEqual(['USER', 'ADMIN', 'MODERATOR']);
+    expect(extracted['Status']).toEqual(['ACTIVE', 'INACTIVE']);
+  });
+
+  it('prefers explicit enums over column-derived enums when both exist', () => {
+    const contractWithBoth = createTestContract({
+      user: createContractTable({
+        id: { nativeType: 'int4', nullable: false },
+        role: {
+          nativeType: 'Role',
+          codecId: 'pg/enum@1',
+          nullable: false,
+          typeParams: { values: ['USER', 'ADMIN'] }, // Column-derived
+        },
+      }),
+    });
+    // Add explicit enum definition with different values
+    (contractWithBoth.storage as { enums?: Record<string, { values: readonly string[] }> }).enums =
+      {
+        Role: { values: ['USER', 'ADMIN', 'MODERATOR'] }, // Explicit (different)
+      };
+
+    const extracted = extractEnumsFromContract(contractWithBoth);
+    // Explicit enum should take precedence
+    expect(extracted['Role']).toEqual(['USER', 'ADMIN', 'MODERATOR']);
+  });
 });

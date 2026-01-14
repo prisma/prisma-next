@@ -1,4 +1,5 @@
 import type {
+  EnumDefinition,
   ForeignKey,
   ForeignKeyReferences,
   Index,
@@ -69,9 +70,15 @@ const StorageTableSchema = type.declare<StorageTable>().type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
+const EnumDefinitionSchema = type.declare<EnumDefinition>().type({
+  values: type.string.array().readonly(),
+  'name?': 'string',
+});
+
 const StorageSchema = type.declare<SqlStorage>().type({
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
+  'enums?': type({ '[string]': EnumDefinitionSchema }),
 });
 
 const ModelFieldSchema = type.declare<ModelField>().type({

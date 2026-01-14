@@ -26,6 +26,7 @@ export class ContractBuilder<
   CoreHash extends string | undefined = undefined,
   ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
+  Enums extends Record<string, readonly string[]> = Record<never, never>,
 > {
   protected readonly state: ContractBuilderState<
     Target,
@@ -33,24 +34,41 @@ export class ContractBuilder<
     Models,
     CoreHash,
     ExtensionPacks,
-    Capabilities
+    Capabilities,
+    Enums
   >;
 
   constructor(
-    state?: ContractBuilderState<Target, Tables, Models, CoreHash, ExtensionPacks, Capabilities>,
+    state?: ContractBuilderState<
+      Target,
+      Tables,
+      Models,
+      CoreHash,
+      ExtensionPacks,
+      Capabilities,
+      Enums
+    >,
   ) {
     this.state =
       state ??
       ({
         tables: {},
         models: {},
-      } as ContractBuilderState<Target, Tables, Models, CoreHash, ExtensionPacks, Capabilities>);
+      } as ContractBuilderState<
+        Target,
+        Tables,
+        Models,
+        CoreHash,
+        ExtensionPacks,
+        Capabilities,
+        Enums
+      >);
   }
 
   target<T extends string>(
     packRef: TargetPackRef<string, T>,
-  ): ContractBuilder<T, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
-    return new ContractBuilder<T, Tables, Models, CoreHash, ExtensionPacks, Capabilities>({
+  ): ContractBuilder<T, Tables, Models, CoreHash, ExtensionPacks, Capabilities, Enums> {
+    return new ContractBuilder<T, Tables, Models, CoreHash, ExtensionPacks, Capabilities, Enums>({
       ...this.state,
       target: packRef.targetId,
     });
@@ -58,8 +76,8 @@ export class ContractBuilder<
 
   capabilities<C extends Record<string, Record<string, boolean>>>(
     capabilities: C,
-  ): ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, C> {
-    return new ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, C>({
+  ): ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, C, Enums> {
+    return new ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, C, Enums>({
       ...this.state,
       capabilities,
     });
@@ -81,7 +99,8 @@ export class ContractBuilder<
     Models,
     CoreHash,
     ExtensionPacks,
-    Capabilities
+    Capabilities,
+    Enums
   > {
     const tableBuilder = createTable(name);
     const result = callback(tableBuilder);
@@ -94,7 +113,8 @@ export class ContractBuilder<
       Models,
       CoreHash,
       ExtensionPacks,
-      Capabilities
+      Capabilities,
+      Enums
     >({
       ...this.state,
       tables: { ...this.state.tables, [name]: tableState } as Tables &
@@ -123,7 +143,8 @@ export class ContractBuilder<
     Models & Record<ModelName, ReturnType<M['build']>>,
     CoreHash,
     ExtensionPacks,
-    Capabilities
+    Capabilities,
+    Enums
   > {
     const modelBuilder = new ModelBuilder<ModelName, TableName>(name, table);
     const result = callback(modelBuilder);
@@ -136,7 +157,8 @@ export class ContractBuilder<
       Models & Record<ModelName, ReturnType<M['build']>>,
       CoreHash,
       ExtensionPacks,
-      Capabilities
+      Capabilities,
+      Enums
     >({
       ...this.state,
       models: { ...this.state.models, [name]: modelState } as Models &
@@ -146,8 +168,8 @@ export class ContractBuilder<
 
   coreHash<H extends string>(
     hash: H,
-  ): ContractBuilder<Target, Tables, Models, H, ExtensionPacks, Capabilities> {
-    return new ContractBuilder<Target, Tables, Models, H, ExtensionPacks, Capabilities>({
+  ): ContractBuilder<Target, Tables, Models, H, ExtensionPacks, Capabilities, Enums> {
+    return new ContractBuilder<Target, Tables, Models, H, ExtensionPacks, Capabilities, Enums>({
       ...this.state,
       coreHash: hash,
     });

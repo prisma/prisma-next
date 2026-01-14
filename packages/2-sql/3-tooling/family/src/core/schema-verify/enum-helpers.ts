@@ -26,6 +26,15 @@ export function extractEnumsFromContract(contract: SqlContract<SqlStorage>): Enu
   const enums: Record<string, string[]> = {};
   const storage = contract.storage;
 
+  // First, check explicit enum definitions in storage.enums
+  if (storage.enums) {
+    for (const [enumName, enumDef] of Object.entries(storage.enums)) {
+      enums[enumName] = [...enumDef.values];
+    }
+  }
+
+  // Then, extract enums from columns (backward compatibility)
+  // Explicit enums take precedence, so we only add column-derived enums if they don't already exist
   for (const table of Object.values(storage.tables)) {
     for (const column of Object.values(table.columns)) {
       const typeParams = resolveColumnTypeParams(column, storage);
@@ -38,11 +47,14 @@ export function extractEnumsFromContract(contract: SqlContract<SqlStorage>): Enu
       const enumName = column.nativeType;
       const existing = enums[enumName];
       if (existing) {
-        // Preserve first-seen definition; mismatches will be caught in verification.
+        // Preserve first-seen definition (explicit enum takes precedence);
+        // mismatches will be caught in verification.
         if (!arraysEqual(existing, values)) {
+          // Keep existing (explicit) definition
           enums[enumName] = existing;
         }
       } else {
+        // No explicit enum found, use column-derived definition
         enums[enumName] = [...values];
       }
     }

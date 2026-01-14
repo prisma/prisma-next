@@ -199,6 +199,31 @@ describe('contract builder methods', () => {
     expect(contract.coreHash).toBe('sha256:custom');
     expect(contract.capabilities).toEqual({ feature: { enabled: true } });
   });
+
+  it('defines enums explicitly', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .enum('Role', ['USER', 'ADMIN', 'MODERATOR'] as const)
+      .enum('Status', ['PENDING', 'ACTIVE', 'INACTIVE'] as const)
+      .build();
+    expect(contract.storage['enums']).toBeDefined();
+    expect(contract.storage['enums']?.['Role']).toEqual({ values: ['USER', 'ADMIN', 'MODERATOR'] });
+    expect(contract.storage['enums']?.['Status']).toEqual({
+      values: ['PENDING', 'ACTIVE', 'INACTIVE'],
+    });
+  });
+
+  it('allows chaining enum definitions with other methods', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .enum('Role', ['USER', 'ADMIN'] as const)
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .enum('Status', ['ACTIVE', 'INACTIVE'] as const)
+      .build();
+    expect(contract.storage['enums']?.['Role']).toEqual({ values: ['USER', 'ADMIN'] });
+    expect(contract.storage['enums']?.['Status']).toEqual({ values: ['ACTIVE', 'INACTIVE'] });
+    expect(contract.storage.tables.user).toBeDefined();
+  });
 });
 
 describe('extensionPacks', () => {

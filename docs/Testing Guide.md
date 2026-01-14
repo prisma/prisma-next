@@ -977,6 +977,29 @@ pnpm typecheck:packages
 pnpm --filter @prisma-next/sql-runtime typecheck
 ```
 
+### Full Verification Workflow
+
+**Before committing changes, always run the complete verification sequence:**
+
+```bash
+pnpm install && pnpm build && pnpm typecheck && pnpm lint && pnpm test && pnpm coverage:report
+```
+
+This ensures:
+- Dependencies are up to date (`pnpm install`)
+- All packages build successfully (`pnpm build`)
+- TypeScript types are correct (`pnpm typecheck`)
+- Code style and linting rules pass (`pnpm lint`)
+- All tests pass (`pnpm test`)
+- Test coverage meets thresholds (`pnpm coverage:report`)
+
+**Important:** Don't stop until the entire sequence succeeds. If any step fails:
+1. Fix the issue
+2. Re-run the full sequence from the beginning
+3. Continue until everything passes
+
+This workflow catches integration issues early and ensures code quality before commits.
+
 ---
 
 ## Summary

@@ -16,11 +16,16 @@ type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
 /**
  * Role enum for user authorization.
  * Uses pg/enum@1 codec with union type inference from typeParams.values.
+ *
+ * Note: Enums can be defined in two ways:
+ * 1. Explicitly via .enum() method (shown below)
+ * 2. Implicitly via enumColumn() factory (alternative approach)
  */
 const roleColumn = enumColumn('Role', ['USER', 'ADMIN', 'MODERATOR'] as const);
 
 export const contract = defineContract<AllCodecTypes>()
   .target(postgresPack)
+  .enum('Role', ['USER', 'ADMIN', 'MODERATOR'] as const)
   .table('user', (t) =>
     t
       .column('id', { type: int4Column, nullable: false })

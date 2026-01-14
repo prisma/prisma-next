@@ -1,4 +1,5 @@
 export type {
+  EnumDefinition,
   ExtractCodecTypes,
   ExtractOperationTypes,
   ForeignKey,

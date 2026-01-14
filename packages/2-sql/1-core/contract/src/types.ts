@@ -74,6 +74,19 @@ export type StorageTypeInstance = {
   readonly typeParams: Record<string, unknown>;
 };
 
+/**
+ * Enum type definition.
+ * Enums represent fixed sets of string values that can be used as column types.
+ */
+export type EnumDefinition = {
+  readonly values: readonly string[];
+  /**
+   * Optional explicit name for the enum type.
+   * If not provided, the key in the `enums` record is used as the name.
+   */
+  readonly name?: string;
+};
+
 export type SqlStorage = {
   readonly tables: Record<string, StorageTable>;
   /**
@@ -81,6 +94,11 @@ export type SqlStorage = {
    * Columns can reference these via `typeRef`.
    */
   readonly types?: Record<string, StorageTypeInstance>;
+  /**
+   * Enum type definitions.
+   * Enums can be referenced by columns via their nativeType matching the enum name.
+   */
+  readonly enums?: Record<string, EnumDefinition>;
 };
 
 export type ModelField = {
