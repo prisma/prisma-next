@@ -14,6 +14,7 @@ import {
   errorUnknownTable,
 } from '../utils/errors';
 import { createParamDescriptor } from '../utils/param-descriptor';
+import { resolveUserlandDefaultsForColumns } from '../utils/userland-defaults';
 
 export function convertModelFieldsToColumns<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,
@@ -81,6 +82,16 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
   if (!contractTable) {
     errorUnknownTable(tableName);
   }
+
+  // Resolve userland defaults for columns not already provided
+  const providedColumns = new Set(Object.keys(values));
+  resolveUserlandDefaultsForColumns(
+    contractTable,
+    providedColumns,
+    values,
+    paramsMap,
+    context.userlandGenerators,
+  );
 
   const insertValues: Record<string, ColumnRef | ParamRef> = {};
   for (const [columnName, placeholder] of Object.entries(values)) {

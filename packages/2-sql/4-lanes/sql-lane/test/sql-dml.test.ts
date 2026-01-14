@@ -496,4 +496,168 @@ describe('DML builders', () => {
       }).toThrow('returning() requires returning capability');
     });
   });
+
+  describe('userland defaults in insert', () => {
+    // Helper to create a contract with userland default on externalId column
+    function createContractWithUserlandDefault() {
+      const userTable = contract.storage.tables['user'];
+      return {
+        ...contract,
+        storage: {
+          ...contract.storage,
+          tables: {
+            ...contract.storage.tables,
+            user: {
+              ...userTable,
+              columns: {
+                ...userTable.columns,
+                externalId: {
+                  nativeType: 'text',
+                  codecId: 'pg/text@1',
+                  nullable: false,
+                  default: { kind: 'userland' as const, name: 'nanoid' },
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+
+    it('resolves userland defaults when generator is registered', () => {
+      const contractWithUserland = createContractWithUserlandDefault();
+
+      // Create context with userland generator
+      const userlandGenerators = new Map<string, () => unknown>([
+        ['nanoid', () => 'generated-id-123'],
+      ]);
+      const contextWithUserland = createTestContext(
+        contractWithUserland as unknown as Contract,
+        adapter,
+        { userlandGenerators },
+      );
+      const tablesWithUserland = schema<Contract>(contextWithUserland).tables;
+
+      const plan = sql<Contract, CodecTypes>({ context: contextWithUserland })
+        .insert(tablesWithUserland.user, {
+          email: param('email'),
+          createdAt: param('createdAt'),
+        })
+        .build({ params: { email: 'test@example.com', createdAt: new Date('2024-01-01') } });
+
+      // Should have the generated value in params
+      expect(plan.params).toContain('generated-id-123');
+      expect(plan.ast).toMatchObject({
+        kind: 'insert',
+        values: {
+          email: expect.objectContaining({ kind: 'param' }),
+          createdAt: expect.objectContaining({ kind: 'param' }),
+          externalId: expect.objectContaining({ kind: 'param', name: '__generated_externalId' }),
+        },
+      });
+    });
+
+    it('skips userland default when value already provided', () => {
+      const contractWithUserland = createContractWithUserlandDefault();
+
+      const userlandGenerators = new Map<string, () => unknown>([
+        ['nanoid', () => 'should-not-be-used'],
+      ]);
+      const contextWithUserland = createTestContext(
+        contractWithUserland as unknown as Contract,
+        adapter,
+        { userlandGenerators },
+      );
+      const tablesWithUserland = schema<Contract>(contextWithUserland).tables;
+
+      const plan = sql<Contract, CodecTypes>({ context: contextWithUserland })
+        .insert(tablesWithUserland.user, {
+          email: param('email'),
+          createdAt: param('createdAt'),
+          externalId: param('externalId'),
+        })
+        .build({
+          params: {
+            email: 'test@example.com',
+            createdAt: new Date('2024-01-01'),
+            externalId: 'custom-id',
+          },
+        });
+
+      // Should use the provided value, not the generated one
+      expect(plan.params).toContain('custom-id');
+      expect(plan.params).not.toContain('should-not-be-used');
+    });
+
+    it('skips userland default when generator not registered', () => {
+      const userTable = contract.storage.tables['user'];
+      const contractWithUserland = {
+        ...contract,
+        storage: {
+          ...contract.storage,
+          tables: {
+            ...contract.storage.tables,
+            user: {
+              ...userTable,
+              columns: {
+                ...userTable.columns,
+                externalId: {
+                  nativeType: 'text',
+                  codecId: 'pg/text@1',
+                  nullable: true, // Must be nullable since no generator
+                  default: { kind: 'userland' as const, name: 'unknownGenerator' },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      // No generators registered
+      const userlandGenerators = new Map<string, () => unknown>();
+      const contextWithUserland = createTestContext(
+        contractWithUserland as unknown as Contract,
+        adapter,
+        { userlandGenerators },
+      );
+      const tablesWithUserland = schema<Contract>(contextWithUserland).tables;
+
+      const plan = sql<Contract, CodecTypes>({ context: contextWithUserland })
+        .insert(tablesWithUserland.user, {
+          email: param('email'),
+          createdAt: param('createdAt'),
+        })
+        .build({ params: { email: 'test@example.com', createdAt: new Date('2024-01-01') } });
+
+      // Should not have externalId in values since generator not found
+      expect(plan.ast).toMatchObject({
+        kind: 'insert',
+        values: {
+          email: expect.objectContaining({ kind: 'param' }),
+          createdAt: expect.objectContaining({ kind: 'param' }),
+        },
+      });
+      expect((plan.ast as { values: Record<string, unknown> }).values).not.toHaveProperty(
+        'externalId',
+      );
+    });
+
+    it('works without userlandGenerators in context', () => {
+      // Standard context without userland generators
+      const plan = sql<Contract, CodecTypes>({ context })
+        .insert(tables.user, {
+          email: param('email'),
+          createdAt: param('createdAt'),
+        })
+        .build({ params: { email: 'test@example.com', createdAt: new Date('2024-01-01') } });
+
+      expect(plan.ast).toMatchObject({
+        kind: 'insert',
+        values: {
+          email: expect.objectContaining({ kind: 'param' }),
+          createdAt: expect.objectContaining({ kind: 'param' }),
+        },
+      });
+    });
+  });
 });

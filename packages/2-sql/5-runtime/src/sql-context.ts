@@ -21,6 +21,8 @@ import type {
 } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
+import type { UserlandGeneratorDefinition, UserlandGeneratorRegistry } from './userland-generators';
+import { createUserlandGeneratorRegistry } from './userland-generators';
 
 // ============================================================================
 // Runtime Parameterized Codec Descriptor Types
@@ -75,6 +77,11 @@ export interface SqlRuntimeExtensionInstance<TTargetId extends string>
    */
   // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
   parameterizedCodecs?(): ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
+  /**
+   * Returns userland default generators to register in the runtime context.
+   * These generators produce client-side values for columns with userland defaults.
+   */
+  userlandGenerators?(): ReadonlyArray<UserlandGeneratorDefinition>;
 }
 
 /**
@@ -124,6 +131,12 @@ export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlC
    * or the validated typeParams (if no init hook).
    */
   readonly types?: TypeHelperRegistry;
+
+  /**
+   * Registry of userland default generators.
+   * Used to generate client-side values for columns with userland defaults during inserts.
+   */
+  readonly userlandGenerators: UserlandGeneratorRegistry;
 }
 
 /**
@@ -361,6 +374,7 @@ export function createRuntimeContext<
 
   // Create extension instances and collect their contributions
   const extensionInstances: SqlRuntimeExtensionInstance<TTargetId>[] = [];
+  const userlandGenerators = createUserlandGeneratorRegistry();
 
   for (const extDescriptor of extensionPacks ?? []) {
     const extInstance = extDescriptor.create();
@@ -377,6 +391,13 @@ export function createRuntimeContext<
     if (extOperations) {
       for (const operation of extOperations) {
         operationRegistry.register(operation);
+      }
+    }
+
+    const extGenerators = extInstance.userlandGenerators?.();
+    if (extGenerators) {
+      for (const genDef of extGenerators) {
+        userlandGenerators.set(genDef.name, genDef.generator);
       }
     }
   }
@@ -398,5 +419,6 @@ export function createRuntimeContext<
     operations: operationRegistry,
     codecs: codecRegistry,
     types,
+    userlandGenerators,
   };
 }

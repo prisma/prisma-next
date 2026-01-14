@@ -134,7 +134,7 @@
       "required": ["columns"]
     },
     "ColumnDefault": {
-      "description": "Column default value. Can be a literal value, database function, sequence reference, or raw expression.",
+      "description": "Column default value. Can be a literal value, database function, sequence reference, raw expression, or userland function.",
       "oneOf": [
         {
           "type": "object",
@@ -154,7 +154,7 @@
         },
         {
           "type": "object",
-          "description": "Database function (autoincrement, now, uuid, cuid)",
+          "description": "Database function that never takes parameters (autoincrement, now, cuid)",
           "additionalProperties": false,
           "properties": {
             "kind": {
@@ -163,8 +163,30 @@
             },
             "name": {
               "type": "string",
-              "enum": ["autoincrement", "now", "uuid", "cuid"],
+              "enum": ["autoincrement", "now", "cuid"],
               "description": "Function name"
+            }
+          },
+          "required": ["kind", "name"]
+        },
+        {
+          "type": "object",
+          "description": "UUID function with optional parameters (for variants like uuidv7)",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["function"]
+            },
+            "name": {
+              "type": "string",
+              "enum": ["uuid"],
+              "description": "Function name"
+            },
+            "params": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Optional function parameters"
             }
           },
           "required": ["kind", "name"]
@@ -200,6 +222,22 @@
             }
           },
           "required": ["kind", "expression"]
+        },
+        {
+          "type": "object",
+          "description": "Client-side userland function (e.g., nanoid with custom alphabet)",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["userland"]
+            },
+            "name": {
+              "type": "string",
+              "description": "Userland function name"
+            }
+          },
+          "required": ["kind", "name"]
         }
       ]
     },

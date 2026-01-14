@@ -2,8 +2,8 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:a9b196e378cc9f7ad2e3438824ef29b8b639cb678f996fb1d300a88b57bdd0d0",
-  "profileHash": "sha256:58a1990244c9a8cf20e2f77c60aa35d2f6ea9823f641b533a9e75abc8606819f",
+  "coreHash": "sha256:0e7f2be8409db44f1b18265a53ec5002012f919f84c7aab91229d33fd484a01d",
+  "profileHash": "sha256:fc74c4c3a1401c2ffd528ee1bd61b0ac57af7bdd5e77d39d567389afcb1027bd",
   "models": {
     "Post": {
       "fields": {
@@ -138,6 +138,8 @@
   },
   "capabilities": {
     "postgres": {
+      "defaults.autoincrement": true,
+      "defaults.now": true,
       "jsonAgg": true,
       "lateral": true,
       "pgvector/cosine": true,

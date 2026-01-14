@@ -166,14 +166,24 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
   adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
   options?: {
     extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
+    userlandGenerators?: Map<string, () => unknown>;
   },
 ): RuntimeContext<TContract> {
-  return createRuntimeContext<TContract, 'postgres'>({
+  const context = createRuntimeContext<TContract, 'postgres'>({
     contract,
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(adapter),
     extensionPacks: options?.extensionPacks ?? [],
   });
+
+  // If custom userland generators are provided, add them to the context's registry
+  if (options?.userlandGenerators) {
+    for (const [name, generator] of options.userlandGenerators) {
+      context.userlandGenerators.set(name, generator);
+    }
+  }
+
+  return context;
 }
 
 /**

@@ -695,25 +695,35 @@ function buildColumnDefaultSql(columnDefault: ColumnDefault | undefined): string
   switch (columnDefault.kind) {
     case 'literal':
       return `DEFAULT ${escapeLiteralValue(columnDefault.value)}`;
-    case 'function':
+    case 'function': {
       switch (columnDefault.name) {
         case 'autoincrement':
           // Handled by SERIAL type, no explicit DEFAULT needed
           return '';
         case 'now':
           return 'DEFAULT now()';
-        case 'uuid':
+        case 'uuid': {
+          // Support params for functions like uuidv7(shift)
+          if (columnDefault.params?.length) {
+            const paramsStr = `(${columnDefault.params.join(', ')})`;
+            return `DEFAULT gen_random_uuid${paramsStr}`;
+          }
           return 'DEFAULT gen_random_uuid()';
+        }
         case 'cuid':
           // CUID is typically generated application-side
           // Use a placeholder that will fail if not overridden
           return "DEFAULT ''";
       }
       break;
+    }
     case 'sequence':
       return `DEFAULT nextval('${escapeLiteral(columnDefault.name)}')`;
     case 'dbGenerated':
       return `DEFAULT ${columnDefault.expression}`;
+    case 'userland':
+      // Userland defaults are computed client-side, no SQL DEFAULT clause
+      return '';
   }
 
   return '';

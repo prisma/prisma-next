@@ -17,18 +17,23 @@ export type ColumnTypeDescriptor = {
  *
  * Discriminated union representing different types of default values:
  * - `literal`: Static value (string, number, boolean)
- * - `function`: Database function (autoincrement, now, uuid, cuid)
+ * - `function`: Database function (autoincrement, now, cuid never take params; uuid can take optional params)
  * - `sequence`: Reference to a named sequence
  * - `dbGenerated`: Raw database expression (escape hatch)
+ * - `userland`: Client-side function (e.g., nanoid with custom alphabet)
  *
  * This type mirrors the `ColumnDefault` type in sql-contract to maintain
  * framework layer independence while ensuring compatibility.
  */
 export type ColumnDefaultDef =
   | { readonly kind: 'literal'; readonly value: string | number | boolean }
-  | { readonly kind: 'function'; readonly name: 'autoincrement' | 'now' | 'uuid' | 'cuid' }
+  // Functions that never take params
+  | { readonly kind: 'function'; readonly name: 'autoincrement' | 'now' | 'cuid' }
+  // uuid can take optional params (for variants like uuidv7)
+  | { readonly kind: 'function'; readonly name: 'uuid'; readonly params?: readonly string[] }
   | { readonly kind: 'sequence'; readonly name: string }
-  | { readonly kind: 'dbGenerated'; readonly expression: string };
+  | { readonly kind: 'dbGenerated'; readonly expression: string }
+  | { readonly kind: 'userland'; readonly name: string };
 
 export interface ColumnBuilderState<
   Name extends string,

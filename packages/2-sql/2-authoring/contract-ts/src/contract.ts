@@ -28,9 +28,17 @@ const ColumnDefaultLiteralSchema = type({
   value: 'string | number | boolean',
 });
 
-const ColumnDefaultFunctionSchema = type({
+// Functions that never take params
+const ColumnDefaultFunctionNoParamsSchema = type({
   kind: "'function'",
-  name: "'autoincrement' | 'now' | 'uuid' | 'cuid'",
+  name: "'autoincrement' | 'now' | 'cuid'",
+});
+
+// uuid can take optional params (for variants like uuidv7)
+const ColumnDefaultFunctionUuidSchema = type({
+  kind: "'function'",
+  name: "'uuid'",
+  'params?': type.string.array().readonly(),
 });
 
 const ColumnDefaultSequenceSchema = type({
@@ -43,10 +51,17 @@ const ColumnDefaultDbGeneratedSchema = type({
   expression: 'string',
 });
 
+const ColumnDefaultUserlandSchema = type({
+  kind: "'userland'",
+  name: 'string',
+});
+
 // Use a simple union type without .declare() to avoid complex type inference issues
-const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionSchema)
+const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionNoParamsSchema)
+  .or(ColumnDefaultFunctionUuidSchema)
   .or(ColumnDefaultSequenceSchema)
-  .or(ColumnDefaultDbGeneratedSchema);
+  .or(ColumnDefaultDbGeneratedSchema)
+  .or(ColumnDefaultUserlandSchema);
 
 const StorageColumnSchema = type.declare<StorageColumn>().type({
   nativeType: 'string',
@@ -222,6 +237,21 @@ export function computeMappings(
 }
 
 /**
+ * Checks if a default function capability is enabled for the given target.
+ * Capability key format: `defaults.<functionName>` (e.g., `defaults.autoincrement`)
+ */
+function hasDefaultFunctionCapability(
+  capabilities: Record<string, Record<string, boolean>> | undefined,
+  target: string,
+  functionName: string,
+): boolean {
+  if (!capabilities) return false;
+  const targetCapabilities = capabilities[target];
+  if (!targetCapabilities) return false;
+  return targetCapabilities[`defaults.${functionName}`] === true;
+}
+
+/**
  * Validates logical consistency of a **structurally validated** SqlContract.
  * This checks that references (e.g., foreign keys, primary keys, uniques) point to storage objects that already exist.
  * Structural validation is expected to have already completed before this helper runs.
@@ -230,7 +260,7 @@ export function computeMappings(
  * @throws Error if logical validation fails
  */
 function validateContractLogic(structurallyValidatedContract: SqlContract<SqlStorage>): void {
-  const { storage, models } = structurallyValidatedContract;
+  const { storage, models, target, capabilities } = structurallyValidatedContract;
   const tableNames = new Set(Object.keys(storage.tables));
   const typeInstanceNames = new Set(Object.keys(storage.types ?? {}));
 
@@ -268,6 +298,18 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
         throw new Error(
           `Column "${columnName}" in table "${tableName}" references non-existent type instance "${column.typeRef}" (not found in storage.types)`,
         );
+      }
+
+      // Validate default function capabilities
+      if (column.default?.kind === 'function') {
+        const functionName = column.default.name;
+        if (!hasDefaultFunctionCapability(capabilities, target, functionName)) {
+          throw new Error(
+            `Column "${columnName}" in table "${tableName}" uses default function "${functionName}" ` +
+              `but capability "defaults.${functionName}" is not enabled for target "${target}". ` +
+              `Add { ${target}: { "defaults.${functionName}": true } } to contract capabilities.`,
+          );
+        }
       }
     }
   }

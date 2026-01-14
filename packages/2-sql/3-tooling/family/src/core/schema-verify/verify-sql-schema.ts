@@ -621,11 +621,19 @@ function describeColumnDefault(columnDefault: ColumnDefault): string {
   switch (columnDefault.kind) {
     case 'literal':
       return `literal(${JSON.stringify(columnDefault.value)})`;
-    case 'function':
-      return `${columnDefault.name}()`;
+    case 'function': {
+      // Only uuid functions have params
+      const paramsStr =
+        columnDefault.name === 'uuid' && columnDefault.params?.length
+          ? columnDefault.params.join(', ')
+          : '';
+      return `${columnDefault.name}(${paramsStr})`;
+    }
     case 'sequence':
       return `sequence(${columnDefault.name})`;
     case 'dbGenerated':
       return `dbGenerated(${columnDefault.expression})`;
+    case 'userland':
+      return `userland(${columnDefault.name})`;
   }
 }

@@ -90,6 +90,8 @@ export const contract = defineContract<AllCodecTypes>()
       jsonAgg: true,
       returning: true,
       'pgvector/cosine': true,
+      'defaults.autoincrement': true,
+      'defaults.now': true,
     },
   })
   .build();

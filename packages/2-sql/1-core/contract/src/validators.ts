@@ -21,9 +21,17 @@ const ColumnDefaultLiteralSchema = type({
   value: 'string | number | boolean',
 });
 
-const ColumnDefaultFunctionSchema = type({
+// Functions that never take params
+const ColumnDefaultFunctionNoParamsSchema = type({
   kind: "'function'",
-  name: "'autoincrement' | 'now' | 'uuid' | 'cuid'",
+  name: "'autoincrement' | 'now' | 'cuid'",
+});
+
+// uuid can take optional params (for variants like uuidv7)
+const ColumnDefaultFunctionUuidSchema = type({
+  kind: "'function'",
+  name: "'uuid'",
+  'params?': type.string.array().readonly(),
 });
 
 const ColumnDefaultSequenceSchema = type({
@@ -36,12 +44,19 @@ const ColumnDefaultDbGeneratedSchema = type({
   expression: 'string',
 });
 
+const ColumnDefaultUserlandSchema = type({
+  kind: "'userland'",
+  name: 'string',
+});
+
 const ColumnDefaultSchema = type
   .declare<ColumnDefault>()
   .type(
-    ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionSchema)
+    ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionNoParamsSchema)
+      .or(ColumnDefaultFunctionUuidSchema)
       .or(ColumnDefaultSequenceSchema)
-      .or(ColumnDefaultDbGeneratedSchema),
+      .or(ColumnDefaultDbGeneratedSchema)
+      .or(ColumnDefaultUserlandSchema),
   );
 
 const StorageColumnSchema = type
