@@ -6,26 +6,18 @@
   "version": "0.0.0",
   "description": "Base tsdown configuration for the monorepo",
   "license": "MIT",
-  "files": [
-    "./base.ts",
-    "./base.js"
-  ],
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   },
   "scripts": {
-    "build": "tsc base.ts --outDir . --module esnext --target es2022 --moduleResolution bundler --declaration false --esModuleInterop true --skipLibCheck true",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "typecheck": "tsc --noEmit"
   },
   "exports": {
-    ".": {
-      "types": "./base.ts",
-      "default": "./base.js"
-    }
+    ".": "./base.ts"
   }
 }

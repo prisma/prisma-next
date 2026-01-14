@@ -91,8 +91,9 @@ function determineDevVersion(baseVersion: string): VersionResult {
 function writeGitHubOutput(result: VersionResult): void {
   const outputFile = process.env.GITHUB_OUTPUT;
   if (outputFile) {
-    appendFileSync(outputFile, `version=${result.version}\n`);
-    appendFileSync(outputFile, `tag=${result.tag}\n`);
+    // Use heredoc syntax to safely write to GITHUB_OUTPUT (prevents injection)
+    appendFileSync(outputFile, `version<<EOF\n${result.version}\nEOF\n`);
+    appendFileSync(outputFile, `tag<<EOF\n${result.tag}\nEOF\n`);
   }
 }
 
