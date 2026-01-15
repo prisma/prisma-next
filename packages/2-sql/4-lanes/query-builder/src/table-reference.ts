@@ -10,7 +10,7 @@ export type TableReference<
   TName extends string = string,
   THash extends CoreHashBase<string> = CoreHashBase<string>,
 > = {
-  readonly name: TName;
+  readonly '~name': TName;
 } & Brand<
   '[info] this table reference belongs to the contract with the following core hash:',
   THash
