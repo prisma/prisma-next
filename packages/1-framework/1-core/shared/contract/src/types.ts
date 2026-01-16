@@ -1,11 +1,20 @@
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { ContractIR } from './ir';
 
-export const __Brand__: unique symbol = Symbol('__prisma_next_brand__');
+/**
+ * Unique symbol used as the key for branding types.
+ */
+export const $: unique symbol = Symbol('__prisma_next_brand__');
 
-export type Brand<TName extends string | number | symbol> = {
-  [__Brand__]: {
-    [K in TName]: true;
+/**
+ * A helper type to brand a given type with a unique identifier.
+ *
+ * @template TKey Text used as the brand key.
+ * @template TValue Optional value associated with the brand key. Defaults to `true`.
+ */
+export type Brand<TKey extends string | number | symbol, TValue = true> = {
+  [$]: {
+    [K in TKey]: TValue;
   };
 };
 
