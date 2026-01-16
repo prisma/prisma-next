@@ -33,6 +33,8 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
   };
 }
 
+const testHashes = { coreHash: 'test-core-hash', profileHash: 'test-profile-hash' };
+
 describe('sql-target-family-hook', () => {
   it('generates contract types with model relations', () => {
     const ir = createContractIR({
@@ -85,7 +87,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('relations: {');
     expect(types).toContain(
       "readonly posts: { readonly on: { readonly parentCols: readonly ['id']; readonly childCols: readonly ['userId'] } }",
@@ -126,7 +128,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('export type Relations');
     expect(types).toContain('readonly user: {');
     expect(types).toContain('readonly posts: {');
@@ -157,7 +159,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('export type Relations');
     expect(types).toContain('readonly user: {');
     expect(types).toContain('readonly posts: unknown');
@@ -186,7 +188,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('export type Relations');
     expect(types).toContain('readonly user: {');
     expect(types).toContain('readonly posts: unknown');
@@ -210,7 +212,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('SqlMappings');
     expect(types).toContain('codecTypes: Record<string, never>');
     expect(types).toContain('operationTypes: Record<string, never>');
@@ -259,6 +261,7 @@ describe('sql-target-family-hook', () => {
       ir,
       codecTypeImports,
       operationTypeImports,
+      testHashes,
     );
     expect(types).toContain('SqlMappings');
     expect(types).toContain('codecTypes: TestTypes');
@@ -307,6 +310,7 @@ describe('sql-target-family-hook', () => {
       ir,
       codecTypeImports,
       operationTypeImports,
+      testHashes,
     );
     expect(types).toContain('SqlMappings');
     expect(types).toContain('codecTypes: TestTypes');
@@ -334,7 +338,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('export type Relations');
     expect(types).toContain('Record<string, never>');
   });
@@ -396,7 +400,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('export type Relations');
     // Relations type is table-based, not model-based
     // The test data doesn't include ir.relations, so Relations will be Record<string, never>
@@ -431,7 +435,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('Record<string, never>');
   });
 
@@ -465,7 +469,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('export type Contract');
     expect(types).toContain("modelToTable: { readonly User: 'user' }");
     expect(types).toContain("tableToModel: { readonly user: 'User' }");
@@ -521,7 +525,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain("modelToTable: { readonly User: 'user'; readonly Post: 'post' }");
     expect(types).toContain("tableToModel: { readonly user: 'User'; readonly post: 'Post' }");
   });
@@ -545,7 +549,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('SqlMappings');
   });
 
@@ -575,7 +579,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     // Should run without error and not generate relations output for invalid ones
     expect(types).not.toContain('invalidRel1');
     expect(types).not.toContain('invalidRel2');
@@ -605,7 +609,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], []);
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     // Should still generate modelToTable and tableToModel, but not fieldToColumn or columnToField
     expect(types).toContain("modelToTable: { readonly User: 'user' }");
     expect(types).toContain("tableToModel: { readonly user: 'User' }");
@@ -752,7 +756,9 @@ describe('sql-target-family-hook', () => {
         `${ctx.codecTypesName}['pg/vector@1']['output'] & { length: ${params['length']} }`,
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], { parameterizedRenderers });
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
+      parameterizedRenderers,
+    });
 
     expect(types).toContain("CodecTypes['pg/vector@1']['output'] & { length: 1536 }");
   });
@@ -804,7 +810,9 @@ describe('sql-target-family-hook', () => {
         `${ctx.codecTypesName}['pg/vector@1']['output'] & { length: ${params['length']} }`,
     });
 
-    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], { parameterizedRenderers });
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
+      parameterizedRenderers,
+    });
 
     expect(types).toContain("CodecTypes['pg/vector@1']['output'] & { length: 1536 }");
   });

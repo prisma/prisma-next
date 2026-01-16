@@ -23,7 +23,7 @@ describe('plan assembly', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test',
+    coreHash: 'sha256:test' as never,
     models: {},
     storage: {
       tables: {

@@ -12,8 +12,8 @@ export const contract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  coreHash: 'sha256:contract',
-  profileHash: 'sha256:profile',
+  coreHash: 'sha256:contract' as never,
+  profileHash: 'sha256:profile' as never,
   storage: {
     tables: {
       user: {

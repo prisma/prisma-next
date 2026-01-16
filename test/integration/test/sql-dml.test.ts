@@ -16,8 +16,8 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  coreHash: 'sha256:dml-test-core',
-  profileHash: 'sha256:dml-test-profile',
+  coreHash: 'sha256:dml-test-core' as never,
+  profileHash: 'sha256:dml-test-profile' as never,
   storage: {
     tables: {
       user: {
