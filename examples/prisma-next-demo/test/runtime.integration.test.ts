@@ -1,12 +1,17 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: non-null assertions are fine for tests */
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
+import postgresDriverDescriptor from '@prisma-next/driver-postgres/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import { budgets, createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
@@ -22,15 +27,21 @@ import {
 // Use the emitted JSON contract which has the real computed hashes
 const contract = validateContract<Contract>(contractJson);
 
+const executionStack = createExecutionStack({
+  target: postgresTargetRuntimeDescriptor,
+  adapter: postgresAdapterRuntimeDescriptor,
+  driver: postgresDriverDescriptor,
+  extensionPacks: [pgvectorExtensionRuntimeDescriptor],
+});
+const executionStackInstance = instantiateExecutionStack(executionStack);
+
 /**
  * Creates a runtime context for the given contract.
  */
 function createContext(contractForContext: ReturnType<typeof validateContract>) {
-  return createRuntimeContext({
+  return createExecutionContext({
     contract: contractForContext,
-    target: postgresTargetRuntimeDescriptor,
-    adapter: postgresAdapterRuntimeDescriptor,
-    extensionPacks: [pgvectorExtensionRuntimeDescriptor],
+    stack: executionStackInstance,
   });
 }
 
@@ -114,12 +125,7 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const context = createRuntimeContext({
-          contract,
-          target: postgresTargetRuntimeDescriptor,
-          adapter: postgresAdapterRuntimeDescriptor,
-          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
-        });
+        const context = createContext(contract);
         const tables = schema(context).tables;
         const userTable = tables['user']!;
         const root = sql({ context });
@@ -149,13 +155,14 @@ describe('runtime execute integration', () => {
 
         const createRuntimeInstance = () => {
           const pool = new Pool({ connectionString });
-          const driver = createPostgresDriverFromOptions({
-            connect: { pool },
-            cursor: { disabled: true },
-          });
           return createRuntime({
+            stack: executionStackInstance,
+            contract,
             context,
-            driver,
+            driverOptions: {
+              connect: { pool },
+              cursor: { disabled: true },
+            },
             verify: { mode: 'always', requireMarker: true },
             plugins: [
               budgets({
@@ -294,20 +301,16 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const context = createRuntimeContext({
-          contract,
-          target: postgresTargetRuntimeDescriptor,
-          adapter: postgresAdapterRuntimeDescriptor,
-          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
-        });
+        const context = createContext(contract);
         const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
         const runtime = createRuntime({
+          stack: executionStackInstance,
+          contract,
           context,
-          driver,
+          driverOptions: {
+            connect: { pool },
+            cursor: { disabled: true },
+          },
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
@@ -380,20 +383,16 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const context = createRuntimeContext({
-          contract,
-          target: postgresTargetRuntimeDescriptor,
-          adapter: postgresAdapterRuntimeDescriptor,
-          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
-        });
+        const context = createContext(contract);
         const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
         const runtime = createRuntime({
+          stack: executionStackInstance,
+          contract,
           context,
-          driver,
+          driverOptions: {
+            connect: { pool },
+            cursor: { disabled: true },
+          },
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({

@@ -7,12 +7,16 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import postgresDriverDescriptor from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import { budgets, createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
 import { Pool } from 'pg';
 import {
@@ -94,20 +98,26 @@ export function createTestRuntime<TContract extends SqlContract>(
   connectionString: string,
   contract: TContract,
 ): TestRuntime {
-  const context = createRuntimeContext({
-    contract,
+  const stack = createExecutionStack({
     target: postgresTargetRuntimeDescriptor,
     adapter: postgresAdapterRuntimeDescriptor,
+    driver: postgresDriverDescriptor,
     extensionPacks: [pgvectorExtensionRuntimeDescriptor],
   });
-  const pool = new Pool({ connectionString });
-  const driver = createPostgresDriverFromOptions({
-    connect: { pool },
-    cursor: { disabled: true },
+  const stackInstance = instantiateExecutionStack(stack);
+  const context = createExecutionContext({
+    contract,
+    stack: stackInstance,
   });
+  const pool = new Pool({ connectionString });
   const runtime = createRuntime({
+    stack: stackInstance,
+    contract,
     context,
-    driver,
+    driverOptions: {
+      connect: { pool },
+      cursor: { disabled: true },
+    },
     verify: { mode: 'onFirstUse', requireMarker: false },
     plugins: [
       budgets({

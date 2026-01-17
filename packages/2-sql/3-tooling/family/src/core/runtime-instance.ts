@@ -1,4 +1,8 @@
 import { assertRuntimeContractRequirementsSatisfied } from '@prisma-next/core-execution-plane/framework-components';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeDriverDescriptor,
@@ -17,11 +21,10 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import type {
   Runtime,
-  RuntimeOptions,
   SqlRuntimeAdapterInstance,
   SqlRuntimeExtensionDescriptor,
 } from '@prisma-next/sql-runtime';
-import { createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
 
 /**
  * SQL runtime driver instance type.
@@ -118,27 +121,28 @@ export function createSqlRuntimeFamilyInstance<TTargetId extends string>(options
         extensionPacks: extensionDescriptors,
       });
 
-      // Create driver instance
-      const driverInstance = driverDescriptor.create(runtimeOptions.driverOptions);
-
-      // Create context via descriptor-first API
-      const context = createRuntimeContext<TContract, TTargetId>({
-        contract: runtimeOptions.contract,
+      const stack = createExecutionStack({
         target: targetDescriptor,
         adapter: adapterDescriptor,
+        driver: driverDescriptor,
         extensionPacks: extensionDescriptors,
       });
+      const stackInstance = instantiateExecutionStack(stack);
+      const context = createExecutionContext({
+        contract: runtimeOptions.contract,
+        stack: stackInstance,
+      });
 
-      const runtimeOptions_: RuntimeOptions<TContract> = {
-        driver: driverInstance,
-        verify: runtimeOptions.verify,
+      return createRuntime({
+        stack: stackInstance,
+        contract: runtimeOptions.contract,
         context,
+        driverOptions: runtimeOptions.driverOptions,
+        verify: runtimeOptions.verify,
         ...(runtimeOptions.plugins ? { plugins: runtimeOptions.plugins } : {}),
         ...(runtimeOptions.mode ? { mode: runtimeOptions.mode } : {}),
         ...(runtimeOptions.log ? { log: runtimeOptions.log } : {}),
-      };
-
-      return createRuntime(runtimeOptions_);
+      });
     },
   };
 }

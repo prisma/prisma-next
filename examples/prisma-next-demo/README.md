@@ -64,7 +64,8 @@ pnpm start:no-emit -- users
 ```mermaid
 flowchart LR
   Contract[Contract] --> Stack[ExecutionStack]
-  Stack --> Context[ExecutionContext]
+  Stack --> StackI[ExecutionStackInstance]
+  StackI --> Context[ExecutionContext]
   Context --> QueryRoots[Query Roots]
   AppConfig[App Config] --> Runtime[Runtime]
   Stack --> Runtime

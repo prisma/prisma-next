@@ -1,5 +1,9 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -13,8 +17,8 @@ import type {
   OrderBuilder,
 } from '@prisma-next/sql-relational-core/types';
 import {
+  createExecutionContext,
   createRuntime,
-  createRuntimeContext,
   type Runtime,
   type RuntimeContext,
 } from '@prisma-next/sql-runtime';
@@ -368,12 +372,18 @@ class PrismaClientImpl {
     // Currently only SQL contracts are supported
     this.contract = options.contract;
 
-    // Create context with contract and descriptor-first composition
-    this.context = createRuntimeContext({
-      contract: this.contract,
+    const stack = createExecutionStack({
       target: postgresTarget,
       adapter: postgresAdapter,
+      driver: postgresDriver,
       extensionPacks: [],
+    });
+    const stackInstance = instantiateExecutionStack(stack);
+
+    // Create context with contract and stack instance
+    this.context = createExecutionContext({
+      contract: this.contract,
+      stack: stackInstance,
     });
 
     // Initialize runtime if not provided
@@ -386,11 +396,11 @@ class PrismaClientImpl {
         throw new Error('DATABASE_URL environment variable or connectionString option is required');
       }
 
-      const driver = postgresDriver.create({ connectionString });
-
       this.runtime = createRuntime({
-        driver,
+        stack: stackInstance,
+        contract: this.contract,
         context: this.context,
+        driverOptions: { connectionString },
         verify: {
           mode: 'onFirstUse',
           requireMarker: false,

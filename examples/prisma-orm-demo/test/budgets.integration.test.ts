@@ -1,9 +1,13 @@
 import postgresAdapterRuntime from '@prisma-next/adapter-postgres/runtime';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import { type createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import { createExecutionContext, type createRuntime } from '@prisma-next/sql-runtime';
 import postgresTargetRuntime from '@prisma-next/target-postgres/runtime';
 import { withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -14,15 +18,20 @@ import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/c
 // Use the emitted JSON contract which has the real computed hashes
 const contract = validateContract<Contract>(contractJson);
 
+const executionStack = createExecutionStack({
+  target: postgresTargetRuntime,
+  adapter: postgresAdapterRuntime,
+  extensionPacks: [],
+});
+const executionStackInstance = instantiateExecutionStack(executionStack);
+
 /**
  * Creates a runtime context for the given contract.
  */
 function createContext(contractForContext: typeof contract) {
-  return createRuntimeContext({
+  return createExecutionContext({
     contract: contractForContext,
-    target: postgresTargetRuntime,
-    adapter: postgresAdapterRuntime,
-    extensionPacks: [],
+    stack: executionStackInstance,
   });
 }
 

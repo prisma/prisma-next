@@ -8,10 +8,11 @@ async function loadQueryModule() {
 
 describe('demo runtime offline', () => {
   it('builds plans without driver options', async () => {
-    const { executionStack, executionContext, sql, tables } = await loadQueryModule();
+    const { executionStackInstance, executionContext, sql, tables } = await loadQueryModule();
 
     const runtime = createRuntime({
-      stack: executionStack,
+      stack: executionStackInstance,
+      contract: executionContext.contract,
       context: executionContext,
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
