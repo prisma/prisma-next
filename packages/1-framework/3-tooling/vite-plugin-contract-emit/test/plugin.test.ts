@@ -13,9 +13,13 @@ vi.mock('@prisma-next/cli/control-api', () => ({
 
 function createMockServer() {
   return {
+    httpServer: {
+      on: vi.fn(),
+    },
     watcher: {
       add: vi.fn(),
       unwatch: vi.fn(),
+      on: vi.fn(),
     },
     ws: {
       send: vi.fn(),
@@ -138,6 +142,31 @@ describe('prismaVitePlugin', () => {
           configPath: expect.stringContaining('prisma-next.config.ts'),
         }),
       );
+    });
+
+    it('registers cleanup hooks for server close', async () => {
+      const { executeContractEmit } = await import('@prisma-next/cli/control-api');
+      const mockExecute = vi.mocked(executeContractEmit);
+      mockExecute.mockResolvedValue({
+        coreHash: 'abc123',
+        profileHash: 'def456',
+        files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
+      });
+
+      const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'silent' });
+      const mockServer = createMockServer();
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      // Verify cleanup hooks were registered
+      expect(mockServer.httpServer.on).toHaveBeenCalledWith('close', expect.any(Function));
+      expect(mockServer.watcher.on).toHaveBeenCalledWith('close', expect.any(Function));
     });
   });
 

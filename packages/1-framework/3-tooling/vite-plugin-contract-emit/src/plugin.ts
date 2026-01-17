@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
 import { ContractEmitCancelledError, executeContractEmit } from '@prisma-next/cli/control-api';
-import type { Plugin, ViteDevServer } from 'vite';
+import type { ModuleNode, Plugin, ViteDevServer } from 'vite';
 import type { PrismaVitePluginOptions } from './types';
 
 const PLUGIN_NAME = 'prisma-vite-plugin-contract-emit';
@@ -87,8 +87,9 @@ export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginO
 
       return result;
     } catch (error) {
-      // Ignore cancellation errors
+      // Ignore cancellation - check signal first, then error types
       if (
+        signal.aborted ||
         error instanceof ContractEmitCancelledError ||
         (error instanceof Error && error.name === 'AbortError')
       ) {
@@ -145,26 +146,25 @@ export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginO
       await viteServer.ssrLoadModule(viteModuleId);
 
       // Crawl the module graph starting from the config file
-      const visited = new Set<string>();
-      const queue = [viteModuleId];
+      // Use ModuleNode references directly to avoid id/file mismatch issues
+      const rootMod = viteServer.moduleGraph.getModuleById(viteModuleId);
+      const visited = new Set<ModuleNode>();
+      const queue: ModuleNode[] = rootMod ? [rootMod] : [];
 
       while (queue.length > 0) {
-        const current = queue.shift();
-        if (current === undefined || visited.has(current)) continue;
-        visited.add(current);
-
-        const mod = viteServer.moduleGraph.getModuleById(current);
-        if (!mod) continue;
+        const mod = queue.shift();
+        if (mod === undefined || visited.has(mod)) continue;
+        visited.add(mod);
 
         // Add file to watched set if it's a file path
         if (mod.file) {
           files.add(mod.file);
         }
 
-        // Add imported modules to queue
+        // Add imported modules to queue (using ModuleNode references directly)
         for (const imported of mod.importedModules) {
-          if (imported.id && !visited.has(imported.id)) {
-            queue.push(imported.id);
+          if (!visited.has(imported)) {
+            queue.push(imported);
           }
         }
       }
@@ -223,6 +223,25 @@ export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginO
 
     async configureServer(viteServer) {
       server = viteServer;
+
+      // Register close hook to clean up timers and abort in-flight work
+      const cleanup = () => {
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+          debounceTimer = null;
+        }
+        if (currentAbortController) {
+          currentAbortController.abort();
+          currentAbortController = null;
+        }
+        server = null;
+        watchedFiles = new Set<string>();
+        log('Server closed, cleaned up resources', 'debug');
+      };
+
+      // Register cleanup on server close via httpServer or watcher
+      viteServer.httpServer?.on('close', cleanup);
+      viteServer.watcher.on('close', cleanup);
 
       // Collect files to watch from the module graph
       watchedFiles = await collectWatchedFiles(viteServer);
