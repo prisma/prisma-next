@@ -12,5 +12,6 @@ export function loadRuntimeConfig() {
     const message = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Invalid runtime configuration: ${message}`);
   }
-  return { databaseUrl: result.DATABASE_URL };
+  const parsed = result as { DATABASE_URL: string };
+  return { databaseUrl: parsed.DATABASE_URL };
 }

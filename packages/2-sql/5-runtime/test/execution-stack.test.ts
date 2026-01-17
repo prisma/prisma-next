@@ -153,6 +153,11 @@ function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgre
             method: 'example',
             args: [],
             returns: { kind: 'builtin', type: 'string' },
+            lowering: {
+              targetFamily: 'sql',
+              strategy: 'function',
+              template: 'example({args})',
+            },
           },
         ],
       };

@@ -380,11 +380,14 @@ class PrismaClientImpl {
     });
     const stackInstance = instantiateExecutionStack(stack);
 
-    // Create context with contract and stack instance
-    this.context = createExecutionContext({
+    const executionContext = createExecutionContext({
       contract: this.contract,
       stack: stackInstance,
     });
+    this.context = {
+      ...executionContext,
+      adapter: stackInstance.adapter,
+    };
 
     // Initialize runtime if not provided
     if (options.runtime) {

@@ -82,13 +82,10 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
       create() {
-        return Object.assign(
-          {
-            familyId: 'sql' as const,
-            targetId: 'postgres' as const,
-          },
-          driver,
-        );
+        return Object.assign(driver, {
+          familyId: 'sql' as const,
+          targetId: 'postgres' as const,
+        });
       },
     };
     const stack = createExecutionStack({
@@ -164,13 +161,10 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
       create() {
-        return Object.assign(
-          {
-            familyId: 'sql' as const,
-            targetId: 'postgres' as const,
-          },
-          driver,
-        );
+        return Object.assign(driver, {
+          familyId: 'sql' as const,
+          targetId: 'postgres' as const,
+        });
       },
     };
     const stack = createExecutionStack({

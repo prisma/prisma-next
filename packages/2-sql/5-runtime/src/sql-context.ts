@@ -146,7 +146,13 @@ export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlC
 
 function assertExecutionStackContractRequirements(
   contract: SqlContract<SqlStorage>,
-  stack: ExecutionStackInstance<'sql', string>['stack'],
+  stack: ExecutionStackInstance<
+    'sql',
+    string,
+    SqlRuntimeAdapterInstance<string>,
+    RuntimeDriverInstance<'sql', string>,
+    SqlRuntimeExtensionInstance<string>
+  >['stack'],
 ): void {
   const providedComponentIds = new Set<string>([
     stack.target.id,
@@ -437,7 +443,13 @@ export function createExecutionContext<
   TTargetId extends string = string,
 >(options: {
   readonly contract: TContract;
-  readonly stack: ExecutionStackInstance<'sql', TTargetId>;
+  readonly stack: ExecutionStackInstance<
+    'sql',
+    TTargetId,
+    SqlRuntimeAdapterInstance<TTargetId>,
+    RuntimeDriverInstance<'sql', TTargetId>,
+    SqlRuntimeExtensionInstance<TTargetId>
+  >;
 }): ExecutionContext<TContract> {
   assertExecutionStackContractRequirements(options.contract, options.stack.stack);
   return createExecutionContextFromInstances({

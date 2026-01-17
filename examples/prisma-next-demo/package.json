@@ -30,6 +30,7 @@
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
+    "arktype": "^2.1.29",
     "dotenv": "^16.4.5",
     "pg": "catalog:"
   },

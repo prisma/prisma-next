@@ -1,5 +1,6 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
+import type { RuntimeDriverInstance } from '@prisma-next/core-execution-plane/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type {
   Log,
@@ -28,7 +29,12 @@ import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
 import { lowerSqlPlan } from './lower-sql-plan';
-import type { ExecutionContext, RuntimeContext } from './sql-context';
+import type {
+  ExecutionContext,
+  RuntimeContext,
+  SqlRuntimeAdapterInstance,
+  SqlRuntimeExtensionInstance,
+} from './sql-context';
 import { createExecutionContext } from './sql-context';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
@@ -51,7 +57,13 @@ export interface RuntimeStackOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   TTargetId extends string = string,
 > {
-  readonly stack: ExecutionStackInstance<'sql', TTargetId>;
+  readonly stack: ExecutionStackInstance<
+    'sql',
+    TTargetId,
+    SqlRuntimeAdapterInstance<TTargetId>,
+    RuntimeDriverInstance<'sql', TTargetId>,
+    SqlRuntimeExtensionInstance<TTargetId>
+  >;
   readonly contract: TContract;
   readonly context?: ExecutionContext<TContract>;
   readonly driverOptions?: unknown;
@@ -205,6 +217,19 @@ function createOfflineDriver(): SqlDriver {
   };
 }
 
+function isSqlDriver(driver: unknown): driver is SqlDriver {
+  if (!driver || typeof driver !== 'object') {
+    return false;
+  }
+  const candidate = driver as SqlDriver;
+  return (
+    typeof candidate.connect === 'function' &&
+    typeof candidate.execute === 'function' &&
+    typeof candidate.query === 'function' &&
+    typeof candidate.close === 'function'
+  );
+}
+
 function createRuntimeFromStack<
   TContract extends SqlContract<SqlStorage>,
   TTargetId extends string,
@@ -226,11 +251,19 @@ function createRuntimeFromStack<
     throw new Error('Driver options provided, but the execution stack has no driver descriptor.');
   }
 
-  const driver = stack.stack.driver
-    ? driverOptions === undefined
-      ? createOfflineDriver()
-      : stack.stack.driver.create(driverOptions)
-    : createOfflineDriver();
+  let driver: SqlDriver = createOfflineDriver();
+
+  if (stack.stack.driver) {
+    if (driverOptions === undefined) {
+      driver = createOfflineDriver();
+    } else {
+      const driverInstance = stack.stack.driver.create(driverOptions);
+      if (!isSqlDriver(driverInstance)) {
+        throw new Error('Execution stack driver does not implement SqlDriver.');
+      }
+      driver = driverInstance;
+    }
+  }
 
   return new SqlRuntimeImpl({
     context: runtimeContext,

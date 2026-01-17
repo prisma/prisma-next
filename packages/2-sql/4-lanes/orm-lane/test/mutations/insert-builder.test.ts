@@ -55,6 +55,7 @@ describe('insert builder', () => {
     contract,
     operations: createOperationRegistry(),
     codecs: createCodecRegistry(),
+    types: {},
   };
 
   describe('convertModelFieldsToColumns', () => {

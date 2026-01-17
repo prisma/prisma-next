@@ -9,26 +9,74 @@ import type {
   RuntimeTargetInstance,
 } from './types';
 
-export interface ExecutionStack<TFamilyId extends string, TTargetId extends string> {
+export interface ExecutionStack<
+  TFamilyId extends string,
+  TTargetId extends string,
+  TAdapterInstance extends RuntimeAdapterInstance<TFamilyId, TTargetId> = RuntimeAdapterInstance<
+    TFamilyId,
+    TTargetId
+  >,
+  TDriverInstance extends RuntimeDriverInstance<TFamilyId, TTargetId> = RuntimeDriverInstance<
+    TFamilyId,
+    TTargetId
+  >,
+  TExtensionInstance extends RuntimeExtensionInstance<
+    TFamilyId,
+    TTargetId
+  > = RuntimeExtensionInstance<TFamilyId, TTargetId>,
+> {
   readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
-  readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId>;
-  readonly driver: RuntimeDriverDescriptor<TFamilyId, TTargetId> | undefined;
-  readonly extensionPacks: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[];
+  readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId, TAdapterInstance>;
+  readonly driver: RuntimeDriverDescriptor<TFamilyId, TTargetId, TDriverInstance> | undefined;
+  readonly extensionPacks: readonly RuntimeExtensionDescriptor<
+    TFamilyId,
+    TTargetId,
+    TExtensionInstance
+  >[];
 }
 
-export interface ExecutionStackInstance<TFamilyId extends string, TTargetId extends string> {
-  readonly stack: ExecutionStack<TFamilyId, TTargetId>;
+export interface ExecutionStackInstance<
+  TFamilyId extends string,
+  TTargetId extends string,
+  TAdapterInstance extends RuntimeAdapterInstance<TFamilyId, TTargetId> = RuntimeAdapterInstance<
+    TFamilyId,
+    TTargetId
+  >,
+  TDriverInstance extends RuntimeDriverInstance<TFamilyId, TTargetId> = RuntimeDriverInstance<
+    TFamilyId,
+    TTargetId
+  >,
+  TExtensionInstance extends RuntimeExtensionInstance<
+    TFamilyId,
+    TTargetId
+  > = RuntimeExtensionInstance<TFamilyId, TTargetId>,
+> {
+  readonly stack: ExecutionStack<
+    TFamilyId,
+    TTargetId,
+    TAdapterInstance,
+    TDriverInstance,
+    TExtensionInstance
+  >;
   readonly target: RuntimeTargetInstance<TFamilyId, TTargetId>;
-  readonly adapter: RuntimeAdapterInstance<TFamilyId, TTargetId>;
-  readonly extensionPacks: readonly RuntimeExtensionInstance<TFamilyId, TTargetId>[];
+  readonly adapter: TAdapterInstance;
+  readonly extensionPacks: readonly TExtensionInstance[];
 }
 
-export function createExecutionStack<TFamilyId extends string, TTargetId extends string>(input: {
+export function createExecutionStack<
+  TFamilyId extends string,
+  TTargetId extends string,
+  TAdapterInstance extends RuntimeAdapterInstance<TFamilyId, TTargetId>,
+  TDriverInstance extends RuntimeDriverInstance<TFamilyId, TTargetId>,
+  TExtensionInstance extends RuntimeExtensionInstance<TFamilyId, TTargetId>,
+>(input: {
   readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
-  readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId>;
-  readonly driver?: RuntimeDriverDescriptor<TFamilyId, TTargetId> | undefined;
-  readonly extensionPacks?: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[] | undefined;
-}): ExecutionStack<TFamilyId, TTargetId> {
+  readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId, TAdapterInstance>;
+  readonly driver?: RuntimeDriverDescriptor<TFamilyId, TTargetId, TDriverInstance> | undefined;
+  readonly extensionPacks?:
+    | readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId, TExtensionInstance>[]
+    | undefined;
+}): ExecutionStack<TFamilyId, TTargetId, TAdapterInstance, TDriverInstance, TExtensionInstance> {
   return {
     target: input.target,
     adapter: input.adapter,
@@ -37,9 +85,27 @@ export function createExecutionStack<TFamilyId extends string, TTargetId extends
   };
 }
 
-export function instantiateExecutionStack<TFamilyId extends string, TTargetId extends string>(
-  stack: ExecutionStack<TFamilyId, TTargetId>,
-): ExecutionStackInstance<TFamilyId, TTargetId> {
+export function instantiateExecutionStack<
+  TFamilyId extends string,
+  TTargetId extends string,
+  TAdapterInstance extends RuntimeAdapterInstance<TFamilyId, TTargetId>,
+  TDriverInstance extends RuntimeDriverInstance<TFamilyId, TTargetId>,
+  TExtensionInstance extends RuntimeExtensionInstance<TFamilyId, TTargetId>,
+>(
+  stack: ExecutionStack<
+    TFamilyId,
+    TTargetId,
+    TAdapterInstance,
+    TDriverInstance,
+    TExtensionInstance
+  >,
+): ExecutionStackInstance<
+  TFamilyId,
+  TTargetId,
+  TAdapterInstance,
+  TDriverInstance,
+  TExtensionInstance
+> {
   return {
     stack,
     target: stack.target.create(),
