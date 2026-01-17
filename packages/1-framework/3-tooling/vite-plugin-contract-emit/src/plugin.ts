@@ -132,22 +132,16 @@ export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginO
     }, debounceMs);
   }
 
-  function toViteModuleId(absolutePath: string): string {
-    return `/@fs${absolutePath}`;
-  }
-
   async function collectWatchedFiles(viteServer: ViteDevServer): Promise<Set<string>> {
     const files = new Set<string>();
 
     try {
       // Load the config module through Vite's SSR loader to populate the module graph
-      // Vite expects module IDs with /@fs/ prefix for absolute paths
-      const viteModuleId = toViteModuleId(absoluteConfigPath);
-      await viteServer.ssrLoadModule(viteModuleId);
+      await viteServer.ssrLoadModule(absoluteConfigPath);
 
       // Crawl the module graph starting from the config file
       const visited = new Set<string>();
-      const queue = [viteModuleId];
+      const queue = [absoluteConfigPath];
 
       while (queue.length > 0) {
         const current = queue.shift();
