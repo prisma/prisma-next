@@ -1,6 +1,6 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { sql, tables } from '../prisma/query-no-emit';
+import { sql, tables } from '../prisma-no-emit/query-no-emit';
 import { collect } from './utils';
 
 export async function getUserPosts(userId: number, runtime: Runtime) {

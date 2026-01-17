@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { closeRuntime } from './prisma/runtime-no-emit';
+import { closeRuntime } from './prisma-no-emit/runtime-no-emit';
 import { getUserById } from './queries/get-user-by-id-no-emit';
 import { getUserPosts } from './queries/get-user-posts-no-emit';
 import { getUsers } from './queries/get-users-no-emit';

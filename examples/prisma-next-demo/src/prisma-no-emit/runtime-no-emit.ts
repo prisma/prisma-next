@@ -1,16 +1,12 @@
 import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
 import { executionContext, executionStackInstance } from './query-no-emit';
-import { loadRuntimeConfig } from './runtime-config';
 
 let runtime: Runtime | undefined;
-let pool: Pool | undefined;
 
-export function getRuntime(): Runtime {
+export function getRuntime(databaseUrl: string): Runtime {
   if (!runtime) {
-    const { databaseUrl } = loadRuntimeConfig();
-
-    pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool({ connectionString: databaseUrl });
 
     runtime = createRuntime({
       stack: executionStackInstance,
@@ -41,9 +37,5 @@ export async function closeRuntime() {
   if (runtime) {
     await runtime.close();
     runtime = undefined;
-  }
-  // Pool is closed by runtime.close() -> driver.close(), so we just clear the reference
-  if (pool) {
-    pool = undefined;
   }
 }

@@ -7,12 +7,30 @@ import { getUsers } from './queries/get-users';
 import { getUsersWithPosts } from './queries/get-users-with-posts';
 import { ormGetUsersBackward, ormGetUsersByIdCursor } from './queries/orm-pagination';
 import { similaritySearch } from './queries/similarity-search';
+import { type as arktype } from 'arktype';
+
+const appConfigSchema = arktype({
+  DATABASE_URL: 'string',
+});
+
+export function loadAppConfig() {
+  const result = appConfigSchema({
+    DATABASE_URL: process.env['DATABASE_URL'],
+  });
+  if (result instanceof arktype.errors) {
+    const message = result.map((p: { message: string }) => p.message).join('; ');
+    throw new Error(`Invalid app configuration: ${message}`);
+  }
+  const parsed = result as { DATABASE_URL: string };
+  return { databaseUrl: parsed.DATABASE_URL };
+}
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
 
 async function main() {
-  const runtime = getRuntime();
+  const { databaseUrl } = loadAppConfig();
+  const runtime = getRuntime(databaseUrl);
   try {
     if (cmd === 'users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
