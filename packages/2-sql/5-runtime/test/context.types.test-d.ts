@@ -36,9 +36,7 @@ type TestContract = SqlContract<
 test('RuntimeContext.types is TypeHelperRegistry', () => {
   // RuntimeContext.types is intentionally loose (Record<string, unknown>)
   // The strong typing comes from schema(context).types via ExtractSchemaTypes
-  expectTypeOf<RuntimeContext<TestContract>['types']>().toEqualTypeOf<
-    TypeHelperRegistry | undefined
-  >();
+  expectTypeOf<RuntimeContext<TestContract>['types']>().toEqualTypeOf<TypeHelperRegistry>();
 
   // TypeHelperRegistry allows any values - the actual type depends on init hooks
   expectTypeOf<TypeHelperRegistry>().toEqualTypeOf<Record<string, unknown>>();
@@ -66,5 +64,5 @@ test('RuntimeContext accepts generic SqlContract', () => {
   // Verify RuntimeContext defaults work
   type DefaultContext = RuntimeContext;
   expectTypeOf<DefaultContext['contract']>().toExtend<SqlContract<SqlStorage>>();
-  expectTypeOf<DefaultContext['types']>().toEqualTypeOf<TypeHelperRegistry | undefined>();
+  expectTypeOf<DefaultContext['types']>().toEqualTypeOf<TypeHelperRegistry>();
 });

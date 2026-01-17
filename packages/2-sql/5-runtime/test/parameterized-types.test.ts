@@ -157,7 +157,7 @@ describe('parameterized types', () => {
         },
       });
       // types registry should contain the raw type instance (no init hook provided)
-      expect(context.types?.['Vector1536']).toBeDefined();
+      expect(context.types['Vector1536']).toBeDefined();
     });
   });
 
@@ -223,7 +223,7 @@ describe('parameterized types', () => {
         extensionPacks: [createVectorExtensionDescriptor()],
       });
 
-      expect(context.types?.['Vector1536']).toBeDefined();
+      expect(context.types['Vector1536']).toBeDefined();
     });
 
     it('rejects invalid typeParams with stable error code', () => {
@@ -352,7 +352,7 @@ describe('parameterized types', () => {
         extensionPacks: [extensionDescriptor],
       });
 
-      expect(context.types?.['Vector1536']).toEqual({
+      expect(context.types['Vector1536']).toEqual({
         dimensions: 1536,
         isVector: true,
       });
@@ -412,7 +412,7 @@ describe('parameterized types', () => {
       });
 
       // Without init hook, stores the full type instance (matches contract typing)
-      expect(context.types?.['Vector1536']).toEqual({
+      expect(context.types['Vector1536']).toEqual({
         codecId: 'pg/vector@1',
         nativeType: 'vector',
         typeParams: { length: 1536 },

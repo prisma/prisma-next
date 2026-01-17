@@ -89,6 +89,7 @@ function createTestContext(contract: SqlContract<SqlStorage>): RuntimeContext<ty
     adapter,
     codecs: adapter.profile.codecs(),
     operations: createOperationRegistry(),
+    types: {},
   };
 }
 
