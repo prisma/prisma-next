@@ -168,6 +168,42 @@ describe('prismaVitePlugin', () => {
       expect(mockServer.httpServer.on).toHaveBeenCalledWith('close', expect.any(Function));
       expect(mockServer.watcher.on).toHaveBeenCalledWith('close', expect.any(Function));
     });
+
+    it('shows error overlay when no files are being watched', async () => {
+      const { executeContractEmit } = await import('@prisma-next/cli/control-api');
+      const mockExecute = vi.mocked(executeContractEmit);
+      mockExecute.mockResolvedValue({
+        coreHash: 'abc123',
+        profileHash: 'def456',
+        files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
+      });
+
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'info' });
+      const mockServer = createMockServer();
+
+      // Module graph returns null, so no files will be collected
+      mockServer.moduleGraph.getModuleById.mockReturnValue(null);
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      // Should send error to Vite overlay
+      expect(mockServer.ws.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          err: expect.objectContaining({
+            message: expect.stringContaining('No files are being watched'),
+          }),
+        }),
+      );
+    });
   });
 
   describe('handleHotUpdate', () => {

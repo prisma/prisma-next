@@ -246,10 +246,26 @@ export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginO
         viteServer.watcher.add(file);
       }
 
-      log(`Watching ${watchedFiles.size} files`, 'debug');
-      if (logLevel === 'debug') {
-        for (const file of watchedFiles) {
-          log(`  ${file}`, 'debug');
+      // Error if no files are being watched - this indicates a configuration problem
+      if (watchedFiles.size === 0) {
+        const errorMessage =
+          `No files are being watched. The config file "${absoluteConfigPath}" could not be loaded ` +
+          'or has no dependencies. HMR for contract changes will not work.';
+        logError(errorMessage);
+        viteServer.ws.send({
+          type: 'error',
+          err: {
+            message: `[prisma-next] ${errorMessage}`,
+            stack: '',
+            plugin: PLUGIN_NAME,
+          },
+        });
+      } else {
+        log(`Watching ${watchedFiles.size} files`, 'debug');
+        if (logLevel === 'debug') {
+          for (const file of watchedFiles) {
+            log(`  ${file}`, 'debug');
+          }
         }
       }
 
