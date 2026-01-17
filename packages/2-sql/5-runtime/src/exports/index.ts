@@ -12,8 +12,6 @@ export {
   validateCodecRegistryCompleteness,
   validateContractCodecMappings,
 } from '../codecs/validation';
-export type { ExecutionStack } from '../execution-stack';
-export { createExecutionStack } from '../execution-stack';
 export { lowerSqlPlan } from '../lower-sql-plan';
 export type {
   CreateRuntimeContextOptions,
@@ -26,7 +24,7 @@ export type {
   SqlRuntimeExtensionInstance,
   TypeHelperRegistry,
 } from '../sql-context';
-export { createRuntimeContext } from '../sql-context';
+export { createExecutionContext, createRuntimeContext } from '../sql-context';
 export type { SqlStatement } from '../sql-marker';
 export {
   ensureSchemaStatement,
@@ -36,7 +34,6 @@ export {
 } from '../sql-marker';
 export type {
   Runtime,
-  RuntimeOptions,
   RuntimeStackOptions,
   RuntimeTelemetryEvent,
   RuntimeVerifyOptions,

@@ -1,3 +1,7 @@
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeDriverDescriptor,
@@ -12,7 +16,7 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { createExecutionStack } from '../src/execution-stack';
+import { createExecutionContext } from '../src/exports';
 import type {
   ExecutionContext,
   SqlRuntimeAdapterInstance,
@@ -179,7 +183,11 @@ describe('createExecutionStack', () => {
       storage: { tables: {} },
     });
 
-    const context = stack.createContext({ contract }) as ExecutionContext<typeof contract>;
+    const stackInstance = instantiateExecutionStack(stack);
+    const context = createExecutionContext({
+      contract,
+      stack: stackInstance,
+    }) as ExecutionContext<typeof contract>;
 
     expect(context.contract).toBe(contract);
     expect(context.codecs.get('pg/text@1')).toBeDefined();

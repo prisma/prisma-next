@@ -1,4 +1,9 @@
 import type { ExecutionPlan, ResultType } from '@prisma-next/contract/types';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
+import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -16,6 +21,7 @@ import {
 import type {
   RuntimeContext,
   SqlRuntimeAdapterInstance,
+  SqlRuntimeDriverInstance,
   SqlRuntimeExtensionDescriptor,
 } from '../src/sql-context';
 
@@ -174,6 +180,20 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
     adapter: createTestAdapterDescriptor(adapter),
     extensionPacks: options?.extensionPacks ?? [],
   });
+}
+
+export function createTestStackInstance(options?: {
+  extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
+  driver?: RuntimeDriverDescriptor<'sql', 'postgres', SqlRuntimeDriverInstance<'postgres'>>;
+}) {
+  const stack = createExecutionStack({
+    target: createTestTargetDescriptor(),
+    adapter: createTestAdapterDescriptor(createStubAdapter()),
+    driver: options?.driver,
+    extensionPacks: options?.extensionPacks ?? [],
+  });
+
+  return instantiateExecutionStack(stack);
 }
 
 /**

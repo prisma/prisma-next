@@ -41,7 +41,8 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import { createExecutionStack, createRuntime } from '@prisma-next/sql-runtime';
+import { createExecutionStack, instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
 
 const contract = validateContract<Contract>(contractJson);
 const stack = createExecutionStack({
@@ -51,10 +52,12 @@ const stack = createExecutionStack({
   extensionPacks: [pgvector],
 });
 
-const context = stack.createContext({ contract });
+const stackInstance = instantiateExecutionStack(stack);
+const context = createExecutionContext({ contract, stack: stackInstance });
 
 const runtime = createRuntime({
-  stack,
+  stack: stackInstance,
+  contract,
   context,
   driverOptions: { connect: { connectionString: process.env.DATABASE_URL } },
   verify: { mode: 'onFirstUse', requireMarker: false },
@@ -69,9 +72,9 @@ for await (const row of runtime.execute(plan)) {
 ## Exports
 
 - `createRuntime` - Create a SQL runtime instance
-- `createExecutionStack` - Compose runtime descriptors into a stack
+- `createExecutionContext` - Create an env-free execution context
 - `createRuntimeContext` - Create a SQL runtime context
-- `ExecutionStack`, `ExecutionContext`, `RuntimeContext` - Context and stack types
+- `ExecutionContext`, `RuntimeContext` - Context types
 - `budgets`, `lints` - SQL-compatible plugins (re-exported from runtime-executor)
 - `readContractMarker`, `writeContractMarker` - SQL marker statements
 - `encodeParams`, `decodeRow` - Codec encoding/decoding utilities
@@ -81,15 +84,17 @@ for await (const row of runtime.execute(plan)) {
 
 The SQL runtime composes runtime-executor with SQL-specific implementations:
 
-1. **ExecutionStack**: Holds runtime descriptors and builds `ExecutionContext`
-2. **SqlFamilyAdapter**: Implements `RuntimeFamilyAdapter` for SQL contracts
-3. **SqlRuntime**: Wraps `RuntimeCore` and adds SQL-specific encoding/decoding
-4. **SqlContext**: Creates runtime contexts with SQL contracts, adapters, and codecs
-5. **SqlMarker**: Provides SQL statements for marker management
+1. **ExecutionStack**: Descriptors-only stack (from `@prisma-next/core-execution-plane`)
+2. **ExecutionStackInstance**: Instantiated components used for runtime/context creation
+3. **SqlFamilyAdapter**: Implements `RuntimeFamilyAdapter` for SQL contracts
+4. **SqlRuntime**: Wraps `RuntimeCore` and adds SQL-specific encoding/decoding
+5. **SqlContext**: Creates runtime contexts with SQL contracts, adapters, and codecs
+6. **SqlMarker**: Provides SQL statements for marker management
 
 ```mermaid
 flowchart LR
-  Stack[ExecutionStack] --> Context[ExecutionContext]
+  Stack[ExecutionStack] --> StackI[ExecutionStackInstance]
+  StackI --> Context[ExecutionContext]
   Stack --> DriverDesc[Driver Descriptor]
   Stack --> AdapterDesc[Adapter Descriptor]
   Stack --> Packs[Extension Packs]

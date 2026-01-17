@@ -1,4 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type {
   Log,
@@ -26,13 +27,9 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
-import type { ExecutionStack } from './execution-stack';
-import {
-  assertExecutionStackContractRequirements,
-  getExecutionStackInstances,
-} from './execution-stack';
 import { lowerSqlPlan } from './lower-sql-plan';
 import type { ExecutionContext, RuntimeContext } from './sql-context';
+import { createExecutionContext } from './sql-context';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
 export interface RuntimeOptions<
@@ -54,8 +51,9 @@ export interface RuntimeStackOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   TTargetId extends string = string,
 > {
-  readonly stack: ExecutionStack<TTargetId>;
-  readonly context: ExecutionContext<TContract>;
+  readonly stack: ExecutionStackInstance<'sql', TTargetId>;
+  readonly contract: TContract;
+  readonly context?: ExecutionContext<TContract>;
   readonly driverOptions?: unknown;
   readonly verify: RuntimeVerifyOptions;
   readonly plugins?: readonly Plugin<
@@ -211,25 +209,27 @@ function createRuntimeFromStack<
   TContract extends SqlContract<SqlStorage>,
   TTargetId extends string,
 >(options: RuntimeStackOptions<TContract, TTargetId>): Runtime {
-  const { stack, context, driverOptions, verify, plugins, mode, log } = options;
-  const contract = context.contract;
-
-  assertExecutionStackContractRequirements(contract, stack);
-  const { adapterInstance } = getExecutionStackInstances(stack);
+  const { stack, contract, context, driverOptions, verify, plugins, mode, log } = options;
+  const resolvedContext =
+    context ??
+    createExecutionContext({
+      contract,
+      stack,
+    });
 
   const runtimeContext: RuntimeContext<TContract> = {
-    ...context,
-    adapter: adapterInstance,
+    ...resolvedContext,
+    adapter: stack.adapter,
   };
 
-  if (driverOptions !== undefined && !stack.driver) {
+  if (driverOptions !== undefined && !stack.stack.driver) {
     throw new Error('Driver options provided, but the execution stack has no driver descriptor.');
   }
 
-  const driver = stack.driver
+  const driver = stack.stack.driver
     ? driverOptions === undefined
       ? createOfflineDriver()
-      : stack.driver.create(driverOptions)
+      : stack.stack.driver.create(driverOptions)
     : createOfflineDriver();
 
   return new SqlRuntimeImpl({
@@ -242,19 +242,12 @@ function createRuntimeFromStack<
   });
 }
 
-export function createRuntime<TContract extends SqlContract<SqlStorage>>(
-  options: RuntimeOptions<TContract>,
-): Runtime;
-
 export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
   options: RuntimeStackOptions<TContract, TTargetId>,
 ): Runtime;
 
 export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
-  options: RuntimeOptions<TContract> | RuntimeStackOptions<TContract, TTargetId>,
+  options: RuntimeStackOptions<TContract, TTargetId>,
 ): Runtime {
-  if ('stack' in options) {
-    return createRuntimeFromStack(options);
-  }
-  return new SqlRuntimeImpl(options);
+  return createRuntimeFromStack(options);
 }

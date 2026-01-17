@@ -1,3 +1,9 @@
+import { checkContractComponentRequirements } from '@prisma-next/contract/framework-components';
+import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
@@ -136,6 +142,42 @@ export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlC
    * or the validated typeParams (if no init hook).
    */
   readonly types: TypeHelperRegistry;
+}
+
+function assertExecutionStackContractRequirements(
+  contract: SqlContract<SqlStorage>,
+  stack: ExecutionStackInstance<'sql', string>['stack'],
+): void {
+  const providedComponentIds = new Set<string>([
+    stack.target.id,
+    stack.adapter.id,
+    ...stack.extensionPacks.map((pack) => pack.id),
+  ]);
+
+  const result = checkContractComponentRequirements({
+    contract,
+    expectedTargetFamily: 'sql',
+    expectedTargetId: stack.target.targetId,
+    providedComponentIds,
+  });
+
+  if (result.familyMismatch) {
+    throw new Error(
+      `Contract target family '${result.familyMismatch.actual}' does not match runtime family '${result.familyMismatch.expected}'.`,
+    );
+  }
+
+  if (result.targetMismatch) {
+    throw new Error(
+      `Contract target '${result.targetMismatch.actual}' does not match runtime target descriptor '${result.targetMismatch.expected}'.`,
+    );
+  }
+
+  for (const packId of result.missingExtensionPackIds) {
+    throw new Error(
+      `Contract requires extension pack '${packId}', but runtime descriptors do not provide a matching component.`,
+    );
+  }
 }
 
 /**
@@ -390,6 +432,21 @@ function createExecutionContextFromInstances<
   };
 }
 
+export function createExecutionContext<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  TTargetId extends string = string,
+>(options: {
+  readonly contract: TContract;
+  readonly stack: ExecutionStackInstance<'sql', TTargetId>;
+}): ExecutionContext<TContract> {
+  assertExecutionStackContractRequirements(options.contract, options.stack.stack);
+  return createExecutionContextFromInstances({
+    contract: options.contract,
+    adapterInstance: options.stack.adapter,
+    extensionInstances: options.stack.extensionPacks,
+  });
+}
+
 /**
  * Creates a SQL runtime context from descriptor-first composition.
  *
@@ -407,25 +464,20 @@ export function createRuntimeContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   TTargetId extends string = string,
 >(options: CreateRuntimeContextOptions<TContract, TTargetId>): RuntimeContext<TContract> {
-  const { contract, adapter: adapterDescriptor, extensionPacks } = options;
-
-  // Create adapter instance from descriptor
-  // The adapter instance IS an Adapter (via intersection)
-  const adapterInstance = adapterDescriptor.create();
-
-  const extensionInstances: SqlRuntimeExtensionInstance<TTargetId>[] = (extensionPacks ?? []).map(
-    (descriptor) => descriptor.create(),
-  );
-
-  const context = createExecutionContextFromInstances<TContract, TTargetId>({
-    contract,
-    adapterInstance,
-    extensionInstances,
+  const stack = createExecutionStack({
+    target: options.target,
+    adapter: options.adapter,
+    extensionPacks: options.extensionPacks ?? [],
+  });
+  const stackInstance = instantiateExecutionStack(stack);
+  const context = createExecutionContext({
+    contract: options.contract,
+    stack: stackInstance,
   });
 
   return {
     ...context,
-    adapter: adapterInstance,
+    adapter: stackInstance.adapter,
   };
 }
 

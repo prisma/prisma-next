@@ -1,4 +1,12 @@
-import { createOperationRegistry } from '@prisma-next/operations';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
+import type {
+  RuntimeAdapterDescriptor,
+  RuntimeDriverDescriptor,
+  RuntimeTargetDescriptor,
+} from '@prisma-next/core-execution-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   CodecRegistry,
@@ -8,7 +16,8 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
-import type { RuntimeContext } from '../src/sql-context';
+import type { SqlRuntimeAdapterInstance, SqlRuntimeDriverInstance } from '../src/sql-context';
+import { createExecutionContext } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 
 // Minimal test contract
@@ -81,26 +90,87 @@ function createMockDriver(): SqlDriver {
   };
 }
 
-// Create a test runtime context
-function createTestContext(contract: SqlContract<SqlStorage>): RuntimeContext<typeof contract> {
+function createTestStackInstance() {
   const adapter = createStubAdapter();
-  return {
-    contract,
-    adapter,
-    codecs: adapter.profile.codecs(),
-    operations: createOperationRegistry(),
-    types: {},
+
+  const targetDescriptor: RuntimeTargetDescriptor<'sql', 'postgres'> = {
+    kind: 'target',
+    id: 'postgres',
+    version: '0.0.1',
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    create() {
+      return { familyId: 'sql' as const, targetId: 'postgres' as const };
+    },
   };
+
+  const adapterDescriptor: RuntimeAdapterDescriptor<
+    'sql',
+    'postgres',
+    SqlRuntimeAdapterInstance<'postgres'>
+  > = {
+    kind: 'adapter',
+    id: 'test-adapter',
+    version: '0.0.1',
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    create() {
+      return Object.assign(
+        {
+          familyId: 'sql' as const,
+          targetId: 'postgres' as const,
+        },
+        adapter,
+      ) as SqlRuntimeAdapterInstance<'postgres'>;
+    },
+  };
+
+  const driver = createMockDriver();
+  const driverDescriptor: RuntimeDriverDescriptor<
+    'sql',
+    'postgres',
+    SqlRuntimeDriverInstance<'postgres'>
+  > = {
+    kind: 'driver',
+    id: 'test-driver',
+    version: '0.0.1',
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    create() {
+      return Object.assign(
+        {
+          familyId: 'sql' as const,
+          targetId: 'postgres' as const,
+        },
+        driver,
+      ) as SqlRuntimeDriverInstance<'postgres'>;
+    },
+  };
+
+  const stack = createExecutionStack({
+    target: targetDescriptor,
+    adapter: adapterDescriptor,
+    driver: driverDescriptor,
+    extensionPacks: [],
+  });
+
+  const stackInstance = instantiateExecutionStack(stack);
+  return { stackInstance, driver };
 }
 
 describe('createRuntime', () => {
   it('creates runtime with valid options', () => {
-    const context = createTestContext(testContract);
-    const driver = createMockDriver();
+    const { stackInstance } = createTestStackInstance();
+    const context = createExecutionContext({
+      contract: testContract,
+      stack: stackInstance,
+    });
 
     const runtime = createRuntime({
+      stack: stackInstance,
+      contract: testContract,
       context,
-      driver,
+      driverOptions: {},
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -112,12 +182,12 @@ describe('createRuntime', () => {
   });
 
   it('returns operations registry', () => {
-    const context = createTestContext(testContract);
-    const driver = createMockDriver();
+    const { stackInstance } = createTestStackInstance();
 
     const runtime = createRuntime({
-      context,
-      driver,
+      stack: stackInstance,
+      contract: testContract,
+      driverOptions: {},
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -127,12 +197,12 @@ describe('createRuntime', () => {
   });
 
   it('returns null telemetry when no events', () => {
-    const context = createTestContext(testContract);
-    const driver = createMockDriver();
+    const { stackInstance } = createTestStackInstance();
 
     const runtime = createRuntime({
-      context,
-      driver,
+      stack: stackInstance,
+      contract: testContract,
+      driverOptions: {},
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -141,12 +211,12 @@ describe('createRuntime', () => {
   });
 
   it('closes runtime', async () => {
-    const context = createTestContext(testContract);
-    const driver = createMockDriver();
+    const { stackInstance, driver } = createTestStackInstance();
 
     const runtime = createRuntime({
-      context,
-      driver,
+      stack: stackInstance,
+      contract: testContract,
+      driverOptions: {},
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
