@@ -12,12 +12,16 @@ export {
   validateCodecRegistryCompleteness,
   validateContractCodecMappings,
 } from '../codecs/validation';
+export type { ExecutionStack } from '../execution-stack';
+export { createExecutionStack } from '../execution-stack';
 export { lowerSqlPlan } from '../lower-sql-plan';
 export type {
   CreateRuntimeContextOptions,
+  ExecutionContext,
   RuntimeContext,
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeAdapterInstance,
+  SqlRuntimeDriverInstance,
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeExtensionInstance,
   TypeHelperRegistry,
@@ -33,6 +37,7 @@ export {
 export type {
   Runtime,
   RuntimeOptions,
+  RuntimeStackOptions,
   RuntimeTelemetryEvent,
   RuntimeVerifyOptions,
   TelemetryOutcome,

@@ -1,6 +1,7 @@
 import type {
   RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
+  RuntimeDriverInstance,
   RuntimeExtensionDescriptor,
   RuntimeExtensionInstance,
   RuntimeTargetDescriptor,
@@ -13,10 +14,11 @@ import type {
   CodecRegistry,
   LoweredStatement,
   QueryAst,
+  SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
-  QueryLaneContext,
+  ExecutionContext,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Type } from 'arktype';
@@ -105,14 +107,24 @@ export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = Runti
 > &
   Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
 
+/**
+ * SQL runtime driver instance type.
+ * Combines identity properties with SQL driver behavior methods.
+ */
+export type SqlRuntimeDriverInstance<TTargetId extends string = string> = RuntimeDriverInstance<
+  'sql',
+  TTargetId
+> &
+  SqlDriver;
+
 // ============================================================================
 // SQL Runtime Context
 // ============================================================================
 
-export type { TypeHelperRegistry };
+export type { ExecutionContext, TypeHelperRegistry };
 
 export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
-  extends QueryLaneContext<TContract> {
+  extends ExecutionContext<TContract> {
   readonly adapter:
     | Adapter<QueryAst, TContract, LoweredStatement>
     | Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
@@ -123,7 +135,7 @@ export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlC
    * The value is the result of calling the codec's init hook (if provided)
    * or the validated typeParams (if no init hook).
    */
-  readonly types?: TypeHelperRegistry;
+  readonly types: TypeHelperRegistry;
 }
 
 /**
@@ -326,6 +338,58 @@ function validateColumnTypeParams(
   }
 }
 
+function createExecutionContextFromInstances<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  TTargetId extends string = string,
+>(options: {
+  readonly contract: TContract;
+  readonly adapterInstance: SqlRuntimeAdapterInstance<TTargetId>;
+  readonly extensionInstances: ReadonlyArray<SqlRuntimeExtensionInstance<TTargetId>>;
+}): ExecutionContext<TContract> {
+  const { contract, adapterInstance, extensionInstances } = options;
+
+  const codecRegistry = createCodecRegistry();
+  const operationRegistry = createOperationRegistry();
+
+  const adapterCodecs = adapterInstance.profile.codecs();
+  for (const codec of adapterCodecs.values()) {
+    codecRegistry.register(codec);
+  }
+
+  for (const extInstance of extensionInstances) {
+    const extCodecs = extInstance.codecs?.();
+    if (extCodecs) {
+      for (const codec of extCodecs.values()) {
+        codecRegistry.register(codec);
+      }
+    }
+
+    const extOperations = extInstance.operations?.();
+    if (extOperations) {
+      for (const operation of extOperations) {
+        operationRegistry.register(operation);
+      }
+    }
+  }
+
+  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(
+    extensionInstances as ReadonlyArray<SqlRuntimeExtensionInstance<string>>,
+  );
+
+  if (parameterizedCodecDescriptors.size > 0) {
+    validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);
+  }
+
+  const types = initializeTypeHelpers(contract.storage.types, parameterizedCodecDescriptors);
+
+  return {
+    contract,
+    operations: operationRegistry,
+    codecs: codecRegistry,
+    types,
+  };
+}
+
 /**
  * Creates a SQL runtime context from descriptor-first composition.
  *
@@ -349,54 +413,20 @@ export function createRuntimeContext<
   // The adapter instance IS an Adapter (via intersection)
   const adapterInstance = adapterDescriptor.create();
 
-  // Create registries
-  const codecRegistry = createCodecRegistry();
-  const operationRegistry = createOperationRegistry();
+  const extensionInstances: SqlRuntimeExtensionInstance<TTargetId>[] = (extensionPacks ?? []).map(
+    (descriptor) => descriptor.create(),
+  );
 
-  // Register adapter codecs (adapter instance has profile.codecs())
-  const adapterCodecs = adapterInstance.profile.codecs();
-  for (const codec of adapterCodecs.values()) {
-    codecRegistry.register(codec);
-  }
-
-  // Create extension instances and collect their contributions
-  const extensionInstances: SqlRuntimeExtensionInstance<TTargetId>[] = [];
-
-  for (const extDescriptor of extensionPacks ?? []) {
-    const extInstance = extDescriptor.create();
-    extensionInstances.push(extInstance);
-
-    const extCodecs = extInstance.codecs?.();
-    if (extCodecs) {
-      for (const codec of extCodecs.values()) {
-        codecRegistry.register(codec);
-      }
-    }
-
-    const extOperations = extInstance.operations?.();
-    if (extOperations) {
-      for (const operation of extOperations) {
-        operationRegistry.register(operation);
-      }
-    }
-  }
-
-  // Collect parameterized codec descriptors from extensions
-  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(extensionInstances);
-
-  // Validate column typeParams if any descriptors are registered
-  if (parameterizedCodecDescriptors.size > 0) {
-    validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);
-  }
-
-  // Initialize type helpers from storage.types
-  const types = initializeTypeHelpers(contract.storage.types, parameterizedCodecDescriptors);
+  const context = createExecutionContextFromInstances<TContract, TTargetId>({
+    contract,
+    adapterInstance,
+    extensionInstances,
+  });
 
   return {
-    contract,
+    ...context,
     adapter: adapterInstance,
-    operations: operationRegistry,
-    codecs: codecRegistry,
-    types,
   };
 }
+
+export { createExecutionContextFromInstances };

@@ -9,7 +9,11 @@ import type {
   RuntimeVerifyOptions,
   TelemetryOutcome,
 } from '@prisma-next/runtime-executor';
-import { AsyncIterableResult, createRuntimeCore } from '@prisma-next/runtime-executor';
+import {
+  AsyncIterableResult,
+  createRuntimeCore,
+  runtimeError,
+} from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
@@ -22,8 +26,13 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
+import type { ExecutionStack } from './execution-stack';
+import {
+  assertExecutionStackContractRequirements,
+  getExecutionStackInstances,
+} from './execution-stack';
 import { lowerSqlPlan } from './lower-sql-plan';
-import type { RuntimeContext } from './sql-context';
+import type { ExecutionContext, RuntimeContext } from './sql-context';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
 export interface RuntimeOptions<
@@ -32,6 +41,23 @@ export interface RuntimeOptions<
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
   readonly context: RuntimeContext<TContract>;
+  readonly plugins?: readonly Plugin<
+    TContract,
+    Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
+    SqlDriver
+  >[];
+  readonly mode?: 'strict' | 'permissive';
+  readonly log?: Log;
+}
+
+export interface RuntimeStackOptions<
+  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
+  TTargetId extends string = string,
+> {
+  readonly stack: ExecutionStack<TTargetId>;
+  readonly context: ExecutionContext<TContract>;
+  readonly driverOptions?: unknown;
+  readonly verify: RuntimeVerifyOptions;
   readonly plugins?: readonly Plugin<
     TContract,
     Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
@@ -159,8 +185,76 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
   }
 }
 
+function createOfflineDriver(): SqlDriver {
+  const missingDriver = () =>
+    runtimeError(
+      'RUNTIME.DRIVER_MISSING',
+      'Runtime created without driver options. Provide driver options to execute queries.',
+    );
+
+  return {
+    async connect() {
+      throw missingDriver();
+    },
+    async *execute() {
+      yield* [];
+      throw missingDriver();
+    },
+    async query() {
+      throw missingDriver();
+    },
+    async close() {},
+  };
+}
+
+function createRuntimeFromStack<
+  TContract extends SqlContract<SqlStorage>,
+  TTargetId extends string,
+>(options: RuntimeStackOptions<TContract, TTargetId>): Runtime {
+  const { stack, context, driverOptions, verify, plugins, mode, log } = options;
+  const contract = context.contract;
+
+  assertExecutionStackContractRequirements(contract, stack);
+  const { adapterInstance } = getExecutionStackInstances(stack);
+
+  const runtimeContext: RuntimeContext<TContract> = {
+    ...context,
+    adapter: adapterInstance,
+  };
+
+  if (driverOptions !== undefined && !stack.driver) {
+    throw new Error('Driver options provided, but the execution stack has no driver descriptor.');
+  }
+
+  const driver = stack.driver
+    ? driverOptions === undefined
+      ? createOfflineDriver()
+      : stack.driver.create(driverOptions)
+    : createOfflineDriver();
+
+  return new SqlRuntimeImpl({
+    context: runtimeContext,
+    driver,
+    verify,
+    ...(plugins ? { plugins } : {}),
+    ...(mode ? { mode } : {}),
+    ...(log ? { log } : {}),
+  });
+}
+
 export function createRuntime<TContract extends SqlContract<SqlStorage>>(
   options: RuntimeOptions<TContract>,
+): Runtime;
+
+export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
+  options: RuntimeStackOptions<TContract, TTargetId>,
+): Runtime;
+
+export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
+  options: RuntimeOptions<TContract> | RuntimeStackOptions<TContract, TTargetId>,
 ): Runtime {
+  if ('stack' in options) {
+    return createRuntimeFromStack(options);
+  }
   return new SqlRuntimeImpl(options);
 }
