@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
@@ -109,10 +110,10 @@ export async function executeContractEmit(
   throwIfAborted(signal);
 
   // Create directories if needed and write files
-  mkdirSync(dirname(outputJsonPath), { recursive: true });
-  mkdirSync(dirname(outputDtsPath), { recursive: true });
-  writeFileSync(outputJsonPath, emitResult.contractJson, 'utf-8');
-  writeFileSync(outputDtsPath, emitResult.contractDts, 'utf-8');
+  await mkdir(dirname(outputJsonPath), { recursive: true });
+  await mkdir(dirname(outputDtsPath), { recursive: true });
+  await writeFile(outputJsonPath, emitResult.contractJson, 'utf-8');
+  await writeFile(outputDtsPath, emitResult.contractDts, 'utf-8');
 
   return {
     coreHash: emitResult.coreHash,
