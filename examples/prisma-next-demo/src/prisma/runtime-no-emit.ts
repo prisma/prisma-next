@@ -1,43 +1,20 @@
-import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import sqlFamily from '@prisma-next/family-sql/runtime';
-import {
-  budgets,
-  createRuntimeContext,
-  type Runtime,
-  type RuntimeContext,
-} from '@prisma-next/sql-runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
-import { contract } from '../../prisma/contract';
+import { executionContext, executionStack } from './query-no-emit';
+import { loadRuntimeConfig } from './runtime-config';
 
 let runtime: Runtime | undefined;
-let context: RuntimeContext<typeof contract> | undefined;
 let pool: Pool | undefined;
 
 export function getRuntime(): Runtime {
   if (!runtime) {
-    const connectionString = process.env['DATABASE_URL'];
-    if (!connectionString) {
-      throw new Error('DATABASE_URL environment variable is required');
-    }
+    const { databaseUrl } = loadRuntimeConfig();
 
-    // Use contract directly from TypeScript - no emit needed!
-    // The contract is already validated at build time via the builder API
+    pool = new Pool({ connectionString: databaseUrl });
 
-    pool = new Pool({ connectionString });
-
-    // Create runtime family instance from descriptors (extension packs routed through composition)
-    const familyInstance = sqlFamily.create({
-      target: postgresTarget,
-      adapter: postgresAdapter,
-      driver: postgresDriver,
-      extensionPacks: [],
-    });
-
-    // Create runtime using family instance
-    runtime = familyInstance.createRuntime({
-      contract,
+    runtime = createRuntime({
+      stack: executionStack,
+      context: executionContext,
       driverOptions: {
         connect: { pool },
         cursor: { disabled: true },
@@ -55,26 +32,8 @@ export function getRuntime(): Runtime {
         }),
       ],
     });
-
-    // Create context for schema/query builders
-    context = createRuntimeContext({
-      contract,
-      target: postgresTarget,
-      adapter: postgresAdapter,
-      extensionPacks: [],
-    });
   }
   return runtime;
-}
-
-export function getContext(): RuntimeContext<typeof contract> {
-  if (!context) {
-    getRuntime();
-  }
-  if (!context) {
-    throw new Error('Context not initialized');
-  }
-  return context;
 }
 
 export async function closeRuntime() {
@@ -86,6 +45,4 @@ export async function closeRuntime() {
   if (pool) {
     pool = undefined;
   }
-  // Clear context reference as well
-  context = undefined;
 }
