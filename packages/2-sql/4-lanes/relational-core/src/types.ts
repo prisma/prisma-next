@@ -17,7 +17,7 @@ import type {
   QueryAst,
 } from './ast/types';
 import type { SqlQueryPlan } from './plan';
-import type { QueryLaneContext } from './query-lane-context';
+import type { ExecutionContext } from './query-lane-context';
 
 export interface ParamPlaceholder {
   readonly kind: 'param-placeholder';
@@ -788,7 +788,7 @@ export interface BuildOptions {
 export interface SqlBuilderOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
-  readonly context: QueryLaneContext<TContract>;
+  readonly context: ExecutionContext<TContract>;
 }
 
 /**

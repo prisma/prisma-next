@@ -3,7 +3,7 @@ import { planInvalid } from '@prisma-next/plan';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SelectAst, TableRef } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
@@ -53,7 +53,7 @@ export class OrmModelBuilderImpl<
   Row = unknown,
 > implements OrmModelBuilder<TContract, CodecTypes, ModelName, Includes, Row>
 {
-  private readonly context: QueryLaneContext<TContract>;
+  private readonly context: ExecutionContext<TContract>;
   private readonly contract: TContract;
   private readonly modelName: ModelName;
   private table: TableRef;

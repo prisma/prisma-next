@@ -16,15 +16,18 @@ export type TypeHelperRegistry = Record<string, unknown>;
  * operation builders. This interface explicitly excludes runtime concerns like
  * adapters, connection management, and transaction state.
  */
-export interface QueryLaneContext<
+export interface ExecutionContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
   readonly contract: TContract;
   readonly operations: OperationRegistry;
   readonly codecs: CodecRegistry;
   /**
-   * Optional type helper registry for parameterized types.
-   * When present, schema() will expose these helpers via schema.types.
+   * Type helper registry for parameterized types.
+   * Schema builders expose these helpers via schema.types.
    */
-  readonly types?: TypeHelperRegistry;
+  readonly types: TypeHelperRegistry;
 }
+
+export type QueryLaneContext<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>> =
+  ExecutionContext<TContract>;
