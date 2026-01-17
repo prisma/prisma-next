@@ -12,10 +12,11 @@ const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
 
 async function main() {
+  const runtime = getRuntime();
   try {
     if (cmd === 'users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
-      const users = await getUsers(limit);
+      const users = await getUsers(runtime, limit);
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'user') {
       const [userIdStr] = args;
@@ -24,7 +25,7 @@ async function main() {
         process.exit(1);
       }
       const userId = Number.parseInt(userIdStr, 10);
-      const user = await getUserById(userId);
+      const user = await getUserById(userId, runtime);
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'posts') {
       const [userIdStr] = args;
@@ -33,11 +34,11 @@ async function main() {
         process.exit(1);
       }
       const userId = Number.parseInt(userIdStr, 10);
-      const posts = await getUserPosts(userId);
+      const posts = await getUserPosts(userId, runtime);
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'users-with-posts') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
-      const users = await getUsersWithPosts(limit);
+      const users = await getUsersWithPosts(runtime, limit);
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'similarity-search') {
       const [queryVectorStr, limitStr] = args;
@@ -61,13 +62,12 @@ async function main() {
         process.exit(1);
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-      const results = await similaritySearch(queryVector, limit);
+      const results = await similaritySearch(queryVector, runtime, limit);
       console.log(JSON.stringify(results, null, 2));
     } else if (cmd === 'users-paginate') {
       const [cursorStr, limitStr] = args;
       const cursor = cursorStr ? Number.parseInt(cursorStr, 10) : null;
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-      const runtime = getRuntime();
       const users = await ormGetUsersByIdCursor(cursor, limit, runtime);
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'users-paginate-back') {
@@ -78,14 +78,13 @@ async function main() {
       }
       const cursor = Number.parseInt(cursorStr, 10);
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-      const runtime = getRuntime();
       const users = await ormGetUsersBackward(cursor, limit, runtime);
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'budget-violation') {
       console.log('Running unbounded query to demonstrate budget violation...');
       console.log('This query has no LIMIT clause and will trigger BUDGET.ROWS_EXCEEDED error.\n');
       try {
-        const result = await getAllPostsUnbounded();
+        const result = await getAllPostsUnbounded(runtime);
         console.log(JSON.stringify(result, null, 2));
       } catch (error) {
         console.error('Budget violation caught:');

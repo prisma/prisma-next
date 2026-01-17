@@ -1,15 +1,14 @@
 import type { ResultType } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
+import type { Runtime } from '@prisma-next/sql-runtime';
 import { sql, tables } from '../prisma/query';
-import { getRuntime } from '../prisma/runtime';
 import { collect } from './utils';
 
 /**
  * Search for posts by cosine distance to a query vector.
  * Returns the top N posts ordered by similarity (closest first).
  */
-export async function similaritySearch(queryVector: number[], limit = 10) {
-  const runtime = getRuntime();
+export async function similaritySearch(queryVector: number[], runtime: Runtime, limit = 10) {
   const postTable = tables.post;
 
   const queryParam = param('queryVector');
