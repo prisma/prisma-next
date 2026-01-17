@@ -26,6 +26,8 @@ export {
 
 // CLI-specific types
 export type {
+  ContractEmitOptions,
+  ContractEmitResult,
   ContractSourceLoader,
   ContractSourceValue,
   ControlActionName,
