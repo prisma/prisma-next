@@ -1,6 +1,6 @@
 import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
-import { executionContext, executionStackInstance } from './query';
+import { executionContext, executionStackInstance } from './execution-context';
 import { loadRuntimeConfig } from './runtime-config';
 
 let runtime: Runtime | undefined;
