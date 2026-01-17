@@ -34,10 +34,22 @@
     "node": ">=20"
   },
   "exports": {
-    "./framework-components": "./dist/framework-components.mjs",
-    "./ir": "./dist/ir.mjs",
-    "./pack-manifest-types": "./dist/pack-manifest-types.mjs",
-    "./types": "./dist/types.mjs",
+    "./framework-components": {
+      "types": "./dist/framework-components.d.mts",
+      "import": "./dist/framework-components.mjs"
+    },
+    "./ir": {
+      "types": "./dist/ir.d.mts",
+      "import": "./dist/ir.mjs"
+    },
+    "./pack-manifest-types": {
+      "types": "./dist/pack-manifest-types.d.mts",
+      "import": "./dist/pack-manifest-types.mjs"
+    },
+    "./types": {
+      "types": "./dist/types.d.mts",
+      "import": "./dist/types.mjs"
+    },
     "./package.json": "./package.json"
   }
 }
