@@ -1,14 +1,23 @@
 import { createRuntime } from '@prisma-next/sql-runtime';
 import { describe, expect, it, vi } from 'vitest';
 
-async function loadQueryModule() {
+async function loadModules() {
   vi.resetModules();
-  return import('../src/prisma/query');
+  const [executionContextModule, queryModule] = await Promise.all([
+    import('../src/prisma/execution-context'),
+    import('../src/prisma/query'),
+  ]);
+  return {
+    executionStackInstance: executionContextModule.executionStackInstance,
+    executionContext: executionContextModule.executionContext,
+    sql: queryModule.sql,
+    tables: queryModule.tables,
+  };
 }
 
 describe('demo runtime offline', () => {
   it('builds plans without driver options', async () => {
-    const { executionStackInstance, executionContext, sql, tables } = await loadQueryModule();
+    const { executionStackInstance, executionContext, sql, tables } = await loadModules();
 
     const runtime = createRuntime({
       stack: executionStackInstance,
@@ -38,7 +47,7 @@ describe('demo runtime offline', () => {
     delete process.env['DATABASE_URL'];
 
     try {
-      const { executionContext, sql, tables } = await loadQueryModule();
+      const { executionContext, sql, tables } = await loadModules();
 
       expect(executionContext.contract.target).toBe('postgres');
       const plan = sql.from(tables.user).select({ id: tables.user.columns.id }).limit(1).build();

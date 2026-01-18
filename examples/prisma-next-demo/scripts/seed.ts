@@ -5,24 +5,11 @@ import { loadContractFromTs } from '@prisma-next/cli';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { schema, sql } from '../src/prisma/query';
-import { closeRuntime, getRuntime } from '../src/prisma/runtime';
+import { getRuntime } from '../src/prisma/runtime';
 import { createDemoControlClient } from '../test/utils/control-client';
-
-async function collectRows<P extends ExecutionPlan | SqlQueryPlan<unknown>>(
-  plan: P,
-): Promise<ResultType<P>[]> {
-  const runtime = getRuntime();
-  const rows: ResultType<P>[] = [];
-  for await (const row of runtime.execute(plan)) {
-    rows.push(row as ResultType<P>);
-  }
-  return rows;
-}
 
 async function initializeSchema() {
   const connectionString = process.env['DATABASE_URL'];
@@ -51,6 +38,9 @@ async function main() {
   // Initialize schema using control client
   await initializeSchema();
 
+  // biome-ignore lint/style/noNonNullAssertion: don't care about type safety in seed script
+  const runtime = getRuntime(process.env['DATABASE_URL']!);
+
   const tables = schema.tables;
   const userTable = tables.user;
   const postTable = tables.post;
@@ -69,7 +59,7 @@ async function main() {
       },
     });
 
-  const alice = (await collectRows(alicePlan))[0];
+  const alice = (await runtime.execute(alicePlan).toArray())[0];
 
   const bobPlan = sql
     .insert(userTable, {
@@ -82,7 +72,7 @@ async function main() {
       },
     });
 
-  const bob = (await collectRows(bobPlan))[0];
+  const bob = (await runtime.execute(bobPlan).toArray())[0];
 
   if (!alice || !bob) {
     throw new Error('Failed to create users');
@@ -120,7 +110,7 @@ async function main() {
       },
     });
 
-  const post1 = (await collectRows(post1Plan))[0];
+  const post1 = (await runtime.execute(post1Plan).toArray())[0];
 
   const post2Plan = sql
     .insert(postTable, {
@@ -137,7 +127,7 @@ async function main() {
       },
     });
 
-  const post2 = (await collectRows(post2Plan))[0];
+  const post2 = (await runtime.execute(post2Plan).toArray())[0];
 
   const post3Plan = sql
     .insert(postTable, {
@@ -154,20 +144,18 @@ async function main() {
       },
     });
 
-  const post3 = (await collectRows(post3Plan))[0];
+  const post3 = (await runtime.execute(post3Plan).toArray())[0];
 
   if (post1) console.log(`Created post: ${post1.title} (id: ${post1.id}, userId: ${post1.userId})`);
   if (post2) console.log(`Created post: ${post2.title} (id: ${post2.id}, userId: ${post2.userId})`);
   if (post3) console.log(`Created post: ${post3.title} (id: ${post3.id}, userId: ${post3.userId})`);
 
   console.log('Seed completed successfully!');
+
+  await runtime.close();
 }
 
-main()
-  .catch((e) => {
-    console.error('Error seeding database:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await closeRuntime();
-  });
+main().catch((e) => {
+  console.error('Error seeding database:', e);
+  process.exit(1);
+});
