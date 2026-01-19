@@ -6,6 +6,7 @@ import type { PrismaVitePluginOptions } from './types';
 
 const PLUGIN_NAME = 'prisma-vite-plugin-contract-emit';
 const DEFAULT_DEBOUNCE_MS = 150;
+const DEFAULT_CONFIG_PATH = 'prisma-next.config.ts';
 
 /**
  * Creates a Vite plugin that automatically emits Prisma Next contract artifacts.
@@ -13,7 +14,7 @@ const DEFAULT_DEBOUNCE_MS = 150;
  * The plugin watches the config file and its transitive dependencies, re-emitting
  * contract artifacts on changes with debounce and "last change wins" semantics.
  *
- * @param configPath - Path to prisma-next.config.ts (relative or absolute)
+ * @param configPath - Path to prisma-next.config.ts (relative or absolute). Defaults to 'prisma-next.config.ts'
  * @param options - Optional plugin configuration
  * @returns Vite plugin
  *
@@ -22,12 +23,21 @@ const DEFAULT_DEBOUNCE_MS = 150;
  * import { defineConfig } from 'vite';
  * import { prismaVitePlugin } from '@prisma-next/vite-plugin-contract-emit';
  *
+ * // Use default config path
  * export default defineConfig({
- *   plugins: [prismaVitePlugin('prisma-next.config.ts')],
+ *   plugins: [prismaVitePlugin()],
+ * });
+ *
+ * // Or specify a custom path
+ * export default defineConfig({
+ *   plugins: [prismaVitePlugin('custom/prisma-next.config.ts')],
  * });
  * ```
  */
-export function prismaVitePlugin(configPath: string, options?: PrismaVitePluginOptions): Plugin {
+export function prismaVitePlugin(
+  configPath: string = DEFAULT_CONFIG_PATH,
+  options?: PrismaVitePluginOptions,
+): Plugin {
   const debounceMs = options?.debounceMs ?? DEFAULT_DEBOUNCE_MS;
   const logLevel = options?.logLevel ?? 'info';
 
