@@ -14,48 +14,23 @@
  * - main.ts: CLI app using the same emitted contract
  * - main-no-emit.ts: CLI app using inline contract definition
  */
-import contract from './prisma/contract.json';
+import type { ModelDefinition, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import contractJson from './prisma/contract.json';
 
-interface Column {
-  codecId: string;
-  nativeType: string;
-  nullable?: boolean;
-}
+type Relation = {
+  readonly cardinality: string;
+  readonly to: string;
+  readonly on: { readonly parentCols: readonly string[]; readonly childCols: readonly string[] };
+};
 
-interface Table {
-  columns: Record<string, Column>;
-  primaryKey?: { columns: string[] };
-  foreignKeys?: Array<{
-    columns: string[];
-    name: string;
-    references: { table: string; columns: string[] };
-  }>;
-}
-
-interface Model {
-  fields: Record<string, { column: string }>;
-  relations: Record<string, unknown>;
-  storage: { table: string };
-}
-
-interface Relation {
-  cardinality: string;
-  to: string;
-  on: { parentCols: string[]; childCols: string[] };
-}
-
-interface Contract {
-  coreHash: string;
-  profileHash: string;
+type ContractIR = SqlContract<SqlStorage, Record<string, ModelDefinition>> & {
   target: string;
-  models: Record<string, Model>;
-  storage: { tables: Record<string, Table> };
   relations: Record<string, Record<string, Relation>>;
   capabilities: Record<string, Record<string, boolean>>;
   extensionPacks: Record<string, unknown>;
-}
+};
 
-function renderContract(c: Contract): string {
+function renderContract(c: ContractIR): string {
   const models = Object.entries(c.models)
     .map(([name, model]) => {
       const tableName = model.storage.table;
@@ -66,7 +41,7 @@ function renderContract(c: Contract): string {
           return `
             <div class="column">
               <span class="col-name">${fieldName}</span>
-              <span class="col-type">→ ${field.column}</span>
+              <span class="col-type">→ ${field?.column}</span>
             </div>
           `;
         })
@@ -176,14 +151,14 @@ function renderContract(c: Contract): string {
 
 const app = document.getElementById('contract-view');
 if (app) {
-  app.innerHTML = renderContract(contract as unknown as Contract);
+  app.innerHTML = renderContract(contractJson as unknown as ContractIR);
 }
 
 if (import.meta.hot) {
   import.meta.hot.accept('./prisma/contract.json', (newContract) => {
+    console.log(newContract);
     if (app && newContract) {
-      const mod = newContract as unknown as { default: unknown };
-      app.innerHTML = renderContract(mod.default as Contract);
+      app.innerHTML = renderContract(newContract as unknown as ContractIR);
     }
   });
 }
