@@ -6,5 +6,5 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],
-  "exclude": ["dist"]
+  "exclude": ["dist", "test/fixtures/**", "test/**/fixtures/**", "fixtures/**"]
 }
