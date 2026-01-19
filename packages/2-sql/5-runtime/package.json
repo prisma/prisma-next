@@ -40,7 +40,7 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
+      "types": "./dist/src/exports/index.d.ts",
       "import": "./dist/index.js"
     },
     "./test/utils": {
