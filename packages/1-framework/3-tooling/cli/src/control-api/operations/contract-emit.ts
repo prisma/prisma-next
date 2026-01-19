@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import { cancelable } from '@prisma-next/utils/cancelable';
+import { dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing } from '../../utils/cli-errors';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
