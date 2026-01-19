@@ -78,9 +78,6 @@ export async function executeContractEmit(
   });
   const familyInstance = config.family.create(stack);
 
-  // Check for cancellation before emitting
-  signal.throwIfAborted();
-
   // Resolve contract source from config
   let contractRaw: unknown;
   if (typeof contractConfig.source === 'function') {
@@ -89,14 +86,8 @@ export async function executeContractEmit(
     contractRaw = contractConfig.source;
   }
 
-  // Check for cancellation after resolving source, before emitting
-  signal.throwIfAborted();
-
   // Emit contract via family instance
   const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: contractRaw }));
-
-  // Check for cancellation before writing files
-  signal.throwIfAborted();
 
   // Create directories if needed and write files
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
