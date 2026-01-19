@@ -621,12 +621,18 @@ importers:
         specifier: workspace:*
         version: link:../cli
     devDependencies:
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.4
-      tsup:
+      tsdown:
         specifier: 'catalog:'
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+        version: 0.18.4(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
