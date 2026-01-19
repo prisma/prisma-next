@@ -78,8 +78,15 @@ withTempDir(({ createTempDir }) => {
 
         // Read initial contract to verify it was emitted correctly
         const initialContract = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
-        expect(initialContract.storage.tables.user).toBeDefined();
-        expect(initialContract.storage.tables.user.columns.email).toBeDefined();
+        expect(initialContract.storage).toMatchObject({
+          tables: {
+            user: {
+              columns: {
+                email: expect.anything(),
+              },
+            },
+          },
+        });
 
         // Get the mtime of the initial contract
         const { stat } = await import('node:fs/promises');
@@ -115,8 +122,15 @@ withTempDir(({ createTempDir }) => {
 
         // Verify the new contract has the additional column
         const updatedContract = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
-        expect(updatedContract.storage.tables.user.columns.name).toBeDefined();
-        expect(updatedContract.storage.tables.user.columns.name.nullable).toBe(true);
+        expect(updatedContract.storage).toMatchObject({
+          tables: {
+            user: {
+              columns: {
+                name: { nullable: true },
+              },
+            },
+          },
+        });
       },
       timeouts.databaseOperation,
     );
