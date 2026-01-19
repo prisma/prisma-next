@@ -931,6 +931,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/shared/contract
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../1-core/contract
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../0-config/tsconfig

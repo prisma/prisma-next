@@ -11,4 +11,7 @@ export type TableReference<
   THash extends CoreHashBase<string> = CoreHashBase<string>,
 > = {
   readonly name: TName;
-} & Brand<'this table reference belongs to the contract with the following core hash:', THash>;
+} & Brand<
+  '[info] this table reference belongs to the contract with the following core hash:',
+  THash
+>;
