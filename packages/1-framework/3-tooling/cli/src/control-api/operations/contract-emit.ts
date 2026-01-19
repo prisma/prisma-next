@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
+import { cancelable } from '@prisma-next/utils/cancelable';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing } from '../../utils/cli-errors';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
@@ -25,16 +26,11 @@ import type { ContractEmitOptions, ContractEmitResult } from '../types';
 export async function executeContractEmit(
   options: ContractEmitOptions,
 ): Promise<ContractEmitResult> {
-  const { configPath, signal } = options;
-
-  // Check for cancellation before starting
-  signal?.throwIfAborted();
+  const { configPath, signal = new AbortController().signal } = options;
+  const unlessAborted = cancelable(signal);
 
   // Load config using the existing config loader
-  const config = await loadConfig(configPath);
-
-  // Check for cancellation after config load
-  signal?.throwIfAborted();
+  const config = await unlessAborted(loadConfig(configPath));
 
   // Validate contract config is present
   if (!config.contract) {
@@ -83,30 +79,30 @@ export async function executeContractEmit(
   const familyInstance = config.family.create(stack);
 
   // Check for cancellation before emitting
-  signal?.throwIfAborted();
+  signal.throwIfAborted();
 
   // Resolve contract source from config
   let contractRaw: unknown;
   if (typeof contractConfig.source === 'function') {
-    contractRaw = await contractConfig.source();
+    contractRaw = await unlessAborted(contractConfig.source());
   } else {
     contractRaw = contractConfig.source;
   }
 
   // Check for cancellation after resolving source, before emitting
-  signal?.throwIfAborted();
+  signal.throwIfAborted();
 
   // Emit contract via family instance
-  const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });
+  const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: contractRaw }));
 
   // Check for cancellation before writing files
-  signal?.throwIfAborted();
+  signal.throwIfAborted();
 
   // Create directories if needed and write files
-  await mkdir(dirname(outputJsonPath), { recursive: true });
-  await mkdir(dirname(outputDtsPath), { recursive: true });
-  await writeFile(outputJsonPath, emitResult.contractJson, 'utf-8');
-  await writeFile(outputDtsPath, emitResult.contractDts, 'utf-8');
+  await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
+  await unlessAborted(mkdir(dirname(outputDtsPath), { recursive: true }));
+  await unlessAborted(writeFile(outputJsonPath, emitResult.contractJson, 'utf-8'));
+  await unlessAborted(writeFile(outputDtsPath, emitResult.contractDts, 'utf-8'));
 
   return {
     coreHash: emitResult.coreHash,

@@ -29,6 +29,7 @@
   "exports": {
     "./array-equal": "./dist/array-equal.mjs",
     "./assertions": "./dist/assertions.mjs",
+    "./cancelable": "./dist/cancelable.mjs",
     "./defined": "./dist/defined.mjs",
     "./redact-db-url": "./dist/redact-db-url.mjs",
     "./result": "./dist/result.mjs",
