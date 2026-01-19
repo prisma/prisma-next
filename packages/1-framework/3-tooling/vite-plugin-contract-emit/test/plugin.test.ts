@@ -2,12 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prismaVitePlugin } from '../src/plugin';
 
 vi.mock('@prisma-next/cli/control-api', () => ({
-  ContractEmitCancelledError: class ContractEmitCancelledError extends Error {
-    override readonly name = 'ContractEmitCancelledError' as const;
-    constructor() {
-      super('Contract emit was cancelled');
-    }
-  },
   executeContractEmit: vi.fn(),
 }));
 
@@ -353,12 +347,10 @@ describe('prismaVitePlugin', () => {
     });
 
     it('silently ignores cancellation errors', async () => {
-      const { executeContractEmit, ContractEmitCancelledError } = await import(
-        '@prisma-next/cli/control-api'
-      );
+      const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
-      const CancelledError = ContractEmitCancelledError as unknown as new () => Error;
-      mockExecute.mockRejectedValue(new CancelledError());
+      // Use standard AbortError (DOMException with name 'AbortError')
+      mockExecute.mockRejectedValue(new DOMException('The operation was aborted', 'AbortError'));
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 

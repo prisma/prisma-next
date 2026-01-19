@@ -19,10 +19,7 @@ export type {
 export { createControlClient } from '../control-api/client';
 
 // Standalone operations (for tooling that doesn't need full client)
-export {
-  ContractEmitCancelledError,
-  executeContractEmit,
-} from '../control-api/operations/contract-emit';
+export { executeContractEmit } from '../control-api/operations/contract-emit';
 
 // CLI-specific types
 export type {

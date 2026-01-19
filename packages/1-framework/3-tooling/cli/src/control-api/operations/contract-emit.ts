@@ -6,18 +6,6 @@ import { errorContractConfigMissing } from '../../utils/cli-errors';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
 /**
- * @deprecated No longer thrown - kept for backwards compatibility.
- * Use signal.aborted or check error.name === 'AbortError' instead.
- */
-export class ContractEmitCancelledError extends Error {
-  override readonly name = 'ContractEmitCancelledError' as const;
-
-  constructor() {
-    super('Contract emit was cancelled');
-  }
-}
-
-/**
  * Executes the contract emit operation.
  *
  * This is an offline operation that:

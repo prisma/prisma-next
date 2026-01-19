@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
-import { ContractEmitCancelledError, executeContractEmit } from '@prisma-next/cli/control-api';
+import { executeContractEmit } from '@prisma-next/cli/control-api';
 import type { Plugin, ViteDevServer } from 'vite';
 import type { PrismaVitePluginOptions } from './types';
 
@@ -97,12 +97,8 @@ export function prismaVitePlugin(
 
       return result;
     } catch (error) {
-      // Ignore cancellation - check signal first, then error types
-      if (
-        signal.aborted ||
-        error instanceof ContractEmitCancelledError ||
-        (error instanceof Error && error.name === 'AbortError')
-      ) {
+      // Ignore cancellation - check signal first, then error name
+      if (signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
         log('Emit cancelled', 'debug');
         return null;
       }
