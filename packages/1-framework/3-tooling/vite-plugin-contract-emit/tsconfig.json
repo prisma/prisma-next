@@ -1,10 +1,8 @@
 {
-  "extends": "../../../../tsconfig.base.json",
+  "extends": ["@prisma-next/tsconfig/base"],
   "compilerOptions": {
-    "rootDir": ".",
-    "outDir": "dist",
-    "skipLibCheck": true
+    "rootDir": "."
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
-  "exclude": ["dist", "test/fixtures/**", "test/**/fixtures/**", "fixtures/**"]
+  "include": ["src", "test", "*.config.*", "package.json"],
+  "exclude": ["dist", "dist-tsc", "dist-tsc-prod", "node_modules"]
 }
