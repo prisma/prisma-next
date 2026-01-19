@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { createServer, type ViteDevServer } from 'vite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { setupTestDirectoryFromFixtures, withTempDir } from './utils/cli-test-helpers';
 
 const fixtureSubdir = 'vite-plugin';
