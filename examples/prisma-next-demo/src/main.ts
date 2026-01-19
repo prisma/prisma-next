@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import { closeRuntime, getRuntime } from './prisma/runtime';
+import { type as arktype } from 'arktype';
+import { getRuntime } from './prisma/runtime';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
@@ -7,7 +8,6 @@ import { getUsers } from './queries/get-users';
 import { getUsersWithPosts } from './queries/get-users-with-posts';
 import { ormGetUsersBackward, ormGetUsersByIdCursor } from './queries/orm-pagination';
 import { similaritySearch } from './queries/similarity-search';
-import { type as arktype } from 'arktype';
 
 const appConfigSchema = arktype({
   DATABASE_URL: 'string',
@@ -132,7 +132,7 @@ async function main() {
     console.error('Error:', error);
     process.exit(1);
   } finally {
-    await closeRuntime();
+    await runtime.close();
   }
 }
 
