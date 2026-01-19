@@ -1,3 +1,19 @@
+/**
+ * Database Seed Script
+ *
+ * Populates the demo database with sample data using Prisma Next's SQL DSL.
+ * Demonstrates INSERT with RETURNING clause and parameterized queries.
+ *
+ * Run with: pnpm seed
+ *
+ * Creates:
+ * - 2 users (alice, bob)
+ * - 3 posts with vector embeddings (for similarity search demos)
+ *
+ * Prerequisites:
+ * - DATABASE_URL environment variable set
+ * - Database schema already applied (run pnpm db:push first)
+ */
 import 'dotenv/config';
 
 import { param } from '@prisma-next/sql-relational-core/param';

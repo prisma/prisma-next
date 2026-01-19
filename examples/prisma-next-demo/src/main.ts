@@ -1,3 +1,26 @@
+/**
+ * CLI Application Entry Point (Emitted Contract Workflow)
+ *
+ * This is a command-line demo application that showcases Prisma Next's query
+ * capabilities using the standard emitted contract workflow:
+ * - contract.json (runtime contract data)
+ * - contract.d.ts (compile-time types)
+ *
+ * Run with: pnpm start -- <command> [args]
+ *
+ * Available commands:
+ * - users [limit]              List users with optional limit
+ * - user <id>                  Get user by ID
+ * - posts <userId>             Get posts for a user
+ * - users-with-posts [limit]   Users with nested posts (includeMany)
+ * - users-paginate [cursor]    Cursor-based pagination
+ * - similarity-search <vec>    Vector similarity search (pgvector)
+ * - budget-violation           Demo budget enforcement error
+ *
+ * See also:
+ * - main-no-emit.ts: Same CLI using inline contract (no emission step)
+ * - entry.ts: Browser app for visualizing contract.json
+ */
 import 'dotenv/config';
 import { type as arktype } from 'arktype';
 import { getRuntime } from './prisma/runtime';

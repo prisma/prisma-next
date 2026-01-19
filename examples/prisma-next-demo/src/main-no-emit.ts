@@ -1,3 +1,27 @@
+/**
+ * CLI Application Entry Point (No-Emit Workflow)
+ *
+ * This is a command-line demo that showcases the "no-emit" workflow where the
+ * contract is defined inline in TypeScript (prisma-no-emit/query-no-emit.ts)
+ * rather than emitted to separate JSON/d.ts files.
+ *
+ * This workflow is useful for:
+ * - Rapid prototyping without a build step
+ * - Simpler projects that don't need contract serialization
+ * - Understanding the contract structure before committing to emission
+ *
+ * Run with: pnpm start:no-emit -- <command> [args]
+ *
+ * Available commands:
+ * - users [limit]              List users with optional limit
+ * - user <id>                  Get user by ID
+ * - posts <userId>             Get posts for a user
+ * - users-with-posts [limit]   Users with nested posts
+ *
+ * See also:
+ * - main.ts: Full CLI using emitted contract.json + contract.d.ts
+ * - entry.ts: Browser app for visualizing contract.json
+ */
 import 'dotenv/config';
 import { type as arktype } from 'arktype';
 import { getRuntime } from './prisma-no-emit/runtime-no-emit';

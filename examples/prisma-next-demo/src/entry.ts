@@ -1,3 +1,19 @@
+/**
+ * Browser Application Entry Point (Contract Visualization)
+ *
+ * This is a Vite-powered browser application that renders the emitted
+ * contract.json as an interactive HTML visualization. It demonstrates:
+ *
+ * - Machine-readable contracts: The JSON structure can be consumed by tools
+ * - Hot Module Replacement: Edit contract.ts, re-emit, and watch it update live
+ * - Contract introspection: Models, tables, relations, capabilities, extensions
+ *
+ * Run with: pnpm dev (starts Vite dev server with HMR)
+ *
+ * See also:
+ * - main.ts: CLI app using the same emitted contract
+ * - main-no-emit.ts: CLI app using inline contract definition
+ */
 import contract from './prisma/contract.json';
 
 interface Column {
