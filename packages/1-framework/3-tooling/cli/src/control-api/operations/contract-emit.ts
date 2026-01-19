@@ -19,11 +19,9 @@ export class ContractEmitCancelledError extends Error {
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (!signal?.aborted) return;
-  if (typeof signal.throwIfAborted === 'function') {
-    signal.throwIfAborted();
-  } else {
-    throw new ContractEmitCancelledError();
-  }
+  // Always throw ContractEmitCancelledError for consistent cancellation detection
+  // (native throwIfAborted throws DOMException/AbortError which differs from our error type)
+  throw new ContractEmitCancelledError();
 }
 
 /**
