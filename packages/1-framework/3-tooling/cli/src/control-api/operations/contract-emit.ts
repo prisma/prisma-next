@@ -6,8 +6,8 @@ import { errorContractConfigMissing } from '../../utils/cli-errors';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
 /**
- * Error thrown when contract emission is cancelled via AbortSignal.
- * Callers can check error.name === 'ContractEmitCancelledError' to detect cancellation.
+ * @deprecated No longer thrown - kept for backwards compatibility.
+ * Use signal.aborted or check error.name === 'AbortError' instead.
  */
 export class ContractEmitCancelledError extends Error {
   override readonly name = 'ContractEmitCancelledError' as const;
@@ -15,13 +15,6 @@ export class ContractEmitCancelledError extends Error {
   constructor() {
     super('Contract emit was cancelled');
   }
-}
-
-function throwIfAborted(signal: AbortSignal | undefined): void {
-  if (!signal?.aborted) return;
-  // Always throw ContractEmitCancelledError for consistent cancellation detection
-  // (native throwIfAborted throws DOMException/AbortError which differs from our error type)
-  throw new ContractEmitCancelledError();
 }
 
 /**
@@ -39,7 +32,7 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
  * @param options - Options including configPath and optional signal
  * @returns File paths and hashes of emitted artifacts
  * @throws If config loading fails, contract is invalid, or file I/O fails
- * @throws ContractEmitCancelledError if cancelled via signal
+ * @throws signal.reason if cancelled via AbortSignal (typically DOMException with name 'AbortError')
  */
 export async function executeContractEmit(
   options: ContractEmitOptions,
@@ -47,13 +40,13 @@ export async function executeContractEmit(
   const { configPath, signal } = options;
 
   // Check for cancellation before starting
-  throwIfAborted(signal);
+  signal?.throwIfAborted();
 
   // Load config using the existing config loader
   const config = await loadConfig(configPath);
 
   // Check for cancellation after config load
-  throwIfAborted(signal);
+  signal?.throwIfAborted();
 
   // Validate contract config is present
   if (!config.contract) {
@@ -102,7 +95,7 @@ export async function executeContractEmit(
   const familyInstance = config.family.create(stack);
 
   // Check for cancellation before emitting
-  throwIfAborted(signal);
+  signal?.throwIfAborted();
 
   // Resolve contract source from config
   let contractRaw: unknown;
@@ -113,13 +106,13 @@ export async function executeContractEmit(
   }
 
   // Check for cancellation after resolving source, before emitting
-  throwIfAborted(signal);
+  signal?.throwIfAborted();
 
   // Emit contract via family instance
   const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });
 
   // Check for cancellation before writing files
-  throwIfAborted(signal);
+  signal?.throwIfAborted();
 
   // Create directories if needed and write files
   await mkdir(dirname(outputJsonPath), { recursive: true });
