@@ -139,7 +139,7 @@ export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlC
    * Initialized type helpers from storage.types.
    * Each entry corresponds to a named type instance in the contract's storage.types.
    * The value is the result of calling the codec's init hook (if provided)
-   * or the validated typeParams (if no init hook).
+   * or the full StorageTypeInstance metadata (if no init hook).
    */
   readonly types: TypeHelperRegistry;
 }

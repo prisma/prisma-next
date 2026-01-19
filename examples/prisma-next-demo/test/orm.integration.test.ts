@@ -119,7 +119,6 @@ describe('ORM integration tests', () => {
             users: ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
           });
 
-          process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsers } = await import('../src/queries/orm-get-users');
           const users = await ormGetUsers(2, runtime);
 
@@ -148,7 +147,6 @@ describe('ORM integration tests', () => {
         try {
           await seedTestData(runtime, contract, { users: ['alice@example.com'] });
 
-          process.env['DATABASE_URL'] = connectionString;
           const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
           const user = await ormGetUserById(1, runtime);
 
@@ -179,7 +177,6 @@ describe('ORM integration tests', () => {
             posts: [{ title: 'First Post', userIndex: 0 }],
           });
 
-          process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsersWithPosts } = await import('../src/queries/orm-relation-filters');
           const users = await ormGetUsersWithPosts(runtime);
 
@@ -213,7 +210,6 @@ describe('ORM integration tests', () => {
             ],
           });
 
-          process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsersWithPosts } = await import('../src/queries/orm-includes');
           const users = await ormGetUsersWithPosts(10, runtime);
 
@@ -239,7 +235,6 @@ describe('ORM integration tests', () => {
         const { runtime, pool } = createTestRuntime(connectionString, contract);
 
         try {
-          process.env['DATABASE_URL'] = connectionString;
           const { ormCreateUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormCreateUser(
             { id: 1, email: 'alice@example.com', createdAt: new Date() },
@@ -265,7 +260,6 @@ describe('ORM integration tests', () => {
         try {
           await seedTestData(runtime, contract, { users: ['alice@example.com'] });
 
-          process.env['DATABASE_URL'] = connectionString;
           const { ormUpdateUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
 
@@ -288,7 +282,6 @@ describe('ORM integration tests', () => {
         try {
           await seedTestData(runtime, contract, { users: ['alice@example.com'] });
 
-          process.env['DATABASE_URL'] = connectionString;
           const { ormDeleteUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormDeleteUser(1, runtime);
 
@@ -312,7 +305,6 @@ describe('ORM integration tests', () => {
           const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
           await seedTestData(runtime, contract, { users: emails });
 
-          process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsersByIdCursor } = await import('../src/queries/orm-pagination');
 
           const firstPage = await ormGetUsersByIdCursor(null, 3, runtime);
@@ -352,7 +344,6 @@ describe('ORM integration tests', () => {
           const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
           await seedTestData(runtime, contract, { users: emails });
 
-          process.env['DATABASE_URL'] = connectionString;
           const { ormGetUsersBackward } = await import('../src/queries/orm-pagination');
 
           const page = await ormGetUsersBackward(8, 3, runtime);

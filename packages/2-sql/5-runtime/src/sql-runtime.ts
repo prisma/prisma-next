@@ -252,7 +252,10 @@ function createRuntimeFromStack<
   };
 
   if (driverOptions !== undefined && !stack.stack.driver) {
-    throw new Error('Driver options provided, but the execution stack has no driver descriptor.');
+    throw runtimeError(
+      'RUNTIME.DRIVER_OPTIONS_WITHOUT_DESCRIPTOR',
+      'Driver options provided, but the execution stack has no driver descriptor.',
+    );
   }
 
   let driver: SqlDriver = createOfflineDriver();
@@ -263,7 +266,10 @@ function createRuntimeFromStack<
     } else {
       const driverInstance = stack.stack.driver.create(driverOptions);
       if (!isSqlDriver(driverInstance)) {
-        throw new Error('Execution stack driver does not implement SqlDriver.');
+        throw runtimeError(
+          'RUNTIME.INVALID_DRIVER_INSTANCE',
+          'Execution stack driver does not implement SqlDriver interface.',
+        );
       }
       driver = driverInstance;
     }

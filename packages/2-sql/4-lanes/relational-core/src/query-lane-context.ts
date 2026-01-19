@@ -4,8 +4,9 @@ import type { CodecRegistry } from './ast/codec-types';
 
 /**
  * Registry of initialized type helpers from storage.types.
- * Each key is a type name from storage.types, and the value is the initialized helper
- * (or validated typeParams if no init hook was provided).
+ * Each key is a type name from storage.types, and the value is:
+ * - The result of the codec's init hook (if provided), or
+ * - The full StorageTypeInstance metadata (codecId, nativeType, typeParams) if no init hook
  */
 export type TypeHelperRegistry = Record<string, unknown>;
 
