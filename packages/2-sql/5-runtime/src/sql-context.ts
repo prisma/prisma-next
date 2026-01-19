@@ -144,7 +144,7 @@ export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlC
   readonly types: TypeHelperRegistry;
 }
 
-function assertExecutionStackContractRequirements(
+export function assertExecutionStackContractRequirements(
   contract: SqlContract<SqlStorage>,
   stack: ExecutionStackInstance<
     'sql',

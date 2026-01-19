@@ -35,7 +35,7 @@ import type {
   SqlRuntimeAdapterInstance,
   SqlRuntimeExtensionInstance,
 } from './sql-context';
-import { createExecutionContext } from './sql-context';
+import { assertExecutionStackContractRequirements, createExecutionContext } from './sql-context';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
 export interface RuntimeOptions<
@@ -235,6 +235,10 @@ function createRuntimeFromStack<
   TTargetId extends string,
 >(options: RuntimeStackOptions<TContract, TTargetId>): Runtime {
   const { stack, contract, context, driverOptions, verify, plugins, mode, log } = options;
+
+  // Always validate contract/stack requirements, even when context is provided
+  assertExecutionStackContractRequirements(contract, stack.stack);
+
   const resolvedContext =
     context ??
     createExecutionContext({
