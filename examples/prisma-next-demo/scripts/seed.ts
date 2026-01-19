@@ -1,43 +1,11 @@
 import 'dotenv/config';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { loadContractFromTs } from '@prisma-next/cli';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { schema, sql } from '../src/prisma/query';
 import { getRuntime } from '../src/prisma/runtime';
-import { createDemoControlClient } from '../test/utils/control-client';
-
-async function initializeSchema() {
-  const connectionString = process.env['DATABASE_URL'];
-  if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is required');
-  }
-
-  // Load the contract from TypeScript source
-  const contractPath = resolve(__dirname, '../prisma/contract.ts');
-  const contractIR = await loadContractFromTs(contractPath);
-
-  // Use control client to initialize schema and write marker
-  const client = createDemoControlClient({ connection: connectionString });
-  try {
-    const result = await client.dbInit({ contractIR, mode: 'apply' });
-    if (!result.ok) {
-      throw new Error(`dbInit failed: ${result.failure.summary}`);
-    }
-    console.log(`Schema initialized: ${result.value.summary}`);
-  } finally {
-    await client.close();
-  }
-}
 
 async function main() {
-  // Initialize schema using control client
-  await initializeSchema();
-
   // biome-ignore lint/style/noNonNullAssertion: don't care about type safety in seed script
   const runtime = getRuntime(process.env['DATABASE_URL']!);
 
@@ -50,12 +18,16 @@ async function main() {
   // Insert users
   const alicePlan = sql
     .insert(userTable, {
+      id: param('id'),
       email: param('email'),
+      createdAt: param('createdAt'),
     })
     .returning(userColumns.id, userColumns.email)
     .build({
       params: {
+        id: 1,
         email: 'alice@example.com',
+        createdAt: new Date(),
       },
     });
 
@@ -63,12 +35,16 @@ async function main() {
 
   const bobPlan = sql
     .insert(userTable, {
+      id: param('id'),
       email: param('email'),
+      createdAt: param('createdAt'),
     })
     .returning(userColumns.id, userColumns.email)
     .build({
       params: {
+        id: 2,
         email: 'bob@example.com',
+        createdAt: new Date(),
       },
     });
 
@@ -97,16 +73,20 @@ async function main() {
   // Insert posts with embeddings
   const post1Plan = sql
     .insert(postTable, {
+      id: param('id'),
       title: param('title'),
       userId: param('userId'),
       embedding: param('embedding'),
+      createdAt: param('createdAt'),
     })
     .returning(postColumns.id, postColumns.title, postColumns.userId)
     .build({
       params: {
+        id: 1,
         title: 'First Post',
         userId: alice.id,
         embedding: generateEmbedding(1),
+        createdAt: new Date(),
       },
     });
 
@@ -114,16 +94,20 @@ async function main() {
 
   const post2Plan = sql
     .insert(postTable, {
+      id: param('id'),
       title: param('title'),
       userId: param('userId'),
       embedding: param('embedding'),
+      createdAt: param('createdAt'),
     })
     .returning(postColumns.id, postColumns.title, postColumns.userId)
     .build({
       params: {
+        id: 2,
         title: 'Second Post',
         userId: alice.id,
         embedding: generateEmbedding(2),
+        createdAt: new Date(),
       },
     });
 
@@ -131,16 +115,20 @@ async function main() {
 
   const post3Plan = sql
     .insert(postTable, {
+      id: param('id'),
       title: param('title'),
       userId: param('userId'),
       embedding: param('embedding'),
+      createdAt: param('createdAt'),
     })
     .returning(postColumns.id, postColumns.title, postColumns.userId)
     .build({
       params: {
+        id: 3,
         title: 'Third Post',
         userId: bob.id,
         embedding: generateEmbedding(3),
+        createdAt: new Date(),
       },
     });
 
