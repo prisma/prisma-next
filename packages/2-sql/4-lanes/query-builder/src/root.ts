@@ -36,6 +36,9 @@ export class Root<TContract extends SqlContract> {
   ): TName extends string
     ? SelectBuilder<TContract, Pick<TContract['storage']['tables'], TName>>
     : PreviousFunctionReceivedBadInputError<'[error] invalid table reference in previous `root.from()` call will probably cause runtime errors'>;
+  from(
+    table: TableReferenceTooWideError<'[error] `root.from()` call received a table reference without a specific table name'>,
+  ): PreviousFunctionReceivedBadInputError<'[error] invalid table reference in previous `root.from()` call will probably cause runtime errors'>;
   /**
    * @internal
    */

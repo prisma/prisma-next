@@ -1,13 +1,38 @@
 import type { CoreHashBase } from '@prisma-next/contract/types';
-import type { SqlContract, StorageTable } from '@prisma-next/sql-contract/types';
-import { createRoot, type TableReference } from './src';
+import type { SqlContract } from '@prisma-next/sql-contract/types';
+import { createRef, createRoot, type TableReference } from './src';
 
 type CoreHash = CoreHashBase<'core-hash-example'>;
 type AnotherCoreHash = CoreHashBase<'another-core-hash-example'>;
 
 declare const contract: SqlContract<
   {
-    tables: Record<'users' | 'posts', StorageTable>;
+    tables: {
+      users: {
+        columns: {
+          id: {
+            codecId: 'codecid';
+            nativeType: 'nativetype';
+            nullable: false;
+          };
+        };
+        foreignKeys: [];
+        indexes: [];
+        uniques: [];
+      };
+      posts: {
+        columns: {
+          id: {
+            codecId: 'codecid';
+            nativeType: 'nativetype';
+            nullable: false;
+          };
+        };
+        foreignKeys: [];
+        indexes: [];
+        uniques: [];
+      };
+    };
   },
   Record<string, unknown>,
   Record<string, unknown>,
@@ -18,21 +43,20 @@ declare const contract: SqlContract<
   CoreHash
 >;
 
-declare const thatTable: TableReference<'users', CoreHash>;
-declare const differentHashTable: TableReference<'users', AnotherCoreHash>;
-declare const anotherTable: TableReference<'posts', CoreHash>;
 declare const wrongTable: TableReference<'comments', CoreHash>;
 declare const allTable: TableReference<string, CoreHash>;
 declare const anyTable: TableReference<any, CoreHash>;
 declare const neverTable: TableReference<never, CoreHash>;
-declare const customTable: { name: 'users' };
+declare const customTable: { '~name': 'users' };
 // @ts-expect-error
 declare const unknownTable: TableReference<unknown, CoreHash>;
+declare const differentHashTable: TableReference<'users', AnotherCoreHash>;
 
 const root = createRoot(contract);
+const ref = createRef(contract);
 
-root.from(thatTable).build();
-root.from(anotherTable).build();
+root.from(ref.users).build();
+root.from(ref.posts).build();
 
 root
   // @ts-expect-error
@@ -54,6 +78,11 @@ root
   .build();
 root
   .from(neverTable)
+  // @ts-expect-error
+  .build();
+root
+  // @ts-expect-error
+  .from(ref.no_such_table)
   // @ts-expect-error
   .build();
 root
