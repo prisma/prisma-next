@@ -82,6 +82,17 @@ export async function executeContractEmit(
     ? contractConfig.types
     : resolve(configDir, contractConfig.types);
 
+  // Validate source is defined and is either a function or a non-null value
+  if (
+    contractConfig.source === undefined ||
+    contractConfig.source === null ||
+    (typeof contractConfig.source !== 'function' && typeof contractConfig.source !== 'object')
+  ) {
+    throw errorContractConfigMissing({
+      why: 'Contract config must include a valid source (function or value)',
+    });
+  }
+
   // Create control plane stack from config
   const stack = createControlPlaneStack({
     target: config.target,
