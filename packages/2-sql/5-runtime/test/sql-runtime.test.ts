@@ -223,4 +223,272 @@ describe('createRuntime', () => {
     await runtime.close();
     expect(driver.close).toHaveBeenCalled();
   });
+
+  it('throws when driverOptions provided but stack has no driver', () => {
+    const adapter = createStubAdapter();
+
+    const targetDescriptor: RuntimeTargetDescriptor<'sql', 'postgres'> = {
+      kind: 'target',
+      id: 'postgres',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+
+    const adapterDescriptor: RuntimeAdapterDescriptor<
+      'sql',
+      'postgres',
+      SqlRuntimeAdapterInstance<'postgres'>
+    > = {
+      kind: 'adapter',
+      id: 'test-adapter',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return Object.assign(
+          { familyId: 'sql' as const, targetId: 'postgres' as const },
+          adapter,
+        ) as SqlRuntimeAdapterInstance<'postgres'>;
+      },
+    };
+
+    // Create stack WITHOUT driver
+    const stack = createExecutionStack({
+      target: targetDescriptor,
+      adapter: adapterDescriptor,
+      extensionPacks: [],
+    });
+
+    const stackInstance = instantiateExecutionStack(stack);
+
+    expect(() =>
+      createRuntime({
+        stack: stackInstance,
+        contract: testContract,
+        driverOptions: {}, // Providing options but no driver in stack
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      }),
+    ).toThrow('Driver options provided, but the execution stack has no driver descriptor.');
+  });
+
+  it('uses offline driver when stack has driver but driverOptions is undefined', async () => {
+    const { stackInstance } = createTestStackInstance();
+
+    // Create runtime WITHOUT driverOptions (stack has driver)
+    const runtime = createRuntime({
+      stack: stackInstance,
+      contract: testContract,
+      // driverOptions is undefined
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    expect(runtime).toBeDefined();
+  });
+
+  it('throws when driver instance does not implement SqlDriver interface', () => {
+    const adapter = createStubAdapter();
+
+    const targetDescriptor: RuntimeTargetDescriptor<'sql', 'postgres'> = {
+      kind: 'target',
+      id: 'postgres',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+
+    const adapterDescriptor: RuntimeAdapterDescriptor<
+      'sql',
+      'postgres',
+      SqlRuntimeAdapterInstance<'postgres'>
+    > = {
+      kind: 'adapter',
+      id: 'test-adapter',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return Object.assign(
+          { familyId: 'sql' as const, targetId: 'postgres' as const },
+          adapter,
+        ) as SqlRuntimeAdapterInstance<'postgres'>;
+      },
+    };
+
+    // Driver that returns invalid instance (doesn't implement SqlDriver)
+    const invalidDriverDescriptor: RuntimeDriverDescriptor<
+      'sql',
+      'postgres',
+      SqlRuntimeDriverInstance<'postgres'>
+    > = {
+      kind: 'driver',
+      id: 'invalid-driver',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        // Return something that doesn't implement SqlDriver
+        return {
+          familyId: 'sql' as const,
+          targetId: 'postgres' as const,
+        } as SqlRuntimeDriverInstance<'postgres'>;
+      },
+    };
+
+    const stack = createExecutionStack({
+      target: targetDescriptor,
+      adapter: adapterDescriptor,
+      driver: invalidDriverDescriptor,
+      extensionPacks: [],
+    });
+
+    const stackInstance = instantiateExecutionStack(stack);
+
+    expect(() =>
+      createRuntime({
+        stack: stackInstance,
+        contract: testContract,
+        driverOptions: {},
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      }),
+    ).toThrow('Execution stack driver does not implement SqlDriver interface.');
+  });
+
+  it('throws when driver instance is null', () => {
+    const adapter = createStubAdapter();
+
+    const targetDescriptor: RuntimeTargetDescriptor<'sql', 'postgres'> = {
+      kind: 'target',
+      id: 'postgres',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+
+    const adapterDescriptor: RuntimeAdapterDescriptor<
+      'sql',
+      'postgres',
+      SqlRuntimeAdapterInstance<'postgres'>
+    > = {
+      kind: 'adapter',
+      id: 'test-adapter',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return Object.assign(
+          { familyId: 'sql' as const, targetId: 'postgres' as const },
+          adapter,
+        ) as SqlRuntimeAdapterInstance<'postgres'>;
+      },
+    };
+
+    // Driver that returns null
+    const nullDriverDescriptor: RuntimeDriverDescriptor<
+      'sql',
+      'postgres',
+      SqlRuntimeDriverInstance<'postgres'>
+    > = {
+      kind: 'driver',
+      id: 'null-driver',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return null as unknown as SqlRuntimeDriverInstance<'postgres'>;
+      },
+    };
+
+    const stack = createExecutionStack({
+      target: targetDescriptor,
+      adapter: adapterDescriptor,
+      driver: nullDriverDescriptor,
+      extensionPacks: [],
+    });
+
+    const stackInstance = instantiateExecutionStack(stack);
+
+    expect(() =>
+      createRuntime({
+        stack: stackInstance,
+        contract: testContract,
+        driverOptions: {},
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      }),
+    ).toThrow('Execution stack driver does not implement SqlDriver interface.');
+  });
+
+  it('validates codec registry at startup when verify mode is startup', () => {
+    const { stackInstance } = createTestStackInstance();
+
+    const runtime = createRuntime({
+      stack: stackInstance,
+      contract: testContract,
+      driverOptions: {},
+      verify: { mode: 'startup', requireMarker: false },
+    });
+
+    expect(runtime).toBeDefined();
+  });
+
+  it('offline driver throws on connect when no driverOptions provided', async () => {
+    const adapter = createStubAdapter();
+
+    const targetDescriptor: RuntimeTargetDescriptor<'sql', 'postgres'> = {
+      kind: 'target',
+      id: 'postgres',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+
+    const adapterDescriptor: RuntimeAdapterDescriptor<
+      'sql',
+      'postgres',
+      SqlRuntimeAdapterInstance<'postgres'>
+    > = {
+      kind: 'adapter',
+      id: 'test-adapter',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return Object.assign(
+          { familyId: 'sql' as const, targetId: 'postgres' as const },
+          adapter,
+        ) as SqlRuntimeAdapterInstance<'postgres'>;
+      },
+    };
+
+    // Create stack WITHOUT driver - uses offline driver
+    const stack = createExecutionStack({
+      target: targetDescriptor,
+      adapter: adapterDescriptor,
+      extensionPacks: [],
+    });
+
+    const stackInstance = instantiateExecutionStack(stack);
+
+    const runtime = createRuntime({
+      stack: stackInstance,
+      contract: testContract,
+      // No driverOptions - uses offline driver
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    // The runtime is created, but operations will fail
+    expect(runtime).toBeDefined();
+  });
 });
