@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { createServer, type ViteDevServer } from 'vite';
@@ -56,9 +56,6 @@ withTempDir(({ createTempDir }) => {
         // testDir is inside cli-e2e-test-app, so navigate up then into fixtures
         const fixtureViteConfig = join(testDir, '..', 'fixtures', fixtureSubdir, 'vite.config.ts');
         copyFileSync(fixtureViteConfig, join(testDir, 'vite.config.ts'));
-
-        // Create output directory
-        mkdirSync(outputDir, { recursive: true });
 
         const contractJsonPath = join(outputDir, 'contract.json');
 
