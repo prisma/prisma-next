@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, resolve } from 'node:path';
-import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import { loadConfig } from '../../config-loader';
+import { errorContractConfigMissing } from '../../utils/cli-errors';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
 /**
@@ -71,14 +71,15 @@ export async function executeContractEmit(
     });
   }
 
-  // Resolve artifact paths relative to config file directory (unless already absolute)
-  const configDir = dirname(configPath);
+  // Normalize configPath and resolve artifact paths relative to config file directory
+  const normalizedConfigPath = resolve(configPath);
+  const configDir = dirname(normalizedConfigPath);
   const outputJsonPath = isAbsolute(contractConfig.output)
     ? contractConfig.output
-    : resolve(configDir, contractConfig.output);
+    : join(configDir, contractConfig.output);
   const outputDtsPath = isAbsolute(contractConfig.types)
     ? contractConfig.types
-    : resolve(configDir, contractConfig.types);
+    : join(configDir, contractConfig.types);
 
   // Validate source is defined and is either a function or a non-null value
   if (
@@ -110,6 +111,9 @@ export async function executeContractEmit(
   } else {
     contractRaw = contractConfig.source;
   }
+
+  // Check for cancellation after resolving source, before emitting
+  throwIfAborted(signal);
 
   // Emit contract via family instance
   const emitResult = await familyInstance.emitContract({ contractIR: contractRaw });
