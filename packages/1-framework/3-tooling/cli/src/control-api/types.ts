@@ -236,14 +236,9 @@ export interface EmitContractConfig {
   readonly source: EmitContractSource;
   /**
    * Output path for contract.json.
-   * Should be an absolute or relative path.
+   * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
    */
   readonly output: string;
-  /**
-   * Output path for contract.d.ts.
-   * Should be an absolute or relative path.
-   */
-  readonly types: string;
 }
 
 /**

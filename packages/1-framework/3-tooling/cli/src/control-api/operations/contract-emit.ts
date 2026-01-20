@@ -35,16 +35,16 @@ export async function executeContractEmit(
   // Validate contract config is present
   if (!config.contract) {
     throw errorContractConfigMissing({
-      why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ..., types: ... }',
+      why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ... }',
     });
   }
 
   const contractConfig = config.contract;
 
-  // Validate output paths are present
-  if (!contractConfig.output || !contractConfig.types) {
+  // Validate output path is present
+  if (!contractConfig.output) {
     throw errorContractConfigMissing({
-      why: 'Contract config must have output and types paths. This should not happen if defineConfig() was used.',
+      why: 'Contract config must have output path. This should not happen if defineConfig() was used.',
     });
   }
 
@@ -54,14 +54,11 @@ export async function executeContractEmit(
   const outputJsonPath = isAbsolute(contractConfig.output)
     ? contractConfig.output
     : join(configDir, contractConfig.output);
-  const outputDtsPath = isAbsolute(contractConfig.types)
-    ? contractConfig.types
-    : join(configDir, contractConfig.types);
+  // Colocate .d.ts with .json (e.g., contract.json → contract.d.ts)
+  const outputDtsPath = outputJsonPath.replace(/\.json$/, '.d.ts');
 
   // Validate source is defined and is either a function or a non-null value
-  if (
-    typeof contractConfig.source !== 'function' && typeof contractConfig.source !== 'object'
-  ) {
+  if (typeof contractConfig.source !== 'function' && typeof contractConfig.source !== 'object') {
     throw errorContractConfigMissing({
       why: 'Contract config must include a valid source (function or value)',
     });
@@ -72,16 +69,16 @@ export async function executeContractEmit(
   const familyInstance = config.family.create(stack);
 
   // Resolve contract source from config
-  const contractRaw = typeof contractConfig.source === 'function'
-  	? await unlessAborted(contractConfig.source())
-  	: contractConfig.source;
+  const contractRaw =
+    typeof contractConfig.source === 'function'
+      ? await unlessAborted(contractConfig.source())
+      : contractConfig.source;
 
   // Emit contract via family instance
   const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: contractRaw }));
 
-  // Create directories if needed and write files
+  // Create directory if needed and write files (both colocated)
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
-  await unlessAborted(mkdir(dirname(outputDtsPath), { recursive: true }));
   await unlessAborted(writeFile(outputJsonPath, emitResult.contractJson, 'utf-8'));
   await unlessAborted(writeFile(outputDtsPath, emitResult.contractDts, 'utf-8'));
 
