@@ -19,8 +19,8 @@ import type {
 import {
   createExecutionContext,
   createRuntime,
+  type ExecutionContext,
   type Runtime,
-  type RuntimeContext,
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 
@@ -66,7 +66,7 @@ class ModelDelegate {
 
   constructor(
     private readonly runtime: Runtime,
-    private readonly context: RuntimeContext<SqlContract<SqlStorage>>,
+    private readonly context: ExecutionContext<SqlContract<SqlStorage>>,
     private readonly contract: SqlContract<SqlStorage>,
     private readonly table: TableFromSchema<SqlContract<SqlStorage>>,
     tableName: string,
@@ -360,7 +360,7 @@ class ModelDelegate {
 
 class PrismaClientImpl {
   readonly runtime: Runtime;
-  readonly context: RuntimeContext<SqlContract<SqlStorage>>;
+  readonly context: ExecutionContext<SqlContract<SqlStorage>>;
   readonly contract: SqlContract<SqlStorage>;
   readonly schemaHandle: ReturnType<typeof schema>;
   readonly models: Record<string, ModelDelegate> = {};
@@ -380,14 +380,10 @@ class PrismaClientImpl {
     });
     const stackInstance = instantiateExecutionStack(stack);
 
-    const executionContext = createExecutionContext({
+    this.context = createExecutionContext({
       contract: this.contract,
       stack: stackInstance,
     });
-    this.context = {
-      ...executionContext,
-      adapter: stackInstance.adapter,
-    };
 
     // Initialize runtime if not provided
     if (options.runtime) {

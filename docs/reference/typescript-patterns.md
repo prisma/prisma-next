@@ -1323,9 +1323,9 @@ function createStubAdapter(): Adapter<...> {
 - Common helper patterns from the codebase
 - Testing anti-patterns and solutions
 
-## RuntimeContext and Extension Pattern
+## ExecutionContext and Extension Pattern
 
-**Pattern**: Use `RuntimeContext` to decouple codec and operations registries from `Runtime`, allowing them to be passed to schema/query builders.
+**Pattern**: Use `ExecutionContext` to decouple codec and operations registries from `Runtime`, allowing them to be passed to schema/query builders.
 
 ### Why?
 
@@ -1337,44 +1337,40 @@ This decouples registries from the runtime, enabling:
 
 ### Implementation
 
-**✅ CORRECT: Create context separately and pass to runtime and schema**
+**✅ CORRECT: Create stack, instantiate, then create context and runtime**
 
 ```typescript
-import { createRuntimeContext, createRuntime } from '@prisma-next/runtime';
-import { schema } from '@prisma-next/sql-query/schema';
-import pgVector from '@prisma/extension-pg-vector';
+import { createExecutionStack, instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
+import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import pgVector from '@prisma-next/extension-pgvector/runtime';
 
-// Create context with adapter and extensions
-const context = createRuntimeContext({
-  adapter,
-  extensions: [pgVector()],  // Programmatic extension registration
+// Create execution stack with all components
+const stack = createExecutionStack({
+  target: postgresTarget,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensionPacks: [pgVector],
 });
+const stackInstance = instantiateExecutionStack(stack);
 
-// Pass context to runtime
+// Create context from stack instance
+const context = createExecutionContext({ contract, stack: stackInstance });
+
+// Create runtime from stack instance
 const runtime = createRuntime({
+  stack: stackInstance,
   contract,
-  adapter,
-  driver,
-  context,  // Pass context to runtime
+  context,
+  driverOptions: { connectionString },
+  verify: { mode: 'onFirstUse', requireMarker: false },
 });
 
 // Pass context to schema (for operations registry)
-const tables = schema<Contract, CodecTypes>(contract, context).tables;
-```
-
-**❌ WRONG: Don't assemble registries in runtime**
-
-```typescript
-// Don't do this - registries are coupled to runtime
-const runtime = createRuntime({
-  contract,
-  adapter,
-  driver,
-  extensions: [...],  // Runtime assembles registries internally
-});
-
-// Can't use registries independently
-const tables = schema(contract, undefined, runtime.operations());
+const tables = schema(context).tables;
 ```
 
 ### Extension Interface
@@ -1392,27 +1388,18 @@ interface Extension {
 
 ### Schema API
 
-**✅ CORRECT: Pass context to schema (codecTypes is generic only)**
+**✅ CORRECT: Pass context to schema**
 
 ```typescript
-// codecTypes is a generic type parameter (compile-time only)
-const tables = schema<Contract, CodecTypes>(contract, context).tables;
-```
-
-**❌ WRONG: Don't pass codecTypes as runtime parameter**
-
-```typescript
-// Don't do this - codecTypes is not a runtime parameter
-const tables = schema(contract, codecTypes, context).tables;
+const tables = schema(context).tables;
 ```
 
 **Removed `makeT()`**: Use `schema().tables` instead. The `makeT()` function was redundant.
 
 ### Key Points
 
-- **RuntimeContext** encapsulates `OperationRegistry` and `CodecRegistry`
+- **ExecutionContext** encapsulates contract, `OperationRegistry`, `CodecRegistry`, and types
+- **ExecutionStack** holds descriptors; **ExecutionStackInstance** holds instantiated components
 - **Extensions** are registered programmatically (no file I/O at runtime)
 - **Adapters** are treated as extensions (provide codecs via `profile.codecs()`)
-- **Schema API** accepts `context` (optional) for operations registry
-- **codecTypes** is a generic type parameter only (compile-time), not a runtime parameter
 - **No file I/O at runtime** - everything is bundled by the user's bundler

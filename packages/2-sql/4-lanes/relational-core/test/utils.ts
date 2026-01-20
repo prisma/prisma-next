@@ -37,7 +37,7 @@ export interface Extension {
 /**
  * Creates an ExecutionContext for testing.
  * This helper DRYs up the common pattern of context creation in tests.
- * Note: This creates an ExecutionContext (not RuntimeContext), so it doesn't include an adapter.
+ * Note: This creates an ExecutionContext, so it doesn't include an adapter.
  *
  * @param contract - The SQL contract
  * @param adapter - Optional adapter (for backward compatibility with old test code, but not used)

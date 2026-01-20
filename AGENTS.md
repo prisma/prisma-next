@@ -59,7 +59,7 @@ pnpm lint:deps             # Validate layering/imports
 ### Key Patterns
 
 - **Type Parameter Pattern**: JSON imports lose literal types. Use `.d.ts` for precise types, `validateContract()` for runtime validation
-- **RuntimeContext**: Encapsulates contract, adapter, and extension registries. Pass to `schema()`, `sql()`, `orm()`
+- **ExecutionContext**: Encapsulates contract, codecs, operations, and types. Pass to `schema()`, `sql()`, `orm()`
 - **Interface-Based Design**: Export interfaces and factory functions, not classes
 - **Capability Gating**: Features like `includeMany` and `returning()` require capabilities in contract
 
@@ -81,14 +81,17 @@ See `architecture.config.json` for the complete mapping and `pnpm lint:deps` to 
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { sql } from '@prisma-next/sql-lane/sql';
-import { createRuntimeContext } from '@prisma-next/sql-runtime';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import { createExecutionStack, instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { createExecutionContext } from '@prisma-next/sql-runtime';
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
-const adapter = createPostgresAdapter();
-const context = createRuntimeContext({ contract, adapter, extensionPacks: [] });
+const stack = createExecutionStack({ target: postgresTarget, adapter: postgresAdapter, extensionPacks: [] });
+const stackInstance = instantiateExecutionStack(stack);
+const context = createExecutionContext({ contract, stack: stackInstance });
 
 const tables = schema(context).tables;
 const plan = sql({ context })

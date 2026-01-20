@@ -10,16 +10,20 @@ This document covers standard patterns for working with Prisma Next queries, inc
 
 ```typescript
 // src/prisma/query.ts
-import { schema as schemaBuilder } from '@prisma-next/sql-query/schema';
-import { validateContract } from '@prisma-next/sql-query/schema';
-import { sql as sqlBuilder } from '@prisma-next/sql-query/sql';
-import { createRuntimeContext } from '@prisma-next/runtime';
-import { adapter } from './adapter';
+import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { sql as sqlBuilder } from '@prisma-next/sql-lane/sql';
+import { createExecutionStack, instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { createExecutionContext } from '@prisma-next/sql-runtime';
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const stack = createExecutionStack({ target: postgresTarget, adapter: postgresAdapter, extensionPacks: [] });
+const stackInstance = instantiateExecutionStack(stack);
+const context = createExecutionContext({ contract, stack: stackInstance });
 
 export const sql = sqlBuilder<Contract>({ context });
 export const schema = schemaBuilder<Contract>(context);
@@ -193,15 +197,18 @@ type UserWithPosts = ResultType<typeof plan>;
 **✅ CORRECT: ORM entrypoint with model registry**
 
 ```typescript
-import { orm } from '@prisma-next/sql-query/orm';
-import { createRuntimeContext } from '@prisma-next/runtime';
-import { validateContract } from '@prisma-next/sql-query/schema';
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres';
+import { orm } from '@prisma-next/orm-lane/orm';
+import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { createExecutionStack, instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { createExecutionContext } from '@prisma-next/sql-runtime';
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Contract } from './contract.d';
 
 const contract = validateContract<Contract>(contractJson);
-const adapter = createPostgresAdapter();
-const context = createRuntimeContext({ contract, adapter, extensions: [] });
+const stack = createExecutionStack({ target: postgresTarget, adapter: postgresAdapter, extensionPacks: [] });
+const stackInstance = instantiateExecutionStack(stack);
+const context = createExecutionContext({ contract, stack: stackInstance });
 const o = orm<Contract>({ context });
 
 // Model registry proxy: orm.user(), orm.post(), etc.

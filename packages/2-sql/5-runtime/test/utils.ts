@@ -12,8 +12,8 @@ import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import type { SqlStatement } from '../src/exports';
 import {
+  createExecutionContext,
   type createRuntime,
-  createRuntimeContext,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
@@ -161,7 +161,7 @@ function createTestTargetDescriptor(): {
 }
 
 /**
- * Creates a runtime context with standard test configuration.
+ * Creates an ExecutionContext for testing.
  * This helper DRYs up the common pattern of context creation in tests.
  *
  * Accepts a raw adapter and optional extension descriptors, wrapping the
@@ -173,13 +173,14 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
   options?: {
     extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   },
-): ExecutionContext<TContract> & { adapter: SqlRuntimeAdapterInstance<'postgres'> } {
-  return createRuntimeContext<TContract, 'postgres'>({
-    contract,
+): ExecutionContext<TContract> {
+  const stack = createExecutionStack({
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(adapter),
     extensionPacks: options?.extensionPacks ?? [],
   });
+  const stackInstance = instantiateExecutionStack(stack);
+  return createExecutionContext({ contract, stack: stackInstance });
 }
 
 export function createTestStackInstance(options?: {

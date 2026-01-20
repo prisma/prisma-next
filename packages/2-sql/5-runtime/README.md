@@ -72,9 +72,8 @@ for await (const row of runtime.execute(plan)) {
 ## Exports
 
 - `createRuntime` - Create a SQL runtime instance
-- `createExecutionContext` - Create an env-free execution context
-- `createRuntimeContext` - Create a SQL runtime context
-- `ExecutionContext`, `RuntimeContext` - Context types
+- `createExecutionContext` - Create an execution context from stack instance
+- `ExecutionContext` - Context type for SQL operations
 - `budgets`, `lints` - SQL-compatible plugins (re-exported from runtime-executor)
 - `readContractMarker`, `writeContractMarker` - SQL marker statements
 - `encodeParams`, `decodeRow` - Codec encoding/decoding utilities

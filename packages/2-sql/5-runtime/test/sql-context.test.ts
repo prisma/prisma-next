@@ -1,10 +1,14 @@
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { CodecRegistry, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
-  createRuntimeContext,
+  createExecutionContext,
   type SqlRuntimeExtensionDescriptor,
   type SqlRuntimeExtensionInstance,
 } from '../src/sql-context';
@@ -42,7 +46,7 @@ function createStubCodecs(): CodecRegistry {
   return registry;
 }
 
-// Create a test adapter descriptor
+// Create a test adapter descriptor that wraps a raw adapter
 function createTestAdapterDescriptor() {
   const codecs = createStubCodecs();
   return {
@@ -148,27 +152,29 @@ function createTestExtensionDescriptor(options?: {
   };
 }
 
-describe('createRuntimeContext', () => {
+function createContext(options?: {
+  extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
+}) {
+  const stack = createExecutionStack({
+    target: createTestTargetDescriptor(),
+    adapter: createTestAdapterDescriptor(),
+    extensionPacks: options?.extensionPacks ?? [],
+  });
+  const stackInstance = instantiateExecutionStack(stack);
+  return createExecutionContext({ contract: testContract, stack: stackInstance });
+}
+
+describe('createExecutionContext', () => {
   it('creates context with adapter codecs', () => {
-    const context = createRuntimeContext({
-      contract: testContract,
-      target: createTestTargetDescriptor(),
-      adapter: createTestAdapterDescriptor(),
-    });
+    const context = createContext();
 
     expect(context.contract).toBe(testContract);
-    expect(context.adapter).toBeDefined();
     expect(context.codecs.has('pg/int4@1')).toBe(true);
     expect(context.operations).toBeDefined();
   });
 
   it('creates context with empty extension packs', () => {
-    const context = createRuntimeContext({
-      contract: testContract,
-      target: createTestTargetDescriptor(),
-      adapter: createTestAdapterDescriptor(),
-      extensionPacks: [],
-    });
+    const context = createContext({ extensionPacks: [] });
 
     expect(context.codecs.has('pg/int4@1')).toBe(true);
     // No extension codecs registered
@@ -176,10 +182,7 @@ describe('createRuntimeContext', () => {
   });
 
   it('registers extension codecs', () => {
-    const context = createRuntimeContext({
-      contract: testContract,
-      target: createTestTargetDescriptor(),
-      adapter: createTestAdapterDescriptor(),
+    const context = createContext({
       extensionPacks: [createTestExtensionDescriptor({ hasCodecs: true })],
     });
 
@@ -190,10 +193,7 @@ describe('createRuntimeContext', () => {
   });
 
   it('registers extension operations', () => {
-    const context = createRuntimeContext({
-      contract: testContract,
-      target: createTestTargetDescriptor(),
-      adapter: createTestAdapterDescriptor(),
+    const context = createContext({
       extensionPacks: [createTestExtensionDescriptor({ hasOperations: true })],
     });
 
@@ -203,10 +203,7 @@ describe('createRuntimeContext', () => {
   });
 
   it('handles extension without codecs or operations', () => {
-    const context = createRuntimeContext({
-      contract: testContract,
-      target: createTestTargetDescriptor(),
-      adapter: createTestAdapterDescriptor(),
+    const context = createContext({
       extensionPacks: [createTestExtensionDescriptor({ hasCodecs: false, hasOperations: false })],
     });
 

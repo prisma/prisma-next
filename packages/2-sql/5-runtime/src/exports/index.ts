@@ -14,7 +14,6 @@ export {
 } from '../codecs/validation';
 export { lowerSqlPlan } from '../lower-sql-plan';
 export type {
-  CreateRuntimeContextOptions,
   ExecutionContext,
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeAdapterInstance,
@@ -23,7 +22,7 @@ export type {
   SqlRuntimeExtensionInstance,
   TypeHelperRegistry,
 } from '../sql-context';
-export { createExecutionContext, createRuntimeContext } from '../sql-context';
+export { createExecutionContext } from '../sql-context';
 export type { SqlStatement } from '../sql-marker';
 export {
   ensureSchemaStatement,

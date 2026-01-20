@@ -1,16 +1,10 @@
 import { checkContractComponentRequirements } from '@prisma-next/contract/framework-components';
 import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
 import type {
-  RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
   RuntimeDriverInstance,
   RuntimeExtensionDescriptor,
   RuntimeExtensionInstance,
-  RuntimeTargetDescriptor,
 } from '@prisma-next/core-execution-plane/types';
 import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
@@ -167,27 +161,6 @@ export function assertExecutionStackContractRequirements(
   }
 }
 
-/**
- * Descriptor-first options for creating a SQL runtime context.
- * Takes the same framework composition as control-plane: target, adapter, extensionPacks.
- *
- * @template TContract - The SQL contract type
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- */
-export interface CreateRuntimeContextOptions<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  TTargetId extends string = string,
-> {
-  readonly contract: TContract;
-  readonly target: RuntimeTargetDescriptor<'sql', TTargetId>;
-  readonly adapter: RuntimeAdapterDescriptor<
-    'sql',
-    TTargetId,
-    SqlRuntimeAdapterInstance<TTargetId>
-  >;
-  readonly extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<TTargetId>>;
-}
-
 // ============================================================================
 // Runtime Error Types and Helpers
 // ============================================================================
@@ -204,7 +177,7 @@ export interface CreateRuntimeContextOptions<
  * @example
  * ```typescript
  * try {
- *   createRuntimeContext({ ... });
+ *   createExecutionContext({ ... });
  * } catch (e) {
  *   if ((e as RuntimeError).code === 'RUNTIME.TYPE_PARAMS_INVALID') {
  *     console.error('Invalid type parameters:', (e as RuntimeError).details);
@@ -438,38 +411,6 @@ export function createExecutionContext<
     adapterInstance: options.stack.adapter,
     extensionInstances: options.stack.extensionPacks,
   });
-}
-
-/**
- * Creates a SQL execution context and adapter from descriptor-first composition.
- *
- * @deprecated Use createExecutionStack + instantiateExecutionStack + createExecutionContext directly.
- * This function exists for backward compatibility.
- *
- * @param options - Descriptor-first composition options
- * @returns ExecutionContext with adapter
- */
-export function createRuntimeContext<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  TTargetId extends string = string,
->(
-  options: CreateRuntimeContextOptions<TContract, TTargetId>,
-): ExecutionContext<TContract> & { adapter: SqlRuntimeAdapterInstance<TTargetId> } {
-  const stack = createExecutionStack({
-    target: options.target,
-    adapter: options.adapter,
-    extensionPacks: options.extensionPacks ?? [],
-  });
-  const stackInstance = instantiateExecutionStack(stack);
-  const context = createExecutionContext({
-    contract: options.contract,
-    stack: stackInstance,
-  });
-
-  return {
-    ...context,
-    adapter: stackInstance.adapter,
-  };
 }
 
 export { createExecutionContextFromInstances };

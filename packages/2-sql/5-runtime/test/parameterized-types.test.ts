@@ -1,3 +1,7 @@
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -5,7 +9,7 @@ import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
-  createRuntimeContext,
+  createExecutionContext,
   type RuntimeParameterizedCodecDescriptor,
   type SqlRuntimeExtensionDescriptor,
   type SqlRuntimeExtensionInstance,
@@ -115,6 +119,21 @@ function createTestTargetDescriptor() {
   };
 }
 
+function createTestContext<TContract extends SqlContract<SqlStorage>>(options: {
+  contract: TContract;
+  target: ReturnType<typeof createTestTargetDescriptor>;
+  adapter: ReturnType<typeof createTestAdapterDescriptor>;
+  extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
+}) {
+  const stack = createExecutionStack({
+    target: options.target,
+    adapter: options.adapter,
+    extensionPacks: options.extensionPacks ?? [],
+  });
+  const stackInstance = instantiateExecutionStack(stack);
+  return createExecutionContext({ contract: options.contract, stack: stackInstance });
+}
+
 // =============================================================================
 // Tests: Parameterized type validation
 // =============================================================================
@@ -123,7 +142,7 @@ describe('parameterized types', () => {
   describe('storage.types validation', () => {
     it('creates context with empty storage.types', () => {
       const contract = createTestContract({ types: {} });
-      const context = createRuntimeContext({
+      const context = createTestContext({
         contract,
         target: createTestTargetDescriptor(),
         adapter: createTestAdapterDescriptor(),
@@ -143,7 +162,7 @@ describe('parameterized types', () => {
           },
         },
       });
-      const context = createRuntimeContext({
+      const context = createTestContext({
         contract,
         target: createTestTargetDescriptor(),
         adapter: createTestAdapterDescriptor(),
@@ -216,7 +235,7 @@ describe('parameterized types', () => {
         },
       });
 
-      const context = createRuntimeContext({
+      const context = createTestContext({
         contract,
         target: createTestTargetDescriptor(),
         adapter: createTestAdapterDescriptor(),
@@ -239,7 +258,7 @@ describe('parameterized types', () => {
 
       let thrownError: unknown;
       try {
-        createRuntimeContext({
+        createTestContext({
           contract,
           target: createTestTargetDescriptor(),
           adapter: createTestAdapterDescriptor(),
@@ -274,7 +293,7 @@ describe('parameterized types', () => {
 
       let thrownError: unknown;
       try {
-        createRuntimeContext({
+        createTestContext({
           contract,
           target: createTestTargetDescriptor(),
           adapter: createTestAdapterDescriptor(),
@@ -345,7 +364,7 @@ describe('parameterized types', () => {
         },
       });
 
-      const context = createRuntimeContext({
+      const context = createTestContext({
         contract,
         target: createTestTargetDescriptor(),
         adapter: createTestAdapterDescriptor(),
@@ -404,7 +423,7 @@ describe('parameterized types', () => {
         },
       });
 
-      const context = createRuntimeContext({
+      const context = createTestContext({
         contract,
         target: createTestTargetDescriptor(),
         adapter: createTestAdapterDescriptor(),
@@ -469,7 +488,7 @@ describe('parameterized types', () => {
       });
 
       // Should not throw - valid typeParams
-      const context = createRuntimeContext({
+      const context = createTestContext({
         contract,
         target: createTestTargetDescriptor(),
         adapter: createTestAdapterDescriptor(),
@@ -528,7 +547,7 @@ describe('parameterized types', () => {
 
       let thrownError: unknown;
       try {
-        createRuntimeContext({
+        createTestContext({
           contract,
           target: createTestTargetDescriptor(),
           adapter: createTestAdapterDescriptor(),
