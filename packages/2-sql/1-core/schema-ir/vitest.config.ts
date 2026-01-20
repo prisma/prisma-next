@@ -20,6 +20,7 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
+        'src/index.ts', // Pure re-export, no executable code
       ],
       thresholds: {
         lines: 90,

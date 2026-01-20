@@ -261,10 +261,5 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
         why: 'Config.contract.output must be a string when provided',
       });
     }
-    if (contract['types'] !== undefined && typeof contract['types'] !== 'string') {
-      throw errorConfigValidation('contract.types', {
-        why: 'Config.contract.types must be a string when provided',
-      });
-    }
   }
 }

@@ -10,9 +10,10 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
   contract: {
     source: contract,
-    output: 'test/fixtures/generated/contract.json',
+    output: 'output/contract.json',
+    types: 'output/contract.d.ts',
   },
 });

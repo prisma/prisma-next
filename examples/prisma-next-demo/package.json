@@ -6,6 +6,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "dev": "vite",
     "emit": "prisma-next contract emit",
     "db:drop": "tsx scripts/drop-db.ts",
     "seed": "tsx scripts/seed.ts",
@@ -38,12 +39,14 @@
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/vite-plugin-contract-emit": "workspace:*",
     "@prisma/dev": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "tsup": "catalog:",
     "tsx": "^4.19.2",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

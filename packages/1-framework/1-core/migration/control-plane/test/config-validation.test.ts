@@ -367,7 +367,6 @@ describe('validateConfig', () => {
       contract: {
         source: 'src/prisma/contract.ts',
         output: 'src/prisma/contract.json',
-        types: 'src/prisma/contract.d.ts',
       },
     });
     expect(() => validateConfig(config)).not.toThrow();
@@ -399,26 +398,7 @@ describe('validateConfig', () => {
     expect(() => validateConfig(config)).toThrow(CliStructuredError);
   });
 
-  it('throws error when contract.types is not a string', () => {
-    const config = createValidConfig({
-      contract: {
-        source: 'src/prisma/contract.ts',
-        types: 123,
-      },
-    });
-    expect(() => validateConfig(config)).toThrow(CliStructuredError);
-  });
-
   it('allows contract.output to be undefined', () => {
-    const config = createValidConfig({
-      contract: {
-        source: 'src/prisma/contract.ts',
-      },
-    });
-    expect(() => validateConfig(config)).not.toThrow();
-  });
-
-  it('allows contract.types to be undefined', () => {
     const config = createValidConfig({
       contract: {
         source: 'src/prisma/contract.ts',

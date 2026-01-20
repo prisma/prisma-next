@@ -16,6 +16,7 @@
   "dependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
+    "@prisma-next/vite-plugin-contract-emit": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
@@ -39,6 +40,7 @@
     "pg": "catalog:",
     "strip-ansi": "^7.1.0",
     "typescript": "catalog:",
+    "vite": "7.3.1",
     "vitest": "catalog:"
   }
 }
