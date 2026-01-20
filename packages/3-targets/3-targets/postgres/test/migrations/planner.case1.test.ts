@@ -329,8 +329,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults',
-      profileHash: 'sha256:test-defaults-profile',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
           user: {
@@ -385,8 +385,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults',
-      profileHash: 'sha256:test-defaults-profile',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
           user: {
@@ -439,8 +439,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults',
-      profileHash: 'sha256:test-defaults-profile',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
           user: {
@@ -492,8 +492,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults',
-      profileHash: 'sha256:test-defaults-profile',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
           config: {
@@ -567,8 +567,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults',
-      profileHash: 'sha256:test-defaults-profile',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
           audit: {
@@ -621,8 +621,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults',
-      profileHash: 'sha256:test-defaults-profile',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
           counter: {
@@ -674,8 +674,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults',
-      profileHash: 'sha256:test-defaults-profile',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
           bigcounter: {
@@ -728,8 +728,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults',
-      profileHash: 'sha256:test-defaults-profile',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
           smallcounter: {
@@ -782,8 +782,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults',
-      profileHash: 'sha256:test-defaults-profile',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
           item: {
@@ -838,8 +838,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults',
-      profileHash: 'sha256:test-defaults-profile',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
           event: {
