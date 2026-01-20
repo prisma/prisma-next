@@ -1,10 +1,7 @@
 ---
 description: Use pathe for path operations
-globs:
-  - "packages/**/*.{ts,tsx}"
-  - "!packages/**/*.test.{ts,tsx}"
+alwaysApply: false
 ---
-
 # Use pathe for Path Operations
 
 Use `pathe` instead of `node:path` for path manipulation:
