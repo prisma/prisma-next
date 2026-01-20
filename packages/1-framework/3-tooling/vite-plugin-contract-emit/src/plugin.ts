@@ -42,7 +42,7 @@ export function prismaVitePlugin(
   const logLevel = options?.logLevel ?? 'info';
 
   let absoluteConfigPath: string;
-  let watchedFiles = new Set<string>();
+  const watchedFiles = new Set<string>();
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let currentAbortController: AbortController | null = null;
   let server: ViteDevServer | null = null;
@@ -206,7 +206,10 @@ export function prismaVitePlugin(
     }
 
     // Replace the watched files set
-    watchedFiles = newWatchedFiles;
+    watchedFiles.clear();
+    for (const file of newWatchedFiles) {
+      watchedFiles.add(file);
+    }
 
     if (toAdd.length > 0 || toRemove.length > 0) {
       log(`Updated watched files: +${toAdd.length} -${toRemove.length}`, 'debug');
@@ -236,7 +239,7 @@ export function prismaVitePlugin(
           currentAbortController = null;
         }
         server = null;
-        watchedFiles = new Set<string>();
+        watchedFiles.clear();
         log('Server closed, cleaned up resources', 'debug');
       };
 
@@ -245,7 +248,9 @@ export function prismaVitePlugin(
       viteServer.watcher?.on?.('close', cleanup);
 
       // Collect files to watch from the module graph
-      watchedFiles = await collectWatchedFiles(viteServer);
+      for (const file of await collectWatchedFiles(viteServer)) {
+        watchedFiles.add(file);
+      }
 
       // Add all dependency files to Vite's watcher
       for (const file of watchedFiles) {
