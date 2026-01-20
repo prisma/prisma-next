@@ -34,21 +34,9 @@
     "node": ">=20"
   },
   "exports": {
-    "./framework-components": {
-      "types": "./dist/framework-components.d.mts",
-      "import": "./dist/framework-components.mjs",
-      "default": "./dist/framework-components.mjs"
-    },
-    "./stack": {
-      "types": "./dist/stack.d.mts",
-      "import": "./dist/stack.mjs",
-      "default": "./dist/stack.mjs"
-    },
-    "./types": {
-      "types": "./dist/types.d.mts",
-      "import": "./dist/types.mjs",
-      "default": "./dist/types.mjs"
-    },
+    "./framework-components": "./dist/framework-components.mjs",
+    "./stack": "./dist/stack.mjs",
+    "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
   }
 }
