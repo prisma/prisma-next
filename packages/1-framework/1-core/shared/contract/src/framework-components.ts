@@ -1,4 +1,4 @@
-import type { OperationManifest, TypesImportSpec } from './types';
+import type { OperationManifest, RenderTypeContext, TypesImportSpec } from './types';
 
 // ============================================================================
 // Type Renderer Types (for parameterized codec emission)
@@ -14,14 +14,6 @@ import type { OperationManifest, TypesImportSpec } from './types';
 //   3. Emission: Emitter calls normalized render functions
 //
 // ============================================================================
-
-/**
- * Context passed to type renderers during contract.d.ts generation.
- */
-export interface RenderTypeContext {
-  /** The name of the CodecTypes type alias (typically 'CodecTypes') */
-  readonly codecTypesName: string;
-}
 
 /**
  * A template-based type renderer (structured form).

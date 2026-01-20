@@ -236,14 +236,9 @@ export interface EmitContractConfig {
   readonly source: EmitContractSource;
   /**
    * Output path for contract.json.
-   * Should be an absolute or relative path.
+   * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
    */
   readonly output: string;
-  /**
-   * Output path for contract.d.ts.
-   * Should be an absolute or relative path.
-   */
-  readonly types: string;
 }
 
 /**
@@ -350,6 +345,39 @@ export interface EmitFailure {
  * Uses Result pattern: success returns EmitSuccess, failure returns EmitFailure.
  */
 export type EmitResult = Result<EmitSuccess, EmitFailure>;
+
+// ============================================================================
+// Standalone Contract Emit Types
+// ============================================================================
+
+/**
+ * Options for the standalone executeContractEmit function.
+ * Used by tooling (e.g., Vite plugin) that needs to emit contracts
+ * without the full ControlClient infrastructure.
+ */
+export interface ContractEmitOptions {
+  /** Path to the prisma-next.config.ts file */
+  readonly configPath: string;
+  /** Optional AbortSignal for cancellation support */
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * Result from the standalone executeContractEmit function.
+ */
+export interface ContractEmitResult {
+  /** Hash of the core contract (schema-level) */
+  readonly coreHash: string;
+  /** Hash of the profile (target+extensions) */
+  readonly profileHash: string;
+  /** Paths to the emitted files */
+  readonly files: {
+    /** Path to the emitted contract.json file */
+    readonly json: string;
+    /** Path to the emitted contract.d.ts file */
+    readonly dts: string;
+  };
+}
 
 // ============================================================================
 // Client Interface

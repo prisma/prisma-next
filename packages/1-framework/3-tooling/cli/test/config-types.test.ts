@@ -108,7 +108,7 @@ describe('defineConfig', () => {
     expect(result.adapter.id).toBe('postgres');
   });
 
-  it('normalizes contract config with default output and types', () => {
+  it('normalizes contract config with default output', () => {
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
@@ -118,10 +118,9 @@ describe('defineConfig', () => {
 
     const result = defineConfig(config);
     expect(result.contract?.output).toBe('src/prisma/contract.json');
-    expect(result.contract?.types).toBe('src/prisma/contract.d.ts');
   });
 
-  it('normalizes contract config with custom output and default types', () => {
+  it('normalizes contract config with custom output', () => {
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
@@ -132,36 +131,6 @@ describe('defineConfig', () => {
 
     const result = defineConfig(config);
     expect(result.contract?.output).toBe('custom/contract.json');
-    expect(result.contract?.types).toBe('custom/contract.d.ts');
-  });
-
-  it('normalizes contract config with custom output (non-json) and default types', () => {
-    const config: PrismaNextConfig = {
-      ...baseConfig,
-      contract: {
-        source: { target: 'postgres' },
-        output: 'custom/contract',
-      },
-    };
-
-    const result = defineConfig(config);
-    expect(result.contract?.output).toBe('custom/contract');
-    expect(result.contract?.types).toBe('custom/contract.d.ts');
-  });
-
-  it('normalizes contract config with custom output and types', () => {
-    const config: PrismaNextConfig = {
-      ...baseConfig,
-      contract: {
-        source: { target: 'postgres' },
-        output: 'custom/contract.json',
-        types: 'custom/contract.d.ts',
-      },
-    };
-
-    const result = defineConfig(config);
-    expect(result.contract?.output).toBe('custom/contract.json');
-    expect(result.contract?.types).toBe('custom/contract.d.ts');
   });
 
   it('validates contract source accepts object', () => {

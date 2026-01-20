@@ -46,11 +46,12 @@ const mockSqlHook: TargetFamilyHook = {
       throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
     }
   },
-  generateContractTypes: (ir: ContractIR, _codecTypeImports, _operationTypeImports) => {
+  generateContractTypes: (ir: ContractIR, _codecTypeImports, _operationTypeImports, _hashes) => {
     // Access ir properties to satisfy lint rules, but we don't use them in the mock
     void ir;
     void _codecTypeImports;
     void _operationTypeImports;
+    void _hashes;
     return `// Generated contract types
 export type CodecTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
@@ -624,9 +625,10 @@ describe('emitter', () => {
           throw new Error(`Expected targetFamily "sql", got "${ir.targetFamily}"`);
         }
       },
-      generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports) => {
+      generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports, _hashes) => {
         void _codecTypeImports;
         void _operationTypeImports;
+        void _hashes;
         return `// Generated contract types
 export type CodecTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
@@ -662,7 +664,7 @@ export type Contract = unknown;
       id: 'sql',
       validateTypes: () => {},
       validateStructure: () => {},
-      generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports, options) => {
+      generateContractTypes: (_ir, _codecTypeImports, _operationTypeImports, _hashes, options) => {
         receivedOptions = options;
         return `// Generated contract types
 export type CodecTypes = Record<string, never>;

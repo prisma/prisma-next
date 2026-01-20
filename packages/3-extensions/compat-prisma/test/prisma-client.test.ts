@@ -19,8 +19,8 @@ const testContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  coreHash: 'sha256:test-core',
-  profileHash: 'sha256:test-profile',
+  coreHash: 'sha256:test-core' as never,
+  profileHash: 'sha256:test-profile' as never,
   storage: {
     tables: {
       user: {

@@ -42,8 +42,8 @@ describe('emitContract API', () => {
         contractRaw = contractConfig.source;
       }
 
-      if (!contractConfig.output || !contractConfig.types) {
-        throw new Error('Contract config must have output and types paths');
+      if (!contractConfig.output) {
+        throw new Error('Contract config must have output path');
       }
 
       // Create family instance (assembles operation registry, type imports, extension IDs)
@@ -66,11 +66,10 @@ describe('emitContract API', () => {
       expect(result.contractJson).toBeDefined();
       expect(result.contractDts).toBeDefined();
 
-      // Write the returned strings to files
+      // Write the returned strings to files (dts is colocated with json)
       const contractJsonPath = resolve(testDir, contractConfig.output);
-      const contractDtsPath = resolve(testDir, contractConfig.types);
+      const contractDtsPath = contractJsonPath.replace(/\.json$/, '.d.ts');
       mkdirSync(dirname(contractJsonPath), { recursive: true });
-      mkdirSync(dirname(contractDtsPath), { recursive: true });
       writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
       writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
 
@@ -107,8 +106,8 @@ describe('emitContract API', () => {
         contractRaw = contractConfig.source;
       }
 
-      if (!contractConfig.output || !contractConfig.types) {
-        throw new Error('Contract config must have output and types paths');
+      if (!contractConfig.output) {
+        throw new Error('Contract config must have output path');
       }
 
       // Create family instance (assembles operation registry, type imports, extension IDs)
@@ -125,11 +124,10 @@ describe('emitContract API', () => {
       // emitContract handles stripping mappings and validation internally
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
 
-      // Write files and verify paths
+      // Write files and verify paths (dts is colocated with json)
       const contractJsonPath = resolve(testDir, contractConfig.output);
-      const contractDtsPath = resolve(testDir, contractConfig.types);
+      const contractDtsPath = contractJsonPath.replace(/\.json$/, '.d.ts');
       mkdirSync(dirname(contractJsonPath), { recursive: true });
-      mkdirSync(dirname(contractDtsPath), { recursive: true });
       writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
       writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
       expect(contractJsonPath).toContain('output/contract.json');
@@ -167,8 +165,8 @@ describe('emitContract API', () => {
           contractRaw = contractConfig.source;
         }
 
-        if (!contractConfig.output || !contractConfig.types) {
-          throw new Error('Contract config must have output and types paths');
+        if (!contractConfig.output) {
+          throw new Error('Contract config must have output path');
         }
 
         // Create family instance (assembles operation registry, type imports, extension IDs)
@@ -185,11 +183,10 @@ describe('emitContract API', () => {
         // emitContract handles stripping mappings and validation internally
         const result = await familyInstance.emitContract({ contractIR: contractRaw });
 
-        // Write files
+        // Write files (dts is colocated with json)
         const contractJsonPath = resolve(customTestDir, contractConfig.output);
-        const contractDtsPath = resolve(customTestDir, contractConfig.types);
+        const contractDtsPath = contractJsonPath.replace(/\.json$/, '.d.ts');
         mkdirSync(dirname(contractJsonPath), { recursive: true });
-        mkdirSync(dirname(contractDtsPath), { recursive: true });
         writeFileSync(contractJsonPath, result.contractJson, 'utf-8');
         writeFileSync(contractDtsPath, result.contractDts, 'utf-8');
         expect(existsSync(newOutputDir)).toBe(true);
@@ -219,8 +216,8 @@ describe('emitContract API', () => {
         contractRaw = contractConfig.source;
       }
 
-      if (!contractConfig.output || !contractConfig.types) {
-        throw new Error('Contract config must have output and types paths');
+      if (!contractConfig.output) {
+        throw new Error('Contract config must have output path');
       }
 
       // Create family instance (assembles operation registry, type imports, extension IDs)
@@ -261,8 +258,8 @@ describe('emitContract API', () => {
         contractRaw = contractConfig.source;
       }
 
-      if (!contractConfig.output || !contractConfig.types) {
-        throw new Error('Contract config must have output and types paths');
+      if (!contractConfig.output) {
+        throw new Error('Contract config must have output path');
       }
 
       // Create family instance (assembles operation registry, type imports, extension IDs)
@@ -303,8 +300,8 @@ describe('emitContract API', () => {
         contractRaw = contractConfig.source;
       }
 
-      if (!contractConfig.output || !contractConfig.types) {
-        throw new Error('Contract config must have output and types paths');
+      if (!contractConfig.output) {
+        throw new Error('Contract config must have output path');
       }
 
       // Create family instance (assembles operation registry, type imports, extension IDs)

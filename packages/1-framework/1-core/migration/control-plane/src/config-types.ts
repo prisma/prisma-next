@@ -1,4 +1,3 @@
-import { dirname, join } from 'node:path';
 import { type } from 'arktype';
 import type {
   ControlAdapterDescriptor,
@@ -26,15 +25,9 @@ export interface ContractConfig {
   readonly source: unknown | (() => unknown | Promise<unknown>);
   /**
    * Path to contract.json artifact. Defaults to 'src/prisma/contract.json'.
-   * This is the canonical location where other CLI commands can find the contract JSON.
+   * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
    */
   readonly output?: string;
-  /**
-   * Path to contract.d.ts artifact. Defaults to output with .d.ts extension.
-   * If output ends with .json, replaces .json with .d.ts.
-   * Otherwise, appends .d.ts to the directory containing output.
-   */
-  readonly types?: string;
 }
 
 /**
@@ -92,7 +85,6 @@ export interface PrismaNextConfig<
 const ContractConfigSchema = type({
   source: 'unknown', // Can be value or function - runtime check needed
   'output?': 'string',
-  'types?': 'string',
 });
 
 /**
@@ -115,7 +107,6 @@ const PrismaNextConfigSchema = type({
  *
  * Normalization:
  * - contract.output defaults to 'src/prisma/contract.json' if missing
- * - contract.types defaults to output with .d.ts extension if missing
  *
  * @param config - Raw config input from user
  * @returns Normalized config IR with defaults applied
@@ -150,16 +141,10 @@ export function defineConfig<TFamilyId extends string = string, TTargetId extend
 
     // Apply defaults
     const output = config.contract.output ?? 'src/prisma/contract.json';
-    const types =
-      config.contract.types ??
-      (output.endsWith('.json')
-        ? `${output.slice(0, -5)}.d.ts`
-        : join(dirname(output), 'contract.d.ts'));
 
     const normalizedContract: ContractConfig = {
       source: config.contract.source,
       output,
-      types,
     };
 
     // Return normalized config

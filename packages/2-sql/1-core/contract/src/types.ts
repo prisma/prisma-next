@@ -1,4 +1,4 @@
-import type { ContractBase } from '@prisma-next/contract/types';
+import type { ContractBase, CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
 
 /**
  * Column default value.
@@ -136,7 +136,9 @@ export type SqlContract<
   M extends Record<string, unknown> = Record<string, unknown>,
   R extends Record<string, unknown> = Record<string, unknown>,
   Map extends SqlMappings = SqlMappings,
-> = ContractBase & {
+  TCoreHash extends CoreHashBase<string> = CoreHashBase<string>,
+  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
+> = ContractBase<TCoreHash, TProfileHash> & {
   readonly targetFamily: string;
   readonly storage: S;
   readonly models: M;

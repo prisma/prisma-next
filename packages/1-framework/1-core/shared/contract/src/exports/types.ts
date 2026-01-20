@@ -1,11 +1,9 @@
-// Shared types
-// Document family types
-// Plan types - target-family agnostic execution types
-// Emitter types (moved from @prisma-next/emitter)
-// Parameterized codec descriptor types
 export type {
+  $,
+  Brand,
   ContractBase,
   ContractMarkerRecord,
+  CoreHashBase,
   DocCollection,
   DocIndex,
   DocumentContract,
@@ -13,13 +11,14 @@ export type {
   ExecutionPlan,
   Expr,
   FieldType,
-  // Type generation options for parameterized codecs
   GenerateContractTypesOptions,
   OperationManifest,
   ParamDescriptor,
   ParameterizedCodecDescriptor,
   PlanMeta,
   PlanRefs,
+  ProfileHashBase,
+  RenderTypeContext,
   ResultType,
   Source,
   TargetFamilyHook,
@@ -29,5 +28,4 @@ export type {
   TypesImportSpec,
   ValidationContext,
 } from '../types';
-// Type guards
 export { isDocumentContract } from '../types';

@@ -6,12 +6,18 @@ import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvecto
 import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
+import type { CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
 import type {
   SqlContract,
   SqlStorage,
   SqlMappings,
   ModelDefinition,
 } from '@prisma-next/sql-contract/types';
+
+export type CoreHash =
+  CoreHashBase<'sha256:97998a9dc27b4ffdd7258e171236148b81c220a194d7adadbdb47ff28b476766'>;
+export type ProfileHash =
+  ProfileHashBase<'sha256:58a1990244c9a8cf20e2f77c60aa35d2f6ea9823f641b533a9e75abc8606819f'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -160,7 +166,9 @@ export type Contract = SqlContract<
     };
     codecTypes: PgTypes & PgVectorTypes;
     operationTypes: PgVectorOperationTypes;
-  }
+  },
+  CoreHash,
+  ProfileHash
 >;
 
 export type Tables = Contract['storage']['tables'];

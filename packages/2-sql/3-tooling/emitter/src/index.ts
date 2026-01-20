@@ -226,6 +226,7 @@ export const sqlTargetFamilyHook = {
     ir: ContractIR,
     codecTypeImports: ReadonlyArray<TypesImportSpec>,
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
+    hashes: { readonly coreHash: string; readonly profileHash: string },
     options?: GenerateContractTypesOptions,
   ): string {
     const parameterizedRenderers = options?.parameterizedRenderers;
@@ -289,7 +290,11 @@ export const sqlTargetFamilyHook = {
   // To regenerate, run: prisma-next contract emit
   ${importLines.join('\n')}
 
+  import type { CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
   import type { SqlContract, SqlStorage, SqlMappings, ModelDefinition } from '@prisma-next/sql-contract/types';
+
+  export type CoreHash = CoreHashBase<'${hashes.coreHash}'>;
+  export type ProfileHash = ProfileHashBase<'${hashes.profileHash}'>;
 
   export type CodecTypes = ${codecTypes || 'Record<string, never>'};
   export type LaneCodecTypes = CodecTypes;
@@ -299,7 +304,9 @@ export const sqlTargetFamilyHook = {
   ${storageType},
   ${modelsType},
   ${relationsType},
-  ${mappingsType}
+  ${mappingsType},
+  CoreHash,
+  ProfileHash
   >;
 
   export type Tables = Contract['storage']['tables'];

@@ -395,7 +395,6 @@ describe('ControlClient progress emission', () => {
         contractConfig: {
           source: { kind: 'value', value: { test: true } },
           output: '/tmp/contract.json',
-          types: '/tmp/contract.d.ts',
         },
         onProgress: (event) => events.push(event),
       });
@@ -440,7 +439,6 @@ describe('ControlClient progress emission', () => {
         contractConfig: {
           source: { kind: 'loader', load: async () => ({ test: true }) },
           output: '/tmp/contract.json',
-          types: '/tmp/contract.d.ts',
         },
         onProgress: (event) => events.push(event),
       });
@@ -479,7 +477,6 @@ describe('ControlClient progress emission', () => {
             },
           },
           output: '/tmp/contract.json',
-          types: '/tmp/contract.d.ts',
         },
         onProgress: (event) => events.push(event),
       });
@@ -517,7 +514,6 @@ describe('ControlClient progress emission', () => {
         contractConfig: {
           source: { kind: 'value', value: { test: true } },
           output: '/tmp/contract.json',
-          types: '/tmp/contract.d.ts',
         },
         onProgress: (event) => events.push(event),
       });
@@ -628,7 +624,6 @@ describe('ControlClient progress emission', () => {
         contractConfig: {
           source: { kind: 'value', value: { test: true } },
           output: '/tmp/contract.json',
-          types: '/tmp/contract.d.ts',
         },
       });
 

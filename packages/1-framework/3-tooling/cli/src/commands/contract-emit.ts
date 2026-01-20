@@ -94,15 +94,23 @@ async function executeContractEmitCommand(
   const contractConfig = config.contract;
 
   // Resolve artifact paths from config (already normalized by defineConfig() with defaults)
-  if (!contractConfig.output || !contractConfig.types) {
+  if (!contractConfig.output) {
     return notOk(
       errorContractConfigMissing({
-        why: 'Contract config must have output and types paths. This should not happen if defineConfig() was used.',
+        why: 'Contract config must have output path. This should not happen if defineConfig() was used.',
+      }),
+    );
+  }
+  if (!contractConfig.output.endsWith('.json')) {
+    return notOk(
+      errorContractConfigMissing({
+        why: 'Contract config output path must end with .json (e.g., "src/prisma/contract.json")',
       }),
     );
   }
   const outputJsonPath = resolve(contractConfig.output);
-  const outputDtsPath = resolve(contractConfig.types);
+  // Colocate .d.ts with .json (contract.json → contract.d.ts)
+  const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 
   // Output header (only for human-readable output)
   if (flags.json !== 'object' && !flags.quiet) {
@@ -151,7 +159,6 @@ async function executeContractEmitCommand(
       contractConfig: {
         source,
         output: outputJsonPath,
-        types: outputDtsPath,
       },
       onProgress,
     });

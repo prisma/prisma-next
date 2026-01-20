@@ -1,3 +1,4 @@
+import type { CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
 import type {
   ForeignKey,
   ForeignKeyReferences,
@@ -100,21 +101,31 @@ export function storage(tables: Record<string, StorageTable>): SqlStorage {
   return { tables };
 }
 
-export function contract(opts: {
+export function contract<
+  TCoreHash extends CoreHashBase<string> = CoreHashBase<string>,
+  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
+>(opts: {
   target: string;
-  coreHash: string;
+  coreHash: TCoreHash;
   storage: SqlStorage;
   models?: Record<string, ModelDefinition>;
   relations?: Record<string, unknown>;
   mappings?: Partial<SqlMappings>;
   schemaVersion?: '1';
   targetFamily?: 'sql';
-  profileHash?: string;
+  profileHash?: TProfileHash;
   capabilities?: Record<string, Record<string, boolean>>;
   extensionPacks?: Record<string, unknown>;
   meta?: Record<string, unknown>;
   sources?: Record<string, unknown>;
-}): SqlContract {
+}): SqlContract<
+  SqlStorage,
+  Record<string, unknown>,
+  Record<string, unknown>,
+  SqlMappings,
+  TCoreHash,
+  TProfileHash
+> {
   return {
     schemaVersion: opts.schemaVersion ?? '1',
     target: opts.target,
@@ -129,5 +140,12 @@ export function contract(opts: {
     ...(opts.extensionPacks !== undefined && { extensionPacks: opts.extensionPacks }),
     ...(opts.meta !== undefined && { meta: opts.meta }),
     ...(opts.sources !== undefined && { sources: opts.sources as Record<string, unknown> }),
-  } as SqlContract;
+  } as SqlContract<
+    SqlStorage,
+    Record<string, unknown>,
+    Record<string, unknown>,
+    SqlMappings,
+    TCoreHash,
+    TProfileHash
+  >;
 }

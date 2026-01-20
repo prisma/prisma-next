@@ -1,13 +1,54 @@
 import type { OperationRegistry } from '@prisma-next/operations';
-import type { RenderTypeContext } from './framework-components';
 import type { ContractIR } from './ir';
 
-export interface ContractBase {
+/**
+ * Unique symbol used as the key for branding types.
+ */
+export const $: unique symbol = Symbol('__prisma_next_brand__');
+
+/**
+ * A helper type to brand a given type with a unique identifier.
+ *
+ * @template TKey Text used as the brand key.
+ * @template TValue Optional value associated with the brand key. Defaults to `true`.
+ */
+export type Brand<TKey extends string | number | symbol, TValue = true> = {
+  [$]: {
+    [K in TKey]: TValue;
+  };
+};
+
+/**
+ * Context passed to type renderers during contract.d.ts generation.
+ */
+export interface RenderTypeContext {
+  /** The name of the CodecTypes type alias (typically 'CodecTypes') */
+  readonly codecTypesName: string;
+}
+
+/**
+ * Base type for core contract hashes.
+ * Emitted contract.d.ts files use this with the hash value as a type parameter:
+ * `type CoreHash = CoreHashBase<'sha256:abc123...'>`
+ */
+export type CoreHashBase<THash extends string> = THash & Brand<'CoreHash'>;
+
+/**
+ * Base type for profile contract hashes.
+ * Emitted contract.d.ts files use this with the hash value as a type parameter:
+ * `type ProfileHash = ProfileHashBase<'sha256:def456...'>`
+ */
+export type ProfileHashBase<THash extends string> = THash & Brand<'ProfileHash'>;
+
+export interface ContractBase<
+  TCoreHash extends CoreHashBase<string> = CoreHashBase<string>,
+  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
+> {
   readonly schemaVersion: string;
   readonly target: string;
   readonly targetFamily: string;
-  readonly coreHash: string;
-  readonly profileHash?: string;
+  readonly coreHash: TCoreHash;
+  readonly profileHash?: TProfileHash | undefined;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;
   readonly meta: Record<string, unknown>;
@@ -56,7 +97,10 @@ export interface DocumentStorage {
   };
 }
 
-export interface DocumentContract extends ContractBase {
+export interface DocumentContract<
+  TCoreHash extends CoreHashBase<string> = CoreHashBase<string>,
+  TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
+> extends ContractBase<TCoreHash, TProfileHash> {
   // Accept string to work with JSON imports; runtime validation ensures 'document'
   readonly targetFamily: string;
   readonly storage: DocumentStorage;
@@ -247,6 +291,7 @@ export interface TargetFamilyHook {
    * @param ir - Contract IR
    * @param codecTypeImports - Array of codec type import specs
    * @param operationTypeImports - Array of operation type import specs
+   * @param hashes - Contract hash values (coreHash and profileHash)
    * @param options - Additional options including parameterized type renderers
    * @returns Generated TypeScript type definitions as string
    */
@@ -254,6 +299,7 @@ export interface TargetFamilyHook {
     ir: ContractIR,
     codecTypeImports: ReadonlyArray<TypesImportSpec>,
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
+    hashes: { readonly coreHash: string; readonly profileHash: string },
     options?: GenerateContractTypesOptions,
   ): string;
 }
@@ -292,9 +338,6 @@ export interface OperationManifest {
 // coupling the SQL family emitter to specific adapter codec IDs.
 //
 // ============================================================================
-
-// Re-export RenderTypeContext so it's available alongside TypeRenderer
-export type { RenderTypeContext };
 
 /**
  * Declarative type renderer that produces a TypeScript type expression.

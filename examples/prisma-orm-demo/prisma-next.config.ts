@@ -15,7 +15,6 @@ export default defineConfig({
   contract: {
     source: contract,
     output: 'src/prisma-next/contract.json',
-    types: 'src/prisma-next/contract.d.ts',
   },
   db: {
     connection: process.env['DATABASE_URL'],
