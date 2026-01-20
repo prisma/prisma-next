@@ -287,10 +287,6 @@ function createRuntimeFromStack<
 
 export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
   options: RuntimeStackOptions<TContract, TTargetId>,
-): Runtime;
-
-export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
-  options: RuntimeStackOptions<TContract, TTargetId>,
 ): Runtime {
   return createRuntimeFromStack(options);
 }
