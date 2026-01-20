@@ -1,5 +1,7 @@
 /**
- * Creates a wrapper function that races promises against an AbortSignal.
+ * Allows aborting an async operation by returning a Promise which rejects if
+ * the provided AbortSignal aborts and otherwise resolves with the result of
+ * the async operation.
  *
  * Throws immediately if the signal is already aborted.
  * When the signal is aborted later, any wrapped promise will reject with
@@ -8,7 +10,7 @@
  * @example
  * ```typescript
  * const { signal = new AbortController().signal } = options;
- * const unlessAborted = cancelable(signal);
+ * const unlessAborted = abortable(signal);
  *
  * // Any of these will reject if signal is aborted
  * await unlessAborted(asyncOperation());
@@ -19,7 +21,7 @@
  * @returns A function that wraps promises to be cancelable
  * @throws If signal is already aborted
  */
-export function cancelable(signal: AbortSignal): <T>(promise: Promise<T>) => Promise<T> {
+export function abortable(signal: AbortSignal): <T>(promise: Promise<T>) => Promise<T> {
   signal.throwIfAborted();
 
   const abortPromise = new Promise<never>((_resolve, reject) => {
@@ -32,7 +34,7 @@ export function cancelable(signal: AbortSignal): <T>(promise: Promise<T>) => Pro
     );
   });
 
-  return <T>(promise: Promise<T>): Promise<T> => {
-    return Promise.race([promise, abortPromise]);
+  return <T>(operation: Promise<T>): Promise<T> => {
+    return Promise.race([operation, abortPromise]);
   };
 }

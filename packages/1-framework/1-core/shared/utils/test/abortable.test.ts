@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { cancelable } from '../src/cancelable';
+import { abortable } from '../src/abortable';
 
-describe('cancelable', () => {
+describe('abortable', () => {
   it('throws immediately if signal already aborted', () => {
     const controller = new AbortController();
     controller.abort(new Error('Already cancelled'));
 
-    expect(() => cancelable(controller.signal)).toThrow('Already cancelled');
+    expect(() => abortable(controller.signal)).toThrow('Already cancelled');
   });
 
   it('resolves when promise completes before abort', async () => {
     const controller = new AbortController();
-    const unlessAborted = cancelable(controller.signal);
+    const unlessAborted = abortable(controller.signal);
 
     const result = await unlessAborted(Promise.resolve('success'));
 
@@ -20,7 +20,7 @@ describe('cancelable', () => {
 
   it('rejects when signal is aborted before promise completes', async () => {
     const controller = new AbortController();
-    const unlessAborted = cancelable(controller.signal);
+    const unlessAborted = abortable(controller.signal);
 
     const slowPromise = new Promise<string>((resolve) => {
       setTimeout(() => resolve('too late'), 100);
@@ -34,7 +34,7 @@ describe('cancelable', () => {
 
   it('uses signal.reason when provided', async () => {
     const controller = new AbortController();
-    const unlessAborted = cancelable(controller.signal);
+    const unlessAborted = abortable(controller.signal);
 
     const slowPromise = new Promise<string>((resolve) => {
       setTimeout(() => resolve('too late'), 100);
@@ -49,7 +49,7 @@ describe('cancelable', () => {
 
   it('uses signal default DOMException when no reason provided', async () => {
     const controller = new AbortController();
-    const unlessAborted = cancelable(controller.signal);
+    const unlessAborted = abortable(controller.signal);
 
     const slowPromise = new Promise<string>((resolve) => {
       setTimeout(() => resolve('too late'), 100);
@@ -64,7 +64,7 @@ describe('cancelable', () => {
 
   it('can wrap multiple promises with same wrapper', async () => {
     const controller = new AbortController();
-    const unlessAborted = cancelable(controller.signal);
+    const unlessAborted = abortable(controller.signal);
 
     const result1 = await unlessAborted(Promise.resolve(1));
     const result2 = await unlessAborted(Promise.resolve(2));

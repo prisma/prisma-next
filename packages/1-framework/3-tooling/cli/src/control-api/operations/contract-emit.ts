@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
-import { cancelable } from '@prisma-next/utils/cancelable';
+import { abortable } from '@prisma-next/utils/abortable';
 import { dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing } from '../../utils/cli-errors';
@@ -27,7 +27,7 @@ export async function executeContractEmit(
   options: ContractEmitOptions,
 ): Promise<ContractEmitResult> {
   const { configPath, signal = new AbortController().signal } = options;
-  const unlessAborted = cancelable(signal);
+  const unlessAborted = abortable(signal);
 
   // Load config using the existing config loader
   const config = await unlessAborted(loadConfig(configPath));
