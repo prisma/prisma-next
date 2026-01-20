@@ -41,10 +41,25 @@ export async function executeContractEmit(
 
   const contractConfig = config.contract;
 
-  // Validate output path is present
+  // Validate output path is present and ends with .json
   if (!contractConfig.output) {
     throw errorContractConfigMissing({
       why: 'Contract config must have output path. This should not happen if defineConfig() was used.',
+    });
+  }
+  if (!contractConfig.output.endsWith('.json')) {
+    throw errorContractConfigMissing({
+      why: 'Contract config output path must end with .json (e.g., "src/prisma/contract.json")',
+    });
+  }
+
+  // Validate source is defined and is either a function or a non-null object
+  if (
+    contractConfig.source === null ||
+    (typeof contractConfig.source !== 'function' && typeof contractConfig.source !== 'object')
+  ) {
+    throw errorContractConfigMissing({
+      why: 'Contract config must include a valid source (function or non-null object)',
     });
   }
 
@@ -54,15 +69,8 @@ export async function executeContractEmit(
   const outputJsonPath = isAbsolute(contractConfig.output)
     ? contractConfig.output
     : join(configDir, contractConfig.output);
-  // Colocate .d.ts with .json (e.g., contract.json → contract.d.ts)
-  const outputDtsPath = outputJsonPath.replace(/\.json$/, '.d.ts');
-
-  // Validate source is defined and is either a function or a non-null value
-  if (typeof contractConfig.source !== 'function' && typeof contractConfig.source !== 'object') {
-    throw errorContractConfigMissing({
-      why: 'Contract config must include a valid source (function or value)',
-    });
-  }
+  // Colocate .d.ts with .json (contract.json → contract.d.ts)
+  const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 
   // Create control plane stack from config
   const stack = createControlPlaneStack(config);

@@ -1,8 +1,8 @@
 ---
 description: Use pathe for path operations
 globs:
-  - "packages/**/*.ts"
-  - "!packages/**/*.test.ts"
+  - "packages/**/*.{ts,tsx}"
+  - "!packages/**/*.test.{ts,tsx}"
 ---
 
 # Use pathe for Path Operations

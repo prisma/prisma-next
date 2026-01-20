@@ -101,9 +101,16 @@ async function executeContractEmitCommand(
       }),
     );
   }
+  if (!contractConfig.output.endsWith('.json')) {
+    return notOk(
+      errorContractConfigMissing({
+        why: 'Contract config output path must end with .json (e.g., "src/prisma/contract.json")',
+      }),
+    );
+  }
   const outputJsonPath = resolve(contractConfig.output);
-  // Colocate .d.ts with .json (e.g., contract.json → contract.d.ts)
-  const outputDtsPath = outputJsonPath.replace(/\.json$/, '.d.ts');
+  // Colocate .d.ts with .json (contract.json → contract.d.ts)
+  const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 
   // Output header (only for human-readable output)
   if (flags.json !== 'object' && !flags.quiet) {
