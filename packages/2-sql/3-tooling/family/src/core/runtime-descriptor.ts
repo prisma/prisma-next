@@ -24,7 +24,7 @@ export class SqlRuntimeFamilyDescriptor
   readonly familyId = 'sql' as const;
   readonly version = '0.0.1';
 
-  create<TTargetId extends string>(options: {
+  create<TTargetId extends string>(_options: {
     readonly target: RuntimeTargetDescriptor<'sql', TTargetId>;
     readonly adapter: RuntimeAdapterDescriptor<
       'sql',
@@ -34,12 +34,6 @@ export class SqlRuntimeFamilyDescriptor
     readonly driver: RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>;
     readonly extensionPacks: readonly RuntimeExtensionDescriptor<'sql', TTargetId>[];
   }): SqlRuntimeFamilyInstance {
-    return createSqlRuntimeFamilyInstance({
-      family: this,
-      target: options.target,
-      adapter: options.adapter,
-      driver: options.driver,
-      extensionPacks: options.extensionPacks,
-    });
+    return createSqlRuntimeFamilyInstance();
   }
 }

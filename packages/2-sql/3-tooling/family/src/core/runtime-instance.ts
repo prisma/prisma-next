@@ -1,30 +1,8 @@
-import { assertRuntimeContractRequirementsSatisfied } from '@prisma-next/core-execution-plane/framework-components';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
 import type {
-  RuntimeAdapterDescriptor,
-  RuntimeDriverDescriptor,
   RuntimeDriverInstance,
-  RuntimeFamilyDescriptor,
   RuntimeFamilyInstance,
-  RuntimeTargetDescriptor,
 } from '@prisma-next/core-execution-plane/types';
-import type { Log, Plugin, RuntimeVerifyOptions } from '@prisma-next/runtime-executor';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
-  Adapter,
-  LoweredStatement,
-  SelectAst,
-  SqlDriver,
-} from '@prisma-next/sql-relational-core/ast';
-import type {
-  Runtime,
-  SqlRuntimeAdapterInstance,
-  SqlRuntimeExtensionDescriptor,
-} from '@prisma-next/sql-runtime';
-import { createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
+import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
 
 /**
  * SQL runtime driver instance type.
@@ -41,108 +19,24 @@ export type { SqlRuntimeAdapterInstance } from '@prisma-next/sql-runtime';
 
 /**
  * SQL runtime family instance interface.
- * Extends base RuntimeFamilyInstance with SQL-specific runtime creation method.
+ * Identity-only interface for runtime plane. No runtime creation API.
+ *
+ * Runtime creation should use the stack/context/runtime factory pattern directly:
+ * - createExecutionStack({ target, adapter, driver, extensionPacks })
+ * - instantiateExecutionStack(stack)
+ * - createExecutionContext({ contract, stack: stackInstance })
+ * - createRuntime({ stack: stackInstance, contract, context, driverOptions, verify, ... })
  */
-export interface SqlRuntimeFamilyInstance extends RuntimeFamilyInstance<'sql'> {
-  /**
-   * Creates a SQL runtime from contract, driver options, and verification settings.
-   *
-   * Extension packs are routed through composition (at instance creation time),
-   * not through this method. This aligns with control-plane composition patterns.
-   *
-   * @param options - Runtime creation options
-   * @param options.contract - SQL contract
-   * @param options.driverOptions - Driver options (e.g., PostgresDriverOptions)
-   * @param options.verify - Runtime verification options
-   * @param options.plugins - Optional plugins
-   * @param options.mode - Optional runtime mode
-   * @param options.log - Optional log instance
-   * @returns Runtime instance
-   */
-  createRuntime<TContract extends SqlContract<SqlStorage>>(options: {
-    readonly contract: TContract;
-    readonly driverOptions: unknown;
-    readonly verify: RuntimeVerifyOptions;
-    readonly plugins?: readonly Plugin<
-      TContract,
-      Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
-      SqlDriver
-    >[];
-    readonly mode?: 'strict' | 'permissive';
-    readonly log?: Log;
-  }): Runtime;
-}
+export interface SqlRuntimeFamilyInstance extends RuntimeFamilyInstance<'sql'> {}
 
 /**
- * Creates a SQL runtime family instance from runtime descriptors.
+ * Creates a SQL runtime family instance (identity-only).
  *
- * Routes the same framework composition as control-plane:
- * family, target, adapter, driver, extensionPacks (all as descriptors with IDs).
+ * This instance is identity-only and does not provide runtime creation.
+ * Use stack/context/runtime factories directly for runtime creation.
  */
-export function createSqlRuntimeFamilyInstance<TTargetId extends string>(options: {
-  readonly family: RuntimeFamilyDescriptor<'sql'>;
-  readonly target: RuntimeTargetDescriptor<'sql', TTargetId>;
-  readonly adapter: RuntimeAdapterDescriptor<
-    'sql',
-    TTargetId,
-    SqlRuntimeAdapterInstance<TTargetId>
-  >;
-  readonly driver: RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>;
-  readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
-}): SqlRuntimeFamilyInstance {
-  const {
-    family: familyDescriptor,
-    target: targetDescriptor,
-    adapter: adapterDescriptor,
-    driver: driverDescriptor,
-    extensionPacks: extensionDescriptors = [],
-  } = options;
-
+export function createSqlRuntimeFamilyInstance(): SqlRuntimeFamilyInstance {
   return {
     familyId: 'sql' as const,
-    createRuntime<TContract extends SqlContract<SqlStorage>>(runtimeOptions: {
-      readonly contract: TContract;
-      readonly driverOptions: unknown;
-      readonly verify: RuntimeVerifyOptions;
-      readonly plugins?: readonly Plugin<
-        TContract,
-        Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
-        SqlDriver
-      >[];
-      readonly mode?: 'strict' | 'permissive';
-      readonly log?: Log;
-    }): Runtime {
-      // Validate contract requirements against provided descriptors
-      assertRuntimeContractRequirementsSatisfied({
-        contract: runtimeOptions.contract,
-        family: familyDescriptor,
-        target: targetDescriptor,
-        adapter: adapterDescriptor,
-        extensionPacks: extensionDescriptors,
-      });
-
-      const stack = createExecutionStack({
-        target: targetDescriptor,
-        adapter: adapterDescriptor,
-        driver: driverDescriptor,
-        extensionPacks: extensionDescriptors,
-      });
-      const stackInstance = instantiateExecutionStack(stack);
-      const context = createExecutionContext({
-        contract: runtimeOptions.contract,
-        stack: stackInstance,
-      });
-
-      return createRuntime({
-        stack: stackInstance,
-        contract: runtimeOptions.contract,
-        context,
-        driverOptions: runtimeOptions.driverOptions,
-        verify: runtimeOptions.verify,
-        ...(runtimeOptions.plugins ? { plugins: runtimeOptions.plugins } : {}),
-        ...(runtimeOptions.mode ? { mode: runtimeOptions.mode } : {}),
-        ...(runtimeOptions.log ? { log: runtimeOptions.log } : {}),
-      });
-    },
   };
 }
