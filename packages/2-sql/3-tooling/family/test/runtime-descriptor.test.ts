@@ -17,7 +17,7 @@ describe('@prisma-next/family-sql/runtime entrypoint', () => {
     expect(sqlFamilyRuntime.id).toBe('sql');
   });
 
-  it('is identity-only (no createRuntime method)', () => {
+  it('does not expose createRuntime', () => {
     const instance = sqlFamilyRuntime.create({
       target: {
         kind: 'target',

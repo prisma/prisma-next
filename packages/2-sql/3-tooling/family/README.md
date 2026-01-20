@@ -111,17 +111,13 @@ The runner returns structured errors with the following codes:
 - **`SCHEMA_VERIFY_FAILED`**: Resulting schema doesn't satisfy the destination contract
 - **`EXECUTION_FAILED`**: SQL execution error during operation execution
 - **`src/exports/control.ts`**: Control plane entry point (exports `SqlFamilyDescriptor` instance)
-- **`src/exports/runtime.ts`**: Runtime plane entry point (identity-only, no runtime creation API)
+- **`src/exports/runtime.ts`**: Runtime plane entry point
 
 ## Entrypoints
 
-- **`./control`**: Control plane entry point for CLI/config usage (exports `SqlFamilyDescriptor`). This is the **primary entry point** for control-plane operations (verify, schemaVerify, introspect, emitContract, etc.)
+- **`./control`**: Control plane entry point for CLI/config usage (exports `SqlFamilyDescriptor`)
 - **`./control-adapter`**: SQL control adapter interface (`SqlControlAdapter`, `SqlControlAdapterDescriptor`) for target-specific adapters
-- **`./runtime`**: Runtime plane entry point (identity-only). Does **not** provide runtime creation. Use stack/context/runtime factories from `@prisma-next/sql-runtime` directly:
-  - `createExecutionStack({ target, adapter, driver, extensionPacks })`
-  - `instantiateExecutionStack(stack)`
-  - `createExecutionContext({ contract, stack: stackInstance })`
-  - `createRuntime({ stack: stackInstance, contract, context, driverOptions, verify, ... })`
+- **`./runtime`**: Runtime plane entry point
 - **`./verify`**: Verification utilities (`readMarker`, `readMarkerSql`, `parseContractMarkerRow`) for reading contract markers from databases
 
 ## Dependencies

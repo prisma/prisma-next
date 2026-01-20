@@ -19,21 +19,11 @@ export type { SqlRuntimeAdapterInstance } from '@prisma-next/sql-runtime';
 
 /**
  * SQL runtime family instance interface.
- * Identity-only interface for runtime plane. No runtime creation API.
- *
- * Runtime creation should use the stack/context/runtime factory pattern directly:
- * - createExecutionStack({ target, adapter, driver, extensionPacks })
- * - instantiateExecutionStack(stack)
- * - createExecutionContext({ contract, stack: stackInstance })
- * - createRuntime({ stack: stackInstance, contract, context, driverOptions, verify, ... })
  */
 export interface SqlRuntimeFamilyInstance extends RuntimeFamilyInstance<'sql'> {}
 
 /**
- * Creates a SQL runtime family instance (identity-only).
- *
- * This instance is identity-only and does not provide runtime creation.
- * Use stack/context/runtime factories directly for runtime creation.
+ * Creates a SQL runtime family instance.
  */
 export function createSqlRuntimeFamilyInstance(): SqlRuntimeFamilyInstance {
   return {

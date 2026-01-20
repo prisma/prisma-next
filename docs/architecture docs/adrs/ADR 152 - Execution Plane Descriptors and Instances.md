@@ -144,7 +144,6 @@ Base instances:
 ```ts
 export interface RuntimeFamilyInstance<TFamilyId extends string = string> {
   readonly familyId: TFamilyId;
-  // Identity-only interface. Runtime creation uses stack/context/runtime factories directly.
 }
 
 export interface RuntimeTargetInstance<
@@ -288,18 +287,13 @@ Non-goals for this ADR:
 1. ✅ Introduced the new `Runtime*Descriptor` and `Runtime*Instance` interfaces in `@prisma-next/core-execution-plane`
 2. ✅ Updated the SQL family:
    - `SqlRuntimeAdapter` extends `RuntimeAdapterInstance<'sql', TTarget>`
-   - `SqlRuntimeFamilyInstance` (family-specific interface) extends `RuntimeFamilyInstance<'sql'>` (identity-only)
+   - `SqlRuntimeFamilyInstance` (family-specific interface) extends `RuntimeFamilyInstance<'sql'>`
 3. ✅ Updated Postgres packs:
    - `@prisma-next/targets-postgres/runtime` exports a default `RuntimeTargetDescriptor<'sql','postgres'>`
    - `@prisma-next/targets-postgres-adapter/runtime` exports a default `RuntimeAdapterDescriptor<'sql','postgres'>`
    - `@prisma-next/targets-postgres-driver/runtime` exports a default `RuntimeDriverDescriptor<'sql','postgres'>`
-4. ✅ Updated runtime assembly to use stack/context/runtime factory pattern:
-   - `createExecutionStack({ target, adapter, driver, extensionPacks })`
-   - `instantiateExecutionStack(stack)`
-   - `createExecutionContext({ contract, stack: stackInstance })`
-   - `createRuntime({ stack: stackInstance, contract, context, driverOptions, verify, ... })`
-5. ✅ Updated examples and test utilities to use stack/context/runtime factories directly
-6. ✅ `@prisma-next/family-sql/runtime` is now identity-only (no `createRuntime` method)
+4. ✅ Updated runtime assembly to use stack/context/runtime factory pattern
+5. ✅ Updated examples and test utilities to use stack/context/runtime factories
 
 ## References
 
