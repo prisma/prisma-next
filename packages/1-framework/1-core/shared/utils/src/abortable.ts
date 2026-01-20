@@ -28,7 +28,7 @@ export function abortable(signal: AbortSignal): <T>(promise: Promise<T>) => Prom
     signal.addEventListener(
       'abort',
       () => {
-        reject(signal.reason ?? new Error('Operation cancelled'));
+        reject(signal.reason ?? new DOMException('Operation cancelled'));
       },
       { once: true },
     );
