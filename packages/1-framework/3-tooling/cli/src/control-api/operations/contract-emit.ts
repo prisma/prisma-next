@@ -60,9 +60,7 @@ export async function executeContractEmit(
 
   // Validate source is defined and is either a function or a non-null value
   if (
-    contractConfig.source === undefined ||
-    contractConfig.source === null ||
-    (typeof contractConfig.source !== 'function' && typeof contractConfig.source !== 'object')
+    typeof contractConfig.source !== 'function' && typeof contractConfig.source !== 'object'
   ) {
     throw errorContractConfigMissing({
       why: 'Contract config must include a valid source (function or value)',
@@ -70,21 +68,13 @@ export async function executeContractEmit(
   }
 
   // Create control plane stack from config
-  const stack = createControlPlaneStack({
-    target: config.target,
-    adapter: config.adapter,
-    driver: config.driver,
-    extensionPacks: config.extensionPacks,
-  });
+  const stack = createControlPlaneStack(config);
   const familyInstance = config.family.create(stack);
 
   // Resolve contract source from config
-  let contractRaw: unknown;
-  if (typeof contractConfig.source === 'function') {
-    contractRaw = await unlessAborted(contractConfig.source());
-  } else {
-    contractRaw = contractConfig.source;
-  }
+  const contractRaw = typeof contractConfig.source === 'function'
+  	? await unlessAborted(contractConfig.source())
+  	: contractConfig.source;
 
   // Emit contract via family instance
   const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: contractRaw }));

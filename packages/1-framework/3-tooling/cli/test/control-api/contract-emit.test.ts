@@ -7,13 +7,10 @@ describe('executeContractEmit', () => {
   });
 
   it('respects signal cancellation before starting', async () => {
-    const controller = new AbortController();
-    controller.abort();
-
     await expect(
       executeContractEmit({
         configPath: 'prisma-next.config.ts',
-        signal: controller.signal,
+        signal: AbortSignal.abort(),
       }),
     ).rejects.toSatisfy((error: unknown) => error instanceof Error && error.name === 'AbortError');
   });
