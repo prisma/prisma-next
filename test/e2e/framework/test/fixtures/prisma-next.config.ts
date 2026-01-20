@@ -14,6 +14,5 @@ export default defineConfig({
   contract: {
     source: contract,
     output: 'test/fixtures/generated/contract.json',
-    types: 'test/fixtures/generated/contract.d.ts',
   },
 });

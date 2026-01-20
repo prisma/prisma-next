@@ -16,7 +16,6 @@ export default defineConfig({
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',
-    types: 'src/prisma/contract.d.ts',
   },
   db: {
     // biome-ignore lint/style/noNonNullAssertion: loaded from .env
