@@ -69,21 +69,58 @@ describe('prismaVitePlugin', () => {
   });
 
   describe('configResolved', () => {
-    it('resolves config path relative to vite root', () => {
+    it('resolves config path relative to vite root', async () => {
+      const { executeContractEmit } = await import('@prisma-next/cli/control-api');
+      const mockExecute = vi.mocked(executeContractEmit);
+      mockExecute.mockResolvedValue({
+        coreHash: 'abc123',
+        profileHash: 'def456',
+        files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
+      });
+
       const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'silent' });
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const mockServer = createMockServer();
 
       const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
       configResolved({ root: '/project' });
 
-      consoleSpy.mockRestore();
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configPath: '/project/prisma-next.config.ts',
+        }),
+      );
     });
 
-    it('resolves absolute config path correctly', () => {
+    it('preserves absolute config path', async () => {
+      const { executeContractEmit } = await import('@prisma-next/cli/control-api');
+      const mockExecute = vi.mocked(executeContractEmit);
+      mockExecute.mockResolvedValue({
+        coreHash: 'abc123',
+        profileHash: 'def456',
+        files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
+      });
+
       const plugin = prismaVitePlugin('/absolute/prisma-next.config.ts', { logLevel: 'silent' });
+      const mockServer = createMockServer();
 
       const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
       configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configPath: '/absolute/prisma-next.config.ts',
+        }),
+      );
     });
   });
 
