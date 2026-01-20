@@ -230,13 +230,11 @@ function isSqlDriver(driver: unknown): driver is SqlDriver {
   );
 }
 
-function createRuntimeFromStack<
-  TContract extends SqlContract<SqlStorage>,
-  TTargetId extends string,
->(options: RuntimeStackOptions<TContract, TTargetId>): Runtime {
+export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
+  options: RuntimeStackOptions<TContract, TTargetId>,
+): Runtime {
   const { stack, contract, context, driverOptions, verify, plugins, mode, log } = options;
 
-  // Always validate contract/stack requirements, even when context is provided
   assertExecutionStackContractRequirements(contract, stack.stack);
 
   const resolvedContext =
@@ -258,21 +256,18 @@ function createRuntimeFromStack<
     );
   }
 
-  let driver: SqlDriver = createOfflineDriver();
-
-  if (stack.stack.driver) {
-    if (driverOptions === undefined) {
-      driver = createOfflineDriver();
-    } else {
-      const driverInstance = stack.stack.driver.create(driverOptions);
-      if (!isSqlDriver(driverInstance)) {
-        throw runtimeError(
-          'RUNTIME.INVALID_DRIVER_INSTANCE',
-          'Execution stack driver does not implement SqlDriver interface.',
-        );
-      }
-      driver = driverInstance;
+  let driver: SqlDriver;
+  if (stack.stack.driver && driverOptions !== undefined) {
+    const driverInstance = stack.stack.driver.create(driverOptions);
+    if (!isSqlDriver(driverInstance)) {
+      throw runtimeError(
+        'RUNTIME.INVALID_DRIVER_INSTANCE',
+        'Execution stack driver does not implement SqlDriver interface.',
+      );
     }
+    driver = driverInstance;
+  } else {
+    driver = createOfflineDriver();
   }
 
   return new SqlRuntimeImpl({
@@ -283,10 +278,4 @@ function createRuntimeFromStack<
     ...(mode ? { mode } : {}),
     ...(log ? { log } : {}),
   });
-}
-
-export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
-  options: RuntimeStackOptions<TContract, TTargetId>,
-): Runtime {
-  return createRuntimeFromStack(options);
 }
