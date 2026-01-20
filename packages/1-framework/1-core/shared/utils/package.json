@@ -27,9 +27,9 @@
     "node": ">=20"
   },
   "exports": {
+    "./abortable": "./dist/abortable.mjs",
     "./array-equal": "./dist/array-equal.mjs",
     "./assertions": "./dist/assertions.mjs",
-    "./abortable": "./dist/abortable.mjs",
     "./defined": "./dist/defined.mjs",
     "./redact-db-url": "./dist/redact-db-url.mjs",
     "./result": "./dist/result.mjs",
