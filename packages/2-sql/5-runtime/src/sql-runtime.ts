@@ -21,6 +21,7 @@ import type {
   Adapter,
   CodecRegistry,
   LoweredStatement,
+  QueryAst,
   SelectAst,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
@@ -31,7 +32,6 @@ import { validateCodecRegistryCompleteness } from './codecs/validation';
 import { lowerSqlPlan } from './lower-sql-plan';
 import type {
   ExecutionContext,
-  RuntimeContext,
   SqlRuntimeAdapterInstance,
   SqlRuntimeExtensionInstance,
 } from './sql-context';
@@ -41,9 +41,10 @@ import { SqlFamilyAdapter } from './sql-family-adapter';
 export interface RuntimeOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
+  readonly context: ExecutionContext<TContract>;
+  readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
-  readonly context: RuntimeContext<TContract>;
   readonly plugins?: readonly Plugin<
     TContract,
     Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
@@ -97,14 +98,14 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     SqlDriver
   >;
   private readonly contract: TContract;
-  private readonly context: RuntimeContext<TContract>;
+  private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   private readonly codecRegistry: CodecRegistry;
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
-    const { context, driver, verify, plugins, mode, log } = options;
+    const { context, adapter, driver, verify, plugins, mode, log } = options;
     this.contract = context.contract;
-    this.context = context;
+    this.adapter = adapter;
     this.codecRegistry = context.codecs;
     this.codecRegistryValidated = false;
 
@@ -148,14 +149,12 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
   ): AsyncIterableResult<Row> {
     this.ensureCodecRegistryValidated(this.contract);
 
-    // Check if plan is SqlQueryPlan (has ast but no sql)
     const isSqlQueryPlan = (p: ExecutionPlan<Row> | SqlQueryPlan<Row>): p is SqlQueryPlan<Row> => {
       return 'ast' in p && !('sql' in p);
     };
 
-    // Lower SqlQueryPlan to Plan if needed
     const executablePlan: ExecutionPlan<Row> = isSqlQueryPlan(plan)
-      ? lowerSqlPlan(this.context, plan)
+      ? lowerSqlPlan(this.adapter, this.contract, plan)
       : plan;
 
     const iterator = async function* (
@@ -244,11 +243,6 @@ export function createRuntime<TContract extends SqlContract<SqlStorage>, TTarget
       stack,
     });
 
-  const runtimeContext: RuntimeContext<TContract> = {
-    ...resolvedContext,
-    adapter: stack.adapter,
-  };
-
   if (driverOptions !== undefined && !stack.stack.driver) {
     throw runtimeError(
       'RUNTIME.DRIVER_OPTIONS_WITHOUT_DESCRIPTOR',
@@ -271,7 +265,8 @@ export function createRuntime<TContract extends SqlContract<SqlStorage>, TTarget
   }
 
   return new SqlRuntimeImpl({
-    context: runtimeContext,
+    context: resolvedContext,
+    adapter: stack.adapter,
     driver,
     verify,
     ...(plugins ? { plugins } : {}),

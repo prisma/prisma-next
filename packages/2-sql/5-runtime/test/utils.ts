@@ -19,7 +19,7 @@ import {
   writeContractMarker,
 } from '../src/exports';
 import type {
-  RuntimeContext,
+  ExecutionContext,
   SqlRuntimeAdapterInstance,
   SqlRuntimeDriverInstance,
   SqlRuntimeExtensionDescriptor,
@@ -173,7 +173,7 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
   options?: {
     extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   },
-): RuntimeContext<TContract> {
+): ExecutionContext<TContract> & { adapter: SqlRuntimeAdapterInstance<'postgres'> } {
   return createRuntimeContext<TContract, 'postgres'>({
     contract,
     target: createTestTargetDescriptor(),

@@ -1,6 +1,6 @@
 import type { SqlContract, SqlMappings, SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectTypeOf, test } from 'vitest';
-import type { RuntimeContext, TypeHelperRegistry } from '../src/sql-context';
+import type { ExecutionContext, TypeHelperRegistry } from '../src/sql-context';
 
 // Contract type with storage.types using literal types (matching emission output)
 type TestContract = SqlContract<
@@ -33,21 +33,21 @@ type TestContract = SqlContract<
   SqlMappings
 >;
 
-test('RuntimeContext.types is TypeHelperRegistry', () => {
-  // RuntimeContext.types is intentionally loose (Record<string, unknown>)
+test('ExecutionContext.types is TypeHelperRegistry', () => {
+  // ExecutionContext.types is intentionally loose (Record<string, unknown>)
   // The strong typing comes from schema(context).types via ExtractSchemaTypes
-  expectTypeOf<RuntimeContext<TestContract>['types']>().toEqualTypeOf<TypeHelperRegistry>();
+  expectTypeOf<ExecutionContext<TestContract>['types']>().toEqualTypeOf<TypeHelperRegistry>();
 
   // TypeHelperRegistry allows any values - the actual type depends on init hooks
   expectTypeOf<TypeHelperRegistry>().toEqualTypeOf<Record<string, unknown>>();
 });
 
-test('RuntimeContext preserves contract type parameter', () => {
-  // Verify the contract type is preserved in RuntimeContext
-  expectTypeOf<RuntimeContext<TestContract>['contract']>().toEqualTypeOf<TestContract>();
+test('ExecutionContext preserves contract type parameter', () => {
+  // Verify the contract type is preserved in ExecutionContext
+  expectTypeOf<ExecutionContext<TestContract>['contract']>().toEqualTypeOf<TestContract>();
 
   // Verify we can access storage.types through the context's contract
-  type ContractStorageTypes = RuntimeContext<TestContract>['contract']['storage']['types'];
+  type ContractStorageTypes = ExecutionContext<TestContract>['contract']['storage']['types'];
   expectTypeOf<ContractStorageTypes>().toExtend<
     | {
         readonly Vector1536: {
@@ -60,9 +60,9 @@ test('RuntimeContext preserves contract type parameter', () => {
   >();
 });
 
-test('RuntimeContext accepts generic SqlContract', () => {
-  // Verify RuntimeContext defaults work
-  type DefaultContext = RuntimeContext;
+test('ExecutionContext accepts generic SqlContract', () => {
+  // Verify ExecutionContext defaults work
+  type DefaultContext = ExecutionContext;
   expectTypeOf<DefaultContext['contract']>().toExtend<SqlContract<SqlStorage>>();
   expectTypeOf<DefaultContext['types']>().toEqualTypeOf<TypeHelperRegistry>();
 });

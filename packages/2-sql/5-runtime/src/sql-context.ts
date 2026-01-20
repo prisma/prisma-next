@@ -123,26 +123,7 @@ export type SqlRuntimeDriverInstance<TTargetId extends string = string> = Runtim
 > &
   SqlDriver;
 
-// ============================================================================
-// SQL Runtime Context
-// ============================================================================
-
 export type { ExecutionContext, TypeHelperRegistry };
-
-export interface RuntimeContext<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
-  extends ExecutionContext<TContract> {
-  readonly adapter:
-    | Adapter<QueryAst, TContract, LoweredStatement>
-    | Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
-
-  /**
-   * Initialized type helpers from storage.types.
-   * Each entry corresponds to a named type instance in the contract's storage.types.
-   * The value is the result of calling the codec's init hook (if provided)
-   * or the full StorageTypeInstance metadata (if no init hook).
-   */
-  readonly types: TypeHelperRegistry;
-}
 
 export function assertExecutionStackContractRequirements(
   contract: SqlContract<SqlStorage>,
@@ -460,22 +441,20 @@ export function createExecutionContext<
 }
 
 /**
- * Creates a SQL runtime context from descriptor-first composition.
+ * Creates a SQL execution context and adapter from descriptor-first composition.
  *
- * The context includes:
- * - The validated contract
- * - The adapter instance (created from descriptor)
- * - Codec registry (populated from adapter + extension instances)
- * - Operation registry (populated from extension instances)
- * - Types registry (initialized helpers from storage.types)
+ * @deprecated Use createExecutionStack + instantiateExecutionStack + createExecutionContext directly.
+ * This function exists for backward compatibility.
  *
  * @param options - Descriptor-first composition options
- * @returns RuntimeContext with registries wired from all components
+ * @returns ExecutionContext with adapter
  */
 export function createRuntimeContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   TTargetId extends string = string,
->(options: CreateRuntimeContextOptions<TContract, TTargetId>): RuntimeContext<TContract> {
+>(
+  options: CreateRuntimeContextOptions<TContract, TTargetId>,
+): ExecutionContext<TContract> & { adapter: SqlRuntimeAdapterInstance<TTargetId> } {
   const stack = createExecutionStack({
     target: options.target,
     adapter: options.adapter,
