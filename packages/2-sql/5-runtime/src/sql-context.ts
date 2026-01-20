@@ -340,15 +340,23 @@ function validateColumnTypeParams(
   }
 }
 
-function createExecutionContextFromInstances<
+export function createExecutionContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   TTargetId extends string = string,
 >(options: {
   readonly contract: TContract;
-  readonly adapterInstance: SqlRuntimeAdapterInstance<TTargetId>;
-  readonly extensionInstances: ReadonlyArray<SqlRuntimeExtensionInstance<TTargetId>>;
+  readonly stack: ExecutionStackInstance<
+    'sql',
+    TTargetId,
+    SqlRuntimeAdapterInstance<TTargetId>,
+    RuntimeDriverInstance<'sql', TTargetId>,
+    SqlRuntimeExtensionInstance<TTargetId>
+  >;
 }): ExecutionContext<TContract> {
-  const { contract, adapterInstance, extensionInstances } = options;
+  const { contract, stack } = options;
+  const { adapter: adapterInstance, extensionPacks: extensionInstances } = stack;
+
+  assertExecutionStackContractRequirements(contract, stack.stack);
 
   const codecRegistry = createCodecRegistry();
   const operationRegistry = createOperationRegistry();
@@ -391,26 +399,3 @@ function createExecutionContextFromInstances<
     types,
   };
 }
-
-export function createExecutionContext<
-  TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
-  TTargetId extends string = string,
->(options: {
-  readonly contract: TContract;
-  readonly stack: ExecutionStackInstance<
-    'sql',
-    TTargetId,
-    SqlRuntimeAdapterInstance<TTargetId>,
-    RuntimeDriverInstance<'sql', TTargetId>,
-    SqlRuntimeExtensionInstance<TTargetId>
-  >;
-}): ExecutionContext<TContract> {
-  assertExecutionStackContractRequirements(options.contract, options.stack.stack);
-  return createExecutionContextFromInstances({
-    contract: options.contract,
-    adapterInstance: options.stack.adapter,
-    extensionInstances: options.stack.extensionPacks,
-  });
-}
-
-export { createExecutionContextFromInstances };
