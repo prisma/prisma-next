@@ -1,15 +1,34 @@
-export type { ColumnReference } from './column-reference';
+export type {
+  Asterisk,
+  ColumnReference,
+  ColumnReferenceOutOfContractError,
+  TableAsterisk,
+} from './column-reference';
 export {
-  type ColumnReferenceOutOfContractError,
   createRef,
   type Ref,
-  type TableReferenceOutOfContractError,
 } from './ref';
 export { createRoot, type Root } from './root';
 export type { SelectBuilder } from './select-builder';
-export type { TableReference } from './table-reference';
+export type {
+  ExtractOutputType,
+  Selection,
+  SelectionValue,
+  TableToSelection,
+} from './selection';
+export type {
+  TableReference,
+  TableReferenceOutOfContractError,
+  TableReferenceTooWideError,
+} from './table-reference';
+export type {
+  DrainOuterGeneric,
+  ExactlyOneProperty,
+  IsNever,
+  MergeObjects,
+  Simplify,
+} from './type-atoms';
 export type {
   ErrorMessage,
   PreviousFunctionReceivedBadInputError,
-  TableReferenceTooWideError,
 } from './type-errors';
