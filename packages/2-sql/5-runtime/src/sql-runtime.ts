@@ -55,7 +55,7 @@ export interface RuntimeOptions<
   readonly log?: Log;
 }
 
-export interface RuntimeStackOptions<
+export interface CreateRuntimeOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   TTargetId extends string = string,
 > {
@@ -231,7 +231,7 @@ function isSqlDriver(driver: unknown): driver is SqlDriver {
 }
 
 export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
-  options: RuntimeStackOptions<TContract, TTargetId>,
+  options: CreateRuntimeOptions<TContract, TTargetId>,
 ): Runtime {
   const { stackInstance, contract, context, driverOptions, verify, plugins, mode, log } = options;
 

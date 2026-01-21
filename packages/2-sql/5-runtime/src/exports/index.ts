@@ -32,7 +32,7 @@ export {
 } from '../sql-marker';
 export type {
   Runtime,
-  RuntimeStackOptions,
+  CreateRuntimeOptions,
   RuntimeTelemetryEvent,
   RuntimeVerifyOptions,
   TelemetryOutcome,
