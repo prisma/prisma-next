@@ -15,8 +15,8 @@ async function loadModules() {
   };
 }
 
-describe('demo runtime offline', () => {
-  it('builds plans without driver options', async () => {
+describe('when no driver is available', () => {
+  it('can still build query plans', async () => {
     const { executionStackInstance, executionContext, sql, tables } = await loadModules();
 
     const runtime = createRuntime({
@@ -42,7 +42,7 @@ describe('demo runtime offline', () => {
     await runtime.close();
   });
 
-  it('imports query roots without env config', async () => {
+  it('can import query modules without DATABASE_URL', async () => {
     const original = process.env['DATABASE_URL'];
     delete process.env['DATABASE_URL'];
 
