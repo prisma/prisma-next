@@ -1,21 +1,7 @@
-import type {
-  RuntimeDriverInstance,
-  RuntimeFamilyInstance,
-} from '@prisma-next/core-execution-plane/types';
-import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
+import type { RuntimeFamilyInstance } from '@prisma-next/core-execution-plane/types';
 
-/**
- * SQL runtime driver instance type.
- * Combines identity properties with SQL-specific behavior methods.
- */
-export type SqlRuntimeDriverInstance<TTargetId extends string = string> = RuntimeDriverInstance<
-  'sql',
-  TTargetId
-> &
-  SqlDriver;
-
-// Re-export SqlRuntimeAdapterInstance from sql-runtime for consumers
-export type { SqlRuntimeAdapterInstance } from '@prisma-next/sql-runtime';
+// Re-export SQL runtime instance types from canonical source
+export type { SqlRuntimeAdapterInstance, SqlRuntimeDriverInstance } from '@prisma-next/sql-runtime';
 
 /**
  * SQL runtime family instance interface.
