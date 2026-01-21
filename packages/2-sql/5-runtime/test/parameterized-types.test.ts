@@ -569,4 +569,54 @@ describe('parameterized types', () => {
       });
     });
   });
+
+  describe('duplicate codec descriptor detection', () => {
+    it('throws RUNTIME.DUPLICATE_PARAMETERIZED_CODEC when multiple extensions provide same codecId', () => {
+      const vectorParamsSchema = arktype({
+        length: 'number',
+      });
+
+      function createVectorExtension(id: string): SqlRuntimeExtensionDescriptor<'postgres'> {
+        return {
+          kind: 'extension' as const,
+          id,
+          version: '0.0.1',
+          familyId: 'sql' as const,
+          targetId: 'postgres' as const,
+          create(): SqlRuntimeExtensionInstance<'postgres'> {
+            return {
+              familyId: 'sql' as const,
+              targetId: 'postgres' as const,
+              parameterizedCodecs: () => [
+                {
+                  codecId: 'pg/vector@1',
+                  paramsSchema: vectorParamsSchema,
+                },
+              ],
+            };
+          },
+        };
+      }
+
+      const contract = createTestContract();
+
+      expect(() =>
+        createTestContext({
+          contract,
+          target: createTestTargetDescriptor(),
+          adapter: createTestAdapterDescriptor(),
+          extensionPacks: [createVectorExtension('ext-1'), createVectorExtension('ext-2')],
+        }),
+      ).toThrow(
+        expect.objectContaining({
+          code: 'RUNTIME.DUPLICATE_PARAMETERIZED_CODEC',
+          category: 'RUNTIME',
+          severity: 'error',
+          details: {
+            codecId: 'pg/vector@1',
+          },
+        }),
+      );
+    });
+  });
 });

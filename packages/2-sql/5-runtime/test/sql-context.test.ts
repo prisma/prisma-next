@@ -212,3 +212,60 @@ describe('createExecutionContext', () => {
     expect(context.codecs.has('test/ext@1')).toBe(false);
   });
 });
+
+describe('contract/stack validation errors', () => {
+  it('throws RUNTIME.CONTRACT_TARGET_MISMATCH when contract target differs from stack', () => {
+    const mismatchedContract: SqlContract<SqlStorage> = {
+      ...testContract,
+      target: 'mysql', // Different from stack's 'postgres'
+    };
+
+    const stack = createExecutionStack({
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(),
+      extensionPacks: [],
+    });
+    const stackInstance = instantiateExecutionStack(stack);
+
+    expect(() => createExecutionContext({ contract: mismatchedContract, stackInstance })).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.CONTRACT_TARGET_MISMATCH',
+        category: 'RUNTIME',
+        severity: 'error',
+        details: {
+          actual: 'mysql',
+          expected: 'postgres',
+        },
+      }),
+    );
+  });
+
+  it('throws RUNTIME.MISSING_EXTENSION_PACK when contract requires extension not in stack', () => {
+    const contractWithExtension: SqlContract<SqlStorage> = {
+      ...testContract,
+      extensionPacks: {
+        'required-extension': { id: 'required-extension', version: '1.0.0', capabilities: {} },
+      },
+    };
+
+    const stack = createExecutionStack({
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(),
+      extensionPacks: [], // No extensions provided
+    });
+    const stackInstance = instantiateExecutionStack(stack);
+
+    expect(() =>
+      createExecutionContext({ contract: contractWithExtension, stackInstance }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.MISSING_EXTENSION_PACK',
+        category: 'RUNTIME',
+        severity: 'error',
+        details: {
+          packId: 'required-extension',
+        },
+      }),
+    );
+  });
+});

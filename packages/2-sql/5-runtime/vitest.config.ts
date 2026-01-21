@@ -27,7 +27,7 @@ export default defineConfig({
       thresholds: {
         lines: 84,
         branches: 50,
-        functions: 83, // TODO: Increase to 85% after adding tests for offline driver methods (lines 199, 207-214)
+        functions: 85,
         statements: 84,
       },
     },
