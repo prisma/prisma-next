@@ -134,7 +134,7 @@
       "required": ["columns"]
     },
     "ColumnDefault": {
-      "description": "Column default value. Can be a literal value, database function, sequence reference, raw expression, or userland function.",
+      "description": "Column default value. Can be a literal value, database function, sequence reference, or raw expression.",
       "oneOf": [
         {
           "type": "object",
@@ -222,22 +222,6 @@
             }
           },
           "required": ["kind", "expression"]
-        },
-        {
-          "type": "object",
-          "description": "Client-side userland function (e.g., nanoid with custom alphabet)",
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "type": "string",
-              "enum": ["userland"]
-            },
-            "name": {
-              "type": "string",
-              "description": "Userland function name"
-            }
-          },
-          "required": ["kind", "name"]
         }
       ]
     },

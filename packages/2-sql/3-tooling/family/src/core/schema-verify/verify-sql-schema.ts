@@ -633,7 +633,5 @@ function describeColumnDefault(columnDefault: ColumnDefault): string {
       return `sequence(${columnDefault.name})`;
     case 'dbGenerated':
       return `dbGenerated(${columnDefault.expression})`;
-    case 'userland':
-      return `userland(${columnDefault.name})`;
   }
 }

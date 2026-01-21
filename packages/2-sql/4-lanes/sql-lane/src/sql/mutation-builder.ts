@@ -1,5 +1,5 @@
 import type { ParamDescriptor } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ColumnRef, ParamRef, TableRef } from '@prisma-next/sql-relational-core/ast';
 import {
   createColumnRef,
@@ -9,7 +9,6 @@ import {
   createTableRef,
   createUpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { param } from '@prisma-next/sql-relational-core/param';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
@@ -33,37 +32,6 @@ import {
 import type { ProjectionState } from '../utils/state';
 import { buildMeta } from './plan';
 import { buildWhereExpr } from './predicate-builder';
-
-/**
- * Resolves userland defaults for columns not already present in the provided values.
- * Mutates the values and paramsMap to add generated values.
- */
-function resolveUserlandDefaultsForInsert(
-  table: StorageTable,
-  providedColumns: Set<string>,
-  values: Record<string, ParamPlaceholder>,
-  paramsMap: Record<string, unknown>,
-  userlandGenerators?: Map<string, () => unknown>,
-): void {
-  if (!userlandGenerators) {
-    return;
-  }
-
-  for (const [columnName, column] of Object.entries(table.columns)) {
-    if (providedColumns.has(columnName)) {
-      continue;
-    }
-
-    if (column.default?.kind === 'userland') {
-      const generator = userlandGenerators.get(column.default.name);
-      if (generator) {
-        const paramName = `__generated_${columnName}`;
-        values[columnName] = param(paramName);
-        paramsMap[paramName] = generator();
-      }
-    }
-  }
-}
 
 export interface InsertBuilder<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
@@ -150,21 +118,8 @@ export class InsertBuilderImpl<
       errorUnknownTable(this.table.name);
     }
 
-    // Create a mutable copy of values for userland defaults
-    const valuesToInsert = { ...this.values };
-
-    // Resolve userland defaults for columns not already provided
-    const providedColumns = new Set(Object.keys(this.values));
-    resolveUserlandDefaultsForInsert(
-      contractTable,
-      providedColumns,
-      valuesToInsert,
-      paramsMap,
-      this.context.userlandGenerators,
-    );
-
     const values: Record<string, ColumnRef | ParamRef> = {};
-    for (const [columnName, placeholder] of Object.entries(valuesToInsert)) {
+    for (const [columnName, placeholder] of Object.entries(this.values)) {
       if (!contractTable.columns[columnName]) {
         errorUnknownColumn(columnName, this.table.name);
       }

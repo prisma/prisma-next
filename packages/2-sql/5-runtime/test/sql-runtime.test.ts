@@ -10,7 +10,6 @@ import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast
 import { describe, expect, it, vi } from 'vitest';
 import type { RuntimeContext } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
-import { createUserlandGeneratorRegistry } from '../src/userland-generators';
 
 // Minimal test contract
 const testContract: SqlContract<SqlStorage> = {
@@ -90,7 +89,6 @@ function createTestContext(contract: SqlContract<SqlStorage>): RuntimeContext<ty
     adapter,
     codecs: adapter.profile.codecs(),
     operations: createOperationRegistry(),
-    userlandGenerators: createUserlandGeneratorRegistry(),
   };
 }
 

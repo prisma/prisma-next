@@ -27,10 +27,4 @@ export interface QueryLaneContext<
    * When present, schema() will expose these helpers via schema.types.
    */
   readonly types?: TypeHelperRegistry;
-  /**
-   * Optional registry of userland default generators.
-   * When present, insert builders can resolve userland defaults for columns
-   * that have userland default definitions in the contract.
-   */
-  readonly userlandGenerators?: Map<string, () => unknown>;
 }

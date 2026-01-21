@@ -9,8 +9,6 @@ import type {
   SqlContract,
   SqlMappings,
   SqlStorage,
-  StorageColumn,
-  StorageTable,
   StorageTypeInstance,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
@@ -23,47 +21,41 @@ import type { O } from 'ts-toolbelt';
  */
 
 // Column default value schemas
-const ColumnDefaultLiteralSchema = type({
+const ColumnDefaultLiteralSchema = {
   kind: "'literal'",
   value: 'string | number | boolean',
-});
+} as const;
 
 // Functions that never take params
-const ColumnDefaultFunctionNoParamsSchema = type({
+const ColumnDefaultFunctionNoParamsSchema = {
   kind: "'function'",
   name: "'autoincrement' | 'now' | 'cuid'",
-});
+} as const;
 
 // uuid can take optional params (for variants like uuidv7)
-const ColumnDefaultFunctionUuidSchema = type({
+const ColumnDefaultFunctionUuidSchema = {
   kind: "'function'",
   name: "'uuid'",
   'params?': type.string.array().readonly(),
-});
+} as const;
 
-const ColumnDefaultSequenceSchema = type({
+const ColumnDefaultSequenceSchema = {
   kind: "'sequence'",
   name: 'string',
-});
+} as const;
 
-const ColumnDefaultDbGeneratedSchema = type({
+const ColumnDefaultDbGeneratedSchema = {
   kind: "'dbGenerated'",
   expression: 'string',
-});
+} as const;
 
-const ColumnDefaultUserlandSchema = type({
-  kind: "'userland'",
-  name: 'string',
-});
-
-// Use a simple union type without .declare() to avoid complex type inference issues
-const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionNoParamsSchema)
+const ColumnDefaultSchema = type(ColumnDefaultLiteralSchema)
+  .or(ColumnDefaultFunctionNoParamsSchema)
   .or(ColumnDefaultFunctionUuidSchema)
   .or(ColumnDefaultSequenceSchema)
-  .or(ColumnDefaultDbGeneratedSchema)
-  .or(ColumnDefaultUserlandSchema);
+  .or(ColumnDefaultDbGeneratedSchema);
 
-const StorageColumnSchema = type.declare<StorageColumn>().type({
+const StorageColumnSchema = type({
   nativeType: 'string',
   codecId: 'string',
   nullable: 'boolean',
@@ -104,7 +96,7 @@ const ForeignKeySchema = type.declare<ForeignKey>().type({
   'name?': 'string',
 });
 
-const StorageTableSchema = type.declare<StorageTable>().type({
+const StorageTableSchema = type({
   columns: type({ '[string]': StorageColumnSchema }),
   'primaryKey?': PrimaryKeySchema,
   uniques: UniqueConstraintSchema.array().readonly(),
@@ -112,7 +104,7 @@ const StorageTableSchema = type.declare<StorageTable>().type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
-const StorageSchema = type.declare<SqlStorage>().type({
+const StorageSchema = type({
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });

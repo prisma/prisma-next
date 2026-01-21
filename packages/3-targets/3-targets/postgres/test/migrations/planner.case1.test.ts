@@ -777,62 +777,6 @@ describe('PostgresMigrationPlanner - column defaults', () => {
     expect(sql).not.toContain('DEFAULT');
   });
 
-  it('generates no DEFAULT clause for userland defaults (client-side)', () => {
-    const contractWithDefaults: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
-      storage: {
-        tables: {
-          item: {
-            columns: {
-              id: {
-                nativeType: 'text',
-                codecId: 'pg/text@1',
-                nullable: false,
-                default: { kind: 'userland', name: 'nanoid' },
-              },
-              name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      models: {},
-      relations: {},
-      mappings: { codecTypes: {}, operationTypes: {} },
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      sources: {},
-    };
-
-    const planner = createPostgresMigrationPlanner();
-    const result = planner.plan({
-      contract: contractWithDefaults,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.item');
-    expect(tableOp).toBeDefined();
-    const sql = tableOp!.execute[0]!.sql;
-    // Userland defaults are computed client-side, no DEFAULT clause
-    expect(sql).toContain('"id" text NOT NULL');
-    expect(sql).not.toContain('DEFAULT');
-  });
-
   it('generates DEFAULT with function params when provided', () => {
     const contractWithDefaults: SqlContract<SqlStorage> = {
       schemaVersion: '1',

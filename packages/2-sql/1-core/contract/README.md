@@ -19,7 +19,7 @@ Each `StorageColumn` in SQL contracts includes both:
 - **`nativeType`** (required): Native database type identifier (e.g., `'int4'`, `'text'`, `'vector'`) - used for database structure verification and migration planning
 - **`codecId`** (required): Codec identifier (e.g., `'pg/int4@1'`, `'pg/text@1'`, `'pg/vector@1'`) - used for query builders and runtime codecs
 - **`nullable`** (required): Whether the column is nullable
-- **`default`** (optional): Uses the shared `ColumnDefault` type from `@prisma-next/contract`
+- **`default`** (optional): Uses the shared `ColumnDefault` type from `@prisma-next/contract` (database-injected only)
 
 Both `nativeType` and `codecId` are required to ensure contracts are consumable by both the application (via codec IDs) and the database (via native types). See `docs/briefs/Sql-Contract-Native-and-Codec-Types.md` for details.
 

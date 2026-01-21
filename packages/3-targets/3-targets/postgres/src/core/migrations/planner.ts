@@ -721,9 +721,6 @@ function buildColumnDefaultSql(columnDefault: ColumnDefault | undefined): string
       return `DEFAULT nextval('${escapeLiteral(columnDefault.name)}')`;
     case 'dbGenerated':
       return `DEFAULT ${columnDefault.expression}`;
-    case 'userland':
-      // Userland defaults are computed client-side, no SQL DEFAULT clause
-      return '';
   }
 
   return '';
