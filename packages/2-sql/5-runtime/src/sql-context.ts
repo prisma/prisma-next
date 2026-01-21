@@ -165,11 +165,13 @@ export function assertExecutionStackContractRequirements(
     );
   }
 
-  for (const packId of result.missingExtensionPackIds) {
+  if (result.missingExtensionPackIds.length > 0) {
+    const packIds = result.missingExtensionPackIds;
+    const packList = packIds.map((id) => `'${id}'`).join(', ');
     throw runtimeError(
       'RUNTIME.MISSING_EXTENSION_PACK',
-      `Contract requires extension pack '${packId}', but runtime descriptors do not provide a matching component.`,
-      { packId },
+      `Contract requires extension pack(s) ${packList}, but runtime descriptors do not provide matching component(s).`,
+      { packIds },
     );
   }
 }

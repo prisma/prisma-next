@@ -263,7 +263,35 @@ describe('contract/stack validation errors', () => {
         category: 'RUNTIME',
         severity: 'error',
         details: {
-          packId: 'required-extension',
+          packIds: ['required-extension'],
+        },
+      }),
+    );
+  });
+
+  it('lists all missing extension packs in a single error', () => {
+    const contractWithExtensions: SqlContract<SqlStorage> = {
+      ...testContract,
+      extensionPacks: {
+        'ext-a': { id: 'ext-a', version: '1.0.0', capabilities: {} },
+        'ext-b': { id: 'ext-b', version: '1.0.0', capabilities: {} },
+      },
+    };
+
+    const stack = createExecutionStack({
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(),
+      extensionPacks: [],
+    });
+    const stackInstance = instantiateExecutionStack(stack);
+
+    expect(() =>
+      createExecutionContext({ contract: contractWithExtensions, stackInstance }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.MISSING_EXTENSION_PACK',
+        details: {
+          packIds: expect.arrayContaining(['ext-a', 'ext-b']),
         },
       }),
     );
