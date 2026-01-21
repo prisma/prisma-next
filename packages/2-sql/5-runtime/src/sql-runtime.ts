@@ -244,6 +244,15 @@ export function createRuntime<TContract extends SqlContract<SqlStorage>, TTarget
       stackInstance,
     });
 
+  // NOTE: Driver instantiation is handled here (instead of in instantiateExecutionStack) because
+  // runtime drivers currently receive connection information at construction time (need driverOptions).
+  //
+  // That makes it impossible to instantiate the stack in instantiateExecutionStack() which is a
+  // framework domain utility and unaware of the driver connection data structure.
+  //
+  // That forces this function to juggle offline mode + driverOptions/descriptor mismatches +
+  // runtime-shape validation. This will get simpler in TML-1837 once drivers can be instantiated
+  // unbound and connected later.
   if (driverOptions !== undefined && !stackInstance.stack.driver) {
     throw runtimeError(
       'RUNTIME.DRIVER_OPTIONS_WITHOUT_DESCRIPTOR',
