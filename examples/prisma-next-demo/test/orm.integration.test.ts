@@ -112,7 +112,7 @@ describe('ORM integration tests', () => {
         // Initialize schema using control client
         await initTestDatabase({ connection: connectionString, contractIR: contract });
 
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
         try {
           // Seed data using runtime
           await seedTestData(runtime, contract, {
@@ -142,7 +142,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
 
         try {
           await seedTestData(runtime, contract, { users: ['alice@example.com'] });
@@ -169,7 +169,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
 
         try {
           await seedTestData(runtime, contract, {
@@ -198,7 +198,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
 
         try {
           await seedTestData(runtime, contract, {
@@ -232,7 +232,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
 
         try {
           const { ormCreateUser } = await import('../src/queries/orm-writes');
@@ -255,7 +255,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
 
         try {
           await seedTestData(runtime, contract, { users: ['alice@example.com'] });
@@ -277,7 +277,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
 
         try {
           await seedTestData(runtime, contract, { users: ['alice@example.com'] });
@@ -299,7 +299,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
 
         try {
           const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
@@ -338,7 +338,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
 
         try {
           const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);

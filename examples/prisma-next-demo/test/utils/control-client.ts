@@ -7,23 +7,13 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import postgresDriverDescriptor from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
-import type { SqlContract } from '@prisma-next/sql-contract/types';
-import { budgets, createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
+import { budgets, createRuntime } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
 import { Pool } from 'pg';
-import {
-  pgvectorExtensionRuntimeDescriptor,
-  postgresAdapterRuntimeDescriptor,
-  postgresTargetRuntimeDescriptor,
-} from './framework-components';
+import { executionContext, executionStackInstance } from '../../src/prisma/execution-context';
 
 export interface TestControlClientOptions {
   readonly connection: string;
@@ -84,9 +74,11 @@ export interface TestRuntime {
 /**
  * Creates a test runtime configured for the demo app's stack.
  *
+ * Uses the app's execution context and stack instance directly.
+ *
  * @example
  * ```typescript
- * const { runtime, pool } = createTestRuntime(connectionString, contract);
+ * const { runtime, pool } = createTestRuntime(connectionString);
  * try {
  *   // Use runtime...
  * } finally {
@@ -94,26 +86,12 @@ export interface TestRuntime {
  * }
  * ```
  */
-export function createTestRuntime<TContract extends SqlContract>(
-  connectionString: string,
-  contract: TContract,
-): TestRuntime {
-  const stack = createExecutionStack({
-    target: postgresTargetRuntimeDescriptor,
-    adapter: postgresAdapterRuntimeDescriptor,
-    driver: postgresDriverDescriptor,
-    extensionPacks: [pgvectorExtensionRuntimeDescriptor],
-  });
-  const stackInstance = instantiateExecutionStack(stack);
-  const context = createExecutionContext({
-    contract,
-    stackInstance,
-  });
+export function createTestRuntime(connectionString: string): TestRuntime {
   const pool = new Pool({ connectionString });
   const runtime = createRuntime({
-    stackInstance,
-    contract,
-    context,
+    stackInstance: executionStackInstance,
+    contract: executionContext.contract,
+    context: executionContext,
     driverOptions: {
       connect: { pool },
       cursor: { disabled: true },

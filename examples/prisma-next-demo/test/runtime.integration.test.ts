@@ -228,7 +228,7 @@ describe('runtime execute integration', () => {
           connection: connectionString,
           contractIR: contract,
         });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
 
         try {
           // Seed data
@@ -323,7 +323,7 @@ describe('runtime execute integration', () => {
 
         try {
           // Seed 100 users using a separate runtime without strict budgets
-          const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+          const { runtime: seedRuntime } = createTestRuntime(connectionString);
           try {
             const emails = Array.from({ length: 100 }, (_, i) => `user${i}@example.com`);
             await seedTestData(seedRuntime, contract, { users: emails });
@@ -405,7 +405,7 @@ describe('runtime execute integration', () => {
 
         try {
           // Seed 50 users using a separate runtime without strict budgets
-          const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+          const { runtime: seedRuntime } = createTestRuntime(connectionString);
           try {
             const emails = Array.from({ length: 50 }, (_, i) => `user${i}@example.com`);
             await seedTestData(seedRuntime, contract, { users: emails });
@@ -449,7 +449,7 @@ describe('runtime execute integration', () => {
           connection: connectionString,
           contractIR: contract,
         });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const { runtime, pool } = createTestRuntime(connectionString);
 
         try {
           // Seed users and posts
