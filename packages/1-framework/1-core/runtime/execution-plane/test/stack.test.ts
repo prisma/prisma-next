@@ -50,10 +50,12 @@ describe('createExecutionStack', () => {
       adapter,
     });
 
-    expect(stack.target).toBe(target);
-    expect(stack.adapter).toBe(adapter);
-    expect(stack.driver).toBeUndefined();
-    expect(stack.extensionPacks).toEqual([]);
+    expect(stack).toMatchObject({
+      target,
+      adapter,
+      driver: undefined,
+      extensionPacks: [],
+    });
   });
 
   it('creates stack with optional driver', () => {
@@ -130,10 +132,12 @@ describe('instantiateExecutionStack', () => {
     expect(adapterCreate).toHaveBeenCalledOnce();
     expect(extensionCreate).toHaveBeenCalledOnce();
 
-    expect(instance.stack).toBe(stack);
-    expect(instance.target).toBe(targetInstance);
-    expect(instance.adapter).toBe(adapterInstance);
-    expect(instance.extensionPacks).toEqual([extensionInstance]);
+    expect(instance).toMatchObject({
+      stack,
+      target: targetInstance,
+      adapter: adapterInstance,
+      extensionPacks: [extensionInstance],
+    });
   });
 
   it('handles empty extension packs', () => {
