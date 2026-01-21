@@ -125,6 +125,8 @@ The SQL runtime uses stable error codes for programmatic error handling:
 - `RUNTIME.DUPLICATE_PARAMETERIZED_CODEC` — Multiple extensions registered same parameterized codec
 - `RUNTIME.TYPE_PARAMS_INVALID` — Type parameters fail codec schema validation
 - `RUNTIME.DRIVER_MISSING` — Driver not provided but required for operation
+- `RUNTIME.DRIVER_OPTIONS_WITHOUT_DESCRIPTOR` — Driver options provided but stack has no driver descriptor
+- `RUNTIME.INVALID_DRIVER_INSTANCE` — Driver instance does not implement SqlDriver interface
 
 All errors follow the repo's error envelope convention with `code`, `category`, `severity`, and optional `details`.
 
