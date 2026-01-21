@@ -186,7 +186,7 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
 export function createTestStackInstance(options?: {
   extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   driver?: RuntimeDriverDescriptor<'sql', 'postgres', SqlRuntimeDriverInstance<'postgres'>>;
-}) {
+}): ReturnType<typeof instantiateExecutionStack> {
   const stack = createExecutionStack({
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(createStubAdapter()),
