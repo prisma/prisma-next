@@ -9,9 +9,9 @@ import { orm as ormBuilder } from '@prisma-next/sql-orm-lane';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import { createExecutionContext } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
+// Use contract directly from TypeScript - no emit needed!
 import { contract } from '../../prisma/contract';
 
-// Use contract directly from TypeScript - no emit needed!
 export const executionStack = createExecutionStack({
   target: postgresTarget,
   adapter: postgresAdapter,

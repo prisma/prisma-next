@@ -31,8 +31,8 @@ export {
   writeContractMarker,
 } from '../sql-marker';
 export type {
-  Runtime,
   CreateRuntimeOptions,
+  Runtime,
   RuntimeTelemetryEvent,
   RuntimeVerifyOptions,
   TelemetryOutcome,
