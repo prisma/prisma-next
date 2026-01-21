@@ -133,7 +133,7 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
     });
 
     const runtime = createRuntime({
-      stack: stackInstance,
+      stackInstance,
       contract: validatedContract,
       context,
       driverOptions: {

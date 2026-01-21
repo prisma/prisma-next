@@ -20,7 +20,7 @@ describe('demo runtime offline', () => {
     const { executionStackInstance, executionContext, sql, tables } = await loadModules();
 
     const runtime = createRuntime({
-      stack: executionStackInstance,
+      stackInstance: executionStackInstance,
       contract: executionContext.contract,
       context: executionContext,
       verify: { mode: 'onFirstUse', requireMarker: false },

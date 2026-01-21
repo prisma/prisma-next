@@ -6,7 +6,7 @@ export function getRuntime(databaseUrl: string): Runtime {
   const pool = new Pool({ connectionString: databaseUrl });
 
   return createRuntime({
-    stack: executionStackInstance,
+    stackInstance: executionStackInstance,
     contract: executionContext.contract,
     context: executionContext,
     driverOptions: {

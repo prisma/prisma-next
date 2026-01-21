@@ -58,7 +58,7 @@ export interface RuntimeStackOptions<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   TTargetId extends string = string,
 > {
-  readonly stack: ExecutionStackInstance<
+  readonly stackInstance: ExecutionStackInstance<
     'sql',
     TTargetId,
     SqlRuntimeAdapterInstance<TTargetId>,
@@ -232,18 +232,18 @@ function isSqlDriver(driver: unknown): driver is SqlDriver {
 export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
   options: RuntimeStackOptions<TContract, TTargetId>,
 ): Runtime {
-  const { stack, contract, context, driverOptions, verify, plugins, mode, log } = options;
+  const { stackInstance, contract, context, driverOptions, verify, plugins, mode, log } = options;
 
-  assertExecutionStackContractRequirements(contract, stack.stack);
+  assertExecutionStackContractRequirements(contract, stackInstance.stack);
 
   const resolvedContext =
     context ??
     createExecutionContext({
       contract,
-      stack,
+      stack: stackInstance,
     });
 
-  if (driverOptions !== undefined && !stack.stack.driver) {
+  if (driverOptions !== undefined && !stackInstance.stack.driver) {
     throw runtimeError(
       'RUNTIME.DRIVER_OPTIONS_WITHOUT_DESCRIPTOR',
       'Driver options provided, but the execution stack has no driver descriptor.',
@@ -251,8 +251,8 @@ export function createRuntime<TContract extends SqlContract<SqlStorage>, TTarget
   }
 
   let driver: SqlDriver;
-  if (stack.stack.driver && driverOptions !== undefined) {
-    const driverInstance = stack.stack.driver.create(driverOptions);
+  if (stackInstance.stack.driver && driverOptions !== undefined) {
+    const driverInstance = stackInstance.stack.driver.create(driverOptions);
     if (!isSqlDriver(driverInstance)) {
       throw runtimeError(
         'RUNTIME.INVALID_DRIVER_INSTANCE',
@@ -266,7 +266,7 @@ export function createRuntime<TContract extends SqlContract<SqlStorage>, TTarget
 
   return new SqlRuntimeImpl({
     context: resolvedContext,
-    adapter: stack.adapter,
+    adapter: stackInstance.adapter,
     driver,
     verify,
     ...(plugins ? { plugins } : {}),

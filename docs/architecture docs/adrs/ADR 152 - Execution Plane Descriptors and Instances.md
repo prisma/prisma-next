@@ -282,19 +282,6 @@ Non-goals for this ADR:
 - **Control vs runtime drift**: Control and runtime planes might diverge over time
   - Mitigation: This ADR mirrors ADR 151's structure and conventions to minimize drift
 
-### Migration plan (execution/runtime plane)
-
-1. ✅ Introduced the new `Runtime*Descriptor` and `Runtime*Instance` interfaces in `@prisma-next/core-execution-plane`
-2. ✅ Updated the SQL family:
-   - `SqlRuntimeAdapter` extends `RuntimeAdapterInstance<'sql', TTarget>`
-   - `SqlRuntimeFamilyInstance` (family-specific interface) extends `RuntimeFamilyInstance<'sql'>`
-3. ✅ Updated Postgres packs:
-   - `@prisma-next/targets-postgres/runtime` exports a default `RuntimeTargetDescriptor<'sql','postgres'>`
-   - `@prisma-next/targets-postgres-adapter/runtime` exports a default `RuntimeAdapterDescriptor<'sql','postgres'>`
-   - `@prisma-next/targets-postgres-driver/runtime` exports a default `RuntimeDriverDescriptor<'sql','postgres'>`
-4. ✅ Updated runtime assembly to use stack/context/runtime factory pattern
-5. ✅ Updated examples and test utilities to use stack/context/runtime factories
-
 ## References
 
 - [ADR 005 - Thin Core Fat Targets](./ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md)

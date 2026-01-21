@@ -57,7 +57,7 @@ export function createTestRuntime(
   });
 
   return createRuntime({
-    stack: stackInstance,
+    stackInstance,
     contract,
     context,
     driverOptions,

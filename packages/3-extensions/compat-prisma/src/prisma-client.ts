@@ -396,7 +396,7 @@ class PrismaClientImpl {
       }
 
       this.runtime = createRuntime({
-        stack: stackInstance,
+        stackInstance,
         contract: this.contract,
         context: this.context,
         driverOptions: { connectionString },

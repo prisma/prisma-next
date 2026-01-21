@@ -44,7 +44,7 @@ export function getPrismaNextRuntime(): Runtime {
     });
 
     runtime = createRuntime({
-      stack: stackInstance,
+      stackInstance,
       contract,
       context,
       driverOptions: {

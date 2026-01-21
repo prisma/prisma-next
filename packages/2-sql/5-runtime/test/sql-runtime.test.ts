@@ -167,7 +167,7 @@ describe('createRuntime', () => {
     });
 
     const runtime = createRuntime({
-      stack: stackInstance,
+      stackInstance,
       contract: testContract,
       context,
       driverOptions: {},
@@ -185,7 +185,7 @@ describe('createRuntime', () => {
     const { stackInstance } = createTestStackInstance();
 
     const runtime = createRuntime({
-      stack: stackInstance,
+      stackInstance,
       contract: testContract,
       driverOptions: {},
       verify: { mode: 'onFirstUse', requireMarker: false },
@@ -200,7 +200,7 @@ describe('createRuntime', () => {
     const { stackInstance } = createTestStackInstance();
 
     const runtime = createRuntime({
-      stack: stackInstance,
+      stackInstance,
       contract: testContract,
       driverOptions: {},
       verify: { mode: 'onFirstUse', requireMarker: false },
@@ -214,7 +214,7 @@ describe('createRuntime', () => {
     const { stackInstance, driver } = createTestStackInstance();
 
     const runtime = createRuntime({
-      stack: stackInstance,
+      stackInstance,
       contract: testContract,
       driverOptions: {},
       verify: { mode: 'onFirstUse', requireMarker: false },
@@ -267,7 +267,7 @@ describe('createRuntime', () => {
 
     expect(() =>
       createRuntime({
-        stack: stackInstance,
+        stackInstance,
         contract: testContract,
         driverOptions: {}, // Providing options but no driver in stack
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -280,7 +280,7 @@ describe('createRuntime', () => {
 
     // Create runtime WITHOUT driverOptions (stack has driver)
     const runtime = createRuntime({
-      stack: stackInstance,
+      stackInstance,
       contract: testContract,
       // driverOptions is undefined
       verify: { mode: 'onFirstUse', requireMarker: false },
@@ -352,7 +352,7 @@ describe('createRuntime', () => {
 
     expect(() =>
       createRuntime({
-        stack: stackInstance,
+        stackInstance,
         contract: testContract,
         driverOptions: {},
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -419,7 +419,7 @@ describe('createRuntime', () => {
 
     expect(() =>
       createRuntime({
-        stack: stackInstance,
+        stackInstance,
         contract: testContract,
         driverOptions: {},
         verify: { mode: 'onFirstUse', requireMarker: false },
@@ -431,7 +431,7 @@ describe('createRuntime', () => {
     const { stackInstance } = createTestStackInstance();
 
     const runtime = createRuntime({
-      stack: stackInstance,
+      stackInstance,
       contract: testContract,
       driverOptions: {},
       verify: { mode: 'startup', requireMarker: false },
@@ -482,7 +482,7 @@ describe('createRuntime', () => {
     const stackInstance = instantiateExecutionStack(stack);
 
     const runtime = createRuntime({
-      stack: stackInstance,
+      stackInstance,
       contract: testContract,
       // No driverOptions - uses offline driver
       verify: { mode: 'onFirstUse', requireMarker: false },

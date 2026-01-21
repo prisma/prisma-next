@@ -156,7 +156,7 @@ describe('runtime execute integration', () => {
         const createRuntimeInstance = () => {
           const pool = new Pool({ connectionString });
           return createRuntime({
-            stack: executionStackInstance,
+            stackInstance: executionStackInstance,
             contract,
             context,
             driverOptions: {
@@ -304,7 +304,7 @@ describe('runtime execute integration', () => {
         const context = createContext(contract);
         const pool = new Pool({ connectionString });
         const runtime = createRuntime({
-          stack: executionStackInstance,
+          stackInstance: executionStackInstance,
           contract,
           context,
           driverOptions: {
@@ -386,7 +386,7 @@ describe('runtime execute integration', () => {
         const context = createContext(contract);
         const pool = new Pool({ connectionString });
         const runtime = createRuntime({
-          stack: executionStackInstance,
+          stackInstance: executionStackInstance,
           contract,
           context,
           driverOptions: {

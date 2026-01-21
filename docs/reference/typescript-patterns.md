@@ -1362,7 +1362,7 @@ const context = createExecutionContext({ contract, stack: stackInstance });
 
 // Create runtime from stack instance
 const runtime = createRuntime({
-  stack: stackInstance,
+  stackInstance,
   contract,
   context,
   driverOptions: { connectionString },

@@ -56,7 +56,7 @@ const stackInstance = instantiateExecutionStack(stack);
 const context = createExecutionContext({ contract, stack: stackInstance });
 
 const runtime = createRuntime({
-  stack: stackInstance,
+  stackInstance,
   contract,
   context,
   driverOptions: { connect: { connectionString: process.env.DATABASE_URL } },
