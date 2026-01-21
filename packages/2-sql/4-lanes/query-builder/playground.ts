@@ -1,44 +1,57 @@
 import type { CoreHashBase } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
-import { createRef, createRoot, type TableReference } from './src';
+import { createRef, createRoot, type SelectBuilder, type TableReference } from './src';
 
 type CoreHash = CoreHashBase<'core-hash-example'>;
 type AnotherCoreHash = CoreHashBase<'another-core-hash-example'>;
 
 declare const contract: SqlContract<
   {
-    tables: {
-      users: {
-        columns: {
-          id: {
-            codecId: 'codecid';
-            nativeType: 'nativetype';
+    readonly tables: {
+      readonly users: {
+        readonly columns: {
+          readonly id: {
+            readonly codecId: 'pg/int8@1';
+            readonly nativeType: 'serial';
             nullable: false;
           };
+          readonly email: {
+            readonly codecId: 'pg/varchar@1';
+            readonly nativeType: 'varchar';
+            nullable: true;
+          };
         };
-        foreignKeys: [];
-        indexes: [];
-        uniques: [];
+        readonly foreignKeys: [];
+        readonly indexes: [];
+        readonly uniques: [];
       };
-      posts: {
-        columns: {
-          id: {
-            codecId: 'codecid';
-            nativeType: 'nativetype';
+      readonly posts: {
+        readonly columns: {
+          readonly id: {
+            readonly codecId: 'pg/int8@1';
+            readonly nativeType: 'serial';
             nullable: false;
           };
+          readonly authorId: {
+            readonly codecId: 'pg/int8@1';
+            readonly nativeType: 'int8';
+            nullable: true;
+          };
         };
-        foreignKeys: [];
-        indexes: [];
-        uniques: [];
+        readonly foreignKeys: [];
+        readonly indexes: [];
+        readonly uniques: [];
       };
     };
   },
   Record<string, unknown>,
   Record<string, unknown>,
   {
-    codecTypes: Record<string, { output: unknown }>;
-    operationTypes: Record<string, Record<string, unknown>>;
+    readonly codecTypes: {
+      'pg/int8@1': { output: number };
+      'pg/varchar@1': { output: string };
+    };
+    readonly operationTypes: Record<string, Record<string, unknown>>;
   },
   CoreHash
 >;
@@ -55,8 +68,22 @@ declare const differentHashTable: TableReference<'users', AnotherCoreHash>;
 const root = createRoot(contract);
 const ref = createRef(contract);
 
-root.from(ref.users).build();
-root.from(ref.posts).build();
+root.from(ref.users).select(ref['*']).build();
+root.from(ref.posts).select(ref.posts['*']).build();
+
+// testing multi-table select * type error
+(
+  root.from(ref.users) as SelectBuilder<
+    typeof contract,
+    {
+      users: (typeof contract)['storage']['tables']['users'];
+      posts: (typeof contract)['storage']['tables']['posts'];
+    }
+  >
+)
+  .select(ref['*'])
+  // @ts-expect-error
+  .build();
 
 root
   // @ts-expect-error
