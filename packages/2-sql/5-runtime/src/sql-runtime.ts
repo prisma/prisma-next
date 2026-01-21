@@ -26,6 +26,7 @@ import type {
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
@@ -124,8 +125,8 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
         Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
         SqlDriver
       >[],
-      ...(mode !== undefined ? { mode } : {}),
-      ...(log !== undefined ? { log } : {}),
+      ...ifDefined('mode', mode),
+      ...ifDefined('log', log),
       operationRegistry: context.operations,
     };
 
