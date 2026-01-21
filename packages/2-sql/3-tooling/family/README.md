@@ -117,7 +117,7 @@ The runner returns structured errors with the following codes:
 
 - **`./control`**: Control plane entry point for CLI/config usage (exports `SqlFamilyDescriptor`)
 - **`./control-adapter`**: SQL control adapter interface (`SqlControlAdapter`, `SqlControlAdapterDescriptor`) for target-specific adapters
-- **`./runtime`**: Runtime plane entry point
+- **`./runtime`**: Runtime plane identity exports only (family ID, types, descriptor identity). Does **not** export runtime creation helpers—use `createExecutionStack`, `instantiateExecutionStack` from `@prisma-next/core-execution-plane/stack` and `createExecutionContext`, `createRuntime` from `@prisma-next/sql-runtime`. See [ADR 152](../../../docs/architecture%20docs/adrs/ADR%20152%20-%20Execution%20Plane%20Descriptors%20and%20Instances.md).
 - **`./verify`**: Verification utilities (`readMarker`, `readMarkerSql`, `parseContractMarkerRow`) for reading contract markers from databases
 
 ## Dependencies
