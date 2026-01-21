@@ -13,6 +13,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Client } from 'pg';
+import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 let runtime: Runtime | undefined;
@@ -27,7 +28,7 @@ export function getPrismaNextRuntime(): Runtime {
 
     client = new Client({ connectionString });
 
-    const contract = validateContract(contractJson);
+    const contract = validateContract<Contract>(contractJson);
 
     const stack = createExecutionStack({
       target: postgresTarget,

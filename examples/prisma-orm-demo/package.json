@@ -20,6 +20,7 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/compat-prisma": "workspace:*",
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
@@ -34,7 +35,6 @@
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
-    "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma/dev": "catalog:",
     "@types/node": "catalog:",
