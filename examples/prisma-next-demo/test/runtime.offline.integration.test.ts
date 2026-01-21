@@ -26,9 +26,7 @@ describe('when no driver is available', () => {
         }
       }).rejects.toMatchObject({ code: 'RUNTIME.DRIVER_MISSING' });
     } finally {
-      if (runtime) {
-        await runtime.close();
-      }
+      await runtime.close();
     }
   });
 });
