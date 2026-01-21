@@ -7,6 +7,7 @@ import type {
   RuntimeExtensionInstance,
 } from '@prisma-next/core-execution-plane/types';
 import { createOperationRegistry } from '@prisma-next/operations';
+import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type {
@@ -143,82 +144,34 @@ export function assertExecutionStackContractRequirements(
   });
 
   if (result.familyMismatch) {
-    throw new Error(
+    throw runtimeError(
+      'RUNTIME.CONTRACT_FAMILY_MISMATCH',
       `Contract target family '${result.familyMismatch.actual}' does not match runtime family '${result.familyMismatch.expected}'.`,
+      {
+        actual: result.familyMismatch.actual,
+        expected: result.familyMismatch.expected,
+      },
     );
   }
 
   if (result.targetMismatch) {
-    throw new Error(
+    throw runtimeError(
+      'RUNTIME.CONTRACT_TARGET_MISMATCH',
       `Contract target '${result.targetMismatch.actual}' does not match runtime target descriptor '${result.targetMismatch.expected}'.`,
+      {
+        actual: result.targetMismatch.actual,
+        expected: result.targetMismatch.expected,
+      },
     );
   }
 
   for (const packId of result.missingExtensionPackIds) {
-    throw new Error(
+    throw runtimeError(
+      'RUNTIME.MISSING_EXTENSION_PACK',
       `Contract requires extension pack '${packId}', but runtime descriptors do not provide a matching component.`,
+      { packId },
     );
   }
-}
-
-// ============================================================================
-// Runtime Error Types and Helpers
-// ============================================================================
-
-/**
- * Structured error thrown by the SQL runtime.
- *
- * Aligns with the repository's error envelope convention:
- * - `code`: Stable error code for programmatic handling (e.g., `RUNTIME.TYPE_PARAMS_INVALID`)
- * - `category`: Error source category (`RUNTIME`)
- * - `severity`: Error severity level (`error`)
- * - `details`: Optional structured details for debugging
- *
- * @example
- * ```typescript
- * try {
- *   createExecutionContext({ ... });
- * } catch (e) {
- *   if ((e as RuntimeError).code === 'RUNTIME.TYPE_PARAMS_INVALID') {
- *     console.error('Invalid type parameters:', (e as RuntimeError).details);
- *   }
- * }
- * ```
- */
-export interface RuntimeError extends Error {
-  /** Stable error code for programmatic handling (e.g., `RUNTIME.TYPE_PARAMS_INVALID`) */
-  readonly code: string;
-  /** Error source category */
-  readonly category: 'RUNTIME';
-  /** Error severity level */
-  readonly severity: 'error';
-  /** Optional structured details for debugging */
-  readonly details?: Record<string, unknown>;
-}
-
-/**
- * Creates a RuntimeError for invalid type parameters.
- *
- * Error code: `RUNTIME.TYPE_PARAMS_INVALID`
- *
- * Thrown when:
- * - `storage.types` entries have typeParams that fail codec schema validation
- * - Column inline typeParams fail codec schema validation
- *
- * @internal
- */
-function runtimeTypeParamsInvalid(
-  message: string,
-  details?: Record<string, unknown>,
-): RuntimeError {
-  const error = new Error(message) as RuntimeError;
-  Object.defineProperty(error, 'name', { value: 'RuntimeError', configurable: true });
-  return Object.assign(error, {
-    code: 'RUNTIME.TYPE_PARAMS_INVALID',
-    category: 'RUNTIME' as const,
-    severity: 'error' as const,
-    details,
-  });
 }
 
 // ============================================================================
@@ -227,7 +180,7 @@ function runtimeTypeParamsInvalid(
 
 /**
  * Validates typeParams against the codec's paramsSchema.
- * @throws RuntimeError with code RUNTIME.TYPE_PARAMS_INVALID if validation fails
+ * @throws RuntimeErrorEnvelope with code RUNTIME.TYPE_PARAMS_INVALID if validation fails
  */
 function validateTypeParams(
   typeParams: Record<string, unknown>,
@@ -240,7 +193,8 @@ function validateTypeParams(
     const locationInfo = context.typeName
       ? `type '${context.typeName}'`
       : `column '${context.tableName}.${context.columnName}'`;
-    throw runtimeTypeParamsInvalid(
+    throw runtimeError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
       `Invalid typeParams for ${locationInfo} (codecId: ${codecDescriptor.codecId}): ${messages}`,
       { ...context, codecId: codecDescriptor.codecId, typeParams },
     );
@@ -251,6 +205,7 @@ function validateTypeParams(
 /**
  * Collects parameterized codec descriptors from extension instances.
  * Returns a map of codecId → descriptor for quick lookup.
+ * @throws RuntimeErrorEnvelope with code RUNTIME.DUPLICATE_PARAMETERIZED_CODEC if duplicate codecIds are found
  */
 function collectParameterizedCodecDescriptors(
   extensionInstances: ReadonlyArray<SqlRuntimeExtensionInstance<string>>,
@@ -262,8 +217,10 @@ function collectParameterizedCodecDescriptors(
     if (paramCodecs) {
       for (const descriptor of paramCodecs) {
         if (descriptors.has(descriptor.codecId)) {
-          console.warn(
-            `Duplicate parameterized codec descriptor for codecId '${descriptor.codecId}' - using later registration`,
+          throw runtimeError(
+            'RUNTIME.DUPLICATE_PARAMETERIZED_CODEC',
+            `Duplicate parameterized codec descriptor for codecId '${descriptor.codecId}'.`,
+            { codecId: descriptor.codecId },
           );
         }
         descriptors.set(descriptor.codecId, descriptor);
@@ -322,7 +279,7 @@ function initializeTypeHelpers(
 
 /**
  * Validates inline column typeParams across all tables.
- * @throws RuntimeError with code RUNTIME.TYPE_PARAMS_INVALID if validation fails
+ * @throws RuntimeErrorEnvelope with code RUNTIME.TYPE_PARAMS_INVALID if validation fails
  */
 function validateColumnTypeParams(
   storage: SqlStorage,
