@@ -29,6 +29,3 @@ export interface ExecutionContext<
    */
   readonly types: TypeHelperRegistry;
 }
-
-export type QueryLaneContext<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>> =
-  ExecutionContext<TContract>;

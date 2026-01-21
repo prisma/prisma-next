@@ -12,19 +12,23 @@ describe('when no driver is available', () => {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
-    const plan = sql.from(tables.user).select({ id: tables.user.columns.id }).limit(1).build();
+    try {
+      const plan = sql.from(tables.user).select({ id: tables.user.columns.id }).limit(1).build();
 
-    expect(plan).toMatchObject({
-      ast: { kind: 'select' },
-      meta: { lane: 'dsl' },
-    });
+      expect(plan).toMatchObject({
+        ast: { kind: 'select' },
+        meta: { lane: 'dsl' },
+      });
 
-    await expect(async () => {
-      for await (const _row of runtime.execute(plan)) {
-        // offline runtime should not execute
+      await expect(async () => {
+        for await (const _row of runtime.execute(plan)) {
+          // offline runtime should not execute
+        }
+      }).rejects.toMatchObject({ code: 'RUNTIME.DRIVER_MISSING' });
+    } finally {
+      if (runtime) {
+        await runtime.close();
       }
-    }).rejects.toMatchObject({ code: 'RUNTIME.DRIVER_MISSING' });
-
-    await runtime.close();
+    }
   });
 });

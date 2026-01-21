@@ -161,7 +161,6 @@ if (app) {
 
 if (import.meta.hot) {
   import.meta.hot.accept('./prisma/contract.json', (newContract) => {
-    console.log(newContract);
     if (app && newContract) {
       app.innerHTML = renderContract(newContract as unknown as ContractIR);
     }
