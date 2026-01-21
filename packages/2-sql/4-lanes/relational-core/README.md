@@ -24,7 +24,7 @@ Provide shared relational primitives (schema builders, column builders, paramete
 - **Column Builders**: Provides column accessors with operation methods attached based on column typeId
 - **Parameter Helpers**: Creates parameter placeholders for query building
 - **Operations Registry**: Attaches registered operations as methods on column builders
-- **Execution Context Types**: Defines the env-free context shape used by query lanes
+- **Execution Context Types**: Defines the context shape used by query lanes
 - **Type Definitions**: Defines TypeScript types for column builders, operations, and projections
 
 **Non-goals:**

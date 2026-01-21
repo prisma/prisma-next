@@ -10,7 +10,7 @@ SQL runtime implementation for Prisma Next.
 
 ## Overview
 
-The SQL runtime package implements the SQL family runtime by composing `@prisma-next/runtime-executor` with SQL-specific adapters, drivers, and codecs. It provides the public runtime API for SQL-based databases, including execution-plane composition via `ExecutionStack` and env-free `ExecutionContext` creation for query lanes.
+The SQL runtime package implements the SQL family runtime by composing `@prisma-next/runtime-executor` with SQL-specific adapters, drivers, and codecs. It provides the public runtime API for SQL-based databases, including execution-plane composition via `ExecutionStack` and `ExecutionContext` creation for query lanes.
 
 ## Purpose
 
@@ -19,7 +19,7 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 ## Responsibilities
 
 - **Execution Stack Composition**: Compose runtime descriptors into a reusable `ExecutionStack`
-- **Execution Context Creation**: Build env-free contexts for query lanes (contract + registries + types)
+- **Execution Context Creation**: Build contexts for query lanes (contract + registries + types)
 - **SQL Context Creation**: Create runtime contexts with SQL contracts, adapters, and codecs
 - **SQL Marker Management**: Provide SQL statements for reading/writing contract markers
 - **Codec Encoding/Decoding**: Encode parameters and decode rows using SQL codec registries
