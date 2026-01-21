@@ -1,24 +1,11 @@
-import type { ContractBase, CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
+import type {
+  ContractBase,
+  CoreHashBase,
+  ProfileHashBase,
+  ColumnDefault as SharedColumnDefault,
+} from '@prisma-next/contract/types';
 
-/**
- * Column default value.
- *
- * Discriminated union representing different types of default values:
- * - `literal`: Static value (string, number, boolean)
- * - `function`: Database function (autoincrement, now, cuid never take params; uuid can take optional params)
- * - `sequence`: Reference to a named sequence
- * - `dbGenerated`: Raw database expression (escape hatch)
- * - `userland`: Client-side function (e.g., nanoid with custom alphabet)
- */
-export type ColumnDefault =
-  | { readonly kind: 'literal'; readonly value: string | number | boolean }
-  // Functions that never take params
-  | { readonly kind: 'function'; readonly name: 'autoincrement' | 'now' | 'cuid' }
-  // uuid can take optional params (for variants like uuidv7)
-  | { readonly kind: 'function'; readonly name: 'uuid'; readonly params?: readonly string[] }
-  | { readonly kind: 'sequence'; readonly name: string }
-  | { readonly kind: 'dbGenerated'; readonly expression: string }
-  | { readonly kind: 'userland'; readonly name: string };
+export type ColumnDefault = SharedColumnDefault;
 
 /**
  * A column definition in storage.

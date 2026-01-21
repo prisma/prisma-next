@@ -18,6 +18,9 @@
     "typecheck": "tsc --noEmit"
   },
   "exports": {
-    ".": "./base.ts"
+    ".": {
+      "types": "./base.ts",
+      "import": "./base.js"
+    }
   }
 }

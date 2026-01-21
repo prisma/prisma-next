@@ -115,6 +115,32 @@ describe('TableBuilder', () => {
     expect(table.columns.id.nullable).toBe(false);
   });
 
+  it('stores column defaults in state', () => {
+    const builder = createTable('user');
+    const table = builder
+      .column('id', {
+        type: intColumn,
+        default: { kind: 'function', name: 'autoincrement' },
+      })
+      .column('createdAt', {
+        type: textColumn,
+        default: { kind: 'function', name: 'uuid', params: ['v7'] },
+      })
+      .column('active', {
+        type: textColumn,
+        default: { kind: 'literal', value: true },
+      })
+      .build();
+
+    expect(table.columns.id.default).toEqual({ kind: 'function', name: 'autoincrement' });
+    expect(table.columns.createdAt.default).toEqual({
+      kind: 'function',
+      name: 'uuid',
+      params: ['v7'],
+    });
+    expect(table.columns.active.default).toEqual({ kind: 'literal', value: true });
+  });
+
   it('stores typeParams from descriptor', () => {
     const builder = createTable('document');
     const table = builder
