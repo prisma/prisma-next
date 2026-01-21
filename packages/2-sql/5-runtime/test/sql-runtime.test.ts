@@ -338,7 +338,7 @@ describe('createRuntime', () => {
     expect(runtime).toBeDefined();
   });
 
-  it('offline driver throws on connect when no driverOptions provided', async () => {
+  it('offline driver throws RUNTIME.DRIVER_MISSING on execute', async () => {
     const adapter = createStubAdapter();
 
     const stack = createExecutionStack({
@@ -355,6 +355,20 @@ describe('createRuntime', () => {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
-    expect(runtime).toBeDefined();
+    const plan = {
+      sql: 'SELECT 1',
+      params: [],
+      meta: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:test',
+        lane: 'sql',
+        paramDescriptors: [],
+      },
+    };
+
+    await expect(runtime.execute(plan).toArray()).rejects.toMatchObject({
+      code: 'RUNTIME.DRIVER_MISSING',
+    });
   });
 });

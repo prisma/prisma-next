@@ -1,25 +1,20 @@
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
 import { describe, expect, it } from 'vitest';
-import {
-  createExecutionContext,
-  type RuntimeParameterizedCodecDescriptor,
-  type SqlRuntimeExtensionDescriptor,
-  type SqlRuntimeExtensionInstance,
+import type {
+  RuntimeParameterizedCodecDescriptor,
+  SqlRuntimeExtensionDescriptor,
+  SqlRuntimeExtensionInstance,
 } from '../src/sql-context';
+import { createStubAdapter, createTestContext } from './utils';
 
 // =============================================================================
 // Test helpers
 // =============================================================================
 
-function createTestContract(
+function createParamTypesTestContract(
   options?: Partial<{
     types: Record<string, StorageTypeInstance>;
     tableColumns: Record<
@@ -66,74 +61,6 @@ function createTestContract(
   };
 }
 
-function createTestAdapterDescriptor() {
-  const codecs = createCodecRegistry();
-  codecs.register(
-    codec({
-      typeId: 'pg/int4@1',
-      targetTypes: ['int4'],
-      encode: (v: number) => v,
-      decode: (w: number) => w,
-    }),
-  );
-
-  return {
-    kind: 'adapter' as const,
-    id: 'test-adapter',
-    version: '0.0.1',
-    familyId: 'sql' as const,
-    targetId: 'postgres' as const,
-    create() {
-      return {
-        familyId: 'sql' as const,
-        targetId: 'postgres' as const,
-        profile: {
-          id: 'test-profile',
-          target: 'postgres',
-          capabilities: {},
-          codecs() {
-            return codecs;
-          },
-        },
-        lower(ast: SelectAst) {
-          return {
-            profileId: 'test-profile',
-            body: Object.freeze({ sql: JSON.stringify(ast), params: [] }),
-          };
-        },
-      };
-    },
-  };
-}
-
-function createTestTargetDescriptor() {
-  return {
-    kind: 'target' as const,
-    id: 'postgres',
-    version: '0.0.1',
-    familyId: 'sql' as const,
-    targetId: 'postgres' as const,
-    create() {
-      return { familyId: 'sql' as const, targetId: 'postgres' as const };
-    },
-  };
-}
-
-function createTestContext<TContract extends SqlContract<SqlStorage>>(options: {
-  contract: TContract;
-  target: ReturnType<typeof createTestTargetDescriptor>;
-  adapter: ReturnType<typeof createTestAdapterDescriptor>;
-  extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
-}) {
-  const stack = createExecutionStack({
-    target: options.target,
-    adapter: options.adapter,
-    extensionPacks: options.extensionPacks ?? [],
-  });
-  const stackInstance = instantiateExecutionStack(stack);
-  return createExecutionContext({ contract: options.contract, stackInstance });
-}
-
 // =============================================================================
 // Tests: Parameterized type validation
 // =============================================================================
@@ -141,19 +68,15 @@ function createTestContext<TContract extends SqlContract<SqlStorage>>(options: {
 describe('parameterized types', () => {
   describe('storage.types validation', () => {
     it('creates context with empty storage.types', () => {
-      const contract = createTestContract({ types: {} });
-      const context = createTestContext({
-        contract,
-        target: createTestTargetDescriptor(),
-        adapter: createTestAdapterDescriptor(),
-      });
+      const contract = createParamTypesTestContract({ types: {} });
+      const context = createTestContext(contract, createStubAdapter());
 
       expect(context.contract.storage.types).toEqual({});
       expect(context.types).toEqual({});
     });
 
     it('creates context with storage.types containing valid type instances', () => {
-      const contract = createTestContract({
+      const contract = createParamTypesTestContract({
         types: {
           Vector1536: {
             codecId: 'pg/vector@1',
@@ -162,11 +85,7 @@ describe('parameterized types', () => {
           },
         },
       });
-      const context = createTestContext({
-        contract,
-        target: createTestTargetDescriptor(),
-        adapter: createTestAdapterDescriptor(),
-      });
+      const context = createTestContext(contract, createStubAdapter());
 
       expect(context.contract.storage.types).toEqual({
         Vector1536: {
@@ -225,7 +144,7 @@ describe('parameterized types', () => {
     }
 
     it('validates typeParams against codec paramsSchema', () => {
-      const contract = createTestContract({
+      const contract = createParamTypesTestContract({
         types: {
           Vector1536: {
             codecId: 'pg/vector@1',
@@ -235,10 +154,7 @@ describe('parameterized types', () => {
         },
       });
 
-      const context = createTestContext({
-        contract,
-        target: createTestTargetDescriptor(),
-        adapter: createTestAdapterDescriptor(),
+      const context = createTestContext(contract, createStubAdapter(), {
         extensionPacks: [createVectorExtensionDescriptor()],
       });
 
@@ -246,7 +162,7 @@ describe('parameterized types', () => {
     });
 
     it('rejects invalid typeParams with stable error code', () => {
-      const contract = createTestContract({
+      const contract = createParamTypesTestContract({
         types: {
           InvalidVector: {
             codecId: 'pg/vector@1',
@@ -258,10 +174,7 @@ describe('parameterized types', () => {
 
       let thrownError: unknown;
       try {
-        createTestContext({
-          contract,
-          target: createTestTargetDescriptor(),
-          adapter: createTestAdapterDescriptor(),
+        createTestContext(contract, createStubAdapter(), {
           extensionPacks: [createVectorExtensionDescriptor()],
         });
       } catch (e) {
@@ -281,7 +194,7 @@ describe('parameterized types', () => {
     });
 
     it('rejects missing required typeParams with stable error code', () => {
-      const contract = createTestContract({
+      const contract = createParamTypesTestContract({
         types: {
           InvalidVector: {
             codecId: 'pg/vector@1',
@@ -293,10 +206,7 @@ describe('parameterized types', () => {
 
       let thrownError: unknown;
       try {
-        createTestContext({
-          contract,
-          target: createTestTargetDescriptor(),
-          adapter: createTestAdapterDescriptor(),
+        createTestContext(contract, createStubAdapter(), {
           extensionPacks: [createVectorExtensionDescriptor()],
         });
       } catch (e) {
@@ -354,7 +264,7 @@ describe('parameterized types', () => {
         },
       };
 
-      const contract = createTestContract({
+      const contract = createParamTypesTestContract({
         types: {
           Vector1536: {
             codecId: 'pg/vector@1',
@@ -364,10 +274,7 @@ describe('parameterized types', () => {
         },
       });
 
-      const context = createTestContext({
-        contract,
-        target: createTestTargetDescriptor(),
-        adapter: createTestAdapterDescriptor(),
+      const context = createTestContext(contract, createStubAdapter(), {
         extensionPacks: [extensionDescriptor],
       });
 
@@ -413,7 +320,7 @@ describe('parameterized types', () => {
         },
       };
 
-      const contract = createTestContract({
+      const contract = createParamTypesTestContract({
         types: {
           Vector1536: {
             codecId: 'pg/vector@1',
@@ -423,10 +330,7 @@ describe('parameterized types', () => {
         },
       });
 
-      const context = createTestContext({
-        contract,
-        target: createTestTargetDescriptor(),
-        adapter: createTestAdapterDescriptor(),
+      const context = createTestContext(contract, createStubAdapter(), {
         extensionPacks: [extensionDescriptor],
       });
 
@@ -475,7 +379,7 @@ describe('parameterized types', () => {
         },
       };
 
-      const contract = createTestContract({
+      const contract = createParamTypesTestContract({
         tableColumns: {
           id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           embedding: {
@@ -488,10 +392,7 @@ describe('parameterized types', () => {
       });
 
       // Should not throw - valid typeParams
-      const context = createTestContext({
-        contract,
-        target: createTestTargetDescriptor(),
-        adapter: createTestAdapterDescriptor(),
+      const context = createTestContext(contract, createStubAdapter(), {
         extensionPacks: [extensionDescriptor],
       });
 
@@ -533,7 +434,7 @@ describe('parameterized types', () => {
         },
       };
 
-      const contract = createTestContract({
+      const contract = createParamTypesTestContract({
         tableColumns: {
           id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           embedding: {
@@ -547,10 +448,7 @@ describe('parameterized types', () => {
 
       let thrownError: unknown;
       try {
-        createTestContext({
-          contract,
-          target: createTestTargetDescriptor(),
-          adapter: createTestAdapterDescriptor(),
+        createTestContext(contract, createStubAdapter(), {
           extensionPacks: [extensionDescriptor],
         });
       } catch (e) {
@@ -598,13 +496,10 @@ describe('parameterized types', () => {
         };
       }
 
-      const contract = createTestContract();
+      const contract = createParamTypesTestContract();
 
       expect(() =>
-        createTestContext({
-          contract,
-          target: createTestTargetDescriptor(),
-          adapter: createTestAdapterDescriptor(),
+        createTestContext(contract, createStubAdapter(), {
           extensionPacks: [createVectorExtension('ext-1'), createVectorExtension('ext-2')],
         }),
       ).toThrow(
