@@ -270,8 +270,8 @@ export function createRuntime<TContract extends SqlContract<SqlStorage>, TTarget
     adapter: stackInstance.adapter,
     driver,
     verify,
-    ...(plugins ? { plugins } : {}),
-    ...(mode ? { mode } : {}),
-    ...(log ? { log } : {}),
+    ...ifDefined('plugins', plugins),
+    ...ifDefined('mode', mode),
+    ...ifDefined('log', log),
   });
 }
