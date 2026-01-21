@@ -23,6 +23,11 @@ type Relation = {
   readonly on: { readonly parentCols: readonly string[]; readonly childCols: readonly string[] };
 };
 
+// Temporary demo-only shim: today the validated Contract type doesn't fully reflect the
+// traversable IR shape we visualize here (target/relations/capabilities/extensionPacks).
+// TML-1831 will make this redundant by aligning Contract with validateContract() output and
+// moving derived mappings onto ExecutionContext:
+// https://linear.app/prisma-company/issue/TML-1831/runtime-dx-ir-shaped-contract-mappings-on-executioncontext
 type ContractIR = SqlContract<SqlStorage, Record<string, ModelDefinition>> & {
   target: string;
   relations: Record<string, Record<string, Relation>>;
