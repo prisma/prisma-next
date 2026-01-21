@@ -10,10 +10,9 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
-import { budgets, createRuntime } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
-import { Pool } from 'pg';
-import { executionContext, executionStackInstance } from '../../src/prisma/execution-context';
+
+export { getRuntime } from '../../src/prisma/runtime';
 
 export interface TestControlClientOptions {
   readonly connection: string;
@@ -63,61 +62,5 @@ export async function initTestDatabase(options: {
     }
   } finally {
     await client.close();
-  }
-}
-
-export interface TestRuntime {
-  readonly runtime: ReturnType<typeof createRuntime>;
-  readonly pool: Pool;
-}
-
-/**
- * Creates a test runtime configured for the demo app's stack.
- *
- * Uses the app's execution context and stack instance directly.
- *
- * @example
- * ```typescript
- * const { runtime, pool } = createTestRuntime(connectionString);
- * try {
- *   // Use runtime...
- * } finally {
- *   await closeTestRuntime({ runtime, pool });
- * }
- * ```
- */
-export function createTestRuntime(connectionString: string): TestRuntime {
-  const pool = new Pool({ connectionString });
-  const runtime = createRuntime({
-    stackInstance: executionStackInstance,
-    contract: executionContext.contract,
-    context: executionContext,
-    driverOptions: {
-      connect: { pool },
-      cursor: { disabled: true },
-    },
-    verify: { mode: 'onFirstUse', requireMarker: false },
-    plugins: [
-      budgets({
-        maxRows: 10_000,
-        defaultTableRows: 10_000,
-        tableRows: { user: 10_000, post: 10_000 },
-      }),
-    ],
-  });
-  return { runtime, pool };
-}
-
-/**
- * Closes the test runtime and pool.
- */
-export async function closeTestRuntime({ runtime, pool }: TestRuntime): Promise<void> {
-  try {
-    await runtime.close();
-  } finally {
-    // Only close pool if runtime.close() didn't already close it
-    if (!(pool as { ended?: boolean }).ended) {
-      await pool.end();
-    }
   }
 }

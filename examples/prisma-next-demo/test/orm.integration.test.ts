@@ -1,54 +1,22 @@
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import { createExecutionContext, type createRuntime } from '@prisma-next/sql-runtime';
+import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../src/prisma/contract.d';
-import contractJson from '../src/prisma/contract.json' with { type: 'json' };
-import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
-import {
-  pgvectorExtensionRuntimeDescriptor,
-  postgresAdapterRuntimeDescriptor,
-  postgresTargetRuntimeDescriptor,
-} from './utils/framework-components';
+import { executionContext } from '../src/prisma/execution-context';
+import { getRuntime, initTestDatabase } from './utils/control-client';
 
-// Use the emitted JSON contract which has the real computed hashes
-const contract = validateContract<Contract>(contractJson);
-
-const executionStack = createExecutionStack({
-  target: postgresTargetRuntimeDescriptor,
-  adapter: postgresAdapterRuntimeDescriptor,
-  extensionPacks: [pgvectorExtensionRuntimeDescriptor],
-});
-const executionStackInstance = instantiateExecutionStack(executionStack);
-
-/**
- * Creates a runtime context for the given contract.
- */
-function createContext<TContract extends SqlContract<SqlStorage>>(contract: TContract) {
-  return createExecutionContext({
-    contract,
-    stackInstance: executionStackInstance,
-  });
-}
+const { contract } = executionContext;
 
 /**
  * Seeds test data using the runtime and query DSL.
  */
 async function seedTestData(
-  runtime: ReturnType<typeof createRuntime>,
-  contract: Contract,
+  runtime: Runtime,
   data: { users?: string[]; posts?: Array<{ title: string; userIndex: number }> },
 ): Promise<{ userIds: number[] }> {
-  const context = createContext(contract);
-  const tables = schema(context).tables;
+  const tables = schema(executionContext).tables;
   const userTable = tables['user']!;
   const postTable = tables['post']!;
 
@@ -61,7 +29,7 @@ async function seedTestData(
       const id = i + 1;
       const createdAt = new Date();
 
-      const plan = sql({ context })
+      const plan = sql({ context: executionContext })
         .insert(userTable, {
           id: param('id'),
           email: param('email'),
@@ -86,7 +54,7 @@ async function seedTestData(
       const id = i + 1;
       const createdAt = new Date();
 
-      const plan = sql({ context })
+      const plan = sql({ context: executionContext })
         .insert(postTable, {
           id: param('id'),
           title: param('title'),
@@ -112,10 +80,10 @@ describe('ORM integration tests', () => {
         // Initialize schema using control client
         await initTestDatabase({ connection: connectionString, contractIR: contract });
 
-        const { runtime, pool } = createTestRuntime(connectionString);
+        const runtime = getRuntime(connectionString);
         try {
           // Seed data using runtime
-          await seedTestData(runtime, contract, {
+          await seedTestData(runtime, {
             users: ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
           });
 
@@ -130,7 +98,7 @@ describe('ORM integration tests', () => {
           });
           expect(users[0]).not.toMatchObject({ posts: expect.anything() });
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       });
     },
@@ -142,10 +110,10 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString);
+        const runtime = getRuntime(connectionString);
 
         try {
-          await seedTestData(runtime, contract, { users: ['alice@example.com'] });
+          await seedTestData(runtime, { users: ['alice@example.com'] });
 
           const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
           const user = await ormGetUserById(1, runtime);
@@ -157,7 +125,7 @@ describe('ORM integration tests', () => {
             createdAt: expect.anything(),
           });
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       });
     },
@@ -169,10 +137,10 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString);
+        const runtime = getRuntime(connectionString);
 
         try {
-          await seedTestData(runtime, contract, {
+          await seedTestData(runtime, {
             users: ['alice@example.com', 'bob@example.com'],
             posts: [{ title: 'First Post', userIndex: 0 }],
           });
@@ -186,7 +154,7 @@ describe('ORM integration tests', () => {
             email: expect.anything(),
           });
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       });
     },
@@ -198,10 +166,10 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString);
+        const runtime = getRuntime(connectionString);
 
         try {
-          await seedTestData(runtime, contract, {
+          await seedTestData(runtime, {
             users: ['alice@example.com', 'bob@example.com'],
             posts: [
               { title: 'First Post', userIndex: 0 },
@@ -220,7 +188,7 @@ describe('ORM integration tests', () => {
             posts: expect.any(Array),
           });
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       });
     },
@@ -232,7 +200,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString);
+        const runtime = getRuntime(connectionString);
 
         try {
           const { ormCreateUser } = await import('../src/queries/orm-writes');
@@ -243,7 +211,7 @@ describe('ORM integration tests', () => {
 
           expect(affectedRows).toBe(1);
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       });
     },
@@ -255,17 +223,17 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString);
+        const runtime = getRuntime(connectionString);
 
         try {
-          await seedTestData(runtime, contract, { users: ['alice@example.com'] });
+          await seedTestData(runtime, { users: ['alice@example.com'] });
 
           const { ormUpdateUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
 
           expect(affectedRows).toBe(1);
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       });
     },
@@ -277,17 +245,17 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString);
+        const runtime = getRuntime(connectionString);
 
         try {
-          await seedTestData(runtime, contract, { users: ['alice@example.com'] });
+          await seedTestData(runtime, { users: ['alice@example.com'] });
 
           const { ormDeleteUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormDeleteUser(1, runtime);
 
           expect(affectedRows).toBe(1);
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       });
     },
@@ -299,11 +267,11 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString);
+        const runtime = getRuntime(connectionString);
 
         try {
           const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
-          await seedTestData(runtime, contract, { users: emails });
+          await seedTestData(runtime, { users: emails });
 
           const { ormGetUsersByIdCursor } = await import('../src/queries/orm-pagination');
 
@@ -326,7 +294,7 @@ describe('ORM integration tests', () => {
           const emptyPage = await ormGetUsersByIdCursor(10, 3, runtime);
           expect(emptyPage).toHaveLength(0);
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       });
     },
@@ -338,11 +306,11 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const { runtime, pool } = createTestRuntime(connectionString);
+        const runtime = getRuntime(connectionString);
 
         try {
           const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
-          await seedTestData(runtime, contract, { users: emails });
+          await seedTestData(runtime, { users: emails });
 
           const { ormGetUsersBackward } = await import('../src/queries/orm-pagination');
 
@@ -361,7 +329,7 @@ describe('ORM integration tests', () => {
           const emptyPage = await ormGetUsersBackward(1, 3, runtime);
           expect(emptyPage).toHaveLength(0);
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       });
     },
