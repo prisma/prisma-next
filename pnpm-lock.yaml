@@ -186,6 +186,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/shared/contract
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/1-core/runtime/execution-plane
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/7-drivers/postgres
@@ -223,9 +226,6 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/cli
-      '@prisma-next/core-execution-plane':
-        specifier: workspace:*
-        version: link:../../packages/1-framework/1-core/runtime/execution-plane
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../packages/0-config/tsconfig
