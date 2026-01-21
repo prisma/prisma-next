@@ -20,7 +20,6 @@ import type { SqlRuntimeAdapterInstance, SqlRuntimeDriverInstance } from '../src
 import { createExecutionContext } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 
-// Minimal test contract
 const testContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   targetFamily: 'sql',
@@ -39,7 +38,6 @@ const testContract: SqlContract<SqlStorage> = {
   },
 };
 
-// Create a stub codec registry
 function createStubCodecs(): CodecRegistry {
   const registry = createCodecRegistry();
   registry.register(
@@ -53,7 +51,6 @@ function createStubCodecs(): CodecRegistry {
   return registry;
 }
 
-// Create a stub adapter
 function createStubAdapter() {
   const codecs = createStubCodecs();
   return {
@@ -76,7 +73,6 @@ function createStubAdapter() {
   };
 }
 
-// Create a mock driver that implements SqlDriver interface
 function createMockDriver(): SqlDriver {
   const execute = vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
     yield { id: 1 };
@@ -90,10 +86,8 @@ function createMockDriver(): SqlDriver {
   };
 }
 
-function createTestStackInstance() {
-  const adapter = createStubAdapter();
-
-  const targetDescriptor: RuntimeTargetDescriptor<'sql', 'postgres'> = {
+function createTestTargetDescriptor(): RuntimeTargetDescriptor<'sql', 'postgres'> {
+  return {
     kind: 'target',
     id: 'postgres',
     version: '0.0.1',
@@ -103,12 +97,12 @@ function createTestStackInstance() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
   };
+}
 
-  const adapterDescriptor: RuntimeAdapterDescriptor<
-    'sql',
-    'postgres',
-    SqlRuntimeAdapterInstance<'postgres'>
-  > = {
+function createTestAdapterDescriptor(
+  adapter: ReturnType<typeof createStubAdapter>,
+): RuntimeAdapterDescriptor<'sql', 'postgres', SqlRuntimeAdapterInstance<'postgres'>> {
+  return {
     kind: 'adapter',
     id: 'test-adapter',
     version: '0.0.1',
@@ -116,16 +110,17 @@ function createTestStackInstance() {
     targetId: 'postgres' as const,
     create() {
       return Object.assign(
-        {
-          familyId: 'sql' as const,
-          targetId: 'postgres' as const,
-        },
+        { familyId: 'sql' as const, targetId: 'postgres' as const },
         adapter,
       ) as SqlRuntimeAdapterInstance<'postgres'>;
     },
   };
+}
 
+function createTestStackInstance() {
+  const adapter = createStubAdapter();
   const driver = createMockDriver();
+
   const driverDescriptor: RuntimeDriverDescriptor<
     'sql',
     'postgres',
@@ -138,18 +133,15 @@ function createTestStackInstance() {
     targetId: 'postgres' as const,
     create() {
       return Object.assign(
-        {
-          familyId: 'sql' as const,
-          targetId: 'postgres' as const,
-        },
+        { familyId: 'sql' as const, targetId: 'postgres' as const },
         driver,
       ) as SqlRuntimeDriverInstance<'postgres'>;
     },
   };
 
   const stack = createExecutionStack({
-    target: targetDescriptor,
-    adapter: adapterDescriptor,
+    target: createTestTargetDescriptor(),
+    adapter: createTestAdapterDescriptor(adapter),
     driver: driverDescriptor,
     extensionPacks: [],
   });
@@ -206,7 +198,6 @@ describe('createRuntime', () => {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
-    // Before any execution, telemetry should be null
     expect(runtime.telemetry()).toBeNull();
   });
 
@@ -227,39 +218,9 @@ describe('createRuntime', () => {
   it('throws when driverOptions provided but stack has no driver', () => {
     const adapter = createStubAdapter();
 
-    const targetDescriptor: RuntimeTargetDescriptor<'sql', 'postgres'> = {
-      kind: 'target',
-      id: 'postgres',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create() {
-        return { familyId: 'sql' as const, targetId: 'postgres' as const };
-      },
-    };
-
-    const adapterDescriptor: RuntimeAdapterDescriptor<
-      'sql',
-      'postgres',
-      SqlRuntimeAdapterInstance<'postgres'>
-    > = {
-      kind: 'adapter',
-      id: 'test-adapter',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create() {
-        return Object.assign(
-          { familyId: 'sql' as const, targetId: 'postgres' as const },
-          adapter,
-        ) as SqlRuntimeAdapterInstance<'postgres'>;
-      },
-    };
-
-    // Create stack WITHOUT driver
     const stack = createExecutionStack({
-      target: targetDescriptor,
-      adapter: adapterDescriptor,
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(adapter),
       extensionPacks: [],
     });
 
@@ -269,7 +230,7 @@ describe('createRuntime', () => {
       createRuntime({
         stackInstance,
         contract: testContract,
-        driverOptions: {}, // Providing options but no driver in stack
+        driverOptions: {},
         verify: { mode: 'onFirstUse', requireMarker: false },
       }),
     ).toThrow('Driver options provided, but the execution stack has no driver descriptor.');
@@ -278,11 +239,9 @@ describe('createRuntime', () => {
   it('uses offline driver when stack has driver but driverOptions is undefined', async () => {
     const { stackInstance } = createTestStackInstance();
 
-    // Create runtime WITHOUT driverOptions (stack has driver)
     const runtime = createRuntime({
       stackInstance,
       contract: testContract,
-      // driverOptions is undefined
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
@@ -292,36 +251,6 @@ describe('createRuntime', () => {
   it('throws when driver instance does not implement SqlDriver interface', () => {
     const adapter = createStubAdapter();
 
-    const targetDescriptor: RuntimeTargetDescriptor<'sql', 'postgres'> = {
-      kind: 'target',
-      id: 'postgres',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create() {
-        return { familyId: 'sql' as const, targetId: 'postgres' as const };
-      },
-    };
-
-    const adapterDescriptor: RuntimeAdapterDescriptor<
-      'sql',
-      'postgres',
-      SqlRuntimeAdapterInstance<'postgres'>
-    > = {
-      kind: 'adapter',
-      id: 'test-adapter',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create() {
-        return Object.assign(
-          { familyId: 'sql' as const, targetId: 'postgres' as const },
-          adapter,
-        ) as SqlRuntimeAdapterInstance<'postgres'>;
-      },
-    };
-
-    // Driver that returns invalid instance (doesn't implement SqlDriver)
     const invalidDriverDescriptor: RuntimeDriverDescriptor<
       'sql',
       'postgres',
@@ -333,7 +262,6 @@ describe('createRuntime', () => {
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
       create() {
-        // Return something that doesn't implement SqlDriver
         return {
           familyId: 'sql' as const,
           targetId: 'postgres' as const,
@@ -342,8 +270,8 @@ describe('createRuntime', () => {
     };
 
     const stack = createExecutionStack({
-      target: targetDescriptor,
-      adapter: adapterDescriptor,
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(adapter),
       driver: invalidDriverDescriptor,
       extensionPacks: [],
     });
@@ -363,36 +291,6 @@ describe('createRuntime', () => {
   it('throws when driver instance is null', () => {
     const adapter = createStubAdapter();
 
-    const targetDescriptor: RuntimeTargetDescriptor<'sql', 'postgres'> = {
-      kind: 'target',
-      id: 'postgres',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create() {
-        return { familyId: 'sql' as const, targetId: 'postgres' as const };
-      },
-    };
-
-    const adapterDescriptor: RuntimeAdapterDescriptor<
-      'sql',
-      'postgres',
-      SqlRuntimeAdapterInstance<'postgres'>
-    > = {
-      kind: 'adapter',
-      id: 'test-adapter',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create() {
-        return Object.assign(
-          { familyId: 'sql' as const, targetId: 'postgres' as const },
-          adapter,
-        ) as SqlRuntimeAdapterInstance<'postgres'>;
-      },
-    };
-
-    // Driver that returns null
     const nullDriverDescriptor: RuntimeDriverDescriptor<
       'sql',
       'postgres',
@@ -409,8 +307,8 @@ describe('createRuntime', () => {
     };
 
     const stack = createExecutionStack({
-      target: targetDescriptor,
-      adapter: adapterDescriptor,
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(adapter),
       driver: nullDriverDescriptor,
       extensionPacks: [],
     });
@@ -443,39 +341,9 @@ describe('createRuntime', () => {
   it('offline driver throws on connect when no driverOptions provided', async () => {
     const adapter = createStubAdapter();
 
-    const targetDescriptor: RuntimeTargetDescriptor<'sql', 'postgres'> = {
-      kind: 'target',
-      id: 'postgres',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create() {
-        return { familyId: 'sql' as const, targetId: 'postgres' as const };
-      },
-    };
-
-    const adapterDescriptor: RuntimeAdapterDescriptor<
-      'sql',
-      'postgres',
-      SqlRuntimeAdapterInstance<'postgres'>
-    > = {
-      kind: 'adapter',
-      id: 'test-adapter',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create() {
-        return Object.assign(
-          { familyId: 'sql' as const, targetId: 'postgres' as const },
-          adapter,
-        ) as SqlRuntimeAdapterInstance<'postgres'>;
-      },
-    };
-
-    // Create stack WITHOUT driver - uses offline driver
     const stack = createExecutionStack({
-      target: targetDescriptor,
-      adapter: adapterDescriptor,
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(adapter),
       extensionPacks: [],
     });
 
@@ -484,11 +352,9 @@ describe('createRuntime', () => {
     const runtime = createRuntime({
       stackInstance,
       contract: testContract,
-      // No driverOptions - uses offline driver
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
-    // The runtime is created, but operations will fail
     expect(runtime).toBeDefined();
   });
 });
