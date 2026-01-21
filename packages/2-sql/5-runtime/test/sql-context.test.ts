@@ -161,7 +161,7 @@ function createContext(options?: {
     extensionPacks: options?.extensionPacks ?? [],
   });
   const stackInstance = instantiateExecutionStack(stack);
-  return createExecutionContext({ contract: testContract, stack: stackInstance });
+  return createExecutionContext({ contract: testContract, stackInstance });
 }
 
 describe('createExecutionContext', () => {

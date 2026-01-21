@@ -107,7 +107,7 @@ export function createTestRuntime<TContract extends SqlContract>(
   const stackInstance = instantiateExecutionStack(stack);
   const context = createExecutionContext({
     contract,
-    stack: stackInstance,
+    stackInstance,
   });
   const pool = new Pool({ connectionString });
   const runtime = createRuntime({

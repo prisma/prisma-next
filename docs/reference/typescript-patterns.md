@@ -1358,7 +1358,7 @@ const stack = createExecutionStack({
 const stackInstance = instantiateExecutionStack(stack);
 
 // Create context from stack instance
-const context = createExecutionContext({ contract, stack: stackInstance });
+const context = createExecutionContext({ contract, stackInstance });
 
 // Create runtime from stack instance
 const runtime = createRuntime({

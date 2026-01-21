@@ -345,7 +345,7 @@ export function createExecutionContext<
   TTargetId extends string = string,
 >(options: {
   readonly contract: TContract;
-  readonly stack: ExecutionStackInstance<
+  readonly stackInstance: ExecutionStackInstance<
     'sql',
     TTargetId,
     SqlRuntimeAdapterInstance<TTargetId>,
@@ -353,10 +353,10 @@ export function createExecutionContext<
     SqlRuntimeExtensionInstance<TTargetId>
   >;
 }): ExecutionContext<TContract> {
-  const { contract, stack } = options;
-  const { adapter: adapterInstance, extensionPacks: extensionInstances } = stack;
+  const { contract, stackInstance } = options;
+  const { adapter: adapterInstance, extensionPacks: extensionInstances } = stackInstance;
 
-  assertExecutionStackContractRequirements(contract, stack.stack);
+  assertExecutionStackContractRequirements(contract, stackInstance.stack);
 
   const codecRegistry = createCodecRegistry();
   const operationRegistry = createOperationRegistry();

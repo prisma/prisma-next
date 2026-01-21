@@ -23,5 +23,5 @@ export const executionStack = createExecutionStack({
 export const executionStackInstance = instantiateExecutionStack(executionStack);
 export const executionContext = createExecutionContext({
   contract,
-  stack: executionStackInstance,
+  stackInstance: executionStackInstance,
 });

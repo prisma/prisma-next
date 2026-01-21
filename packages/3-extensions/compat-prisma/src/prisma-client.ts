@@ -382,7 +382,7 @@ class PrismaClientImpl {
 
     this.context = createExecutionContext({
       contract: this.contract,
-      stack: stackInstance,
+      stackInstance,
     });
 
     // Initialize runtime if not provided

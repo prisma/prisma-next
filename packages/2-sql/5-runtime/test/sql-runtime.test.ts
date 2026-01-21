@@ -163,7 +163,7 @@ describe('createRuntime', () => {
     const { stackInstance } = createTestStackInstance();
     const context = createExecutionContext({
       contract: testContract,
-      stack: stackInstance,
+      stackInstance,
     });
 
     const runtime = createRuntime({

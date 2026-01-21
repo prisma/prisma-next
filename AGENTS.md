@@ -91,7 +91,7 @@ import contractJson from './contract.json' with { type: 'json' };
 const contract = validateContract<Contract>(contractJson);
 const stack = createExecutionStack({ target: postgresTarget, adapter: postgresAdapter, extensionPacks: [] });
 const stackInstance = instantiateExecutionStack(stack);
-const context = createExecutionContext({ contract, stack: stackInstance });
+const context = createExecutionContext({ contract, stackInstance });
 
 const tables = schema(context).tables;
 const plan = sql({ context })

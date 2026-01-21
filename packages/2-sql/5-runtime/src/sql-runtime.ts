@@ -240,7 +240,7 @@ export function createRuntime<TContract extends SqlContract<SqlStorage>, TTarget
     context ??
     createExecutionContext({
       contract,
-      stack: stackInstance,
+      stackInstance,
     });
 
   if (driverOptions !== undefined && !stackInstance.stack.driver) {

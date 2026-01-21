@@ -191,7 +191,7 @@ describe('createExecutionStack', () => {
     const stackInstance = instantiateExecutionStack(stack);
     const context = createExecutionContext({
       contract,
-      stack: stackInstance,
+      stackInstance,
     }) as ExecutionContext<typeof contract>;
 
     expect(context.contract).toBe(contract);

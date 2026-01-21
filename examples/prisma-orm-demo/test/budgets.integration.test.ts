@@ -31,7 +31,7 @@ const executionStackInstance = instantiateExecutionStack(executionStack);
 function createContext(contractForContext: typeof contract) {
   return createExecutionContext({
     contract: contractForContext,
-    stack: executionStackInstance,
+    stackInstance: executionStackInstance,
   });
 }
 

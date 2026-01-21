@@ -106,7 +106,7 @@ const stack = createExecutionStack({
   extensionPacks: [pgvector],
 });
 const stackInstance = instantiateExecutionStack(stack);
-const context = createExecutionContext({ contract, stack: stackInstance });
+const context = createExecutionContext({ contract, stackInstance });
 ```
 
 ### Query Usage

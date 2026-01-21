@@ -131,7 +131,7 @@ function createTestContext<TContract extends SqlContract<SqlStorage>>(options: {
     extensionPacks: options.extensionPacks ?? [],
   });
   const stackInstance = instantiateExecutionStack(stack);
-  return createExecutionContext({ contract: options.contract, stack: stackInstance });
+  return createExecutionContext({ contract: options.contract, stackInstance });
 }
 
 // =============================================================================

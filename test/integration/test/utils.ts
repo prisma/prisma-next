@@ -53,7 +53,7 @@ export function createTestRuntime(
 
   const context = createExecutionContext({
     contract,
-    stack: stackInstance,
+    stackInstance,
   });
 
   return createRuntime({

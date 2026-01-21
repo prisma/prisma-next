@@ -35,7 +35,7 @@ const executionStackInstance = instantiateExecutionStack(executionStack);
 function createContext<TContract extends SqlContract<SqlStorage>>(contract: TContract) {
   return createExecutionContext({
     contract,
-    stack: executionStackInstance,
+    stackInstance: executionStackInstance,
   });
 }
 

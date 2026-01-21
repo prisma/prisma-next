@@ -7,54 +7,35 @@
 
 ## Context
 
-The current execution/runtime plane stack (SQL family, Postgres target, adapters, drivers, extensions, runtime) evolved through several refactors:
+The execution plane composes a runtime from independently packaged components (targets, adapters, drivers, extensions). Historically, these pieces existed but the wiring was inconsistent (ad-hoc shapes, unclear entrypoints, and incomplete type-level compatibility).
 
-- Runtime assembly uses ad-hoc shapes and factory functions without consistent type-level wiring
-- Runtime entrypoints (`./runtime`) exist as placeholders but don't follow a consistent descriptor pattern
-- Some runtime interfaces live in core (`RuntimeFamilyAdapter`), others in family packages, and some are only implicit
-- Type-level compatibility between family/target/adapter/driver/extension at runtime is only partially enforced
+We need a clear, cross-family pattern that standardizes:
 
-As we add new targets (MySQL, MongoDB) and families (document), we need a clear, cross-family pattern for:
+- descriptor identity + declarative metadata
+- instance creation and lifecycle expectations
+- runtime entrypoints (`./runtime`)
 
-- Runtime descriptor identity and compatibility
-- Runtime instance interfaces and lifecycle
-- Control vs runtime plane entrypoints
-- How runtime packs fit into the overall model
-
-This ADR defines a consistent descriptor/instance pattern for the **execution/runtime plane**, mirroring ADR 151 for the control plane.
+This ADR defines the execution-plane descriptor/instance model, mirroring ADR 151 for the control plane.
 
 ## Decision
 
-We standardize on a **descriptor + instance** pattern for all execution/runtime-plane participants:
+We standardize on a **descriptor + instance** pattern for execution-plane components:
 
-- **Descriptors** are flat data objects with identity and a factory method
-- **Instances** are concrete objects implementing well-defined interfaces
-- All descriptors and instances are parameterized by **family** and **target** IDs
-- Descriptor and base instance interfaces live in **core** packages and are **cross-family**
-- Families define **family-specific interfaces** that extend or refine the core base interfaces
+- **Descriptors** are flat objects (identity + declarative metadata) with a `create()` factory.
+- **Instances** are the runtime objects used during execution.
+- Everything is parameterized by **familyId** and **targetId** to make mis-wiring a type error.
+- Base interfaces live in `@prisma-next/core-execution-plane`; families refine them with family-specific behavior.
 
-We apply this pattern to:
-
-- **Family**: RuntimeFamilyDescriptor / RuntimeFamilyInstance
-- **Target**: RuntimeTargetDescriptor / RuntimeTargetInstance
-- **Adapter**: RuntimeAdapterDescriptor / RuntimeAdapterInstance
-- **Driver**: RuntimeDriverDescriptor / RuntimeDriverInstance
-- **Extension**: RuntimeExtensionDescriptor / RuntimeExtensionInstance
-
-This ADR does **not** change runtime behavior; it formalizes types, naming, and entrypoint structure so we can safely refactor existing runtime packs and add new ones.
+This ADR formalizes the model and entrypoints; it is not intended to change runtime behavior.
 
 ### Canonical IDs
 
-We treat the following identifiers as canonical, literal types:
+We treat the following identifiers as canonical literal values (and expose them as literal types):
 
 - **Family IDs**: e.g. `type SqlFamilyId = 'sql'`
 - **Target IDs**: e.g. `type PostgresTargetId = 'postgres'`
 
-These IDs are:
-
-- The values used in `contract.targetFamily` and `contract.target`
-- Exposed on descriptors as `familyId` and `targetId`
-- Reflected in instance interfaces for type-level wiring
+These IDs appear in contracts and on descriptors/instances and anchor type-level wiring.
 
 ### Cross-family descriptor interfaces
 
@@ -73,7 +54,7 @@ export interface RuntimeFamilyDescriptor<
     readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
     readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId>;
     readonly driver: RuntimeDriverDescriptor<TFamilyId, TTargetId>;
-    readonly extensions: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[];
+    readonly extensionPacks: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[];
   }): TFamilyInstance;
 }
 
@@ -95,16 +76,19 @@ export interface RuntimeAdapterDescriptor<
     TFamilyId,
     TTargetId
   >,
-> extends TargetBoundComponentDescriptor<'adapter', TFamilyId, TTargetId> {
+> extends AdapterDescriptor<TFamilyId, TTargetId> {
   create(): TAdapterInstance;
 }
 
 export interface RuntimeDriverDescriptor<
   TFamilyId extends string,
   TTargetId extends string,
-  TDriverInstance extends RuntimeDriverInstance<TTargetId> = RuntimeDriverInstance<TTargetId>,
-> extends TargetBoundComponentDescriptor<'driver', TFamilyId, TTargetId> {
-  create(options: unknown): Promise<TDriverInstance> | TDriverInstance;
+  TDriverInstance extends RuntimeDriverInstance<TFamilyId, TTargetId> = RuntimeDriverInstance<
+    TFamilyId,
+    TTargetId
+  >,
+> extends DriverDescriptor<TFamilyId, TTargetId> {
+  create(options: unknown): TDriverInstance;
 }
 
 export interface RuntimeExtensionDescriptor<
@@ -114,26 +98,17 @@ export interface RuntimeExtensionDescriptor<
     TFamilyId,
     TTargetId
   > = RuntimeExtensionInstance<TFamilyId, TTargetId>,
-> extends TargetBoundComponentDescriptor<'extension', TFamilyId, TTargetId> {
+> extends ExtensionDescriptor<TFamilyId, TTargetId> {
   create(): TExtensionInstance;
 }
 ```
 
-Note: All runtime-plane descriptors extend base descriptor interfaces from `@prisma-next/contract/framework-components` which provide:
-- `kind`: Discriminator literal
-- `id`: Unique identifier
-- `version`: Component version (semver)
-- `targets?`: Target compatibility metadata
-- `capabilities?`: Capability declarations
-- `types?`: Type import specifications for contract.d.ts
-- `operations?`: Operation manifests for building registries
+Note: runtime-plane descriptors build on `@prisma-next/contract/framework-components` (identity + declarative metadata like `types`, `operations`, and `capabilities`).
 
 Notes:
 
-- Descriptors are **open for extension** via declaration merging or family-specific subtypes; families may add extra fields
-- Adapters, drivers, and extensions are **strictly single-target** (`targetId` is a single literal, not an array)
-- `kind` is a plane-level discriminator: `'family' | 'target' | 'adapter' | 'driver' | 'extension'`
-- Driver `create()` accepts options (may be async or sync depending on driver implementation)
+- Descriptors are flat, immutable objects.
+- Adapters/drivers/extensions are target-bound via `targetId`.
 
 ### Cross-family instance interfaces
 
@@ -164,28 +139,14 @@ export interface RuntimeAdapterInstance<
   // Family-specific runtime adapter interfaces extend this
 }
 
-export interface RuntimeDriverInstance<TTargetId extends string = string> {
-  readonly targetId?: TTargetId;
-}
-```
-
-**Note**: The base `RuntimeDriverInstance` interface only provides target identification. Family-specific driver interfaces (e.g., `SqlDriver` for SQL family) define the actual execution methods (`execute`, `explain`, `close`) that are specific to that family's execution model.
-
-```typescript
-// SQL family defines its own driver interface
-export interface SqlDriver {
-  connect(): Promise<void>;
-  execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row>;
-  explain?(request: SqlExecuteRequest): Promise<SqlExplainResult>;
-  query<Row = Record<string, unknown>>(sql: string, params?: readonly unknown[]): Promise<SqlQueryResult<Row>>;
-  close(): Promise<void>;
+export interface RuntimeDriverInstance<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  readonly familyId: TFamilyId;
+  readonly targetId: TTargetId;
 }
 
-// Postgres driver combines both interfaces
-export type PostgresRuntimeDriver = RuntimeDriverInstance<'postgres'> & SqlDriver;
-```
-
-```typescript
 export interface RuntimeExtensionInstance<
   TFamilyId extends string = string,
   TTargetId extends string = string,
@@ -195,7 +156,13 @@ export interface RuntimeExtensionInstance<
 }
 ```
 
-Family packages define richer interfaces like:
+Families define richer behavior interfaces (e.g., SQL’s AST lowering adapter and SQL driver execution methods). Concrete runtime instances are typically intersections of the identity interface with a family-specific behavior interface:
+
+```ts
+export type PostgresRuntimeDriver = RuntimeDriverInstance<'sql', 'postgres'> & SqlDriver;
+```
+
+Family packages also define richer adapter interfaces, for example:
 
 ```ts
 export interface SqlRuntimeAdapter<TTarget extends string = string>
@@ -205,37 +172,47 @@ export interface SqlRuntimeAdapter<TTarget extends string = string>
 }
 ```
 
+## Where the family fits (and why it is not part of the stack)
+
+This is easy to misread if you come in expecting “family creates the runtime”.
+
+### What the stack represents
+
+The execution stack is a *target-bound* bundle of components:
+
+- target descriptor
+- adapter descriptor
+- optional driver descriptor
+- extension-pack descriptors
+
+Instantiating the stack is straightforward: call `create()` on each descriptor to obtain instances.
+
+### Why the family is not included in the stack
+
+We intentionally keep **family** separate from the stack because:
+
+- Every component already carries `familyId` (and target-bound components carry `targetId`), so storing a separate family in the stack would be redundant.
+- The stack is about *wiring target-bound components*. “Family” is a broader semantic layer that defines how to interpret and execute plans for a given family (e.g., SQL), and it often exists independently of any one target.
+- In current Runtime DX flows, runtime creation is driven by **stack + contract + context**, not by a family instance. Family “instances” may exist, but they are commonly identity-only.
+
+### When a family descriptor is still useful
+
+Some helper APIs accept a `RuntimeFamilyDescriptor` alongside target/adapter/extensions to:
+
+- validate contract requirements against a composition (IDs, required packs)
+- anchor family-specific runtime utilities in shared tooling
+
+But the execution stack itself stays target-bound and does not require a family descriptor to be carried around.
+
 ### Entry points and exports
 
-We standardize execution/runtime-plane entrypoints and default exports:
+Each pack exposes a `./runtime` entrypoint that `export default`s a descriptor implementing the relevant `Runtime*Descriptor` interface (and may export named types for family-specific behavior interfaces).
 
-- Each pack exposes a **runtime-plane entrypoint**:
-  - Family: `@prisma-next/family-sql/runtime`
-  - Target: `@prisma-next/targets-postgres/runtime`
-  - Adapter: `@prisma-next/targets-postgres-adapter/runtime`
-  - Driver: `@prisma-next/targets-postgres-driver/runtime`
-  - Extensions: `@prisma-next/extensions-*/runtime`
-- Each runtime-plane entrypoint:
-  - `export default` a flat descriptor object implementing the appropriate `Runtime*Descriptor` interface
-  - May optionally export named types for family-specific interfaces (e.g. `SqlRuntimeAdapter`)
-
-Descriptors:
-
-- Are **frozen const objects** that implement the descriptor interface
-- Encapsulate a **stateless factory function** `create(...)`
-- Never hold mutable state; lifecycle is a caller concern:
-  - Each `create(...)` call is permitted to create a fresh instance
-  - Callers decide whether to cache instances
-
-Instances:
-
-- Are created via descriptor factories
-- Implement the appropriate family-specific interfaces
-- May be classes or plain objects; class vs object is an implementation detail
+Descriptors are immutable, side-effect-free objects that can be imported freely. `create()` may return a fresh instance; caching/reuse is a caller concern. Instances may be classes or plain objects.
 
 ### Type-level compatibility
 
-We enforce **compile-time compatibility** across the runtime-plane wiring:
+We enforce compile-time compatibility across execution-plane wiring:
 
 - Families, targets, adapters, drivers, extensions are parameterized by `TFamilyId` and `TTargetId` literal types
 - Runtime assembly uses these generics so mis-wiring is a type error:
@@ -245,17 +222,12 @@ We enforce **compile-time compatibility** across the runtime-plane wiring:
   - Runtime values (used for logging, validation, and metadata)
   - Type-level anchors for TS inference and narrowing
 
-### Scope for first phase (execution/runtime plane)
+### Scope for first phase
 
 This ADR covers:
 
-- Cross-family interfaces in core for the **execution/runtime plane**
-- Refactoring and naming alignment for the **SQL family + Postgres target**:
-  - **Core:** `Runtime*Descriptor`, `Runtime*Instance` in `@prisma-next/core-execution-plane`
-  - **SQL family:** `SqlRuntimeAdapter`, SQL runtime family instance
-  - **Postgres target pack:** Postgres runtime target descriptor and instance
-  - **Postgres adapter pack:** Postgres runtime adapter descriptor and instance
-  - **Postgres driver pack:** Postgres runtime driver descriptor and instance
+- Cross-family interfaces in core for the execution plane (`@prisma-next/core-execution-plane`).
+- First implementation pass for SQL + Postgres packs (targets/adapters/drivers/extensions) using the standardized runtime entrypoints.
 
 Non-goals for this ADR:
 
@@ -267,19 +239,19 @@ Non-goals for this ADR:
 
 ### Benefits
 
-- **Consistency**: All runtime-plane participants follow the same descriptor + instance pattern
+- **Consistency**: All execution-plane participants follow the same descriptor + instance pattern
 - **Type safety**: Mis-wiring family/target/adapter/driver/extension becomes a compile-time error
 - **Clear separation**: Descriptors are pure data + factory; instances own state and behavior
 - **Cross-family reuse**: Shared tooling (runtime factories, test harnesses) can rely on a small set of core interfaces
 - **Future-proofing**: Adding new targets/families is a matter of implementing descriptors and instances, not inventing new shapes
-- **Mirror control plane**: Runtime plane pattern mirrors control plane pattern, making the system easier to understand
+- **Mirror control plane**: Execution plane pattern mirrors control plane pattern, making the system easier to understand
 
 ### Risks and mitigations
 
 - **Refactor surface area**: Touching core and multiple packs risks breakage
-  - Mitigation: First phase is limited to runtime plane and the SQL + Postgres stack
+  - Mitigation: First phase is limited to the execution plane and the SQL + Postgres stack
   - Tests that exercise runtime execution, plan execution, and streaming provide guardrails
-- **Control vs runtime drift**: Control and runtime planes might diverge over time
+- **Control vs execution drift**: Control and execution planes might diverge over time
   - Mitigation: This ADR mirrors ADR 151's structure and conventions to minimize drift
 
 ## References

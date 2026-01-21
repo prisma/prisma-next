@@ -119,7 +119,7 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
       extensionPacks: [],
     });
     const stackInstance = instantiateExecutionStack(stack);
-    const context = createExecutionContext({ contract: fixtureContract, stack: stackInstance });
+    const context = createExecutionContext({ contract: fixtureContract, stackInstance });
     const runtime = createRuntime({
       stackInstance,
       contract: fixtureContract,
@@ -198,7 +198,7 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
       extensionPacks: [],
     });
     const stackInstance = instantiateExecutionStack(stack);
-    const context = createExecutionContext({ contract: fixtureContract, stack: stackInstance });
+    const context = createExecutionContext({ contract: fixtureContract, stackInstance });
     const runtime = createRuntime({
       stackInstance,
       contract: fixtureContract,

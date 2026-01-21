@@ -23,7 +23,7 @@ import contractJson from './contract.json' with { type: 'json' };
 const contract = validateContract<Contract>(contractJson);
 const stack = createExecutionStack({ target: postgresTarget, adapter: postgresAdapter, extensionPacks: [] });
 const stackInstance = instantiateExecutionStack(stack);
-const context = createExecutionContext({ contract, stack: stackInstance });
+const context = createExecutionContext({ contract, stackInstance });
 
 export const sql = sqlBuilder<Contract>({ context });
 export const schema = schemaBuilder<Contract>(context);
@@ -208,7 +208,7 @@ import type { Contract } from './contract.d';
 const contract = validateContract<Contract>(contractJson);
 const stack = createExecutionStack({ target: postgresTarget, adapter: postgresAdapter, extensionPacks: [] });
 const stackInstance = instantiateExecutionStack(stack);
-const context = createExecutionContext({ contract, stack: stackInstance });
+const context = createExecutionContext({ contract, stackInstance });
 const o = orm<Contract>({ context });
 
 // Model registry proxy: orm.user(), orm.post(), etc.

@@ -129,7 +129,7 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
     const stackInstance = instantiateExecutionStack(stack);
     const context = createExecutionContext({
       contract: validatedContract,
-      stack: stackInstance,
+      stackInstance,
     });
 
     const runtime = createRuntime({

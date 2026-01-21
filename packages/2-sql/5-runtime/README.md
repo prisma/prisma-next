@@ -53,7 +53,7 @@ const stack = createExecutionStack({
 });
 
 const stackInstance = instantiateExecutionStack(stack);
-const context = createExecutionContext({ contract, stack: stackInstance });
+const context = createExecutionContext({ contract, stackInstance });
 
 const runtime = createRuntime({
   stackInstance,
