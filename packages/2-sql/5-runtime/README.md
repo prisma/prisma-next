@@ -115,6 +115,19 @@ flowchart LR
 
 - [ADR 152 - Execution Plane Descriptors and Instances](../../../../docs/architecture%20docs/adrs/ADR%20152%20-%20Execution%20Plane%20Descriptors%20and%20Instances.md)
 
+## Error Codes
+
+The SQL runtime uses stable error codes for programmatic error handling:
+
+- `RUNTIME.CONTRACT_FAMILY_MISMATCH` — Contract target family differs from runtime family
+- `RUNTIME.CONTRACT_TARGET_MISMATCH` — Contract target differs from stack target descriptor
+- `RUNTIME.MISSING_EXTENSION_PACK` — Contract requires an extension pack not provided in stack
+- `RUNTIME.DUPLICATE_PARAMETERIZED_CODEC` — Multiple extensions registered same parameterized codec
+- `RUNTIME.TYPE_PARAMS_INVALID` — Type parameters fail codec schema validation
+- `RUNTIME.DRIVER_MISSING` — Driver not provided but required for operation
+
+All errors follow the repo's error envelope convention with `code`, `category`, `severity`, and optional `details`.
+
 ## Testing
 
 Unit tests verify:
