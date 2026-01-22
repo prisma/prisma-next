@@ -236,7 +236,7 @@ describe('createRuntime', () => {
     ).toThrow('Driver options provided, but the execution stack has no driver descriptor.');
   });
 
-  it('uses offline driver when stack has driver but driverOptions is undefined', async () => {
+  it('creates runtime in offline mode when driverOptions is undefined', async () => {
     const { stackInstance } = createTestStackInstance();
 
     const runtime = createRuntime({

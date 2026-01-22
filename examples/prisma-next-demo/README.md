@@ -68,7 +68,7 @@ flowchart LR
   StackI --> Context[ExecutionContext]
   Context --> QueryRoots[Query Roots]
   AppConfig[App Config] --> Runtime[Runtime]
-  Stack --> Runtime
+  StackI --> Runtime
   Context --> Runtime
 ```
 
