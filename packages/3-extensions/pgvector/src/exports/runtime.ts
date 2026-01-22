@@ -1,4 +1,3 @@
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
@@ -37,36 +36,27 @@ const parameterizedCodecDescriptors = [
 >;
 
 /**
- * pgvector SQL runtime extension instance.
- * Provides codecs and operations for vector data type and similarity operations.
+ * Creates the codec registry from codec definitions.
+ * Used for static contributions on the descriptor.
  */
-class PgVectorRuntimeExtensionInstance implements SqlRuntimeExtensionInstance<'postgres'> {
-  readonly familyId = 'sql' as const;
-  readonly targetId = 'postgres' as const;
-
-  codecs(): CodecRegistry {
-    const registry = createCodecRegistry();
-    // Register all codecs from codecDefinitions
-    for (const def of Object.values(codecDefinitions)) {
-      registry.register(def.codec);
-    }
-    return registry;
+function createPgvectorCodecRegistry(): CodecRegistry {
+  const registry = createCodecRegistry();
+  for (const def of Object.values(codecDefinitions)) {
+    registry.register(def.codec);
   }
-
-  operations(): ReadonlyArray<SqlOperationSignature> {
-    return [pgvectorRuntimeOperation];
-  }
-
-  parameterizedCodecs(): ReadonlyArray<
-    RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
-  > {
-    return parameterizedCodecDescriptors;
-  }
+  return registry;
 }
 
 /**
  * pgvector SQL runtime extension descriptor.
- * Provides metadata and factory for creating runtime extension instances.
+ * Implements SqlRuntimeExtensionDescriptor with required static contributions.
+ *
+ * The extension contributes:
+ * - codecs: pg/vector@1 codec for vector type
+ * - operations: l2Distance operation for vector similarity search
+ * - parameterizedCodecs: vector params schema for length validation
+ *
+ * The instance is minimal (identity only) - all contributions are on the descriptor.
  */
 const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   kind: 'extension' as const,
@@ -74,8 +64,14 @@ const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   version: pgvectorPackMeta.version,
   familyId: 'sql' as const,
   targetId: 'postgres' as const,
+  codecs: createPgvectorCodecRegistry,
+  operationSignatures: () => [pgvectorRuntimeOperation],
+  parameterizedCodecs: () => parameterizedCodecDescriptors,
   create(): SqlRuntimeExtensionInstance<'postgres'> {
-    return new PgVectorRuntimeExtensionInstance();
+    return {
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+    };
   },
 };
 
