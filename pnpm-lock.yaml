@@ -1372,6 +1372,9 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../../2-sql/4-lanes/relational-core
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../../../2-sql/5-runtime
       '@prisma-next/sql-schema-ir':
         specifier: workspace:*
         version: link:../../../2-sql/1-core/schema-ir
