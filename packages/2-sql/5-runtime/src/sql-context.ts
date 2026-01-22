@@ -1,10 +1,13 @@
 import { checkContractComponentRequirements } from '@prisma-next/contract/framework-components';
 import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
 import type {
+  RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
   RuntimeDriverInstance,
   RuntimeExtensionDescriptor,
   RuntimeExtensionInstance,
+  RuntimeTargetDescriptor,
+  RuntimeTargetInstance,
 } from '@prisma-next/core-execution-plane/types';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from '@prisma-next/runtime-executor';
@@ -56,6 +59,89 @@ export interface RuntimeParameterizedCodecDescriptor<
 }
 
 // ============================================================================
+// SQL Static Contributions Interface
+// ============================================================================
+
+/**
+ * Static contributions surface for SQL runtime-plane descriptors.
+ *
+ * This interface defines the methods that targets, adapters, and extensions
+ * must implement to contribute codecs, operations, and parameterized codec
+ * descriptors to the ExecutionContext.
+ *
+ * All methods are **required** (non-optional). If a descriptor has nothing
+ * to contribute, it returns empty values. This design:
+ * - Ensures consistent API across all descriptor types
+ * - Eliminates null-checking and defaulting in context creation
+ * - Makes contributions explicit and discoverable
+ *
+ * Note: The method is named `operationSignatures()` rather than `operations()`
+ * to avoid conflict with `ComponentMetadata.operations` property inherited from
+ * base descriptor interfaces.
+ */
+export interface SqlStaticContributions {
+  /** Returns codecs to register in the runtime context. */
+  readonly codecs: () => CodecRegistry;
+  /** Returns operation signatures to register in the runtime context. */
+  readonly operationSignatures: () => ReadonlyArray<SqlOperationSignature>;
+  /**
+   * Returns parameterized codec descriptors for type validation and helper creation.
+   * Uses unknown for type parameters to allow any concrete descriptor types.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
+  readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
+}
+
+// ============================================================================
+// SQL Runtime Descriptor Types (extend core types with static contributions)
+// ============================================================================
+
+/**
+ * SQL runtime target descriptor.
+ * Extends RuntimeTargetDescriptor with required static contributions.
+ *
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ * @template TTargetInstance - The target instance type
+ */
+export interface SqlRuntimeTargetDescriptor<
+  TTargetId extends string = string,
+  TTargetInstance extends RuntimeTargetInstance<'sql', TTargetId> = RuntimeTargetInstance<
+    'sql',
+    TTargetId
+  >,
+> extends RuntimeTargetDescriptor<'sql', TTargetId, TTargetInstance>,
+    SqlStaticContributions {}
+
+/**
+ * SQL runtime adapter descriptor.
+ * Extends RuntimeAdapterDescriptor with required static contributions.
+ *
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ * @template TAdapterInstance - The adapter instance type
+ */
+export interface SqlRuntimeAdapterDescriptor<
+  TTargetId extends string = string,
+  TAdapterInstance extends RuntimeAdapterInstance<'sql', TTargetId> = RuntimeAdapterInstance<
+    'sql',
+    TTargetId
+  >,
+> extends RuntimeAdapterDescriptor<'sql', TTargetId, TAdapterInstance>,
+    SqlStaticContributions {}
+
+/**
+ * SQL runtime extension descriptor.
+ * Extends RuntimeExtensionDescriptor with required static contributions.
+ *
+ * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ * @template TExtensionInstance - The extension instance type
+ */
+export interface SqlRuntimeExtensionDescriptor<TTargetId extends string = string>
+  extends RuntimeExtensionDescriptor<'sql', TTargetId, SqlRuntimeExtensionInstance<TTargetId>>,
+    SqlStaticContributions {
+  create(): SqlRuntimeExtensionInstance<TTargetId>;
+}
+
+// ============================================================================
 // SQL Runtime Extension Types
 // ============================================================================
 
@@ -78,17 +164,6 @@ export interface SqlRuntimeExtensionInstance<TTargetId extends string>
    */
   // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
   parameterizedCodecs?(): ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
-}
-
-/**
- * SQL runtime extension descriptor.
- * Extends the framework RuntimeExtensionDescriptor with SQL-specific instance type.
- *
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- */
-export interface SqlRuntimeExtensionDescriptor<TTargetId extends string>
-  extends RuntimeExtensionDescriptor<'sql', TTargetId, SqlRuntimeExtensionInstance<TTargetId>> {
-  create(): SqlRuntimeExtensionInstance<TTargetId>;
 }
 
 // ============================================================================

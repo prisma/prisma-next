@@ -129,40 +129,45 @@ function createStubDriverDescriptor(): RuntimeDriverDescriptor<
 }
 
 function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
+  const registry = createCodecRegistry();
+  registry.register(
+    codec({
+      typeId: 'pg/uuid@1',
+      targetTypes: ['uuid'],
+      encode: (value: string) => value,
+      decode: (wire: string) => wire,
+    }),
+  );
+
+  const operations = [
+    {
+      forTypeId: 'pg/text@1',
+      method: 'example',
+      args: [],
+      returns: { kind: 'builtin' as const, type: 'string' as const },
+      lowering: {
+        targetFamily: 'sql' as const,
+        strategy: 'function' as const,
+        template: 'example({args})',
+      },
+    },
+  ];
+
   return {
     kind: 'extension',
     id: 'test-extension',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    codecs: () => registry,
+    operationSignatures: () => operations,
+    parameterizedCodecs: () => [],
     create(): SqlRuntimeExtensionInstance<'postgres'> {
-      const registry = createCodecRegistry();
-      registry.register(
-        codec({
-          typeId: 'pg/uuid@1',
-          targetTypes: ['uuid'],
-          encode: (value: string) => value,
-          decode: (wire: string) => wire,
-        }),
-      );
-
       return {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
         codecs: () => registry,
-        operations: () => [
-          {
-            forTypeId: 'pg/text@1',
-            method: 'example',
-            args: [],
-            returns: { kind: 'builtin', type: 'string' },
-            lowering: {
-              targetFamily: 'sql',
-              strategy: 'function',
-              template: 'example({args})',
-            },
-          },
-        ],
+        operations: () => operations,
       };
     },
   };

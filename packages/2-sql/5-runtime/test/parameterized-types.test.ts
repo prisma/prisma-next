@@ -117,22 +117,26 @@ describe('parameterized types', () => {
         },
       ];
 
+      const registry = createCodecRegistry();
+      registry.register(
+        codec({
+          typeId: 'pg/vector@1',
+          targetTypes: ['vector'],
+          encode: (v: number[]) => v,
+          decode: (w: number[]) => w,
+        }),
+      );
+
       return {
         kind: 'extension' as const,
         id: 'pgvector',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
+        codecs: () => registry,
+        operationSignatures: () => [],
+        parameterizedCodecs: () => parameterizedCodecs,
         create(): SqlRuntimeExtensionInstance<'postgres'> {
-          const registry = createCodecRegistry();
-          registry.register(
-            codec({
-              typeId: 'pg/vector@1',
-              targetTypes: ['vector'],
-              encode: (v: number[]) => v,
-              decode: (w: number[]) => w,
-            }),
-          );
           return {
             familyId: 'sql' as const,
             targetId: 'postgres' as const,
@@ -233,33 +237,39 @@ describe('parameterized types', () => {
         isVector: true,
       });
 
+      const registry = createCodecRegistry();
+      registry.register(
+        codec({
+          typeId: 'pg/vector@1',
+          targetTypes: ['vector'],
+          encode: (v: number[]) => v,
+          decode: (w: number[]) => w,
+        }),
+      );
+
+      const parameterizedCodecs = [
+        {
+          codecId: 'pg/vector@1',
+          paramsSchema: vectorParamsSchema,
+          init: initFn,
+        },
+      ];
+
       const extensionDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
         kind: 'extension' as const,
         id: 'pgvector',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
+        codecs: () => registry,
+        operationSignatures: () => [],
+        parameterizedCodecs: () => parameterizedCodecs,
         create(): SqlRuntimeExtensionInstance<'postgres'> {
-          const registry = createCodecRegistry();
-          registry.register(
-            codec({
-              typeId: 'pg/vector@1',
-              targetTypes: ['vector'],
-              encode: (v: number[]) => v,
-              decode: (w: number[]) => w,
-            }),
-          );
           return {
             familyId: 'sql' as const,
             targetId: 'postgres' as const,
             codecs: () => registry,
-            parameterizedCodecs: () => [
-              {
-                codecId: 'pg/vector@1',
-                paramsSchema: vectorParamsSchema,
-                init: initFn,
-              },
-            ],
+            parameterizedCodecs: () => parameterizedCodecs,
           };
         },
       };
@@ -289,33 +299,38 @@ describe('parameterized types', () => {
         length: 'number',
       });
 
+      const registry = createCodecRegistry();
+      registry.register(
+        codec({
+          typeId: 'pg/vector@1',
+          targetTypes: ['vector'],
+          encode: (v: number[]) => v,
+          decode: (w: number[]) => w,
+        }),
+      );
+
+      const parameterizedCodecs = [
+        {
+          codecId: 'pg/vector@1',
+          paramsSchema: vectorParamsSchema,
+        },
+      ];
+
       const extensionDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
         kind: 'extension' as const,
         id: 'pgvector',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
+        codecs: () => registry,
+        operationSignatures: () => [],
+        parameterizedCodecs: () => parameterizedCodecs,
         create(): SqlRuntimeExtensionInstance<'postgres'> {
-          const registry = createCodecRegistry();
-          registry.register(
-            codec({
-              typeId: 'pg/vector@1',
-              targetTypes: ['vector'],
-              encode: (v: number[]) => v,
-              decode: (w: number[]) => w,
-            }),
-          );
           return {
             familyId: 'sql' as const,
             targetId: 'postgres' as const,
             codecs: () => registry,
-            parameterizedCodecs: () => [
-              {
-                codecId: 'pg/vector@1',
-                paramsSchema: vectorParamsSchema,
-                // No init hook
-              },
-            ],
+            parameterizedCodecs: () => parameterizedCodecs,
           };
         },
       };
@@ -349,32 +364,38 @@ describe('parameterized types', () => {
         length: 'number',
       });
 
+      const registry = createCodecRegistry();
+      registry.register(
+        codec({
+          typeId: 'pg/vector@1',
+          targetTypes: ['vector'],
+          encode: (v: number[]) => v,
+          decode: (w: number[]) => w,
+        }),
+      );
+
+      const parameterizedCodecs = [
+        {
+          codecId: 'pg/vector@1',
+          paramsSchema: vectorParamsSchema,
+        },
+      ];
+
       const extensionDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
         kind: 'extension' as const,
         id: 'pgvector',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
+        codecs: () => registry,
+        operationSignatures: () => [],
+        parameterizedCodecs: () => parameterizedCodecs,
         create(): SqlRuntimeExtensionInstance<'postgres'> {
-          const registry = createCodecRegistry();
-          registry.register(
-            codec({
-              typeId: 'pg/vector@1',
-              targetTypes: ['vector'],
-              encode: (v: number[]) => v,
-              decode: (w: number[]) => w,
-            }),
-          );
           return {
             familyId: 'sql' as const,
             targetId: 'postgres' as const,
             codecs: () => registry,
-            parameterizedCodecs: () => [
-              {
-                codecId: 'pg/vector@1',
-                paramsSchema: vectorParamsSchema,
-              },
-            ],
+            parameterizedCodecs: () => parameterizedCodecs,
           };
         },
       };
@@ -404,32 +425,38 @@ describe('parameterized types', () => {
         length: 'number',
       });
 
+      const registry = createCodecRegistry();
+      registry.register(
+        codec({
+          typeId: 'pg/vector@1',
+          targetTypes: ['vector'],
+          encode: (v: number[]) => v,
+          decode: (w: number[]) => w,
+        }),
+      );
+
+      const parameterizedCodecs = [
+        {
+          codecId: 'pg/vector@1',
+          paramsSchema: vectorParamsSchema,
+        },
+      ];
+
       const extensionDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
         kind: 'extension' as const,
         id: 'pgvector',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
+        codecs: () => registry,
+        operationSignatures: () => [],
+        parameterizedCodecs: () => parameterizedCodecs,
         create(): SqlRuntimeExtensionInstance<'postgres'> {
-          const registry = createCodecRegistry();
-          registry.register(
-            codec({
-              typeId: 'pg/vector@1',
-              targetTypes: ['vector'],
-              encode: (v: number[]) => v,
-              decode: (w: number[]) => w,
-            }),
-          );
           return {
             familyId: 'sql' as const,
             targetId: 'postgres' as const,
             codecs: () => registry,
-            parameterizedCodecs: () => [
-              {
-                codecId: 'pg/vector@1',
-                paramsSchema: vectorParamsSchema,
-              },
-            ],
+            parameterizedCodecs: () => parameterizedCodecs,
           };
         },
       };
@@ -475,22 +502,27 @@ describe('parameterized types', () => {
       });
 
       function createVectorExtension(id: string): SqlRuntimeExtensionDescriptor<'postgres'> {
+        const parameterizedCodecs = [
+          {
+            codecId: 'pg/vector@1',
+            paramsSchema: vectorParamsSchema,
+          },
+        ];
+
         return {
           kind: 'extension' as const,
           id,
           version: '0.0.1',
           familyId: 'sql' as const,
           targetId: 'postgres' as const,
+          codecs: () => createCodecRegistry(),
+          operationSignatures: () => [],
+          parameterizedCodecs: () => parameterizedCodecs,
           create(): SqlRuntimeExtensionInstance<'postgres'> {
             return {
               familyId: 'sql' as const,
               targetId: 'postgres' as const,
-              parameterizedCodecs: () => [
-                {
-                  codecId: 'pg/vector@1',
-                  paramsSchema: vectorParamsSchema,
-                },
-              ],
+              parameterizedCodecs: () => parameterizedCodecs,
             };
           },
         };

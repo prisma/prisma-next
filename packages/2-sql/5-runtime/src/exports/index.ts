@@ -16,10 +16,13 @@ export { lowerSqlPlan } from '../lower-sql-plan';
 export type {
   ExecutionContext,
   RuntimeParameterizedCodecDescriptor,
+  SqlRuntimeAdapterDescriptor,
   SqlRuntimeAdapterInstance,
   SqlRuntimeDriverInstance,
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeExtensionInstance,
+  SqlRuntimeTargetDescriptor,
+  SqlStaticContributions,
   TypeHelperRegistry,
 } from '../sql-context';
 export { createExecutionContext } from '../sql-context';

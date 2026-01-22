@@ -99,9 +99,9 @@ function createTestExtensionDescriptor(options?: {
 }): SqlRuntimeExtensionDescriptor<'postgres'> {
   const { hasCodecs = false, hasOperations = false } = options ?? {};
 
-  // Build the codecs function if needed
-  const codecsFn = hasCodecs
-    ? () => {
+  // Build the codecs registry if needed
+  const codecRegistry = hasCodecs
+    ? (() => {
         const registry = createCodecRegistry();
         registry.register(
           codec({
@@ -112,21 +112,25 @@ function createTestExtensionDescriptor(options?: {
           }),
         );
         return registry;
-      }
-    : undefined;
+      })()
+    : createCodecRegistry();
 
-  // Build the operations function if needed
-  const operationsFn = hasOperations
-    ? (): ReadonlyArray<SqlOperationSignature> => [
+  // Build the operations array if needed
+  const operationsArray: ReadonlyArray<SqlOperationSignature> = hasOperations
+    ? [
         {
           forTypeId: 'test/ext@1',
           method: 'testOp',
           args: [],
-          returns: { kind: 'builtin', type: 'number' },
-          lowering: { targetFamily: 'sql', strategy: 'function', template: 'test()' },
+          returns: { kind: 'builtin' as const, type: 'number' as const },
+          lowering: {
+            targetFamily: 'sql' as const,
+            strategy: 'function' as const,
+            template: 'test()',
+          },
         },
       ]
-    : undefined;
+    : [];
 
   return {
     kind: 'extension' as const,
@@ -134,18 +138,20 @@ function createTestExtensionDescriptor(options?: {
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    codecs: () => codecRegistry,
+    operationSignatures: () => operationsArray,
+    parameterizedCodecs: () => [],
     create(): SqlRuntimeExtensionInstance<'postgres'> {
-      // Return object with optional methods only if they exist
       const instance: SqlRuntimeExtensionInstance<'postgres'> = {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
       };
-      if (codecsFn) {
-        (instance as { codecs?: () => CodecRegistry }).codecs = codecsFn;
+      if (hasCodecs) {
+        (instance as { codecs?: () => CodecRegistry }).codecs = () => codecRegistry;
       }
-      if (operationsFn) {
-        (instance as { operations?: () => ReadonlyArray<SqlOperationSignature> }).operations =
-          operationsFn;
+      if (hasOperations) {
+        (instance as { operations?: () => ReadonlyArray<SqlOperationSignature> }).operations = () =>
+          operationsArray;
       }
       return instance;
     },
