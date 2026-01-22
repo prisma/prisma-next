@@ -12,8 +12,6 @@ import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
 
-export { getRuntime } from '../../src/prisma/runtime';
-
 export interface TestControlClientOptions {
   readonly connection: string;
 }
