@@ -8,4 +8,3 @@ export {
   extractExtensionIds,
   extractOperationTypeImports,
 } from '../core/assembly';
-export { convertOperationManifest } from '../core/control-instance';

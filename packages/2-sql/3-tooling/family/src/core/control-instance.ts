@@ -1,15 +1,11 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
-  ControlAdapterDescriptor,
   ControlDriverInstance,
-  ControlExtensionDescriptor,
   ControlFamilyInstance,
-  ControlTargetDescriptor,
   EmitContractResult,
   OperationContext,
   SignDatabaseResult,
@@ -20,7 +16,6 @@ import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -35,54 +30,15 @@ import {
   extractOperationTypeImports,
   extractParameterizedRenderers,
   extractParameterizedTypeImports,
+  type SqlControlDescriptorWithContributions,
 } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
+import type {
+  SqlControlAdapterDescriptor,
+  SqlControlExtensionDescriptor,
+} from './migrations/types';
 import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
-
-/**
- * Converts an OperationManifest (descriptor declarative data) to a SqlOperationSignature.
- * This is SQL-family-specific conversion logic used by instance creation and test utilities.
- */
-export function convertOperationManifest(manifest: OperationManifest): SqlOperationSignature {
-  return {
-    forTypeId: manifest.for,
-    method: manifest.method,
-    args: manifest.args.map((arg: OperationManifest['args'][number]) => {
-      if (arg.kind === 'typeId') {
-        if (!arg.type) {
-          throw new Error('typeId arg must have type property');
-        }
-        return { kind: 'typeId' as const, type: arg.type };
-      }
-      if (arg.kind === 'param') {
-        return { kind: 'param' as const };
-      }
-      if (arg.kind === 'literal') {
-        return { kind: 'literal' as const };
-      }
-      throw new Error(`Invalid arg kind: ${(arg as { kind: unknown }).kind}`);
-    }),
-    returns: (() => {
-      if (manifest.returns.kind === 'typeId') {
-        return { kind: 'typeId' as const, type: manifest.returns.type };
-      }
-      if (manifest.returns.kind === 'builtin') {
-        return {
-          kind: 'builtin' as const,
-          type: manifest.returns.type as 'number' | 'boolean' | 'string',
-        };
-      }
-      throw new Error(`Invalid return kind: ${(manifest.returns as { kind: unknown }).kind}`);
-    })(),
-    lowering: {
-      targetFamily: 'sql',
-      strategy: manifest.lowering.strategy,
-      template: manifest.lowering.template,
-    },
-    ...(manifest.capabilities ? { capabilities: manifest.capabilities } : {}),
-  };
-}
 
 /**
  * Extracts codec type IDs used in contract storage tables.
@@ -329,10 +285,14 @@ export interface SqlControlFamilyInstance
  */
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
+/**
+ * Options for creating a SQL family instance.
+ * All descriptors must implement SqlControlStaticContributions (provide operationSignatures()).
+ */
 interface CreateSqlFamilyInstanceOptions<TTargetId extends string> {
-  readonly target: ControlTargetDescriptor<'sql', TTargetId>;
-  readonly adapter: ControlAdapterDescriptor<'sql', TTargetId>;
-  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', TTargetId>[];
+  readonly target: SqlControlDescriptorWithContributions;
+  readonly adapter: SqlControlAdapterDescriptor<TTargetId>;
+  readonly extensionPacks: readonly SqlControlExtensionDescriptor<TTargetId>[];
 }
 
 function isSqlControlAdapter<TTargetId extends string>(
@@ -347,6 +307,25 @@ function isSqlControlAdapter<TTargetId extends string>(
 }
 
 /**
+ * Descriptor with storage types for type metadata extraction.
+ */
+interface DescriptorWithStorageTypes {
+  readonly targetId?: string | undefined;
+  readonly types?:
+    | {
+        readonly storage?:
+          | ReadonlyArray<{
+              readonly typeId: string;
+              readonly familyId: string;
+              readonly targetId: string;
+              readonly nativeType?: string | undefined;
+            }>
+          | undefined;
+      }
+    | undefined;
+}
+
+/**
  * Builds a SQL type metadata registry from extension pack manifests.
  * Collects type metadata from target, adapter, and extension pack manifests.
  *
@@ -354,9 +333,9 @@ function isSqlControlAdapter<TTargetId extends string>(
  * @returns Registry mapping type IDs to their metadata, filtered by targetId
  */
 function buildSqlTypeMetadataRegistry(options: {
-  readonly target: ControlTargetDescriptor<'sql', string>;
-  readonly adapter: ControlAdapterDescriptor<'sql', string>;
-  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', string>[];
+  readonly target: DescriptorWithStorageTypes;
+  readonly adapter: DescriptorWithStorageTypes & { readonly targetId: string };
+  readonly extensionPacks: readonly DescriptorWithStorageTypes[];
 }): SqlTypeMetadataRegistry {
   const { target, adapter, extensionPacks: extensions } = options;
   const registry = new Map<string, SqlTypeMetadata>();
@@ -403,11 +382,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const { target, adapter, extensionPacks: extensions = [] } = options;
 
   // Build descriptors array for assembly
-  // Assembly functions only use manifest and id, so we can pass Control*Descriptor types directly
-  const descriptors = [target, adapter, ...extensions];
+  // All descriptors must implement SqlControlStaticContributions
+  const descriptors: SqlControlDescriptorWithContributions[] = [target, adapter, ...extensions];
 
   // Assemble operation registry, type imports, extension IDs, and parameterized renderers
-  const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+  const operationRegistry = assembleOperationRegistry(descriptors);
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
   const extensionIds = extractExtensionIds(adapter, target, extensions);
@@ -415,10 +394,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const parameterizedTypeImports = extractParameterizedTypeImports(descriptors);
 
   // Build type metadata registry from manifests
+  // Cast descriptors to satisfy structural typing requirements
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
-    target,
-    adapter,
-    extensionPacks: extensions,
+    target: target as DescriptorWithStorageTypes,
+    adapter: adapter as DescriptorWithStorageTypes & { readonly targetId: string },
+    extensionPacks: extensions as readonly DescriptorWithStorageTypes[],
   });
 
   /**
@@ -489,11 +469,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       // Compute codec coverage (optional)
       let missingCodecs: readonly string[] | undefined;
       let codecCoverageSkipped = false;
-      const supportedTypeIds = collectSupportedCodecTypeIds<'sql', string>([
-        adapter,
-        target,
-        ...extensions,
-      ]);
+      const supportedTypeIds = collectSupportedCodecTypeIds([adapter, target, ...extensions]);
       if (supportedTypeIds.length === 0) {
         // Helper is present but returns empty (MVP behavior)
         // Coverage check is skipped - missingCodecs remains undefined

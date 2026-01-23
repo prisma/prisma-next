@@ -4,21 +4,10 @@ import type {
   TypeRenderer,
 } from '@prisma-next/contract/framework-components';
 import { normalizeRenderer } from '@prisma-next/contract/framework-components';
-import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { TypesImportSpec } from '@prisma-next/contract/types';
-import type {
-  ControlAdapterDescriptor,
-  ControlExtensionDescriptor,
-  ControlTargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
-import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
+import type { OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
-import type { CodecControlHooks } from './migrations/types';
-
-type SqlControlDescriptor =
-  | ControlTargetDescriptor<'sql', string>
-  | ControlAdapterDescriptor<'sql', string>
-  | ControlExtensionDescriptor<'sql', string>;
+import type { CodecControlHooks, SqlControlStaticContributions } from './migrations/types';
 
 function addUniqueId(ids: string[], seen: Set<string>, id: string): void {
   if (!seen.has(id)) {
@@ -48,20 +37,33 @@ function assertUniqueCodecOwner(options: {
 // Operation Registry Assembly
 // ============================================================================
 /**
- * Assembles an operation registry from descriptors (adapter, target, extensions).
- * Loops over descriptors, extracts operations, converts them using the provided
- * conversion function, and registers them in a new registry.
+ * Descriptor type that provides static contributions for SQL control plane assembly.
+ * Includes component identity (id, types) plus required operationSignatures() method.
+ */
+export interface SqlControlDescriptorWithContributions extends SqlControlStaticContributions {
+  readonly id: string;
+  readonly types?: {
+    readonly codecTypes?: {
+      readonly import?: TypesImportSpec;
+      readonly parameterized?: Record<string, TypeRenderer>;
+      readonly typeImports?: ReadonlyArray<TypesImportSpec>;
+    };
+    readonly operationTypes?: { readonly import: TypesImportSpec };
+  };
+}
+
+/**
+ * Assembles an operation registry from descriptors with static contributions.
+ * Loops over descriptors, calls operationSignatures(), and registers them in a new registry.
  */
 export function assembleOperationRegistry(
-  descriptors: ReadonlyArray<SqlControlDescriptor>,
-  convertOperationManifest: (manifest: OperationManifest) => OperationSignature,
+  descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
 ): OperationRegistry {
   const registry = createOperationRegistry();
 
   for (const descriptor of descriptors) {
-    const operations = descriptor.operations ?? [];
-    for (const operationManifest of operations as ReadonlyArray<OperationManifest>) {
-      const signature = convertOperationManifest(operationManifest);
+    const signatures = descriptor.operationSignatures();
+    for (const signature of signatures) {
       registry.register(signature);
     }
   }
@@ -73,10 +75,26 @@ export function assembleOperationRegistry(
 // Type Import Extraction
 // ============================================================================
 /**
+ * Descriptor shape for type extraction functions.
+ * Only requires the fields used for type imports and metadata.
+ */
+interface DescriptorWithTypes {
+  readonly id: string;
+  readonly types?: {
+    readonly codecTypes?: {
+      readonly import?: TypesImportSpec;
+      readonly parameterized?: Record<string, TypeRenderer>;
+      readonly typeImports?: ReadonlyArray<TypesImportSpec>;
+    };
+    readonly operationTypes?: { readonly import: TypesImportSpec };
+  };
+}
+
+/**
  * Extracts codec type imports from descriptors for contract.d.ts generation.
  */
 export function extractCodecTypeImports(
-  descriptors: ReadonlyArray<SqlControlDescriptor>,
+  descriptors: ReadonlyArray<DescriptorWithTypes>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -98,7 +116,7 @@ export function extractCodecTypeImports(
  * Extracts operation type imports from descriptors for contract.d.ts generation.
  */
 export function extractOperationTypeImports(
-  descriptors: ReadonlyArray<SqlControlDescriptor>,
+  descriptors: ReadonlyArray<DescriptorWithTypes>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -122,9 +140,9 @@ export function extractOperationTypeImports(
  * Deduplicates while preserving stable order.
  */
 export function extractExtensionIds(
-  adapter: ControlAdapterDescriptor<'sql', string>,
-  target: ControlTargetDescriptor<'sql', string>,
-  extensions: ReadonlyArray<ControlExtensionDescriptor<'sql', string>>,
+  adapter: { readonly id: string },
+  target: { readonly id: string },
+  extensions: ReadonlyArray<{ readonly id: string }>,
 ): ReadonlyArray<string> {
   const ids: string[] = [];
   const seen = new Set<string>();
@@ -156,7 +174,7 @@ export function extractExtensionIds(
  * @returns Map from codecId to normalized renderer
  */
 export function extractParameterizedRenderers(
-  descriptors: ReadonlyArray<SqlControlDescriptor>,
+  descriptors: ReadonlyArray<DescriptorWithTypes>,
 ): Map<string, NormalizedTypeRenderer> {
   const renderers = new Map<string, NormalizedTypeRenderer>();
   // Codec owner: the single descriptor allowed to define a codecId renderer or hooks.
@@ -254,7 +272,7 @@ export function extractCodecControlHooks(
  * @returns Array of type import specs (may contain duplicates; caller should deduplicate)
  */
 export function extractParameterizedTypeImports(
-  descriptors: ReadonlyArray<SqlControlDescriptor>,
+  descriptors: ReadonlyArray<DescriptorWithTypes>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
