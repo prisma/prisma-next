@@ -7,6 +7,7 @@
 
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type {
+  ControlAdapterDescriptor,
   ControlDriverInstance,
   ControlExtensionDescriptor,
   ControlTargetDescriptor,
@@ -24,11 +25,33 @@ import type {
   SchemaIssue,
 } from '@prisma-next/core-control-plane/types';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../control-instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
+
+// ============================================================================
+// SQL Control Static Contributions
+// ============================================================================
+
+/**
+ * Static contributions surface for SQL control-plane descriptors.
+ *
+ * This interface defines the required method for contributing operation signatures
+ * to the operation registry during control-plane assembly.
+ *
+ * All methods are **required** (non-optional). If a descriptor has nothing
+ * to contribute, it returns empty arrays. This design:
+ * - Ensures consistent API across all descriptor types
+ * - Eliminates null-checking and defaulting in assembly code
+ * - Makes contributions explicit and discoverable
+ */
+export interface SqlControlStaticContributions {
+  /** Returns operation signatures to register in the operation registry. */
+  readonly operationSignatures: () => ReadonlyArray<SqlOperationSignature>;
+}
 
 // ============================================================================
 // Component Database Dependencies
@@ -127,17 +150,32 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
 // ============================================================================
 
 /**
- * SQL-specific extension descriptor with optional database dependencies.
+ * SQL-specific extension descriptor with required static contributions and optional database dependencies.
  * Extends the core ControlExtensionDescriptor with SQL-specific metadata.
  *
  * Database dependencies are attached to the descriptor (not the instance) because
  * they are declarative metadata that planner/verifier need without constructing instances.
+ *
+ * Static contributions (operationSignatures) are required and must return an array
+ * (empty if no contributions). This eliminates null-checking in assembly code.
  */
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
-  extends ControlExtensionDescriptor<'sql', TTargetId> {
+  extends ControlExtensionDescriptor<'sql', TTargetId>,
+    SqlControlStaticContributions {
   /** Optional database dependencies this extension requires. */
   readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
 }
+
+/**
+ * SQL-specific adapter descriptor with required static contributions.
+ * Extends ControlAdapterDescriptor with operation signatures method.
+ *
+ * Static contributions (operationSignatures) are required and must return an array
+ * (empty if no contributions). This eliminates null-checking in assembly code.
+ */
+export interface SqlControlAdapterDescriptor<TTargetId extends string>
+  extends ControlAdapterDescriptor<'sql', TTargetId>,
+    SqlControlStaticContributions {}
 
 // ============================================================================
 // SQL-Specific Plan Types
@@ -383,16 +421,20 @@ export interface SqlMigrationRunner<TTargetDetails> {
 // ============================================================================
 
 /**
- * SQL control target descriptor with migration support.
+ * SQL control target descriptor with migration support and required static contributions.
  * Extends the core ControlTargetDescriptor with SQL-specific migration methods.
+ *
+ * Static contributions (operationSignatures) are required and must return an array
+ * (empty if no contributions). This eliminates null-checking in assembly code.
  */
 export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDetails>
   extends ControlTargetDescriptor<
-    'sql',
-    TTargetId,
-    ControlTargetInstance<'sql', TTargetId>,
-    SqlControlFamilyInstance
-  > {
+      'sql',
+      TTargetId,
+      ControlTargetInstance<'sql', TTargetId>,
+      SqlControlFamilyInstance
+    >,
+    SqlControlStaticContributions {
   /**
    * Creates a SQL migration planner for this target.
    * Direct method for SQL-specific usage.

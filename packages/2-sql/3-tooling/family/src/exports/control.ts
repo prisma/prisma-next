@@ -12,6 +12,7 @@ export type {
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
 export { extractCodecControlHooks } from '../core/assembly';
+export type { SqlControlDescriptorWithContributions } from '../core/assembly';
 export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/control-instance';
 export {
   createMigrationPlan,
@@ -27,7 +28,9 @@ export type {
   ComponentDatabaseDependencies,
   ComponentDatabaseDependency,
   CreateSqlMigrationPlanOptions,
+  SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
+  SqlControlStaticContributions,
   SqlControlTargetDescriptor,
   SqlMigrationPlan,
   SqlMigrationPlanContractInfo,
