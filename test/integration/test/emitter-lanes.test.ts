@@ -7,7 +7,6 @@ import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
 import {
   assembleOperationRegistry,
-  convertOperationManifest,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
@@ -103,7 +102,7 @@ describe('emitter → lanes integration', () => {
         extensions: extensionDescriptors,
         descriptors,
       } = getSqlDescriptorBundle();
-      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractExtensionIds(
@@ -212,7 +211,7 @@ describe('emitter → lanes integration', () => {
       extensions: extensionDescriptors,
       descriptors,
     } = getSqlDescriptorBundle();
-    const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+    const operationRegistry = assembleOperationRegistry(descriptors);
     const codecTypeImports = extractCodecTypeImports(descriptors);
     const operationTypeImports = extractOperationTypeImports(descriptors);
     const extensionIds = extractExtensionIds(
@@ -300,7 +299,7 @@ describe('emitter → lanes integration', () => {
       extensions: extensionDescriptors,
       descriptors,
     } = getSqlDescriptorBundle();
-    const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+    const operationRegistry = assembleOperationRegistry(descriptors);
     const codecTypeImports = extractCodecTypeImports(descriptors);
     const operationTypeImports = extractOperationTypeImports(descriptors);
     const extensionIds = extractExtensionIds(
@@ -326,10 +325,7 @@ describe('emitter → lanes integration', () => {
     // Intentionally load extension packs independently a second time to ensure
     // the emit -> validate -> re-emit flow produces consistent results
     const descriptorsBundle2 = getSqlDescriptorBundle();
-    const operationRegistry2 = assembleOperationRegistry(
-      descriptorsBundle2.descriptors,
-      convertOperationManifest,
-    );
+    const operationRegistry2 = assembleOperationRegistry(descriptorsBundle2.descriptors);
     const codecTypeImports2 = extractCodecTypeImports(descriptorsBundle2.descriptors);
     const operationTypeImports2 = extractOperationTypeImports(descriptorsBundle2.descriptors);
     const extensionIds2 = extractExtensionIds(

@@ -310,32 +310,37 @@ describe('DML builders', () => {
     });
 
     const adapterWithOps = createStubAdapter();
-    // Create a mock extension descriptor for testing (cast to satisfy type constraints)
-    const mockVectorExtensionDescriptor = {
-      kind: 'extension' as const,
-      id: 'mock-vector-ext',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create: () => ({
+    // Create a mock extension descriptor for testing with required static contributions
+    // Operation signature for cosineDistance
+    const cosineDistanceOp = {
+      forTypeId: 'pg/vector@1' as const,
+      method: 'cosineDistance' as const,
+      args: [{ kind: 'param' as const }] as const,
+      returns: { kind: 'builtin' as const, type: 'number' as const },
+      lowering: {
+        targetFamily: 'sql' as const,
+        strategy: 'infix' as const,
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} <=> ${arg0}',
+      },
+    };
+    const mockVectorExtensionDescriptor: import('@prisma-next/sql-runtime').SqlRuntimeExtensionDescriptor<'postgres'> =
+      {
+        kind: 'extension' as const,
+        id: 'mock-vector-ext',
+        version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        operations: () => [
-          {
-            forTypeId: 'pg/vector@1',
-            method: 'cosineDistance',
-            args: [{ kind: 'param' as const }],
-            returns: { kind: 'builtin' as const, type: 'number' },
-            lowering: {
-              targetFamily: 'sql',
-              strategy: 'infix',
-              // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
-              template: '${self} <=> ${arg0}',
-            },
-          },
-        ],
-      }),
-    } as import('@prisma-next/sql-runtime').SqlRuntimeExtensionDescriptor<'postgres'>;
+        codecs: () => createCodecRegistry(),
+        operationSignatures: () => [cosineDistanceOp],
+        parameterizedCodecs: () => [],
+        create: () => ({
+          familyId: 'sql' as const,
+          targetId: 'postgres' as const,
+          // Provide operations on the instance as well (required by createExecutionContext)
+          operations: () => [cosineDistanceOp],
+        }),
+      };
     const contextWithOps = createTestContext(contractWithVector, adapterWithOps, {
       extensionPacks: [mockVectorExtensionDescriptor],
     });

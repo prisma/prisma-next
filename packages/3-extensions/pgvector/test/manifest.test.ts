@@ -29,14 +29,12 @@ describe('pgvector descriptor', () => {
     });
   });
 
-  it('has cosineDistance operation', () => {
-    const operations = pgvectorExtensionDescriptor.operations;
-    expect(operations).toBeDefined();
-    expect(operations?.length).toBeGreaterThan(0);
+  it('has cosineDistance operation via operationSignatures()', () => {
+    const operations = pgvectorExtensionDescriptor.operationSignatures();
+    expect(operations.length).toBeGreaterThan(0);
 
-    const cosineDistanceOp = operations?.find(
-      (op: { for: string; method: string }) =>
-        op.for === 'pg/vector@1' && op.method === 'cosineDistance',
+    const cosineDistanceOp = operations.find(
+      (op) => op.forTypeId === 'pg/vector@1' && op.method === 'cosineDistance',
     );
 
     expect(cosineDistanceOp).toBeDefined();

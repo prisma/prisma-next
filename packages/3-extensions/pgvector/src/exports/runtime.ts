@@ -53,10 +53,11 @@ function createPgvectorCodecRegistry(): CodecRegistry {
  *
  * The extension contributes:
  * - codecs: pg/vector@1 codec for vector type
- * - operations: l2Distance operation for vector similarity search
+ * - operations: cosineDistance operation for vector similarity search
  * - parameterizedCodecs: vector params schema for length validation
  *
- * The instance is minimal (identity only) - all contributions are on the descriptor.
+ * Static contributions are available on both the descriptor and the instance
+ * for backwards compatibility with createExecutionContext.
  */
 const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   kind: 'extension' as const,
@@ -71,6 +72,10 @@ const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
     return {
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
+      // Provide codecs and operations on instance for backwards compatibility
+      // with createExecutionContext which reads from instances
+      codecs: createPgvectorCodecRegistry,
+      operations: () => [pgvectorOperationSignature],
     };
   },
 };

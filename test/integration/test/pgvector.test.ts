@@ -1,7 +1,6 @@
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import {
   assembleOperationRegistry,
-  convertOperationManifest,
   extractCodecTypeImports,
   extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
@@ -62,7 +61,7 @@ describe('pgvector extension pack integration', () => {
       extensions: [pgvectorExtensionDescriptor],
     });
 
-    const registry = assembleOperationRegistry(descriptors, convertOperationManifest);
+    const registry = assembleOperationRegistry(descriptors);
 
     const operations = registry.byType('pg/vector@1');
     expect(operations.length).toBe(1);
