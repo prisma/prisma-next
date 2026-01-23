@@ -10,7 +10,8 @@ import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
 import { executionContext, executionStackInstance } from '../src/prisma/execution-context';
-import { getRuntime, initTestDatabase } from './utils/control-client';
+import { getRuntime } from '../src/prisma/runtime';
+import { initTestDatabase } from './utils/control-client';
 
 const { contract } = executionContext;
 

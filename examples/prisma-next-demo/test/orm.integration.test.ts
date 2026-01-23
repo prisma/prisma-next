@@ -5,7 +5,8 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { executionContext } from '../src/prisma/execution-context';
-import { getRuntime, initTestDatabase } from './utils/control-client';
+import { getRuntime } from '../src/prisma/runtime';
+import { initTestDatabase } from './utils/control-client';
 
 const { contract } = executionContext;
 
