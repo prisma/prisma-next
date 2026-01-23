@@ -13,7 +13,6 @@ export type {
   Expr,
   FieldType,
   GenerateContractTypesOptions,
-  OperationManifest,
   ParamDescriptor,
   ParameterizedCodecDescriptor,
   PlanMeta,

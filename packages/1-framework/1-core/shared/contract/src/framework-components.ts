@@ -1,4 +1,4 @@
-import type { OperationManifest, RenderTypeContext, TypesImportSpec } from './types';
+import type { RenderTypeContext, TypesImportSpec } from './types';
 
 // ============================================================================
 // Type Renderer Types (for parameterized codec emission)
@@ -196,6 +196,10 @@ export function normalizeRenderer(codecId: string, renderer: TypeRenderer): Norm
 /**
  * Declarative fields that describe component metadata.
  * These fields are owned directly by descriptors (not nested under a manifest).
+ *
+ * Note: Operations are NOT included in component metadata. Operations with lowering
+ * (like SQL operations) are family-owned and contributed via family-specific descriptor
+ * methods (e.g., `operationSignatures()` for SQL descriptors).
  */
 export interface ComponentMetadata {
   /** Component version (semver) */
@@ -250,9 +254,6 @@ export interface ComponentMetadata {
       readonly nativeType?: string;
     }>;
   };
-
-  /** Operation manifests for building operation registries */
-  readonly operations?: ReadonlyArray<OperationManifest>;
 }
 
 /**
