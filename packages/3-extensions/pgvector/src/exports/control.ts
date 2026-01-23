@@ -4,7 +4,7 @@ import type {
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { pgvectorPackMeta } from '../core/descriptor-meta';
+import { pgvectorOperationSignature, pgvectorPackMeta } from '../core/descriptor-meta';
 
 /**
  * Pure verification hook: checks whether the 'vector' extension is installed
@@ -66,10 +66,11 @@ const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
 
 /**
  * pgvector extension descriptor for CLI config.
- * Declares database dependencies for the 'vector' Postgres extension.
+ * Implements SqlControlExtensionDescriptor with required operationSignatures().
  */
 const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   ...pgvectorPackMeta,
+  operationSignatures: () => [pgvectorOperationSignature],
   databaseDependencies: pgvectorDatabaseDependencies,
   create: () => ({
     familyId: 'sql' as const,
