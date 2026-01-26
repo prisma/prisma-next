@@ -223,31 +223,56 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
         columnStatus = 'fail';
       }
 
-      // Compare column default (additive semantics: missing contract default is OK, missing schema default is not)
-      // If the contract specifies a default, we expect the database to have one too.
-      // We don't compare the exact default expression since different DBs represent defaults differently.
-      if (contractColumn.default && !schemaColumn.default) {
-        // Contract expects a default but database doesn't have one
-        const defaultDescription = describeColumnDefault(contractColumn.default);
-        issues.push({
-          kind: 'default_missing',
-          table: tableName,
-          column: columnName,
-          expected: defaultDescription,
-          message: `Column "${tableName}"."${columnName}" should have default ${defaultDescription} but database has no default`,
-        });
-        columnChildren.push({
-          status: 'fail',
-          kind: 'default',
-          name: 'default',
-          contractPath: `${columnPath}.default`,
-          code: 'default_missing',
-          message: `Default missing: expected ${defaultDescription}`,
-          expected: defaultDescription,
-          actual: undefined,
-          children: [],
-        });
-        columnStatus = 'fail';
+      // Compare column defaults semantically
+      // Both contract and schema now use the same ColumnDefault type for proper comparison
+      if (contractColumn.default) {
+        if (!schemaColumn.default) {
+          // Contract expects a default but database doesn't have one
+          const defaultDescription = describeColumnDefault(contractColumn.default);
+          issues.push({
+            kind: 'default_missing',
+            table: tableName,
+            column: columnName,
+            expected: defaultDescription,
+            message: `Column "${tableName}"."${columnName}" should have default ${defaultDescription} but database has no default`,
+          });
+          columnChildren.push({
+            status: 'fail',
+            kind: 'default',
+            name: 'default',
+            contractPath: `${columnPath}.default`,
+            code: 'default_missing',
+            message: `Default missing: expected ${defaultDescription}`,
+            expected: defaultDescription,
+            actual: undefined,
+            children: [],
+          });
+          columnStatus = 'fail';
+        } else if (!columnDefaultsEqual(contractColumn.default, schemaColumn.default)) {
+          // Both have defaults but they differ
+          const expectedDescription = describeColumnDefault(contractColumn.default);
+          const actualDescription = describeColumnDefault(schemaColumn.default);
+          issues.push({
+            kind: 'default_mismatch',
+            table: tableName,
+            column: columnName,
+            expected: expectedDescription,
+            actual: actualDescription,
+            message: `Column "${tableName}"."${columnName}" has default mismatch: expected ${expectedDescription}, got ${actualDescription}`,
+          });
+          columnChildren.push({
+            status: 'fail',
+            kind: 'default',
+            name: 'default',
+            contractPath: `${columnPath}.default`,
+            code: 'default_mismatch',
+            message: `Default mismatch: expected ${expectedDescription}, got ${actualDescription}`,
+            expected: expectedDescription,
+            actual: actualDescription,
+            children: [],
+          });
+          columnStatus = 'fail';
+        }
       }
 
       // Compute column status from children (fail > warn > pass)
@@ -625,4 +650,23 @@ function describeColumnDefault(columnDefault: ColumnDefault): string {
     case 'function':
       return columnDefault.expression;
   }
+}
+
+/**
+ * Compares two ColumnDefault values for semantic equality.
+ * Both must have the same kind and matching value/expression.
+ */
+function columnDefaultsEqual(a: ColumnDefault, b: ColumnDefault): boolean {
+  if (a.kind !== b.kind) {
+    return false;
+  }
+  if (a.kind === 'literal' && b.kind === 'literal') {
+    return a.value === b.value;
+  }
+  if (a.kind === 'function' && b.kind === 'function') {
+    // Normalize function expressions for comparison (case-insensitive, whitespace-tolerant)
+    const normalizeExpr = (expr: string) => expr.toLowerCase().replace(/\s+/g, '');
+    return normalizeExpr(a.expression) === normalizeExpr(b.expression);
+  }
+  return false;
 }

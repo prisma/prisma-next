@@ -5,6 +5,8 @@
  * for the SQL family, used for verification and future migration planning.
  */
 
+import type { ColumnDefault } from '@prisma-next/contract/types';
+
 /**
  * Primary key definition matching ContractIR format.
  * Defined here to avoid circular dependency with sql-contract.
@@ -29,7 +31,7 @@ export type SqlColumnIR = {
   readonly name: string;
   readonly nativeType: string; // explicit DB type, e.g. 'integer', 'vector'
   readonly nullable: boolean;
-  readonly default?: string; // Raw default expression from database (e.g., 'nextval(...)', 'now()')
+  readonly default?: ColumnDefault; // Normalized default value (parsed from database)
   readonly annotations?: SqlAnnotations; // column-level metadata
 };
 

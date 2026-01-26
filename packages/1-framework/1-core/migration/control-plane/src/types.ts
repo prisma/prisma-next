@@ -405,7 +405,8 @@ export interface SchemaIssue {
     | 'unique_constraint_mismatch'
     | 'index_mismatch'
     | 'extension_missing'
-    | 'default_missing';
+    | 'default_missing'
+    | 'default_mismatch';
   readonly table: string;
   readonly column?: string;
   readonly indexOrConstraint?: string;
