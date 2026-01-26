@@ -14,11 +14,6 @@ export type ColumnTypeDescriptor = {
   readonly typeParams?: Record<string, unknown>;
 };
 
-/**
- * Column default value definition for the builder.
- */
-export type ColumnDefaultDef = ColumnDefault;
-
 export interface ColumnBuilderState<
   Name extends string,
   Nullable extends boolean,
@@ -29,7 +24,7 @@ export interface ColumnBuilderState<
   readonly type: Type;
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown>;
-  readonly default?: ColumnDefaultDef;
+  readonly default?: ColumnDefault;
 }
 
 /**

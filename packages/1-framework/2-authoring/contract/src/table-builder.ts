@@ -1,6 +1,6 @@
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
-  ColumnDefaultDef,
   ColumnTypeDescriptor,
   ForeignKeyDef,
   IndexDef,
@@ -88,7 +88,7 @@ export class TableBuilder<
       type: Descriptor;
       nullable?: Nullable;
       typeParams?: Record<string, unknown>;
-      default?: ColumnDefaultDef;
+      default?: ColumnDefault;
     },
   ): TableBuilder<
     Name,

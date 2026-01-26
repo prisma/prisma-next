@@ -1,11 +1,9 @@
 import type {
+  ColumnDefault,
   ContractBase,
   CoreHashBase,
   ProfileHashBase,
-  ColumnDefault as SharedColumnDefault,
 } from '@prisma-next/contract/types';
-
-export type ColumnDefault = SharedColumnDefault;
 
 /**
  * A column definition in storage.

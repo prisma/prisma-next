@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/sql-contract/types';
+import type { ColumnDefault } from '@prisma-next/contract/types';
 
 export type PostgresColumnDefault =
   | ColumnDefault

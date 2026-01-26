@@ -7,13 +7,14 @@
  */
 
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
   OperationContext,
   SchemaIssue,
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import type { ColumnDefault, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { ComponentDatabaseDependency } from '../migrations/types';
