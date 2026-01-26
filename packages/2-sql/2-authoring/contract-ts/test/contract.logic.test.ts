@@ -595,7 +595,7 @@ describe('validateContract logic validation', () => {
     });
   });
 
-  describe('default function capability gating', () => {
+  describe('column defaults', () => {
     const baseContract = {
       schemaVersion: '1',
       target: 'postgres',
@@ -623,57 +623,11 @@ describe('validateContract logic validation', () => {
       },
     };
 
-    it('throws when default function capability is missing', () => {
-      expect(() => validateContract<SqlContract<SqlStorage>>(baseContract)).toThrow(
-        /uses default function "uuid" but capability "defaults.uuid" is not enabled/,
-      );
+    it('accepts function defaults without capability gating', () => {
+      expect(() => validateContract<SqlContract<SqlStorage>>(baseContract)).not.toThrow();
     });
 
-    it('throws when capabilities object is empty', () => {
-      const contract = {
-        ...baseContract,
-        capabilities: {},
-      };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
-        /uses default function "uuid" but capability "defaults.uuid" is not enabled/,
-      );
-    });
-
-    it('throws when target capabilities are missing', () => {
-      const contract = {
-        ...baseContract,
-        capabilities: {
-          mysql: { 'defaults.uuid': true },
-        },
-      };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
-        /uses default function "uuid" but capability "defaults.uuid" is not enabled for target "postgres"/,
-      );
-    });
-
-    it('throws when default function capability is false', () => {
-      const contract = {
-        ...baseContract,
-        capabilities: {
-          postgres: { 'defaults.uuid': false },
-        },
-      };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
-        /uses default function "uuid" but capability "defaults.uuid" is not enabled/,
-      );
-    });
-
-    it('accepts when default function capability is enabled', () => {
-      const contract = {
-        ...baseContract,
-        capabilities: {
-          postgres: { 'defaults.uuid': true },
-        },
-      };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
-    });
-
-    it('validates multiple default functions', () => {
+    it('accepts multiple function defaults without capability gating', () => {
       const contract = {
         ...baseContract,
         storage: {
@@ -705,67 +659,6 @@ describe('validateContract logic validation', () => {
               indexes: [],
               foreignKeys: [],
             },
-          },
-        },
-        capabilities: {
-          postgres: {
-            'defaults.autoincrement': true,
-            'defaults.now': true,
-            // uuid missing - should fail
-          },
-        },
-      };
-      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
-        /uses default function "uuid" but capability "defaults.uuid" is not enabled/,
-      );
-    });
-
-    it('accepts all default functions when all capabilities enabled', () => {
-      const contract = {
-        ...baseContract,
-        storage: {
-          tables: {
-            Post: {
-              columns: {
-                id: {
-                  codecId: 'pg/int4@1',
-                  nativeType: 'int4',
-                  nullable: false,
-                  default: { kind: 'function', name: 'autoincrement' },
-                },
-                createdAt: {
-                  codecId: 'pg/timestamptz@1',
-                  nativeType: 'timestamptz',
-                  nullable: false,
-                  default: { kind: 'function', name: 'now' },
-                },
-                externalId: {
-                  codecId: 'pg/text@1',
-                  nativeType: 'text',
-                  nullable: false,
-                  default: { kind: 'function', name: 'uuid' },
-                },
-                clientId: {
-                  codecId: 'pg/text@1',
-                  nativeType: 'text',
-                  nullable: false,
-                  default: { kind: 'function', name: 'cuid' },
-                },
-                title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-        capabilities: {
-          postgres: {
-            'defaults.autoincrement': true,
-            'defaults.now': true,
-            'defaults.uuid': true,
-            'defaults.cuid': true,
           },
         },
       };
