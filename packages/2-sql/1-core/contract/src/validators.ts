@@ -31,21 +31,9 @@ const ColumnDefaultFunctionUuidSchema = {
   'params?': type.string.array().readonly(),
 } as const;
 
-const ColumnDefaultSequenceSchema = {
-  kind: "'sequence'",
-  name: 'string',
-} as const;
-
-const ColumnDefaultDbGeneratedSchema = {
-  kind: "'dbGenerated'",
-  expression: 'string',
-} as const;
-
 const ColumnDefaultSchema = type(ColumnDefaultLiteralSchema)
   .or(ColumnDefaultFunctionNoParamsSchema)
-  .or(ColumnDefaultFunctionUuidSchema)
-  .or(ColumnDefaultSequenceSchema)
-  .or(ColumnDefaultDbGeneratedSchema);
+  .or(ColumnDefaultFunctionUuidSchema);
 
 const StorageColumnSchema = type({
   nativeType: 'string',

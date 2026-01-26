@@ -665,7 +665,7 @@ describe('validateContract logic validation', () => {
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
     });
 
-    it('ignores non-function defaults (literal, sequence, dbGenerated)', () => {
+    it('ignores non-function defaults (literal)', () => {
       const contract = {
         ...baseContract,
         storage: {
@@ -678,18 +678,6 @@ describe('validateContract logic validation', () => {
                   nativeType: 'text',
                   nullable: false,
                   default: { kind: 'literal', value: 'draft' },
-                },
-                counter: {
-                  codecId: 'pg/int4@1',
-                  nativeType: 'int4',
-                  nullable: false,
-                  default: { kind: 'sequence', name: 'post_counter_seq' },
-                },
-                checksum: {
-                  codecId: 'pg/text@1',
-                  nativeType: 'text',
-                  nullable: true,
-                  default: { kind: 'dbGenerated', expression: 'md5(random()::text)' },
                 },
               },
               primaryKey: { columns: ['id'] },

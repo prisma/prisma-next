@@ -18,7 +18,6 @@ import {
   verifySqlSchema,
 } from '@prisma-next/family-sql/schema-verify';
 import type {
-  ColumnDefault,
   ForeignKey,
   SqlContract,
   SqlStorage,
@@ -26,6 +25,7 @@ import type {
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { PostgresColumnDefault } from '../types';
 
 type OperationClass = 'extension' | 'table' | 'unique' | 'index' | 'foreignKey';
 
@@ -687,7 +687,7 @@ function buildColumnTypeSql(column: StorageColumn): string {
  *
  * Note: autoincrement is handled specially via SERIAL types, so we skip it here.
  */
-function buildColumnDefaultSql(columnDefault: ColumnDefault | undefined): string {
+function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined): string {
   if (!columnDefault) {
     return '';
   }
@@ -719,8 +719,6 @@ function buildColumnDefaultSql(columnDefault: ColumnDefault | undefined): string
     }
     case 'sequence':
       return `DEFAULT nextval('${escapeLiteral(columnDefault.name)}')`;
-    case 'dbGenerated':
-      return `DEFAULT ${columnDefault.expression}`;
   }
 
   return '';

@@ -65,9 +65,7 @@ export interface FieldType {
 export type ColumnDefault =
   | { readonly kind: 'literal'; readonly value: string | number | boolean }
   | { readonly kind: 'function'; readonly name: 'autoincrement' | 'now' | 'cuid' }
-  | { readonly kind: 'function'; readonly name: 'uuid'; readonly params?: readonly string[] }
-  | { readonly kind: 'sequence'; readonly name: string }
-  | { readonly kind: 'dbGenerated'; readonly expression: string };
+  | { readonly kind: 'function'; readonly name: 'uuid'; readonly params?: readonly string[] };
 
 export interface Source {
   readonly readOnly: boolean;

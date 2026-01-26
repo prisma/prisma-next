@@ -134,7 +134,7 @@
       "required": ["columns"]
     },
     "ColumnDefault": {
-      "description": "Column default value. Can be a literal value, database function, sequence reference, or raw expression.",
+      "description": "Column default value. Can be a literal value or a database function.",
       "oneOf": [
         {
           "type": "object",
@@ -190,38 +190,6 @@
             }
           },
           "required": ["kind", "name"]
-        },
-        {
-          "type": "object",
-          "description": "Named sequence reference",
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "type": "string",
-              "enum": ["sequence"]
-            },
-            "name": {
-              "type": "string",
-              "description": "Sequence name"
-            }
-          },
-          "required": ["kind", "name"]
-        },
-        {
-          "type": "object",
-          "description": "Raw database expression (escape hatch)",
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "type": "string",
-              "enum": ["dbGenerated"]
-            },
-            "expression": {
-              "type": "string",
-              "description": "Raw SQL expression for the default value"
-            }
-          },
-          "required": ["kind", "expression"]
         }
       ]
     },

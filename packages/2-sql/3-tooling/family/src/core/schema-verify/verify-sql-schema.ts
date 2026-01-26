@@ -629,9 +629,5 @@ function describeColumnDefault(columnDefault: ColumnDefault): string {
           : '';
       return `${columnDefault.name}(${paramsStr})`;
     }
-    case 'sequence':
-      return `sequence(${columnDefault.name})`;
-    case 'dbGenerated':
-      return `dbGenerated(${columnDefault.expression})`;
   }
 }

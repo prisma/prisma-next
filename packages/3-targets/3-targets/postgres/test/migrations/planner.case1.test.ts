@@ -3,10 +3,16 @@ import type {
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import type { PostgresColumnDefault } from '../../src/core/types';
 
 const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
   id: 'postgres.extension.pgvector',
@@ -50,6 +56,22 @@ const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
       },
     ];
   },
+};
+
+type PostgresStorageColumn = Omit<StorageColumn, 'default'> & {
+  readonly default?: PostgresColumnDefault;
+};
+
+type PostgresStorageTable = Omit<StorageTable, 'columns'> & {
+  readonly columns: Record<string, PostgresStorageColumn>;
+};
+
+type PostgresSqlStorage = Omit<SqlStorage, 'tables'> & {
+  readonly tables: Record<string, PostgresStorageTable>;
+};
+
+type PostgresSqlContract = Omit<SqlContract<SqlStorage>, 'storage'> & {
+  readonly storage: PostgresSqlStorage;
 };
 
 function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
@@ -361,7 +383,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
 
     const planner = createPostgresMigrationPlanner();
     const result = planner.plan({
-      contract: contractWithDefaults,
+      contract: contractWithDefaults as unknown as SqlContract<SqlStorage>,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
       frameworkComponents: [],
@@ -417,7 +439,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
 
     const planner = createPostgresMigrationPlanner();
     const result = planner.plan({
-      contract: contractWithDefaults,
+      contract: contractWithDefaults as unknown as SqlContract<SqlStorage>,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
       frameworkComponents: [],
@@ -470,7 +492,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
 
     const planner = createPostgresMigrationPlanner();
     const result = planner.plan({
-      contract: contractWithDefaults,
+      contract: contractWithDefaults as unknown as SqlContract<SqlStorage>,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
       frameworkComponents: [],
@@ -542,7 +564,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
 
     const planner = createPostgresMigrationPlanner();
     const result = planner.plan({
-      contract: contractWithDefaults,
+      contract: contractWithDefaults as unknown as SqlContract<SqlStorage>,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
       frameworkComponents: [],
@@ -562,62 +584,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
     expect(sql).toContain('"priority" int4 DEFAULT 0 NOT NULL');
   });
 
-  it('generates DEFAULT with dbGenerated expression', () => {
-    const contractWithDefaults: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
-      storage: {
-        tables: {
-          audit: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              auditTime: {
-                nativeType: 'timestamptz',
-                codecId: 'pg/timestamptz@1',
-                nullable: false,
-                default: { kind: 'dbGenerated', expression: 'CURRENT_TIMESTAMP' },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      models: {},
-      relations: {},
-      mappings: { codecTypes: {}, operationTypes: {} },
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      sources: {},
-    };
-
-    const planner = createPostgresMigrationPlanner();
-    const result = planner.plan({
-      contract: contractWithDefaults,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.audit');
-    expect(tableOp).toBeDefined();
-    const sql = tableOp!.execute[0]!.sql;
-    expect(sql).toContain('"auditTime" timestamptz DEFAULT CURRENT_TIMESTAMP NOT NULL');
-  });
-
   it('generates DEFAULT with sequence reference', () => {
-    const contractWithDefaults: SqlContract<SqlStorage> = {
+    const contractWithDefaults: PostgresSqlContract = {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
@@ -652,7 +620,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
 
     const planner = createPostgresMigrationPlanner();
     const result = planner.plan({
-      contract: contractWithDefaults,
+      contract: contractWithDefaults as unknown as SqlContract<SqlStorage>,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
       frameworkComponents: [],
