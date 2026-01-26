@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:0e7f2be8409db44f1b18265a53ec5002012f919f84c7aab91229d33fd484a01d",
+  "coreHash": "sha256:8250c76f669e4f9d7aa8dbec3337ba408412024019297b8aa40339e80ff9d388",
   "profileHash": "sha256:fc74c4c3a1401c2ffd528ee1bd61b0ac57af7bdd5e77d39d567389afcb1027bd",
   "models": {
     "Post": {
@@ -53,8 +53,8 @@
           "createdAt": {
             "codecId": "pg/timestamptz@1",
             "default": {
-              "kind": "function",
-              "name": "now"
+              "expression": "now()",
+              "kind": "function"
             },
             "nativeType": "timestamptz"
           },
@@ -66,8 +66,8 @@
           "id": {
             "codecId": "pg/int4@1",
             "default": {
-              "kind": "function",
-              "name": "autoincrement"
+              "expression": "autoincrement()",
+              "kind": "function"
             },
             "nativeType": "int4"
           },
@@ -107,8 +107,8 @@
           "createdAt": {
             "codecId": "pg/timestamptz@1",
             "default": {
-              "kind": "function",
-              "name": "now"
+              "expression": "now()",
+              "kind": "function"
             },
             "nativeType": "timestamptz"
           },
@@ -119,8 +119,8 @@
           "id": {
             "codecId": "pg/int4@1",
             "default": {
-              "kind": "function",
-              "name": "autoincrement"
+              "expression": "autoincrement()",
+              "kind": "function"
             },
             "nativeType": "int4"
           }
