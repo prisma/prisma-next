@@ -1,9 +1,17 @@
-import type { Brand } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
-import type { ColumnReference } from './column-reference';
-import type { TableReference } from './table-reference';
-import type { ErrorMessage } from './type-errors';
+import type {
+  Asterisk,
+  ColumnReference,
+  ColumnReferenceOutOfContractError,
+  TableAsterisk,
+} from './column-reference';
+import type { TableReference, TableReferenceOutOfContractError } from './table-reference';
 
+/**
+ * A fluent API representing references to tables and columns in a SQL contract.
+ *
+ * @template TContract The contract that describes the database.
+ */
 export type Ref<TContract extends SqlContract> = {
   readonly [TableName in keyof TContract['storage']['tables'] & string]: TableReference<
     TableName,
@@ -14,49 +22,49 @@ export type Ref<TContract extends SqlContract> = {
       keyof TableReference
     > &
       string]: ColumnReference<ColumnName, TableName, TContract['coreHash']>;
+  } & {
+    readonly ['*']: TableAsterisk<TableName, TContract['coreHash']>;
   } & Record<
       PropertyKey,
       ColumnReferenceOutOfContractError<`[error] reference to a non-existing column in the '${TableName}' table`>
     >;
+} & {
+  readonly ['*']: Asterisk;
 } & Record<
-  PropertyKey,
-  TableReferenceOutOfContractError<`[error] reference to a non-existing table in the contract`>
->;
-
-/**
- * An error type indicating that the provided table reference is out of the contract's scope.
- * To be used in reference creators, e.g. `createRef()`.
- *
- * @template TMessage The error message.
- */
-export type TableReferenceOutOfContractError<TMessage extends ErrorMessage> = Brand<TMessage>;
-
-/**
- * An error type indicating that the provided column reference is out of the contract's scope.
- * To be used in reference creators, e.g. `createRef()`.
- *
- * @template TMessage The error message.
- */
-export type ColumnReferenceOutOfContractError<TMessage extends ErrorMessage> = Brand<TMessage>;
+    PropertyKey,
+    TableReferenceOutOfContractError<`[error] reference to a non-existing table in the contract`>
+  >;
 
 /**
  * Creates a reference object for the given SQL contract.
+ *
+ * @template TContract The contract that describes the database.
  */
 export function createRef<TContract extends SqlContract>(_contract: TContract): Ref<TContract> {
   return new Proxy({} as Ref<TContract>, {
     get(_target, tableName) {
-      return new Proxy(Object.freeze({ '~name': tableName }), {
-        get(_target, columnName) {
-          if (columnName === '~name') {
-            return tableName;
-          }
+      if (tableName === '*') {
+        return Object.freeze({
+          '~name': tableName,
+          '~table': null,
+        });
+      }
 
-          return Object.freeze({
-            '~name': columnName,
-            '~table': tableName,
-          });
+      return new Proxy(
+        {},
+        {
+          get(_target, columnName) {
+            if (columnName === '~name') {
+              return tableName;
+            }
+
+            return Object.freeze({
+              '~name': columnName,
+              '~table': tableName,
+            });
+          },
         },
-      });
+      );
     },
   });
 }

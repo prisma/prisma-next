@@ -1,10 +1,7 @@
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { SelectBuilder } from './select-builder';
-import type { TableReference } from './table-reference';
-import type {
-  PreviousFunctionReceivedBadInputError,
-  TableReferenceTooWideError,
-} from './type-errors';
+import type { TableReference, TableReferenceTooWideError } from './table-reference';
+import type { PreviousFunctionReceivedBadInputError } from './type-errors';
 
 /**
  * The root of all builder.
