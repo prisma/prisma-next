@@ -1,39 +1,10 @@
 # @prisma-next/tsdown
 
-Shared tsdown configuration helpers used across the monorepo to keep build setup consistent and fast to update.
+We're solving maintenance burden of lots of similar `tsdown.config.ts` files across many packages that need to be aligned on pretty much everything except for the `entry` property.
 
-We ship `esm` only by default. Bundle target is inferred from your package. Output goes to `dist`. We ship DTS files and DTS maps too - so "Go To Definition" jumps to the source files.
+Agents could help us align them and make those changes across the codebase, but doing so is usually pretty slow as the agents have to do a bunch of filesystem scans first and waste a bunch of roundtrips to do the job.
 
-## Responsibilities
-
-- **Base config**: Centralized `tsdown` options applied across packages
-- **Exports alignment**: Normalizes export paths so package `exports` stay consistent
-- **DX helpers**: Convenience `defineConfig` wrapper for simple configs
-
-## Dependencies
-
-- `tsdown` for bundling
-- `typescript` for typechecking
-- `@prisma-next/tsconfig` for shared TS config base
-
-## Architecture
-
-```mermaid
-flowchart TD
-  BaseConfig[Base tsdown config]
-  PackageConfig[Package tsdown.config.ts]
-  Tsdown[tsdown]
-  Dist[dist output]
-
-  BaseConfig --> PackageConfig
-  PackageConfig --> Tsdown
-  Tsdown --> Dist
-```
-
-## Related Docs
-
-- `docs/Architecture Overview.md`
-- `docs/onboarding/Conventions.md`
+We ship `esm` only by default. Bundle target is infered from your package. Output goes to `dist`. We ship DTS files and DTS maps too - so "Go To Definition" jumps to the source files.
 
 ## Prerequisites
 
