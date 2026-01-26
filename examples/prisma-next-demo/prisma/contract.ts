@@ -19,13 +19,13 @@ export const contract = defineContract<AllCodecTypes>()
       .column('id', {
         type: int4Column,
         nullable: false,
-        default: { kind: 'function', name: 'autoincrement' },
+        default: { kind: 'function', expression: 'autoincrement()' },
       })
       .column('email', { type: textColumn, nullable: false })
       .column('createdAt', {
         type: timestamptzColumn,
         nullable: false,
-        default: { kind: 'function', name: 'now' },
+        default: { kind: 'function', expression: 'now()' },
       })
       .primaryKey(['id']),
   )
@@ -34,14 +34,14 @@ export const contract = defineContract<AllCodecTypes>()
       .column('id', {
         type: int4Column,
         nullable: false,
-        default: { kind: 'function', name: 'autoincrement' },
+        default: { kind: 'function', expression: 'autoincrement()' },
       })
       .column('title', { type: textColumn, nullable: false })
       .column('userId', { type: int4Column, nullable: false })
       .column('createdAt', {
         type: timestamptzColumn,
         nullable: false,
-        default: { kind: 'function', name: 'now' },
+        default: { kind: 'function', expression: 'now()' },
       })
       .column('embedding', { type: vectorColumn, nullable: true })
       .primaryKey(['id'])

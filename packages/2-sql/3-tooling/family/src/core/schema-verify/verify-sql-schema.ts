@@ -621,13 +621,7 @@ function describeColumnDefault(columnDefault: ColumnDefault): string {
   switch (columnDefault.kind) {
     case 'literal':
       return `literal(${JSON.stringify(columnDefault.value)})`;
-    case 'function': {
-      // Only uuid functions have params
-      const paramsStr =
-        columnDefault.name === 'uuid' && columnDefault.params?.length
-          ? columnDefault.params.join(', ')
-          : '';
-      return `${columnDefault.name}(${paramsStr})`;
-    }
+    case 'function':
+      return columnDefault.expression;
   }
 }

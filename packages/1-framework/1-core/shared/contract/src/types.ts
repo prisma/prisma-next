@@ -64,8 +64,7 @@ export interface FieldType {
 
 export type ColumnDefault =
   | { readonly kind: 'literal'; readonly value: string | number | boolean }
-  | { readonly kind: 'function'; readonly name: 'autoincrement' | 'now' | 'cuid' }
-  | { readonly kind: 'function'; readonly name: 'uuid'; readonly params?: readonly string[] };
+  | { readonly kind: 'function'; readonly expression: string };
 
 export interface Source {
   readonly readOnly: boolean;
@@ -89,7 +88,7 @@ export type Expr =
 export interface DocCollection {
   readonly name: string;
   readonly id?: {
-    readonly strategy: 'auto' | 'client' | 'uuid' | 'cuid' | 'objectId';
+    readonly strategy: 'auto' | 'client' | 'uuid' | 'objectId';
   };
   readonly fields: Record<string, FieldType>;
   readonly indexes?: ReadonlyArray<DocIndex>;

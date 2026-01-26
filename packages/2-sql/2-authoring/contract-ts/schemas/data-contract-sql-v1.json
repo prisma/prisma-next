@@ -134,7 +134,7 @@
       "required": ["columns"]
     },
     "ColumnDefault": {
-      "description": "Column default value. Can be a literal value or a database function.",
+      "description": "Column default value. Can be a literal value or a database function expression.",
       "oneOf": [
         {
           "type": "object",
@@ -154,42 +154,19 @@
         },
         {
           "type": "object",
-          "description": "Database function that never takes parameters (autoincrement, now, cuid)",
+          "description": "Database function expression (e.g., 'autoincrement()', 'now()', 'gen_random_uuid()')",
           "additionalProperties": false,
           "properties": {
             "kind": {
               "type": "string",
               "enum": ["function"]
             },
-            "name": {
+            "expression": {
               "type": "string",
-              "enum": ["autoincrement", "now", "cuid"],
-              "description": "Function name"
+              "description": "The function expression (e.g., 'autoincrement()', 'now()', 'gen_random_uuid()')"
             }
           },
-          "required": ["kind", "name"]
-        },
-        {
-          "type": "object",
-          "description": "UUID function with optional parameters (for variants like uuidv7)",
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "type": "string",
-              "enum": ["function"]
-            },
-            "name": {
-              "type": "string",
-              "enum": ["uuid"],
-              "description": "Function name"
-            },
-            "params": {
-              "type": "array",
-              "items": { "type": "string" },
-              "description": "Optional function parameters"
-            }
-          },
-          "required": ["kind", "name"]
+          "required": ["kind", "expression"]
         }
       ]
     },

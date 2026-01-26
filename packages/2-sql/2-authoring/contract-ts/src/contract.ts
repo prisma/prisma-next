@@ -26,22 +26,12 @@ const ColumnDefaultLiteralSchema = {
   value: 'string | number | boolean',
 } as const;
 
-// Functions that never take params
-const ColumnDefaultFunctionNoParamsSchema = {
+const ColumnDefaultFunctionSchema = {
   kind: "'function'",
-  name: "'autoincrement' | 'now' | 'cuid'",
+  expression: 'string',
 } as const;
 
-// uuid can take optional params (for variants like uuidv7)
-const ColumnDefaultFunctionUuidSchema = {
-  kind: "'function'",
-  name: "'uuid'",
-  'params?': type.string.array().readonly(),
-} as const;
-
-const ColumnDefaultSchema = type(ColumnDefaultLiteralSchema)
-  .or(ColumnDefaultFunctionNoParamsSchema)
-  .or(ColumnDefaultFunctionUuidSchema);
+const ColumnDefaultSchema = type(ColumnDefaultLiteralSchema).or(ColumnDefaultFunctionSchema);
 
 const StorageColumnSchema = type({
   nativeType: 'string',

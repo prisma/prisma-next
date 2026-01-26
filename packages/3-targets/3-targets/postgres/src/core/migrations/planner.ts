@@ -666,7 +666,7 @@ function buildColumnTypeSql(column: StorageColumn): string {
   const columnDefault = column.default;
 
   // For autoincrement, use SERIAL/BIGSERIAL types instead of int4/int8
-  if (columnDefault?.kind === 'function' && columnDefault.name === 'autoincrement') {
+  if (columnDefault?.kind === 'function' && columnDefault.expression === 'autoincrement()') {
     if (column.nativeType === 'int4' || column.nativeType === 'integer') {
       return 'SERIAL';
     }
@@ -696,26 +696,12 @@ function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined)
     case 'literal':
       return `DEFAULT ${escapeLiteralValue(columnDefault.value)}`;
     case 'function': {
-      switch (columnDefault.name) {
-        case 'autoincrement':
-          // Handled by SERIAL type, no explicit DEFAULT needed
-          return '';
-        case 'now':
-          return 'DEFAULT now()';
-        case 'uuid': {
-          // Support params for functions like uuidv7(shift)
-          if (columnDefault.params?.length) {
-            const paramsStr = `(${columnDefault.params.join(', ')})`;
-            return `DEFAULT gen_random_uuid${paramsStr}`;
-          }
-          return 'DEFAULT gen_random_uuid()';
-        }
-        case 'cuid':
-          // CUID is typically generated application-side
-          // Use a placeholder that will fail if not overridden
-          return "DEFAULT ''";
+      // autoincrement is handled by SERIAL type, no explicit DEFAULT needed
+      if (columnDefault.expression === 'autoincrement()') {
+        return '';
       }
-      break;
+      // Use the expression directly as the DEFAULT value
+      return `DEFAULT ${columnDefault.expression}`;
     }
     case 'sequence':
       return `DEFAULT nextval('${escapeLiteral(columnDefault.name)}')`;

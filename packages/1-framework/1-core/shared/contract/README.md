@@ -220,7 +220,7 @@ All contracts share these common fields:
 - **`storage.document.collections`**: Object mapping collection names to collection definitions
   - Each collection includes:
     - **`name`**: Logical collection name
-    - **`id`** (optional): ID generation strategy (`auto`, `client`, `uuid`, `cuid`, `objectId`)
+    - **`id`** (optional): ID generation strategy (`auto`, `client`, `uuid`, `objectId`)
     - **`fields`**: Field definitions using `FieldType` (supports nested objects and arrays)
     - **`indexes`** (optional): Array of index definitions with keys and optional predicates
     - **`readOnly`** (optional): Whether mutations are disallowed

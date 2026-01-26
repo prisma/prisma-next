@@ -120,11 +120,11 @@ describe('TableBuilder', () => {
     const table = builder
       .column('id', {
         type: intColumn,
-        default: { kind: 'function', name: 'autoincrement' },
+        default: { kind: 'function', expression: 'autoincrement()' },
       })
       .column('createdAt', {
         type: textColumn,
-        default: { kind: 'function', name: 'uuid', params: ['v7'] },
+        default: { kind: 'function', expression: 'gen_random_uuid()' },
       })
       .column('active', {
         type: textColumn,
@@ -132,11 +132,10 @@ describe('TableBuilder', () => {
       })
       .build();
 
-    expect(table.columns.id.default).toEqual({ kind: 'function', name: 'autoincrement' });
+    expect(table.columns.id.default).toEqual({ kind: 'function', expression: 'autoincrement()' });
     expect(table.columns.createdAt.default).toEqual({
       kind: 'function',
-      name: 'uuid',
-      params: ['v7'],
+      expression: 'gen_random_uuid()',
     });
     expect(table.columns.active.default).toEqual({ kind: 'literal', value: true });
   });
