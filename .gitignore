@@ -14,3 +14,6 @@ packages/e2e-tests/.tmp-output
 /wip
 /agent-os
 .pnpm-store
+
+# Generated contract files in test fixtures
+test/**/fixtures/generated/
