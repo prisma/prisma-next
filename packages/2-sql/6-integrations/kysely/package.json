@@ -6,6 +6,10 @@
   "description": "Kysely integration for Prisma Next",
   "scripts": {
     "build": "tsdown",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
     "prepublishOnly": "pnpm build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
