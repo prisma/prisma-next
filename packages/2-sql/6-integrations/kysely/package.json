@@ -11,8 +11,8 @@
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "prepublishOnly": "pnpm build",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

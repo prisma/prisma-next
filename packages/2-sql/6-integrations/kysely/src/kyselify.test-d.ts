@@ -166,13 +166,13 @@ type Database = KyselifyContract<Contract>;
 
 declare const db: Kysely<Database>;
 
-test('KyselifyContract converts Prisma Next contract to Kysely database schema', async () => {
-  const result = await db
+test('KyselifyContract converts Prisma Next contract to Kysely database schema', () => {
+  const result = db
     .selectFrom('user')
     .innerJoin('post', (jb) => jb.onTrue())
     .select('post.id')
     .select('post.embedding')
     .executeTakeFirstOrThrow();
 
-  expectTypeOf(result).toEqualTypeOf<{ id: number; embedding: number[] | null }>();
+  expectTypeOf(result).toEqualTypeOf<Promise<{ id: number; embedding: number[] | null }>>();
 });

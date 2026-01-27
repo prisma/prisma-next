@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['**/*.test.ts', '**/*.test-d.ts'],
+    include: ['**/*.test.ts'],
     testTimeout: timeouts.default,
     hookTimeout: timeouts.default,
     coverage: {
@@ -23,6 +23,10 @@ export default defineConfig({
         '**/types.ts',
         'src/index.ts',
       ],
+    },
+    typecheck: {
+      enabled: true,
+      include: ['**/*.test-d.ts'],
     },
   },
 });
