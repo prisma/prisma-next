@@ -62,6 +62,11 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
     }
 
     if (key === 'nullable' && value === false) {
+      const hasDefault = Object.hasOwn(obj, 'default');
+      if (!hasDefault) {
+        continue;
+      }
+      result[key] = value;
       continue;
     }
 

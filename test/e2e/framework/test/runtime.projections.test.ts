@@ -31,7 +31,9 @@ describe('end-to-end nested projection queries', () => {
         await withClient(connectionString, async (client: import('pg').Client) => {
           await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
+            await c.query(
+              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
+            );
             await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
               'ada@example.com',
               'tess@example.com',
@@ -111,7 +113,9 @@ describe('end-to-end nested projection queries', () => {
         await withClient(connectionString, async (client: import('pg').Client) => {
           await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
+            await c.query(
+              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
+            );
             await c.query('insert into "user" (email) values ($1), ($2)', [
               'ada@example.com',
               'tess@example.com',
@@ -185,9 +189,11 @@ describe('end-to-end nested projection queries', () => {
           await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "post"');
             await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
             await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
+            );
+            await c.query(
+              'create table "post" (id serial primary key, "userId" int4 not null, title text not null, created_at timestamptz not null default now(), update_at timestamptz)',
             );
             await c.query('insert into "user" (email) values ($1), ($2)', [
               'ada@example.com',
@@ -280,7 +286,9 @@ describe('end-to-end nested projection queries', () => {
         await withClient(connectionString, async (client: import('pg').Client) => {
           await setupE2EDatabase(client, contract, async (c: typeof client) => {
             await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
+            await c.query(
+              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
+            );
             await c.query('insert into "user" (email) values ($1), ($2)', [
               'ada@example.com',
               'tess@example.com',

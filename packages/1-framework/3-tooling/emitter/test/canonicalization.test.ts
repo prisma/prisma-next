@@ -55,6 +55,34 @@ describe('canonicalization', () => {
     expect(email['nullable']).toBe(true);
   });
 
+  it('keeps nullable false for columns with defaults', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              created_at: {
+                codecId: 'pg/timestamptz@1',
+                nativeType: 'timestamptz',
+                nullable: false,
+                default: { kind: 'function', expression: 'now()' },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
+    const createdAt = columns['created_at'] as Record<string, unknown>;
+    expect(createdAt['nullable']).toBe(false);
+  });
+
   it('omits empty arrays and objects except required ones', () => {
     const ir = createContractIR();
 

@@ -82,6 +82,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 ## Architecture
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Contract normalization responsibilities
+- `.cursor/rules/contract-default-values.mdc` — Validate emitted column defaults
 - `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype
 - `.cursor/rules/control-plane-descriptors.mdc` — Control plane descriptor pattern (Control*Descriptor types, driver requirement)
 - `.cursor/rules/family-instance-domain-actions.mdc` — Family instance domain actions (inline core logic, import helper functions)

@@ -35,12 +35,14 @@ async function setupJoinTestSchema(
     await c.query('drop table if exists "comment"');
     await c.query('drop table if exists "post"');
     await c.query('drop table if exists "user"');
-    await c.query('create table "user" (id serial primary key, email text not null)');
     await c.query(
-      'create table "post" (id serial primary key, "userId" int4 not null, title text not null)',
+      'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
     );
     await c.query(
-      'create table "comment" (id serial primary key, "postId" int4 not null, content text not null)',
+      'create table "post" (id serial primary key, "userId" int4 not null, title text not null, created_at timestamptz not null default now(), update_at timestamptz)',
+    );
+    await c.query(
+      'create table "comment" (id serial primary key, "postId" int4 not null, content text not null, created_at timestamptz not null default now(), update_at timestamptz)',
     );
     await setupFn(c);
   });
