@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsdown",
     "prepublishOnly": "pnpm build",
-    "test": "pnpm typecheck",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],
@@ -23,6 +24,7 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "kysely": "^0.28.10",

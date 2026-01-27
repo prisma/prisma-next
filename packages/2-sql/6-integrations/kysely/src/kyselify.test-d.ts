@@ -4,6 +4,7 @@ import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvecto
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import type { Kysely } from 'kysely';
+import { expectTypeOf, test } from 'vitest';
 import type { KyselifyContract } from './kyselify';
 
 type CodecTypes = PgTypes & PgVectorTypes;
@@ -163,17 +164,19 @@ type Contract = SqlContract<
 
 type Database = KyselifyContract<Contract>;
 
-async function foo(db: Kysely<Database>) {
-  const result = await db
-    .selectFrom('user')
-    .innerJoin('post', (jb) => jb.onTrue())
-    .select('post.id')
-    .select('post.embedding')
-    .executeTakeFirstOrThrow();
+test('KyselifyContract converts Prisma Next contract to Kysely database schema', () => {
+  async function queryWithJoin(db: Kysely<Database>) {
+    const result = await db
+      .selectFrom('user')
+      .innerJoin('post', (jb) => jb.onTrue())
+      .select('post.id')
+      .select('post.embedding')
+      .executeTakeFirstOrThrow();
 
-  result satisfies { id: number; embedding: number[] | null };
+    expectTypeOf(result).toEqualTypeOf<{ id: number; embedding: number[] | null }>();
 
-  return result;
-}
+    return result;
+  }
 
-void foo;
+  void queryWithJoin;
+});
