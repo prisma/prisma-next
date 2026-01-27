@@ -3,12 +3,7 @@ import type {
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type {
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
@@ -60,18 +55,6 @@ const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
 
 type PostgresStorageColumn = Omit<StorageColumn, 'default'> & {
   readonly default?: PostgresColumnDefault;
-};
-
-type PostgresStorageTable = Omit<StorageTable, 'columns'> & {
-  readonly columns: Record<string, PostgresStorageColumn>;
-};
-
-type PostgresSqlStorage = Omit<SqlStorage, 'tables'> & {
-  readonly tables: Record<string, PostgresStorageTable>;
-};
-
-type PostgresSqlContract = Omit<SqlContract<SqlStorage>, 'storage'> & {
-  readonly storage: PostgresSqlStorage;
 };
 
 function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
@@ -346,8 +329,13 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 });
 
 describe('PostgresMigrationPlanner - column defaults', () => {
-  it('generates SERIAL for autoincrement on int4 columns', () => {
-    const contractWithDefaults: SqlContract<SqlStorage> = {
+  type ColumnDef = PostgresStorageColumn & { nativeType: string; codecId: string };
+
+  function contractWithTable(
+    tableName: string,
+    columns: Record<string, ColumnDef>,
+  ): SqlContract<SqlStorage> {
+    return {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
@@ -355,17 +343,9 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-                default: { kind: 'function', expression: 'autoincrement()' },
-              },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
+          [tableName]: {
+            columns,
+            primaryKey: { columns: [Object.keys(columns)[0]!] },
             uniques: [],
             indexes: [],
             foreignKeys: [],
@@ -379,205 +359,94 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       extensionPacks: {},
       meta: {},
       sources: {},
-    };
+    } as SqlContract<SqlStorage>;
+  }
 
+  function planTableSql(tableName: string, columns: Record<string, ColumnDef>): string {
     const planner = createPostgresMigrationPlanner();
     const result = planner.plan({
-      contract: contractWithDefaults as unknown as SqlContract<SqlStorage>,
+      contract: contractWithTable(tableName, columns),
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
       frameworkComponents: [],
     });
-
     expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.user');
+    if (result.kind !== 'success') throw new Error(`Expected success: ${JSON.stringify(result)}`);
+    const tableOp = result.plan.operations.find((op) => op.id === `table.${tableName}`);
     expect(tableOp).toBeDefined();
-    const sql = tableOp!.execute[0]!.sql;
-    // SERIAL includes implicit NOT NULL
-    expect(sql).toContain('"id" SERIAL NOT NULL');
+    return tableOp!.execute[0]!.sql;
+  }
+
+  it.each([
+    ['int2', 'SMALLSERIAL'],
+    ['int4', 'SERIAL'],
+    ['int8', 'BIGSERIAL'],
+  ] as const)('generates %s for autoincrement on %s columns', (nativeType, serialType) => {
+    const sql = planTableSql('counter', {
+      id: {
+        nativeType,
+        codecId: `pg/${nativeType}@1`,
+        nullable: false,
+        default: { kind: 'function', expression: 'autoincrement()' },
+      },
+    });
+    expect(sql).toContain(`"id" ${serialType} NOT NULL`);
     expect(sql).not.toContain('DEFAULT');
   });
 
   it('generates DEFAULT now() for timestamp columns', () => {
-    const contractWithDefaults: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              createdAt: {
-                nativeType: 'timestamptz',
-                codecId: 'pg/timestamptz@1',
-                nullable: false,
-                default: { kind: 'function', expression: 'now()' },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
+    const sql = planTableSql('user', {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      createdAt: {
+        nativeType: 'timestamptz',
+        codecId: 'pg/timestamptz@1',
+        nullable: false,
+        default: { kind: 'function', expression: 'now()' },
       },
-      models: {},
-      relations: {},
-      mappings: { codecTypes: {}, operationTypes: {} },
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      sources: {},
-    };
-
-    const planner = createPostgresMigrationPlanner();
-    const result = planner.plan({
-      contract: contractWithDefaults as unknown as SqlContract<SqlStorage>,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
     });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.user');
-    expect(tableOp).toBeDefined();
-    const sql = tableOp!.execute[0]!.sql;
     expect(sql).toContain('"createdAt" timestamptz DEFAULT now() NOT NULL');
   });
 
   it('generates DEFAULT gen_random_uuid() for uuid columns', () => {
-    const contractWithDefaults: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'uuid',
-                codecId: 'pg/uuid@1',
-                nullable: false,
-                default: { kind: 'function', expression: 'gen_random_uuid()' },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
+    const sql = planTableSql('user', {
+      id: {
+        nativeType: 'uuid',
+        codecId: 'pg/uuid@1',
+        nullable: false,
+        default: { kind: 'function', expression: 'gen_random_uuid()' },
       },
-      models: {},
-      relations: {},
-      mappings: { codecTypes: {}, operationTypes: {} },
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      sources: {},
-    };
-
-    const planner = createPostgresMigrationPlanner();
-    const result = planner.plan({
-      contract: contractWithDefaults as unknown as SqlContract<SqlStorage>,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
     });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.user');
-    expect(tableOp).toBeDefined();
-    const sql = tableOp!.execute[0]!.sql;
     expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid() NOT NULL');
   });
 
   it('generates DEFAULT with literal values', () => {
-    const contractWithDefaults: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
-      storage: {
-        tables: {
-          config: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              enabled: {
-                nativeType: 'bool',
-                codecId: 'pg/bool@1',
-                nullable: false,
-                default: { kind: 'literal', value: true },
-              },
-              disabled: {
-                nativeType: 'bool',
-                codecId: 'pg/bool@1',
-                nullable: false,
-                default: { kind: 'literal', value: false },
-              },
-              name: {
-                nativeType: 'text',
-                codecId: 'pg/text@1',
-                nullable: false,
-                default: { kind: 'literal', value: 'default' },
-              },
-              priority: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: false,
-                default: { kind: 'literal', value: 0 },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
+    const sql = planTableSql('config', {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      enabled: {
+        nativeType: 'bool',
+        codecId: 'pg/bool@1',
+        nullable: false,
+        default: { kind: 'literal', value: true },
       },
-      models: {},
-      relations: {},
-      mappings: { codecTypes: {}, operationTypes: {} },
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      sources: {},
-    };
-
-    const planner = createPostgresMigrationPlanner();
-    const result = planner.plan({
-      contract: contractWithDefaults as unknown as SqlContract<SqlStorage>,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
+      disabled: {
+        nativeType: 'bool',
+        codecId: 'pg/bool@1',
+        nullable: false,
+        default: { kind: 'literal', value: false },
+      },
+      name: {
+        nativeType: 'text',
+        codecId: 'pg/text@1',
+        nullable: false,
+        default: { kind: 'literal', value: 'default' },
+      },
+      priority: {
+        nativeType: 'int4',
+        codecId: 'pg/int4@1',
+        nullable: false,
+        default: { kind: 'literal', value: 0 },
+      },
     });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.config');
-    expect(tableOp).toBeDefined();
-    const sql = tableOp!.execute[0]!.sql;
     expect(sql).toContain('"enabled" bool DEFAULT TRUE NOT NULL');
     expect(sql).toContain('"disabled" bool DEFAULT FALSE NOT NULL');
     expect(sql).toContain('"name" text DEFAULT \'default\' NOT NULL');
@@ -585,220 +454,26 @@ describe('PostgresMigrationPlanner - column defaults', () => {
   });
 
   it('generates DEFAULT with sequence reference', () => {
-    const contractWithDefaults: PostgresSqlContract = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
-      storage: {
-        tables: {
-          counter: {
-            columns: {
-              id: {
-                nativeType: 'int8',
-                codecId: 'pg/int8@1',
-                nullable: false,
-                default: { kind: 'sequence', name: 'counter_id_seq' },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
+    const sql = planTableSql('counter', {
+      id: {
+        nativeType: 'int8',
+        codecId: 'pg/int8@1',
+        nullable: false,
+        default: { kind: 'sequence', name: 'counter_id_seq' },
       },
-      models: {},
-      relations: {},
-      mappings: { codecTypes: {}, operationTypes: {} },
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      sources: {},
-    };
-
-    const planner = createPostgresMigrationPlanner();
-    const result = planner.plan({
-      contract: contractWithDefaults as unknown as SqlContract<SqlStorage>,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
     });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.counter');
-    expect(tableOp).toBeDefined();
-    const sql = tableOp!.execute[0]!.sql;
     expect(sql).toContain('"id" int8 DEFAULT nextval(\'counter_id_seq\') NOT NULL');
   });
 
-  it('generates BIGSERIAL for autoincrement on int8 columns', () => {
-    const contractWithDefaults: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
-      storage: {
-        tables: {
-          bigcounter: {
-            columns: {
-              id: {
-                nativeType: 'int8',
-                codecId: 'pg/int8@1',
-                nullable: false,
-                default: { kind: 'function', expression: 'autoincrement()' },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      models: {},
-      relations: {},
-      mappings: { codecTypes: {}, operationTypes: {} },
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      sources: {},
-    };
-
-    const planner = createPostgresMigrationPlanner();
-    const result = planner.plan({
-      contract: contractWithDefaults,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.bigcounter');
-    expect(tableOp).toBeDefined();
-    const sql = tableOp!.execute[0]!.sql;
-    expect(sql).toContain('"id" BIGSERIAL NOT NULL');
-    expect(sql).not.toContain('DEFAULT');
-  });
-
-  it('generates SMALLSERIAL for autoincrement on int2 columns', () => {
-    const contractWithDefaults: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
-      storage: {
-        tables: {
-          smallcounter: {
-            columns: {
-              id: {
-                nativeType: 'int2',
-                codecId: 'pg/int2@1',
-                nullable: false,
-                default: { kind: 'function', expression: 'autoincrement()' },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-      models: {},
-      relations: {},
-      mappings: { codecTypes: {}, operationTypes: {} },
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      sources: {},
-    };
-
-    const planner = createPostgresMigrationPlanner();
-    const result = planner.plan({
-      contract: contractWithDefaults,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.smallcounter');
-    expect(tableOp).toBeDefined();
-    const sql = tableOp!.execute[0]!.sql;
-    expect(sql).toContain('"id" SMALLSERIAL NOT NULL');
-    expect(sql).not.toContain('DEFAULT');
-  });
-
   it('generates DEFAULT with function params when provided', () => {
-    const contractWithDefaults: SqlContract<SqlStorage> = {
-      schemaVersion: '1',
-      target: 'postgres',
-      targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
-      storage: {
-        tables: {
-          event: {
-            columns: {
-              id: {
-                nativeType: 'uuid',
-                codecId: 'pg/uuid@1',
-                nullable: false,
-                default: {
-                  kind: 'function',
-                  expression: "gen_random_uuid(INTERVAL '5500 years')",
-                },
-              },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
+    const sql = planTableSql('event', {
+      id: {
+        nativeType: 'uuid',
+        codecId: 'pg/uuid@1',
+        nullable: false,
+        default: { kind: 'function', expression: "gen_random_uuid(INTERVAL '5500 years')" },
       },
-      models: {},
-      relations: {},
-      mappings: { codecTypes: {}, operationTypes: {} },
-      capabilities: {},
-      extensionPacks: {},
-      meta: {},
-      sources: {},
-    };
-
-    const planner = createPostgresMigrationPlanner();
-    const result = planner.plan({
-      contract: contractWithDefaults,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents: [],
     });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-
-    const tableOp = result.plan.operations.find((op) => op.id === 'table.event');
-    expect(tableOp).toBeDefined();
-    const sql = tableOp!.execute[0]!.sql;
-    // uuid with params generates gen_random_uuid with the params
     expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid(INTERVAL \'5500 years\') NOT NULL');
   });
 });
