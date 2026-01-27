@@ -176,4 +176,4 @@ async function foo(db: Kysely<Database>) {
   return result;
 }
 
-foo.name;
+void foo;
