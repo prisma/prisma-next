@@ -1,0 +1,23 @@
+{
+  "name": "@prisma-next/integration-kysely",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "pnpm typecheck",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.27.0",
+  "devDependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/extension-pgvector": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "kysely": "^0.28.10",
+    "typescript": "catalog:"
+  }
+}
