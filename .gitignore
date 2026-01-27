@@ -17,3 +17,5 @@ packages/e2e-tests/.tmp-output
 
 # Generated contract files in test fixtures
 test/**/fixtures/generated/
+!test/e2e/framework/test/fixtures/generated/
+!test/e2e/framework/test/fixtures/generated/**

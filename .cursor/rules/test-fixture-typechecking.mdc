@@ -48,6 +48,14 @@ Exclude fixture directories when:
 Don't exclude when:
 - ❌ The fixtures are actual TypeScript source files that should be typechecked
 - ❌ The fixtures are shared utilities that other tests import
+- ❌ The fixtures are committed artifacts required for typechecking
+
+## Exception: Committed Contract Fixtures
+
+`test/e2e/framework/test/fixtures/generated` contains committed `contract.json` and
+`contract.d.ts` fixtures that tests and typechecks import directly. Keep these
+artifacts tracked in git and do not ignore this path in `.gitignore`, even though
+other `test/**/fixtures/generated` paths remain ignored.
 
 ## Example
 
