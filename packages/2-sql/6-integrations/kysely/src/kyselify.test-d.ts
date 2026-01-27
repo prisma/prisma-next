@@ -164,19 +164,15 @@ type Contract = SqlContract<
 
 type Database = KyselifyContract<Contract>;
 
-test('KyselifyContract converts Prisma Next contract to Kysely database schema', () => {
-  async function queryWithJoin(db: Kysely<Database>) {
-    const result = await db
-      .selectFrom('user')
-      .innerJoin('post', (jb) => jb.onTrue())
-      .select('post.id')
-      .select('post.embedding')
-      .executeTakeFirstOrThrow();
+declare const db: Kysely<Database>;
 
-    expectTypeOf(result).toEqualTypeOf<{ id: number; embedding: number[] | null }>();
+test('KyselifyContract converts Prisma Next contract to Kysely database schema', async () => {
+  const result = await db
+    .selectFrom('user')
+    .innerJoin('post', (jb) => jb.onTrue())
+    .select('post.id')
+    .select('post.embedding')
+    .executeTakeFirstOrThrow();
 
-    return result;
-  }
-
-  void queryWithJoin;
+  expectTypeOf(result).toEqualTypeOf<{ id: number; embedding: number[] | null }>();
 });
