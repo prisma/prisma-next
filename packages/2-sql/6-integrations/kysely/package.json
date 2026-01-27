@@ -1,13 +1,20 @@
 {
   "name": "@prisma-next/integration-kysely",
   "version": "0.0.0",
-  "description": "",
-  "main": "index.js",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Kysely integration for Prisma Next",
   "scripts": {
+    "build": "tsdown",
+    "prepublishOnly": "pnpm build",
     "test": "pnpm typecheck",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],
+  "files": [
+    "dist",
+    "src"
+  ],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.27.0",
@@ -17,7 +24,20 @@
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
     "kysely": "^0.28.10",
-    "typescript": "catalog:"
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
   }
 }

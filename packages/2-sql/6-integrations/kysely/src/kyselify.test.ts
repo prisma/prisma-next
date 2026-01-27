@@ -171,7 +171,7 @@ async function foo(db: Kysely<Database>) {
     .select('post.embedding')
     .executeTakeFirstOrThrow();
 
-  result satisfies { id: number };
+  result satisfies { id: number; embedding: number[] | null };
 
   return result;
 }
