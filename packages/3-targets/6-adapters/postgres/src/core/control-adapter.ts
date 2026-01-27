@@ -33,7 +33,7 @@ function parsePostgresDefault(rawDefault: string): ColumnDefault | undefined {
 
   // gen_random_uuid()
   if (/^gen_random_uuid\s*\(\s*\)$/i.test(trimmed)) {
-    return { kind: 'function', expression: 'uuid()' };
+    return { kind: 'function', expression: 'gen_random_uuid()' };
   }
 
   // Boolean literals

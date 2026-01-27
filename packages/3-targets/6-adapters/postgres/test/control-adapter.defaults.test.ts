@@ -198,7 +198,7 @@ describe('PostgresControlAdapter column defaults', () => {
       default: { kind: 'function', expression: 'now()' },
     });
     expect(columns['uuid']).toMatchObject({
-      default: { kind: 'function', expression: 'uuid()' },
+      default: { kind: 'function', expression: 'gen_random_uuid()' },
     });
     expect(columns['active']).toMatchObject({
       default: { kind: 'literal', value: true },
