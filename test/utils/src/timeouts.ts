@@ -1,5 +1,5 @@
 const BASE_TIMEOUTS = {
-  spinUpPpgDev: 15000,
+  spinUpPpgDev: 60000,
   typeScriptCompilation: 8000,
   databaseOperation: 5000,
   default: 100,

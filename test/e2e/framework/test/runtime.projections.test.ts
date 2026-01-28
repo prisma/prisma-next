@@ -1,9 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  createTestRuntimeFromClient,
-  setupE2EDatabase,
-} from '@prisma-next/integration-tests/test/utils';
+import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
@@ -15,10 +12,13 @@ import {
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
-import { loadContractFromDisk } from './utils';
+import { loadContractFromDisk, runDbInit } from './utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, '../../../../');
+const configPath = resolve(__dirname, 'fixtures/prisma-next.config.ts');
+const cliPath = resolve(repoRoot, 'packages/1-framework/3-tooling/cli/dist/cli.js');
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 describe('end-to-end nested projection queries', () => {
@@ -28,18 +28,13 @@ describe('end-to-end nested projection queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('drop table if exists "user"');
-            await c.query(
-              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
-              'ada@example.com',
-              'tess@example.com',
-              'mike@example.com',
-            ]);
-          });
+          await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
+            'ada@example.com',
+            'tess@example.com',
+            'mike@example.com',
+          ]);
 
           const adapter = createStubAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
@@ -110,17 +105,12 @@ describe('end-to-end nested projection queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('drop table if exists "user"');
-            await c.query(
-              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2)', [
-              'ada@example.com',
-              'tess@example.com',
-            ]);
-          });
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'ada@example.com',
+            'tess@example.com',
+          ]);
 
           const adapter = createStubAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
@@ -185,26 +175,16 @@ describe('end-to-end nested projection queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query(
-              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2)', [
-              'ada@example.com',
-              'tess@example.com',
-            ]);
-            await c.query('insert into "post" ("userId", title) values ($1, $2), ($1, $3)', [
-              1,
-              'First Post',
-              'Second Post',
-            ]);
-          });
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'ada@example.com',
+            'tess@example.com',
+          ]);
+          await client.query(
+            'insert into "post" ("userId", title, published) values ($1, $2, $3), ($1, $4, $5)',
+            [1, 'First Post', true, 'Second Post', false],
+          );
 
           const adapter = createStubAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);
@@ -283,17 +263,12 @@ describe('end-to-end nested projection queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client: import('pg').Client) => {
-          await setupE2EDatabase(client, contract, async (c: typeof client) => {
-            await c.query('drop table if exists "user"');
-            await c.query(
-              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2)', [
-              'ada@example.com',
-              'tess@example.com',
-            ]);
-          });
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'ada@example.com',
+            'tess@example.com',
+          ]);
 
           const adapter = createStubAdapter();
           const runtime = createTestRuntimeFromClient(contract, client);

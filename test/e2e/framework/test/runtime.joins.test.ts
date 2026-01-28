@@ -1,9 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  createTestRuntimeFromClient,
-  setupE2EDatabase,
-} from '@prisma-next/integration-tests/test/utils';
+import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { sql } from '@prisma-next/sql-lane/sql';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -16,37 +13,14 @@ import {
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
-import { loadContractFromDisk } from './utils';
+import { loadContractFromDisk, runDbInit } from './utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, '../../../../');
+const configPath = resolve(__dirname, 'fixtures/prisma-next.config.ts');
+const cliPath = resolve(repoRoot, 'packages/1-framework/3-tooling/cli/dist/cli.js');
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
-
-/**
- * Sets up the join test schema by dropping and creating user/post/comment tables.
- * Calls the provided setup function for test-specific data insertion.
- */
-async function setupJoinTestSchema(
-  client: Parameters<Parameters<typeof withClient>[1]>[0],
-  contract: Contract,
-  setupFn: (c: Parameters<Parameters<typeof withClient>[1]>[0]) => Promise<void>,
-): Promise<void> {
-  await setupE2EDatabase(client, contract, async (c) => {
-    await c.query('drop table if exists "comment"');
-    await c.query('drop table if exists "post"');
-    await c.query('drop table if exists "user"');
-    await c.query(
-      'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-    );
-    await c.query(
-      'create table "post" (id serial primary key, "userId" int4 not null, title text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-    );
-    await c.query(
-      'create table "comment" (id serial primary key, "postId" int4 not null, content text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-    );
-    await setupFn(c);
-  });
-}
 
 /**
  * Creates a test runtime and context for join tests.
@@ -74,18 +48,17 @@ describe('end-to-end JOIN queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client) => {
-          await setupJoinTestSchema(client, contract, async (c) => {
-            await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
-              'ada@example.com',
-              'tess@example.com',
-              'mike@example.com',
-            ]);
-            await c.query(
-              'insert into "post" ("userId", title) values ($1, $2), ($1, $3), ($4, $5)',
-              [1, 'First Post', 'Second Post', 2, 'Third Post'],
-            );
-          });
+          await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
+            'ada@example.com',
+            'tess@example.com',
+            'mike@example.com',
+          ]);
+          await client.query(
+            'insert into "post" ("userId", title, published) values ($1, $2, $3), ($1, $4, $5), ($6, $7, $8)',
+            [1, 'First Post', true, 'Second Post', false, 2, 'Third Post', true],
+          );
 
           const { runtime, context, tables } = createJoinTestRuntime(client, contract);
           const user = tables.user!;
@@ -135,18 +108,17 @@ describe('end-to-end JOIN queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client) => {
-          await setupJoinTestSchema(client, contract, async (c) => {
-            await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
-              'ada@example.com',
-              'tess@example.com',
-              'mike@example.com',
-            ]);
-            await c.query('insert into "post" ("userId", title) values ($1, $2)', [
-              1,
-              'First Post',
-            ]);
-          });
+          await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
+            'ada@example.com',
+            'tess@example.com',
+            'mike@example.com',
+          ]);
+          await client.query(
+            'insert into "post" ("userId", title, published) values ($1, $2, $3)',
+            [1, 'First Post', true],
+          );
 
           const { runtime, context, tables } = createJoinTestRuntime(client, contract);
           const user = tables.user!;
@@ -206,16 +178,13 @@ describe('end-to-end JOIN queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client) => {
-          await setupJoinTestSchema(client, contract, async (c) => {
-            await c.query('insert into "user" (email) values ($1)', ['ada@example.com']);
-            await c.query('insert into "post" ("userId", title) values ($1, $2), ($3, $4)', [
-              1,
-              'First Post',
-              999,
-              'Orphan Post',
-            ]);
-          });
+          await client.query('insert into "user" (email) values ($1)', ['ada@example.com']);
+          await client.query(
+            'insert into "post" ("userId", title, published) values ($1, $2, $3), ($4, $5, $6)',
+            [1, 'First Post', true, 999, 'Orphan Post', true],
+          );
 
           const { runtime, context, tables } = createJoinTestRuntime(client, contract);
           const user = tables.user!;
@@ -268,19 +237,16 @@ describe('end-to-end JOIN queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client) => {
-          await setupJoinTestSchema(client, contract, async (c) => {
-            await c.query('insert into "user" (email) values ($1), ($2)', [
-              'ada@example.com',
-              'tess@example.com',
-            ]);
-            await c.query('insert into "post" ("userId", title) values ($1, $2), ($3, $4)', [
-              1,
-              'First Post',
-              999,
-              'Orphan Post',
-            ]);
-          });
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'ada@example.com',
+            'tess@example.com',
+          ]);
+          await client.query(
+            'insert into "post" ("userId", title, published) values ($1, $2, $3), ($4, $5, $6)',
+            [1, 'First Post', true, 999, 'Orphan Post', true],
+          );
 
           const { runtime, context, tables } = createJoinTestRuntime(client, contract);
           const user = tables.user!;
@@ -338,23 +304,20 @@ describe('end-to-end JOIN queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client) => {
-          await setupJoinTestSchema(client, contract, async (c) => {
-            await c.query('insert into "user" (email) values ($1), ($2)', [
-              'ada@example.com',
-              'tess@example.com',
-            ]);
-            await c.query('insert into "post" ("userId", title) values ($1, $2), ($1, $3)', [
-              1,
-              'First Post',
-              'Second Post',
-            ]);
-            await c.query('insert into "comment" ("postId", content) values ($1, $2), ($1, $3)', [
-              1,
-              'First Comment',
-              'Second Comment',
-            ]);
-          });
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'ada@example.com',
+            'tess@example.com',
+          ]);
+          await client.query(
+            'insert into "post" ("userId", title, published) values ($1, $2, $3), ($1, $4, $5)',
+            [1, 'First Post', true, 'Second Post', false],
+          );
+          await client.query(
+            'insert into "comment" ("postId", content) values ($1, $2), ($1, $3)',
+            [1, 'First Comment', 'Second Comment'],
+          );
 
           const { runtime, context, tables } = createJoinTestRuntime(client, contract);
           const user = tables.user!;

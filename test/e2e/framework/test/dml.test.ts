@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createTestRuntime, setupTestDatabase } from '@prisma-next/integration-tests/test/utils';
+import { createTestRuntime } from '@prisma-next/integration-tests/test/utils';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -11,14 +11,17 @@ import {
   createTestContext,
   executePlanAndCollect,
 } from '@prisma-next/sql-runtime/test/utils';
-import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
+import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
-import { loadContractFromDisk } from './utils';
+import { loadContractFromDisk, runDbInit } from './utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, '../../../../');
+const configPath = resolve(__dirname, 'fixtures/prisma-next.config.ts');
+const cliPath = resolve(repoRoot, 'packages/1-framework/3-tooling/cli/dist/cli.js');
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 describe('DML E2E Tests', { timeout: 30000 }, () => {
@@ -38,6 +41,8 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
     builder = sql({ context });
 
     database = await createDevDatabase();
+    // Run db init BEFORE connecting the client to avoid connection conflicts
+    await runDbInit({ cliPath, configPath, dbUrl: database.connectionString, cwd: repoRoot });
     client = new Client({ connectionString: database.connectionString });
     await client.connect();
   }, timeouts.spinUpPpgDev);
@@ -52,20 +57,8 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
   });
 
   beforeEach(async () => {
-    await setupTestDatabase(client, contract, async (c: typeof client) => {
-      await c.query('DROP TABLE IF EXISTS "user"');
-      await c.query(`
-        CREATE TABLE "user" (
-          id SERIAL PRIMARY KEY,
-          email TEXT NOT NULL
-        )
-      `);
-    });
-  });
-
-  afterEach(async () => {
-    await teardownTestDatabase(client, ['user']);
-  });
+    await client.query('delete from "user"');
+  }, timeouts.databaseOperation);
 
   it('inserts, updates, and deletes a user', async () => {
     const runtime = createTestRuntime(

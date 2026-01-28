@@ -1,9 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  createTestRuntimeFromClient,
-  setupE2EDatabase,
-} from '@prisma-next/integration-tests/test/utils';
+import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -17,7 +14,7 @@ import { type DevDatabase, timeouts, withClient, withDevDatabase } from '@prisma
 import type { Client } from 'pg';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
-import { loadContractFromDisk } from './utils';
+import { loadContractFromDisk, runDbInit } from './utils';
 
 // Extend Contract type with capabilities for includeMany support
 type ContractWithCapabilities = Contract & {
@@ -31,6 +28,9 @@ type ContractWithCapabilities = Contract & {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, '../../../../');
+const configPath = resolve(__dirname, 'fixtures/prisma-next.config.ts');
+const cliPath = resolve(repoRoot, 'packages/1-framework/3-tooling/cli/dist/cli.js');
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 describe('end-to-end includeMany and leftJoin queries', () => {
@@ -40,27 +40,17 @@ describe('end-to-end includeMany and leftJoin queries', () => {
       const contract = await loadContractFromDisk<ContractWithCapabilities>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }: DevDatabase) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client: Client) => {
-          await setupE2EDatabase(client, contract, async (c: Client) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query(
-              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
-              'ada@example.com',
-              'tess@example.com',
-              'mike@example.com',
-            ]);
-            await c.query(
-              'insert into "post" ("userId", title) values ($1, $2), ($1, $3), ($4, $5)',
-              [1, 'Ada Post 1', 'Ada Post 2', 2, 'Tess Post 1'],
-            );
-          });
+          await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
+            'ada@example.com',
+            'tess@example.com',
+            'mike@example.com',
+          ]);
+          await client.query(
+            'insert into "post" ("userId", title, published) values ($1, $2, $3), ($1, $4, $5), ($6, $7, $8)',
+            [1, 'Ada Post 1', true, 'Ada Post 2', false, 2, 'Tess Post 1', true],
+          );
 
           const adapter = createStubAdapter();
           const context = createTestContext(contract, adapter);
@@ -132,23 +122,13 @@ describe('end-to-end includeMany and leftJoin queries', () => {
       const contract = await loadContractFromDisk<ContractWithCapabilities>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }: DevDatabase) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client: Client) => {
-          await setupE2EDatabase(client, contract, async (c: Client) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query(
-              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null, created_at timestamptz not null default now(), update_at timestamptz, published boolean not null default false)',
-            );
-            await c.query('insert into "user" (email) values ($1)', ['ada@example.com']);
-            await c.query(
-              'insert into "post" ("userId", title, published) values ($1, $2, $3), ($1, $4, $5), ($1, $6, $7)',
-              [1, 'Published Post 1', true, 'Unpublished Post', false, 'Published Post 2', true],
-            );
-          });
+          await client.query('insert into "user" (email) values ($1)', ['ada@example.com']);
+          await client.query(
+            'insert into "post" ("userId", title, published) values ($1, $2, $3), ($1, $4, $5), ($1, $6, $7)',
+            [1, 'Published Post 1', true, 'Unpublished Post', false, 'Published Post 2', true],
+          );
 
           const adapter = createStubAdapter();
           const context = createTestContext(contract, adapter);
@@ -203,26 +183,16 @@ describe('end-to-end includeMany and leftJoin queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }: DevDatabase) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client: Client) => {
-          await setupE2EDatabase(client, contract, async (c: Client) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query(
-              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2)', [
-              'ada@example.com',
-              'tess@example.com',
-            ]);
-            await c.query(
-              'insert into "post" ("userId", title) values ($1, $2), ($1, $3), ($4, $5)',
-              [1, 'Ada Post 1', 'Ada Post 2', 2, 'Tess Post 1'],
-            );
-          });
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'ada@example.com',
+            'tess@example.com',
+          ]);
+          await client.query(
+            'insert into "post" ("userId", title, published) values ($1, $2, $3), ($1, $4, $5), ($6, $7, $8)',
+            [1, 'Ada Post 1', true, 'Ada Post 2', false, 2, 'Tess Post 1', true],
+          );
 
           const adapter = createStubAdapter();
           const context = createTestContext(contract, adapter);
@@ -282,26 +252,16 @@ describe('end-to-end includeMany and leftJoin queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }: DevDatabase) => {
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
         await withClient(connectionString, async (client: Client) => {
-          await setupE2EDatabase(client, contract, async (c: Client) => {
-            await c.query('drop table if exists "comment"');
-            await c.query('drop table if exists "post"');
-            await c.query('drop table if exists "user"');
-            await c.query(
-              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now())',
-            );
-            await c.query(
-              'create table "post" (id serial primary key, "userId" int4 not null, title text not null, created_at timestamptz not null default now())',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2)', [
-              'ada@example.com',
-              'tess@example.com',
-            ]);
-            await c.query(
-              'insert into "post" ("userId", title) values ($1, $2), ($1, $3), ($4, $5)',
-              [1, 'Ada Post 1', 'Ada Post 2', 2, 'Tess Post 1'],
-            );
-          });
+          await client.query('insert into "user" (email) values ($1), ($2)', [
+            'ada@example.com',
+            'tess@example.com',
+          ]);
+          await client.query(
+            'insert into "post" ("userId", title, published) values ($1, $2, $3), ($1, $4, $5), ($6, $7, $8)',
+            [1, 'Ada Post 1', true, 'Ada Post 2', false, 2, 'Tess Post 1', true],
+          );
 
           const adapter = createStubAdapter();
           const context = createTestContext(contract, adapter);

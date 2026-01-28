@@ -1,9 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  createTestRuntimeFromClient,
-  setupE2EDatabase,
-} from '@prisma-next/integration-tests/test/utils';
+import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import {
@@ -14,7 +11,7 @@ import {
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
-import { emitAndVerifyContract, loadContractFromDisk } from './utils';
+import { emitAndVerifyContract, loadContractFromDisk, runDbInit } from './utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,18 +36,15 @@ describe('end-to-end basic queries', () => {
       const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
       await withDevDatabase(async ({ connectionString }) => {
+        // Run db init BEFORE connecting the client to avoid connection conflicts
+        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
+
         await withClient(connectionString, async (client) => {
-          await setupE2EDatabase(client, contract, async (c) => {
-            await c.query('drop table if exists "user"');
-            await c.query(
-              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
-            );
-            await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
-              'ada@example.com',
-              'tess@example.com',
-              'mike@example.com',
-            ]);
-          });
+          await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
+            'ada@example.com',
+            'tess@example.com',
+            'mike@example.com',
+          ]);
 
           const adapter = createStubAdapter();
           const context = createTestContext(contract, adapter);

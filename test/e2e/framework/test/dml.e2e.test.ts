@@ -1,10 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  createTestRuntimeFromClient,
-  setupE2EDatabase,
-} from '@prisma-next/integration-tests/test/utils';
+import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -17,10 +14,13 @@ import {
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
-import { loadContractFromDisk } from './utils';
+import { loadContractFromDisk, runDbInit } from './utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, '../../../../');
+const configPath = resolve(__dirname, 'fixtures/prisma-next.config.ts');
+const cliPath = resolve(repoRoot, 'packages/1-framework/3-tooling/cli/dist/cli.js');
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 describe('DML E2E Tests', { timeout: 30000 }, () => {
@@ -28,12 +28,8 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
     const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 
     await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+      await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
       await withClient(connectionString, async (client: import('pg').Client) => {
-        await setupE2EDatabase(client, contract, async (c: typeof client) => {
-          await c.query('DROP TABLE IF EXISTS "user"');
-          await c.query('CREATE TABLE "user" (id SERIAL PRIMARY KEY, email TEXT NOT NULL)');
-        });
-
         const adapter = createStubAdapter();
         const context = createTestContext(contract, adapter);
         const runtime = createTestRuntimeFromClient(contract, client);

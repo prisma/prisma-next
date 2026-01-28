@@ -57,3 +57,17 @@ export async function emitAndVerifyContract(
 
   return validateContract<SqlContract<SqlStorage>>(emittedContract);
 }
+
+export async function runDbInit(options: {
+  readonly cliPath: string;
+  readonly configPath: string;
+  readonly dbUrl: string;
+  readonly cwd?: string;
+}): Promise<void> {
+  const { cliPath, configPath, dbUrl, cwd } = options;
+  await execFileAsync(
+    'node',
+    [cliPath, 'db', 'init', '--config', configPath, '--db', dbUrl, '--quiet', '--no-color'],
+    { cwd, timeout: 30000 },
+  );
+}
