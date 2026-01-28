@@ -38,27 +38,22 @@ function parsePostgresDefault(rawDefault: string): ColumnDefault | undefined {
 
   // Boolean literals
   if (/^true$/i.test(trimmed)) {
-    return { kind: 'literal', value: true };
+    return { kind: 'literal', expression: 'true' };
   }
   if (/^false$/i.test(trimmed)) {
-    return { kind: 'literal', value: false };
+    return { kind: 'literal', expression: 'false' };
   }
 
   // Numeric literals (integer or decimal)
   if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-    const num = Number(trimmed);
-    if (!Number.isNaN(num)) {
-      return { kind: 'literal', value: num };
-    }
+    return { kind: 'literal', expression: trimmed };
   }
 
   // String literals: 'value'::type or just 'value'
   // Match: 'some text'::text, 'hello'::character varying, 'value', etc.
   const stringMatch = trimmed.match(/^'((?:[^']|'')*)'(?:::[\w\s]+(?:\(\d+\))?)?$/);
   if (stringMatch?.[1] !== undefined) {
-    // Unescape doubled single quotes
-    const value = stringMatch[1].replace(/''/g, "'");
-    return { kind: 'literal', value };
+    return { kind: 'literal', expression: trimmed };
   }
 
   // Unrecognized expression - return as a function with the raw expression

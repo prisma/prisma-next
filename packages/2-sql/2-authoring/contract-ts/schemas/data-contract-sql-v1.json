@@ -145,12 +145,12 @@
               "type": "string",
               "enum": ["literal"]
             },
-            "value": {
-              "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }],
-              "description": "The literal default value"
+            "expression": {
+              "type": "string",
+              "description": "SQL literal expression for the default value"
             }
           },
-          "required": ["kind", "value"]
+          "required": ["kind", "expression"]
         },
         {
           "type": "object",

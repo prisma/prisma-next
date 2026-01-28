@@ -128,7 +128,7 @@ describe('TableBuilder', () => {
       })
       .column('active', {
         type: textColumn,
-        default: { kind: 'literal', value: true },
+        default: { kind: 'literal', expression: 'true' },
       })
       .build();
 
@@ -137,7 +137,7 @@ describe('TableBuilder', () => {
       kind: 'function',
       expression: 'gen_random_uuid()',
     });
-    expect(table.columns.active.default).toEqual({ kind: 'literal', value: true });
+    expect(table.columns.active.default).toEqual({ kind: 'literal', expression: 'true' });
   });
 
   it('stores typeParams from descriptor', () => {

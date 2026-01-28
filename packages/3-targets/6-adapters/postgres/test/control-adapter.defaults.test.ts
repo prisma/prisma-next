@@ -201,22 +201,22 @@ describe('PostgresControlAdapter column defaults', () => {
       default: { kind: 'function', expression: 'gen_random_uuid()' },
     });
     expect(columns['active']).toMatchObject({
-      default: { kind: 'literal', value: true },
+      default: { kind: 'literal', expression: 'true' },
     });
     expect(columns['disabled']).toMatchObject({
-      default: { kind: 'literal', value: false },
+      default: { kind: 'literal', expression: 'false' },
     });
     expect(columns['count']).toMatchObject({
-      default: { kind: 'literal', value: 42 },
+      default: { kind: 'literal', expression: '42' },
     });
     expect(columns['ratio']).toMatchObject({
-      default: { kind: 'literal', value: 3.14 },
+      default: { kind: 'literal', expression: '3.14' },
     });
     expect(columns['name']).toMatchObject({
-      default: { kind: 'literal', value: "Hello's" },
+      default: { kind: 'literal', expression: "'Hello''s'::text" },
     });
     expect(columns['note']).toMatchObject({
-      default: { kind: 'literal', value: 'plain text' },
+      default: { kind: 'literal', expression: "'plain text'" },
     });
     expect(columns['fallback']).toMatchObject({
       default: { kind: 'function', expression: 'uuid_generate_v4()' },

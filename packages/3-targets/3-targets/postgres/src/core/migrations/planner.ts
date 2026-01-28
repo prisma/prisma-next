@@ -694,7 +694,7 @@ function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined)
 
   switch (columnDefault.kind) {
     case 'literal':
-      return `DEFAULT ${escapeLiteralValue(columnDefault.value)}`;
+      return `DEFAULT ${columnDefault.expression}`;
     case 'function': {
       // autoincrement is handled by SERIAL type, no explicit DEFAULT needed
       if (columnDefault.expression === 'autoincrement()') {
@@ -708,20 +708,6 @@ function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined)
   }
 
   return '';
-}
-
-/**
- * Escapes a literal value for use in SQL.
- */
-function escapeLiteralValue(value: string | number | boolean): string {
-  if (typeof value === 'string') {
-    return `'${escapeLiteral(value)}'`;
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'TRUE' : 'FALSE';
-  }
-  // number
-  return String(value);
 }
 
 function qualifyTableName(schema: string, table: string): string {

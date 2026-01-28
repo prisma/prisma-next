@@ -63,7 +63,11 @@ export interface FieldType {
 }
 
 export type ColumnDefault =
-  | { readonly kind: 'literal'; readonly value: string | number | boolean }
+  | {
+      readonly kind: 'literal';
+      readonly expression: string;
+      readonly value?: string | number | boolean;
+    }
   | { readonly kind: 'function'; readonly expression: string };
 
 export interface Source {

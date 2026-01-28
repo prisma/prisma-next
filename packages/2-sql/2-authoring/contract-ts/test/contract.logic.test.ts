@@ -677,7 +677,7 @@ describe('validateContract logic validation', () => {
                   codecId: 'pg/text@1',
                   nativeType: 'text',
                   nullable: false,
-                  default: { kind: 'literal', value: 'draft' },
+                  default: { kind: 'literal', expression: "'draft'" },
                 },
               },
               primaryKey: { columns: ['id'] },

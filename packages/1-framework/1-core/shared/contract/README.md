@@ -14,7 +14,7 @@ This package provides the foundational type definitions for Prisma Next, includi
 - **Core Contract Types**: Defines framework-level contract types (`ContractBase`, `Source`, `FamilyInstance`) that are shared across all target families
 - **Framework Component Model**: Provides base descriptor interfaces (`FamilyDescriptor`, `TargetDescriptor`, `AdapterDescriptor`, `DriverDescriptor`, `ExtensionDescriptor`) and identity instance bases (`FamilyInstance`, `TargetInstance`, `AdapterInstance`, `DriverInstance`, `ExtensionInstance`) that plane-specific types extend
 - **Document Family Types**: Provides TypeScript types for document target family contracts (`DocumentContract`)
-- **Shared Column Defaults**: Defines `ColumnDefault` for db-agnostic defaults (literal and function) reused across family contracts and authoring builders
+- **Shared Column Defaults**: Defines `ColumnDefault` for db-agnostic defaults (literal expression and function) reused across family contracts and authoring builders
 - **JSON Schema Validation**: Provides JSON Schemas for validating contract structure in IDEs and tooling
 - **Type Guards**: Provides runtime type guards for narrowing contract types (`isDocumentContract`)
 - **Emitter Types**: Defines emitter SPI types (`TargetFamilyHook`, `ValidationContext`, `TypesImportSpec`) that are shared between emitter and control plane

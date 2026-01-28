@@ -51,7 +51,7 @@ describe('SqlFamilyInstance.toSchemaView', () => {
               name: 'status',
               nativeType: 'text',
               nullable: false,
-              default: { kind: 'literal', value: 'draft' },
+              default: { kind: 'literal', expression: "'draft'" },
             },
           },
           primaryKey: { columns: ['id'] },
@@ -86,7 +86,7 @@ describe('SqlFamilyInstance.toSchemaView', () => {
     expect(statusNode?.meta).toMatchObject({
       nativeType: 'text',
       nullable: false,
-      default: { kind: 'literal', value: 'draft' },
+      default: { kind: 'literal', expression: "'draft'" },
     });
   });
 });

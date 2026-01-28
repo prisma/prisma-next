@@ -14,6 +14,7 @@ import type {
   StorageTypeInstance,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
+import { ColumnDefaultSchema } from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
@@ -21,19 +22,6 @@ import type { O } from 'ts-toolbelt';
  * Structural validation schema for SqlContract using Arktype.
  * This validates the shape and types of the contract structure.
  */
-
-// Column default value schemas
-const ColumnDefaultLiteralSchema = {
-  kind: "'literal'",
-  value: 'string | number | boolean',
-} as const;
-
-const ColumnDefaultFunctionSchema = {
-  kind: "'function'",
-  expression: 'string',
-} as const;
-
-const ColumnDefaultSchema = type(ColumnDefaultLiteralSchema).or(ColumnDefaultFunctionSchema);
 
 const StorageColumnSchema = type.declare<StorageColumn>().type({
   nativeType: 'string',

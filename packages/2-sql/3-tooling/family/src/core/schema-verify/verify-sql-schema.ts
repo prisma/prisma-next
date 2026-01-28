@@ -646,7 +646,7 @@ function collectDependenciesFromFrameworkComponents<T extends string>(
 function describeColumnDefault(columnDefault: ColumnDefault): string {
   switch (columnDefault.kind) {
     case 'literal':
-      return `literal(${JSON.stringify(columnDefault.value)})`;
+      return `literal(${columnDefault.expression})`;
     case 'function':
       return columnDefault.expression;
   }
@@ -661,7 +661,8 @@ function columnDefaultsEqual(a: ColumnDefault, b: ColumnDefault): boolean {
     return false;
   }
   if (a.kind === 'literal' && b.kind === 'literal') {
-    return a.value === b.value;
+    const normalizeLiteral = (expr: string) => expr.trim();
+    return normalizeLiteral(a.expression) === normalizeLiteral(b.expression);
   }
   if (a.kind === 'function' && b.kind === 'function') {
     // Normalize function expressions for comparison (case-insensitive, whitespace-tolerant)
