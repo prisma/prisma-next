@@ -126,6 +126,14 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
     result[key] = omitDefaults(value, currentPath);
   }
 
+  /**
+   * Columns with defaults should always be NOT nullable.
+   */
+  const hasDefault = Object.hasOwn(obj, 'default');
+  if (hasDefault) {
+    result['nullable'] = false;
+  }
+
   return result;
 }
 

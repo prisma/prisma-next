@@ -418,6 +418,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-core/shared/contract
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-core/shared/utils
       ts-toolbelt:
         specifier: ^9.6.0
         version: 9.6.0

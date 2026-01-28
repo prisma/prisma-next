@@ -1,4 +1,5 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
@@ -108,8 +109,8 @@ export class TableBuilder<
       nullable,
       type: codecId,
       nativeType,
-      ...(typeParams ? { typeParams } : {}),
-      ...(options.default ? { default: options.default } : {}),
+      ...ifDefined('typeParams', typeParams),
+      ...ifDefined('default', options.default),
     } as ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>;
     const newColumns = { ...this._columns, [name]: columnState } as Columns &
       Record<

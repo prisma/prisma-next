@@ -9,7 +9,6 @@ alwaysApply: false
 ## Key points
 
 - When adding column defaults, re-emit the contract and verify the emitted JSON includes the full default payload.
-- Keep `nullable: false` explicit for columns with defaults in emitted contracts.
 - Literal defaults must include a `value` in the emitted contract; avoid falsey literals unless the emitter preserves them.
 - Add the corresponding `defaults.*` capability when using function defaults like `autoincrement()` or `now()`.
 
