@@ -33,10 +33,9 @@ export interface PostgresDriverOptions {
 
 const DEFAULT_BATCH_SIZE = 100;
 
-type ConnectionOptions = {
-  readonly cursorBatchSize: number;
-  readonly cursorDisabled: boolean;
-};
+type ConnectionOptions =
+  | { readonly cursorDisabled: true }
+  | { readonly cursorBatchSize: number; readonly cursorDisabled: false };
 
 abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Client>
   implements SqlQueryable
@@ -55,7 +54,12 @@ abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Cl
     try {
       if (!this.options.cursorDisabled) {
         try {
-          for await (const row of this.executeWithCursor(client, request.sql, request.params)) {
+          for await (const row of this.executeWithCursor(
+            client,
+            request.sql,
+            request.params,
+            this.options.cursorBatchSize,
+          )) {
             yield row as Row;
           }
           return;
@@ -114,12 +118,13 @@ abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Cl
     client: PoolClient | Client,
     sql: string,
     params: readonly unknown[] | undefined,
+    cursorBatchSize: number,
   ): AsyncIterable<Record<string, unknown>> {
     const cursor = client.query(new Cursor(sql, params as unknown[] | undefined));
 
     try {
       while (true) {
-        const rows = await readCursor(cursor, this.options.cursorBatchSize);
+        const rows = await readCursor(cursor, cursorBatchSize);
         if (rows.length === 0) {
           break;
         }
