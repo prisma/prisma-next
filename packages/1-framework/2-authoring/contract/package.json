@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "ts-toolbelt": "^9.6.0"
   },
   "devDependencies": {

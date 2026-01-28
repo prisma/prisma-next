@@ -84,6 +84,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype
 - `.cursor/rules/control-plane-descriptors.mdc` — Control plane descriptor pattern (Control*Descriptor types, driver requirement)
 - `.cursor/rules/family-instance-domain-actions.mdc` — Family instance domain actions (inline core logic, import helper functions)
+- `.cursor/rules/storage-type-hooks.mdc` — Codec-owned storage type hooks (avoid enum fields in shared IR)
 
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.

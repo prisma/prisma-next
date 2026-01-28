@@ -211,6 +211,61 @@ describe('sql-target-family-hook parameterized type emission', () => {
     });
   });
 
+  describe('enum unions', () => {
+    it('emits literal unions in value order', () => {
+      const ir = createContractIR({
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: {
+              role: { column: 'role' },
+            },
+            relations: {},
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                role: {
+                  nativeType: 'role',
+                  codecId: 'pg/enum@1',
+                  nullable: false,
+                  typeRef: 'Role',
+                },
+              },
+              primaryKey: { columns: [] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            Role: {
+              codecId: 'pg/enum@1',
+              nativeType: 'role',
+              typeParams: { values: ['USER', 'ADMIN', 'MODERATOR'] },
+            },
+          },
+        },
+      });
+
+      const enumRenderer: TypeRenderEntry = {
+        codecId: 'pg/enum@1',
+        render: (params) => (params['values'] as string[]).map((value) => `'${value}'`).join(' | '),
+      };
+
+      const parameterizedRenderers = new Map<string, TypeRenderEntry>();
+      parameterizedRenderers.set('pg/enum@1', enumRenderer);
+
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes, {
+        parameterizedRenderers,
+      });
+
+      expect(types).toContain("readonly role: 'USER' | 'ADMIN' | 'MODERATOR'");
+    });
+  });
+
   describe('columns with typeRef', () => {
     it('resolves typeRef to storage.types and emits parameterized type', () => {
       const ir = createContractIR({

@@ -31,6 +31,9 @@ const defaultCapabilities = Object.freeze({
     jsonAgg: true,
     returning: true,
   },
+  sql: {
+    enums: true,
+  },
 });
 
 class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, PostgresLoweredStatement> {

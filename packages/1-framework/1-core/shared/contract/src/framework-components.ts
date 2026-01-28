@@ -236,6 +236,11 @@ export interface ComponentMetadata {
        * Example: `Vector<N>` for pgvector renderers that emit `Vector<{{length}}>`
        */
       readonly typeImports?: ReadonlyArray<TypesImportSpec>;
+      /**
+       * Optional control-plane hooks keyed by codecId.
+       * Used by family-specific planners/verifiers to handle storage types.
+       */
+      readonly controlPlane?: Record<string, unknown>;
     };
     readonly operationTypes?: { readonly import: TypesImportSpec };
     readonly storage?: ReadonlyArray<{

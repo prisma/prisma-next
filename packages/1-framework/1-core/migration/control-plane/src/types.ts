@@ -399,6 +399,8 @@ export interface SchemaIssue {
     | 'extra_unique_constraint'
     | 'extra_index'
     | 'type_mismatch'
+    | 'type_missing'
+    | 'type_values_mismatch'
     | 'nullability_mismatch'
     | 'primary_key_mismatch'
     | 'foreign_key_mismatch'
@@ -408,6 +410,7 @@ export interface SchemaIssue {
   readonly table: string;
   readonly column?: string;
   readonly indexOrConstraint?: string;
+  readonly typeName?: string;
   readonly expected?: string;
   readonly actual?: string;
   readonly message: string;

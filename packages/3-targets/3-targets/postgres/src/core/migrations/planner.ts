@@ -8,6 +8,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import {
   createMigrationPlan,
+  extractCodecControlHooks,
   plannerFailure,
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
@@ -26,7 +27,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
-type OperationClass = 'extension' | 'table' | 'unique' | 'index' | 'foreignKey';
+type OperationClass = 'extension' | 'type' | 'table' | 'unique' | 'index' | 'foreignKey';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -90,9 +91,15 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
 
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
+    const storageTypePlan = this.buildStorageTypeOperations(options, schemaName);
+    if (storageTypePlan.conflicts.length > 0) {
+      return plannerFailure(storageTypePlan.conflicts);
+    }
+
     // Build extension operations from component-owned database dependencies
     operations.push(
       ...this.buildDatabaseDependencyOperations(options),
+      ...storageTypePlan.operations,
       ...this.buildTableOperations(options.contract.storage.tables, options.schema, schemaName),
       ...this.buildColumnOperations(options.contract.storage.tables, options.schema, schemaName),
       ...this.buildPrimaryKeyOperations(
@@ -170,6 +177,55 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     }
 
     return operations;
+  }
+
+  private buildStorageTypeOperations(
+    options: PlannerOptionsWithComponents,
+    schemaName: string,
+  ): {
+    readonly operations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+    readonly conflicts: readonly SqlPlannerConflict[];
+  } {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    const conflicts: SqlPlannerConflict[] = [];
+    const storageTypes = options.contract.storage.types ?? {};
+    const hooks = extractCodecControlHooks(options.frameworkComponents);
+
+    for (const [typeName, typeInstance] of sortedEntries(storageTypes)) {
+      const hook = hooks.get(typeInstance.codecId);
+      const planResult = hook?.planTypeOperations?.({
+        typeName,
+        typeInstance,
+        contract: options.contract,
+        schema: options.schema,
+        schemaName,
+        policy: options.policy,
+      });
+      if (!planResult) {
+        continue;
+      }
+      for (const operation of planResult.operations) {
+        if (!options.policy.allowedOperationClasses.includes(operation.operationClass)) {
+          conflicts.push({
+            kind: 'missingButNonAdditive',
+            summary: `Storage type "${typeName}" requires "${operation.operationClass}" operation "${operation.id}"`,
+            location: {
+              type: typeName,
+            },
+          });
+          continue;
+        }
+        operations.push({
+          ...operation,
+          target: {
+            id: operation.target.id,
+            details: this.buildTargetDetails('type', typeName, schemaName),
+          },
+        });
+      }
+    }
+
+    return { operations, conflicts };
   }
   private collectDependencies(
     options: PlannerOptionsWithComponents,
@@ -807,6 +863,8 @@ function hasForeignKey(table: SqlSchemaIR['tables'][string], fk: ForeignKey): bo
 
 function isAdditiveIssue(issue: SchemaIssue): boolean {
   switch (issue.kind) {
+    case 'type_missing':
+    case 'type_values_mismatch':
     case 'missing_table':
     case 'missing_column':
     case 'extension_missing':

@@ -4,6 +4,13 @@ This document defines the canonical capability keys and reserved namespaces used
 
 ## Core Capability Namespaces
 
+### `sql`
+SQL-family capabilities shared across SQL targets.
+
+| Capability | Type | Description | Stability |
+|------------|------|-------------|-----------|
+| `enums` | boolean | Supports contract-defined storage enums | Stable |
+
 ### `postgres`
 Core PostgreSQL capabilities managed by the adapter.
 
@@ -76,6 +83,7 @@ The following namespaces are reserved and cannot be used by extension packs:
 - `prisma` - Reserved for Prisma core features
 - `core` - Reserved for core adapter capabilities
 - `internal` - Reserved for internal implementation details
+- `sql` - Reserved for SQL family capabilities
 
 ### Adapter Namespaces
 - `postgres` - PostgreSQL adapter capabilities
@@ -184,6 +192,7 @@ Canonical capability keys with descriptions, typical implementers, and ADR refer
 
 | Capability key | Description | Implemented by | ADRs |
 |---|---|---|---|
+| sql.enums | Contract-defined enum storage types | postgres adapter | ADR 065 |
 | join.lateral | LATERAL join lowering | postgres adapter | ADR 065 |
 | join.semi | SEMI join lowering | adapters that support SEMI semantics | ADR 065 |
 | join.anti | ANTI join lowering | adapters that support ANTI semantics | ADR 065 |

@@ -1,3 +1,4 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
@@ -98,7 +99,7 @@ export class TableBuilder<
     PrimaryKey
   > {
     const nullable = (options.nullable ?? false) as Nullable extends true ? true : false;
-    const { codecId, nativeType, typeParams: descriptorTypeParams } = options.type;
+    const { codecId, nativeType, typeParams: descriptorTypeParams, typeRef } = options.type;
     const typeParams = options.typeParams ?? descriptorTypeParams;
 
     const columnState = {
@@ -106,7 +107,8 @@ export class TableBuilder<
       nullable,
       type: codecId,
       nativeType,
-      ...(typeParams ? { typeParams } : {}),
+      ...ifDefined('typeParams', typeParams),
+      ...ifDefined('typeRef', typeRef),
     } as ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>;
     const newColumns = { ...this._columns, [name]: columnState } as Columns &
       Record<

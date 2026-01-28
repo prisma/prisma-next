@@ -10,6 +10,7 @@ export type ColumnTypeDescriptor = {
   readonly codecId: string;
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown>;
+  readonly typeRef?: string;
 };
 
 export interface ColumnBuilderState<
@@ -22,7 +23,14 @@ export interface ColumnBuilderState<
   readonly type: Type;
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown>;
+  readonly typeRef?: string;
 }
+
+export type StorageTypeInstanceState = {
+  readonly codecId: string;
+  readonly nativeType: string;
+  readonly typeParams: Record<string, unknown>;
+};
 
 /**
  * Unique constraint definition for table builder.
@@ -126,6 +134,7 @@ export interface ContractBuilderState<
   readonly coreHash?: CoreHash;
   readonly extensionPacks?: ExtensionPacks;
   readonly capabilities?: Capabilities;
+  readonly storageTypes?: Record<string, StorageTypeInstanceState>;
   /**
    * Array of extension pack namespace identifiers (e.g., ['pgvector', 'postgis']).
    * Populated when extension packs are registered during contract building.

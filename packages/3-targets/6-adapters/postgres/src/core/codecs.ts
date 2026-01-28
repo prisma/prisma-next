@@ -174,6 +174,13 @@ const pgBoolCodec = codec<'pg/bool@1', boolean, boolean>({
   },
 });
 
+const pgEnumCodec = codec<'pg/enum@1', string, string>({
+  typeId: 'pg/enum@1',
+  targetTypes: ['enum'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+});
+
 // Build codec definitions using the builder DSL
 const codecs = defineCodecs()
   .add('text', pgTextCodec)
@@ -184,7 +191,8 @@ const codecs = defineCodecs()
   .add('float8', pgFloat8Codec)
   .add('timestamp', pgTimestampCodec)
   .add('timestamptz', pgTimestamptzCodec)
-  .add('bool', pgBoolCodec);
+  .add('bool', pgBoolCodec)
+  .add('enum', pgEnumCodec);
 
 // Export derived structures directly from codecs builder
 export const codecDefinitions = codecs.codecDefinitions;
