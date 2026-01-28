@@ -9,6 +9,8 @@ import type {
   SqlContract,
   SqlMappings,
   SqlStorage,
+  StorageColumn,
+  StorageTable,
   StorageTypeInstance,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
@@ -33,7 +35,7 @@ const ColumnDefaultFunctionSchema = {
 
 const ColumnDefaultSchema = type(ColumnDefaultLiteralSchema).or(ColumnDefaultFunctionSchema);
 
-const StorageColumnSchema = type({
+const StorageColumnSchema = type.declare<StorageColumn>().type({
   nativeType: 'string',
   codecId: 'string',
   nullable: 'boolean',
@@ -74,7 +76,7 @@ const ForeignKeySchema = type.declare<ForeignKey>().type({
   'name?': 'string',
 });
 
-const StorageTableSchema = type({
+const StorageTableSchema = type.declare<StorageTable>().type({
   columns: type({ '[string]': StorageColumnSchema }),
   'primaryKey?': PrimaryKeySchema,
   uniques: UniqueConstraintSchema.array().readonly(),
@@ -82,7 +84,7 @@ const StorageTableSchema = type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
-const StorageSchema = type({
+const StorageSchema = type.declare<SqlStorage>().type({
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
