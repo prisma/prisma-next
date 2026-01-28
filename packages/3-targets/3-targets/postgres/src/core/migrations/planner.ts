@@ -26,6 +26,7 @@ import type {
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 type OperationClass = 'extension' | 'type' | 'table' | 'unique' | 'index' | 'foreignKey';
 
@@ -121,7 +122,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       origin: null,
       destination: {
         coreHash: options.contract.coreHash,
-        ...(options.contract.profileHash ? { profileHash: options.contract.profileHash } : {}),
+        ...ifDefined('profileHash', options.contract.profileHash),
       },
       operations,
     });
@@ -580,7 +581,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       schema,
       objectType,
       name,
-      ...(table ? { table } : {}),
+      ...ifDefined('table', table),
     };
   }
 
@@ -644,16 +645,16 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
     const meta =
       issue.expected || issue.actual
         ? Object.freeze({
-            ...(issue.expected ? { expected: issue.expected } : {}),
-            ...(issue.actual ? { actual: issue.actual } : {}),
+            ...ifDefined('expected', issue.expected),
+            ...ifDefined('actual', issue.actual),
           })
         : undefined;
 
     return {
       kind,
       summary: issue.message,
-      ...(location ? { location } : {}),
-      ...(meta ? { meta } : {}),
+      ...ifDefined('location', location),
+      ...ifDefined('meta', meta),
     };
   }
 }
@@ -721,13 +722,25 @@ function toRegclassLiteral(schema: string, name: string): string {
   return `'${escapeLiteral(regclass)}'`;
 }
 
-/** Escapes and quotes a SQL identifier (table, column, schema name). */
+/**
+ * Escapes and quotes a SQL identifier (table, column, schema name).
+ * Includes null byte validation for security.
+ */
 function quoteIdentifier(identifier: string): string {
-  // TypeScript enforces string type - no runtime check needed for internal callers
+  if (identifier.includes('\0')) {
+    throw new Error(`Identifier cannot contain null bytes: ${identifier.replace(/\0/g, '\\0')}`);
+  }
   return `"${identifier.replace(/"/g, '""')}"`;
 }
 
+/**
+ * Escapes a string literal for SQL.
+ * Includes null byte validation for security.
+ */
 function escapeLiteral(value: string): string {
+  if (value.includes('\0')) {
+    throw new Error(`Literal cannot contain null bytes: ${value.replace(/\0/g, '\\0')}`);
+  }
   return value.replace(/'/g, "''");
 }
 

@@ -1,7 +1,8 @@
-import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
+import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { escapeLiteral, qualifyName, quoteIdentifier } from './sql-utils';
 
 /**
  * Postgres enum control hooks.
@@ -41,91 +42,40 @@ const ENUM_INTROSPECT_QUERY = `
 `;
 
 // ============================================================================
-// Type Guards
+// Schema Helpers (Simplified)
 // ============================================================================
 
+/**
+ * Type guard for string arrays. Used for runtime validation of introspected data.
+ */
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object';
-}
-
-// ============================================================================
-// Contract and Schema Helpers
-// ============================================================================
-
+/**
+ * Extracts enum values from a StorageTypeInstance.
+ * Returns null if values are missing or invalid.
+ */
 function getEnumValues(typeInstance: StorageTypeInstance): readonly string[] | null {
-  const params = typeInstance.typeParams;
-  if (!params || typeof params !== 'object') {
-    return null;
-  }
-  const values = params['values'];
-  if (!isStringArray(values)) {
-    return null;
-  }
-  return values;
+  const values = typeInstance.typeParams?.['values'];
+  return isStringArray(values) ? values : null;
 }
 
-function isStorageTypeInstance(value: unknown): value is StorageTypeInstance {
-  if (!isRecord(value)) {
-    return false;
-  }
-  return (
-    typeof value['codecId'] === 'string' &&
-    typeof value['nativeType'] === 'string' &&
-    isRecord(value['typeParams'])
-  );
-}
-
-function readStorageTypesFromSchema(schema: SqlSchemaIR): Record<string, StorageTypeInstance> {
-  const annotations = schema.annotations;
-  if (!isRecord(annotations)) {
-    return {};
-  }
-  if (!Object.hasOwn(annotations, 'pg')) {
-    return {};
-  }
-  const pg = annotations['pg'];
-  if (!isRecord(pg)) {
-    return {};
-  }
-  if (!Object.hasOwn(pg, 'storageTypes')) {
-    return {};
-  }
-  const storageTypes = pg['storageTypes'];
-  if (!isRecord(storageTypes)) {
-    return {};
-  }
-  const result: Record<string, StorageTypeInstance> = {};
-  for (const [typeName, entry] of Object.entries(storageTypes)) {
-    if (isStorageTypeInstance(entry)) {
-      result[typeName] = entry;
-    }
-  }
-  return result;
-}
-
+/**
+ * Reads existing enum values from the schema IR for a given native type.
+ * Uses optional chaining to simplify navigation through the annotations structure.
+ */
 function readExistingEnumValues(schema: SqlSchemaIR, nativeType: string): readonly string[] | null {
-  const storageTypes = readStorageTypesFromSchema(schema);
-  const existing = storageTypes[nativeType];
+  // Schema annotations.pg.storageTypes is populated by introspection
+  const storageTypes = (schema.annotations?.['pg'] as Record<string, unknown> | undefined)?.[
+    'storageTypes'
+  ] as Record<string, StorageTypeInstance> | undefined;
+
+  const existing = storageTypes?.[nativeType];
   if (!existing || existing.codecId !== ENUM_CODEC_ID) {
     return null;
   }
   return getEnumValues(existing);
-}
-
-function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function determineEnumDiff(existing: readonly string[], desired: readonly string[]): EnumDiff {
@@ -149,20 +99,6 @@ function determineEnumDiff(existing: readonly string[], desired: readonly string
 // SQL Helpers
 // ============================================================================
 
-/** Quote a PostgreSQL identifier (table, column, type names). */
-function quoteIdentifier(identifier: string): string {
-  return `"${identifier.replace(/"/g, '""')}"`;
-}
-
-/** Escape a string literal for SQL. */
-function escapeLiteral(value: string): string {
-  return value.replace(/'/g, "''");
-}
-
-function qualifyTypeName(schemaName: string, typeName: string): string {
-  return `${quoteIdentifier(schemaName)}.${quoteIdentifier(typeName)}`;
-}
-
 function enumTypeExistsCheck(schemaName: string, typeName: string, exists = true): string {
   const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
   return `SELECT ${existsClause} (
@@ -185,7 +121,7 @@ function buildCreateEnumOperation(
   values: readonly string[],
 ): SqlMigrationPlanOperation<unknown> {
   const literalValues = values.map((value) => `'${escapeLiteral(value)}'`).join(', ');
-  const qualifiedType = qualifyTypeName(schemaName, nativeType);
+  const qualifiedType = qualifyName(schemaName, nativeType);
   return {
     id: `type.${typeName}`,
     label: `Create type ${typeName}`,
@@ -261,6 +197,8 @@ function buildAddValueOperations(options: {
       desiredIndex: index,
       current,
     });
+    // Use IF NOT EXISTS for idempotency - safe to re-run after partial failures.
+    // Supported in PostgreSQL 9.3+, and we require PostgreSQL 12+.
     operations.push({
       id: `type.${typeName}.value.${value}`,
       label: `Add value ${value} to ${typeName}`,
@@ -270,8 +208,8 @@ function buildAddValueOperations(options: {
       precheck: [],
       execute: [
         {
-          description: `add value "${value}"`,
-          sql: `ALTER TYPE ${qualifyTypeName(schemaName, nativeType)} ADD VALUE '${escapeLiteral(
+          description: `add value "${value}" if not exists`,
+          sql: `ALTER TYPE ${qualifyName(schemaName, nativeType)} ADD VALUE IF NOT EXISTS '${escapeLiteral(
             value,
           )}'${clause}`,
         },
@@ -382,6 +320,12 @@ function columnTypeCheck(options: {
 )`;
 }
 
+/** PostgreSQL maximum identifier length (NAMEDATALEN - 1) */
+const MAX_IDENTIFIER_LENGTH = 63;
+
+/** Suffix added to enum type names during rebuild operations */
+const REBUILD_SUFFIX = '__pn_rebuild';
+
 function buildRecreateEnumOperation(options: {
   typeName: string;
   nativeType: string;
@@ -390,9 +334,21 @@ function buildRecreateEnumOperation(options: {
   contract: SqlContract<SqlStorage>;
   schema: SqlSchemaIR;
 }): SqlMigrationPlanOperation<unknown> {
-  const tempTypeName = `${options.nativeType}__pn_rebuild`;
-  const qualifiedOriginal = qualifyTypeName(options.schemaName, options.nativeType);
-  const qualifiedTemp = qualifyTypeName(options.schemaName, tempTypeName);
+  const tempTypeName = `${options.nativeType}${REBUILD_SUFFIX}`;
+
+  // Validate temp type name length won't exceed PostgreSQL's 63-character limit.
+  // If it would, PostgreSQL silently truncates which could cause conflicts.
+  if (tempTypeName.length > MAX_IDENTIFIER_LENGTH) {
+    const maxBaseLength = MAX_IDENTIFIER_LENGTH - REBUILD_SUFFIX.length;
+    throw new Error(
+      `Enum type name "${options.nativeType}" is too long for rebuild operation. ` +
+        `Maximum length is ${maxBaseLength} characters (type name + "${REBUILD_SUFFIX}" suffix ` +
+        `must fit within PostgreSQL's ${MAX_IDENTIFIER_LENGTH}-character identifier limit).`,
+    );
+  }
+
+  const qualifiedOriginal = qualifyName(options.schemaName, options.nativeType);
+  const qualifiedTemp = qualifyName(options.schemaName, tempTypeName);
   const literalValues = options.values.map((value) => `'${escapeLiteral(value)}'`).join(', ');
 
   // CRITICAL: Collect columns from BOTH contract AND live database.
@@ -408,7 +364,7 @@ function buildRecreateEnumOperation(options: {
 
   const alterColumns = columnRefs.map((ref) => ({
     description: `alter ${ref.table}.${ref.column} to ${tempTypeName}`,
-    sql: `ALTER TABLE ${qualifyTypeName(options.schemaName, ref.table)}
+    sql: `ALTER TABLE ${qualifyName(options.schemaName, ref.table)}
 ALTER COLUMN ${quoteIdentifier(ref.column)}
 TYPE ${qualifiedTemp}
 USING ${quoteIdentifier(ref.column)}::text::${qualifiedTemp}`,
@@ -450,12 +406,17 @@ USING ${quoteIdentifier(ref.column)}::text::${qualifiedTemp}`,
         description: `ensure type "${options.nativeType}" exists`,
         sql: enumTypeExistsCheck(options.schemaName, options.nativeType),
       },
-      {
-        description: `ensure temp type "${tempTypeName}" does not exist`,
-        sql: enumTypeExistsCheck(options.schemaName, tempTypeName, false),
-      },
+      // Note: We don't precheck that temp type doesn't exist because we handle
+      // orphaned temp types in the execute step below.
     ],
     execute: [
+      // P2 Fix: Clean up any orphaned temp type from a previous failed migration.
+      // This makes the operation recoverable without manual intervention.
+      // DROP TYPE IF EXISTS is safe - it's a no-op if the type doesn't exist.
+      {
+        description: `drop orphaned temp type "${tempTypeName}" if exists`,
+        sql: `DROP TYPE IF EXISTS ${qualifiedTemp}`,
+      },
       {
         description: `create temp type "${tempTypeName}"`,
         sql: `CREATE TYPE ${qualifiedTemp} AS ENUM (${literalValues})`,
@@ -575,13 +536,3 @@ export const pgEnumControlHooks: CodecControlHooks = {
     return types;
   },
 };
-
-/**
- * Convenience wrapper used by the Postgres control adapter.
- */
-export async function introspectEnumStorageTypes(options: {
-  readonly driver: ControlDriverInstance<'sql', string>;
-  readonly schemaName?: string;
-}): Promise<Record<string, StorageTypeInstance>> {
-  return pgEnumControlHooks.introspectTypes?.(options) ?? {};
-}

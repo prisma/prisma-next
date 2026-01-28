@@ -2,7 +2,7 @@ import type { ControlDriverInstance } from '@prisma-next/core-control-plane/type
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { introspectEnumStorageTypes, pgEnumControlHooks } from '../src/core/enum-control-hooks';
+import { pgEnumControlHooks } from '../src/core/enum-control-hooks';
 
 const ENUM_CODEC_ID = 'pg/enum@1';
 
@@ -59,8 +59,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       typeInstance: { codecId: ENUM_CODEC_ID, nativeType: 'role', typeParams: {} },
       contract,
       schema: createSchema(),
-      schemaName: undefined,
-      policy: { allow: () => true },
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     });
 
     expect(result?.operations).toEqual([]);
@@ -86,8 +85,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       },
       contract,
       schema: createSchema(),
-      schemaName: undefined,
-      policy: { allow: () => true },
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     });
 
     expect(result?.operations).toMatchObject([
@@ -132,8 +130,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       },
       contract,
       schema,
-      schemaName: undefined,
-      policy: { allow: () => true },
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     });
 
     expect(result?.operations).toEqual([]);
@@ -143,12 +140,12 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
     {
       existing: ['A'],
       desired: ['A', 'B'],
-      expectedSql: 'ALTER TYPE "public"."role" ADD VALUE \'B\' AFTER \'A\'',
+      expectedSql: 'ALTER TYPE "public"."role" ADD VALUE IF NOT EXISTS \'B\' AFTER \'A\'',
     },
     {
       existing: ['A', 'C'],
       desired: ['A', 'B', 'C'],
-      expectedSql: 'ALTER TYPE "public"."role" ADD VALUE \'B\' AFTER \'A\'',
+      expectedSql: 'ALTER TYPE "public"."role" ADD VALUE IF NOT EXISTS \'B\' AFTER \'A\'',
     },
   ])('adds missing enum values for $desired', ({ existing, desired, expectedSql }) => {
     const contract = createContract({
@@ -178,8 +175,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       },
       contract,
       schema,
-      schemaName: undefined,
-      policy: { allow: () => true },
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     });
 
     expect(result?.operations).toMatchObject([
@@ -241,7 +237,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       contract,
       schema,
       schemaName: 'public',
-      policy: { allow: () => true },
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     });
 
     expect(result?.operations).toHaveLength(1);
@@ -250,8 +246,13 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       id: 'type.Role.rebuild',
       operationClass: 'destructive',
     });
+    // Verify execute steps include orphan cleanup and all rebuild steps
     expect(operation?.execute).toEqual(
       expect.arrayContaining([
+        // First: clean up any orphaned temp type from failed previous migrations
+        expect.objectContaining({
+          sql: 'DROP TYPE IF EXISTS "public"."role__pn_rebuild"',
+        }),
         expect.objectContaining({
           sql: 'CREATE TYPE "public"."role__pn_rebuild" AS ENUM (\'B\', \'A\')',
         }),
@@ -279,7 +280,6 @@ describe('pgEnumControlHooks.verifyType', () => {
       typeName: 'Role',
       typeInstance: { codecId: ENUM_CODEC_ID, nativeType: 'role', typeParams: {} },
       schema,
-      schemaName: undefined,
     });
 
     expect(issues).toEqual([]);
@@ -295,7 +295,6 @@ describe('pgEnumControlHooks.verifyType', () => {
         typeParams: { values: ['USER'] },
       },
       schema,
-      schemaName: undefined,
     });
 
     expect(issues).toMatchObject([
@@ -324,7 +323,6 @@ describe('pgEnumControlHooks.verifyType', () => {
         typeParams: { values: ['ADMIN'] },
       },
       schema,
-      schemaName: undefined,
     });
 
     expect(issues).toMatchObject([
@@ -343,12 +341,13 @@ describe('pgEnumControlHooks.introspectTypes', () => {
     const driver: ControlDriverInstance<'sql', string> = {
       familyId: 'sql',
       targetId: 'postgres',
-      query: async () => ({
-        rows: [
-          { schema_name: 'public', type_name: 'role', values: ['USER', 'ADMIN'] },
-          { schema_name: 'public', type_name: 'invalid', values: [1, 2] },
-        ],
-      }),
+      query: async <Row>() =>
+        ({
+          rows: [
+            { schema_name: 'public', type_name: 'role', values: ['USER', 'ADMIN'] },
+            { schema_name: 'public', type_name: 'invalid', values: [1, 2] },
+          ],
+        }) as { readonly rows: Row[] },
       close: async () => {},
     };
 
@@ -357,22 +356,12 @@ describe('pgEnumControlHooks.introspectTypes', () => {
     }
 
     const types = await pgEnumControlHooks.introspectTypes({ driver, schemaName: 'public' });
-    const viaWrapper = await introspectEnumStorageTypes({ driver, schemaName: 'public' });
 
-    expect({ types, viaWrapper }).toMatchObject({
-      types: {
-        role: {
-          codecId: ENUM_CODEC_ID,
-          nativeType: 'role',
-          typeParams: { values: ['USER', 'ADMIN'] },
-        },
-      },
-      viaWrapper: {
-        role: {
-          codecId: ENUM_CODEC_ID,
-          nativeType: 'role',
-          typeParams: { values: ['USER', 'ADMIN'] },
-        },
+    expect(types).toMatchObject({
+      role: {
+        codecId: ENUM_CODEC_ID,
+        nativeType: 'role',
+        typeParams: { values: ['USER', 'ADMIN'] },
       },
     });
   });
