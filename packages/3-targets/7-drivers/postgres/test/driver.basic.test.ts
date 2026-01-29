@@ -478,4 +478,336 @@ describe('@prisma-next/driver-postgres', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  describe('connection management', () => {
+    it(
+      'acquires and releases connections from pool',
+      async () => {
+        const db = newDb();
+        const { Pool } = db.adapters.createPg();
+        const pool = new Pool();
+
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool: pool as unknown as Pool },
+        });
+
+        cleanup = async () => {
+          await driver.close();
+        };
+
+        await driver.connect();
+        await driver.query('create table items(id serial primary key, name text)');
+
+        const connection = await driver.acquireConnection();
+        expect(connection).toBeDefined();
+
+        // Test that the connection can execute queries
+        await connection.query('insert into items(name) values ($1)', ['test-connection']);
+        const result = await connection.query<{ id: number; name: string }>(
+          'select id, name from items where name = $1',
+          ['test-connection'],
+        );
+
+        expect(result.rows).toHaveLength(1);
+        expect(result.rows[0]?.name).toBe('test-connection');
+
+        // Release the connection
+        await connection.release();
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'acquires and releases connections from direct client',
+      async () => {
+        const db = newDb();
+        const { Client } = db.adapters.createPg();
+        const client = new Client();
+
+        const driver = createPostgresDriverFromOptions({
+          connect: { client: client as unknown as Client },
+        });
+
+        cleanup = async () => {
+          await driver.close();
+        };
+
+        await driver.connect();
+        await driver.query('create table items(id serial primary key, name text)');
+
+        const connection = await driver.acquireConnection();
+        expect(connection).toBeDefined();
+
+        // Test that the connection can execute queries
+        await connection.query('insert into items(name) values ($1)', ['test-direct']);
+        const result = await connection.query<{ id: number; name: string }>(
+          'select id, name from items where name = $1',
+          ['test-direct'],
+        );
+
+        expect(result.rows).toHaveLength(1);
+        expect(result.rows[0]?.name).toBe('test-direct');
+
+        // Release the connection
+        await connection.release();
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'connection can stream data with execute method',
+      async () => {
+        const db = newDb();
+        const { Pool } = db.adapters.createPg();
+        const pool = new Pool();
+
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool: pool as unknown as Pool },
+          cursor: { disabled: true },
+        });
+
+        cleanup = async () => {
+          await driver.close();
+        };
+
+        await driver.connect();
+        await driver.query('create table items(id serial primary key, name text)');
+        await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
+
+        const connection = await driver.acquireConnection();
+
+        const rows: Array<{ id: number; name: string }> = [];
+        for await (const row of connection.execute<{ id: number; name: string }>({
+          sql: 'select id, name from items order by id asc',
+        })) {
+          rows.push(row);
+        }
+
+        expect(rows).toEqual([
+          { id: 1, name: 'a' },
+          { id: 2, name: 'b' },
+        ]);
+
+        await connection.release();
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+
+  describe('transaction management', () => {
+    it(
+      'begins, commits, and ends transaction successfully',
+      async () => {
+        const database = await createDevDatabase();
+
+        const pool = new PgPool({ connectionString: database.connectionString });
+
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool: pool as unknown as Pool },
+        });
+
+        cleanup = async () => {
+          await driver.close();
+          await database.close();
+        };
+
+        await driver.connect();
+        await driver.query('create table tx_items(id serial primary key, name text)');
+
+        const connection = await driver.acquireConnection();
+        const transaction = await connection.beginTransaction();
+
+        expect(transaction).toBeDefined();
+
+        // Insert data within the transaction
+        await transaction.query('insert into tx_items(name) values ($1)', ['tx-test']);
+
+        // Commit the transaction
+        await transaction.commit();
+
+        // Verify the data was committed
+        const result = await connection.query<{ id: number; name: string }>(
+          'select id, name from tx_items where name = $1',
+          ['tx-test'],
+        );
+
+        expect(result.rows).toHaveLength(1);
+        expect(result.rows[0]?.name).toBe('tx-test');
+
+        await connection.release();
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'begins and rolls back transaction',
+      async () => {
+        const database = await createDevDatabase();
+
+        const pool = new PgPool({ connectionString: database.connectionString });
+
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool: pool as unknown as Pool },
+        });
+
+        cleanup = async () => {
+          await driver.close();
+          await database.close();
+        };
+
+        await driver.connect();
+        await driver.query('create table tx_rollback_items(id serial primary key, name text)');
+
+        const connection = await driver.acquireConnection();
+        const transaction = await connection.beginTransaction();
+
+        // Insert data within the transaction
+        await transaction.query('insert into tx_rollback_items(name) values ($1)', [
+          'rollback-test',
+        ]);
+
+        // Rollback the transaction
+        await transaction.rollback();
+
+        // Verify the data was not committed
+        const result = await connection.query<{ id: number; name: string }>(
+          'select id, name from tx_rollback_items where name = $1',
+          ['rollback-test'],
+        );
+
+        expect(result.rows).toHaveLength(0);
+
+        await connection.release();
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'transaction can stream data with execute method',
+      async () => {
+        const database = await createDevDatabase();
+
+        const pool = new PgPool({ connectionString: database.connectionString });
+
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool: pool as unknown as Pool },
+          cursor: { disabled: true },
+        });
+
+        cleanup = async () => {
+          await driver.close();
+          await database.close();
+        };
+
+        await driver.connect();
+        await driver.query('create table tx_stream_items(id serial primary key, name text)');
+        await driver.query('insert into tx_stream_items(name) values ($1), ($2)', ['tx-a', 'tx-b']);
+
+        const connection = await driver.acquireConnection();
+        const transaction = await connection.beginTransaction();
+
+        const rows: Array<{ id: number; name: string }> = [];
+        for await (const row of transaction.execute<{ id: number; name: string }>({
+          sql: 'select id, name from tx_stream_items where name like $1 order by id asc',
+          params: ['tx-%'],
+        })) {
+          rows.push(row);
+        }
+
+        expect(rows).toEqual([
+          { id: 1, name: 'tx-a' },
+          { id: 2, name: 'tx-b' },
+        ]);
+
+        await transaction.commit();
+        await connection.release();
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'transaction can explain queries',
+      async () => {
+        const database = await createDevDatabase();
+
+        const pool = new PgPool({ connectionString: database.connectionString });
+
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool: pool as unknown as Pool },
+        });
+
+        cleanup = async () => {
+          await driver.close();
+          await database.close();
+        };
+
+        await driver.connect();
+        await driver.query('create table tx_explain_items(id serial primary key, name text)');
+
+        const connection = await driver.acquireConnection();
+        const transaction = await connection.beginTransaction();
+
+        const result = await transaction.explain?.({
+          sql: 'select id, name from tx_explain_items',
+        });
+
+        expect(result).toBeDefined();
+        expect(result!.rows).toBeDefined();
+        expect(Array.isArray(result!.rows)).toBe(true);
+
+        await transaction.rollback();
+        await connection.release();
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'handles multiple sequential transactions on same connection',
+      async () => {
+        const database = await createDevDatabase();
+
+        const pool = new PgPool({ connectionString: database.connectionString });
+
+        const driver = createPostgresDriverFromOptions({
+          connect: { pool: pool as unknown as Pool },
+        });
+
+        cleanup = async () => {
+          await driver.close();
+          await database.close();
+        };
+
+        await driver.connect();
+        await driver.query('create table tx_multi_items(id serial primary key, name text)');
+
+        const connection = await driver.acquireConnection();
+
+        // First transaction - commit
+        const tx1 = await connection.beginTransaction();
+        await tx1.query('insert into tx_multi_items(name) values ($1)', ['first-tx']);
+        await tx1.commit();
+
+        // Second transaction - rollback
+        const tx2 = await connection.beginTransaction();
+        await tx2.query('insert into tx_multi_items(name) values ($1)', ['second-tx']);
+        await tx2.rollback();
+
+        // Third transaction - commit
+        const tx3 = await connection.beginTransaction();
+        await tx3.query('insert into tx_multi_items(name) values ($1)', ['third-tx']);
+        await tx3.commit();
+
+        // Verify only committed data is present
+        const result = await connection.query<{ id: number; name: string }>(
+          'select name from tx_multi_items order by id',
+        );
+
+        expect(result.rows).toHaveLength(2);
+        expect(result.rows.map((r) => r.name)).toEqual(['first-tx', 'third-tx']);
+
+        await connection.release();
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });

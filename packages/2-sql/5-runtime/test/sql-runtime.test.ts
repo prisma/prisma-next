@@ -74,14 +74,25 @@ function createStubAdapter() {
 }
 
 function createMockDriver(): SqlDriver {
-  const execute = vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
-    yield { id: 1 };
-  });
+  const queryable = {
+    execute: vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
+      yield { id: 1 };
+    }),
+    query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+  };
 
   return {
+    ...queryable,
     connect: vi.fn().mockResolvedValue(undefined),
-    execute,
-    query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+    acquireConnection: vi.fn().mockResolvedValue({
+      ...queryable,
+      release: vi.fn().mockResolvedValue(undefined),
+      beginTransaction: vi.fn().mockResolvedValue({
+        ...queryable,
+        commit: vi.fn().mockResolvedValue(undefined),
+        rollback: vi.fn().mockResolvedValue(undefined),
+      }),
+    }),
     close: vi.fn().mockResolvedValue(undefined),
   };
 }
