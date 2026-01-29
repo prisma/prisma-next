@@ -1,6 +1,7 @@
 import type { ControlAdapterDescriptor } from '@prisma-next/core-control-plane/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { PostgresControlAdapter } from '../core/control-adapter';
+import { parsePostgresDefault } from '../core/default-normalizer';
 import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
 
 /**
@@ -18,3 +19,5 @@ const postgresAdapterDescriptor: ControlAdapterDescriptor<
 };
 
 export default postgresAdapterDescriptor;
+
+export { parsePostgresDefault };

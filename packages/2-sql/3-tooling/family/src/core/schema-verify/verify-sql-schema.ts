@@ -28,6 +28,15 @@ import {
 } from './verify-helpers';
 
 /**
+ * Function type for normalizing raw database default expressions into ColumnDefault.
+ * Target-specific implementations handle database dialect differences.
+ */
+export type DefaultNormalizer = (
+  rawDefault: string,
+  nativeType: string,
+) => ColumnDefault | undefined;
+
+/**
  * Options for the pure schema verification function.
  */
 export interface VerifySqlSchemaOptions {
@@ -46,6 +55,12 @@ export interface VerifySqlSchemaOptions {
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  /**
+   * Optional target-specific normalizer for raw database default expressions.
+   * When provided, schema defaults (raw strings) are normalized before comparison
+   * with contract defaults (ColumnDefault objects).
+   */
+  readonly normalizeDefault?: DefaultNormalizer;
 }
 
 /**
@@ -59,7 +74,7 @@ export interface VerifySqlSchemaOptions {
  * @returns VerifyDatabaseSchemaResult with verification tree and issues
  */
 export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabaseSchemaResult {
-  const { contract, schema, strict, context, typeMetadataRegistry } = options;
+  const { contract, schema, strict, context, typeMetadataRegistry, normalizeDefault } = options;
   const startTime = Date.now();
 
   const { contractCoreHash, contractProfileHash, contractTarget } =
@@ -69,6 +84,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     schema,
     strict,
     typeMetadataRegistry,
+    ...(normalizeDefault ? { normalizeDefault } : {}),
   });
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
@@ -147,8 +163,9 @@ function verifySchemaTables(options: {
   schema: SqlSchemaIR;
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  normalizeDefault?: DefaultNormalizer;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
-  const { contract, schema, strict, typeMetadataRegistry } = options;
+  const { contract, schema, strict, typeMetadataRegistry, normalizeDefault } = options;
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
   const contractTables = contract.storage.tables;
@@ -186,6 +203,7 @@ function verifySchemaTables(options: {
       issues,
       strict,
       typeMetadataRegistry,
+      ...(normalizeDefault ? { normalizeDefault } : {}),
     });
     rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
   }
@@ -224,9 +242,18 @@ function verifyTableChildren(options: {
   issues: SchemaIssue[];
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  normalizeDefault?: DefaultNormalizer;
 }): SchemaVerificationNode[] {
-  const { contractTable, schemaTable, tableName, tablePath, issues, strict, typeMetadataRegistry } =
-    options;
+  const {
+    contractTable,
+    schemaTable,
+    tableName,
+    tablePath,
+    issues,
+    strict,
+    typeMetadataRegistry,
+    normalizeDefault,
+  } = options;
   const tableChildren: SchemaVerificationNode[] = [];
   const columnNodes = collectContractColumnNodes({
     contractTable,
@@ -235,6 +262,7 @@ function verifyTableChildren(options: {
     tablePath,
     issues,
     typeMetadataRegistry,
+    ...(normalizeDefault ? { normalizeDefault } : {}),
   });
   if (columnNodes.length > 0) {
     tableChildren.push(buildColumnsNode(tablePath, columnNodes));
@@ -343,9 +371,17 @@ function collectContractColumnNodes(options: {
   tablePath: string;
   issues: SchemaIssue[];
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  normalizeDefault?: DefaultNormalizer;
 }): SchemaVerificationNode[] {
-  const { contractTable, schemaTable, tableName, tablePath, issues, typeMetadataRegistry } =
-    options;
+  const {
+    contractTable,
+    schemaTable,
+    tableName,
+    tablePath,
+    issues,
+    typeMetadataRegistry,
+    normalizeDefault,
+  } = options;
   const columnNodes: SchemaVerificationNode[] = [];
 
   for (const [columnName, contractColumn] of Object.entries(contractTable.columns)) {
@@ -382,6 +418,7 @@ function collectContractColumnNodes(options: {
         columnPath,
         issues,
         typeMetadataRegistry,
+        ...(normalizeDefault ? { normalizeDefault } : {}),
       }),
     );
   }
@@ -429,8 +466,17 @@ function verifyColumn(options: {
   columnPath: string;
   issues: SchemaIssue[];
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  normalizeDefault?: DefaultNormalizer;
 }): SchemaVerificationNode {
-  const { tableName, columnName, contractColumn, schemaColumn, columnPath, issues } = options;
+  const {
+    tableName,
+    columnName,
+    contractColumn,
+    schemaColumn,
+    columnPath,
+    issues,
+    normalizeDefault,
+  } = options;
   const columnChildren: SchemaVerificationNode[] = [];
   let columnStatus: VerificationStatus = 'pass';
 
@@ -534,9 +580,17 @@ function verifyColumn(options: {
         children: [],
       });
       columnStatus = 'fail';
-    } else if (!columnDefaultsEqual(contractColumn.default, schemaColumn.default)) {
+    } else if (
+      !columnDefaultsEqual(
+        contractColumn.default,
+        schemaColumn.default,
+        normalizeDefault,
+        schemaNativeType,
+      )
+    ) {
       const expectedDescription = describeColumnDefault(contractColumn.default);
-      const actualDescription = describeColumnDefault(schemaColumn.default);
+      // schemaColumn.default is now a raw string, describe it as-is
+      const actualDescription = schemaColumn.default;
       issues.push({
         kind: 'default_mismatch',
         table: tableName,
@@ -753,21 +807,49 @@ function describeColumnDefault(columnDefault: ColumnDefault): string {
 }
 
 /**
- * Compares two ColumnDefault values for semantic equality.
- * Both must have the same kind and matching value/expression.
+ * Compares a contract ColumnDefault against a schema raw default string for semantic equality.
+ *
+ * When a normalizer is provided, the raw schema default is first normalized to a ColumnDefault
+ * before comparison. Without a normalizer, falls back to direct string comparison against
+ * the contract expression.
+ *
+ * @param contractDefault - The expected default from the contract (normalized ColumnDefault)
+ * @param schemaDefault - The raw default expression from the database (string)
+ * @param normalizer - Optional target-specific normalizer to convert raw defaults
+ * @param nativeType - The column's native type, passed to normalizer for context
  */
-function columnDefaultsEqual(a: ColumnDefault, b: ColumnDefault): boolean {
-  if (a.kind !== b.kind) {
+function columnDefaultsEqual(
+  contractDefault: ColumnDefault,
+  schemaDefault: string,
+  normalizer?: DefaultNormalizer,
+  nativeType?: string,
+): boolean {
+  // If no normalizer provided, fall back to direct string comparison
+  if (!normalizer) {
+    return contractDefault.expression === schemaDefault;
+  }
+
+  // Normalize the raw schema default using target-specific logic
+  const normalizedSchema = normalizer(schemaDefault, nativeType ?? '');
+  if (!normalizedSchema) {
+    // Normalizer couldn't parse the expression - treat as mismatch
     return false;
   }
-  if (a.kind === 'literal' && b.kind === 'literal') {
-    const normalizeLiteral = (expr: string) => expr.trim();
-    return normalizeLiteral(a.expression) === normalizeLiteral(b.expression);
+
+  // Compare normalized defaults
+  if (contractDefault.kind !== normalizedSchema.kind) {
+    return false;
   }
-  if (a.kind === 'function' && b.kind === 'function') {
+  if (contractDefault.kind === 'literal' && normalizedSchema.kind === 'literal') {
+    const normalizeLiteral = (expr: string) => expr.trim();
+    return (
+      normalizeLiteral(contractDefault.expression) === normalizeLiteral(normalizedSchema.expression)
+    );
+  }
+  if (contractDefault.kind === 'function' && normalizedSchema.kind === 'function') {
     // Normalize function expressions for comparison (case-insensitive, whitespace-tolerant)
     const normalizeExpr = (expr: string) => expr.toLowerCase().replace(/\s+/g, '');
-    return normalizeExpr(a.expression) === normalizeExpr(b.expression);
+    return normalizeExpr(contractDefault.expression) === normalizeExpr(normalizedSchema.expression);
   }
   return false;
 }

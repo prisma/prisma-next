@@ -3,6 +3,7 @@ import type {
   ControlDriverInstance,
 } from '@prisma-next/core-control-plane/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { DefaultNormalizer } from './schema-verify/verify-sql-schema';
 
 /**
  * SQL control adapter interface for control-plane operations.
@@ -36,6 +37,13 @@ export interface SqlControlAdapter<TTarget extends string = string>
     contractIR?: unknown,
     schema?: string,
   ): Promise<SqlSchemaIR>;
+
+  /**
+   * Optional target-specific normalizer for raw database default expressions.
+   * When provided, schema defaults (raw strings) are normalized before comparison
+   * with contract defaults (ColumnDefault objects) during schema verification.
+   */
+  readonly normalizeDefault?: DefaultNormalizer;
 }
 
 /**

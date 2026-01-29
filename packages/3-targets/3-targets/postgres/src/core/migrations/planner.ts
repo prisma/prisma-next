@@ -1,3 +1,4 @@
+import { parsePostgresDefault } from '@prisma-next/adapter-postgres/control';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   MigrationOperationPolicy,
@@ -541,6 +542,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       strict: false,
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
+      normalizeDefault: parsePostgresDefault,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
 

@@ -1,6 +1,7 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
+import { parsePostgresDefault } from '../src/core/default-normalizer';
 
 const createMockDriver = (
   columns: Array<{
@@ -47,7 +48,7 @@ const createMockDriver = (
 });
 
 describe('PostgresControlAdapter column defaults', () => {
-  it('parses common default expressions', async () => {
+  it('stores raw default expressions from database', async () => {
     const adapter = new PostgresControlAdapter();
     const mockDriver = createMockDriver([
       {
@@ -185,42 +186,117 @@ describe('PostgresControlAdapter column defaults', () => {
     const result = await adapter.introspect(mockDriver);
     const columns = result.tables['user']?.columns ?? {};
 
+    // Defaults are stored as raw strings from the database
     expect(columns['id']).toMatchObject({
-      default: { kind: 'function', expression: 'autoincrement()' },
+      default: "nextval('user_id_seq'::regclass)",
     });
     expect(columns['created_at']).toMatchObject({
-      default: { kind: 'function', expression: 'now()' },
+      default: 'now()',
     });
     expect(columns['updated_at']).toMatchObject({
-      default: { kind: 'function', expression: 'now()' },
+      default: 'CURRENT_TIMESTAMP',
     });
     expect(columns['tracked_at']).toMatchObject({
-      default: { kind: 'function', expression: 'now()' },
+      default: 'clock_timestamp()',
     });
     expect(columns['uuid']).toMatchObject({
-      default: { kind: 'function', expression: 'gen_random_uuid()' },
+      default: 'gen_random_uuid()',
     });
     expect(columns['active']).toMatchObject({
-      default: { kind: 'literal', expression: 'true' },
+      default: 'true',
     });
     expect(columns['disabled']).toMatchObject({
-      default: { kind: 'literal', expression: 'false' },
+      default: 'false',
     });
     expect(columns['count']).toMatchObject({
-      default: { kind: 'literal', expression: '42' },
+      default: '42',
     });
     expect(columns['ratio']).toMatchObject({
-      default: { kind: 'literal', expression: '3.14' },
+      default: '3.14',
     });
     expect(columns['name']).toMatchObject({
-      default: { kind: 'literal', expression: "'Hello''s'::text" },
+      default: "'Hello''s'::text",
     });
     expect(columns['note']).toMatchObject({
-      default: { kind: 'literal', expression: "'plain text'" },
+      default: "'plain text'",
     });
     expect(columns['fallback']).toMatchObject({
-      default: { kind: 'function', expression: 'uuid_generate_v4()' },
+      default: 'uuid_generate_v4()',
     });
     expect(columns['no_default']).not.toHaveProperty('default');
+  });
+});
+
+describe('parsePostgresDefault normalizer', () => {
+  it('normalizes common default expressions', () => {
+    // Autoincrement patterns
+    expect(parsePostgresDefault("nextval('user_id_seq'::regclass)")).toEqual({
+      kind: 'function',
+      expression: 'autoincrement()',
+    });
+
+    // Timestamp functions
+    expect(parsePostgresDefault('now()')).toEqual({
+      kind: 'function',
+      expression: 'now()',
+    });
+    expect(parsePostgresDefault('CURRENT_TIMESTAMP')).toEqual({
+      kind: 'function',
+      expression: 'now()',
+    });
+    expect(parsePostgresDefault('clock_timestamp()')).toEqual({
+      kind: 'function',
+      expression: 'now()',
+    });
+
+    // UUID function
+    expect(parsePostgresDefault('gen_random_uuid()')).toEqual({
+      kind: 'function',
+      expression: 'gen_random_uuid()',
+    });
+
+    // Boolean literals
+    expect(parsePostgresDefault('true')).toEqual({
+      kind: 'literal',
+      expression: 'true',
+    });
+    expect(parsePostgresDefault('false')).toEqual({
+      kind: 'literal',
+      expression: 'false',
+    });
+
+    // Numeric literals
+    expect(parsePostgresDefault('42')).toEqual({
+      kind: 'literal',
+      expression: '42',
+    });
+    expect(parsePostgresDefault('3.14')).toEqual({
+      kind: 'literal',
+      expression: '3.14',
+    });
+    expect(parsePostgresDefault('-123.45')).toEqual({
+      kind: 'literal',
+      expression: '-123.45',
+    });
+
+    // String literals
+    expect(parsePostgresDefault("'hello'::text")).toEqual({
+      kind: 'literal',
+      expression: "'hello'::text",
+    });
+    expect(parsePostgresDefault("'Hello''s'::text")).toEqual({
+      kind: 'literal',
+      expression: "'Hello''s'::text",
+    });
+    expect(parsePostgresDefault("'plain text'")).toEqual({
+      kind: 'literal',
+      expression: "'plain text'",
+    });
+
+    // Unknown expressions fall back to function type
+    expect(parsePostgresDefault('uuid_generate_v4()')).toEqual({
+      kind: 'function',
+      expression: 'uuid_generate_v4()',
+    });
   });
 });
