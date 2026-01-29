@@ -43,6 +43,9 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "kysely": "^0.28.10"
+  },
   "engines": {
     "node": ">=20"
   },

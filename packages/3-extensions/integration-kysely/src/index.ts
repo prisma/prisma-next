@@ -1,1 +1,1 @@
-export type * from './kyselify';
+export type { KyselifyContract } from './kyselify';
