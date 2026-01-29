@@ -7,6 +7,8 @@
   "scripts": {
     "build": "tsdown",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output",
+    "emit": "prisma-next contract emit --config test/fixtures/prisma-next.config.ts",
+    "emit:check": "pnpm emit && git diff --exit-code test/fixtures/generated/",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
@@ -25,9 +27,13 @@
   "packageManager": "pnpm@10.27.0",
   "devDependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/cli": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
