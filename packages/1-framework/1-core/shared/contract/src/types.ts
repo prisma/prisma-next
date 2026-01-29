@@ -68,7 +68,7 @@ export type ColumnDefault =
       readonly expression: string;
       readonly value?: string | number | boolean;
     }
-  | { readonly kind: 'function'; readonly expression: string };
+  | { readonly kind: 'db-generated'; readonly expression: string };
 
 export interface Source {
   readonly readOnly: boolean;

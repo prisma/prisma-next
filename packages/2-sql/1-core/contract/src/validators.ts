@@ -14,22 +14,22 @@ import type {
 } from './types';
 
 type ColumnDefaultLiteral = { readonly kind: 'literal'; readonly expression: string };
-type ColumnDefaultFunction = { readonly kind: 'function'; readonly expression: string };
+type ColumnDefaultDbGenerated = { readonly kind: 'db-generated'; readonly expression: string };
 
 const literalKindSchema = type("'literal'");
-const functionKindSchema = type("'function'");
+const dbGeneratedKindSchema = type("'db-generated'");
 
 export const ColumnDefaultLiteralSchema = type.declare<ColumnDefaultLiteral>().type({
   kind: literalKindSchema,
   expression: 'string',
 });
 
-export const ColumnDefaultFunctionSchema = type.declare<ColumnDefaultFunction>().type({
-  kind: functionKindSchema,
+export const ColumnDefaultDbGeneratedSchema = type.declare<ColumnDefaultDbGenerated>().type({
+  kind: dbGeneratedKindSchema,
   expression: 'string',
 });
 
-export const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionSchema);
+export const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultDbGeneratedSchema);
 
 const StorageColumnSchema = type({
   nativeType: 'string',

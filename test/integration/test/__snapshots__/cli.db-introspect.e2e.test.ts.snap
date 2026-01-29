@@ -28,7 +28,7 @@ exports[`db introspect command (e2e) > outputs JSON envelope with real database 
           "id": {
             "default": {
               "expression": "autoincrement()",
-              "kind": "function",
+              "kind": "db-generated",
             },
             "name": "id",
             "nativeType": "int4",

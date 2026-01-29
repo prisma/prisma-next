@@ -15,12 +15,12 @@ export const contract = defineContract<CodecTypes>()
     t
       .column('id', {
         type: int4Column,
-        default: { kind: 'function', expression: 'autoincrement()' },
+        default: { kind: 'db-generated', expression: 'autoincrement()' },
       })
       .column('email', { type: textColumn, nullable: false })
       .column('created_at', {
         type: timestamptzColumn,
-        default: { kind: 'function', expression: 'now()' },
+        default: { kind: 'db-generated', expression: 'now()' },
       })
       .column('update_at', { type: timestamptzColumn, nullable: true })
       .primaryKey(['id']),
@@ -29,13 +29,13 @@ export const contract = defineContract<CodecTypes>()
     t
       .column('id', {
         type: int4Column,
-        default: { kind: 'function', expression: 'autoincrement()' },
+        default: { kind: 'db-generated', expression: 'autoincrement()' },
       })
       .column('userId', { type: int4Column, nullable: false })
       .column('title', { type: textColumn, nullable: false })
       .column('created_at', {
         type: timestamptzColumn,
-        default: { kind: 'function', expression: 'now()' },
+        default: { kind: 'db-generated', expression: 'now()' },
       })
       .column('update_at', { type: timestamptzColumn, nullable: true })
       .column('published', { type: boolColumn, nullable: false })
@@ -45,13 +45,13 @@ export const contract = defineContract<CodecTypes>()
     t
       .column('id', {
         type: int4Column,
-        default: { kind: 'function', expression: 'autoincrement()' },
+        default: { kind: 'db-generated', expression: 'autoincrement()' },
       })
       .column('postId', { type: int4Column, nullable: false })
       .column('content', { type: textColumn, nullable: false })
       .column('created_at', {
         type: timestamptzColumn,
-        default: { kind: 'function', expression: 'now()' },
+        default: { kind: 'db-generated', expression: 'now()' },
       })
       .column('update_at', { type: timestamptzColumn, nullable: true })
       .primaryKey(['id']),

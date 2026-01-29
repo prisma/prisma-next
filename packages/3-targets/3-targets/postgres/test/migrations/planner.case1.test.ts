@@ -387,7 +387,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         nativeType,
         codecId: `pg/${nativeType}@1`,
         nullable: false,
-        default: { kind: 'function', expression: 'autoincrement()' },
+        default: { kind: 'db-generated', expression: 'autoincrement()' },
       },
     });
     expect(sql).toContain(`"id" ${serialType} NOT NULL`);
@@ -401,7 +401,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         nativeType: 'timestamptz',
         codecId: 'pg/timestamptz@1',
         nullable: false,
-        default: { kind: 'function', expression: 'now()' },
+        default: { kind: 'db-generated', expression: 'now()' },
       },
     });
     expect(sql).toContain('"createdAt" timestamptz DEFAULT now() NOT NULL');
@@ -413,7 +413,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         nativeType: 'uuid',
         codecId: 'pg/uuid@1',
         nullable: false,
-        default: { kind: 'function', expression: 'gen_random_uuid()' },
+        default: { kind: 'db-generated', expression: 'gen_random_uuid()' },
       },
     });
     expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid() NOT NULL');
@@ -471,7 +471,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         nativeType: 'uuid',
         codecId: 'pg/uuid@1',
         nullable: false,
-        default: { kind: 'function', expression: "gen_random_uuid(INTERVAL '5500 years')" },
+        default: { kind: 'db-generated', expression: "gen_random_uuid(INTERVAL '5500 years')" },
       },
     });
     expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid(INTERVAL \'5500 years\') NOT NULL');

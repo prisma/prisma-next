@@ -29,7 +29,7 @@ export type StorageColumn = {
   readonly typeRef?: string;
   /**
    * Default value for the column.
-   * Can be a literal value or database function.
+   * Can be a literal value or database-generated expression.
    */
   readonly default?: ColumnDefault;
 };

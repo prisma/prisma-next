@@ -666,7 +666,7 @@ function buildColumnTypeSql(column: StorageColumn): string {
   const columnDefault = column.default;
 
   // For autoincrement, use SERIAL/BIGSERIAL types instead of int4/int8
-  if (columnDefault?.kind === 'function' && columnDefault.expression === 'autoincrement()') {
+  if (columnDefault?.kind === 'db-generated' && columnDefault.expression === 'autoincrement()') {
     if (column.nativeType === 'int4' || column.nativeType === 'integer') {
       return 'SERIAL';
     }
@@ -695,7 +695,7 @@ function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined)
   switch (columnDefault.kind) {
     case 'literal':
       return `DEFAULT ${columnDefault.expression}`;
-    case 'function': {
+    case 'db-generated': {
       // autoincrement is handled by SERIAL type, no explicit DEFAULT needed
       if (columnDefault.expression === 'autoincrement()') {
         return '';

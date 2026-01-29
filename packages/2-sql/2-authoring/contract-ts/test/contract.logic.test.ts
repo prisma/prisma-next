@@ -610,7 +610,7 @@ describe('validateContract logic validation', () => {
                 codecId: 'pg/text@1',
                 nativeType: 'text',
                 nullable: false,
-                default: { kind: 'function', expression: 'gen_random_uuid()' },
+                default: { kind: 'db-generated', expression: 'gen_random_uuid()' },
               },
               title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             },
@@ -623,11 +623,11 @@ describe('validateContract logic validation', () => {
       },
     };
 
-    it('accepts function defaults without capability gating', () => {
+    it('accepts db-generated defaults without capability gating', () => {
       expect(() => validateContract<SqlContract<SqlStorage>>(baseContract)).not.toThrow();
     });
 
-    it('accepts multiple function defaults without capability gating', () => {
+    it('accepts multiple db-generated defaults without capability gating', () => {
       const contract = {
         ...baseContract,
         storage: {
@@ -638,19 +638,19 @@ describe('validateContract logic validation', () => {
                   codecId: 'pg/int4@1',
                   nativeType: 'int4',
                   nullable: false,
-                  default: { kind: 'function', expression: 'autoincrement()' },
+                  default: { kind: 'db-generated', expression: 'autoincrement()' },
                 },
                 createdAt: {
                   codecId: 'pg/timestamptz@1',
                   nativeType: 'timestamptz',
                   nullable: false,
-                  default: { kind: 'function', expression: 'now()' },
+                  default: { kind: 'db-generated', expression: 'now()' },
                 },
                 externalId: {
                   codecId: 'pg/text@1',
                   nativeType: 'text',
                   nullable: false,
-                  default: { kind: 'function', expression: 'gen_random_uuid()' },
+                  default: { kind: 'db-generated', expression: 'gen_random_uuid()' },
                 },
                 title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
@@ -665,7 +665,7 @@ describe('validateContract logic validation', () => {
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
     });
 
-    it('ignores non-function defaults (literal)', () => {
+    it('ignores non-db-generated defaults (literal)', () => {
       const contract = {
         ...baseContract,
         storage: {
@@ -687,7 +687,7 @@ describe('validateContract logic validation', () => {
             },
           },
         },
-        // No capabilities needed for non-function defaults
+        // No capabilities needed for non-db-generated defaults
       };
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
     });

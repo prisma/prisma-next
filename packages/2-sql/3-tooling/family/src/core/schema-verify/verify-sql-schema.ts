@@ -647,7 +647,7 @@ function describeColumnDefault(columnDefault: ColumnDefault): string {
   switch (columnDefault.kind) {
     case 'literal':
       return `literal(${columnDefault.expression})`;
-    case 'function':
+    case 'db-generated':
       return columnDefault.expression;
   }
 }
@@ -664,8 +664,8 @@ function columnDefaultsEqual(a: ColumnDefault, b: ColumnDefault): boolean {
     const normalizeLiteral = (expr: string) => expr.trim();
     return normalizeLiteral(a.expression) === normalizeLiteral(b.expression);
   }
-  if (a.kind === 'function' && b.kind === 'function') {
-    // Normalize function expressions for comparison (case-insensitive, whitespace-tolerant)
+  if (a.kind === 'db-generated' && b.kind === 'db-generated') {
+    // Normalize db-generated expressions for comparison (case-insensitive, whitespace-tolerant)
     const normalizeExpr = (expr: string) => expr.toLowerCase().replace(/\s+/g, '');
     return normalizeExpr(a.expression) === normalizeExpr(b.expression);
   }
