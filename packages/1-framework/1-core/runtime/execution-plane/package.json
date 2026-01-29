@@ -35,6 +35,7 @@
   },
   "exports": {
     "./framework-components": "./dist/framework-components.mjs",
+    "./stack": "./dist/stack.mjs",
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
   }

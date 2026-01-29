@@ -3,7 +3,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { Adapter, CodecRegistry, LoweredStatement, SelectAst } from '../src/exports/ast';
 import { createCodecRegistry } from '../src/exports/ast';
-import type { QueryLaneContext } from '../src/exports/query-lane-context';
+import type { ExecutionContext } from '../src/exports/query-lane-context';
 
 /**
  * Creates a stub adapter for testing.
@@ -35,9 +35,9 @@ export interface Extension {
 }
 
 /**
- * Creates a QueryLaneContext for testing.
+ * Creates an ExecutionContext for testing.
  * This helper DRYs up the common pattern of context creation in tests.
- * Note: This creates a QueryLaneContext (not RuntimeContext), so it doesn't include an adapter.
+ * Note: This creates an ExecutionContext, so it doesn't include an adapter.
  *
  * @param contract - The SQL contract
  * @param adapter - Optional adapter (for backward compatibility with old test code, but not used)
@@ -49,7 +49,7 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
   options?: {
     extensions?: ReadonlyArray<Extension>;
   },
-): QueryLaneContext<TContract> {
+): ExecutionContext<TContract> {
   const codecRegistry = createCodecRegistry();
   const operationRegistry = createOperationRegistry();
 
@@ -74,5 +74,6 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
     contract,
     codecs: codecRegistry,
     operations: operationRegistry,
+    types: {},
   };
 }

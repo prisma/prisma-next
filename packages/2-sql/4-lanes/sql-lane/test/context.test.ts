@@ -17,7 +17,7 @@ function loadContract(name: string): Contract {
 }
 
 describe('createSqlContext', () => {
-  it('creates SqlContext from QueryLaneContext', () => {
+  it('creates SqlContext from ExecutionContext', () => {
     const contract = loadContract('contract');
     const adapter = createStubAdapter();
     const runtimeContext = createTestContext(contract, adapter);

@@ -9,7 +9,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type { BinaryOp, ColumnRef, ExpressionSource, TableRef } from './ast/types';
 import { attachOperationsToColumnBuilder } from './operations-registry';
-import type { QueryLaneContext } from './query-lane-context';
+import type { ExecutionContext } from './query-lane-context';
 import type {
   BinaryBuilder,
   CodecTypes as CodecTypesType,
@@ -382,7 +382,7 @@ type ToOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationType
  * ```
  */
 export function schema<Contract extends SqlContract<SqlStorage>>(
-  context: QueryLaneContext<Contract>,
+  context: ExecutionContext<Contract>,
 ): SchemaReturnType<Contract> {
   const contract = context.contract;
   const storage = contract.storage;
@@ -422,8 +422,8 @@ export function schema<Contract extends SqlContract<SqlStorage>>(
     ) as ExtractSchemaTables<Contract, CodecTypes, Operations>[typeof tableName];
   }
 
-  // Get type helpers from context (populated by createRuntimeContext)
-  const types = (context.types ?? {}) as ExtractSchemaTypes<Contract>;
+  // Get type helpers from context (populated by runtime context creation)
+  const types = context.types as ExtractSchemaTypes<Contract>;
 
   return Object.freeze({ tables, types }) as SchemaReturnType<Contract>;
 }

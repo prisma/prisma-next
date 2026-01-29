@@ -1,9 +1,8 @@
 import { param } from '@prisma-next/sql-relational-core/param';
+import type { Runtime } from '@prisma-next/sql-runtime';
 import { sql, tables } from '../prisma/query';
-import { getRuntime } from '../prisma/runtime';
 
-export async function insertUser(email: string) {
-  const runtime = getRuntime();
+export async function insertUser(email: string, runtime: Runtime) {
   const userTable = tables.user;
   const userColumns = userTable.columns;
 
@@ -26,8 +25,7 @@ export async function insertUser(email: string) {
   return rows[0];
 }
 
-export async function updateUser(userId: number, newEmail: string) {
-  const runtime = getRuntime();
+export async function updateUser(userId: number, newEmail: string, runtime: Runtime) {
   const userTable = tables.user;
   const userColumns = userTable.columns;
 
@@ -52,8 +50,7 @@ export async function updateUser(userId: number, newEmail: string) {
   return rows[0];
 }
 
-export async function deleteUser(userId: number) {
-  const runtime = getRuntime();
+export async function deleteUser(userId: number, runtime: Runtime) {
   const userTable = tables.user;
   const userColumns = userTable.columns;
 

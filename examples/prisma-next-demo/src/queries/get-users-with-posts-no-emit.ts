@@ -1,9 +1,8 @@
-import { sql, tables } from '../prisma/query-no-emit';
-import { getRuntime } from '../prisma/runtime-no-emit';
+import type { Runtime } from '@prisma-next/sql-runtime';
+import { sql, tables } from '../prisma-no-emit/query-no-emit';
 import { collect } from './utils';
 
-export async function getUsersWithPosts(limit = 10) {
-  const runtime = getRuntime();
+export async function getUsersWithPosts(runtime: Runtime, limit = 10) {
   const userTable = tables.user;
   const postTable = tables.post;
 

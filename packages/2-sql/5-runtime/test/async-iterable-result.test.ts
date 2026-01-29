@@ -1,10 +1,15 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
+import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
-import { createRuntime } from '../src/exports';
-import { createStubAdapter, createTestContext, createTestContract } from './utils';
+import type { Runtime } from '../src/exports';
+import { createExecutionContext, createRuntime } from '../src/exports';
+import { createStubAdapter, createTestContract } from './utils';
 
-// Mock driver that implements SqlDriver interface
 class MockDriver {
   private rows: ReadonlyArray<Record<string, unknown>> = [];
 
@@ -16,7 +21,6 @@ class MockDriver {
     _sql: string,
     _params: readonly unknown[],
   ): Promise<{ rows: ReadonlyArray<unknown> }> {
-    // Return empty marker result for contract verification
     return { rows: [] };
   }
 
@@ -29,13 +33,9 @@ class MockDriver {
     }
   }
 
-  async connect(): Promise<void> {
-    // No-op
-  }
+  async connect(): Promise<void> {}
 
-  async close(): Promise<void> {
-    // No-op
-  }
+  async close(): Promise<void> {}
 }
 
 const fixtureContract = createTestContract({
@@ -62,20 +62,64 @@ const fixtureContract = createTestContract({
   mappings: { codecTypes: {}, operationTypes: {} },
 });
 
+function createTestRuntime(driver: MockDriver): Runtime {
+  const adapter = createStubAdapter();
+  const driverDescriptor: RuntimeDriverDescriptor<'sql', 'postgres'> = {
+    kind: 'driver',
+    id: 'test-driver',
+    version: '0.0.1',
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    create() {
+      return Object.assign(driver, {
+        familyId: 'sql' as const,
+        targetId: 'postgres' as const,
+      });
+    },
+  };
+  const stack = createExecutionStack({
+    target: {
+      kind: 'target',
+      id: 'postgres',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    },
+    adapter: {
+      kind: 'adapter',
+      id: 'test-adapter',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      create() {
+        return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
+      },
+    },
+    driver: driverDescriptor,
+    extensionPacks: [],
+  });
+  const stackInstance = instantiateExecutionStack(stack);
+  const context = createExecutionContext({ contract: fixtureContract, stackInstance });
+  return createRuntime({
+    stackInstance,
+    contract: fixtureContract,
+    context,
+    driverOptions: {},
+    verify: { mode: 'onFirstUse', requireMarker: false },
+  });
+}
+
 describe('SqlRuntime AsyncIterableResult integration', () => {
   it('returns AsyncIterableResult from execute', async () => {
-    const adapter = createStubAdapter();
     const driver = new MockDriver();
     driver.setRows([
       { id: 1, email: 'test1@example.com' },
       { id: 2, email: 'test2@example.com' },
     ]);
-    const context = createTestContext(fixtureContract, adapter);
-    const runtime = createRuntime({
-      driver: driver as unknown as Parameters<typeof createRuntime>[0]['driver'],
-      context,
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(driver);
 
     const plan: ExecutionPlan<{ id: number; email: string }> = {
       sql: 'SELECT id, email FROM "user" ORDER BY id',
@@ -91,7 +135,6 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
 
     const result = runtime.execute(plan);
 
-    // Verify it's an AsyncIterableResult
     expect(result).toBeInstanceOf(Object);
     expect(typeof result.toArray).toBe('function');
     expect(typeof result[Symbol.asyncIterator]).toBe('function');
@@ -100,15 +143,9 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
   });
 
   it('preserves type information', async () => {
-    const adapter = createStubAdapter();
     const driver = new MockDriver();
     driver.setRows([{ id: 1, email: 'test@example.com' }]);
-    const context = createTestContext(fixtureContract, adapter);
-    const runtime = createRuntime({
-      driver: driver as unknown as Parameters<typeof createRuntime>[0]['driver'],
-      context,
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const runtime = createTestRuntime(driver);
 
     const plan: ExecutionPlan<{ id: number; email: string }> = {
       sql: 'SELECT id, email FROM "user" LIMIT 1',

@@ -22,7 +22,7 @@ catalog:
   tsup: 8.5.1
   typescript: 5.9.3
   vite: 7.3.1
-  vitest: 4.0.16
+  vitest: 4.0.17
 
 cleanupUnusedCatalogs: true
 
