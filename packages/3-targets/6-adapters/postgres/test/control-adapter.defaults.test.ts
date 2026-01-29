@@ -186,19 +186,19 @@ describe('PostgresControlAdapter column defaults', () => {
     const columns = result.tables['user']?.columns ?? {};
 
     expect(columns['id']).toMatchObject({
-      default: { kind: 'db-generated', expression: 'autoincrement()' },
+      default: { kind: 'function', expression: 'autoincrement()' },
     });
     expect(columns['created_at']).toMatchObject({
-      default: { kind: 'db-generated', expression: 'now()' },
+      default: { kind: 'function', expression: 'now()' },
     });
     expect(columns['updated_at']).toMatchObject({
-      default: { kind: 'db-generated', expression: 'now()' },
+      default: { kind: 'function', expression: 'now()' },
     });
     expect(columns['tracked_at']).toMatchObject({
-      default: { kind: 'db-generated', expression: 'now()' },
+      default: { kind: 'function', expression: 'now()' },
     });
     expect(columns['uuid']).toMatchObject({
-      default: { kind: 'db-generated', expression: 'gen_random_uuid()' },
+      default: { kind: 'function', expression: 'gen_random_uuid()' },
     });
     expect(columns['active']).toMatchObject({
       default: { kind: 'literal', expression: 'true' },
@@ -219,7 +219,7 @@ describe('PostgresControlAdapter column defaults', () => {
       default: { kind: 'literal', expression: "'plain text'" },
     });
     expect(columns['fallback']).toMatchObject({
-      default: { kind: 'db-generated', expression: 'uuid_generate_v4()' },
+      default: { kind: 'function', expression: 'uuid_generate_v4()' },
     });
     expect(columns['no_default']).not.toHaveProperty('default');
   });

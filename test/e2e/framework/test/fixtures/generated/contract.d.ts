@@ -12,7 +12,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type CoreHash =
-  CoreHashBase<'sha256:5fe24341fd83ab2c9301c5918275cfacf4a9686d8993e839bcfdfd1d560ea9a3'>;
+  CoreHashBase<'sha256:6bffbe54f87b253e12dd069d57a943d580662ed3da1aeb8bfd114fec3ea0e4d8'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61'>;
 

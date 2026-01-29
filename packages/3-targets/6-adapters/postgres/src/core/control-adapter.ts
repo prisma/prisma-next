@@ -23,17 +23,17 @@ function parsePostgresDefault(rawDefault: string): ColumnDefault | undefined {
 
   // Autoincrement: nextval('tablename_column_seq'::regclass)
   if (/^nextval\s*\(/i.test(trimmed)) {
-    return { kind: 'db-generated', expression: 'autoincrement()' };
+    return { kind: 'function', expression: 'autoincrement()' };
   }
 
   // now() / CURRENT_TIMESTAMP / clock_timestamp()
   if (/^(now\s*\(\s*\)|CURRENT_TIMESTAMP|clock_timestamp\s*\(\s*\))$/i.test(trimmed)) {
-    return { kind: 'db-generated', expression: 'now()' };
+    return { kind: 'function', expression: 'now()' };
   }
 
   // gen_random_uuid()
   if (/^gen_random_uuid\s*\(\s*\)$/i.test(trimmed)) {
-    return { kind: 'db-generated', expression: 'gen_random_uuid()' };
+    return { kind: 'function', expression: 'gen_random_uuid()' };
   }
 
   // Boolean literals
@@ -56,9 +56,9 @@ function parsePostgresDefault(rawDefault: string): ColumnDefault | undefined {
     return { kind: 'literal', expression: trimmed };
   }
 
-  // Unrecognized expression - return as db-generated with the raw expression
+  // Unrecognized expression - return as a function with the raw expression
   // This preserves the information for debugging while still being comparable
-  return { kind: 'db-generated', expression: trimmed };
+  return { kind: 'function', expression: trimmed };
 }
 
 /**

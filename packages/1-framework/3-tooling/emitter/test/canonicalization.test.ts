@@ -68,7 +68,7 @@ describe('canonicalization', () => {
                 codecId: 'pg/timestamptz@1',
                 nativeType: 'timestamptz',
                 nullable,
-                default: { kind: 'db-generated', expression: 'now()' },
+                default: { kind: 'function', expression: 'now()' },
               },
               updated_at: {
                 codecId: 'pg/timestamptz@1',

@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:5fe24341fd83ab2c9301c5918275cfacf4a9686d8993e839bcfdfd1d560ea9a3",
+  "coreHash": "sha256:6bffbe54f87b253e12dd069d57a943d580662ed3da1aeb8bfd114fec3ea0e4d8",
   "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
     "Comment": {
@@ -84,7 +84,7 @@
             "codecId": "pg/timestamptz@1",
             "default": {
               "expression": "now()",
-              "kind": "db-generated"
+              "kind": "function"
             },
             "nativeType": "timestamptz",
             "nullable": false
@@ -93,7 +93,7 @@
             "codecId": "pg/int4@1",
             "default": {
               "expression": "autoincrement()",
-              "kind": "db-generated"
+              "kind": "function"
             },
             "nativeType": "int4",
             "nullable": false
@@ -123,7 +123,7 @@
             "codecId": "pg/timestamptz@1",
             "default": {
               "expression": "now()",
-              "kind": "db-generated"
+              "kind": "function"
             },
             "nativeType": "timestamptz",
             "nullable": false
@@ -132,7 +132,7 @@
             "codecId": "pg/int4@1",
             "default": {
               "expression": "autoincrement()",
-              "kind": "db-generated"
+              "kind": "function"
             },
             "nativeType": "int4",
             "nullable": false
@@ -170,7 +170,7 @@
             "codecId": "pg/timestamptz@1",
             "default": {
               "expression": "now()",
-              "kind": "db-generated"
+              "kind": "function"
             },
             "nativeType": "timestamptz",
             "nullable": false
@@ -183,7 +183,7 @@
             "codecId": "pg/int4@1",
             "default": {
               "expression": "autoincrement()",
-              "kind": "db-generated"
+              "kind": "function"
             },
             "nativeType": "int4",
             "nullable": false

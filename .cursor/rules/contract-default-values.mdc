@@ -10,8 +10,7 @@ alwaysApply: false
 
 - When adding column defaults, re-emit the contract and verify the emitted JSON includes the full default payload.
 - Literal defaults must include a `value` in the emitted contract; avoid falsey literals unless the emitter preserves them.
-- Add the corresponding `defaults.*` capability when using db-generated defaults like `autoincrement()` or `now()`.
-- Standardized, cross-target default functions (e.g., `uuid()`) are not supported yet; this will be designed alongside application-level default generation.
+- Add the corresponding `defaults.*` capability when using function defaults like `autoincrement()` or `now()`.
 
 ## CLI output: tree vs JSON
 

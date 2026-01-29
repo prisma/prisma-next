@@ -45,7 +45,7 @@ describe('SqlFamilyInstance.toSchemaView', () => {
               name: 'id',
               nativeType: 'int4',
               nullable: false,
-              default: { kind: 'db-generated', expression: 'autoincrement()' },
+              default: { kind: 'function', expression: 'autoincrement()' },
             },
             status: {
               name: 'status',
@@ -77,7 +77,7 @@ describe('SqlFamilyInstance.toSchemaView', () => {
     expect(idNode?.meta).toMatchObject({
       nativeType: 'int4',
       nullable: false,
-      default: { kind: 'db-generated', expression: 'autoincrement()' },
+      default: { kind: 'function', expression: 'autoincrement()' },
     });
 
     const statusNode = columnsGroup?.children?.find((n) => n.id === 'column-User-status');

@@ -54,7 +54,7 @@
             "codecId": "pg/timestamptz@1",
             "default": {
               "expression": "now()",
-              "kind": "db-generated"
+              "kind": "function"
             },
             "nativeType": "timestamptz"
           },
@@ -67,7 +67,7 @@
             "codecId": "pg/int4@1",
             "default": {
               "expression": "autoincrement()",
-              "kind": "db-generated"
+              "kind": "function"
             },
             "nativeType": "int4"
           },
@@ -108,7 +108,7 @@
             "codecId": "pg/timestamptz@1",
             "default": {
               "expression": "now()",
-              "kind": "db-generated"
+              "kind": "function"
             },
             "nativeType": "timestamptz"
           },
@@ -120,7 +120,7 @@
             "codecId": "pg/int4@1",
             "default": {
               "expression": "autoincrement()",
-              "kind": "db-generated"
+              "kind": "function"
             },
             "nativeType": "int4"
           }

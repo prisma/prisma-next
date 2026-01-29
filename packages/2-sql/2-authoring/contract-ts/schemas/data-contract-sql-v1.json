@@ -134,7 +134,7 @@
       "required": ["columns"]
     },
     "ColumnDefault": {
-      "description": "Column default value. Can be a literal value or a database-generated expression.",
+      "description": "Column default value. Can be a literal value or a database function expression.",
       "oneOf": [
         {
           "type": "object",
@@ -154,16 +154,16 @@
         },
         {
           "type": "object",
-          "description": "Database-generated expression (e.g., 'autoincrement()', 'now()', 'gen_random_uuid()')",
+          "description": "Database function expression (e.g., 'autoincrement()', 'now()', 'gen_random_uuid()')",
           "additionalProperties": false,
           "properties": {
             "kind": {
               "type": "string",
-              "enum": ["db-generated"]
+              "enum": ["function"]
             },
             "expression": {
               "type": "string",
-              "description": "The database expression (e.g., 'autoincrement()', 'now()', 'gen_random_uuid()')"
+              "description": "The function expression (e.g., 'autoincrement()', 'now()', 'gen_random_uuid()')"
             }
           },
           "required": ["kind", "expression"]
