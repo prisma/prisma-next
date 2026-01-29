@@ -206,6 +206,9 @@ function createOfflineDriver(): SqlDriver {
     async connect() {
       throw missingDriver();
     },
+    async acquireConnection() {
+      throw missingDriver();
+    },
     async *execute() {
       yield* [];
       throw missingDriver();
