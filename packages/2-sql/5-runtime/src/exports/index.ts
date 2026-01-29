@@ -14,15 +14,15 @@ export {
 } from '../codecs/validation';
 export { lowerSqlPlan } from '../lower-sql-plan';
 export type {
-  CreateRuntimeContextOptions,
-  RuntimeContext,
+  ExecutionContext,
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeAdapterInstance,
+  SqlRuntimeDriverInstance,
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeExtensionInstance,
   TypeHelperRegistry,
 } from '../sql-context';
-export { createRuntimeContext } from '../sql-context';
+export { createExecutionContext } from '../sql-context';
 export type { SqlStatement } from '../sql-marker';
 export {
   ensureSchemaStatement,
@@ -31,8 +31,8 @@ export {
   writeContractMarker,
 } from '../sql-marker';
 export type {
+  CreateRuntimeOptions,
   Runtime,
-  RuntimeOptions,
   RuntimeTelemetryEvent,
   RuntimeVerifyOptions,
   TelemetryOutcome,

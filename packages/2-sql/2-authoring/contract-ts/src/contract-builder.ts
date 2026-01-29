@@ -35,8 +35,8 @@ import { computeMappings } from './contract';
  * produces. `codecTypes` uses the generic `CodecTypes` parameter; `operationTypes` is always
  * empty since operations are added via extensions at runtime.
  *
- * **Difference from RuntimeContext**: This is a compile-time type for contract construction.
- * `RuntimeContext` is a runtime object with populated registries for query execution.
+ * **Difference from ExecutionContext**: This is a compile-time type for contract construction.
+ * `ExecutionContext` is a runtime object with populated registries for query execution.
  *
  * @template C - The `CodecTypes` generic parameter passed to `defineContract<CodecTypes>()`
  */

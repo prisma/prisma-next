@@ -1,10 +1,14 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
+import postgresDriverDescriptor from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
+  createExecutionContext,
   createRuntime,
-  createRuntimeContext,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
@@ -113,25 +117,29 @@ describe('PrismaClient compatibility layer - dual implementation harness', () =>
         );
       `);
 
-    // Use the same client connection to avoid multiple connections to dev database
-    const driver = createPostgresDriverFromOptions({
-      connect: { client },
-      cursor: { disabled: true },
-    });
-
     // Validate and canonicalize the contract (converts bare scalars to canonical type IDs)
     const validatedContract = validateContract(testContract);
 
-    const context = createRuntimeContext({
-      contract: validatedContract,
+    const stack = createExecutionStack({
       target: postgresTarget,
       adapter: postgresAdapter,
+      driver: postgresDriverDescriptor,
       extensionPacks: [],
+    });
+    const stackInstance = instantiateExecutionStack(stack);
+    const context = createExecutionContext({
+      contract: validatedContract,
+      stackInstance,
     });
 
     const runtime = createRuntime({
-      driver,
+      stackInstance,
+      contract: validatedContract,
       context,
+      driverOptions: {
+        connect: { client },
+        cursor: { disabled: true },
+      },
       verify: {
         mode: 'onFirstUse',
         requireMarker: false,

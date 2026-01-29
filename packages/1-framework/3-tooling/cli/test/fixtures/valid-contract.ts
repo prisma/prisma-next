@@ -22,6 +22,5 @@ export const contract = {
     postgres: {
       version: '0.0.1',
     },
-    pg: {},
   },
 };

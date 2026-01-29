@@ -58,6 +58,7 @@ describe('delete builder', () => {
     contract,
     operations: createOperationRegistry(),
     codecs: createCodecRegistry(),
+    types: {},
   };
 
   const getModelAccessor: () => ModelColumnAccessor<

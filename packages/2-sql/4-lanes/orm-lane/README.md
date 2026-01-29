@@ -17,7 +17,6 @@ This package provides the ORM query builder that compiles model-based queries to
 
 - `@prisma-next/contract` - Contract types and plan metadata
 - `@prisma-next/plan` - Plan helpers and error utilities
-- `@prisma-next/runtime` - Runtime context for adapter access
 - `@prisma-next/sql-relational-core` - Schema and column builders
 - `@prisma-next/sql-contract` - SQL contract types (via `@prisma-next/sql-contract/types`)
 
@@ -29,6 +28,14 @@ This package provides the ORM query builder that compiles model-based queries to
 ## Architecture
 
 This package compiles ORM queries to SQL lane primitives (AST nodes). Dialect-specific lowering to SQL strings happens in adapters (per ADR 015 and ADR 016).
+
+```mermaid
+flowchart LR
+  ORM[ORM Builder] --> AST[SqlQueryPlan AST]
+  AST --> Plan[SqlQueryPlan]
+  Plan --> Runtime[Runtime Lowering + Execute]
+  Core[Relational Core] --> ORM
+```
 
 The ORM builder:
 1. Takes model-based queries (e.g., `orm().user().where(...).include(...)`)
@@ -82,3 +89,12 @@ src/
 
 - `@prisma-next/sql-relational-core` - Provides schema and column builders used by this package
 - `@prisma-next/sql-contract` - Defines SQL contract types (via `@prisma-next/sql-contract/types`)
+
+## Related Subsystems
+
+- **[Query Lanes](../../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)** — Lane authoring and plan building
+- **[Runtime & Plugin Framework](../../../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)** — Runtime execution pipeline
+
+## Related ADRs
+
+- [ADR 140 - Package Layering & Target-Family Namespacing](../../../../docs/architecture%20docs/adrs/ADR%20140%20-%20Package%20Layering%20&%20Target-Family%20Namespacing.md)

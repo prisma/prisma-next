@@ -1,173 +1,170 @@
+/**
+ * Database Seed Script
+ *
+ * Populates the demo database with sample data using Prisma Next's SQL DSL.
+ * Demonstrates INSERT with RETURNING clause and parameterized queries.
+ *
+ * Run with: pnpm seed
+ *
+ * Creates:
+ * - 2 users (alice, bob)
+ * - 3 posts with vector embeddings (for similarity search demos)
+ *
+ * Prerequisites:
+ * - DATABASE_URL environment variable set
+ * - Database schema already applied (run pnpm db:push first)
+ */
 import 'dotenv/config';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { loadContractFromTs } from '@prisma-next/cli';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { schema, sql } from '../src/prisma/query';
-import { closeRuntime, getRuntime } from '../src/prisma/runtime';
-import { createDemoControlClient } from '../test/utils/control-client';
-
-async function collectRows<P extends ExecutionPlan | SqlQueryPlan<unknown>>(
-  plan: P,
-): Promise<ResultType<P>[]> {
-  const runtime = getRuntime();
-  const rows: ResultType<P>[] = [];
-  for await (const row of runtime.execute(plan)) {
-    rows.push(row as ResultType<P>);
-  }
-  return rows;
-}
-
-async function initializeSchema() {
-  const connectionString = process.env['DATABASE_URL'];
-  if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is required');
-  }
-
-  // Load the contract from TypeScript source
-  const contractPath = resolve(__dirname, '../prisma/contract.ts');
-  const contractIR = await loadContractFromTs(contractPath);
-
-  // Use control client to initialize schema and write marker
-  const client = createDemoControlClient({ connection: connectionString });
-  try {
-    const result = await client.dbInit({ contractIR, mode: 'apply' });
-    if (!result.ok) {
-      throw new Error(`dbInit failed: ${result.failure.summary}`);
-    }
-    console.log(`Schema initialized: ${result.value.summary}`);
-  } finally {
-    await client.close();
-  }
-}
+import { getRuntime } from '../src/prisma/runtime';
 
 async function main() {
-  // Initialize schema using control client
-  await initializeSchema();
+  // biome-ignore lint/style/noNonNullAssertion: don't care about type safety in seed script
+  const runtime = getRuntime(process.env['DATABASE_URL']!);
 
-  const tables = schema.tables;
-  const userTable = tables.user;
-  const postTable = tables.post;
-  const userColumns = userTable.columns;
-  const postColumns = postTable.columns;
+  try {
+    const tables = schema.tables;
+    const userTable = tables.user;
+    const postTable = tables.post;
+    const userColumns = userTable.columns;
+    const postColumns = postTable.columns;
 
-  // Insert users
-  const alicePlan = sql
-    .insert(userTable, {
-      email: param('email'),
-    })
-    .returning(userColumns.id, userColumns.email)
-    .build({
-      params: {
-        email: 'alice@example.com',
-      },
-    });
+    // Insert users
+    const alicePlan = sql
+      .insert(userTable, {
+        id: param('id'),
+        email: param('email'),
+        createdAt: param('createdAt'),
+      })
+      .returning(userColumns.id, userColumns.email)
+      .build({
+        params: {
+          id: 1,
+          email: 'alice@example.com',
+          createdAt: new Date(),
+        },
+      });
 
-  const alice = (await collectRows(alicePlan))[0];
+    const alice = (await runtime.execute(alicePlan).toArray())[0];
 
-  const bobPlan = sql
-    .insert(userTable, {
-      email: param('email'),
-    })
-    .returning(userColumns.id, userColumns.email)
-    .build({
-      params: {
-        email: 'bob@example.com',
-      },
-    });
+    const bobPlan = sql
+      .insert(userTable, {
+        id: param('id'),
+        email: param('email'),
+        createdAt: param('createdAt'),
+      })
+      .returning(userColumns.id, userColumns.email)
+      .build({
+        params: {
+          id: 2,
+          email: 'bob@example.com',
+          createdAt: new Date(),
+        },
+      });
 
-  const bob = (await collectRows(bobPlan))[0];
+    const bob = (await runtime.execute(bobPlan).toArray())[0];
 
-  if (!alice || !bob) {
-    throw new Error('Failed to create users');
-  }
-
-  type UserRow = ResultType<typeof alicePlan>;
-  const aliceUser = alice as UserRow;
-  const bobUser = bob as UserRow;
-
-  console.log(`Created user: ${aliceUser.email} (id: ${aliceUser.id})`);
-  console.log(`Created user: ${bobUser.email} (id: ${bobUser.id})`);
-
-  // Generate sample embedding vectors (1536 dimensions, matching common embedding models)
-  const generateEmbedding = (seed: number): number[] => {
-    const embedding: number[] = [];
-    for (let i = 0; i < 1536; i++) {
-      embedding.push(Math.sin(seed + i) * 0.1);
+    if (!alice || !bob) {
+      throw new Error('Failed to create users');
     }
-    return embedding;
-  };
 
-  // Insert posts with embeddings
-  const post1Plan = sql
-    .insert(postTable, {
-      title: param('title'),
-      userId: param('userId'),
-      embedding: param('embedding'),
-    })
-    .returning(postColumns.id, postColumns.title, postColumns.userId)
-    .build({
-      params: {
-        title: 'First Post',
-        userId: alice.id,
-        embedding: generateEmbedding(1),
-      },
-    });
+    type UserRow = ResultType<typeof alicePlan>;
+    const aliceUser = alice as UserRow;
+    const bobUser = bob as UserRow;
 
-  const post1 = (await collectRows(post1Plan))[0];
+    console.log(`Created user: ${aliceUser.email} (id: ${aliceUser.id})`);
+    console.log(`Created user: ${bobUser.email} (id: ${bobUser.id})`);
 
-  const post2Plan = sql
-    .insert(postTable, {
-      title: param('title'),
-      userId: param('userId'),
-      embedding: param('embedding'),
-    })
-    .returning(postColumns.id, postColumns.title, postColumns.userId)
-    .build({
-      params: {
-        title: 'Second Post',
-        userId: alice.id,
-        embedding: generateEmbedding(2),
-      },
-    });
+    // Generate sample embedding vectors (1536 dimensions, matching common embedding models)
+    const generateEmbedding = (seed: number): number[] => {
+      const embedding: number[] = [];
+      for (let i = 0; i < 1536; i++) {
+        embedding.push(Math.sin(seed + i) * 0.1);
+      }
+      return embedding;
+    };
 
-  const post2 = (await collectRows(post2Plan))[0];
+    // Insert posts with embeddings
+    const post1Plan = sql
+      .insert(postTable, {
+        id: param('id'),
+        title: param('title'),
+        userId: param('userId'),
+        embedding: param('embedding'),
+        createdAt: param('createdAt'),
+      })
+      .returning(postColumns.id, postColumns.title, postColumns.userId)
+      .build({
+        params: {
+          id: 1,
+          title: 'First Post',
+          userId: alice.id,
+          embedding: generateEmbedding(1),
+          createdAt: new Date(),
+        },
+      });
 
-  const post3Plan = sql
-    .insert(postTable, {
-      title: param('title'),
-      userId: param('userId'),
-      embedding: param('embedding'),
-    })
-    .returning(postColumns.id, postColumns.title, postColumns.userId)
-    .build({
-      params: {
-        title: 'Third Post',
-        userId: bob.id,
-        embedding: generateEmbedding(3),
-      },
-    });
+    const post1 = (await runtime.execute(post1Plan).toArray())[0];
 
-  const post3 = (await collectRows(post3Plan))[0];
+    const post2Plan = sql
+      .insert(postTable, {
+        id: param('id'),
+        title: param('title'),
+        userId: param('userId'),
+        embedding: param('embedding'),
+        createdAt: param('createdAt'),
+      })
+      .returning(postColumns.id, postColumns.title, postColumns.userId)
+      .build({
+        params: {
+          id: 2,
+          title: 'Second Post',
+          userId: alice.id,
+          embedding: generateEmbedding(2),
+          createdAt: new Date(),
+        },
+      });
 
-  if (post1) console.log(`Created post: ${post1.title} (id: ${post1.id}, userId: ${post1.userId})`);
-  if (post2) console.log(`Created post: ${post2.title} (id: ${post2.id}, userId: ${post2.userId})`);
-  if (post3) console.log(`Created post: ${post3.title} (id: ${post3.id}, userId: ${post3.userId})`);
+    const post2 = (await runtime.execute(post2Plan).toArray())[0];
 
-  console.log('Seed completed successfully!');
+    const post3Plan = sql
+      .insert(postTable, {
+        id: param('id'),
+        title: param('title'),
+        userId: param('userId'),
+        embedding: param('embedding'),
+        createdAt: param('createdAt'),
+      })
+      .returning(postColumns.id, postColumns.title, postColumns.userId)
+      .build({
+        params: {
+          id: 3,
+          title: 'Third Post',
+          userId: bob.id,
+          embedding: generateEmbedding(3),
+          createdAt: new Date(),
+        },
+      });
+
+    const post3 = (await runtime.execute(post3Plan).toArray())[0];
+
+    if (post1)
+      console.log(`Created post: ${post1.title} (id: ${post1.id}, userId: ${post1.userId})`);
+    if (post2)
+      console.log(`Created post: ${post2.title} (id: ${post2.id}, userId: ${post2.userId})`);
+    if (post3)
+      console.log(`Created post: ${post3.title} (id: ${post3.id}, userId: ${post3.userId})`);
+
+    console.log('Seed completed successfully!');
+  } finally {
+    await runtime.close();
+  }
 }
 
-main()
-  .catch((e) => {
-    console.error('Error seeding database:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await closeRuntime();
-  });
+main().catch((e) => {
+  console.error('Error seeding database:', e);
+  process.exitCode = 1;
+});

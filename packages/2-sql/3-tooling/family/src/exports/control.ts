@@ -1,4 +1,4 @@
-import { SqlFamilyDescriptor } from '../core/descriptor';
+import { SqlFamilyDescriptor } from '../core/control-descriptor';
 
 // Re-export core types from canonical source
 export type {
@@ -12,7 +12,7 @@ export type {
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
 export { extractCodecControlHooks } from '../core/assembly';
-export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/instance';
+export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/control-instance';
 export {
   createMigrationPlan,
   plannerFailure,

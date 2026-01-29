@@ -71,3 +71,17 @@ Rename `tsup.config.ts` to `tsdown.config.ts` - keep only `entry` property - sho
 Replace `package.json#scripts.build` value with `"tsdown"`.
 
 Run `pnpm build` at least once for `package.json#exports` and similar to be generated. Don't forget to push those changes!
+
+## Auto-Generated Exports
+
+The base config sets `exports.enabled: 'local-only'`, which means tsdown automatically generates and updates the `exports` field in `package.json` during local builds.
+
+**Do NOT manually write exports entries.** Instead:
+
+1. Define entry points in `tsdown.config.ts` under the `entry` array
+2. Run `pnpm build` to generate the exports
+3. Commit the updated `package.json`
+
+The `customExports` function in the base config strips `exports/` prefixes from entry paths, so `src/exports/types.ts` becomes the export `./types`.
+
+If you need to add a new export, add the entry file to `tsdown.config.ts` and rebuild.

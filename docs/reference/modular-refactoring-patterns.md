@@ -80,7 +80,7 @@ export interface OrmBuilderState {
 
 // orm/context.ts - Context creation
 export interface OrmContext<TContract extends SqlContract<SqlStorage>> {
-  readonly context: RuntimeContext<TContract>;
+  readonly context: ExecutionContext<TContract>;
   readonly contract: TContract;
 }
 ```

@@ -1,45 +1,41 @@
-import contract from './prisma/contract.json';
+/**
+ * Browser Application Entry Point (Contract Visualization)
+ *
+ * This is a Vite-powered browser application that renders the emitted
+ * contract.json as an interactive HTML visualization. It demonstrates:
+ *
+ * - Machine-readable contracts: The JSON structure can be consumed by tools
+ * - Hot Module Replacement: Edit contract.ts, re-emit, and watch it update live
+ * - Contract introspection: Models, tables, relations, capabilities, extensions
+ *
+ * Run with: pnpm dev (starts Vite dev server with HMR)
+ *
+ * See also:
+ * - main.ts: CLI app using the same emitted contract
+ * - main-no-emit.ts: CLI app using inline contract definition
+ */
+import type { ModelDefinition, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import contractJson from './prisma/contract.json';
 
-interface Column {
-  codecId: string;
-  nativeType: string;
-  nullable?: boolean;
-}
+type Relation = {
+  readonly cardinality: string;
+  readonly to: string;
+  readonly on: { readonly parentCols: readonly string[]; readonly childCols: readonly string[] };
+};
 
-interface Table {
-  columns: Record<string, Column>;
-  primaryKey?: { columns: string[] };
-  foreignKeys?: Array<{
-    columns: string[];
-    name: string;
-    references: { table: string; columns: string[] };
-  }>;
-}
-
-interface Model {
-  fields: Record<string, { column: string }>;
-  relations: Record<string, unknown>;
-  storage: { table: string };
-}
-
-interface Relation {
-  cardinality: string;
-  to: string;
-  on: { parentCols: string[]; childCols: string[] };
-}
-
-interface Contract {
-  coreHash: string;
-  profileHash: string;
+// Temporary demo-only shim: today the validated Contract type doesn't fully reflect the
+// traversable IR shape we visualize here (target/relations/capabilities/extensionPacks).
+// TML-1831 will make this redundant by aligning Contract with validateContract() output and
+// moving derived mappings onto ExecutionContext:
+// https://linear.app/prisma-company/issue/TML-1831/runtime-dx-ir-shaped-contract-mappings-on-executioncontext
+type ContractIR = SqlContract<SqlStorage, Record<string, ModelDefinition>> & {
   target: string;
-  models: Record<string, Model>;
-  storage: { tables: Record<string, Table> };
   relations: Record<string, Record<string, Relation>>;
   capabilities: Record<string, Record<string, boolean>>;
   extensionPacks: Record<string, unknown>;
-}
+};
 
-function renderContract(c: Contract): string {
+function renderContract(c: ContractIR): string {
   const models = Object.entries(c.models)
     .map(([name, model]) => {
       const tableName = model.storage.table;
@@ -50,7 +46,7 @@ function renderContract(c: Contract): string {
           return `
             <div class="column">
               <span class="col-name">${fieldName}</span>
-              <span class="col-type">→ ${field.column}</span>
+              <span class="col-type">→ ${field?.column}</span>
             </div>
           `;
         })
@@ -160,14 +156,13 @@ function renderContract(c: Contract): string {
 
 const app = document.getElementById('contract-view');
 if (app) {
-  app.innerHTML = renderContract(contract as unknown as Contract);
+  app.innerHTML = renderContract(contractJson as unknown as ContractIR);
 }
 
 if (import.meta.hot) {
   import.meta.hot.accept('./prisma/contract.json', (newContract) => {
     if (app && newContract) {
-      const mod = newContract as unknown as { default: unknown };
-      app.innerHTML = renderContract(mod.default as Contract);
+      app.innerHTML = renderContract(newContract as unknown as ContractIR);
     }
   });
 }

@@ -93,8 +93,8 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 
 ## Package Structure
 
-- **`src/core/descriptor.ts`**: `SqlFamilyDescriptor` class implementing `ControlFamilyDescriptor` interface (pure data + factory)
-- **`src/core/instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
+- **`src/core/control-descriptor.ts`**: `SqlFamilyDescriptor` class implementing `ControlFamilyDescriptor` interface (pure data + factory)
+- **`src/core/control-instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
 - **`src/core/assembly.ts`**: Assembly helpers for building operation registries, extracting type imports, and collecting codec-owned storage type control hooks. Test utilities import `convertOperationManifest` from the same package via relative path.
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
 - **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations
@@ -112,13 +112,13 @@ The runner returns structured errors with the following codes:
 - **`SCHEMA_VERIFY_FAILED`**: Resulting schema doesn't satisfy the destination contract
 - **`EXECUTION_FAILED`**: SQL execution error during operation execution
 - **`src/exports/control.ts`**: Control plane entry point (exports `SqlFamilyDescriptor` instance)
-- **`src/exports/runtime.ts`**: Runtime entry point (placeholder for future functionality)
+- **`src/exports/runtime.ts`**: Runtime plane entry point
 
 ## Entrypoints
 
 - **`./control`**: Control plane entry point for CLI/config usage (exports `SqlFamilyDescriptor`)
 - **`./control-adapter`**: SQL control adapter interface (`SqlControlAdapter`, `SqlControlAdapterDescriptor`) for target-specific adapters
-- **`./runtime`**: Runtime entry point (placeholder for future functionality)
+- **`./runtime`**: Runtime plane identity exports only (family ID, types, descriptor identity). Does **not** export runtime creation helpers—use `createExecutionStack`, `instantiateExecutionStack` from `@prisma-next/core-execution-plane/stack` and `createExecutionContext`, `createRuntime` from `@prisma-next/sql-runtime`. See [ADR 152](../../../docs/architecture%20docs/adrs/ADR%20152%20-%20Execution%20Plane%20Descriptors%20and%20Instances.md).
 - **`./verify`**: Verification utilities (`readMarker`, `readMarkerSql`, `parseContractMarkerRow`) for reading contract markers from databases
 
 ## Dependencies

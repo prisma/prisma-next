@@ -1,52 +1,31 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: non-null assertions are fine for tests */
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import type { Contract } from '../src/prisma/contract.d';
-import contractJson from '../src/prisma/contract.json' with { type: 'json' };
-import { closeTestRuntime, createTestRuntime, initTestDatabase } from './utils/control-client';
-import {
-  pgvectorExtensionRuntimeDescriptor,
-  postgresAdapterRuntimeDescriptor,
-  postgresTargetRuntimeDescriptor,
-} from './utils/framework-components';
+import { executionContext, executionStackInstance } from '../src/prisma/execution-context';
+import { getRuntime } from '../src/prisma/runtime';
+import { initTestDatabase } from './utils/control-client';
 
-// Use the emitted JSON contract which has the real computed hashes
-const contract = validateContract<Contract>(contractJson);
-
-/**
- * Creates a runtime context for the given contract.
- */
-function createContext(contractForContext: ReturnType<typeof validateContract>) {
-  return createRuntimeContext({
-    contract: contractForContext,
-    target: postgresTargetRuntimeDescriptor,
-    adapter: postgresAdapterRuntimeDescriptor,
-    extensionPacks: [pgvectorExtensionRuntimeDescriptor],
-  });
-}
+const { contract } = executionContext;
 
 /**
  * Seeds test data using the runtime and query DSL.
  */
 async function seedTestData(
-  runtime: ReturnType<typeof createRuntime>,
-  contractForSeed: ReturnType<typeof validateContract>,
+  runtime: Runtime,
   data: {
     users?: string[];
     posts?: Array<{ title: string; userIndex: number }>;
   },
 ): Promise<{ userIds: number[] }> {
-  const context = createContext(contractForSeed);
-  const tables = schema(context).tables;
+  const tables = schema(executionContext).tables;
   const userTable = tables['user']!;
   const postTable = tables['post']!;
 
@@ -59,7 +38,7 @@ async function seedTestData(
       const id = i + 1;
       const createdAt = new Date();
 
-      const plan = sql({ context })
+      const plan = sql({ context: executionContext })
         .insert(userTable, {
           id: param('id'),
           email: param('email'),
@@ -85,7 +64,7 @@ async function seedTestData(
       const id = i + 1;
       const createdAt = new Date();
 
-      const plan = sql({ context })
+      const plan = sql({ context: executionContext })
         .insert(postTable, {
           id: param('id'),
           title: param('title'),
@@ -114,15 +93,10 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const context = createRuntimeContext({
-          contract,
-          target: postgresTargetRuntimeDescriptor,
-          adapter: postgresAdapterRuntimeDescriptor,
-          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
-        });
+        const context = executionContext;
         const tables = schema(context).tables;
         const userTable = tables['user']!;
-        const root = sql({ context });
+        const root = sql({ context: executionContext });
         const plan = root
           .from(userTable)
           .select({
@@ -149,13 +123,14 @@ describe('runtime execute integration', () => {
 
         const createRuntimeInstance = () => {
           const pool = new Pool({ connectionString });
-          const driver = createPostgresDriverFromOptions({
-            connect: { pool },
-            cursor: { disabled: true },
-          });
           return createRuntime({
+            stackInstance: executionStackInstance,
+            contract,
             context,
-            driver,
+            driverOptions: {
+              connect: { pool },
+              cursor: { disabled: true },
+            },
             verify: { mode: 'always', requireMarker: true },
             plugins: [
               budgets({
@@ -170,7 +145,7 @@ describe('runtime execute integration', () => {
         // Seed data using a runtime instance
         const seedRuntime = createRuntimeInstance();
         try {
-          await seedTestData(seedRuntime, contract, {
+          await seedTestData(seedRuntime, {
             users: ['alice@example.com'],
           });
         } finally {
@@ -221,21 +196,21 @@ describe('runtime execute integration', () => {
           connection: connectionString,
           contractIR: contract,
         });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const runtime = getRuntime(connectionString);
 
         try {
           // Seed data
-          await seedTestData(runtime, contract, {
+          await seedTestData(runtime, {
             users: ['alice@example.com'],
             posts: [{ title: 'First Post', userIndex: 0 }],
           });
 
-          const context = createContext(contract);
+          const context = executionContext;
           const tables = schema(context).tables;
           const userTable = tables['user']!;
           const postTable = tables['post']!;
 
-          const userPlan = sql({ context })
+          const userPlan = sql({ context: executionContext })
             .from(userTable)
             .select({
               id: userTable.columns['id']!,
@@ -247,7 +222,7 @@ describe('runtime execute integration', () => {
 
           type UserRow = ResultType<typeof userPlan>;
 
-          const postPlan = sql({ context })
+          const postPlan = sql({ context: executionContext })
             .from(postTable)
             .where(postTable.columns['userId']!.eq(param('userId')))
             .select({
@@ -278,7 +253,7 @@ describe('runtime execute integration', () => {
             userId: 1,
           });
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       }, {});
     },
@@ -294,20 +269,16 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const context = createRuntimeContext({
-          contract,
-          target: postgresTargetRuntimeDescriptor,
-          adapter: postgresAdapterRuntimeDescriptor,
-          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
-        });
+        const context = executionContext;
         const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
         const runtime = createRuntime({
+          stackInstance: executionStackInstance,
+          contract,
           context,
-          driver,
+          driverOptions: {
+            connect: { pool },
+            cursor: { disabled: true },
+          },
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
@@ -320,17 +291,17 @@ describe('runtime execute integration', () => {
 
         try {
           // Seed 100 users using a separate runtime without strict budgets
-          const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+          const seedRuntime = getRuntime(connectionString);
           try {
             const emails = Array.from({ length: 100 }, (_, i) => `user${i}@example.com`);
-            await seedTestData(seedRuntime, contract, { users: emails });
+            await seedTestData(seedRuntime, { users: emails });
           } finally {
             await seedRuntime.close();
           }
 
           const tables = schema(context).tables;
           const userTable = tables['user']!;
-          const unboundedPlan = sql({ context })
+          const unboundedPlan = sql({ context: executionContext })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -347,7 +318,7 @@ describe('runtime execute integration', () => {
             category: 'BUDGET',
           });
 
-          const boundedPlan = sql({ context })
+          const boundedPlan = sql({ context: executionContext })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -380,20 +351,16 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const context = createRuntimeContext({
-          contract,
-          target: postgresTargetRuntimeDescriptor,
-          adapter: postgresAdapterRuntimeDescriptor,
-          extensionPacks: [pgvectorExtensionRuntimeDescriptor],
-        });
+        const context = executionContext;
         const pool = new Pool({ connectionString });
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool },
-          cursor: { disabled: true },
-        });
         const runtime = createRuntime({
+          stackInstance: executionStackInstance,
+          contract,
           context,
-          driver,
+          driverOptions: {
+            connect: { pool },
+            cursor: { disabled: true },
+          },
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
@@ -406,17 +373,17 @@ describe('runtime execute integration', () => {
 
         try {
           // Seed 50 users using a separate runtime without strict budgets
-          const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+          const seedRuntime = getRuntime(connectionString);
           try {
             const emails = Array.from({ length: 50 }, (_, i) => `user${i}@example.com`);
-            await seedTestData(seedRuntime, contract, { users: emails });
+            await seedTestData(seedRuntime, { users: emails });
           } finally {
             await seedRuntime.close();
           }
 
           const tables = schema(context).tables;
           const userTable = tables['user']!;
-          const plan = sql({ context })
+          const plan = sql({ context: executionContext })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -450,11 +417,11 @@ describe('runtime execute integration', () => {
           connection: connectionString,
           contractIR: contract,
         });
-        const { runtime, pool } = createTestRuntime(connectionString, contract);
+        const runtime = getRuntime(connectionString);
 
         try {
           // Seed users and posts
-          await seedTestData(runtime, contract, {
+          await seedTestData(runtime, {
             users: ['alice@example.com', 'bob@example.com'],
             posts: [
               { title: 'First Post', userIndex: 0 },
@@ -463,12 +430,12 @@ describe('runtime execute integration', () => {
             ],
           });
 
-          const context = createContext(contract);
+          const context = executionContext;
           const tables = schema(context).tables;
           const userTable = tables['user']!;
           const postTable = tables['post']!;
 
-          const plan = sql({ context })
+          const plan = sql({ context: executionContext })
             .from(userTable)
             .includeMany(
               postTable,
@@ -519,7 +486,7 @@ describe('runtime execute integration', () => {
           expect(bob!.posts).toHaveLength(1);
           expect(bob!.posts[0]!.title).toBe('Third Post');
         } finally {
-          await closeTestRuntime({ runtime, pool });
+          await runtime.close();
         }
       }, {});
     },

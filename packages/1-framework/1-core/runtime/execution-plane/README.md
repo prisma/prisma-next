@@ -4,12 +4,14 @@ Execution/runtime plane descriptor and instance types for Prisma Next.
 
 ## Overview
 
-This package provides TypeScript type definitions for execution/runtime-plane descriptors and instances. These types define the structure for runtime components (families, targets, adapters, drivers, extensions) that are used during query execution.
+This package provides TypeScript type definitions for execution/runtime-plane descriptors and instances. These types define the structure for runtime components (families, targets, adapters, drivers, extensions) and the descriptors-only execution stack that is instantiated by applications.
 
 ## Responsibilities
 
 - **Runtime Instance Types**: Base interfaces for runtime plane instances (`RuntimeFamilyInstance`, `RuntimeTargetInstance`, `RuntimeAdapterInstance`, `RuntimeDriverInstance`, `RuntimeExtensionInstance`)
 - **Runtime Descriptor Types**: Type definitions for runtime plane descriptors (`RuntimeFamilyDescriptor`, `RuntimeTargetDescriptor`, `RuntimeAdapterDescriptor`, `RuntimeDriverDescriptor`, `RuntimeExtensionDescriptor`)
+- **Execution Stack Types**: Descriptors-only execution stack (`ExecutionStack`) and instantiated stack (`ExecutionStackInstance`)
+- **Stack Instantiation**: Helper to instantiate a stack (`instantiateExecutionStack`)
 
 ## Dependencies
 
@@ -75,6 +77,23 @@ import type { RuntimeAdapterInstance } from '@prisma-next/core-execution-plane/t
 
 // Adapter instance used at runtime
 const adapter: RuntimeAdapterInstance<'sql', 'postgres'> = adapterDescriptor.create();
+```
+
+### Execution Stack
+
+Execution stacks group runtime descriptors and are instantiated explicitly:
+
+```typescript
+import { createExecutionStack, instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+
+const stack = createExecutionStack({
+  target: postgresTarget,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensionPacks: [],
+});
+
+const stackInstance = instantiateExecutionStack(stack);
 ```
 
 ## Package Location
