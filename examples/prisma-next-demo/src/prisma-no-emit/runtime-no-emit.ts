@@ -1,6 +1,6 @@
 import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
-import { executionContext, executionStackInstance } from './execution-context';
+import { executionContext, executionStackInstance } from './query-no-emit';
 
 export function getRuntime(databaseUrl: string): Runtime {
   const pool = new Pool({ connectionString: databaseUrl });

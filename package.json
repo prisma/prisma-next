@@ -39,7 +39,7 @@
     "@changesets/cli": "^2.27.8",
     "@prisma-next/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "@vitest/coverage-v8": "^4.0.16",
+    "@vitest/coverage-v8": "^4.0.17",
     "dependency-cruiser": "^16.3.3",
     "gray-matter": "catalog:",
     "husky": "^9.1.7",

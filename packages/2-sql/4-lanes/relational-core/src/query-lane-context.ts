@@ -4,8 +4,9 @@ import type { CodecRegistry } from './ast/codec-types';
 
 /**
  * Registry of initialized type helpers from storage.types.
- * Each key is a type name from storage.types, and the value is the initialized helper
- * (or validated typeParams if no init hook was provided).
+ * Each key is a type name from storage.types, and the value is:
+ * - The result of the codec's init hook (if provided), or
+ * - The full StorageTypeInstance metadata (codecId, nativeType, typeParams) if no init hook
  */
 export type TypeHelperRegistry = Record<string, unknown>;
 
@@ -16,15 +17,15 @@ export type TypeHelperRegistry = Record<string, unknown>;
  * operation builders. This interface explicitly excludes runtime concerns like
  * adapters, connection management, and transaction state.
  */
-export interface QueryLaneContext<
+export interface ExecutionContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
 > {
   readonly contract: TContract;
   readonly operations: OperationRegistry;
   readonly codecs: CodecRegistry;
   /**
-   * Optional type helper registry for parameterized types.
-   * When present, schema() will expose these helpers via schema.types.
+   * Type helper registry for parameterized types.
+   * Schema builders expose these helpers via schema.types.
    */
-  readonly types?: TypeHelperRegistry;
+  readonly types: TypeHelperRegistry;
 }

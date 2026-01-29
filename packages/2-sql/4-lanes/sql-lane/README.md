@@ -30,6 +30,14 @@ This package provides the relational query DSL and raw SQL helpers for building 
 
 This package compiles relational DSL queries to SQL AST nodes using factories from `@prisma-next/sql-relational-core/ast`. Dialect-specific lowering to SQL strings happens in adapters (per ADR 015 and ADR 016).
 
+```mermaid
+flowchart LR
+  DSL[SQL DSL] --> AST[SqlQueryPlan AST]
+  AST --> Plan[SqlQueryPlan]
+  Plan --> Runtime[Runtime Lowering + Execute]
+  Core[Relational Core] --> DSL
+```
+
 ### Module Structure
 
 The package is organized into focused modules:
@@ -60,3 +68,12 @@ All AST construction flows through factories from `@prisma-next/sql-relational-c
 - `@prisma-next/sql-relational-core` - Provides schema and column builders, AST factories used by this package
 - `@prisma-next/sql-orm-lane` - ORM builder that compiles to this package's DSL primitives
 - `@prisma-next/sql-contract` - Defines SQL contract types (via `@prisma-next/sql-contract/types`)
+
+## Related Subsystems
+
+- **[Query Lanes](../../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)** — Lane authoring and plan building
+- **[Runtime & Plugin Framework](../../../../docs/architecture%20docs/subsystems/4.%20Runtime%20%26%20Plugin%20Framework.md)** — Runtime execution pipeline
+
+## Related ADRs
+
+- [ADR 140 - Package Layering & Target-Family Namespacing](../../../../docs/architecture%20docs/adrs/ADR%20140%20-%20Package%20Layering%20%26%20Target-Family%20Namespacing.md)

@@ -1,6 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
   AnyBinaryBuilder,
   AnyColumnBuilder,
@@ -14,7 +14,7 @@ import type {
 import type { OrmIncludeChildBuilder } from './orm-include-child';
 
 export interface OrmBuilderOptions<TContract extends SqlContract<SqlStorage>> {
-  readonly context: QueryLaneContext<TContract>;
+  readonly context: ExecutionContext<TContract>;
 }
 
 type ModelName<TContract extends SqlContract<SqlStorage>> = keyof TContract['models'] & string;

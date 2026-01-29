@@ -12,5 +12,4 @@ coverage
 *.tsbuildinfo
 packages/e2e-tests/.tmp-output
 /wip
-/agent-os
 .pnpm-store

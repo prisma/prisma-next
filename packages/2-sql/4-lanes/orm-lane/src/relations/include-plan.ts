@@ -11,7 +11,7 @@ import type {
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { compact } from '@prisma-next/sql-relational-core/ast';
-import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type {
   AnyBinaryBuilder,
@@ -61,7 +61,7 @@ export interface IncludeState {
 interface BuildIncludeAstsInput {
   readonly includes: OrmIncludeState[];
   readonly contract: SqlContract<SqlStorage>;
-  readonly context: QueryLaneContext<SqlContract<SqlStorage>>;
+  readonly context: ExecutionContext<SqlContract<SqlStorage>>;
   readonly modelName: string;
   readonly paramsMap: Record<string, unknown>;
   readonly paramDescriptors: ParamDescriptor[];

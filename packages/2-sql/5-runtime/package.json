@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "@prisma-next/core-execution-plane": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/runtime-executor": "workspace:*",
@@ -40,7 +41,7 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
+      "types": "./dist/src/exports/index.d.ts",
       "import": "./dist/index.js"
     },
     "./test/utils": {

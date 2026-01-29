@@ -59,6 +59,24 @@ Uses contract directly from TypeScript:
 pnpm start:no-emit -- users
 ```
 
+## Architecture
+
+```mermaid
+flowchart LR
+  Contract[Contract] --> Stack[ExecutionStack]
+  Stack --> StackI[ExecutionStackInstance]
+  StackI --> Context[ExecutionContext]
+  Context --> QueryRoots[Query Roots]
+  AppConfig[App Config] --> Runtime[Runtime]
+  StackI --> Runtime
+  Context --> Runtime
+```
+
+## Related Docs
+
+- **[Query Lanes](../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)** — DSL and ORM authoring surfaces
+- **[Runtime & Plugin Framework](../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)** — Runtime execution pipeline
+
 ## Setup
 
 1. Install dependencies:
@@ -90,8 +108,13 @@ pnpm start:no-emit -- users
 - `prisma/contract.ts` - Contract definition (source of truth)
 - `src/prisma/contract.json` - Emitted contract (emit workflow only)
 - `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
-- `src/prisma/runtime.ts` - Runtime using emitted contract
-- `src/prisma/runtime-no-emit.ts` - Runtime using contract directly
+- `src/prisma/execution-context.ts` - Env-free execution stack/context (emit workflow)
+- `src/prisma/query.ts` - Env-free query roots (emit workflow)
+- `src/prisma-no-emit/query-no-emit.ts` - Env-free execution stack/context + query roots (no-emit workflow)
+- `src/prisma/runtime.ts` - Runtime factory (emit workflow)
+- `src/prisma-no-emit/runtime-no-emit.ts` - Runtime factory (no-emit workflow)
+- `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
+- `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
 - `scripts/stamp-marker.ts` - Contract marker management
 - `scripts/seed.ts` - Database seeding (includes vector embeddings)
 - `src/queries/similarity-search.ts` - Example vector similarity search query

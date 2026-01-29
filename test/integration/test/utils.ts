@@ -1,9 +1,13 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import type { PostgresDriverOptions } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import sqlFamily from '@prisma-next/family-sql/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Log, Plugin, Runtime, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
+import { createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
 import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Client } from 'pg';
@@ -38,17 +42,24 @@ export function createTestRuntime(
       }
     : { mode: 'onFirstUse', requireMarker: false };
 
-  // Create runtime family instance from descriptors
-  const familyInstance = sqlFamily.create({
+  const stack = createExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
     extensionPacks: options?.extensionPacks ?? [],
   });
 
-  // Create runtime using family instance
-  return familyInstance.createRuntime({
+  const stackInstance = instantiateExecutionStack(stack);
+
+  const context = createExecutionContext({
     contract,
+    stackInstance,
+  });
+
+  return createRuntime({
+    stackInstance,
+    contract,
+    context,
     driverOptions,
     verify,
     ...(options?.plugins ? { plugins: options.plugins } : {}),

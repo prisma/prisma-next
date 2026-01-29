@@ -10,7 +10,7 @@ import {
   createUpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
   AnyColumnBuilder,
   BinaryBuilder,
@@ -75,7 +75,7 @@ export class InsertBuilderImpl<
 > implements InsertBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly context: QueryLaneContext<TContract>;
+  private readonly context: ExecutionContext<TContract>;
   private readonly table: TableRef;
   private readonly values: Record<string, ParamPlaceholder>;
   private returningColumns: AnyColumnBuilder[] = [];
@@ -204,7 +204,7 @@ export class UpdateBuilderImpl<
 > implements UpdateBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly context: QueryLaneContext<TContract>;
+  private readonly context: ExecutionContext<TContract>;
   private readonly table: TableRef;
   private readonly set: Record<string, ParamPlaceholder>;
   private wherePredicate?: BinaryBuilder | UnaryBuilder;
@@ -373,7 +373,7 @@ export class DeleteBuilderImpl<
 > implements DeleteBuilder<TContract, CodecTypes, Row>
 {
   private readonly contract: TContract;
-  private readonly context: QueryLaneContext<TContract>;
+  private readonly context: ExecutionContext<TContract>;
   private readonly table: TableRef;
   private wherePredicate?: BinaryBuilder | UnaryBuilder;
   private returningColumns: AnyColumnBuilder[] = [];

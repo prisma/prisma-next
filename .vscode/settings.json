@@ -1,5 +1,5 @@
 {
-  "cSpell.words": ["codegen", "Lowerer"],
+  "cSpell.words": ["codegen", "Lowerer", "pgvector"],
   "editor.defaultFormatter": "biomejs.biome",
   "typescript.tsdk": "node_modules/typescript/lib",
   "[typescript]": {

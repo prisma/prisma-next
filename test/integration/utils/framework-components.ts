@@ -44,7 +44,6 @@ export function getSqlDescriptorBundle(options?: {
 
 export const pgvectorExtensionDescriptor = pgvectorDescriptor;
 
-// Runtime descriptors for use with createRuntimeContext
 export const postgresTargetRuntimeDescriptor = postgresTargetRuntime;
 export const postgresAdapterRuntimeDescriptor = postgresAdapterRuntime;
 export const pgvectorExtensionRuntimeDescriptor = pgvectorExtensionRuntime;

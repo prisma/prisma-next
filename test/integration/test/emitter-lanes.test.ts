@@ -66,7 +66,6 @@ describe('emitter → lanes integration', () => {
         target: 'postgres',
         extensionPacks: {
           postgres: { version: '0.0.1' },
-          pg: {},
         },
         models: {
           User: {
@@ -174,7 +173,6 @@ describe('emitter → lanes integration', () => {
       target: 'postgres',
       extensionPacks: {
         postgres: { version: '0.0.1' },
-        pg: {},
       },
       models: {
         User: {
@@ -265,7 +263,6 @@ describe('emitter → lanes integration', () => {
       target: 'postgres',
       extensionPacks: {
         postgres: { version: '0.0.1' },
-        pg: {},
       },
       models: {
         User: {
