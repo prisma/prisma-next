@@ -206,4 +206,66 @@ describe('TableBuilder', () => {
 
     expect(table.columns.id).not.toHaveProperty('typeParams');
   });
+
+  describe('nullable/default mutual exclusivity', () => {
+    it('allows nullable column without default', () => {
+      const table = createTable('user')
+        .column('email', { type: textColumn, nullable: true })
+        .build();
+
+      expect(table.columns.email.nullable).toBe(true);
+      expect(table.columns.email).not.toHaveProperty('default');
+    });
+
+    it('allows non-nullable column with default', () => {
+      const table = createTable('user')
+        .column('createdAt', {
+          type: textColumn,
+          default: { kind: 'function', expression: 'now()' },
+        })
+        .build();
+
+      expect(table.columns.createdAt.nullable).toBe(false);
+      expect(table.columns.createdAt.default).toEqual({
+        kind: 'function',
+        expression: 'now()',
+      });
+    });
+
+    it('allows non-nullable column without default', () => {
+      const table = createTable('user').column('id', { type: intColumn, nullable: false }).build();
+
+      expect(table.columns.id.nullable).toBe(false);
+      expect(table.columns.id).not.toHaveProperty('default');
+    });
+
+    it('allows explicit nullable: false with default', () => {
+      const table = createTable('user')
+        .column('status', {
+          type: textColumn,
+          nullable: false,
+          default: { kind: 'literal', expression: "'active'" },
+        })
+        .build();
+
+      expect(table.columns.status.nullable).toBe(false);
+      expect(table.columns.status.default).toEqual({
+        kind: 'literal',
+        expression: "'active'",
+      });
+    });
+
+    it('rejects nullable column with default at compile time', () => {
+      // This test verifies the type constraint works.
+      // The @ts-expect-error directive asserts that the next line produces a type error.
+      // If the type system ever allows nullable + default, this test will fail to compile.
+      createTable('user')
+        // @ts-expect-error - nullable columns cannot have default values
+        .column('bad', {
+          type: textColumn,
+          nullable: true,
+          default: { kind: 'literal', expression: 'foo' },
+        });
+    });
+  });
 });

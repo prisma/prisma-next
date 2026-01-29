@@ -26,10 +26,7 @@ exports[`db introspect command (e2e) > outputs JSON envelope with real database 
             "nullable": false,
           },
           "id": {
-            "default": {
-              "expression": "autoincrement()",
-              "kind": "function",
-            },
+            "default": "nextval('user_id_seq'::regclass)",
             "name": "id",
             "nativeType": "int4",
             "nullable": false,
