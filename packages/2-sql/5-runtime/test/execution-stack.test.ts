@@ -101,6 +101,9 @@ function createStubDriverDescriptor(): RuntimeDriverDescriptor<
   const driver: SqlDriver = {
     async connect() {},
     async *execute() {},
+    async acquireConnection() {
+      throw new Error('Method not implemented.');
+    },
     async query() {
       return { rows: [] };
     },
