@@ -1,100 +1,81 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { sql } from '@prisma-next/sql-lane/sql';
-import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import {
-  createStubAdapter,
-  createTestContext,
-  executePlanAndCollect,
-} from '@prisma-next/sql-runtime/test/utils';
-import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
-import { loadContractFromDisk, runDbInit } from './utils';
+import { withTestRuntime } from './utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const repoRoot = resolve(__dirname, '../../../../');
-const configPath = resolve(__dirname, 'fixtures/prisma-next.config.ts');
-const cliPath = resolve(repoRoot, 'packages/1-framework/3-tooling/cli/dist/cli.js');
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 describe('end-to-end nested projection queries', () => {
   it(
     'nested projection returns flat rows with correct aliases',
     async () => {
-      const contract = await loadContractFromDisk<Contract>(contractJsonPath);
-
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
-        await withClient(connectionString, async (client: import('pg').Client) => {
+      await withTestRuntime<Contract>(
+        contractJsonPath,
+        async ({ tables, runtime, context, client }) => {
           await client.query('insert into "user" (email) values ($1), ($2), ($3)', [
             'ada@example.com',
             'tess@example.com',
             'mike@example.com',
           ]);
 
-          const adapter = createStubAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client);
-          try {
-            const context = createTestContext(contract, adapter);
-            const tables = schema<Contract>(context).tables;
-            const user = tables.user!;
-            const plan = sql({ context })
-              .from(user)
-              .select({
-                name: user.columns.email!,
-                post: {
-                  title: user.columns.id!,
-                },
-              })
-              .build();
+          const user = tables.user!;
+          const plan = sql({ context })
+            .from(user)
+            .select({
+              name: user.columns.email!,
+              post: {
+                title: user.columns.id!,
+              },
+            })
+            .build();
 
-            const rows = await executePlanAndCollect(runtime, plan);
+          const rows = await executePlanAndCollect(runtime, plan);
 
-            expect(rows.length).toBe(3);
-            expect(rows[0]).toMatchObject({
-              name: expect.any(String),
-              post_title: expect.any(Number),
-            });
-            expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
+          expect(rows.length).toBe(3);
+          expect(rows[0]).toMatchObject({
+            name: expect.any(String),
+            post_title: expect.any(Number),
+          });
+          expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
-            type Row = ResultType<typeof plan>;
-            expectTypeOf<Row>().toExtend<{
-              name: string;
-              post: { title: number };
-            }>();
-            expectTypeOf<Row['name']>().toEqualTypeOf<string>();
-            expectTypeOf<Row['post']>().toEqualTypeOf<{ title: number }>();
-            expectTypeOf<Row['post']['title']>().toEqualTypeOf<number>();
+          type Row = ResultType<typeof plan>;
+          expectTypeOf<Row>().toExtend<{
+            name: string;
+            post: { title: number };
+          }>();
+          expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+          expectTypeOf<Row['post']>().toEqualTypeOf<{ title: number }>();
+          expectTypeOf<Row['post']['title']>().toEqualTypeOf<number>();
 
-            const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
-            expect(flatRow0['name']).toBe('ada@example.com');
-            expect(flatRow0['post_title']).toBe(1);
-            expect({
-              name: flatRow0['name'],
-              post: { title: flatRow0['post_title'] },
-            }).toEqual({
-              name: 'ada@example.com',
-              post: { title: 1 },
-            });
+          const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
+          expect(flatRow0['name']).toBe('ada@example.com');
+          expect(flatRow0['post_title']).toBe(1);
+          expect({
+            name: flatRow0['name'],
+            post: { title: flatRow0['post_title'] },
+          }).toEqual({
+            name: 'ada@example.com',
+            post: { title: 1 },
+          });
 
-            expect(plan.meta.projection).toEqual({
-              name: 'user.email',
-              post_title: 'user.id',
-            });
+          expect(plan.meta.projection).toEqual({
+            name: 'user.email',
+            post_title: 'user.id',
+          });
 
-            expect(plan.meta.projectionTypes).toEqual({
-              name: 'pg/text@1',
-              post_title: 'pg/int4@1',
-            });
-          } finally {
-            await runtime.close();
-          }
-        });
-      });
+          expect(plan.meta.projectionTypes).toEqual({
+            name: 'pg/text@1',
+            post_title: 'pg/int4@1',
+          });
+        },
+      );
     },
     timeouts.spinUpPpgDev,
   );
@@ -102,69 +83,59 @@ describe('end-to-end nested projection queries', () => {
   it(
     'multi-level nested projection returns flat rows with correct aliases',
     async () => {
-      const contract = await loadContractFromDisk<Contract>(contractJsonPath);
-
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
-        await withClient(connectionString, async (client: import('pg').Client) => {
+      await withTestRuntime<Contract>(
+        contractJsonPath,
+        async ({ tables, runtime, context, client }) => {
           await client.query('insert into "user" (email) values ($1), ($2)', [
             'ada@example.com',
             'tess@example.com',
           ]);
 
-          const adapter = createStubAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client);
-          try {
-            const context = createTestContext(contract, adapter);
-            const tables = schema<Contract>(context).tables;
-            const user = tables.user!;
-            const plan = sql({ context })
-              .from(user)
-              .select({
-                a: {
-                  b: {
-                    c: user.columns.id!,
-                  },
+          const user = tables.user!;
+          const plan = sql({ context })
+            .from(user)
+            .select({
+              a: {
+                b: {
+                  c: user.columns.id!,
                 },
-              })
-              .build();
+              },
+            })
+            .build();
 
-            const rows = await executePlanAndCollect(runtime, plan);
+          const rows = await executePlanAndCollect(runtime, plan);
 
-            expect(rows.length).toBe(2);
-            expect(rows[0]).toMatchObject({
-              a_b_c: expect.any(Number),
-            });
-            expect(rows[0]).toEqual(expect.not.objectContaining({ a: expect.anything() }));
+          expect(rows.length).toBe(2);
+          expect(rows[0]).toMatchObject({
+            a_b_c: expect.any(Number),
+          });
+          expect(rows[0]).toEqual(expect.not.objectContaining({ a: expect.anything() }));
 
-            type Row = ResultType<typeof plan>;
-            expectTypeOf<Row>().toExtend<{
-              a: { b: { c: number } };
-            }>();
-            expectTypeOf<Row['a']>().toEqualTypeOf<{ b: { c: number } }>();
-            expectTypeOf<Row['a']['b']>().toEqualTypeOf<{ c: number }>();
-            expectTypeOf<Row['a']['b']['c']>().toEqualTypeOf<number>();
+          type Row = ResultType<typeof plan>;
+          expectTypeOf<Row>().toExtend<{
+            a: { b: { c: number } };
+          }>();
+          expectTypeOf<Row['a']>().toEqualTypeOf<{ b: { c: number } }>();
+          expectTypeOf<Row['a']['b']>().toEqualTypeOf<{ c: number }>();
+          expectTypeOf<Row['a']['b']['c']>().toEqualTypeOf<number>();
 
-            const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
-            expect(flatRow0['a_b_c']).toBe(1);
-            expect({ a: { b: { c: flatRow0['a_b_c'] } } }).toEqual({
-              a: { b: { c: 1 } },
-            });
+          const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
+          expect(flatRow0['a_b_c']).toBe(1);
+          expect({ a: { b: { c: flatRow0['a_b_c'] } } }).toEqual({
+            a: { b: { c: 1 } },
+          });
 
-            const flatRow1 = (rows[1] ?? {}) as Record<string, unknown>;
-            expect(flatRow1['a_b_c']).toBe(2);
-            expect({ a: { b: { c: flatRow1['a_b_c'] } } }).toEqual({
-              a: { b: { c: 2 } },
-            });
+          const flatRow1 = (rows[1] ?? {}) as Record<string, unknown>;
+          expect(flatRow1['a_b_c']).toBe(2);
+          expect({ a: { b: { c: flatRow1['a_b_c'] } } }).toEqual({
+            a: { b: { c: 2 } },
+          });
 
-            expect(plan.meta.projection).toEqual({
-              a_b_c: 'user.id',
-            });
-          } finally {
-            await runtime.close();
-          }
-        });
-      });
+          expect(plan.meta.projection).toEqual({
+            a_b_c: 'user.id',
+          });
+        },
+      );
     },
     timeouts.spinUpPpgDev,
   );
@@ -172,11 +143,9 @@ describe('end-to-end nested projection queries', () => {
   it(
     'nested projection with joins returns flat rows with correct aliases',
     async () => {
-      const contract = await loadContractFromDisk<Contract>(contractJsonPath);
-
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
-        await withClient(connectionString, async (client: import('pg').Client) => {
+      await withTestRuntime<Contract>(
+        contractJsonPath,
+        async ({ tables, runtime, context, client }) => {
           await client.query('insert into "user" (email) values ($1), ($2)', [
             'ada@example.com',
             'tess@example.com',
@@ -186,73 +155,65 @@ describe('end-to-end nested projection queries', () => {
             [1, 'First Post', true, 'Second Post', false],
           );
 
-          const adapter = createStubAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client);
-          try {
-            const context = createTestContext(contract, adapter);
-            const tables = schema(context).tables;
-            const user = tables.user!;
-            const post = tables.post!;
-            const plan = sql({ context })
-              .from(user)
-              .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
-              .select({
-                name: user.columns.email!,
-                post: {
-                  title: post.columns.title!,
-                  id: post.columns.id!,
-                },
-              })
-              .build();
+          const user = tables.user!;
+          const post = tables.post!;
+          const plan = sql({ context })
+            .from(user)
+            .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+            .select({
+              name: user.columns.email!,
+              post: {
+                title: post.columns.title!,
+                id: post.columns.id!,
+              },
+            })
+            .build();
 
-            const rows = await executePlanAndCollect(runtime, plan);
+          const rows = await executePlanAndCollect(runtime, plan);
 
-            expect(rows.length).toBe(2);
-            expect(rows[0]).toMatchObject({
-              name: expect.any(String),
-              post_title: expect.any(String),
-              post_id: expect.any(Number),
-            });
-            expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
+          expect(rows.length).toBe(2);
+          expect(rows[0]).toMatchObject({
+            name: expect.any(String),
+            post_title: expect.any(String),
+            post_id: expect.any(Number),
+          });
+          expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
-            type Row = ResultType<typeof plan>;
-            expectTypeOf<Row>().toExtend<{
-              name: string;
-              post: { title: string; id: number };
-            }>();
-            expectTypeOf<Row['name']>().toEqualTypeOf<string>();
-            expectTypeOf<Row['post']>().toEqualTypeOf<{
-              title: string;
-              id: number;
-            }>();
-            expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
-            expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
+          type Row = ResultType<typeof plan>;
+          expectTypeOf<Row>().toExtend<{
+            name: string;
+            post: { title: string; id: number };
+          }>();
+          expectTypeOf<Row['name']>().toEqualTypeOf<string>();
+          expectTypeOf<Row['post']>().toEqualTypeOf<{
+            title: string;
+            id: number;
+          }>();
+          expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
+          expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
 
-            const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
-            expect(flatRow0['name']).toBe('ada@example.com');
-            expect(flatRow0['post_title']).toBe('First Post');
-            expect(flatRow0['post_id']).toBe(1);
-            expect({
-              name: flatRow0['name'],
-              post: { title: flatRow0['post_title'], id: flatRow0['post_id'] },
-            }).toEqual({
-              name: 'ada@example.com',
-              post: { title: 'First Post', id: 1 },
-            });
+          const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
+          expect(flatRow0['name']).toBe('ada@example.com');
+          expect(flatRow0['post_title']).toBe('First Post');
+          expect(flatRow0['post_id']).toBe(1);
+          expect({
+            name: flatRow0['name'],
+            post: { title: flatRow0['post_title'], id: flatRow0['post_id'] },
+          }).toEqual({
+            name: 'ada@example.com',
+            post: { title: 'First Post', id: 1 },
+          });
 
-            expect(plan.meta.projection).toEqual({
-              name: 'user.email',
-              post_title: 'post.title',
-              post_id: 'post.id',
-            });
+          expect(plan.meta.projection).toEqual({
+            name: 'user.email',
+            post_title: 'post.title',
+            post_id: 'post.id',
+          });
 
-            expect(plan.meta.refs?.tables).toContain('user');
-            expect(plan.meta.refs?.tables).toContain('post');
-          } finally {
-            await runtime.close();
-          }
-        });
-      });
+          expect(plan.meta.refs?.tables).toContain('user');
+          expect(plan.meta.refs?.tables).toContain('post');
+        },
+      );
     },
     timeouts.spinUpPpgDev,
   );
@@ -260,94 +221,84 @@ describe('end-to-end nested projection queries', () => {
   it(
     'mixed leaves and nested objects in projection returns flat rows',
     async () => {
-      const contract = await loadContractFromDisk<Contract>(contractJsonPath);
-
-      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
-        await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
-        await withClient(connectionString, async (client: import('pg').Client) => {
+      await withTestRuntime<Contract>(
+        contractJsonPath,
+        async ({ tables, runtime, context, client }) => {
           await client.query('insert into "user" (email) values ($1), ($2)', [
             'ada@example.com',
             'tess@example.com',
           ]);
 
-          const adapter = createStubAdapter();
-          const runtime = createTestRuntimeFromClient(contract, client);
-          try {
-            const context = createTestContext(contract, adapter);
-            const tables = schema(context).tables;
-            const user = tables.user!;
-            const plan = sql({ context })
-              .from(user)
-              .select({
-                id: user.columns.id!,
-                post: {
-                  title: user.columns.email!,
-                  author: {
-                    name: user.columns.id!,
-                  },
-                },
-                email: user.columns.email!,
-              })
-              .build();
-
-            const rows = await executePlanAndCollect(runtime, plan);
-
-            expect(rows.length).toBe(2);
-            expect(rows[0]).toMatchObject({
-              id: expect.any(Number),
-              post_title: expect.any(String),
-              post_author_name: expect.any(Number),
-              email: expect.any(String),
-            });
-            expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
-
-            type Row = ResultType<typeof plan>;
-            expectTypeOf<Row>().toExtend<{
-              id: number;
-              post: { title: string; author: { name: number } };
-              email: string;
-            }>();
-            expectTypeOf<Row['id']>().toEqualTypeOf<number>();
-            expectTypeOf<Row['post']>().toEqualTypeOf<{
-              title: string;
-              author: { name: number };
-            }>();
-            expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
-            expectTypeOf<Row['post']['author']>().toEqualTypeOf<{
-              name: number;
-            }>();
-            expectTypeOf<Row['post']['author']['name']>().toEqualTypeOf<number>();
-            expectTypeOf<Row['email']>().toEqualTypeOf<string>();
-
-            const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
-            expect(flatRow0['id']).toBe(1);
-            expect(flatRow0['post_title']).toBe('ada@example.com');
-            expect(flatRow0['post_author_name']).toBe(1);
-            expect(flatRow0['email']).toBe('ada@example.com');
-            expect({
-              id: flatRow0['id'],
+          const user = tables.user!;
+          const plan = sql({ context })
+            .from(user)
+            .select({
+              id: user.columns.id!,
               post: {
-                title: flatRow0['post_title'],
-                author: { name: flatRow0['post_author_name'] },
+                title: user.columns.email!,
+                author: {
+                  name: user.columns.id!,
+                },
               },
-              email: flatRow0['email'],
-            }).toEqual({
-              id: 1,
-              post: { title: 'ada@example.com', author: { name: 1 } },
-              email: 'ada@example.com',
-            });
+              email: user.columns.email!,
+            })
+            .build();
 
-            expect(plan.meta.projection).toEqual({
-              id: 'user.id',
-              post_title: 'user.email',
-              post_author_name: 'user.id',
-              email: 'user.email',
-            });
-          } finally {
-            await runtime.close();
-          }
-        });
-      });
+          const rows = await executePlanAndCollect(runtime, plan);
+
+          expect(rows.length).toBe(2);
+          expect(rows[0]).toMatchObject({
+            id: expect.any(Number),
+            post_title: expect.any(String),
+            post_author_name: expect.any(Number),
+            email: expect.any(String),
+          });
+          expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
+
+          type Row = ResultType<typeof plan>;
+          expectTypeOf<Row>().toExtend<{
+            id: number;
+            post: { title: string; author: { name: number } };
+            email: string;
+          }>();
+          expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+          expectTypeOf<Row['post']>().toEqualTypeOf<{
+            title: string;
+            author: { name: number };
+          }>();
+          expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
+          expectTypeOf<Row['post']['author']>().toEqualTypeOf<{
+            name: number;
+          }>();
+          expectTypeOf<Row['post']['author']['name']>().toEqualTypeOf<number>();
+          expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+
+          const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
+          expect(flatRow0['id']).toBe(1);
+          expect(flatRow0['post_title']).toBe('ada@example.com');
+          expect(flatRow0['post_author_name']).toBe(1);
+          expect(flatRow0['email']).toBe('ada@example.com');
+          expect({
+            id: flatRow0['id'],
+            post: {
+              title: flatRow0['post_title'],
+              author: { name: flatRow0['post_author_name'] },
+            },
+            email: flatRow0['email'],
+          }).toEqual({
+            id: 1,
+            post: { title: 'ada@example.com', author: { name: 1 } },
+            email: 'ada@example.com',
+          });
+
+          expect(plan.meta.projection).toEqual({
+            id: 'user.id',
+            post_title: 'user.email',
+            post_author_name: 'user.id',
+            email: 'user.email',
+          });
+        },
+      );
     },
     timeouts.spinUpPpgDev,
   );

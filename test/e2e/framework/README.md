@@ -25,7 +25,7 @@ flowchart TD
     A[Contract TS] -->|CLI emit| B[Contract JSON + DTS]
     B -->|Load from fixtures| C[E2E Tests]
     C -->|withDevDatabase| D[Dev Postgres]
-    C -->|setupE2EDatabase| E[Schema + Data + Marker]
+    C -->|runDbInit| E[Schema + Marker]
     C -->|createTestRuntimeFromClient| F[Runtime]
     C -->|executePlanAndCollect| G[Query Results]
     G -->|Assert| H[Runtime Values + Types]
@@ -56,9 +56,7 @@ import {
   executePlanAndCollect,
 } from './utils';  // Wrapper around @prisma-next/test-utils
 
-const repoRoot = resolve(__dirname, '../../../../');
-const configPath = resolve(__dirname, 'fixtures/prisma-next.config.ts');
-const cliPath = resolve(repoRoot, 'packages/1-framework/3-tooling/cli/dist/cli.js');
+const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 // Load contract from committed fixtures (not emit on every test)
 const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -66,7 +64,7 @@ const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 await withDevDatabase(
   async ({ connectionString }) => {
     await withClient(connectionString, async (client) => {
-      await runDbInit({ cliPath, configPath, dbUrl: connectionString, cwd: repoRoot });
+      await runDbInit({ connectionString, contractJsonPath });
       // Test-specific data setup
       await client.query('insert into "user" (email) values ($1)', ['ada@example.com']);
 
@@ -104,7 +102,7 @@ Contract-related test utilities are located in `test/e2e/framework/test/utils.ts
 **Available Utilities:**
 - `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk. The generic type parameter should be specified from the emitted `contract.d.ts` file (e.g., `loadContractFromDisk<Contract>(contractJsonPath)`).
 - `emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, expectedContractJsonPath)`: Emits contract via CLI and verifies it matches on-disk artifacts. Used in a single test to verify contract emission correctness.
-- `runDbInit({ cliPath, configPath, dbUrl, cwd })`: Runs `prisma-next db init` for the ephemeral dev database before inserting test data.
+- `runDbInit({ connectionString, contractJsonPath })`: Runs `dbInit` via the control client before inserting test data.
 
 **Usage:**
 ```typescript

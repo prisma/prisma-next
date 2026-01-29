@@ -11,7 +11,7 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { schema, sql } from '../src/prisma/query';
 import { closeRuntime, getRuntime } from '../src/prisma/runtime';
-import { createDemoControlClient } from '../test/utils/control-client';
+import { createPrismaNextControlClient } from '../test/utils/control-client';
 
 async function collectRows<P extends ExecutionPlan | SqlQueryPlan<unknown>>(
   plan: P,
@@ -35,7 +35,7 @@ async function initializeSchema() {
   const contractIR = await loadContractFromTs(contractPath);
 
   // Use control client to initialize schema and write marker
-  const client = createDemoControlClient({ connection: connectionString });
+  const client = createPrismaNextControlClient({ connection: connectionString });
   try {
     const result = await client.dbInit({ contractIR, mode: 'apply' });
     if (!result.ok) {

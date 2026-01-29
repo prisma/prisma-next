@@ -10,7 +10,7 @@ import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
-import { createDemoControlClient, initTestDatabase } from './utils/control-client';
+import { createPrismaNextControlClient, initTestDatabase } from './utils/control-client';
 
 // Use the emitted JSON contract which has the real computed hashes
 const contract = validateContract<Contract>(contractJson);
@@ -52,7 +52,7 @@ describe('control client integration', () => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
 
         // Create a new client to verify
-        const client = createDemoControlClient({ connection: connectionString });
+        const client = createPrismaNextControlClient({ connection: connectionString });
         try {
           const verifyResult = await client.verify({ contractIR: contract });
 
@@ -74,7 +74,7 @@ describe('control client integration', () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
 
-        const client = createDemoControlClient({ connection: connectionString });
+        const client = createPrismaNextControlClient({ connection: connectionString });
         try {
           const schemaResult = await client.schemaVerify({ contractIR: contract });
 
@@ -93,7 +93,7 @@ describe('control client integration', () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
 
-        const client = createDemoControlClient({ connection: connectionString });
+        const client = createPrismaNextControlClient({ connection: connectionString });
         try {
           const schema = await client.introspect();
 
