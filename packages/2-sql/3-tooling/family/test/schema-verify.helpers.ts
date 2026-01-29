@@ -1,6 +1,7 @@
 /**
  * Shared test helpers for schema verification tests.
  */
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 
@@ -46,7 +47,10 @@ export function createTestSchemaIR(
  * Creates a minimal contract table for testing.
  */
 export function createContractTable(
-  columns: Record<string, { nativeType: string; codecId?: string; nullable: boolean }>,
+  columns: Record<
+    string,
+    { nativeType: string; codecId?: string; nullable: boolean; default?: ColumnDefault }
+  >,
   options?: {
     primaryKey?: { columns: readonly string[]; name?: string };
     foreignKeys?: ReadonlyArray<{
@@ -66,6 +70,7 @@ export function createContractTable(
           nativeType: col.nativeType,
           codecId: col.codecId ?? `pg/${col.nativeType}@1`,
           nullable: col.nullable,
+          ...(col.default !== undefined ? { default: col.default } : {}),
         },
       ]),
     ),
@@ -84,7 +89,7 @@ export function createContractTable(
  */
 export function createSchemaTable(
   name: string,
-  columns: Record<string, { nativeType: string; nullable: boolean }>,
+  columns: Record<string, { nativeType: string; nullable: boolean; default?: ColumnDefault }>,
   options?: {
     primaryKey?: { columns: readonly string[]; name?: string };
     foreignKeys?: ReadonlyArray<{
@@ -102,7 +107,12 @@ export function createSchemaTable(
     columns: Object.fromEntries(
       Object.entries(columns).map(([colName, col]) => [
         colName,
-        { name: colName, nativeType: col.nativeType, nullable: col.nullable } as SqlColumnIR,
+        {
+          name: colName,
+          nativeType: col.nativeType,
+          nullable: col.nullable,
+          ...(col.default !== undefined ? { default: col.default } : {}),
+        } as SqlColumnIR,
       ]),
     ),
     foreignKeys: options?.foreignKeys ?? [],

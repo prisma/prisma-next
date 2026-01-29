@@ -163,6 +163,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           name: colRow.column_name,
           nativeType,
           nullable: colRow.is_nullable === 'YES',
+          // ifDefined()
           ...(parsedDefault ? { default: parsedDefault } : {}),
         };
       }
