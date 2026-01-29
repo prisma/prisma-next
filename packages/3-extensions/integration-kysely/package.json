@@ -7,15 +7,15 @@
   "scripts": {
     "build": "tsdown",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output",
-    "emit": "prisma-next contract emit --config test/fixtures/prisma-next.config.ts",
+    "emit": "pnpm exec prisma-next contract emit --config test/fixtures/prisma-next.config.ts",
     "emit:check": "pnpm emit && git diff --exit-code test/fixtures/generated/",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "prepublishOnly": "pnpm build",
-    "test": "vitest",
+    "test": "pnpm emit:check && vitest",
     "test:coverage": "vitest --coverage",
-    "typecheck": "pnpm emit:check && tsc --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "files": [
