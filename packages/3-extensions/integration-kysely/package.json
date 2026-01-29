@@ -32,6 +32,7 @@
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",

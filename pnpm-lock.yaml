@@ -1215,6 +1215,9 @@ importers:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../2-sql/2-authoring/contract-ts
+      '@prisma-next/sql-relational-core':
+        specifier: workspace:*
+        version: link:../../2-sql/4-lanes/relational-core
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../3-targets/3-targets/postgres
