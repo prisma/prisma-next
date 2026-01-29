@@ -313,8 +313,6 @@ export function validate(value: unknown): Contract {
 }
 ```
 
-Choose based on your use case. If you need to preserve literal types from JSON imports (e.g., table names as string literals), return the original value with a generic constraint.
-
 ## Complete Example
 
 ```typescript

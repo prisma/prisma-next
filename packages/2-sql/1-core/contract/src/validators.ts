@@ -9,6 +9,7 @@ import type {
   PrimaryKey,
   SqlContract,
   SqlStorage,
+  StorageTable,
   StorageTypeInstance,
   UniqueConstraint,
 } from './types';
@@ -77,7 +78,7 @@ const ForeignKeySchema = type.declare<ForeignKey>().type({
   'name?': 'string',
 });
 
-const StorageTableSchema = type({
+const StorageTableSchema = type.declare<StorageTable>().type({
   columns: type({ '[string]': StorageColumnSchema }),
   'primaryKey?': PrimaryKeySchema,
   uniques: UniqueConstraintSchema.array().readonly(),
@@ -85,7 +86,7 @@ const StorageTableSchema = type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
-const StorageSchema = type({
+const StorageSchema = type.declare<SqlStorage>().type({
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
