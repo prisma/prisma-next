@@ -14,7 +14,7 @@ This package provides the foundational type definitions for Prisma Next, includi
 - **Core Contract Types**: Defines framework-level contract types (`ContractBase`, `Source`, `FamilyInstance`) that are shared across all target families
 - **Framework Component Model**: Provides base descriptor interfaces (`FamilyDescriptor`, `TargetDescriptor`, `AdapterDescriptor`, `DriverDescriptor`, `ExtensionDescriptor`) and identity instance bases (`FamilyInstance`, `TargetInstance`, `AdapterInstance`, `DriverInstance`, `ExtensionInstance`) that plane-specific types extend
 - **Document Family Types**: Provides TypeScript types for document target family contracts (`DocumentContract`)
-- **Shared Column Defaults**: Defines `ColumnDefault` for db-agnostic defaults (literal and function) reused across family contracts and authoring builders
+- **Shared Column Defaults**: Defines `ColumnDefault` for db-agnostic defaults (literal expression and function) reused across family contracts and authoring builders
 - **JSON Schema Validation**: Provides JSON Schemas for validating contract structure in IDEs and tooling
 - **Type Guards**: Provides runtime type guards for narrowing contract types (`isDocumentContract`)
 - **Emitter Types**: Defines emitter SPI types (`TargetFamilyHook`, `ValidationContext`, `TypesImportSpec`) that are shared between emitter and control plane
@@ -224,6 +224,25 @@ All contracts share these common fields:
     - **`fields`**: Field definitions using `FieldType` (supports nested objects and arrays)
     - **`indexes`** (optional): Array of index definitions with keys and optional predicates
     - **`readOnly`** (optional): Whether mutations are disallowed
+
+## Column Defaults
+
+### Key Points
+
+- When adding column defaults, re-emit the contract and verify the emitted JSON includes the full default payload.
+- Keep `nullable: false` explicit for columns with defaults in emitted contracts.
+- Literal defaults must include a `value` in the emitted contract; avoid falsey literals unless the emitter preserves them.
+- Add the corresponding `defaults.*` capability when using function defaults like `autoincrement()` or `now()`.
+
+### CLI Output: Tree vs JSON
+
+Column defaults are handled differently depending on output format:
+
+- **Tree output** (`db introspect`): Labels show only type and nullability, e.g. `id: int4 (not nullable)`. Defaults are omitted from labels to keep tree output concise.
+- **JSON output** (`db introspect --json`): Full default information is preserved in the schema IR.
+- **Programmatic access**: Defaults are always available in `SchemaTreeNode.meta.default` for tooling that needs them.
+
+This separation keeps human-readable tree output clean while preserving full data for automation.
 
 ## Type System
 

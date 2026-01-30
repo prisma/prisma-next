@@ -1,3 +1,4 @@
+import { parsePostgresDefault } from '@prisma-next/adapter-postgres/control';
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
@@ -141,6 +142,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         context: options.context ?? {},
         typeMetadataRegistry: this.family.typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
+        normalizeDefault: parsePostgresDefault,
       });
       if (!schemaVerifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {

@@ -17,7 +17,7 @@ import {
   createTableRef,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { QueryLaneContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type {
   AnyBinaryBuilder,
   AnyOrderBuilder,
@@ -64,7 +64,7 @@ export class SelectBuilderImpl<
 > {
   private readonly contract: TContract;
   private readonly codecTypes: CodecTypes;
-  private readonly context: QueryLaneContext<TContract>;
+  private readonly context: ExecutionContext<TContract>;
   private state: BuilderState = {};
 
   constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {

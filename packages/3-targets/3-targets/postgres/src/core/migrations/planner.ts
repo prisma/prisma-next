@@ -1,3 +1,4 @@
+import { parsePostgresDefault } from '@prisma-next/adapter-postgres/control';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   MigrationOperationPolicy,
@@ -264,15 +265,20 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
     const qualified = qualifyTableName(schema, tableName);
     const notNull = column.nullable === false;
+    const hasDefault = column.default !== undefined;
+    // Only require empty table for NOT NULL columns WITHOUT defaults.
+    // PostgreSQL allows adding NOT NULL columns with defaults to non-empty tables
+    // because the default value is applied to existing rows.
+    const requiresEmptyTable = notNull && !hasDefault;
     const precheck = [
       {
         description: `ensure column "${columnName}" is missing`,
         sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
       },
-      ...(notNull
+      ...(requiresEmptyTable
         ? [
             {
-              description: `ensure table "${tableName}" is empty before adding NOT NULL column`,
+              description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
               sql: tableIsEmptyCheck(qualified),
             },
           ]
@@ -541,6 +547,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       strict: false,
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
+      normalizeDefault: parsePostgresDefault,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
 
@@ -694,34 +701,18 @@ function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined)
 
   switch (columnDefault.kind) {
     case 'literal':
-      return `DEFAULT ${escapeLiteralValue(columnDefault.value)}`;
+      return `DEFAULT ${columnDefault.expression}`;
     case 'function': {
       // autoincrement is handled by SERIAL type, no explicit DEFAULT needed
       if (columnDefault.expression === 'autoincrement()') {
         return '';
       }
-      // Use the expression directly as the DEFAULT value
       return `DEFAULT ${columnDefault.expression}`;
     }
     case 'sequence':
-      return `DEFAULT nextval('${escapeLiteral(columnDefault.name)}')`;
+      // Sequence names use quoteIdentifier for safe identifier handling
+      return `DEFAULT nextval(${quoteIdentifier(columnDefault.name)}::regclass)`;
   }
-
-  return '';
-}
-
-/**
- * Escapes a literal value for use in SQL.
- */
-function escapeLiteralValue(value: string | number | boolean): string {
-  if (typeof value === 'string') {
-    return `'${escapeLiteral(value)}'`;
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'TRUE' : 'FALSE';
-  }
-  // number
-  return String(value);
 }
 
 function qualifyTableName(schema: string, table: string): string {

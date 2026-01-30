@@ -9,21 +9,28 @@ import type {
   PrimaryKey,
   SqlContract,
   SqlStorage,
+  StorageTable,
   StorageTypeInstance,
   UniqueConstraint,
 } from './types';
 
-const ColumnDefaultLiteralSchema = {
-  kind: "'literal'",
-  value: 'string | number | boolean',
-} as const;
+type ColumnDefaultLiteral = { readonly kind: 'literal'; readonly expression: string };
+type ColumnDefaultFunction = { readonly kind: 'function'; readonly expression: string };
 
-const ColumnDefaultFunctionSchema = {
-  kind: "'function'",
+const literalKindSchema = type("'literal'");
+const functionKindSchema = type("'function'");
+
+export const ColumnDefaultLiteralSchema = type.declare<ColumnDefaultLiteral>().type({
+  kind: literalKindSchema,
   expression: 'string',
-} as const;
+});
 
-const ColumnDefaultSchema = type(ColumnDefaultLiteralSchema).or(ColumnDefaultFunctionSchema);
+export const ColumnDefaultFunctionSchema = type.declare<ColumnDefaultFunction>().type({
+  kind: functionKindSchema,
+  expression: 'string',
+});
+
+export const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionSchema);
 
 const StorageColumnSchema = type({
   nativeType: 'string',
@@ -71,7 +78,7 @@ const ForeignKeySchema = type.declare<ForeignKey>().type({
   'name?': 'string',
 });
 
-const StorageTableSchema = type({
+const StorageTableSchema = type.declare<StorageTable>().type({
   columns: type({ '[string]': StorageColumnSchema }),
   'primaryKey?': PrimaryKeySchema,
   uniques: UniqueConstraintSchema.array().readonly(),
@@ -79,7 +86,7 @@ const StorageTableSchema = type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
-const StorageSchema = type({
+const StorageSchema = type.declare<SqlStorage>().type({
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });

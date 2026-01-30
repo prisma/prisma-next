@@ -24,6 +24,7 @@ Provide shared relational primitives (schema builders, column builders, paramete
 - **Column Builders**: Provides column accessors with operation methods attached based on column typeId
 - **Parameter Helpers**: Creates parameter placeholders for query building
 - **Operations Registry**: Attaches registered operations as methods on column builders
+- **Execution Context Types**: Defines the context shape used by query lanes
 - **Type Definitions**: Defines TypeScript types for column builders, operations, and projections
 
 **Non-goals:**
@@ -95,8 +96,8 @@ flowchart TD
 ## Dependencies
 
 - **`@prisma-next/contract`**: Core contract types
+- **`@prisma-next/operations`**: Operation registry used by schema builders
 - **`@prisma-next/plan`**: Plan error helpers (`planInvalid`, `planUnsupported`) and `RuntimeError` type
-- **`@prisma-next/runtime`**: Runtime context types (TODO: Slice 6 will clean this up)
 - **`@prisma-next/sql-contract`**: SQL contract types (via `@prisma-next/sql-contract/types`)
 
 **Note**: This package does not depend on specific adapters (e.g., `@prisma-next/adapter-postgres`). Test fixtures define `CodecTypes` inline to remain adapter-agnostic and avoid cyclic dependencies.

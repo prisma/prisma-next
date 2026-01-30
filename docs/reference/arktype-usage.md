@@ -2,6 +2,64 @@
 
 This document covers common patterns and pitfalls when using Arktype for schema validation in this codebase.
 
+## Type-Safe Schema Declaration (Recommended Pattern)
+
+**Always use `type.declare<TypeScriptType>().type({ ... })` instead of plain `type({ ... })`.**
+
+This pattern ensures compile-time validation that your Arktype schema precisely matches an existing TypeScript type. If the inferred type is too wide or too narrow, TypeScript will error during compilation.
+
+**✅ CORRECT (Type-Safe):**
+```typescript
+import { type } from 'arktype';
+
+// Define your TypeScript type first (or import from a types module)
+type User = {
+  id: string;
+  name: string;
+  email?: string;
+};
+
+// Use type.declare<>() to ensure schema matches the type exactly
+const UserSchema = type.declare<User>().type({
+  id: 'string',
+  name: 'string',
+  'email?': 'string',
+});
+```
+
+**❌ WRONG (No Compile-Time Safety):**
+```typescript
+// Without declare, schema mismatches won't be caught at compile time
+const UserSchema = type({
+  id: 'string',
+  name: 'string',
+  'email?': 'number',  // Typo: should be 'string', but no error!
+});
+```
+
+### Benefits of `type.declare<>()`
+
+1. **Autocomplete**: Get IDE autocomplete for object keys based on the TypeScript type
+2. **Compile-time errors**: Mismatches between schema and type are caught immediately
+3. **Documentation**: The schema explicitly shows which type it validates against
+4. **Refactoring safety**: Changing the TypeScript type surfaces all schema mismatches
+
+### Handling Morphs and Default Values
+
+If your schema contains morphs (transformations) like `string.numeric.parse`, the input and output types differ. Use the `side` config to specify which side to validate:
+
+```typescript
+type Expected = { count: number; label?: string };
+
+// Validate the output type (after parsing)
+const Schema = type.declare<Expected, { side: 'out' }>().type({
+  count: 'string.numeric.parse',  // Input: string, Output: number
+  'label?': 'string',
+});
+```
+
+Reference: [Arktype Declare API](https://arktype.io/docs/declare)
+
 ## Optional Keys
 
 **❌ WRONG:**
@@ -87,42 +145,62 @@ const Schema = type({
 
 Use the `.array()` method on a schema to create an array type. Arktype will automatically validate each element of the array against the schema. No manual validation needed.
 
-## Type Inference
+## Type Inference vs Type Declaration
 
-To extract TypeScript types from Arktype schemas, use the `.infer` property:
+There are two patterns for keeping TypeScript types and Arktype schemas in sync:
 
-**✅ CORRECT:**
+### Pattern 1: `type.declare<>()` — Type-First (Preferred)
+
+Use when you have an existing TypeScript type that the schema must match:
+
 ```typescript
 import { type } from 'arktype';
 
-const UserSchema = type({
-  name: 'string',
-  platform: "'android' | 'ios'",
-  'versions?': '(number | string)[]',
-});
-
-type User = typeof UserSchema.infer;
-// User is: { name: string; platform: 'android' | 'ios'; versions?: (number | string)[] }
-```
-
-**❌ WRONG:**
-```typescript
-// Don't manually define types that duplicate the schema
+// Type exists first (from types module, API contract, etc.)
 type User = {
   name: string;
   platform: 'android' | 'ios';
   versions?: (number | string)[];
 };
 
-// Use .infer instead to keep types in sync with schemas
+// Schema validates against the existing type
+const UserSchema = type.declare<User>().type({
+  name: 'string',
+  platform: "'android' | 'ios'",
+  'versions?': '(number | string)[]',
+});
+```
+
+### Pattern 2: `.infer` — Schema-First
+
+Use when the schema is your source of truth and you need to derive the type:
+
+```typescript
+import { type } from 'arktype';
+
+// Schema is the source of truth
+const UserSchema = type({
+  name: 'string',
+  platform: "'android' | 'ios'",
+  'versions?': '(number | string)[]',
+});
+
+// Type is derived from the schema
 type User = typeof UserSchema.infer;
 ```
 
-The `.infer` property extracts the TypeScript type that the schema validates. This keeps your types in sync with your validation schemas automatically.
+### When to Use Which
 
-## Type Declaration and Readonly Arrays
+| Pattern | Use Case |
+|---------|----------|
+| `type.declare<T>()` | Validating against existing types (e.g., contract types, imported interfaces) |
+| `.infer` | Schema is the source of truth, type is derived |
 
-When you need to ensure a schema matches a pre-existing TypeScript type (useful for maintaining type safety between type-only and runtime code), use `type.declare<>()`:
+**In this codebase, prefer `type.declare<>()` because we typically have existing TypeScript types from contract definitions that schemas must match exactly.**
+
+## Readonly Arrays
+
+When your TypeScript type uses readonly arrays, your schema must match with `.array().readonly()`:
 
 **✅ CORRECT:**
 ```typescript
@@ -133,34 +211,26 @@ type PrimaryKey = {
   readonly name?: string;
 };
 
-// type.declare<>() ensures the schema matches the declared type at compile-time
 const PrimaryKeySchema = type.declare<PrimaryKey>().type({
   columns: type.string.array().readonly(),  // Use .readonly() for readonly arrays
   'name?': 'string',
 });
 ```
 
-**For readonly arrays**, use `.array().readonly()` instead of `'string[]'`:
-
-**✅ CORRECT:**
-```typescript
-const Schema = type.declare<{ readonly items: readonly string[] }>().type({
-  items: type.string.array().readonly(),  // Creates readonly string[]
-});
-```
-
 **❌ WRONG:**
 ```typescript
-// This creates a mutable array type
-const Schema = type.declare<{ readonly items: readonly string[] }>().type({
-  items: 'string[]',  // Type mismatch: mutable vs readonly
+// This creates a mutable array type - compile error with type.declare<>()
+const PrimaryKeySchema = type.declare<PrimaryKey>().type({
+  columns: 'string[]',  // Type mismatch: mutable vs readonly
+  'name?': 'string',
 });
 ```
 
-**For arrays of schemas**, apply `.readonly()` to the array:
+**For arrays of schema-typed values**, apply `.readonly()` to the array:
 
-**✅ CORRECT:**
 ```typescript
+type Item = { id: string };
+
 const ItemSchema = type.declare<Item>().type({ id: 'string' });
 
 const ContainerSchema = type.declare<{ readonly items: readonly Item[] }>().type({
@@ -168,14 +238,12 @@ const ContainerSchema = type.declare<{ readonly items: readonly Item[] }>().type
 });
 ```
 
-Use `type.declare<>()` when you want compile-time guarantees that your schema matches an existing TypeScript type, especially when working with type-only modules that need to stay in sync with runtime validation code.
-
 ## Avoiding Redundant Validation
 
 **❌ WRONG:**
 ```typescript
 const contractResult = SqlContractSchema(value);
-if (Array.isArray(contractResult)) {
+if (contractResult instanceof type.errors) {
   throw new Error(...);
 }
 
@@ -188,12 +256,12 @@ if (typeof value.storage !== 'object' || value.storage === null) {
 **✅ CORRECT:**
 ```typescript
 const contractResult = SqlContractSchema(value);
-if (Array.isArray(contractResult)) {
+if (contractResult instanceof type.errors) {
   throw new Error(...);
 }
 
 // Arktype has already validated the structure, so we can safely access nested properties
-const storage = value.storage;
+const storage = contractResult.storage;
 ```
 
 Once Arktype validation passes, you can trust that the structure matches the schema. Don't manually re-validate what Arktype already checked.
@@ -219,24 +287,30 @@ Use `instanceof type.errors` to check for validation errors. This provides prope
 
 ## Returning Validated Values
 
-To preserve literal types from the input (important for JSON imports), return the original value, not the validated result:
+When validating JSON imports with generic type parameters, consider whether to return the original value or the validated result:
 
-**✅ CORRECT:**
+**Option 1: Return original value (preserves literal types from JSON)**
 ```typescript
 export function validateContractStructure<T extends SqlContract>(value: T): T {
   const contractResult = SqlContractSchema(value);
-  if (Array.isArray(contractResult)) {
+  if (contractResult instanceof type.errors) {
     throw new Error(...);
   }
-  // Return original value to preserve literal types
+  // Return original value to preserve literal types from JSON imports
   return value;
 }
 ```
 
-**❌ WRONG:**
+**Option 2: Return validated result (standard approach)**
 ```typescript
-// Don't return contractResult - it may lose literal types
-return contractResult;
+export function validate(value: unknown): Contract {
+  const contractResult = SqlContractSchema(value);
+  if (contractResult instanceof type.errors) {
+    throw new Error(...);
+  }
+  // Return validated result - Arktype has confirmed it matches the schema
+  return contractResult;
+}
 ```
 
 ## Complete Example
@@ -244,38 +318,27 @@ return contractResult;
 ```typescript
 import { type } from 'arktype';
 
-// Define nested schemas
-const ColumnSchema = type({
-  type: 'string',
-  'nullable?': 'boolean',
+type User = {
+  id: string;
+  name: string;
+  roles: readonly string[];
+  metadata?: Record<string, unknown>;
+};
+
+const UserSchema = type.declare<User>().type({
+  id: 'string',
+  name: 'string',
+  roles: type.string.array().readonly(),
+  'metadata?': type({ '[string]': 'unknown' }),
 });
 
-const TableSchema = type({
-  columns: type({ '[string]': ColumnSchema }),  // Record with schema-typed values
-  'primaryKey?': PrimaryKeySchema,              // See "Type Declaration and Readonly Arrays" above
-  'foreignKeys?': ForeignKeySchema.array(),     // See "Schema References in Object Properties" above
-});
-
-const StorageSchema = type({
-  tables: type({ '[string]': TableSchema }),   // Record with schema-typed values
-});
-
-const ContractSchema = type({
-  target: 'string',
-  'schemaVersion?': "'1'",                     // Optional literal type
-  storage: StorageSchema,                       // Direct schema reference
-});
-
-type Contract = typeof ContractSchema.infer;
-
-export function validate(value: Contract): Contract {
-  const result = ContractSchema(value);
+export function validateUser(value: unknown): User {
+  const result = UserSchema(value);
   if (result instanceof type.errors) {
-    const messages = result.map((p: { message: string }) => p.message).join('; ');
-    throw new Error(`Validation failed: ${messages}`);
+    throw new Error(result.map((p) => p.message).join('; '));
   }
-
-  // Arktype automatically validates all nested structures including arrays
-  return value; // Preserve literal types
+  return result;
 }
 ```
+
+For a comprehensive real-world example, see `packages/2-sql/2-authoring/contract-ts/src/contract.ts`.

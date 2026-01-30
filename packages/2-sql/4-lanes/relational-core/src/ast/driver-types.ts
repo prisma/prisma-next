@@ -13,13 +13,27 @@ export interface SqlExplainResult<Row = Record<string, unknown>> {
   readonly rows: ReadonlyArray<Row>;
 }
 
-export interface SqlDriver {
+export interface SqlDriver extends SqlQueryable {
   connect(): Promise<void>;
+  acquireConnection(): Promise<SqlConnection>;
+  close(): Promise<void>;
+}
+
+export interface SqlConnection extends SqlQueryable {
+  beginTransaction(): Promise<SqlTransaction>;
+  release(): Promise<void>;
+}
+
+export interface SqlTransaction extends SqlQueryable {
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
+
+export interface SqlQueryable {
   execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row>;
   explain?(request: SqlExecuteRequest): Promise<SqlExplainResult>;
   query<Row = Record<string, unknown>>(
     sql: string,
     params?: readonly unknown[],
   ): Promise<SqlQueryResult<Row>>;
-  close(): Promise<void>;
 }

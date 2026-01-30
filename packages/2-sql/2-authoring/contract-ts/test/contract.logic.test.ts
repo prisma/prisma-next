@@ -677,7 +677,7 @@ describe('validateContract logic validation', () => {
                   codecId: 'pg/text@1',
                   nativeType: 'text',
                   nullable: false,
-                  default: { kind: 'literal', value: 'draft' },
+                  default: { kind: 'literal', expression: "'draft'" },
                 },
               },
               primaryKey: { columns: ['id'] },
@@ -690,6 +690,84 @@ describe('validateContract logic validation', () => {
         // No capabilities needed for non-function defaults
       };
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
+    });
+
+    it('throws for default with unsupported kind', () => {
+      const contract = {
+        ...baseContract,
+        storage: {
+          tables: {
+            Post: {
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                status: {
+                  codecId: 'pg/text@1',
+                  nativeType: 'text',
+                  nullable: false,
+                  default: { kind: 'now', expression: 'now()' },
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      };
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow();
+    });
+
+    it('throws for default missing expression', () => {
+      const contract = {
+        ...baseContract,
+        storage: {
+          tables: {
+            Post: {
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                status: {
+                  codecId: 'pg/text@1',
+                  nativeType: 'text',
+                  nullable: false,
+                  default: { kind: 'literal' },
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      };
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow();
+    });
+
+    it('throws for default expression with non-string type', () => {
+      const contract = {
+        ...baseContract,
+        storage: {
+          tables: {
+            Post: {
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                status: {
+                  codecId: 'pg/text@1',
+                  nativeType: 'text',
+                  nullable: false,
+                  default: { kind: 'function', expression: 123 },
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      };
+      expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow();
     });
   });
 });

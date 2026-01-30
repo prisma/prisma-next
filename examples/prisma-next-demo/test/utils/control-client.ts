@@ -8,18 +8,9 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
-import type { SqlContract } from '@prisma-next/sql-contract/types';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
-import { Pool } from 'pg';
-import {
-  pgvectorExtensionRuntimeDescriptor,
-  postgresAdapterRuntimeDescriptor,
-  postgresTargetRuntimeDescriptor,
-} from './framework-components';
 
 export interface TestControlClientOptions {
   readonly connection: string;
@@ -69,67 +60,5 @@ export async function initTestDatabase(options: {
     }
   } finally {
     await client.close();
-  }
-}
-
-export interface TestRuntime {
-  readonly runtime: ReturnType<typeof createRuntime>;
-  readonly pool: Pool;
-}
-
-/**
- * Creates a test runtime configured for the demo app's stack.
- *
- * @example
- * ```typescript
- * const { runtime, pool } = createTestRuntime(connectionString, contract);
- * try {
- *   // Use runtime...
- * } finally {
- *   await closeTestRuntime({ runtime, pool });
- * }
- * ```
- */
-export function createTestRuntime<TContract extends SqlContract>(
-  connectionString: string,
-  contract: TContract,
-): TestRuntime {
-  const context = createRuntimeContext({
-    contract,
-    target: postgresTargetRuntimeDescriptor,
-    adapter: postgresAdapterRuntimeDescriptor,
-    extensionPacks: [pgvectorExtensionRuntimeDescriptor],
-  });
-  const pool = new Pool({ connectionString });
-  const driver = createPostgresDriverFromOptions({
-    connect: { pool },
-    cursor: { disabled: true },
-  });
-  const runtime = createRuntime({
-    context,
-    driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
-    plugins: [
-      budgets({
-        maxRows: 10_000,
-        defaultTableRows: 10_000,
-        tableRows: { user: 10_000, post: 10_000 },
-      }),
-    ],
-  });
-  return { runtime, pool };
-}
-
-/**
- * Closes the test runtime and pool.
- */
-export async function closeTestRuntime({ runtime, pool }: TestRuntime): Promise<void> {
-  try {
-    await runtime.close();
-  } finally {
-    // Only close pool if runtime.close() didn't already close it
-    if (!(pool as { ended?: boolean }).ended) {
-      await pool.end();
-    }
   }
 }

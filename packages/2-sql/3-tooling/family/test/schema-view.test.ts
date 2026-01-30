@@ -4,7 +4,7 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { createSqlFamilyInstance } from '../src/core/instance';
+import { createSqlFamilyInstance } from '../src/core/control-instance';
 
 function createMockTarget(): ControlTargetDescriptor<'sql', 'postgres'> {
   return {
@@ -45,13 +45,13 @@ describe('SqlFamilyInstance.toSchemaView', () => {
               name: 'id',
               nativeType: 'int4',
               nullable: false,
-              default: { kind: 'function', expression: 'autoincrement()' },
+              default: "nextval('users_id_seq'::regclass)", // Raw Postgres default
             },
             status: {
               name: 'status',
               nativeType: 'text',
               nullable: false,
-              default: { kind: 'literal', value: 'draft' },
+              default: "'draft'::text", // Raw Postgres default
             },
           },
           primaryKey: { columns: ['id'] },
@@ -71,13 +71,14 @@ describe('SqlFamilyInstance.toSchemaView', () => {
     expect(columnsGroup?.kind).toBe('collection');
 
     // Defaults are in meta (for JSON/programmatic access), not in label (for tree output)
+    // Defaults are now raw strings from the database
     const idNode = columnsGroup?.children?.find((n) => n.id === 'column-User-id');
     expect(idNode?.kind).toBe('field');
     expect(idNode?.label).toBe('id: int4 (not nullable)');
     expect(idNode?.meta).toMatchObject({
       nativeType: 'int4',
       nullable: false,
-      default: { kind: 'function', expression: 'autoincrement()' },
+      default: "nextval('users_id_seq'::regclass)",
     });
 
     const statusNode = columnsGroup?.children?.find((n) => n.id === 'column-User-status');
@@ -86,7 +87,7 @@ describe('SqlFamilyInstance.toSchemaView', () => {
     expect(statusNode?.meta).toMatchObject({
       nativeType: 'text',
       nullable: false,
-      default: { kind: 'literal', value: 'draft' },
+      default: "'draft'::text",
     });
   });
 });

@@ -6,7 +6,7 @@ import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
-import type { RuntimeContext } from '@prisma-next/sql-runtime';
+import type { ExecutionContext } from '@prisma-next/sql-runtime';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { orm } from '../src/orm';
@@ -42,9 +42,9 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
 }
 
 function createOrmWithContext<TContract extends SqlContract<SqlStorage>>(
-  context: RuntimeContext<SqlContract<SqlStorage>>,
+  context: ExecutionContext<SqlContract<SqlStorage>>,
 ): ReturnType<typeof orm<TContract>> {
-  return orm<TContract>({ context: context as unknown as RuntimeContext<TContract> });
+  return orm<TContract>({ context: context as unknown as ExecutionContext<TContract> });
 }
 
 describe('orm base builder', () => {

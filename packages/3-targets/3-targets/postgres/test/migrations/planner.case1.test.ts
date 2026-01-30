@@ -426,29 +426,29 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         nativeType: 'bool',
         codecId: 'pg/bool@1',
         nullable: false,
-        default: { kind: 'literal', value: true },
+        default: { kind: 'literal', expression: 'true' },
       },
       disabled: {
         nativeType: 'bool',
         codecId: 'pg/bool@1',
         nullable: false,
-        default: { kind: 'literal', value: false },
+        default: { kind: 'literal', expression: 'false' },
       },
       name: {
         nativeType: 'text',
         codecId: 'pg/text@1',
         nullable: false,
-        default: { kind: 'literal', value: 'default' },
+        default: { kind: 'literal', expression: "'default'" },
       },
       priority: {
         nativeType: 'int4',
         codecId: 'pg/int4@1',
         nullable: false,
-        default: { kind: 'literal', value: 0 },
+        default: { kind: 'literal', expression: '0' },
       },
     });
-    expect(sql).toContain('"enabled" bool DEFAULT TRUE NOT NULL');
-    expect(sql).toContain('"disabled" bool DEFAULT FALSE NOT NULL');
+    expect(sql).toContain('"enabled" bool DEFAULT true NOT NULL');
+    expect(sql).toContain('"disabled" bool DEFAULT false NOT NULL');
     expect(sql).toContain('"name" text DEFAULT \'default\' NOT NULL');
     expect(sql).toContain('"priority" int4 DEFAULT 0 NOT NULL');
   });
@@ -462,7 +462,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         default: { kind: 'sequence', name: 'counter_id_seq' },
       },
     });
-    expect(sql).toContain('"id" int8 DEFAULT nextval(\'counter_id_seq\') NOT NULL');
+    // Sequence names use quoteIdentifier for proper identifier escaping
+    expect(sql).toContain('"id" int8 DEFAULT nextval("counter_id_seq"::regclass) NOT NULL');
   });
 
   it('generates DEFAULT with function params when provided', () => {

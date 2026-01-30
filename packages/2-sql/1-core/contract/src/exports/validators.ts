@@ -1,1 +1,1 @@
-export { validateModel, validateSqlContract, validateStorage } from '../validators';
+export * from '../validators';

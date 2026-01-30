@@ -1,4 +1,9 @@
 import type { ExecutionPlan, ResultType } from '@prisma-next/contract/types';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
+import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -7,15 +12,16 @@ import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import type { SqlStatement } from '../src/exports';
 import {
+  createExecutionContext,
   type createRuntime,
-  createRuntimeContext,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
 } from '../src/exports';
 import type {
-  RuntimeContext,
+  ExecutionContext,
   SqlRuntimeAdapterInstance,
+  SqlRuntimeDriverInstance,
   SqlRuntimeExtensionDescriptor,
 } from '../src/sql-context';
 
@@ -155,7 +161,7 @@ function createTestTargetDescriptor(): {
 }
 
 /**
- * Creates a runtime context with standard test configuration.
+ * Creates an ExecutionContext for testing.
  * This helper DRYs up the common pattern of context creation in tests.
  *
  * Accepts a raw adapter and optional extension descriptors, wrapping the
@@ -167,15 +173,28 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
   options?: {
     extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   },
-): RuntimeContext<TContract> {
-  const context = createRuntimeContext<TContract, 'postgres'>({
-    contract,
+): ExecutionContext<TContract> {
+  const stack = createExecutionStack({
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(adapter),
     extensionPacks: options?.extensionPacks ?? [],
   });
+  const stackInstance = instantiateExecutionStack(stack);
+  return createExecutionContext({ contract, stackInstance });
+}
 
-  return context;
+export function createTestStackInstance(options?: {
+  extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
+  driver?: RuntimeDriverDescriptor<'sql', 'postgres', SqlRuntimeDriverInstance<'postgres'>>;
+}): ReturnType<typeof instantiateExecutionStack> {
+  const stack = createExecutionStack({
+    target: createTestTargetDescriptor(),
+    adapter: createTestAdapterDescriptor(createStubAdapter()),
+    driver: options?.driver,
+    extensionPacks: options?.extensionPacks ?? [],
+  });
+
+  return instantiateExecutionStack(stack);
 }
 
 /**

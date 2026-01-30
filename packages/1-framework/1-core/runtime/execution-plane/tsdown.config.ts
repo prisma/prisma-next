@@ -1,5 +1,5 @@
 import { defineConfig } from '@prisma-next/tsdown';
 
 export default defineConfig({
-  entry: ['src/exports/types.ts', 'src/exports/framework-components.ts'],
+  entry: ['src/exports/types.ts', 'src/exports/framework-components.ts', 'src/exports/stack.ts'],
 });

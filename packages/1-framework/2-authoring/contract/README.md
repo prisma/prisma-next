@@ -14,7 +14,7 @@ This package provides generic builder primitives that can be composed with targe
 - **State Management**: Manages builder state for tables, columns, models, and relations without target-specific logic
 - **Type Helpers**: Provides generic type-level helpers for transforming builder states into contract structures
 - **Composition Surface**: Enables target-family specific packages (e.g., `@prisma-next/sql-contract-ts`) to compose generic core with family-specific types
-- **Defaults**: Reuses shared contract `ColumnDefault` for db-agnostic column defaults (literal/function)
+- **Defaults**: Reuses shared contract `ColumnDefault` for db-agnostic column defaults (literal expression or function)
 
 ## Package Status
 

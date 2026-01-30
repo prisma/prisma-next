@@ -8,11 +8,15 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresAdapterRuntime from '@prisma-next/adapter-postgres/runtime';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import { createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+import postgresDriverDescriptor from '@prisma-next/driver-postgres/runtime';
 import sql from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { budgets, createRuntime, createRuntimeContext } from '@prisma-next/sql-runtime';
+import { budgets, createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
 import postgresTargetRuntime from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
@@ -67,20 +71,26 @@ export function createTestRuntime<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,
   budgetConfig?: { maxRows: number; defaultTableRows: number; tableRows: Record<string, number> },
 ): TestRuntime {
-  const context = createRuntimeContext({
-    contract,
+  const stack = createExecutionStack({
     target: postgresTargetRuntime,
     adapter: postgresAdapterRuntime,
+    driver: postgresDriverDescriptor,
     extensionPacks: [],
   });
-  const pool = new Pool({ connectionString });
-  const driver = createPostgresDriverFromOptions({
-    connect: { pool },
-    cursor: { disabled: true },
+  const stackInstance = instantiateExecutionStack(stack);
+  const context = createExecutionContext({
+    contract,
+    stackInstance,
   });
+  const pool = new Pool({ connectionString });
   const runtime = createRuntime({
+    stackInstance,
+    contract,
     context,
-    driver,
+    driverOptions: {
+      connect: { pool },
+      cursor: { disabled: true },
+    },
     verify: { mode: 'onFirstUse', requireMarker: false },
     plugins: budgetConfig ? [budgets(budgetConfig)] : [],
   });

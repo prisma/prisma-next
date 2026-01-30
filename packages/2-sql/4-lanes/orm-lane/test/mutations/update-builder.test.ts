@@ -59,6 +59,7 @@ describe('update builder', () => {
     contract,
     operations: createOperationRegistry(),
     codecs: createCodecRegistry(),
+    types: {},
   };
 
   const getModelAccessor: () => ModelColumnAccessor<

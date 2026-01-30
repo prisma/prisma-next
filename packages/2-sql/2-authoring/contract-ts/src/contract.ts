@@ -9,9 +9,12 @@ import type {
   SqlContract,
   SqlMappings,
   SqlStorage,
+  StorageColumn,
+  StorageTable,
   StorageTypeInstance,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
+import { ColumnDefaultSchema } from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
@@ -20,20 +23,7 @@ import type { O } from 'ts-toolbelt';
  * This validates the shape and types of the contract structure.
  */
 
-// Column default value schemas
-const ColumnDefaultLiteralSchema = {
-  kind: "'literal'",
-  value: 'string | number | boolean',
-} as const;
-
-const ColumnDefaultFunctionSchema = {
-  kind: "'function'",
-  expression: 'string',
-} as const;
-
-const ColumnDefaultSchema = type(ColumnDefaultLiteralSchema).or(ColumnDefaultFunctionSchema);
-
-const StorageColumnSchema = type({
+const StorageColumnSchema = type.declare<StorageColumn>().type({
   nativeType: 'string',
   codecId: 'string',
   nullable: 'boolean',
@@ -74,7 +64,7 @@ const ForeignKeySchema = type.declare<ForeignKey>().type({
   'name?': 'string',
 });
 
-const StorageTableSchema = type({
+const StorageTableSchema = type.declare<StorageTable>().type({
   columns: type({ '[string]': StorageColumnSchema }),
   'primaryKey?': PrimaryKeySchema,
   uniques: UniqueConstraintSchema.array().readonly(),
@@ -82,7 +72,7 @@ const StorageTableSchema = type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
-const StorageSchema = type({
+const StorageSchema = type.declare<SqlStorage>().type({
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });

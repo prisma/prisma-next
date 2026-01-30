@@ -6,7 +6,7 @@ import type {
   ControlTargetDescriptor,
 } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import { createSqlFamilyInstance } from '../src/core/instance';
+import { createSqlFamilyInstance } from '../src/core/control-instance';
 
 /**
  * Integration tests for parameterized codec emission plumbing.

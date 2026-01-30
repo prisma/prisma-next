@@ -19,6 +19,7 @@ export default defineConfig({
         '**/*.config.ts',
         '**/exports/**',
         '**/types.ts',
+        'src/core/descriptor-meta.ts',
       ],
       thresholds: {
         lines: 92,

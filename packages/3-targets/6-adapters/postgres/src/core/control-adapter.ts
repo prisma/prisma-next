@@ -1,4 +1,3 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type {
@@ -10,61 +9,8 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-
-/**
- * Parses a raw Postgres column default expression into a normalized ColumnDefault.
- * This enables semantic comparison between contract defaults and introspected schema defaults.
- *
- * @param rawDefault - Raw default expression from information_schema.columns.column_default
- * @returns Normalized ColumnDefault or undefined if the expression cannot be parsed
- */
-function parsePostgresDefault(rawDefault: string): ColumnDefault | undefined {
-  const trimmed = rawDefault.trim();
-
-  // Autoincrement: nextval('tablename_column_seq'::regclass)
-  if (/^nextval\s*\(/i.test(trimmed)) {
-    return { kind: 'function', expression: 'autoincrement()' };
-  }
-
-  // now() / CURRENT_TIMESTAMP / clock_timestamp()
-  if (/^(now\s*\(\s*\)|CURRENT_TIMESTAMP|clock_timestamp\s*\(\s*\))$/i.test(trimmed)) {
-    return { kind: 'function', expression: 'now()' };
-  }
-
-  // gen_random_uuid()
-  if (/^gen_random_uuid\s*\(\s*\)$/i.test(trimmed)) {
-    return { kind: 'function', expression: 'gen_random_uuid()' };
-  }
-
-  // Boolean literals
-  if (/^true$/i.test(trimmed)) {
-    return { kind: 'literal', value: true };
-  }
-  if (/^false$/i.test(trimmed)) {
-    return { kind: 'literal', value: false };
-  }
-
-  // Numeric literals (integer or decimal)
-  if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-    const num = Number(trimmed);
-    if (!Number.isNaN(num)) {
-      return { kind: 'literal', value: num };
-    }
-  }
-
-  // String literals: 'value'::type or just 'value'
-  // Match: 'some text'::text, 'hello'::character varying, 'value', etc.
-  const stringMatch = trimmed.match(/^'((?:[^']|'')*)'(?:::[\w\s]+(?:\(\d+\))?)?$/);
-  if (stringMatch?.[1] !== undefined) {
-    // Unescape doubled single quotes
-    const value = stringMatch[1].replace(/''/g, "'");
-    return { kind: 'literal', value };
-  }
-
-  // Unrecognized expression - return as a function with the raw expression
-  // This preserves the information for debugging while still being comparable
-  return { kind: 'function', expression: trimmed };
-}
+import { ifDefined } from '@prisma-next/utils/defined';
+import { parsePostgresDefault } from './default-normalizer';
 
 /**
  * Postgres control plane adapter for control-plane operations like introspection.
@@ -77,6 +23,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * @deprecated Use targetId instead
    */
   readonly target = 'postgres' as const;
+
+  /**
+   * Target-specific normalizer for raw Postgres default expressions.
+   * Used by schema verification to normalize raw defaults before comparison.
+   */
+  readonly normalizeDefault = parsePostgresDefault;
 
   /**
    * Introspects a Postgres database schema and returns a raw SqlSchemaIR.
@@ -161,14 +113,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           nativeType = colRow.udt_name || colRow.data_type;
         }
 
-        const parsedDefault =
-          colRow.column_default != null ? parsePostgresDefault(colRow.column_default) : undefined;
-
         columns[colRow.column_name] = {
           name: colRow.column_name,
           nativeType,
           nullable: colRow.is_nullable === 'YES',
-          ...(parsedDefault ? { default: parsedDefault } : {}),
+          // Store raw default expression - normalization happens in comparison layer
+          ...ifDefined('default', colRow.column_default ?? undefined),
         };
       }
 

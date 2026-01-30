@@ -1,45 +1,23 @@
-import type {
-  RuntimeAdapterDescriptor,
-  RuntimeDriverDescriptor,
-  RuntimeExtensionDescriptor,
-  RuntimeFamilyDescriptor,
-  RuntimeTargetDescriptor,
-} from '@prisma-next/core-execution-plane/types';
-import {
-  createSqlRuntimeFamilyInstance,
-  type SqlRuntimeAdapterInstance,
-  type SqlRuntimeDriverInstance,
-  type SqlRuntimeFamilyInstance,
-} from './runtime-instance';
+import type { RuntimeFamilyDescriptor } from '@prisma-next/core-execution-plane/types';
+import { createSqlRuntimeFamilyInstance, type SqlRuntimeFamilyInstance } from './runtime-instance';
 
 /**
- * SQL runtime family descriptor implementation.
- * Provides factory method to create SQL runtime family instance.
+ * SQL execution-plane family descriptor.
+ *
+ * Note: this is currently named `sqlRuntimeFamilyDescriptor` because the execution plane
+ * framework types are still using the `Runtime*` naming (`RuntimeFamilyDescriptor`, etc.).
+ *
+ * This will be renamed to `sqlExecutionFamilyDescriptor` as part of `TML-1842`.
  */
-export class SqlRuntimeFamilyDescriptor
-  implements RuntimeFamilyDescriptor<'sql', SqlRuntimeFamilyInstance>
-{
-  readonly kind = 'family' as const;
-  readonly id = 'sql';
-  readonly familyId = 'sql' as const;
-  readonly version = '0.0.1';
+export const sqlRuntimeFamilyDescriptor: RuntimeFamilyDescriptor<'sql', SqlRuntimeFamilyInstance> =
+  {
+    kind: 'family',
+    id: 'sql',
+    familyId: 'sql',
+    version: '0.0.1',
+    create() {
+      return createSqlRuntimeFamilyInstance();
+    },
+  };
 
-  create<TTargetId extends string>(options: {
-    readonly target: RuntimeTargetDescriptor<'sql', TTargetId>;
-    readonly adapter: RuntimeAdapterDescriptor<
-      'sql',
-      TTargetId,
-      SqlRuntimeAdapterInstance<TTargetId>
-    >;
-    readonly driver: RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>;
-    readonly extensionPacks: readonly RuntimeExtensionDescriptor<'sql', TTargetId>[];
-  }): SqlRuntimeFamilyInstance {
-    return createSqlRuntimeFamilyInstance({
-      family: this,
-      target: options.target,
-      adapter: options.adapter,
-      driver: options.driver,
-      extensionPacks: options.extensionPacks,
-    });
-  }
-}
+Object.freeze(sqlRuntimeFamilyDescriptor);

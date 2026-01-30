@@ -1,10 +1,14 @@
+import {
+  createExecutionStack,
+  instantiateExecutionStack,
+} from '@prisma-next/core-execution-plane/stack';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { CodecRegistry, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
-  createRuntimeContext,
+  createExecutionContext,
   type SqlRuntimeExtensionDescriptor,
   type SqlRuntimeExtensionInstance,
 } from '../src/sql-context';
@@ -42,7 +46,7 @@ function createStubCodecs(): CodecRegistry {
   return registry;
 }
 
-// Create a test adapter descriptor
+// Create a test adapter descriptor that wraps a raw adapter
 function createTestAdapterDescriptor() {
   const codecs = createStubCodecs();
   return {
@@ -148,27 +152,29 @@ function createTestExtensionDescriptor(options?: {
   };
 }
 
-describe('createRuntimeContext', () => {
+function createContext(options?: {
+  extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
+}) {
+  const stack = createExecutionStack({
+    target: createTestTargetDescriptor(),
+    adapter: createTestAdapterDescriptor(),
+    extensionPacks: options?.extensionPacks ?? [],
+  });
+  const stackInstance = instantiateExecutionStack(stack);
+  return createExecutionContext({ contract: testContract, stackInstance });
+}
+
+describe('createExecutionContext', () => {
   it('creates context with adapter codecs', () => {
-    const context = createRuntimeContext({
-      contract: testContract,
-      target: createTestTargetDescriptor(),
-      adapter: createTestAdapterDescriptor(),
-    });
+    const context = createContext();
 
     expect(context.contract).toBe(testContract);
-    expect(context.adapter).toBeDefined();
     expect(context.codecs.has('pg/int4@1')).toBe(true);
     expect(context.operations).toBeDefined();
   });
 
   it('creates context with empty extension packs', () => {
-    const context = createRuntimeContext({
-      contract: testContract,
-      target: createTestTargetDescriptor(),
-      adapter: createTestAdapterDescriptor(),
-      extensionPacks: [],
-    });
+    const context = createContext({ extensionPacks: [] });
 
     expect(context.codecs.has('pg/int4@1')).toBe(true);
     // No extension codecs registered
@@ -176,10 +182,7 @@ describe('createRuntimeContext', () => {
   });
 
   it('registers extension codecs', () => {
-    const context = createRuntimeContext({
-      contract: testContract,
-      target: createTestTargetDescriptor(),
-      adapter: createTestAdapterDescriptor(),
+    const context = createContext({
       extensionPacks: [createTestExtensionDescriptor({ hasCodecs: true })],
     });
 
@@ -190,10 +193,7 @@ describe('createRuntimeContext', () => {
   });
 
   it('registers extension operations', () => {
-    const context = createRuntimeContext({
-      contract: testContract,
-      target: createTestTargetDescriptor(),
-      adapter: createTestAdapterDescriptor(),
+    const context = createContext({
       extensionPacks: [createTestExtensionDescriptor({ hasOperations: true })],
     });
 
@@ -203,15 +203,97 @@ describe('createRuntimeContext', () => {
   });
 
   it('handles extension without codecs or operations', () => {
-    const context = createRuntimeContext({
-      contract: testContract,
-      target: createTestTargetDescriptor(),
-      adapter: createTestAdapterDescriptor(),
+    const context = createContext({
       extensionPacks: [createTestExtensionDescriptor({ hasCodecs: false, hasOperations: false })],
     });
 
     // Only adapter codec
     expect(context.codecs.has('pg/int4@1')).toBe(true);
     expect(context.codecs.has('test/ext@1')).toBe(false);
+  });
+});
+
+describe('contract/stack validation errors', () => {
+  it('throws RUNTIME.CONTRACT_TARGET_MISMATCH when contract target differs from stack', () => {
+    const mismatchedContract: SqlContract<SqlStorage> = {
+      ...testContract,
+      target: 'mysql', // Different from stack's 'postgres'
+    };
+
+    const stack = createExecutionStack({
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(),
+      extensionPacks: [],
+    });
+    const stackInstance = instantiateExecutionStack(stack);
+
+    expect(() => createExecutionContext({ contract: mismatchedContract, stackInstance })).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.CONTRACT_TARGET_MISMATCH',
+        category: 'RUNTIME',
+        severity: 'error',
+        details: {
+          actual: 'mysql',
+          expected: 'postgres',
+        },
+      }),
+    );
+  });
+
+  it('throws RUNTIME.MISSING_EXTENSION_PACK when contract requires extension not in stack', () => {
+    const contractWithExtension: SqlContract<SqlStorage> = {
+      ...testContract,
+      extensionPacks: {
+        'required-extension': { id: 'required-extension', version: '1.0.0', capabilities: {} },
+      },
+    };
+
+    const stack = createExecutionStack({
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(),
+      extensionPacks: [], // No extensions provided
+    });
+    const stackInstance = instantiateExecutionStack(stack);
+
+    expect(() =>
+      createExecutionContext({ contract: contractWithExtension, stackInstance }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.MISSING_EXTENSION_PACK',
+        category: 'RUNTIME',
+        severity: 'error',
+        details: {
+          packIds: ['required-extension'],
+        },
+      }),
+    );
+  });
+
+  it('lists all missing extension packs in a single error', () => {
+    const contractWithExtensions: SqlContract<SqlStorage> = {
+      ...testContract,
+      extensionPacks: {
+        'ext-a': { id: 'ext-a', version: '1.0.0', capabilities: {} },
+        'ext-b': { id: 'ext-b', version: '1.0.0', capabilities: {} },
+      },
+    };
+
+    const stack = createExecutionStack({
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(),
+      extensionPacks: [],
+    });
+    const stackInstance = instantiateExecutionStack(stack);
+
+    expect(() =>
+      createExecutionContext({ contract: contractWithExtensions, stackInstance }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.MISSING_EXTENSION_PACK',
+        details: {
+          packIds: expect.arrayContaining(['ext-a', 'ext-b']),
+        },
+      }),
+    );
   });
 });

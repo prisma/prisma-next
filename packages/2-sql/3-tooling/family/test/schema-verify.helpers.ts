@@ -1,8 +1,10 @@
 /**
  * Shared test helpers for schema verification tests.
  */
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 /**
  * Empty type metadata registry for tests that don't need codec warnings.
@@ -46,7 +48,10 @@ export function createTestSchemaIR(
  * Creates a minimal contract table for testing.
  */
 export function createContractTable(
-  columns: Record<string, { nativeType: string; codecId?: string; nullable: boolean }>,
+  columns: Record<
+    string,
+    { nativeType: string; codecId?: string; nullable: boolean; default?: ColumnDefault }
+  >,
   options?: {
     primaryKey?: { columns: readonly string[]; name?: string };
     foreignKeys?: ReadonlyArray<{
@@ -66,6 +71,7 @@ export function createContractTable(
           nativeType: col.nativeType,
           codecId: col.codecId ?? `pg/${col.nativeType}@1`,
           nullable: col.nullable,
+          ...ifDefined('default', col.default),
         },
       ]),
     ),
@@ -81,10 +87,11 @@ export function createContractTable(
 
 /**
  * Creates a minimal schema table for testing.
+ * Note: default is now a raw string (e.g., "now()", "'hello'::text") matching SqlColumnIR.
  */
 export function createSchemaTable(
   name: string,
-  columns: Record<string, { nativeType: string; nullable: boolean }>,
+  columns: Record<string, { nativeType: string; nullable: boolean; default?: string }>,
   options?: {
     primaryKey?: { columns: readonly string[]; name?: string };
     foreignKeys?: ReadonlyArray<{
@@ -102,7 +109,12 @@ export function createSchemaTable(
     columns: Object.fromEntries(
       Object.entries(columns).map(([colName, col]) => [
         colName,
-        { name: colName, nativeType: col.nativeType, nullable: col.nullable } as SqlColumnIR,
+        {
+          name: colName,
+          nativeType: col.nativeType,
+          nullable: col.nullable,
+          ...ifDefined('default', col.default),
+        },
       ]),
     ),
     foreignKeys: options?.foreignKeys ?? [],
