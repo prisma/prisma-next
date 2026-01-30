@@ -462,7 +462,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         default: { kind: 'sequence', name: 'counter_id_seq' },
       },
     });
-    expect(sql).toContain('"id" int8 DEFAULT nextval(\'counter_id_seq\') NOT NULL');
+    // Sequence names use quoteIdentifier for proper identifier escaping
+    expect(sql).toContain('"id" int8 DEFAULT nextval("counter_id_seq"::regclass) NOT NULL');
   });
 
   it('generates DEFAULT with function params when provided', () => {

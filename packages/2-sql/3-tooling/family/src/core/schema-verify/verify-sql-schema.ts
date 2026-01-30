@@ -614,20 +614,20 @@ function verifyColumn(options: {
     }
   }
 
-  const finalColumnStatus = mergeStatusFromChildren(columnChildren, columnStatus);
+  // Single-pass aggregation for better performance
+  const aggregated = aggregateChildState(columnChildren, columnStatus);
   const nullableText = contractColumn.nullable ? 'nullable' : 'not nullable';
   const columnTypeDisplay = contractColumn.codecId
     ? `${contractNativeType} (${contractColumn.codecId})`
     : contractNativeType;
-  const columnMessage = summarizeFailureMessages(columnChildren, finalColumnStatus);
-  const columnCode = selectNodeCode(columnChildren, finalColumnStatus);
+  const columnMessage = aggregated.failureMessages.join('; ');
 
   return {
-    status: finalColumnStatus,
+    status: aggregated.status,
     kind: 'column',
     name: `${columnName}: ${columnTypeDisplay} (${nullableText})`,
     contractPath: columnPath,
-    code: columnCode,
+    code: aggregated.firstCode,
     message: columnMessage,
     expected: undefined,
     actual: undefined,
@@ -698,38 +698,56 @@ function buildRootNode(rootChildren: SchemaVerificationNode[]): SchemaVerificati
   };
 }
 
+/**
+ * Aggregated state from child nodes, computed in a single pass.
+ */
+interface AggregatedChildState {
+  readonly status: VerificationStatus;
+  readonly failureMessages: readonly string[];
+  readonly firstCode: string;
+}
+
+/**
+ * Aggregates status, failure messages, and code from children in a single pass.
+ * This is more efficient than calling separate functions that each iterate the array.
+ */
+function aggregateChildState(
+  children: SchemaVerificationNode[],
+  fallback: VerificationStatus,
+): AggregatedChildState {
+  let status: VerificationStatus = fallback;
+  const failureMessages: string[] = [];
+  let firstCode = '';
+
+  for (const child of children) {
+    if (child.status === 'fail') {
+      status = 'fail';
+      if (!firstCode) {
+        firstCode = child.code;
+      }
+      if (child.message && typeof child.message === 'string' && child.message.length > 0) {
+        failureMessages.push(child.message);
+      }
+    } else if (child.status === 'warn' && status !== 'fail') {
+      status = 'warn';
+      if (!firstCode) {
+        firstCode = child.code;
+      }
+    }
+  }
+
+  return { status, failureMessages, firstCode };
+}
+
+/**
+ * @deprecated Use aggregateChildState for better performance when you need multiple values.
+ * Kept for backward compatibility with callers that only need status.
+ */
 function mergeStatusFromChildren(
   children: SchemaVerificationNode[],
   fallback: VerificationStatus,
 ): VerificationStatus {
-  if (children.some((child) => child.status === 'fail')) {
-    return 'fail';
-  }
-  if (children.some((child) => child.status === 'warn')) {
-    return 'warn';
-  }
-  return fallback;
-}
-
-function summarizeFailureMessages(
-  children: SchemaVerificationNode[],
-  status: VerificationStatus,
-): string {
-  if (status !== 'fail') {
-    return '';
-  }
-  const failureMessages = children
-    .filter((child) => child.status === 'fail' && child.message)
-    .map((child) => child.message)
-    .filter((msg): msg is string => typeof msg === 'string' && msg.length > 0);
-  return failureMessages.length > 0 ? failureMessages.join('; ') : '';
-}
-
-function selectNodeCode(children: SchemaVerificationNode[], status: VerificationStatus): string {
-  if ((status === 'fail' || status === 'warn') && children[0]) {
-    return children[0].code;
-  }
-  return '';
+  return aggregateChildState(children, fallback).status;
 }
 
 function validateFrameworkComponentsForExtensions(

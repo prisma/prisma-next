@@ -293,10 +293,10 @@ describe('parsePostgresDefault normalizer', () => {
       expression: "'plain text'",
     });
 
-    // Unknown expressions fall back to function type
+    // uuid_generate_v4() from uuid-ossp extension is normalized to gen_random_uuid()
     expect(parsePostgresDefault('uuid_generate_v4()')).toEqual({
       kind: 'function',
-      expression: 'uuid_generate_v4()',
+      expression: 'gen_random_uuid()',
     });
   });
 });

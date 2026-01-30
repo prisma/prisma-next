@@ -265,15 +265,20 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
     const qualified = qualifyTableName(schema, tableName);
     const notNull = column.nullable === false;
+    const hasDefault = column.default !== undefined;
+    // Only require empty table for NOT NULL columns WITHOUT defaults.
+    // PostgreSQL allows adding NOT NULL columns with defaults to non-empty tables
+    // because the default value is applied to existing rows.
+    const requiresEmptyTable = notNull && !hasDefault;
     const precheck = [
       {
         description: `ensure column "${columnName}" is missing`,
         sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
       },
-      ...(notNull
+      ...(requiresEmptyTable
         ? [
             {
-              description: `ensure table "${tableName}" is empty before adding NOT NULL column`,
+              description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
               sql: tableIsEmptyCheck(qualified),
             },
           ]
@@ -702,14 +707,12 @@ function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined)
       if (columnDefault.expression === 'autoincrement()') {
         return '';
       }
-      // Use the expression directly as the DEFAULT value
       return `DEFAULT ${columnDefault.expression}`;
     }
     case 'sequence':
-      return `DEFAULT nextval('${escapeLiteral(columnDefault.name)}')`;
+      // Sequence names use quoteIdentifier for safe identifier handling
+      return `DEFAULT nextval(${quoteIdentifier(columnDefault.name)}::regclass)`;
   }
-
-  return '';
 }
 
 function qualifyTableName(schema: string, table: string): string {

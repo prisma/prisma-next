@@ -1,6 +1,19 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 
 /**
+ * Pre-compiled regex patterns for performance.
+ * These are compiled once at module load time rather than on each function call.
+ */
+const NEXTVAL_PATTERN = /^nextval\s*\(/i;
+const TIMESTAMP_PATTERN = /^(now\s*\(\s*\)|CURRENT_TIMESTAMP|clock_timestamp\s*\(\s*\))$/i;
+const UUID_PATTERN = /^gen_random_uuid\s*\(\s*\)$/i;
+const UUID_OSSP_PATTERN = /^uuid_generate_v4\s*\(\s*\)$/i;
+const TRUE_PATTERN = /^true$/i;
+const FALSE_PATTERN = /^false$/i;
+const NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
+const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::[\w\s]+(?:\(\d+\))?)?$/;
+
+/**
  * Parses a raw Postgres column default expression into a normalized ColumnDefault.
  * This enables semantic comparison between contract defaults and introspected schema defaults.
  *
@@ -18,36 +31,41 @@ export function parsePostgresDefault(
   const trimmed = rawDefault.trim();
 
   // Autoincrement: nextval('tablename_column_seq'::regclass)
-  if (/^nextval\s*\(/i.test(trimmed)) {
+  if (NEXTVAL_PATTERN.test(trimmed)) {
     return { kind: 'function', expression: 'autoincrement()' };
   }
 
   // now() / CURRENT_TIMESTAMP / clock_timestamp()
-  if (/^(now\s*\(\s*\)|CURRENT_TIMESTAMP|clock_timestamp\s*\(\s*\))$/i.test(trimmed)) {
+  if (TIMESTAMP_PATTERN.test(trimmed)) {
     return { kind: 'function', expression: 'now()' };
   }
 
   // gen_random_uuid()
-  if (/^gen_random_uuid\s*\(\s*\)$/i.test(trimmed)) {
+  if (UUID_PATTERN.test(trimmed)) {
+    return { kind: 'function', expression: 'gen_random_uuid()' };
+  }
+
+  // uuid_generate_v4() from uuid-ossp extension
+  if (UUID_OSSP_PATTERN.test(trimmed)) {
     return { kind: 'function', expression: 'gen_random_uuid()' };
   }
 
   // Boolean literals
-  if (/^true$/i.test(trimmed)) {
+  if (TRUE_PATTERN.test(trimmed)) {
     return { kind: 'literal', expression: 'true' };
   }
-  if (/^false$/i.test(trimmed)) {
+  if (FALSE_PATTERN.test(trimmed)) {
     return { kind: 'literal', expression: 'false' };
   }
 
   // Numeric literals (integer or decimal)
-  if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+  if (NUMERIC_PATTERN.test(trimmed)) {
     return { kind: 'literal', expression: trimmed };
   }
 
   // String literals: 'value'::type or just 'value'
   // Match: 'some text'::text, 'hello'::character varying, 'value', etc.
-  const stringMatch = trimmed.match(/^'((?:[^']|'')*)'(?:::[\w\s]+(?:\(\d+\))?)?$/);
+  const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);
   if (stringMatch?.[1] !== undefined) {
     return { kind: 'literal', expression: trimmed };
   }
