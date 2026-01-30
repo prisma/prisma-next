@@ -174,8 +174,6 @@ class PostgresConnectionImpl extends PostgresQueryable implements SqlConnection 
   async release(): Promise<void> {
     if ('release' in this.#connection) {
       this.#connection.release();
-    } else {
-      await this.#connection.end();
     }
   }
 }

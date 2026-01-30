@@ -318,6 +318,7 @@ describe('budgets plugin integration', () => {
             maxLatencyMs: -1,
             severities: {
               latency: 'warn',
+              rowCount: 'warn',
             },
           }),
         ],

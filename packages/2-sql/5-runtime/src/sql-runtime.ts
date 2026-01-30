@@ -79,13 +79,27 @@ export interface CreateRuntimeOptions<
   readonly log?: Log;
 }
 
-export interface Runtime {
-  execute<Row = Record<string, unknown>>(
-    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
-  ): AsyncIterableResult<Row>;
+export interface Runtime extends RuntimeQueryable {
+  connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
   operations(): OperationRegistry;
+}
+
+export interface RuntimeConnection extends RuntimeQueryable {
+  transaction(): Promise<RuntimeTransaction>;
+  release(): Promise<void>;
+}
+
+export interface RuntimeTransaction extends RuntimeQueryable {
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
+
+export interface RuntimeQueryable {
+  execute<Row = Record<string, unknown>>(
+    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+  ): AsyncIterableResult<Row>;
 }
 
 export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
@@ -182,6 +196,10 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     return new AsyncIterableResult(iterator(this));
   }
 
+  connection(): Promise<RuntimeConnection> {
+    return this.core.connection();
+  }
+
   telemetry(): RuntimeTelemetryEvent | null {
     return this.core.telemetry();
   }
@@ -202,19 +220,37 @@ function createOfflineDriver(): SqlDriver {
       'Runtime created without driver options. Provide driver options to execute queries.',
     );
 
-  return {
-    async connect() {
-      throw missingDriver();
-    },
-    async acquireConnection() {
-      throw missingDriver();
-    },
+  const queryable = {
     async *execute() {
       yield* [];
       throw missingDriver();
     },
     async query() {
       throw missingDriver();
+    },
+  };
+
+  return {
+    ...queryable,
+    async connect() {},
+    async acquireConnection() {
+      return {
+        ...queryable,
+        async release() {
+          throw missingDriver();
+        },
+        async beginTransaction() {
+          return {
+            ...queryable,
+            async commit() {
+              throw missingDriver();
+            },
+            async rollback() {
+              throw missingDriver();
+            },
+          };
+        },
+      };
     },
     async close() {},
   };

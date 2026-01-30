@@ -15,7 +15,7 @@
       "package": "3-extensions/compat-prisma",
       "reason": "Partial implementation for proof of concept",
       "addedDate": "2026-01-02",
-      "expiryDays": 29,
+      "expiryDays": 32,
       "assignee": "Will",
       "linear": null,
       "notes": "Should be completed by end of Jan or removed"
