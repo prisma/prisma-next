@@ -3,10 +3,11 @@ import type {
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import type { PostgresColumnDefault } from '../../src/core/types';
 
 const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
   id: 'postgres.extension.pgvector',
@@ -50,6 +51,10 @@ const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
       },
     ];
   },
+};
+
+type PostgresStorageColumn = Omit<StorageColumn, 'default'> & {
+  readonly default?: PostgresColumnDefault;
 };
 
 function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
@@ -320,5 +325,156 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       'index.user.user_email_idx',
       'foreignKey.post.post_userId_fkey',
     ]);
+  });
+});
+
+describe('PostgresMigrationPlanner - column defaults', () => {
+  type ColumnDef = PostgresStorageColumn & { nativeType: string; codecId: string };
+
+  function contractWithTable(
+    tableName: string,
+    columns: Record<string, ColumnDef>,
+  ): SqlContract<SqlStorage> {
+    return {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      coreHash: 'sha256:test-defaults' as never,
+      profileHash: 'sha256:test-defaults-profile' as never,
+      storage: {
+        tables: {
+          [tableName]: {
+            columns,
+            primaryKey: { columns: [Object.keys(columns)[0]!] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: { codecTypes: {}, operationTypes: {} },
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      sources: {},
+    } as SqlContract<SqlStorage>;
+  }
+
+  function planTableSql(tableName: string, columns: Record<string, ColumnDef>): string {
+    const planner = createPostgresMigrationPlanner();
+    const result = planner.plan({
+      contract: contractWithTable(tableName, columns),
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [],
+    });
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') throw new Error(`Expected success: ${JSON.stringify(result)}`);
+    const tableOp = result.plan.operations.find((op) => op.id === `table.${tableName}`);
+    expect(tableOp).toBeDefined();
+    return tableOp!.execute[0]!.sql;
+  }
+
+  it.each([
+    ['int2', 'SMALLSERIAL'],
+    ['int4', 'SERIAL'],
+    ['int8', 'BIGSERIAL'],
+  ] as const)('generates %s for autoincrement on %s columns', (nativeType, serialType) => {
+    const sql = planTableSql('counter', {
+      id: {
+        nativeType,
+        codecId: `pg/${nativeType}@1`,
+        nullable: false,
+        default: { kind: 'function', expression: 'autoincrement()' },
+      },
+    });
+    expect(sql).toContain(`"id" ${serialType} NOT NULL`);
+    expect(sql).not.toContain('DEFAULT');
+  });
+
+  it('generates DEFAULT now() for timestamp columns', () => {
+    const sql = planTableSql('user', {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      createdAt: {
+        nativeType: 'timestamptz',
+        codecId: 'pg/timestamptz@1',
+        nullable: false,
+        default: { kind: 'function', expression: 'now()' },
+      },
+    });
+    expect(sql).toContain('"createdAt" timestamptz DEFAULT now() NOT NULL');
+  });
+
+  it('generates DEFAULT gen_random_uuid() for uuid columns', () => {
+    const sql = planTableSql('user', {
+      id: {
+        nativeType: 'uuid',
+        codecId: 'pg/uuid@1',
+        nullable: false,
+        default: { kind: 'function', expression: 'gen_random_uuid()' },
+      },
+    });
+    expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid() NOT NULL');
+  });
+
+  it('generates DEFAULT with literal values', () => {
+    const sql = planTableSql('config', {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      enabled: {
+        nativeType: 'bool',
+        codecId: 'pg/bool@1',
+        nullable: false,
+        default: { kind: 'literal', expression: 'true' },
+      },
+      disabled: {
+        nativeType: 'bool',
+        codecId: 'pg/bool@1',
+        nullable: false,
+        default: { kind: 'literal', expression: 'false' },
+      },
+      name: {
+        nativeType: 'text',
+        codecId: 'pg/text@1',
+        nullable: false,
+        default: { kind: 'literal', expression: "'default'" },
+      },
+      priority: {
+        nativeType: 'int4',
+        codecId: 'pg/int4@1',
+        nullable: false,
+        default: { kind: 'literal', expression: '0' },
+      },
+    });
+    expect(sql).toContain('"enabled" bool DEFAULT true NOT NULL');
+    expect(sql).toContain('"disabled" bool DEFAULT false NOT NULL');
+    expect(sql).toContain('"name" text DEFAULT \'default\' NOT NULL');
+    expect(sql).toContain('"priority" int4 DEFAULT 0 NOT NULL');
+  });
+
+  it('generates DEFAULT with sequence reference', () => {
+    const sql = planTableSql('counter', {
+      id: {
+        nativeType: 'int8',
+        codecId: 'pg/int8@1',
+        nullable: false,
+        default: { kind: 'sequence', name: 'counter_id_seq' },
+      },
+    });
+    // Sequence names use quoteIdentifier for proper identifier escaping
+    expect(sql).toContain('"id" int8 DEFAULT nextval("counter_id_seq"::regclass) NOT NULL');
+  });
+
+  it('generates DEFAULT with function params when provided', () => {
+    const sql = planTableSql('event', {
+      id: {
+        nativeType: 'uuid',
+        codecId: 'pg/uuid@1',
+        nullable: false,
+        default: { kind: 'function', expression: "gen_random_uuid(INTERVAL '5500 years')" },
+      },
+    });
+    expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid(INTERVAL \'5500 years\') NOT NULL');
   });
 });

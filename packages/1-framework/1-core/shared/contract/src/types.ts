@@ -62,6 +62,13 @@ export interface FieldType {
   readonly properties?: Record<string, FieldType>;
 }
 
+export type ColumnDefault =
+  | {
+      readonly kind: 'literal';
+      readonly expression: string;
+    }
+  | { readonly kind: 'function'; readonly expression: string };
+
 export interface Source {
   readonly readOnly: boolean;
   readonly projection: Record<string, FieldType>;
@@ -84,7 +91,7 @@ export type Expr =
 export interface DocCollection {
   readonly name: string;
   readonly id?: {
-    readonly strategy: 'auto' | 'client' | 'uuid' | 'cuid' | 'objectId';
+    readonly strategy: 'auto' | 'client' | 'uuid' | 'objectId';
   };
   readonly fields: Record<string, FieldType>;
   readonly indexes?: ReadonlyArray<DocIndex>;

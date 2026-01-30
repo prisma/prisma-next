@@ -2,8 +2,8 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:97998a9dc27b4ffdd7258e171236148b81c220a194d7adadbdb47ff28b476766",
-  "profileHash": "sha256:58a1990244c9a8cf20e2f77c60aa35d2f6ea9823f641b533a9e75abc8606819f",
+  "coreHash": "sha256:8250c76f669e4f9d7aa8dbec3337ba408412024019297b8aa40339e80ff9d388",
+  "profileHash": "sha256:fc74c4c3a1401c2ffd528ee1bd61b0ac57af7bdd5e77d39d567389afcb1027bd",
   "models": {
     "Post": {
       "fields": {
@@ -52,6 +52,10 @@
         "columns": {
           "createdAt": {
             "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
             "nativeType": "timestamptz"
           },
           "embedding": {
@@ -61,6 +65,10 @@
           },
           "id": {
             "codecId": "pg/int4@1",
+            "default": {
+              "expression": "autoincrement()",
+              "kind": "function"
+            },
             "nativeType": "int4"
           },
           "title": {
@@ -98,6 +106,10 @@
         "columns": {
           "createdAt": {
             "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
             "nativeType": "timestamptz"
           },
           "email": {
@@ -106,6 +118,10 @@
           },
           "id": {
             "codecId": "pg/int4@1",
+            "default": {
+              "expression": "autoincrement()",
+              "kind": "function"
+            },
             "nativeType": "int4"
           }
         },
@@ -122,6 +138,8 @@
   },
   "capabilities": {
     "postgres": {
+      "defaults.autoincrement": true,
+      "defaults.now": true,
       "jsonAgg": true,
       "lateral": true,
       "pgvector/cosine": true,

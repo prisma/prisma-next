@@ -13,3 +13,8 @@ coverage
 packages/e2e-tests/.tmp-output
 /wip
 .pnpm-store
+
+# Generated contract files in test fixtures
+test/**/fixtures/generated/
+!test/e2e/framework/test/fixtures/generated/
+!test/e2e/framework/test/fixtures/generated/**

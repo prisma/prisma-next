@@ -9,27 +9,42 @@ import type {
   PrimaryKey,
   SqlContract,
   SqlStorage,
-  StorageColumn,
   StorageTable,
   StorageTypeInstance,
   UniqueConstraint,
 } from './types';
 
-const StorageColumnSchema = type
-  .declare<StorageColumn>()
-  .type({
-    nativeType: 'string',
-    codecId: 'string',
-    nullable: 'boolean',
-    'typeParams?': 'Record<string, unknown>',
-    'typeRef?': 'string',
-  })
-  .narrow((col, ctx) => {
-    if (col.typeParams !== undefined && col.typeRef !== undefined) {
-      return ctx.mustBe('a column with either typeParams or typeRef, not both');
-    }
-    return true;
-  });
+type ColumnDefaultLiteral = { readonly kind: 'literal'; readonly expression: string };
+type ColumnDefaultFunction = { readonly kind: 'function'; readonly expression: string };
+
+const literalKindSchema = type("'literal'");
+const functionKindSchema = type("'function'");
+
+export const ColumnDefaultLiteralSchema = type.declare<ColumnDefaultLiteral>().type({
+  kind: literalKindSchema,
+  expression: 'string',
+});
+
+export const ColumnDefaultFunctionSchema = type.declare<ColumnDefaultFunction>().type({
+  kind: functionKindSchema,
+  expression: 'string',
+});
+
+export const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionSchema);
+
+const StorageColumnSchema = type({
+  nativeType: 'string',
+  codecId: 'string',
+  nullable: 'boolean',
+  'typeParams?': 'Record<string, unknown>',
+  'typeRef?': 'string',
+  'default?': ColumnDefaultSchema,
+}).narrow((col, ctx) => {
+  if (col.typeParams !== undefined && col.typeRef !== undefined) {
+    return ctx.mustBe('a column with either typeParams or typeRef, not both');
+  }
+  return true;
+});
 
 const StorageTypeInstanceSchema = type.declare<StorageTypeInstance>().type({
   codecId: 'string',

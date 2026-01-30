@@ -1,3 +1,4 @@
+import { parsePostgresDefault } from '@prisma-next/adapter-postgres/control';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   MigrationOperationPolicy,
@@ -25,6 +26,7 @@ import type {
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { PostgresColumnDefault } from '../types';
 
 type OperationClass = 'extension' | 'table' | 'unique' | 'index' | 'foreignKey';
 
@@ -263,15 +265,20 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
     const qualified = qualifyTableName(schema, tableName);
     const notNull = column.nullable === false;
+    const hasDefault = column.default !== undefined;
+    // Only require empty table for NOT NULL columns WITHOUT defaults.
+    // PostgreSQL allows adding NOT NULL columns with defaults to non-empty tables
+    // because the default value is applied to existing rows.
+    const requiresEmptyTable = notNull && !hasDefault;
     const precheck = [
       {
         description: `ensure column "${columnName}" is missing`,
         sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
       },
-      ...(notNull
+      ...(requiresEmptyTable
         ? [
             {
-              description: `ensure table "${tableName}" is empty before adding NOT NULL column`,
+              description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
               sql: tableIsEmptyCheck(qualified),
             },
           ]
@@ -540,6 +547,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       strict: false,
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
+      normalizeDefault: parsePostgresDefault,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
 
@@ -638,7 +646,8 @@ function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): s
     ([columnName, column]: [string, StorageColumn]) => {
       const parts = [
         quoteIdentifier(columnName),
-        column.nativeType,
+        buildColumnTypeSql(column),
+        buildColumnDefaultSql(column.default),
         column.nullable ? '' : 'NOT NULL',
       ].filter(Boolean);
       return parts.join(' ');
@@ -654,6 +663,56 @@ function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): s
 
   const allDefinitions = [...columnDefinitions, ...constraintDefinitions];
   return `CREATE TABLE ${qualifiedTableName} (\n  ${allDefinitions.join(',\n  ')}\n)`;
+}
+
+/**
+ * Builds the column type SQL, handling autoincrement as a special case.
+ * For autoincrement on int4/int8, we use SERIAL/BIGSERIAL types.
+ */
+function buildColumnTypeSql(column: StorageColumn): string {
+  const columnDefault = column.default;
+
+  // For autoincrement, use SERIAL/BIGSERIAL types instead of int4/int8
+  if (columnDefault?.kind === 'function' && columnDefault.expression === 'autoincrement()') {
+    if (column.nativeType === 'int4' || column.nativeType === 'integer') {
+      return 'SERIAL';
+    }
+    if (column.nativeType === 'int8' || column.nativeType === 'bigint') {
+      return 'BIGSERIAL';
+    }
+    if (column.nativeType === 'int2' || column.nativeType === 'smallint') {
+      return 'SMALLSERIAL';
+    }
+  }
+
+  return column.nativeType;
+}
+
+/**
+ * Builds the DEFAULT clause for a column definition.
+ * Returns empty string if no default is defined.
+ *
+ * Note: autoincrement is handled specially via SERIAL types, so we skip it here.
+ */
+function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined): string {
+  if (!columnDefault) {
+    return '';
+  }
+
+  switch (columnDefault.kind) {
+    case 'literal':
+      return `DEFAULT ${columnDefault.expression}`;
+    case 'function': {
+      // autoincrement is handled by SERIAL type, no explicit DEFAULT needed
+      if (columnDefault.expression === 'autoincrement()') {
+        return '';
+      }
+      return `DEFAULT ${columnDefault.expression}`;
+    }
+    case 'sequence':
+      // Sequence names use quoteIdentifier for safe identifier handling
+      return `DEFAULT nextval(${quoteIdentifier(columnDefault.name)}::regclass)`;
+  }
 }
 
 function qualifyTableName(schema: string, table: string): string {
@@ -746,9 +805,12 @@ function buildAddColumnSql(
   columnName: string,
   column: StorageColumn,
 ): string {
+  const typeSql = buildColumnTypeSql(column);
+  const defaultSql = buildColumnDefaultSql(column.default);
   const parts = [
     `ALTER TABLE ${qualifiedTableName}`,
-    `ADD COLUMN ${quoteIdentifier(columnName)} ${column.nativeType}`,
+    `ADD COLUMN ${quoteIdentifier(columnName)} ${typeSql}`,
+    defaultSql,
     column.nullable ? '' : 'NOT NULL',
   ].filter(Boolean);
   return parts.join(' ');

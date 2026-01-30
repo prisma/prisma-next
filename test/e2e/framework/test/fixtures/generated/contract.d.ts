@@ -3,12 +3,18 @@
 // To regenerate, run: prisma-next contract emit
 import type { CodecTypes as PgTypes } from '@prisma-next/adapter-postgres/codec-types';
 
+import type { CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
 import type {
   SqlContract,
   SqlStorage,
   SqlMappings,
   ModelDefinition,
 } from '@prisma-next/sql-contract/types';
+
+export type CoreHash =
+  CoreHashBase<'sha256:6bffbe54f87b253e12dd069d57a943d580662ed3da1aeb8bfd114fec3ea0e4d8'>;
+export type ProfileHash =
+  ProfileHashBase<'sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -28,6 +34,16 @@ export type Contract = SqlContract<
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
+          };
+          readonly created_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
+          };
+          readonly update_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: true;
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
@@ -51,6 +67,16 @@ export type Contract = SqlContract<
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
+          };
+          readonly created_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
+          };
+          readonly update_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: true;
           };
           readonly published: {
             readonly nativeType: 'bool';
@@ -80,6 +106,16 @@ export type Contract = SqlContract<
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
+          readonly created_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
+          };
+          readonly update_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: true;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
@@ -95,6 +131,8 @@ export type Contract = SqlContract<
       fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly email: CodecTypes['pg/text@1']['output'];
+        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
       };
     };
     readonly Post: {
@@ -103,6 +141,8 @@ export type Contract = SqlContract<
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly userId: CodecTypes['pg/int4@1']['output'];
         readonly title: CodecTypes['pg/text@1']['output'];
+        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
       };
     };
     readonly Comment: {
@@ -111,6 +151,8 @@ export type Contract = SqlContract<
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly postId: CodecTypes['pg/int4@1']['output'];
         readonly content: CodecTypes['pg/text@1']['output'];
+        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
       };
     };
   },
@@ -119,26 +161,54 @@ export type Contract = SqlContract<
     modelToTable: { readonly User: 'user'; readonly Post: 'post'; readonly Comment: 'comment' };
     tableToModel: { readonly user: 'User'; readonly post: 'Post'; readonly comment: 'Comment' };
     fieldToColumn: {
-      readonly User: { readonly id: 'id'; readonly email: 'email' };
-      readonly Post: { readonly id: 'id'; readonly userId: 'userId'; readonly title: 'title' };
+      readonly User: {
+        readonly id: 'id';
+        readonly email: 'email';
+        readonly createdAt: 'created_at';
+        readonly updatedAt: 'update_at';
+      };
+      readonly Post: {
+        readonly id: 'id';
+        readonly userId: 'userId';
+        readonly title: 'title';
+        readonly createdAt: 'created_at';
+        readonly updatedAt: 'update_at';
+      };
       readonly Comment: {
         readonly id: 'id';
         readonly postId: 'postId';
         readonly content: 'content';
+        readonly createdAt: 'created_at';
+        readonly updatedAt: 'update_at';
       };
     };
     columnToField: {
-      readonly user: { readonly id: 'id'; readonly email: 'email' };
-      readonly post: { readonly id: 'id'; readonly userId: 'userId'; readonly title: 'title' };
+      readonly user: {
+        readonly id: 'id';
+        readonly email: 'email';
+        readonly created_at: 'createdAt';
+        readonly update_at: 'updatedAt';
+      };
+      readonly post: {
+        readonly id: 'id';
+        readonly userId: 'userId';
+        readonly title: 'title';
+        readonly created_at: 'createdAt';
+        readonly update_at: 'updatedAt';
+      };
       readonly comment: {
         readonly id: 'id';
         readonly postId: 'postId';
         readonly content: 'content';
+        readonly created_at: 'createdAt';
+        readonly update_at: 'updatedAt';
       };
     };
     codecTypes: PgTypes;
     operationTypes: Record<string, never>;
-  }
+  },
+  CoreHash,
+  ProfileHash
 >;
 
 export type Tables = Contract['storage']['tables'];

@@ -1,6 +1,7 @@
 export type {
   $,
   Brand,
+  ColumnDefault,
   ContractBase,
   ContractMarkerRecord,
   CoreHashBase,

@@ -42,7 +42,9 @@ describe('end-to-end basic queries', () => {
         await withClient(connectionString, async (client) => {
           await setupE2EDatabase(client, contract, async (c) => {
             await c.query('drop table if exists "user"');
-            await c.query('create table "user" (id serial primary key, email text not null)');
+            await c.query(
+              'create table "user" (id serial primary key, email text not null, created_at timestamptz not null default now(), update_at timestamptz)',
+            );
             await c.query('insert into "user" (email) values ($1), ($2), ($3)', [
               'ada@example.com',
               'tess@example.com',

@@ -427,6 +427,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-core/shared/contract
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-core/shared/utils
       ts-toolbelt:
         specifier: ^9.6.0
         version: 9.6.0
@@ -802,6 +805,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../1-core/contract
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/utils
       arktype:
         specifier: ^2.1.25
         version: 2.1.29
@@ -1346,6 +1352,9 @@ importers:
       '@prisma-next/sql-schema-ir':
         specifier: workspace:*
         version: link:../../../2-sql/1-core/schema-ir
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/utils
       arktype:
         specifier: ^2.0.0
         version: 2.1.29

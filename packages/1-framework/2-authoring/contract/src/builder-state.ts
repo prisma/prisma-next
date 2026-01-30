@@ -1,3 +1,5 @@
+import type { ColumnDefault } from '@prisma-next/contract/types';
+
 /**
  * Column type descriptor containing both codec ID and native type.
  * Used when defining columns with descriptor objects instead of string IDs.
@@ -12,17 +14,39 @@ export type ColumnTypeDescriptor = {
   readonly typeParams?: Record<string, unknown>;
 };
 
-export interface ColumnBuilderState<
-  Name extends string,
-  Nullable extends boolean,
-  Type extends string,
-> {
+/**
+ * Base column properties shared by all column states.
+ */
+type ColumnBuilderStateBase<Name extends string, Type extends string> = {
   readonly name: Name;
-  readonly nullable: Nullable;
   readonly type: Type;
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown>;
-}
+};
+
+/**
+ * Descriptive error type shown when attempting to use both nullable and default.
+ * This string literal appears in TypeScript error messages for better DX.
+ */
+export type NullableColumnCannotHaveDefault =
+  "Error: A nullable column cannot have a default value. Remove 'nullable: true' or remove 'default'.";
+
+/**
+ * Column builder state with enforced nullable/default mutual exclusivity.
+ *
+ * Invariant: A column with a default value is always NOT NULL.
+ * This is enforced at the type level via conditional types:
+ * - Nullable columns (`nullable: true`) cannot have a `default` property
+ * - Non-nullable columns (`nullable: false`) can optionally have a `default` property
+ */
+export type ColumnBuilderState<
+  Name extends string,
+  Nullable extends boolean,
+  Type extends string,
+> = ColumnBuilderStateBase<Name, Type> &
+  (Nullable extends true
+    ? { readonly nullable: true; readonly default?: NullableColumnCannotHaveDefault }
+    : { readonly nullable: false; readonly default?: ColumnDefault });
 
 /**
  * Unique constraint definition for table builder.

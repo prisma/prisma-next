@@ -1,24 +1,3 @@
----
-name: Unify Descriptor Hierarchy
-overview: Establish a shared **framework component descriptor model** (shared plane) and update control-plane and runtime-plane descriptors to extend it. This removes duplication (`kind`, `id`, `manifest`, `familyId`, `targetId`) while avoiding conflating “delivery mechanism” (packs) with “component” (family/target/adapter/driver/extension). The shared model is exposed via its own entrypoint in `@prisma-next/contract` to enable a future package extraction with minimal churn.
-todos:
-  - id: add-component-descriptor-model
-    content: Add shared framework component descriptor interfaces (ComponentDescriptor, FamilyDescriptor, TargetDescriptor, etc.) in a dedicated module
-    status: completed
-  - id: add-component-model-entrypoint
-    content: Add a dedicated `@prisma-next/contract/framework-components` entrypoint (exports + tsup entry)
-    status: completed
-  - id: update-control-descriptors
-    content: Update control-plane descriptors to extend shared component descriptor bases and remove duplicated fields
-    status: completed
-  - id: update-runtime-descriptors
-    content: Update runtime-plane descriptors to extend shared component descriptor bases and remove duplicated fields
-    status: completed
-  - id: verify-build
-    content: Build and typecheck to verify changes
-    status: completed
----
-
 # Unify Descriptor Type Hierarchy
 
 ## Current State
@@ -96,8 +75,6 @@ classDiagram
         +targetId
     }
 ```
-
-
 
 
 ## Implementation

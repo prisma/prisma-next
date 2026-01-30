@@ -621,6 +621,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ...ifDefined('context', context),
         typeMetadataRegistry,
         frameworkComponents,
+        // Wire up target-specific normalizer if available
+        ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
       });
     },
     async sign(options: {
@@ -758,10 +760,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           // Add column nodes grouped under "columns"
           const columnNodes: SchemaTreeNode[] = [];
           for (const [columnName, column] of Object.entries(table.columns)) {
-            const nullableText = column.nullable ? '(nullable)' : '(not nullable)';
             // Always display nativeType for introspection (database state)
             const typeDisplay = column.nativeType;
-            const label = `${columnName}: ${typeDisplay} ${nullableText}`;
+            // Tree label shows only nullability; defaults are in meta for JSON/programmatic access
+            const nullability = column.nullable ? 'nullable' : 'not nullable';
+            const label = `${columnName}: ${typeDisplay} (${nullability})`;
             columnNodes.push({
               kind: 'field',
               id: `column-${tableName}-${columnName}`,
@@ -769,6 +772,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
               meta: {
                 nativeType: column.nativeType,
                 nullable: column.nullable,
+                ...ifDefined('default', column.default),
               },
             });
           }

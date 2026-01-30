@@ -1,11 +1,47 @@
+import type { ColumnDefault } from '@prisma-next/contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
   ForeignKeyDef,
   IndexDef,
+  NullableColumnCannotHaveDefault,
   TableBuilderState,
   UniqueConstraintDef,
 } from './builder-state';
+
+/**
+ * Column options for nullable columns.
+ * Nullable columns cannot have a default value.
+ */
+interface NullableColumnOptions<Descriptor extends ColumnTypeDescriptor> {
+  type: Descriptor;
+  nullable: true;
+  typeParams?: Record<string, unknown>;
+  default?: NullableColumnCannotHaveDefault;
+}
+
+/**
+ * Column options for non-nullable columns.
+ * Non-nullable columns can optionally have a default value.
+ */
+interface NonNullableColumnOptions<Descriptor extends ColumnTypeDescriptor> {
+  type: Descriptor;
+  nullable?: false;
+  typeParams?: Record<string, unknown>;
+  default?: ColumnDefault;
+}
+
+/**
+ * Column options that enforce nullable/default mutual exclusivity.
+ *
+ * Invariant: A column with a default value is always NOT NULL.
+ * - If `nullable: true`, the `default` property is forbidden
+ * - If `nullable` is `false` or omitted, the `default` property is allowed
+ */
+type ColumnOptions<Descriptor extends ColumnTypeDescriptor> =
+  | NullableColumnOptions<Descriptor>
+  | NonNullableColumnOptions<Descriptor>;
 
 interface TableBuilderInternalState<
   Name extends string,
@@ -77,42 +113,60 @@ export class TableBuilder<
     return this._state.primaryKey;
   }
 
-  column<
-    ColName extends string,
-    Descriptor extends ColumnTypeDescriptor,
-    Nullable extends boolean | undefined = undefined,
-  >(
+  /**
+   * Add a nullable column to the table.
+   * Nullable columns cannot have a default value.
+   */
+  column<ColName extends string, Descriptor extends ColumnTypeDescriptor>(
     name: ColName,
-    options: {
-      type: Descriptor;
-      nullable?: Nullable;
-      typeParams?: Record<string, unknown>;
-    },
+    options: NullableColumnOptions<Descriptor>,
   ): TableBuilder<
     Name,
-    Columns &
-      Record<
-        ColName,
-        ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>
-      >,
+    Columns & Record<ColName, ColumnBuilderState<ColName, true, Descriptor['codecId']>>,
+    PrimaryKey
+  >;
+
+  /**
+   * Add a non-nullable column to the table.
+   * Non-nullable columns can optionally have a default value.
+   */
+  column<ColName extends string, Descriptor extends ColumnTypeDescriptor>(
+    name: ColName,
+    options: NonNullableColumnOptions<Descriptor>,
+  ): TableBuilder<
+    Name,
+    Columns & Record<ColName, ColumnBuilderState<ColName, false, Descriptor['codecId']>>,
+    PrimaryKey
+  >;
+
+  /**
+   * Implementation of the column method.
+   */
+  column<ColName extends string, Descriptor extends ColumnTypeDescriptor>(
+    name: ColName,
+    options: ColumnOptions<Descriptor>,
+  ): TableBuilder<
+    Name,
+    Columns & Record<ColName, ColumnBuilderState<ColName, boolean, Descriptor['codecId']>>,
     PrimaryKey
   > {
-    const nullable = (options.nullable ?? false) as Nullable extends true ? true : false;
+    const nullable = options.nullable ?? false;
     const { codecId, nativeType, typeParams: descriptorTypeParams } = options.type;
     const typeParams = options.typeParams ?? descriptorTypeParams;
 
+    // The type safety is enforced at the call site via overloads:
+    // - NullableColumnOptions forbids `default` when `nullable: true`
+    // - NonNullableColumnOptions allows `default` when `nullable` is false/omitted
     const columnState = {
       name,
       nullable,
       type: codecId,
       nativeType,
-      ...(typeParams ? { typeParams } : {}),
-    } as ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>;
+      ...ifDefined('typeParams', typeParams),
+      ...ifDefined('default', 'default' in options ? options.default : undefined),
+    } as ColumnBuilderState<ColName, boolean, Descriptor['codecId']>;
     const newColumns = { ...this._columns, [name]: columnState } as Columns &
-      Record<
-        ColName,
-        ColumnBuilderState<ColName, Nullable extends true ? true : false, Descriptor['codecId']>
-      >;
+      Record<ColName, ColumnBuilderState<ColName, boolean, Descriptor['codecId']>>;
     return new TableBuilder(
       this._state.name,
       newColumns,

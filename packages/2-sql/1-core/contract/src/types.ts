@@ -1,4 +1,9 @@
-import type { ContractBase, CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ContractBase,
+  CoreHashBase,
+  ProfileHashBase,
+} from '@prisma-next/contract/types';
 
 /**
  * A column definition in storage.
@@ -22,6 +27,11 @@ export type StorageColumn = {
    * Mutually exclusive with `typeParams`.
    */
   readonly typeRef?: string;
+  /**
+   * Default value for the column.
+   * Can be a literal value or database function.
+   */
+  readonly default?: ColumnDefault;
 };
 
 export type PrimaryKey = {

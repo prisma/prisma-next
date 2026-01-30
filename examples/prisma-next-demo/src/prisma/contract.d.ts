@@ -15,9 +15,9 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type CoreHash =
-  CoreHashBase<'sha256:97998a9dc27b4ffdd7258e171236148b81c220a194d7adadbdb47ff28b476766'>;
+  CoreHashBase<'sha256:8250c76f669e4f9d7aa8dbec3337ba408412024019297b8aa40339e80ff9d388'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:58a1990244c9a8cf20e2f77c60aa35d2f6ea9823f641b533a9e75abc8606819f'>;
+  ProfileHashBase<'sha256:fc74c4c3a1401c2ffd528ee1bd61b0ac57af7bdd5e77d39d567389afcb1027bd'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;

@@ -30,26 +30,31 @@ function validatePurity(value: unknown): void {
     return;
   }
 
-  const seen = new WeakSet();
+  const path = new WeakSet();
+
   function check(value: unknown): void {
     if (value === null || typeof value !== 'object') {
       return;
     }
 
-    if (seen.has(value)) {
+    if (path.has(value)) {
       throw new Error('Contract export contains circular references');
     }
-    seen.add(value);
+    path.add(value);
 
-    for (const key in value) {
-      const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (descriptor && (descriptor.get || descriptor.set)) {
-        throw new Error(`Contract export contains getter/setter at key "${key}"`);
+    try {
+      for (const key in value) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        if (descriptor && (descriptor.get || descriptor.set)) {
+          throw new Error(`Contract export contains getter/setter at key "${key}"`);
+        }
+        if (descriptor && typeof descriptor.value === 'function') {
+          throw new Error(`Contract export contains function at key "${key}"`);
+        }
+        check((value as Record<string, unknown>)[key]);
       }
-      if (descriptor && typeof descriptor.value === 'function') {
-        throw new Error(`Contract export contains function at key "${key}"`);
-      }
-      check((value as Record<string, unknown>)[key]);
+    } finally {
+      path.delete(value);
     }
   }
 
