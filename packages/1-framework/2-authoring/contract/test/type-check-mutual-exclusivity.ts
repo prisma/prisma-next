@@ -30,10 +30,9 @@ createTable('user').column('email', { type: textColumn, nullable: false });
 
 // INVALID: nullable: true with default - this produces a user-friendly compile error
 // Uncomment the line below to see the error message:
-// createTable('user').column('email', {
-//   type: textColumn,
-//   nullable: true,
-//   default: { kind: 'literal', expression: 'foo' },
-// });
-// Error: Type '{ kind: "literal"; expression: "foo"; }' is not assignable to type
-// '"Error: A nullable column cannot have a default value. Remove 'nullable: true' or remove 'default'."'
+// @ts-expect-error
+createTable('user').column('email', {
+  type: textColumn,
+  nullable: true,
+  default: { kind: 'literal', expression: 'foo' },
+});

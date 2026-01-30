@@ -4,6 +4,7 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 /**
  * Empty type metadata registry for tests that don't need codec warnings.
@@ -70,7 +71,7 @@ export function createContractTable(
           nativeType: col.nativeType,
           codecId: col.codecId ?? `pg/${col.nativeType}@1`,
           nullable: col.nullable,
-          ...(col.default !== undefined ? { default: col.default } : {}),
+          ...ifDefined('default', col.default),
         },
       ]),
     ),
@@ -112,7 +113,7 @@ export function createSchemaTable(
           name: colName,
           nativeType: col.nativeType,
           nullable: col.nullable,
-          ...(col.default !== undefined ? { default: col.default } : {}),
+          ...ifDefined('default', col.default),
         },
       ]),
     ),
