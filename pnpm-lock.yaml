@@ -1447,6 +1447,9 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../../packages/3-targets/7-drivers/postgres
+      '@prisma-next/extension-pgvector':
+        specifier: workspace:*
+        version: link:../../../packages/3-extensions/pgvector
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../packages/2-sql/3-tooling/family

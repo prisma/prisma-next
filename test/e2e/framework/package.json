@@ -24,6 +24,7 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/integration-tests": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
