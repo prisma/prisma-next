@@ -94,10 +94,12 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Build
+      - name: Install dependencies (skip bin linking)
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build packages (including CLI)
         run: pnpm build
+      - name: Link bins
+        run: pnpm install --frozen-lockfile
       - name: Test packages
         run: pnpm test:packages
       - name: Test examples
