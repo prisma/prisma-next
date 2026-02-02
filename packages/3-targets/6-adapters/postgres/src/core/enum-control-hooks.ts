@@ -410,7 +410,7 @@ USING ${quoteIdentifier(ref.column)}::text::${qualifiedTemp}`,
       // orphaned temp types in the execute step below.
     ],
     execute: [
-      // P2 Fix: Clean up any orphaned temp type from a previous failed migration.
+      // Clean up any orphaned temp type from a previous failed migration.
       // This makes the operation recoverable without manual intervention.
       // DROP TYPE IF EXISTS is safe - it's a no-op if the type doesn't exist.
       {
