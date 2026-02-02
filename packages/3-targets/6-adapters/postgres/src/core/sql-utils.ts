@@ -84,3 +84,27 @@ export function escapeLiteral(value: string): string {
 export function qualifyName(schemaName: string, objectName: string): string {
   return `${quoteIdentifier(schemaName)}.${quoteIdentifier(objectName)}`;
 }
+
+/**
+ * Validates that an enum value doesn't exceed PostgreSQL's label length limit.
+ *
+ * PostgreSQL enum labels have a maximum length of NAMEDATALEN-1 (63 bytes by default).
+ * Unlike identifiers, enum labels that exceed this limit cause an error rather than
+ * silent truncation.
+ *
+ * @param value - The enum value to validate
+ * @param enumTypeName - Name of the enum type (for error messages)
+ * @throws {SqlEscapeError} If the value exceeds the maximum length
+ */
+export function validateEnumValueLength(value: string, enumTypeName: string): void {
+  // PostgreSQL uses byte length, not character length. For simplicity, we use
+  // character length as a conservative approximation (multi-byte chars would fail earlier).
+  if (value.length > MAX_IDENTIFIER_LENGTH) {
+    throw new SqlEscapeError(
+      `Enum value "${value.slice(0, 20)}..." for type "${enumTypeName}" exceeds PostgreSQL's ` +
+        `${MAX_IDENTIFIER_LENGTH}-character label limit`,
+      value,
+      'literal',
+    );
+  }
+}

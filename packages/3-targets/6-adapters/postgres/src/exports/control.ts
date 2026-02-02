@@ -3,6 +3,7 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import { PostgresControlAdapter } from '../core/control-adapter';
 import { parsePostgresDefault } from '../core/default-normalizer';
 import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
+import { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError } from '../core/sql-utils';
 
 /**
  * Postgres adapter descriptor for CLI config.
@@ -20,4 +21,4 @@ const postgresAdapterDescriptor: ControlAdapterDescriptor<
 
 export default postgresAdapterDescriptor;
 
-export { parsePostgresDefault };
+export { escapeLiteral, parsePostgresDefault, qualifyName, quoteIdentifier, SqlEscapeError };

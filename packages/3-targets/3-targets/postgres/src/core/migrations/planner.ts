@@ -1,6 +1,11 @@
-import { parsePostgresDefault } from '@prisma-next/adapter-postgres/control';
+import {
+  escapeLiteral,
+  parsePostgresDefault,
+  quoteIdentifier,
+} from '@prisma-next/adapter-postgres/control';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
+  CodecControlHooks,
   MigrationOperationPolicy,
   SqlMigrationPlanner,
   SqlMigrationPlannerPlanOptions,
@@ -92,9 +97,13 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       return plannerFailure(classification.conflicts);
     }
 
+    // Extract codec control hooks once at entry point for reuse across all operations.
+    // This avoids repeated iteration over frameworkComponents for each method that needs hooks.
+    const codecHooks = extractCodecControlHooks(options.frameworkComponents);
+
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
-    const storageTypePlan = this.buildStorageTypeOperations(options, schemaName);
+    const storageTypePlan = this.buildStorageTypeOperations(options, schemaName, codecHooks);
     if (storageTypePlan.conflicts.length > 0) {
       return plannerFailure(storageTypePlan.conflicts);
     }
@@ -185,6 +194,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   private buildStorageTypeOperations(
     options: PlannerOptionsWithComponents,
     schemaName: string,
+    codecHooks: Map<string, CodecControlHooks>,
   ): {
     readonly operations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
     readonly conflicts: readonly SqlPlannerConflict[];
@@ -192,10 +202,9 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     const conflicts: SqlPlannerConflict[] = [];
     const storageTypes = options.contract.storage.types ?? {};
-    const hooks = extractCodecControlHooks(options.frameworkComponents);
 
     for (const [typeName, typeInstance] of sortedEntries(storageTypes)) {
-      const hook = hooks.get(typeInstance.codecId);
+      const hook = codecHooks.get(typeInstance.codecId);
       const planResult = hook?.planTypeOperations?.({
         typeName,
         typeInstance,
@@ -779,28 +788,6 @@ function qualifyTableName(schema: string, table: string): string {
 function toRegclassLiteral(schema: string, name: string): string {
   const regclass = `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
   return `'${escapeLiteral(regclass)}'`;
-}
-
-/**
- * Escapes and quotes a SQL identifier (table, column, schema name).
- * Includes null byte validation for security.
- */
-function quoteIdentifier(identifier: string): string {
-  if (identifier.includes('\0')) {
-    throw new Error(`Identifier cannot contain null bytes: ${identifier.replace(/\0/g, '\\0')}`);
-  }
-  return `"${identifier.replace(/"/g, '""')}"`;
-}
-
-/**
- * Escapes a string literal for SQL.
- * Includes null byte validation for security.
- */
-function escapeLiteral(value: string): string {
-  if (value.includes('\0')) {
-    throw new Error(`Literal cannot contain null bytes: ${value.replace(/\0/g, '\\0')}`);
-  }
-  return value.replace(/'/g, "''");
 }
 
 function sortedEntries<V>(record: Readonly<Record<string, V>>): Array<[string, V]> {

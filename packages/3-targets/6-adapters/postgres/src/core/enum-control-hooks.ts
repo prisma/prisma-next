@@ -2,7 +2,7 @@ import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { escapeLiteral, qualifyName, quoteIdentifier } from './sql-utils';
+import { escapeLiteral, qualifyName, quoteIdentifier, validateEnumValueLength } from './sql-utils';
 
 /**
  * Postgres enum control hooks.
@@ -22,7 +22,7 @@ type EnumRow = {
 type EnumDiff =
   | { kind: 'unchanged' }
   | { kind: 'add_values'; values: readonly string[] }
-  | { kind: 'rebuild' };
+  | { kind: 'rebuild'; removedValues: readonly string[] };
 
 // ============================================================================
 // Introspection SQL
@@ -78,18 +78,37 @@ function readExistingEnumValues(schema: SqlSchemaIR, nativeType: string): readon
   return getEnumValues(existing);
 }
 
+/**
+ * Determines what changes are needed to transform existing enum values to desired values.
+ *
+ * Returns one of:
+ * - `unchanged`: No changes needed, values match exactly
+ * - `add_values`: New values can be safely appended (PostgreSQL supports this)
+ * - `rebuild`: Full enum rebuild required (value removal, reordering, or both)
+ *
+ * Note: PostgreSQL enums can only have values added (not removed or reordered) without
+ * a full type rebuild involving temp type creation and column migration.
+ *
+ * @param existing - Current enum values in the database
+ * @param desired - Target enum values from the contract
+ * @returns The type of change required
+ */
 function determineEnumDiff(existing: readonly string[], desired: readonly string[]): EnumDiff {
   if (arraysEqual(existing, desired)) {
     return { kind: 'unchanged' };
   }
 
-  const missingValues = desired.filter((value) => !existing.includes(value));
-  const removedValues = existing.filter((value) => !desired.includes(value));
+  // Use Sets for O(1) lookups instead of O(n) array.includes()
+  const existingSet = new Set(existing);
+  const desiredSet = new Set(desired);
+
+  const missingValues = desired.filter((value) => !existingSet.has(value));
+  const removedValues = existing.filter((value) => !desiredSet.has(value));
   const orderMismatch =
     missingValues.length === 0 && removedValues.length === 0 && !arraysEqual(existing, desired);
 
   if (removedValues.length > 0 || orderMismatch) {
-    return { kind: 'rebuild' };
+    return { kind: 'rebuild', removedValues };
   }
 
   return { kind: 'add_values', values: missingValues };
@@ -120,6 +139,10 @@ function buildCreateEnumOperation(
   schemaName: string,
   values: readonly string[],
 ): SqlMigrationPlanOperation<unknown> {
+  // Validate all enum values don't exceed PostgreSQL's label length limit
+  for (const value of values) {
+    validateEnumValueLength(value, typeName);
+  }
   const literalValues = values.map((value) => `'${escapeLiteral(value)}'`).join(', ');
   const qualifiedType = qualifyName(schemaName, nativeType);
   return {
@@ -149,17 +172,33 @@ function buildCreateEnumOperation(
   };
 }
 
+/**
+ * Computes the optimal position for inserting a new enum value to maintain
+ * the desired order relative to existing values.
+ *
+ * PostgreSQL's `ALTER TYPE ADD VALUE` supports BEFORE/AFTER positioning.
+ * This function finds the best reference value by:
+ * 1. Looking for the nearest preceding value that already exists
+ * 2. Falling back to the nearest following value if no preceding exists
+ * 3. Defaulting to end-of-list if no reference is found
+ *
+ * @param options.desired - The target ordered list of all enum values
+ * @param options.desiredIndex - Index of the value being inserted in the desired list
+ * @param options.current - Current list of enum values (being built up incrementally)
+ * @returns SQL clause (e.g., " AFTER 'x'") and insert position for tracking
+ */
 function computeInsertPosition(options: {
   desired: readonly string[];
   desiredIndex: number;
   current: readonly string[];
 }): { clause: string; insertAt: number } {
   const { desired, desiredIndex, current } = options;
+  const currentSet = new Set(current);
   const previous = desired
     .slice(0, desiredIndex)
     .reverse()
-    .find((candidate) => current.includes(candidate));
-  const next = desired.slice(desiredIndex + 1).find((candidate) => current.includes(candidate));
+    .find((candidate) => currentSet.has(candidate));
+  const next = desired.slice(desiredIndex + 1).find((candidate) => currentSet.has(candidate));
   const clause = previous
     ? ` AFTER '${escapeLiteral(previous)}'`
     : next
@@ -174,6 +213,22 @@ function computeInsertPosition(options: {
   return { clause, insertAt };
 }
 
+/**
+ * Builds operations to add new enum values to an existing PostgreSQL enum type.
+ *
+ * Each new value is added with `ALTER TYPE ... ADD VALUE IF NOT EXISTS` for idempotency.
+ * Values are inserted in the correct order using BEFORE/AFTER positioning to match
+ * the desired final order.
+ *
+ * This is a safe, non-destructive operation - existing data is not affected.
+ *
+ * @param options.typeName - Contract-level type name (e.g., 'Role')
+ * @param options.nativeType - PostgreSQL type name (e.g., 'role')
+ * @param options.schemaName - PostgreSQL schema (e.g., 'public')
+ * @param options.desired - Target ordered list of all enum values
+ * @param options.existing - Current enum values in the database
+ * @returns Array of migration operations to add each missing value
+ */
 function buildAddValueOperations(options: {
   typeName: string;
   nativeType: string;
@@ -183,15 +238,18 @@ function buildAddValueOperations(options: {
 }): SqlMigrationPlanOperation<unknown>[] {
   const { typeName, nativeType, schemaName } = options;
   const current = [...options.existing];
+  const currentSet = new Set(current);
   const operations: SqlMigrationPlanOperation<unknown>[] = [];
   for (let index = 0; index < options.desired.length; index += 1) {
     const value = options.desired[index];
     if (value === undefined) {
       continue;
     }
-    if (current.includes(value)) {
+    if (currentSet.has(value)) {
       continue;
     }
+    // Validate the new value doesn't exceed PostgreSQL's label length limit
+    validateEnumValueLength(value, typeName);
     const { clause, insertAt } = computeInsertPosition({
       desired: options.desired,
       desiredIndex: index,
@@ -217,6 +275,7 @@ function buildAddValueOperations(options: {
       postcheck: [],
     });
     current.splice(insertAt, 0, value);
+    currentSet.add(value);
   }
   return operations;
 }
@@ -326,11 +385,66 @@ const MAX_IDENTIFIER_LENGTH = 63;
 /** Suffix added to enum type names during rebuild operations */
 const REBUILD_SUFFIX = '__pn_rebuild';
 
+/**
+ * Builds an SQL check to verify no rows contain any of the removed enum values.
+ * This prevents data loss during enum rebuild operations.
+ *
+ * @param schemaName - PostgreSQL schema name
+ * @param tableName - Table containing the enum column
+ * @param columnName - Column using the enum type
+ * @param removedValues - Array of enum values being removed
+ * @returns SQL query that returns true if no rows contain removed values
+ */
+function noRemovedValuesExistCheck(
+  schemaName: string,
+  tableName: string,
+  columnName: string,
+  removedValues: readonly string[],
+): string {
+  if (removedValues.length === 0) {
+    // No values being removed, always passes
+    return 'SELECT true';
+  }
+  const valuesList = removedValues.map((v) => `'${escapeLiteral(v)}'`).join(', ');
+  return `SELECT NOT EXISTS (
+  SELECT 1 FROM ${qualifyName(schemaName, tableName)}
+  WHERE ${quoteIdentifier(columnName)}::text IN (${valuesList})
+  LIMIT 1
+)`;
+}
+
+/**
+ * Builds a migration operation to recreate a PostgreSQL enum type with updated values.
+ *
+ * This is required when:
+ * - Enum values are removed (PostgreSQL doesn't support direct removal)
+ * - Enum values are reordered (PostgreSQL doesn't support reordering)
+ *
+ * The operation:
+ * 1. Creates a new enum type with the desired values (temp name)
+ * 2. Migrates all columns to use the new type via text cast
+ * 3. Drops the original type
+ * 4. Renames the temp type to the original name
+ *
+ * IMPORTANT: If values are being removed and data exists using those values,
+ * the operation will fail at the precheck stage with a clear error message.
+ * This prevents silent data loss.
+ *
+ * @param options.typeName - Contract-level type name
+ * @param options.nativeType - PostgreSQL type name
+ * @param options.schemaName - PostgreSQL schema
+ * @param options.values - Desired final enum values
+ * @param options.removedValues - Values being removed (for data loss checks)
+ * @param options.contract - Full contract for column discovery
+ * @param options.schema - Current schema IR for column discovery
+ * @returns Migration operation for full enum rebuild
+ */
 function buildRecreateEnumOperation(options: {
   typeName: string;
   nativeType: string;
   schemaName: string;
   values: readonly string[];
+  removedValues: readonly string[];
   contract: SqlContract<SqlStorage>;
   schema: SqlSchemaIR;
 }): SqlMigrationPlanOperation<unknown> {
@@ -408,6 +522,21 @@ USING ${quoteIdentifier(ref.column)}::text::${qualifiedTemp}`,
       },
       // Note: We don't precheck that temp type doesn't exist because we handle
       // orphaned temp types in the execute step below.
+
+      // CRITICAL: If values are being removed, verify no data exists using those values.
+      // This prevents silent data loss during the rebuild - the USING cast would fail
+      // at runtime if rows contain values that don't exist in the new enum.
+      ...(options.removedValues.length > 0
+        ? columnRefs.map((ref) => ({
+            description: `ensure no rows in ${ref.table}.${ref.column} contain removed values (${options.removedValues.join(', ')})`,
+            sql: noRemovedValuesExistCheck(
+              options.schemaName,
+              ref.table,
+              ref.column,
+              options.removedValues,
+            ),
+          }))
+        : []),
     ],
     execute: [
       // Clean up any orphaned temp type from a previous failed migration.
@@ -472,6 +601,7 @@ export const pgEnumControlHooks: CodecControlHooks = {
             nativeType: typeInstance.nativeType,
             schemaName: schemaNamespace,
             values: desired,
+            removedValues: diff.removedValues,
             contract,
             schema,
           }),

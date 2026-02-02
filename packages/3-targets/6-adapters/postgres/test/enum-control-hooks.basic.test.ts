@@ -1,54 +1,11 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
-import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { pgEnumControlHooks } from '../src/core/enum-control-hooks';
-
-const ENUM_CODEC_ID = 'pg/enum@1';
-
-function createContract(storage: Partial<SqlStorage>): SqlContract<SqlStorage> {
-  return {
-    schemaVersion: '1',
-    target: 'postgres',
-    targetFamily: 'sql',
-    coreHash: 'sha256:test' as never,
-    storage: {
-      tables: {},
-      types: {},
-      ...storage,
-    } as SqlStorage,
-    models: {},
-    relations: {},
-    mappings: {
-      codecTypes: {},
-      operationTypes: {},
-    },
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    sources: {},
-  };
-}
-
-function createSchema(storageTypes?: Record<string, StorageTypeInstance>): SqlSchemaIR {
-  if (!storageTypes) {
-    return { tables: {}, extensions: [] };
-  }
-
-  return {
-    tables: {},
-    extensions: [],
-    annotations: {
-      pg: {
-        storageTypes,
-      },
-    },
-  };
-}
+import { createTestContract, createTestSchema, ENUM_CODEC_ID } from './test-utils';
 
 describe('pgEnumControlHooks.planTypeOperations', () => {
   it('returns empty operations when values are missing', () => {
-    const contract = createContract({
+    const contract = createTestContract({
       types: {
         Role: { codecId: ENUM_CODEC_ID, nativeType: 'role', typeParams: {} },
       },
@@ -58,7 +15,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       typeName: 'Role',
       typeInstance: { codecId: ENUM_CODEC_ID, nativeType: 'role', typeParams: {} },
       contract,
-      schema: createSchema(),
+      schema: createTestSchema(),
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     });
 
@@ -66,7 +23,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
   });
 
   it('creates enum type when schema is missing storage type', () => {
-    const contract = createContract({
+    const contract = createTestContract({
       types: {
         Role: {
           codecId: ENUM_CODEC_ID,
@@ -84,7 +41,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
         typeParams: { values: ['USER', 'ADMIN'] },
       },
       contract,
-      schema: createSchema(),
+      schema: createTestSchema(),
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     });
 
@@ -103,7 +60,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
   });
 
   it('returns empty operations when values match', () => {
-    const contract = createContract({
+    const contract = createTestContract({
       types: {
         Role: {
           codecId: ENUM_CODEC_ID,
@@ -113,7 +70,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       },
     });
 
-    const schema = createSchema({
+    const schema = createTestSchema({
       role: {
         codecId: ENUM_CODEC_ID,
         nativeType: 'role',
@@ -148,7 +105,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       expectedSql: 'ALTER TYPE "public"."role" ADD VALUE IF NOT EXISTS \'B\' AFTER \'A\'',
     },
   ])('adds missing enum values for $desired', ({ existing, desired, expectedSql }) => {
-    const contract = createContract({
+    const contract = createTestContract({
       types: {
         Role: {
           codecId: ENUM_CODEC_ID,
@@ -158,7 +115,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       },
     });
 
-    const schema = createSchema({
+    const schema = createTestSchema({
       role: {
         codecId: ENUM_CODEC_ID,
         nativeType: 'role',
@@ -188,7 +145,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
   });
 
   it('rebuilds enum when values are reordered', () => {
-    const contract = createContract({
+    const contract = createTestContract({
       tables: {
         user: {
           columns: {
@@ -219,7 +176,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       },
     });
 
-    const schema = createSchema({
+    const schema = createTestSchema({
       role: {
         codecId: ENUM_CODEC_ID,
         nativeType: 'role',
@@ -275,7 +232,7 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
 
 describe('pgEnumControlHooks.verifyType', () => {
   it('returns empty list when values are missing', () => {
-    const schema = createSchema();
+    const schema = createTestSchema();
     const issues = pgEnumControlHooks.verifyType?.({
       typeName: 'Role',
       typeInstance: { codecId: ENUM_CODEC_ID, nativeType: 'role', typeParams: {} },
@@ -286,7 +243,7 @@ describe('pgEnumControlHooks.verifyType', () => {
   });
 
   it('reports missing type', () => {
-    const schema = createSchema();
+    const schema = createTestSchema();
     const issues = pgEnumControlHooks.verifyType?.({
       typeName: 'Role',
       typeInstance: {
@@ -307,7 +264,7 @@ describe('pgEnumControlHooks.verifyType', () => {
   });
 
   it('reports mismatched enum values', () => {
-    const schema = createSchema({
+    const schema = createTestSchema({
       role: {
         codecId: ENUM_CODEC_ID,
         nativeType: 'role',

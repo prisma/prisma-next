@@ -185,21 +185,27 @@ export function extractParameterizedRenderers(
 
 type CodecControlHooksMap = Record<string, CodecControlHooks>;
 
+/**
+ * Type guard to check if a descriptor has codec control plane hooks.
+ * Returns true if descriptor.types.codecTypes.controlPlaneHooks is a non-null object.
+ *
+ * @param descriptor - Component descriptor to check (adapter, target, or extension)
+ * @returns True if the descriptor has control plane hooks attached
+ */
 function hasCodecControlHooks(descriptor: unknown): descriptor is {
+  readonly id: string;
   readonly types: {
     readonly codecTypes: {
       readonly controlPlaneHooks: CodecControlHooksMap;
     };
   };
 } {
-  const controlPlaneHooks = (
-    descriptor as {
-      readonly types?: {
-        readonly codecTypes?: { readonly controlPlaneHooks?: CodecControlHooksMap };
-      };
-    }
-  )?.types?.codecTypes?.controlPlaneHooks;
-  return controlPlaneHooks !== null && typeof controlPlaneHooks === 'object';
+  if (typeof descriptor !== 'object' || descriptor === null) {
+    return false;
+  }
+  const d = descriptor as { types?: { codecTypes?: { controlPlaneHooks?: unknown } } };
+  const hooks = d.types?.codecTypes?.controlPlaneHooks;
+  return hooks !== null && hooks !== undefined && typeof hooks === 'object';
 }
 
 // ============================================================================
