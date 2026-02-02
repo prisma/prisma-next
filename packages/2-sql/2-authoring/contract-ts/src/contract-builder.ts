@@ -240,7 +240,7 @@ class SqlContractBuilder<
             boolean,
           ...ifDefined('typeParams', columnState.typeParams),
           ...ifDefined('default', columnState.default),
-          ...(typeRef ? { typeRef } : {}),
+          ...ifDefined('typeRef', typeRef),
         } as BuildStorageColumn<
           ColumnDefs[keyof ColumnDefs]['nullable'] & boolean,
           ColumnDefs[keyof ColumnDefs]['type']

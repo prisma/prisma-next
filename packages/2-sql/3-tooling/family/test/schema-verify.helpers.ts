@@ -24,7 +24,7 @@ export function createTestContract(
     target: 'postgres',
     targetFamily: 'sql',
     coreHash: 'sha256:test',
-    storage: { tables, ...(storageTypes ? { types: storageTypes } : {}) },
+    storage: { tables, ...ifDefined('types', storageTypes) },
     models: {},
     relations: {},
     mappings: {
