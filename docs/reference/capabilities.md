@@ -2,23 +2,27 @@
 
 This document defines the canonical capability keys and reserved namespaces used throughout Prisma Next for adapter negotiation, feature gating, and extension integration.
 
-## Core Capability Namespaces
+Capabilities describe **what the database environment can do**. Adapters report capabilities at connect time, and the runtime negotiates them with extension packs. The contract only **declares requirements** (`contract.capabilities`) and pins the resulting `profileHash`; it does not define capabilities.
+
+## Adapter (database) capabilities
+
+Adapter-reported features of the database runtime. These are not contract-owned; they are discovered and negotiated.
 
 ### `sql`
-SQL-family capabilities shared across SQL targets.
-
-| Capability | Type | Description | Stability |
-|------------|------|-------------|-----------|
-| `enums` | boolean | Supports contract-defined storage enums | Stable |
-
-### `postgres`
-Core PostgreSQL capabilities managed by the adapter.
+Common SQL features reported by adapters using the `sql` namespace. This is a naming convention for shared SQL keys, not a separate “SQL family” capability set.
 
 | Capability | Type | Description | Stability |
 |------------|------|-------------|-----------|
 | `lateral` | boolean | Supports LATERAL joins | Stable |
-| `jsonAgg` | boolean | Supports JSON aggregation functions | Stable |
 | `returning` | boolean | Supports RETURNING clauses for DML operations (INSERT, UPDATE, DELETE) | Stable |
+| `jsonAgg` | boolean | Supports JSON aggregation functions | Stable |
+| `enums` | boolean | Supports native enum storage types | Stable |
+
+### `postgres`
+PostgreSQL-specific capabilities managed by the adapter.
+
+| Capability | Type | Description | Stability |
+|------------|------|-------------|-----------|
 | `partialIndex` | boolean | Supports partial/filtered indexes | Stable |
 | `deferrableConstraints` | boolean | Supports DEFERRABLE constraints | Stable |
 | `savepoints` | boolean | Supports savepoint transactions | Stable |
@@ -26,7 +30,7 @@ Core PostgreSQL capabilities managed by the adapter.
 | `explainFormat` | enum | EXPLAIN output format (`text` \| `json`) | Stable |
 
 ### `mysql`
-Core MySQL capabilities managed by the adapter.
+MySQL-specific capabilities managed by the adapter.
 
 | Capability | Type | Description | Stability |
 |------------|------|-------------|-----------|
@@ -36,7 +40,7 @@ Core MySQL capabilities managed by the adapter.
 | `explainFormat` | enum | EXPLAIN output format (`text` \| `json`) | Stable |
 
 ### `sqlite`
-Core SQLite capabilities managed by the adapter.
+SQLite-specific capabilities managed by the adapter.
 
 | Capability | Type | Description | Stability |
 |------------|------|-------------|-----------|
@@ -44,9 +48,28 @@ Core SQLite capabilities managed by the adapter.
 | `fts5` | boolean | Supports FTS5 full-text search | Stable |
 | `rtree` | boolean | Supports R*Tree spatial indexing | Stable |
 
-## Extension Capability Namespaces
+### Example adapter reports
+Postgres adapters should always report `sql.lateral: true` and `sql.returning: true`. MySQL and SQLite should report those as `false` unless the adapter can prove otherwise.
 
-Extension capabilities are prefixed by pack namespace to avoid collisions.
+Postgres (example):
+```json
+{
+  "sql": { "lateral": true, "returning": true, "jsonAgg": true, "enums": true },
+  "postgres": { "partialIndex": true, "transactionalDDL": true, "explainFormat": "json" }
+}
+```
+
+MySQL (example):
+```json
+{
+  "sql": { "lateral": false, "returning": false, "jsonAgg": false, "enums": false },
+  "mysql": { "jsonFunctions": true, "generatedColumns": true, "explainFormat": "text" }
+}
+```
+
+## Extension pack capabilities
+
+Extension capabilities are prefixed by pack namespace to avoid collisions. These are negotiated alongside adapter capabilities at connect time.
 
 ### `pgvector`
 PostgreSQL vector extension capabilities.
@@ -83,7 +106,7 @@ The following namespaces are reserved and cannot be used by extension packs:
 - `prisma` - Reserved for Prisma core features
 - `core` - Reserved for core adapter capabilities
 - `internal` - Reserved for internal implementation details
-- `sql` - Reserved for SQL family capabilities
+- `sql` - Reserved for common SQL capability keys reported by adapters
 
 ### Adapter Namespaces
 - `postgres` - PostgreSQL adapter capabilities
@@ -99,9 +122,9 @@ The following namespaces are reserved and cannot be used by extension packs:
 ## Capability Key Rules
 
 ### Naming Convention
-- Use lowercase with underscores: `json_agg`, `partial_index`
+- Use lowercase with underscores or camelCase within namespaces (`jsonAgg`, `partial_index`)
 - Boolean capabilities use simple names: `lateral`, `savepoints`
-- Complex capabilities use descriptive names: `explain_format`, `transactional_ddl`
+- Complex capabilities use descriptive names: `explainFormat`, `transactional_ddl`
 
 ### Stability Contract
 - **Stable**: Core capabilities that cannot change meaning or be removed
@@ -132,14 +155,15 @@ Contracts declare required capabilities in `contract.capabilities`:
 ```json
 {
   "capabilities": {
-    "postgres": { "lateral": true, "jsonAgg": true },
+    "sql": { "lateral": true, "returning": true },
+    "postgres": { "transactionalDDL": true },
     "pgvector": { "ivfflat": true }
   }
 }
 ```
 
 ### Negotiation Process
-1. Adapter advertises available capabilities
+1. Adapter advertises available capabilities (discovered from the database environment)
 2. Runtime checks contract requirements against adapter capabilities
 3. Missing required capabilities cause connection failure
 4. Optional capabilities are noted but don't block connection
@@ -192,14 +216,13 @@ Canonical capability keys with descriptions, typical implementers, and ADR refer
 
 | Capability key | Description | Implemented by | ADRs |
 |---|---|---|---|
-| sql.enums | Contract-defined enum storage types | postgres adapter | ADR 065 |
-| join.lateral | LATERAL join lowering | postgres adapter | ADR 065 |
-| join.semi | SEMI join lowering | adapters that support SEMI semantics | ADR 065 |
-| join.anti | ANTI join lowering | adapters that support ANTI semantics | ADR 065 |
-| projection.distinct | DISTINCT projection | most SQL adapters | ADR 065 |
-| projection.distinctOn | DISTINCT ON projection | postgres adapter | ADR 065 |
-| index.partial | Partial/filtered index support | postgres adapter, packs | ADR 065, 116 |
-| distribution.shardKey | Distribution/shard key support | citus pack | ADR 065, 116 |
+| sql.enums | Native enum storage types | adapters with native enums | ADR 065 |
+| sql.lateral | LATERAL join lowering | adapters that support LATERAL | ADR 065 |
+| sql.returning | RETURNING support for DML | adapters that support RETURNING | ADR 065 |
+| sql.jsonAgg | JSON aggregation support | adapters that support JSON aggregation | ADR 065 |
+| postgres.partialIndex | Partial/filtered index support | postgres adapter | ADR 065 |
+| mysql.generatedColumns | Generated column support | mysql adapter | ADR 065 |
+| sqlite.fts5 | FTS5 support | sqlite adapter | ADR 065 |
 | pgvector.vector | Vector type support | pgvector pack | ADR 112–115 |
 | postgis.geometry | Geometry type support | postgis pack | ADR 112–115 |
 
