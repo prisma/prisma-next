@@ -159,6 +159,7 @@ export function extractParameterizedRenderers(
   descriptors: ReadonlyArray<SqlControlDescriptor>,
 ): Map<string, NormalizedTypeRenderer> {
   const renderers = new Map<string, NormalizedTypeRenderer>();
+  // Codec owner: the single descriptor allowed to define a codecId renderer or hooks.
   const owners = new Map<string, string>(); // codecId -> descriptor.id for error messages
 
   for (const descriptor of descriptors) {
@@ -213,6 +214,7 @@ export function extractCodecControlHooks(
   descriptors: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
 ): Map<string, CodecControlHooks> {
   const hooks = new Map<string, CodecControlHooks>();
+  // Codec owner: the single descriptor allowed to define a codecId renderer or hooks.
   const owners = new Map<string, string>();
 
   for (const descriptor of descriptors) {
