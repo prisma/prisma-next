@@ -39,7 +39,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         version: '0.0.0-test',
         types: {
           codecTypes: {
-            controlPlane: {
+            controlPlaneHooks: {
               'pg/enum@1': hooks,
             },
           },
@@ -131,7 +131,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         version: '0.0.0-test',
         types: {
           codecTypes: {
-            controlPlane: {
+            controlPlaneHooks: {
               'pg/enum@1': hooks,
             },
           },

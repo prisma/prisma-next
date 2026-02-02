@@ -240,7 +240,7 @@ export interface ComponentMetadata {
        * Optional control-plane hooks keyed by codecId.
        * Used by family-specific planners/verifiers to handle storage types.
        */
-      readonly controlPlane?: Record<string, unknown>;
+      readonly controlPlaneHooks?: Record<string, unknown>;
     };
     readonly operationTypes?: { readonly import: TypesImportSpec };
     readonly storage?: ReadonlyArray<{

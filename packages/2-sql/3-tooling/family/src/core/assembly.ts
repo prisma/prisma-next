@@ -187,16 +187,18 @@ type CodecControlHooksMap = Record<string, CodecControlHooks>;
 function hasCodecControlHooks(descriptor: unknown): descriptor is {
   readonly types: {
     readonly codecTypes: {
-      readonly controlPlane: CodecControlHooksMap;
+      readonly controlPlaneHooks: CodecControlHooksMap;
     };
   };
 } {
-  const controlPlane = (
+  const controlPlaneHooks = (
     descriptor as {
-      readonly types?: { readonly codecTypes?: { readonly controlPlane?: CodecControlHooksMap } };
+      readonly types?: {
+        readonly codecTypes?: { readonly controlPlaneHooks?: CodecControlHooksMap };
+      };
     }
-  )?.types?.codecTypes?.controlPlane;
-  return controlPlane !== null && typeof controlPlane === 'object';
+  )?.types?.codecTypes?.controlPlaneHooks;
+  return controlPlaneHooks !== null && typeof controlPlaneHooks === 'object';
 }
 
 // ============================================================================
@@ -220,8 +222,8 @@ export function extractCodecControlHooks(
     if (!hasCodecControlHooks(descriptor)) {
       continue;
     }
-    const controlPlane = descriptor.types.codecTypes.controlPlane;
-    for (const [codecId, hook] of Object.entries(controlPlane)) {
+    const controlPlaneHooks = descriptor.types.codecTypes.controlPlaneHooks;
+    for (const [codecId, hook] of Object.entries(controlPlaneHooks)) {
       assertUniqueCodecOwner({
         codecId,
         owners,

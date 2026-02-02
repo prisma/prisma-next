@@ -37,7 +37,7 @@ export const postgresAdapterDescriptorMeta = {
           },
         },
       },
-      controlPlane: {
+      controlPlaneHooks: {
         'pg/enum@1': pgEnumControlHooks,
       },
     },

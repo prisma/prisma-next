@@ -17,7 +17,7 @@ describe('extractCodecControlHooks', () => {
       version: '0.0.0-test',
       types: {
         codecTypes: {
-          controlPlane: {
+          controlPlaneHooks: {
             'test/enum@1': hooks,
           },
         },

@@ -44,7 +44,7 @@ describe('verifySqlSchema - storage types', () => {
         version: '0.0.0-test',
         types: {
           codecTypes: {
-            controlPlane: {
+            controlPlaneHooks: {
               'test/enum@1': hooks,
             },
           },
