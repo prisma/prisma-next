@@ -14,6 +14,7 @@ import type {
   StorageTypeInstance,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
+import { ColumnDefaultSchema } from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
@@ -21,12 +22,14 @@ import type { O } from 'ts-toolbelt';
  * Structural validation schema for SqlContract using Arktype.
  * This validates the shape and types of the contract structure.
  */
+
 const StorageColumnSchema = type.declare<StorageColumn>().type({
   nativeType: 'string',
   codecId: 'string',
   nullable: 'boolean',
   'typeParams?': 'Record<string, unknown>',
   'typeRef?': 'string',
+  'default?': ColumnDefaultSchema,
 });
 
 const StorageTypeInstanceSchema = type.declare<StorageTypeInstance>().type({
@@ -197,6 +200,9 @@ export function computeMappings(
  * Validates logical consistency of a **structurally validated** SqlContract.
  * This checks that references (e.g., foreign keys, primary keys, uniques) point to storage objects that already exist.
  * Structural validation is expected to have already completed before this helper runs.
+ *
+ * Rule: keep this focused on structural consistency only; capability/feature
+ * gating (e.g., defaults.*) belongs in migration/runtime verification, not here.
  *
  * @param structurallyValidatedContract - The contract whose structure has already been validated
  * @throws Error if logical validation fails

@@ -41,6 +41,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/use-contract-ir-factories.mdc` — Use factory functions for ContractIR objects in tests
 - `.cursor/rules/cli-error-handling.mdc` — CLI command error handling patterns
 - `.cursor/rules/cli-e2e-test-patterns.mdc` — CLI e2e test fixture patterns using shared fixture app
+- `.cursor/rules/cli-test-fixture-cleanup.mdc` — Avoid committing generated CLI test fixtures
 - `.cursor/rules/cli-package-exports.mdc` — CLI package export structure and import patterns
 
 ## Imports & Layering
@@ -81,6 +82,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 ## Architecture
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Contract normalization responsibilities
+- `.cursor/rules/contract-default-values.mdc` — Validate emitted column defaults
 - `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype
 - `.cursor/rules/control-plane-descriptors.mdc` — Control plane descriptor pattern (Control*Descriptor types, driver requirement)
 - `.cursor/rules/family-instance-domain-actions.mdc` — Family instance domain actions (inline core logic, import helper functions)

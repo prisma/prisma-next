@@ -133,6 +133,43 @@
       },
       "required": ["columns"]
     },
+    "ColumnDefault": {
+      "description": "Column default value. Can be a literal value or a database function expression.",
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Static literal value",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["literal"]
+            },
+            "expression": {
+              "type": "string",
+              "description": "SQL literal expression for the default value"
+            }
+          },
+          "required": ["kind", "expression"]
+        },
+        {
+          "type": "object",
+          "description": "Database function expression (e.g., 'autoincrement()', 'now()', 'gen_random_uuid()')",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["function"]
+            },
+            "expression": {
+              "type": "string",
+              "description": "The function expression (e.g., 'autoincrement()', 'now()', 'gen_random_uuid()')"
+            }
+          },
+          "required": ["kind", "expression"]
+        }
+      ]
+    },
     "StorageColumn": {
       "type": "object",
       "description": "Column definition with type, nullability, and optional parameterized type info",
@@ -159,6 +196,10 @@
         "typeRef": {
           "type": "string",
           "description": "Reference to a named type instance in storage.types"
+        },
+        "default": {
+          "$ref": "#/$defs/ColumnDefault",
+          "description": "Default value for the column"
         }
       },
       "required": ["nativeType", "codecId", "nullable"]

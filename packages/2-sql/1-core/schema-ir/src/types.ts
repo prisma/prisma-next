@@ -29,6 +29,7 @@ export type SqlColumnIR = {
   readonly name: string;
   readonly nativeType: string; // explicit DB type, e.g. 'integer', 'vector'
   readonly nullable: boolean;
+  readonly default?: string; // Raw database default expression (e.g., "'hello'::text", "nextval('seq')")
   readonly annotations?: SqlAnnotations; // column-level metadata
 };
 

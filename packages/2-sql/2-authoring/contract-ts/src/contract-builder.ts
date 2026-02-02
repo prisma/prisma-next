@@ -26,6 +26,7 @@ import type {
   SqlStorage,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { computeMappings } from './contract';
 
 /**
@@ -237,7 +238,8 @@ class SqlContractBuilder<
           codecId,
           nullable: (columnState.nullable ?? false) as ColumnDefs[keyof ColumnDefs]['nullable'] &
             boolean,
-          ...(columnState.typeParams ? { typeParams: columnState.typeParams } : {}),
+          ...ifDefined('typeParams', columnState.typeParams),
+          ...ifDefined('default', columnState.default),
           ...(typeRef ? { typeRef } : {}),
         } as BuildStorageColumn<
           ColumnDefs[keyof ColumnDefs]['nullable'] & boolean,

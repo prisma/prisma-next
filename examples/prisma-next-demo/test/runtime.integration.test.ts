@@ -17,6 +17,7 @@ const { contract } = executionContext;
 
 /**
  * Seeds test data using the runtime and query DSL.
+ * Uses column defaults for id (autoincrement) and createdAt (now).
  */
 async function seedTestData(
   runtime: Runtime,
@@ -31,21 +32,17 @@ async function seedTestData(
 
   const userIds: number[] = [];
 
-  // Insert users (provide all required columns since contract doesn't have defaults)
+  // Insert users (omit id and createdAt - they have defaults)
   if (data.users) {
     for (let i = 0; i < data.users.length; i++) {
       const email = data.users[i]!;
-      const id = i + 1;
-      const createdAt = new Date();
 
       const plan = sql({ context: executionContext })
         .insert(userTable, {
-          id: param('id'),
           email: param('email'),
-          createdAt: param('createdAt'),
         })
         .returning(userTable.columns['id']!)
-        .build({ params: { id, email, createdAt } });
+        .build({ params: { email } });
 
       type InsertedRow = ResultType<typeof plan>;
       for await (const row of runtime.execute(plan)) {
@@ -54,24 +51,19 @@ async function seedTestData(
     }
   }
 
-  // Insert posts (provide all required columns)
+  // Insert posts (omit id and createdAt - they have defaults)
   if (data.posts) {
     for (let i = 0; i < data.posts.length; i++) {
       const post = data.posts[i]!;
       const userId = userIds[post.userIndex];
       if (userId === undefined) continue;
 
-      const id = i + 1;
-      const createdAt = new Date();
-
       const plan = sql({ context: executionContext })
         .insert(postTable, {
-          id: param('id'),
           title: param('title'),
           userId: param('userId'),
-          createdAt: param('createdAt'),
         })
-        .build({ params: { id, title: post.title, userId, createdAt } });
+        .build({ params: { title: post.title, userId } });
 
       for await (const _row of runtime.execute(plan)) {
         // consume iterator

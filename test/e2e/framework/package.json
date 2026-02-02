@@ -9,7 +9,7 @@
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
-    "emit": "prisma-next contract emit",
+    "emit": "prisma-next contract emit --config test/fixtures/prisma-next.config.ts",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "devDependencies": {
@@ -24,6 +24,7 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/integration-tests": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",

@@ -805,6 +805,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../1-core/contract
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/utils
       arktype:
         specifier: ^2.1.25
         version: 2.1.29
@@ -1195,6 +1198,57 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
 
+  packages/3-extensions/integration-kysely:
+    devDependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/6-adapters/postgres
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/cli
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/shared/contract
+      '@prisma-next/extension-pgvector':
+        specifier: workspace:*
+        version: link:../pgvector
+      '@prisma-next/family-sql':
+        specifier: workspace:*
+        version: link:../../2-sql/3-tooling/family
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../2-sql/1-core/contract
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../2-sql/2-authoring/contract-ts
+      '@prisma-next/sql-relational-core':
+        specifier: workspace:*
+        version: link:../../2-sql/4-lanes/relational-core
+      '@prisma-next/target-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/3-targets/postgres
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../0-config/tsdown
+      kysely:
+        specifier: ^0.28.10
+        version: 0.28.10
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
+
   packages/3-extensions/pgvector:
     dependencies:
       '@prisma-next/cli':
@@ -1422,7 +1476,7 @@ importers:
         version: 2.7.2
       pg-mem:
         specifier: ^3.0.5
-        version: 3.0.5(kysely@0.28.9)
+        version: 3.0.5(kysely@0.28.10)
       tsup:
         specifier: 'catalog:'
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
@@ -1444,6 +1498,9 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../../packages/3-targets/7-drivers/postgres
+      '@prisma-next/extension-pgvector':
+        specifier: workspace:*
+        version: link:../../../packages/3-extensions/pgvector
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../packages/2-sql/3-tooling/family
@@ -3660,8 +3717,8 @@ packages:
     resolution: {integrity: sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w==}
     engines: {node: '>=6'}
 
-  kysely@0.28.9:
-    resolution: {integrity: sha512-3BeXMoiOhpOwu62CiVpO6lxfq4eS6KMYfQdMsN/2kUCRNuF2YiEr7u0HLHaQU+O4Xu8YXE3bHVkwaQ85i72EuA==}
+  kysely@0.28.10:
+    resolution: {integrity: sha512-ksNxfzIW77OcZ+QWSAPC7yDqUSaIVwkTWnTPNiIy//vifNbwsSgQ57OkkncHxxpcBHM3LRfLAZVEh7kjq5twVA==}
     engines: {node: '>=20.0.0'}
 
   levn@0.4.1:
@@ -6486,8 +6543,7 @@ snapshots:
 
   kleur@3.0.3: {}
 
-  kysely@0.28.9:
-    optional: true
+  kysely@0.28.10: {}
 
   levn@0.4.1:
     dependencies:
@@ -6747,7 +6803,7 @@ snapshots:
 
   pg-int8@1.0.1: {}
 
-  pg-mem@3.0.5(kysely@0.28.9):
+  pg-mem@3.0.5(kysely@0.28.10):
     dependencies:
       functional-red-black-tree: 1.0.1
       immutable: 4.3.7
@@ -6757,7 +6813,7 @@ snapshots:
       object-hash: 2.2.0
       pgsql-ast-parser: 12.0.1
     optionalDependencies:
-      kysely: 0.28.9
+      kysely: 0.28.10
 
   pg-pool@3.10.1(pg@8.16.3):
     dependencies:

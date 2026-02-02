@@ -1,10 +1,36 @@
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+import pgvector from '@prisma-next/extension-pgvector/control';
+import sql from '@prisma-next/family-sql/control';
+import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
+import postgres from '@prisma-next/target-postgres/control';
+import { withClient, withDevDatabase } from '@prisma-next/test-utils';
+import type { Client } from 'pg';
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Creates a control client configured for the e2e test stack (Postgres + pgvector).
+ * Used for database initialization via dbInit.
+ */
+function createControlClientForTests(connectionString: string): ControlClient {
+  return createControlClient({
+    family: sql,
+    target: postgres,
+    adapter: postgresAdapter,
+    driver: postgresDriver,
+    extensionPacks: [pgvector],
+    connection: connectionString,
+  });
+}
 
 /**
  * Loads a contract from disk (already-emitted artifact).
@@ -56,4 +82,85 @@ export async function emitAndVerifyContract(
   }
 
   return validateContract<SqlContract<SqlStorage>>(emittedContract);
+}
+
+export async function runDbInit(options: {
+  readonly connectionString: string;
+  readonly contractJsonPath: string;
+}): Promise<void> {
+  const { connectionString, contractJsonPath } = options;
+  const contractJsonContent = await readFile(contractJsonPath, 'utf-8');
+  const contractIR = JSON.parse(contractJsonContent) as Record<string, unknown>;
+  const controlClient = createControlClientForTests(connectionString);
+
+  try {
+    const result = await controlClient.dbInit({ contractIR, mode: 'apply' });
+    if (!result.ok) {
+      throw new Error(`dbInit failed: ${result.failure.summary}`);
+    }
+  } finally {
+    await controlClient.close();
+  }
+}
+
+/**
+ * Test context provided to test callbacks by `withTestRuntime`.
+ * Contains all the setup needed for e2e tests against a real database.
+ */
+export interface TestRuntimeContext<TContract extends SqlContract<SqlStorage>> {
+  /** The validated contract loaded from disk */
+  readonly contract: TContract;
+  /** The SQL query context for building queries */
+  readonly context: ReturnType<typeof createTestContext>;
+  /** The test runtime for executing queries */
+  readonly runtime: ReturnType<typeof createTestRuntimeFromClient>;
+  /** The schema tables extracted from the contract */
+  readonly tables: ReturnType<typeof schema<TContract>>['tables'];
+  /** The raw pg client for direct SQL queries */
+  readonly client: Client;
+}
+
+/**
+ * Sets up a complete test environment with database, contract, and runtime.
+ * This helper DRYs up the common e2e test setup pattern:
+ * - Loads contract from disk
+ * - Spins up a dev database
+ * - Runs db init (migrations)
+ * - Creates adapter, context, runtime, and tables
+ * - Ensures runtime is closed after the test
+ *
+ * @example
+ * ```typescript
+ * it('runs a query', async () => {
+ *   await withTestRuntime<Contract>(contractJsonPath, async ({ tables, runtime, context }) => {
+ *     const user = tables.user!;
+ *     const plan = sql({ context }).from(user).select({ id: user.columns.id! }).build();
+ *     const rows = await executePlanAndCollect(runtime, plan);
+ *     expect(rows.length).toBeGreaterThan(0);
+ *   });
+ * });
+ * ```
+ */
+export async function withTestRuntime<TContract extends SqlContract<SqlStorage>>(
+  contractJsonPath: string,
+  callback: (ctx: TestRuntimeContext<TContract>) => Promise<void>,
+): Promise<void> {
+  const contract = await loadContractFromDisk<TContract>(contractJsonPath);
+
+  await withDevDatabase(async ({ connectionString }) => {
+    await runDbInit({ connectionString, contractJsonPath });
+
+    await withClient(connectionString, async (client: Client) => {
+      const adapter = createStubAdapter();
+      const context = createTestContext(contract, adapter);
+      const runtime = createTestRuntimeFromClient(contract, client);
+
+      try {
+        const tables = schema<TContract>(context).tables;
+        await callback({ contract, context, runtime, tables, client });
+      } finally {
+        await runtime.close();
+      }
+    });
+  });
 }

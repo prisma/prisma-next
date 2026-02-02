@@ -22,7 +22,7 @@ export interface TestControlClientOptions {
  * The client auto-connects when operations are called because we provide
  * a default connection in options.
  */
-export function createDemoControlClient(options: TestControlClientOptions): ControlClient {
+export function createPrismaNextControlClient(options: TestControlClientOptions): ControlClient {
   return createControlClient({
     family: sql,
     target: postgres,
@@ -51,7 +51,7 @@ export async function initTestDatabase(options: {
   readonly connection: string;
   readonly contractIR: ContractIR;
 }): Promise<void> {
-  const client = createDemoControlClient({ connection: options.connection });
+  const client = createPrismaNextControlClient({ connection: options.connection });
 
   try {
     const initResult = await client.dbInit({ contractIR: options.contractIR, mode: 'apply' });

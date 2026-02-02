@@ -10,6 +10,7 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { parsePostgresDefault } from './default-normalizer';
 import { pgEnumControlHooks } from './enum-control-hooks';
 
 /**
@@ -23,6 +24,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * @deprecated Use targetId instead
    */
   readonly target = 'postgres' as const;
+
+  /**
+   * Target-specific normalizer for raw Postgres default expressions.
+   * Used by schema verification to normalize raw defaults before comparison.
+   */
+  readonly normalizeDefault = parsePostgresDefault;
 
   /**
    * Introspects a Postgres database schema and returns a raw SqlSchemaIR.
@@ -67,6 +74,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         character_maximum_length: number | null;
         numeric_precision: number | null;
         numeric_scale: number | null;
+        column_default: string | null;
       }>(
         `SELECT
            column_name,
@@ -75,7 +83,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            is_nullable,
            character_maximum_length,
            numeric_precision,
-           numeric_scale
+           numeric_scale,
+           column_default
          FROM information_schema.columns
          WHERE table_schema = $1
            AND table_name = $2
@@ -109,6 +118,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           name: colRow.column_name,
           nativeType,
           nullable: colRow.is_nullable === 'YES',
+          // Store raw default expression - normalization happens in comparison layer
+          ...ifDefined('default', colRow.column_default ?? undefined),
         };
       }
 

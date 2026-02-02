@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   contract,
@@ -53,11 +54,18 @@ describe.sequential('Schema verification after runner - integration', () => {
    * Helper to run a successful migration that creates the schema.
    */
   async function runSuccessfulMigration(d: PostgresControlDriver): Promise<void> {
+    await runSuccessfulMigrationForContract(d, contract);
+  }
+
+  async function runSuccessfulMigrationForContract(
+    d: PostgresControlDriver,
+    contractInput: SqlContract<SqlStorage>,
+  ): Promise<void> {
     const planner = postgresTargetDescriptor.createPlanner(familyInstance);
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
 
     const result = planner.plan({
-      contract,
+      contract: contractInput,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
       frameworkComponents,
@@ -70,7 +78,7 @@ describe.sequential('Schema verification after runner - integration', () => {
     const executeResult = await runner.execute({
       plan: result.plan,
       driver: d,
-      destinationContract: contract,
+      destinationContract: contractInput,
       policy: INIT_ADDITIVE_POLICY,
       frameworkComponents,
     });
@@ -87,6 +95,63 @@ describe.sequential('Schema verification after runner - integration', () => {
       const result = await familyInstance.schemaVerify({
         driver: driver!,
         contractIR: contract,
+        strict: false,
+        frameworkComponents,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.schema.issues).toHaveLength(0);
+    });
+
+    it('returns ok: true with normalized defaults', { timeout: testTimeout }, async () => {
+      const contractWithDefaults: SqlContract<SqlStorage> = {
+        schemaVersion: '1',
+        target: 'postgres',
+        targetFamily: 'sql',
+        coreHash: 'sha256:contract-with-defaults' as never,
+        profileHash: 'sha256:profile-with-defaults' as never,
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: {
+                  nativeType: 'int4',
+                  codecId: 'pg/int4@1',
+                  nullable: false,
+                  default: { kind: 'function', expression: 'autoincrement()' },
+                },
+                createdAt: {
+                  nativeType: 'timestamptz',
+                  codecId: 'pg/timestamptz@1',
+                  nullable: false,
+                  default: { kind: 'function', expression: 'now()' },
+                },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        models: {},
+        relations: {},
+        mappings: {
+          codecTypes: {},
+          operationTypes: {},
+        },
+        capabilities: {},
+        extensionPacks: {},
+        meta: {},
+        sources: {},
+      };
+
+      await runSuccessfulMigrationForContract(driver!, contractWithDefaults);
+
+      const result = await familyInstance.schemaVerify({
+        driver: driver!,
+        contractIR: contractWithDefaults,
         strict: false,
         frameworkComponents,
       });

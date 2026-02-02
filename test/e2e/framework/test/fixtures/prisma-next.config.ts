@@ -13,6 +13,6 @@ export default defineConfig({
   extensionPacks: [],
   contract: {
     source: contract,
-    output: 'test/fixtures/generated/contract.json',
+    output: 'test/e2e/framework/test/fixtures/generated/contract.json',
   },
 });

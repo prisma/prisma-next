@@ -15,6 +15,7 @@ This package provides generic builder primitives that can be composed with targe
 - **Storage Type State**: Captures target-agnostic storage type entries and column `typeRef` metadata for family-specific composition
 - **Type Helpers**: Provides generic type-level helpers for transforming builder states into contract structures
 - **Composition Surface**: Enables target-family specific packages (e.g., `@prisma-next/sql-contract-ts`) to compose generic core with family-specific types
+- **Defaults**: Reuses shared contract `ColumnDefault` for db-agnostic column defaults (literal expression or function)
 
 ## Package Status
 

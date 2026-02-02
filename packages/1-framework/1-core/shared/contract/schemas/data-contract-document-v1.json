@@ -103,7 +103,7 @@
           "properties": {
             "strategy": {
               "type": "string",
-              "enum": ["auto", "client", "uuid", "cuid", "objectId"],
+              "enum": ["auto", "client", "uuid", "objectId"],
               "description": "ID generation strategy"
             }
           }

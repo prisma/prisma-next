@@ -16,7 +16,7 @@ This package is located at `test/e2e/framework/` (not in `packages/`) as it is a
 
 ## Scripts
 - `pnpm test` (from `test/e2e/framework/`) — run the test suite (requires repo build first)
-- `pnpm gen-contract` (from `test/e2e/framework/`) — regenerate committed fixture artifacts from `test/fixtures/contract.ts`
+- `pnpm emit` (from `test/e2e/framework/`) — regenerate committed fixture artifacts from `test/fixtures/contract.ts`
 
 ## Architecture
 
@@ -25,7 +25,7 @@ flowchart TD
     A[Contract TS] -->|CLI emit| B[Contract JSON + DTS]
     B -->|Load from fixtures| C[E2E Tests]
     C -->|withDevDatabase| D[Dev Postgres]
-    C -->|setupE2EDatabase| E[Schema + Data + Marker]
+    C -->|runDbInit| E[Schema + Marker]
     C -->|createTestRuntimeFromClient| F[Runtime]
     C -->|executePlanAndCollect| G[Query Results]
     G -->|Assert| H[Runtime Values + Types]
@@ -44,15 +44,19 @@ flowchart TD
 Tests use shared utilities from `@prisma-next/test-utils` via a wrapper file that injects dependencies:
 
 ```typescript
+import { resolve } from 'node:path';
+
 // Import from package-specific wrapper (injects dependencies)
 import {
   withDevDatabase,
   withClient,
   loadContractFromDisk,
-  setupE2EDatabase,
+  runDbInit,
   createTestRuntimeFromClient,
   executePlanAndCollect,
 } from './utils';  // Wrapper around @prisma-next/test-utils
+
+const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
 // Load contract from committed fixtures (not emit on every test)
 const contract = await loadContractFromDisk<Contract>(contractJsonPath);
@@ -60,9 +64,9 @@ const contract = await loadContractFromDisk<Contract>(contractJsonPath);
 await withDevDatabase(
   async ({ connectionString }) => {
     await withClient(connectionString, async (client) => {
-      await setupE2EDatabase(client, contract, async (c) => {
-        // Test-specific schema/data setup
-      });
+      await runDbInit({ connectionString, contractJsonPath });
+      // Test-specific data setup
+      await client.query('insert into "user" (email) values ($1)', ['ada@example.com']);
 
       const adapter = createPostgresAdapter();
       const runtime = createTestRuntimeFromClient(contract, client, adapter);
@@ -80,14 +84,14 @@ await withDevDatabase(
 
 ## Contract Loading Strategy
 
-- **Load from fixtures**: Tests load contracts from `test/fixtures/generated/contract.json` (committed artifacts)
+- **Load from fixtures**: Tests load contracts from `test/e2e/framework/test/fixtures/generated/contract.json` (committed artifacts)
 - **Single emission test**: One test (`emitAndVerifyContract`) verifies that contract emission produces expected artifacts
 - **Benefits**: Faster test execution, stable contract artifacts, reduced duplication
 
 ## Notes
 - Build the repo first: `pnpm -w build`
 - Uses unique ports for the dev DB to avoid conflicts (54020-54112 range)
-- Type tests import the committed `test/fixtures/generated/contract.d.ts`
+- Type tests import the committed `test/e2e/framework/test/fixtures/generated/contract.d.ts`
 - Tests use shared utilities from `@prisma-next/test-utils` via `test/utils.ts` wrapper (injects dependencies)
 - The `executePlanAndCollect` function properly infers return types using `ResultType<P>` from `@prisma-next/sql-query/types`
 
@@ -98,6 +102,7 @@ Contract-related test utilities are located in `test/e2e/framework/test/utils.ts
 **Available Utilities:**
 - `loadContractFromDisk<TContract>(contractJsonPath)`: Loads an already-emitted contract from disk. The generic type parameter should be specified from the emitted `contract.d.ts` file (e.g., `loadContractFromDisk<Contract>(contractJsonPath)`).
 - `emitAndVerifyContract(cliPath, contractTsPath, adapterPath, outputDir, expectedContractJsonPath)`: Emits contract via CLI and verifies it matches on-disk artifacts. Used in a single test to verify contract emission correctness.
+- `runDbInit({ connectionString, contractJsonPath })`: Runs `dbInit` via the control client before inserting test data.
 
 **Usage:**
 ```typescript

@@ -2,19 +2,25 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:abe065d072c289a7fd8e0e17f8fc40b904460524ee1b460d67a0b3ebf951131d",
-  "profileHash": "sha256:54639207001dcf5237ca394accf5672c99ceb7060eeed0687668bc19e5aff7f9",
+  "coreHash": "sha256:6bffbe54f87b253e12dd069d57a943d580662ed3da1aeb8bfd114fec3ea0e4d8",
+  "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
     "Comment": {
       "fields": {
         "content": {
           "column": "content"
         },
+        "createdAt": {
+          "column": "created_at"
+        },
         "id": {
           "column": "id"
         },
         "postId": {
           "column": "postId"
+        },
+        "updatedAt": {
+          "column": "update_at"
         }
       },
       "relations": {},
@@ -24,11 +30,17 @@
     },
     "Post": {
       "fields": {
+        "createdAt": {
+          "column": "created_at"
+        },
         "id": {
           "column": "id"
         },
         "title": {
           "column": "title"
+        },
+        "updatedAt": {
+          "column": "update_at"
         },
         "userId": {
           "column": "userId"
@@ -41,11 +53,17 @@
     },
     "User": {
       "fields": {
+        "createdAt": {
+          "column": "created_at"
+        },
         "email": {
           "column": "email"
         },
         "id": {
           "column": "id"
+        },
+        "updatedAt": {
+          "column": "update_at"
         }
       },
       "relations": {},
@@ -62,13 +80,32 @@
             "codecId": "pg/text@1",
             "nativeType": "text"
           },
+          "created_at": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          },
           "id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "default": {
+              "expression": "autoincrement()",
+              "kind": "function"
+            },
+            "nativeType": "int4",
+            "nullable": false
           },
           "postId": {
             "codecId": "pg/int4@1",
             "nativeType": "int4"
+          },
+          "update_at": {
+            "codecId": "pg/timestamptz@1",
+            "nativeType": "timestamptz",
+            "nullable": true
           }
         },
         "foreignKeys": [],
@@ -82,9 +119,23 @@
       },
       "post": {
         "columns": {
+          "created_at": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          },
           "id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "default": {
+              "expression": "autoincrement()",
+              "kind": "function"
+            },
+            "nativeType": "int4",
+            "nullable": false
           },
           "published": {
             "codecId": "pg/bool@1",
@@ -93,6 +144,11 @@
           "title": {
             "codecId": "pg/text@1",
             "nativeType": "text"
+          },
+          "update_at": {
+            "codecId": "pg/timestamptz@1",
+            "nativeType": "timestamptz",
+            "nullable": true
           },
           "userId": {
             "codecId": "pg/int4@1",
@@ -110,13 +166,32 @@
       },
       "user": {
         "columns": {
+          "created_at": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          },
           "email": {
             "codecId": "pg/text@1",
             "nativeType": "text"
           },
           "id": {
             "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "default": {
+              "expression": "autoincrement()",
+              "kind": "function"
+            },
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "update_at": {
+            "codecId": "pg/timestamptz@1",
+            "nativeType": "timestamptz",
+            "nullable": true
           }
         },
         "foreignKeys": [],
@@ -132,6 +207,8 @@
   },
   "capabilities": {
     "postgres": {
+      "defaults.autoincrement": true,
+      "defaults.now": true,
       "jsonAgg": true,
       "lateral": true,
       "returning": true
