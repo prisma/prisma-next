@@ -1,5 +1,50 @@
-import { PG_ENUM_CODEC_ID } from './codec-ids';
+import type { CodecControlHooks } from '@prisma-next/family-sql/control';
+import {
+  PG_BIT_CODEC_ID,
+  PG_CHAR_CODEC_ID,
+  PG_ENUM_CODEC_ID,
+  PG_INTERVAL_CODEC_ID,
+  PG_NUMERIC_CODEC_ID,
+  PG_TIME_CODEC_ID,
+  PG_TIMESTAMP_CODEC_ID,
+  PG_TIMESTAMPTZ_CODEC_ID,
+  PG_TIMETZ_CODEC_ID,
+  PG_VARBIT_CODEC_ID,
+  PG_VARCHAR_CODEC_ID,
+} from './codec-ids';
 import { pgEnumControlHooks } from './enum-control-hooks';
+import { expandParameterizedNativeType } from './parameterized-types';
+
+// ============================================================================
+// Helper functions for reducing boilerplate
+// ============================================================================
+
+/** Creates a type import spec for codec types */
+const codecTypeImport = (named: string) =>
+  ({
+    package: '@prisma-next/adapter-postgres/codec-types',
+    named,
+    alias: named,
+  }) as const;
+
+/** Creates a precision-based TypeScript type renderer for temporal types */
+const precisionRenderer = (typeName: string) =>
+  ({
+    kind: 'function',
+    render: (params: Record<string, unknown>) => {
+      const precision = params['precision'];
+      return typeof precision === 'number' ? `${typeName}<${precision}>` : typeName;
+    },
+  }) as const;
+
+/** Creates control hooks with just expandNativeType for parameterized types */
+const parameterizedTypeHooks: CodecControlHooks = {
+  expandNativeType: expandParameterizedNativeType,
+};
+
+// ============================================================================
+// Descriptor metadata
+// ============================================================================
 
 export const postgresAdapterDescriptorMeta = {
   kind: 'adapter',
@@ -27,6 +72,28 @@ export const postgresAdapterDescriptorMeta = {
         alias: 'PgTypes',
       },
       parameterized: {
+        [PG_CHAR_CODEC_ID]: 'Char<{{length}}>',
+        [PG_VARCHAR_CODEC_ID]: 'Varchar<{{length}}>',
+        [PG_NUMERIC_CODEC_ID]: {
+          kind: 'function',
+          render: (params: Record<string, unknown>) => {
+            const precision = params['precision'];
+            if (typeof precision !== 'number') {
+              throw new Error('pg/numeric@1 renderer expects precision');
+            }
+            const scale = params['scale'];
+            return typeof scale === 'number'
+              ? `Numeric<${precision}, ${scale}>`
+              : `Numeric<${precision}>`;
+          },
+        },
+        [PG_BIT_CODEC_ID]: 'Bit<{{length}}>',
+        [PG_VARBIT_CODEC_ID]: 'VarBit<{{length}}>',
+        [PG_TIMESTAMP_CODEC_ID]: precisionRenderer('Timestamp'),
+        [PG_TIMESTAMPTZ_CODEC_ID]: precisionRenderer('Timestamptz'),
+        [PG_TIME_CODEC_ID]: precisionRenderer('Time'),
+        [PG_TIMETZ_CODEC_ID]: precisionRenderer('Timetz'),
+        [PG_INTERVAL_CODEC_ID]: precisionRenderer('Interval'),
         [PG_ENUM_CODEC_ID]: {
           kind: 'function',
           render: (params: Record<string, unknown>) => {
@@ -38,17 +105,47 @@ export const postgresAdapterDescriptorMeta = {
           },
         },
       },
+      typeImports: [
+        codecTypeImport('Char'),
+        codecTypeImport('Varchar'),
+        codecTypeImport('Numeric'),
+        codecTypeImport('Bit'),
+        codecTypeImport('VarBit'),
+        codecTypeImport('Timestamp'),
+        codecTypeImport('Timestamptz'),
+        codecTypeImport('Time'),
+        codecTypeImport('Timetz'),
+        codecTypeImport('Interval'),
+      ],
       controlPlaneHooks: {
+        [PG_CHAR_CODEC_ID]: parameterizedTypeHooks,
+        [PG_VARCHAR_CODEC_ID]: parameterizedTypeHooks,
+        [PG_NUMERIC_CODEC_ID]: parameterizedTypeHooks,
+        [PG_BIT_CODEC_ID]: parameterizedTypeHooks,
+        [PG_VARBIT_CODEC_ID]: parameterizedTypeHooks,
+        [PG_TIMESTAMP_CODEC_ID]: parameterizedTypeHooks,
+        [PG_TIMESTAMPTZ_CODEC_ID]: parameterizedTypeHooks,
+        [PG_TIME_CODEC_ID]: parameterizedTypeHooks,
+        [PG_TIMETZ_CODEC_ID]: parameterizedTypeHooks,
+        [PG_INTERVAL_CODEC_ID]: parameterizedTypeHooks,
         [PG_ENUM_CODEC_ID]: pgEnumControlHooks,
       },
     },
     storage: [
       { typeId: 'pg/text@1', familyId: 'sql', targetId: 'postgres', nativeType: 'text' },
+      { typeId: 'pg/char@1', familyId: 'sql', targetId: 'postgres', nativeType: 'character' },
+      {
+        typeId: 'pg/varchar@1',
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: 'character varying',
+      },
       { typeId: 'pg/int4@1', familyId: 'sql', targetId: 'postgres', nativeType: 'int4' },
       { typeId: 'pg/int2@1', familyId: 'sql', targetId: 'postgres', nativeType: 'int2' },
       { typeId: 'pg/int8@1', familyId: 'sql', targetId: 'postgres', nativeType: 'int8' },
       { typeId: 'pg/float4@1', familyId: 'sql', targetId: 'postgres', nativeType: 'float4' },
       { typeId: 'pg/float8@1', familyId: 'sql', targetId: 'postgres', nativeType: 'float8' },
+      { typeId: 'pg/numeric@1', familyId: 'sql', targetId: 'postgres', nativeType: 'numeric' },
       { typeId: 'pg/timestamp@1', familyId: 'sql', targetId: 'postgres', nativeType: 'timestamp' },
       {
         typeId: 'pg/timestamptz@1',
@@ -56,7 +153,17 @@ export const postgresAdapterDescriptorMeta = {
         targetId: 'postgres',
         nativeType: 'timestamptz',
       },
+      { typeId: 'pg/time@1', familyId: 'sql', targetId: 'postgres', nativeType: 'time' },
+      { typeId: 'pg/timetz@1', familyId: 'sql', targetId: 'postgres', nativeType: 'timetz' },
       { typeId: 'pg/bool@1', familyId: 'sql', targetId: 'postgres', nativeType: 'bool' },
+      { typeId: 'pg/bit@1', familyId: 'sql', targetId: 'postgres', nativeType: 'bit' },
+      {
+        typeId: 'pg/varbit@1',
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: 'bit varying',
+      },
+      { typeId: 'pg/interval@1', familyId: 'sql', targetId: 'postgres', nativeType: 'interval' },
     ],
   },
 } as const;

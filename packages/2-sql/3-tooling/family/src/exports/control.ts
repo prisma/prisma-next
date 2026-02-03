@@ -27,6 +27,7 @@ export type {
   ComponentDatabaseDependencies,
   ComponentDatabaseDependency,
   CreateSqlMigrationPlanOptions,
+  ExpandNativeTypeInput,
   SqlControlExtensionDescriptor,
   SqlControlTargetDescriptor,
   SqlMigrationPlan,

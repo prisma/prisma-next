@@ -210,12 +210,14 @@ function validateTypeParams(
  * @throws RuntimeErrorEnvelope with code RUNTIME.DUPLICATE_PARAMETERIZED_CODEC if duplicate codecIds are found
  */
 function collectParameterizedCodecDescriptors(
-  extensionInstances: ReadonlyArray<SqlRuntimeExtensionInstance<string>>,
+  providers: ReadonlyArray<{
+    parameterizedCodecs?(): ReadonlyArray<RuntimeParameterizedCodecDescriptor>;
+  }>,
 ): Map<string, RuntimeParameterizedCodecDescriptor> {
   const descriptors = new Map<string, RuntimeParameterizedCodecDescriptor>();
 
-  for (const extInstance of extensionInstances) {
-    const paramCodecs = extInstance.parameterizedCodecs?.();
+  for (const provider of providers) {
+    const paramCodecs = provider.parameterizedCodecs?.();
     if (paramCodecs) {
       for (const descriptor of paramCodecs) {
         if (descriptors.has(descriptor.codecId)) {
@@ -341,9 +343,12 @@ export function createExecutionContext<
     }
   }
 
-  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(
-    extensionInstances as ReadonlyArray<SqlRuntimeExtensionInstance<string>>,
-  );
+  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors([
+    adapterInstance as {
+      parameterizedCodecs?(): ReadonlyArray<RuntimeParameterizedCodecDescriptor>;
+    },
+    ...(extensionInstances as ReadonlyArray<SqlRuntimeExtensionInstance<string>>),
+  ]);
 
   if (parameterizedCodecDescriptors.size > 0) {
     validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);

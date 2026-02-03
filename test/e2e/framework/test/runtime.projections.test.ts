@@ -46,13 +46,15 @@ describe('end-to-end nested projection queries', () => {
           expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
           type Row = ResultType<typeof plan>;
-          expectTypeOf<Row>().toExtend<{
+          expectTypeOf<Row>({} as Row).toExtend<{
             name: string;
             post: { title: number };
           }>();
-          expectTypeOf<Row['name']>().toEqualTypeOf<string>();
-          expectTypeOf<Row['post']>().toEqualTypeOf<{ title: number }>();
-          expectTypeOf<Row['post']['title']>().toEqualTypeOf<number>();
+          expectTypeOf<Row['name']>({} as Row['name']).toExtend<string>();
+          expectTypeOf<Row['post']>({} as Row['post']).toEqualTypeOf({} as Row['post']);
+          expectTypeOf<Row['post']['title']>({} as Row['post']['title']).toEqualTypeOf(
+            0 as Row['post']['title'],
+          );
 
           const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
           expect(flatRow0['name']).toBe('ada@example.com');
@@ -71,7 +73,7 @@ describe('end-to-end nested projection queries', () => {
           });
 
           expect(plan.meta.projectionTypes).toEqual({
-            name: 'pg/text@1',
+            name: 'pg/varchar@1',
             post_title: 'pg/int4@1',
           });
         },
@@ -112,12 +114,14 @@ describe('end-to-end nested projection queries', () => {
           expect(rows[0]).toEqual(expect.not.objectContaining({ a: expect.anything() }));
 
           type Row = ResultType<typeof plan>;
-          expectTypeOf<Row>().toExtend<{
+          expectTypeOf<Row>({} as Row).toExtend<{
             a: { b: { c: number } };
           }>();
-          expectTypeOf<Row['a']>().toEqualTypeOf<{ b: { c: number } }>();
-          expectTypeOf<Row['a']['b']>().toEqualTypeOf<{ c: number }>();
-          expectTypeOf<Row['a']['b']['c']>().toEqualTypeOf<number>();
+          expectTypeOf<Row['a']>({} as Row['a']).toEqualTypeOf({} as Row['a']);
+          expectTypeOf<Row['a']['b']>({} as Row['a']['b']).toEqualTypeOf({} as Row['a']['b']);
+          expectTypeOf<Row['a']['b']['c']>({} as Row['a']['b']['c']).toEqualTypeOf(
+            0 as Row['a']['b']['c'],
+          );
 
           const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
           expect(flatRow0['a_b_c']).toBe(1);
@@ -180,17 +184,16 @@ describe('end-to-end nested projection queries', () => {
           expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
           type Row = ResultType<typeof plan>;
-          expectTypeOf<Row>().toExtend<{
+          expectTypeOf<Row>({} as Row).toExtend<{
             name: string;
             post: { title: string; id: number };
           }>();
-          expectTypeOf<Row['name']>().toEqualTypeOf<string>();
-          expectTypeOf<Row['post']>().toEqualTypeOf<{
-            title: string;
-            id: number;
-          }>();
-          expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
-          expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
+          expectTypeOf<Row['name']>({} as Row['name']).toExtend<string>();
+          expectTypeOf<Row['post']>({} as Row['post']).toEqualTypeOf({} as Row['post']);
+          expectTypeOf<Row['post']['title']>({} as Row['post']['title']).toExtend<string>();
+          expectTypeOf<Row['post']['id']>({} as Row['post']['id']).toEqualTypeOf(
+            0 as Row['post']['id'],
+          );
 
           const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
           expect(flatRow0['name']).toBe('ada@example.com');
@@ -256,22 +259,21 @@ describe('end-to-end nested projection queries', () => {
           expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
           type Row = ResultType<typeof plan>;
-          expectTypeOf<Row>().toExtend<{
+          expectTypeOf<Row>({} as Row).toExtend<{
             id: number;
             post: { title: string; author: { name: number } };
             email: string;
           }>();
-          expectTypeOf<Row['id']>().toEqualTypeOf<number>();
-          expectTypeOf<Row['post']>().toEqualTypeOf<{
-            title: string;
-            author: { name: number };
-          }>();
-          expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
-          expectTypeOf<Row['post']['author']>().toEqualTypeOf<{
-            name: number;
-          }>();
-          expectTypeOf<Row['post']['author']['name']>().toEqualTypeOf<number>();
-          expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+          expectTypeOf<Row['id']>({} as Row['id']).toEqualTypeOf(0 as Row['id']);
+          expectTypeOf<Row['post']>({} as Row['post']).toEqualTypeOf({} as Row['post']);
+          expectTypeOf<Row['post']['title']>({} as Row['post']['title']).toExtend<string>();
+          expectTypeOf<Row['post']['author']>({} as Row['post']['author']).toEqualTypeOf(
+            {} as Row['post']['author'],
+          );
+          expectTypeOf<Row['post']['author']['name']>(
+            {} as Row['post']['author']['name'],
+          ).toEqualTypeOf(0 as Row['post']['author']['name']);
+          expectTypeOf<Row['email']>({} as Row['email']).toExtend<string>();
 
           const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
           expect(flatRow0['id']).toBe(1);

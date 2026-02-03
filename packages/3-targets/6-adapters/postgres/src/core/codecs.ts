@@ -12,6 +12,16 @@
  */
 
 import { codec, defineCodecs } from '@prisma-next/sql-relational-core/ast';
+import {
+  PG_BIT_CODEC_ID,
+  PG_CHAR_CODEC_ID,
+  PG_INTERVAL_CODEC_ID,
+  PG_NUMERIC_CODEC_ID,
+  PG_TIME_CODEC_ID,
+  PG_TIMETZ_CODEC_ID,
+  PG_VARBIT_CODEC_ID,
+  PG_VARCHAR_CODEC_ID,
+} from './codec-ids';
 
 // Create individual codec instances
 const pgTextCodec = codec({
@@ -30,6 +40,38 @@ const pgTextCodec = codec({
   },
 });
 
+const pgCharCodec = codec<typeof PG_CHAR_CODEC_ID, string, string>({
+  typeId: PG_CHAR_CODEC_ID,
+  targetTypes: ['character'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'character',
+        },
+      },
+    },
+  },
+});
+
+const pgVarcharCodec = codec<typeof PG_VARCHAR_CODEC_ID, string, string>({
+  typeId: PG_VARCHAR_CODEC_ID,
+  targetTypes: ['character varying'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'character varying',
+        },
+      },
+    },
+  },
+});
+
 const pgInt4Codec = codec<'pg/int4@1', number, number>({
   typeId: 'pg/int4@1',
   targetTypes: ['int4'],
@@ -40,6 +82,25 @@ const pgInt4Codec = codec<'pg/int4@1', number, number>({
       sql: {
         postgres: {
           nativeType: 'integer',
+        },
+      },
+    },
+  },
+});
+
+const pgNumericCodec = codec<typeof PG_NUMERIC_CODEC_ID, string, string>({
+  typeId: PG_NUMERIC_CODEC_ID,
+  targetTypes: ['numeric', 'decimal'],
+  encode: (value: string): string => value,
+  decode: (wire: string | number): string => {
+    if (typeof wire === 'number') return String(wire);
+    return wire;
+  },
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'numeric',
         },
       },
     },
@@ -158,6 +219,38 @@ const pgTimestamptzCodec = codec<'pg/timestamptz@1', string | Date, string>({
   },
 });
 
+const pgTimeCodec = codec<typeof PG_TIME_CODEC_ID, string, string>({
+  typeId: PG_TIME_CODEC_ID,
+  targetTypes: ['time'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'time',
+        },
+      },
+    },
+  },
+});
+
+const pgTimetzCodec = codec<typeof PG_TIMETZ_CODEC_ID, string, string>({
+  typeId: PG_TIMETZ_CODEC_ID,
+  targetTypes: ['timetz'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'timetz',
+        },
+      },
+    },
+  },
+});
+
 const pgBoolCodec = codec<'pg/bool@1', boolean, boolean>({
   typeId: 'pg/bool@1',
   targetTypes: ['bool'],
@@ -174,6 +267,38 @@ const pgBoolCodec = codec<'pg/bool@1', boolean, boolean>({
   },
 });
 
+const pgBitCodec = codec<typeof PG_BIT_CODEC_ID, string, string>({
+  typeId: PG_BIT_CODEC_ID,
+  targetTypes: ['bit'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'bit',
+        },
+      },
+    },
+  },
+});
+
+const pgVarbitCodec = codec<typeof PG_VARBIT_CODEC_ID, string, string>({
+  typeId: PG_VARBIT_CODEC_ID,
+  targetTypes: ['bit varying'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'bit varying',
+        },
+      },
+    },
+  },
+});
+
 const pgEnumCodec = codec<'pg/enum@1', string, string>({
   typeId: 'pg/enum@1',
   targetTypes: ['enum'],
@@ -181,17 +306,41 @@ const pgEnumCodec = codec<'pg/enum@1', string, string>({
   decode: (wire) => wire,
 });
 
+const pgIntervalCodec = codec<typeof PG_INTERVAL_CODEC_ID, string, string>({
+  typeId: PG_INTERVAL_CODEC_ID,
+  targetTypes: ['interval'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'interval',
+        },
+      },
+    },
+  },
+});
+
 // Build codec definitions using the builder DSL
 const codecs = defineCodecs()
   .add('text', pgTextCodec)
+  .add('character', pgCharCodec)
+  .add('character varying', pgVarcharCodec)
   .add('int4', pgInt4Codec)
   .add('int2', pgInt2Codec)
   .add('int8', pgInt8Codec)
   .add('float4', pgFloat4Codec)
   .add('float8', pgFloat8Codec)
+  .add('numeric', pgNumericCodec)
   .add('timestamp', pgTimestampCodec)
   .add('timestamptz', pgTimestamptzCodec)
+  .add('time', pgTimeCodec)
+  .add('timetz', pgTimetzCodec)
   .add('bool', pgBoolCodec)
+  .add('bit', pgBitCodec)
+  .add('bit varying', pgVarbitCodec)
+  .add('interval', pgIntervalCodec)
   .add('enum', pgEnumCodec);
 
 // Export derived structures directly from codecs builder
