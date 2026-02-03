@@ -5,16 +5,16 @@ This glossary defines key terms related to Prisma Next's extensions, packs, and 
 ## Core Concepts
 
 ### Data Contract
-A canonical, verifiable JSON artifact that describes an application's data model, relationships, invariants, and policies. The data contract serves as a binding agreement between the application and database, including business logic constraints beyond pure storage (policies, invariants, capabilities). Serialized as `contract.json` and includes both `coreHash` and optional `profileHash`.
+A canonical, verifiable JSON artifact that describes an application's data model, relationships, invariants, and policies. The data contract serves as a binding agreement between the application and database, and declares **required capabilities** under `contract.capabilities`. Serialized as `contract.json` and includes both `coreHash` and optional `profileHash`.
 
 ### CoreHash
 A SHA-256 hash of the meaningful schema components (models, fields, relations, storage layout) that represents the logical data contract. Changes to business logic, constraints, or data model affect the `coreHash`. Used for contract verification and migration planning.
 
 ### ProfileHash
-A SHA-256 hash of the contract-pinned capability profile (declared capability keys/variants and optional adapter pins). It does not change the logical meaning of the data contract. The migration runner verifies that the database satisfies these requirements and writes the same `profileHash` to the marker. At runtime, equality with the marker is enforced. Note: a future "floating mode" could compute a runtime profile from discovery; today, `profileHash` is contract-derived.
+A SHA-256 hash of the pinned capability profile derived from declared requirements, negotiated adapter capabilities, and optional adapter pins. It does not change the logical meaning of the data contract. The migration runner verifies that the database satisfies these requirements and writes the same `profileHash` to the marker. At runtime, equality with the marker is enforced.
 
 ### Capability Key
-A canonical identifier for a database or extension feature (e.g., `lateral`, `jsonAgg`, `ivfflat`). Capability keys are namespaced and follow a stability contract where core capabilities are reserved and extension capabilities are prefixed by pack namespace. Used for adapter negotiation and feature gating.
+A canonical identifier for a database or extension feature (e.g., `sql.lateral`, `sql.returning`, `pgvector.ivfflat`). Capability keys are namespaced and follow a stability contract where core capabilities are reserved and extension capabilities are prefixed by pack namespace. Used for adapter negotiation and feature gating.
 
 ### Extension Pack
 A versioned, installable npm package that extends Prisma Next with domain-specific features like vector search (pgvector) or geospatial operations (PostGIS). Packs declare a namespace, provide schemas for contract decorations, and implement SPIs for authoring, runtime, and migration integration.

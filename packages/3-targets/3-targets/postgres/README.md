@@ -22,6 +22,7 @@ Provides the Postgres target descriptor (`SqlControlTargetDescriptor`) for CLI c
 - **Schema Verification Normalization**: Normalizes Postgres default expressions (for example, `nextval(...)`, `now()`) when verifying the post-apply schema
 - **Postgres-Only Contract Extensions**: Defines Postgres-specific column defaults (e.g., sequences) used by the migration planner
 - **Database Dependency Consumption**: The planner extracts database dependencies from the configured framework components (passed as `frameworkComponents`), verifies each dependency against the live schema, and only emits install operations when required. The runner reuses the same metadata for post-apply verification, so there are no hardcoded extension mappings—database dependencies stay component-owned.
+- **Storage Type Planning**: The planner dispatches storage type hooks for `storage.types` and emits type operations before table creation when supported by the policy
 
 This package spans multiple planes:
 - **Migration plane** (`src/exports/control.ts`): Control plane entry point that exports `SqlControlTargetDescriptor` for config files
@@ -32,7 +33,7 @@ This package spans multiple planes:
 
 This package provides the Postgres implementation of the SQL migration planner/runner used by `prisma-next db init`:
 
-- **Planner** (`src/core/migrations/planner.ts`): produces an additive-only `MigrationPlan` to bring the database schema in line with a destination contract. Extra unrelated schema is tolerated; non-additive mismatches (type/nullability/constraint incompatibilities) surface as structured conflicts.
+- **Planner** (`src/core/migrations/planner.ts`): produces an additive-only `MigrationPlan` to bring the database schema in line with a destination contract. Extra unrelated schema is tolerated; non-additive mismatches (type/nullability/constraint incompatibilities) surface as structured conflicts. Storage type operations (from codec-owned hooks) are emitted before table operations when `storage.types` are present.
 - **Runner** (`src/core/migrations/runner.ts`): executes a plan under an advisory lock, verifies the post-state schema, then writes the contract marker and appends a ledger entry in the `prisma_contract` schema.
 
 For the CLI orchestration, see `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`.

@@ -2,6 +2,29 @@ import type { ControlDriverInstance } from '@prisma-next/core-control-plane/type
 import { describe, expect, it } from 'vitest';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
 
+type QueryHandler = {
+  readonly match: (sql: string) => boolean;
+  readonly rows: ReadonlyArray<Record<string, unknown>>;
+};
+
+function includes(fragment: string): (sql: string) => boolean {
+  return (sql) => sql.includes(fragment);
+}
+
+function createMockDriver(
+  handlers: ReadonlyArray<QueryHandler>,
+): ControlDriverInstance<'sql', 'postgres'> {
+  return {
+    familyId: 'sql',
+    targetId: 'postgres',
+    query: async <Row = Record<string, unknown>>(sql: string) => {
+      const handler = handlers.find((entry) => entry.match(sql));
+      return { rows: (handler?.rows ?? []) as Row[] };
+    },
+    close: async () => {},
+  };
+}
+
 describe('PostgresControlAdapter', () => {
   it('has correct familyId and targetId', () => {
     const adapter = new PostgresControlAdapter();
@@ -29,6 +52,50 @@ describe('PostgresControlAdapter', () => {
           pg: {
             schema: 'public',
             version: expect.any(String),
+          },
+        },
+      });
+    });
+
+    it('introspects enum storage types', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+        familyId: 'sql',
+        targetId: 'postgres',
+        query: async <Row = Record<string, unknown>>(sql: string) => {
+          if (sql.includes('information_schema.tables')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('pg_extension')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('pg_enum')) {
+            return {
+              rows: [
+                {
+                  schema_name: 'public',
+                  type_name: 'role',
+                  values: ['USER', 'ADMIN'],
+                },
+              ] as Row[],
+            };
+          }
+          if (sql.includes('version()')) {
+            return { rows: [{ version: 'PostgreSQL 16.1' }] as Row[] };
+          }
+          return { rows: [] as Row[] };
+        },
+        close: async () => {},
+      };
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.annotations?.['pg']).toMatchObject({
+        storageTypes: {
+          role: {
+            codecId: 'pg/enum@1',
+            nativeType: 'role',
+            typeParams: { values: ['USER', 'ADMIN'] },
           },
         },
       });
@@ -94,6 +161,9 @@ describe('PostgresControlAdapter', () => {
           if (sql.includes('pg_extension')) {
             return { rows: [] as Row[] };
           }
+          if (sql.includes('pg_enum')) {
+            return { rows: [] as Row[] };
+          }
           if (sql.includes('version()')) {
             return {
               rows: [{ version: 'PostgreSQL 15.1 on x86_64-pc-linux-gnu' }] as Row[],
@@ -157,6 +227,9 @@ describe('PostgresControlAdapter', () => {
           if (sql.includes('pg_extension')) {
             return { rows: [] as Row[] };
           }
+          if (sql.includes('pg_enum')) {
+            return { rows: [] as Row[] };
+          }
           if (sql.includes('version()')) {
             return {
               rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
@@ -211,6 +284,9 @@ describe('PostgresControlAdapter', () => {
           if (sql.includes('pg_extension')) {
             return { rows: [] as Row[] };
           }
+          if (sql.includes('pg_enum')) {
+            return { rows: [] as Row[] };
+          }
           if (sql.includes('version()')) {
             return {
               rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
@@ -263,6 +339,9 @@ describe('PostgresControlAdapter', () => {
             return { rows: [] as Row[] };
           }
           if (sql.includes('pg_extension')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('pg_enum')) {
             return { rows: [] as Row[] };
           }
           if (sql.includes('version()')) {
@@ -336,263 +415,405 @@ describe('PostgresControlAdapter', () => {
 
     it('handles foreign keys', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
-        familyId: 'sql',
-        targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'post' }] as Row[] };
-          }
-          if (sql.includes('information_schema.columns')) {
-            return {
-              rows: [
-                {
-                  column_name: 'id',
-                  data_type: 'integer',
-                  udt_name: 'int4',
-                  is_nullable: 'NO',
-                  character_maximum_length: null,
-                  numeric_precision: null,
-                  numeric_scale: null,
-                },
-                {
-                  column_name: 'user_id',
-                  data_type: 'integer',
-                  udt_name: 'int4',
-                  is_nullable: 'NO',
-                  character_maximum_length: null,
-                  numeric_precision: null,
-                  numeric_scale: null,
-                },
-              ] as Row[],
-            };
-          }
-          if (sql.includes('PRIMARY KEY')) {
-            return {
-              rows: [
-                {
-                  constraint_name: 'post_pkey',
-                  column_name: 'id',
-                  ordinal_position: 1,
-                },
-              ] as Row[],
-            };
-          }
-          if (sql.includes('FOREIGN KEY')) {
-            return {
-              rows: [
-                {
-                  constraint_name: 'post_user_id_fkey',
-                  column_name: 'user_id',
-                  ordinal_position: 1,
-                  referenced_table_schema: 'public',
-                  referenced_table_name: 'user',
-                  referenced_column_name: 'id',
-                },
-              ] as Row[],
-            };
-          }
-          if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_indexes')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('version()')) {
-            return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
-            };
-          }
-          return { rows: [] as Row[] };
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'post' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              column_name: 'id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              column_name: 'user_id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+          ],
         },
-        close: async () => {},
-      };
+        {
+          match: includes('PRIMARY KEY'),
+          rows: [
+            {
+              constraint_name: 'post_pkey',
+              column_name: 'id',
+              ordinal_position: 1,
+            },
+          ],
+        },
+        {
+          match: includes('FOREIGN KEY'),
+          rows: [
+            {
+              constraint_name: 'post_user_id_fkey',
+              column_name: 'user_id',
+              ordinal_position: 1,
+              referenced_table_schema: 'public',
+              referenced_table_name: 'user',
+              referenced_column_name: 'id',
+            },
+          ],
+        },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['post']?.foreignKeys).toHaveLength(1);
-      expect(result.tables['post']?.foreignKeys[0]).toEqual({
-        columns: ['user_id'],
-        referencedTable: 'user',
-        referencedColumns: ['id'],
-        name: 'post_user_id_fkey',
-      });
+      expect(result.tables['post']?.foreignKeys).toEqual([
+        {
+          columns: ['user_id'],
+          referencedTable: 'user',
+          referencedColumns: ['id'],
+          name: 'post_user_id_fkey',
+        },
+      ]);
+    });
+
+    it('handles multi-column foreign keys', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'order' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              column_name: 'user_id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              column_name: 'account_id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+          ],
+        },
+        {
+          match: includes('PRIMARY KEY'),
+          rows: [
+            {
+              constraint_name: 'order_pkey',
+              column_name: 'user_id',
+              ordinal_position: 1,
+            },
+          ],
+        },
+        {
+          match: includes('FOREIGN KEY'),
+          rows: [
+            {
+              constraint_name: 'order_account_fkey',
+              column_name: 'user_id',
+              ordinal_position: 1,
+              referenced_table_schema: 'public',
+              referenced_table_name: 'account',
+              referenced_column_name: 'user_id',
+            },
+            {
+              constraint_name: 'order_account_fkey',
+              column_name: 'account_id',
+              ordinal_position: 2,
+              referenced_table_schema: 'public',
+              referenced_table_name: 'account',
+              referenced_column_name: 'id',
+            },
+          ],
+        },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.tables['order']?.foreignKeys).toEqual([
+        {
+          columns: ['user_id', 'account_id'],
+          referencedTable: 'account',
+          referencedColumns: ['user_id', 'id'],
+          name: 'order_account_fkey',
+        },
+      ]);
     });
 
     it('handles unique constraints', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
-        familyId: 'sql',
-        targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'user' }] as Row[] };
-          }
-          if (sql.includes('information_schema.columns')) {
-            return {
-              rows: [
-                {
-                  column_name: 'id',
-                  data_type: 'integer',
-                  udt_name: 'int4',
-                  is_nullable: 'NO',
-                  character_maximum_length: null,
-                  numeric_precision: null,
-                  numeric_scale: null,
-                },
-                {
-                  column_name: 'email',
-                  data_type: 'character varying',
-                  udt_name: 'varchar',
-                  is_nullable: 'NO',
-                  character_maximum_length: 255,
-                  numeric_precision: null,
-                  numeric_scale: null,
-                },
-              ] as Row[],
-            };
-          }
-          // Check for PRIMARY KEY query first (more specific)
-          if (
-            sql.includes("constraint_type = 'PRIMARY KEY'") &&
-            !sql.includes("constraint_type = 'UNIQUE'")
-          ) {
-            return {
-              rows: [
-                {
-                  constraint_name: 'user_pkey',
-                  column_name: 'id',
-                  ordinal_position: 1,
-                },
-              ] as Row[],
-            };
-          }
-          if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
-          }
-          // Check for UNIQUE query (excludes primary keys) - must have both UNIQUE constraint_type and NOT IN
-          if (sql.includes("constraint_type = 'UNIQUE'") && sql.includes('NOT IN')) {
-            return {
-              rows: [
-                {
-                  constraint_name: 'user_email_key',
-                  column_name: 'email',
-                  ordinal_position: 1,
-                },
-              ] as Row[],
-            };
-          }
-          if (sql.includes('pg_indexes')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('version()')) {
-            return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
-            };
-          }
-          return { rows: [] as Row[] };
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'user' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              column_name: 'id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              column_name: 'email',
+              data_type: 'character varying',
+              udt_name: 'varchar',
+              is_nullable: 'NO',
+              character_maximum_length: 255,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+          ],
         },
-        close: async () => {},
-      };
+        {
+          match: (sql) =>
+            sql.includes("constraint_type = 'PRIMARY KEY'") &&
+            !sql.includes("constraint_type = 'UNIQUE'"),
+          rows: [
+            {
+              constraint_name: 'user_pkey',
+              column_name: 'id',
+              ordinal_position: 1,
+            },
+          ],
+        },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        {
+          match: (sql) => sql.includes("constraint_type = 'UNIQUE'") && sql.includes('NOT IN'),
+          rows: [
+            {
+              constraint_name: 'user_email_key',
+              column_name: 'email',
+              ordinal_position: 1,
+            },
+          ],
+        },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.uniques).toHaveLength(1);
-      expect(result.tables['user']?.uniques[0]).toEqual({
-        columns: ['email'],
-        name: 'user_email_key',
-      });
+      expect(result.tables['user']?.uniques).toEqual([
+        {
+          columns: ['email'],
+          name: 'user_email_key',
+        },
+      ]);
+    });
+
+    it('handles multi-column unique constraints', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'user' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              column_name: 'email',
+              data_type: 'character varying',
+              udt_name: 'varchar',
+              is_nullable: 'NO',
+              character_maximum_length: 255,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              column_name: 'tenant_id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+          ],
+        },
+        {
+          match: (sql) =>
+            sql.includes("constraint_type = 'PRIMARY KEY'") &&
+            !sql.includes("constraint_type = 'UNIQUE'"),
+          rows: [],
+        },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        {
+          match: (sql) => sql.includes("constraint_type = 'UNIQUE'") && sql.includes('NOT IN'),
+          rows: [
+            {
+              constraint_name: 'user_email_tenant_key',
+              column_name: 'email',
+              ordinal_position: 1,
+            },
+            {
+              constraint_name: 'user_email_tenant_key',
+              column_name: 'tenant_id',
+              ordinal_position: 2,
+            },
+          ],
+        },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.tables['user']?.uniques).toEqual([
+        {
+          columns: ['email', 'tenant_id'],
+          name: 'user_email_tenant_key',
+        },
+      ]);
     });
 
     it('handles indexes', async () => {
       const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
-        familyId: 'sql',
-        targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [{ table_name: 'user' }] as Row[] };
-          }
-          if (sql.includes('information_schema.columns')) {
-            return {
-              rows: [
-                {
-                  column_name: 'id',
-                  data_type: 'integer',
-                  udt_name: 'int4',
-                  is_nullable: 'NO',
-                  character_maximum_length: null,
-                  numeric_precision: null,
-                  numeric_scale: null,
-                },
-                {
-                  column_name: 'name',
-                  data_type: 'character varying',
-                  udt_name: 'varchar',
-                  is_nullable: 'NO',
-                  character_maximum_length: 255,
-                  numeric_precision: null,
-                  numeric_scale: null,
-                },
-              ] as Row[],
-            };
-          }
-          if (sql.includes('PRIMARY KEY')) {
-            return {
-              rows: [
-                {
-                  constraint_name: 'user_pkey',
-                  column_name: 'id',
-                  ordinal_position: 1,
-                },
-              ] as Row[],
-            };
-          }
-          if (sql.includes('FOREIGN KEY')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('UNIQUE')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_indexes')) {
-            return {
-              rows: [
-                {
-                  indexname: 'user_name_idx',
-                  indisunique: false,
-                  attname: 'name',
-                  attnum: 2,
-                },
-              ] as Row[],
-            };
-          }
-          if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('version()')) {
-            return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
-            };
-          }
-          return { rows: [] as Row[] };
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'user' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              column_name: 'id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              column_name: 'name',
+              data_type: 'character varying',
+              udt_name: 'varchar',
+              is_nullable: 'NO',
+              character_maximum_length: 255,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+          ],
         },
-        close: async () => {},
-      };
+        {
+          match: includes('PRIMARY KEY'),
+          rows: [
+            {
+              constraint_name: 'user_pkey',
+              column_name: 'id',
+              ordinal_position: 1,
+            },
+          ],
+        },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        {
+          match: includes('pg_indexes'),
+          rows: [
+            {
+              indexname: 'user_name_idx',
+              indisunique: false,
+              attname: 'name',
+              attnum: 2,
+            },
+          ],
+        },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.indexes).toHaveLength(1);
-      expect(result.tables['user']?.indexes[0]).toEqual({
-        columns: ['name'],
-        name: 'user_name_idx',
-        unique: false,
-      });
+      expect(result.tables['user']?.indexes).toEqual([
+        {
+          columns: ['name'],
+          name: 'user_name_idx',
+          unique: false,
+        },
+      ]);
+    });
+
+    it('handles multi-column indexes', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'user' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              column_name: 'email',
+              data_type: 'character varying',
+              udt_name: 'varchar',
+              is_nullable: 'NO',
+              character_maximum_length: 255,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              column_name: 'tenant_id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+          ],
+        },
+        {
+          match: includes('PRIMARY KEY'),
+          rows: [],
+        },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        {
+          match: includes('pg_indexes'),
+          rows: [
+            {
+              indexname: 'user_email_tenant_idx',
+              indisunique: false,
+              attname: 'email',
+              attnum: 1,
+            },
+            {
+              indexname: 'user_email_tenant_idx',
+              indisunique: false,
+              attname: 'tenant_id',
+              attnum: 2,
+            },
+          ],
+        },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.tables['user']?.indexes).toEqual([
+        {
+          columns: ['email', 'tenant_id'],
+          name: 'user_email_tenant_idx',
+          unique: false,
+        },
+      ]);
     });
 
     it('skips index rows with null attname', async () => {

@@ -113,6 +113,25 @@ describe('adapter-postgres codecs', () => {
     });
   });
 
+  describe('enum codec', () => {
+    const enumCodec = codecDefinitions.enum.codec as {
+      encode: (value: string) => string;
+      decode: (wire: string) => string;
+    };
+
+    it('encodes string as-is', () => {
+      const value = 'ADMIN';
+      const encoded = enumCodec.encode(value);
+      expect(encoded).toBe(value);
+    });
+
+    it('decodes string as-is', () => {
+      const value = 'USER';
+      const decoded = enumCodec.decode(value);
+      expect(decoded).toBe(value);
+    });
+  });
+
   describe('int4 codec', () => {
     const int4Codec = codecDefinitions.int4.codec as {
       encode: (value: number) => number;

@@ -1,3 +1,6 @@
+import { PG_ENUM_CODEC_ID } from './codec-ids';
+import { pgEnumControlHooks } from './enum-control-hooks';
+
 export const postgresAdapterDescriptorMeta = {
   kind: 'adapter',
   familyId: 'sql',
@@ -12,6 +15,9 @@ export const postgresAdapterDescriptorMeta = {
       jsonAgg: true,
       returning: true,
     },
+    sql: {
+      enums: true,
+    },
   },
   types: {
     codecTypes: {
@@ -19,6 +25,21 @@ export const postgresAdapterDescriptorMeta = {
         package: '@prisma-next/adapter-postgres/codec-types',
         named: 'CodecTypes',
         alias: 'PgTypes',
+      },
+      parameterized: {
+        [PG_ENUM_CODEC_ID]: {
+          kind: 'function',
+          render: (params: Record<string, unknown>) => {
+            const values = params['values'];
+            if (!Array.isArray(values)) {
+              throw new Error('pg/enum@1 renderer expects values array');
+            }
+            return values.map((value) => `'${String(value).replace(/'/g, "\\'")}'`).join(' | ');
+          },
+        },
+      },
+      controlPlaneHooks: {
+        [PG_ENUM_CODEC_ID]: pgEnumControlHooks,
       },
     },
     storage: [

@@ -199,6 +199,33 @@ describe('contract builder methods', () => {
     expect(contract.coreHash).toBe('sha256:custom');
     expect(contract.capabilities).toEqual({ feature: { enabled: true } });
   });
+
+  it('adds storage types and typeRef columns', () => {
+    const roleColumn = {
+      codecId: 'pg/enum@1',
+      nativeType: 'role',
+      typeRef: 'Role',
+    } as const;
+
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .storageType('Role', {
+        codecId: 'pg/enum@1',
+        nativeType: 'role',
+        typeParams: { values: ['USER', 'ADMIN'] },
+      })
+      .table('user', (t) => t.column('role', { type: roleColumn }).primaryKey(['role']))
+      .build();
+
+    expect(contract.storage.types).toEqual({
+      Role: {
+        codecId: 'pg/enum@1',
+        nativeType: 'role',
+        typeParams: { values: ['USER', 'ADMIN'] },
+      },
+    });
+    expect(contract.storage.tables.user.columns.role.typeRef).toBe('Role');
+  });
 });
 
 describe('extensionPacks', () => {

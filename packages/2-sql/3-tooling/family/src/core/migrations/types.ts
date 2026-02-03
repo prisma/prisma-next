@@ -23,7 +23,7 @@ import type {
   OperationContext,
   SchemaIssue,
 } from '@prisma-next/core-control-plane/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../control-instance';
@@ -80,6 +80,46 @@ export interface ComponentDatabaseDependencies<TTargetDetails> {
  */
 export interface DatabaseDependencyProvider {
   readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
+}
+
+// ============================================================================
+// Storage Type Control Hooks
+// ============================================================================
+
+export interface StorageTypePlanResult<TTargetDetails> {
+  readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
+}
+
+export interface CodecControlHooks<TTargetDetails = unknown> {
+  /**
+   * Plans operations for a single storage type instance.
+   * Called by planners that support storage type hooks.
+   */
+  planTypeOperations?: (options: {
+    readonly typeName: string;
+    readonly typeInstance: StorageTypeInstance;
+    readonly contract: SqlContract<SqlStorage>;
+    readonly schema: SqlSchemaIR;
+    readonly schemaName?: string;
+    readonly policy: MigrationOperationPolicy;
+  }) => StorageTypePlanResult<TTargetDetails>;
+  /**
+   * Verifies a storage type instance against the schema IR.
+   * Must be pure (no DB I/O).
+   */
+  verifyType?: (options: {
+    readonly typeName: string;
+    readonly typeInstance: StorageTypeInstance;
+    readonly schema: SqlSchemaIR;
+    readonly schemaName?: string;
+  }) => readonly SchemaIssue[];
+  /**
+   * Introspects storage type instances from a database.
+   */
+  introspectTypes?: (options: {
+    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly schemaName?: string;
+  }) => Promise<Record<string, StorageTypeInstance>>;
 }
 
 // ============================================================================
@@ -187,6 +227,7 @@ export interface SqlPlannerConflictLocation {
   readonly index?: string;
   readonly constraint?: string;
   readonly extension?: string;
+  readonly type?: string;
 }
 
 /**

@@ -456,4 +456,113 @@ describe('validateContract parameterized type fields', () => {
       );
     });
   });
+
+  describe('typeRef consistency validation', () => {
+    it('rejects column with typeRef when codecId mismatches referenced type', () => {
+      const input = {
+        ...baseContractInput,
+        storage: {
+          tables: {
+            User: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                role: {
+                  nativeType: 'role', // matches
+                  codecId: 'pg/int4@1', // MISMATCH - should be pg/enum@1
+                  nullable: false,
+                  typeRef: 'Role',
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            Role: {
+              codecId: 'pg/enum@1',
+              nativeType: 'role',
+              typeParams: { values: ['USER'] },
+            },
+          },
+        },
+      };
+
+      expect(() => validateContract<TestContract>(input)).toThrow(
+        /codecId "pg\/int4@1" but references type instance "Role" with codecId "pg\/enum@1"/,
+      );
+    });
+
+    it('rejects column with typeRef when nativeType mismatches referenced type', () => {
+      const input = {
+        ...baseContractInput,
+        storage: {
+          tables: {
+            User: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                role: {
+                  nativeType: 'int4', // MISMATCH - should be 'role'
+                  codecId: 'pg/enum@1', // matches
+                  nullable: false,
+                  typeRef: 'Role',
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            Role: {
+              codecId: 'pg/enum@1',
+              nativeType: 'role',
+              typeParams: { values: ['USER'] },
+            },
+          },
+        },
+      };
+
+      expect(() => validateContract<TestContract>(input)).toThrow(
+        /nativeType "int4" but references type instance "Role" with nativeType "role"/,
+      );
+    });
+
+    it('accepts column with typeRef when codecId and nativeType both match', () => {
+      const input = {
+        ...baseContractInput,
+        storage: {
+          tables: {
+            User: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                role: {
+                  nativeType: 'role',
+                  codecId: 'pg/enum@1',
+                  nullable: false,
+                  typeRef: 'Role',
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+          types: {
+            Role: {
+              codecId: 'pg/enum@1',
+              nativeType: 'role',
+              typeParams: { values: ['USER'] },
+            },
+          },
+        },
+      };
+
+      const result = validateContract<TestContract>(input);
+      expect(result.storage.tables['User']?.columns['role']?.typeRef).toBe('Role');
+    });
+  });
 });

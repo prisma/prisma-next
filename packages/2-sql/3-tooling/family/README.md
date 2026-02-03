@@ -16,6 +16,8 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlTargetFamilyHook`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
 - **Component Database Dependencies**: Consumes database dependencies declared by framework components (target/adapter/extension packs). Callers pass the active `frameworkComponents` list into planning/execution/verification; SQL layers structurally narrow to components that declare `databaseDependencies` and use their pure verification hooks (no fuzzy matching against `contract.extensionPacks`).
+- **Storage Type Control Hooks**: Extracts codec-owned control hooks for planning/verification/introspection of `storage.types` without adding enum-specific fields to shared IR
+- **Codec Ownership**: Enforces a single owner per `codecId` for parameterized renderers and control-plane hooks to prevent ambiguous conflicts during assembly
 
 ## Usage
 
@@ -94,7 +96,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 
 - **`src/core/control-descriptor.ts`**: `SqlFamilyDescriptor` class implementing `ControlFamilyDescriptor` interface (pure data + factory)
 - **`src/core/control-instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContractIR`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
-- **`src/core/assembly.ts`**: Assembly helpers for building operation registries and extracting type imports from descriptors. Test utilities import `convertOperationManifest` from the same package via relative path.
+- **`src/core/assembly.ts`**: Assembly helpers for building operation registries, extracting type imports, and collecting codec-owned storage type control hooks. Test utilities import `convertOperationManifest` from the same package via relative path.
 - **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
 - **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations
 - **`src/core/migrations/`**: Migration IR helpers plus planner and runner SPI types (`MigrationPlanner`, `MigrationRunner`, `SqlControlTargetDescriptor`). Runners return `MigrationRunnerResult` which is a union of success/failure.

@@ -151,7 +151,7 @@ export class TableBuilder<
     PrimaryKey
   > {
     const nullable = options.nullable ?? false;
-    const { codecId, nativeType, typeParams: descriptorTypeParams } = options.type;
+    const { codecId, nativeType, typeParams: descriptorTypeParams, typeRef } = options.type;
     const typeParams = options.typeParams ?? descriptorTypeParams;
 
     // The type safety is enforced at the call site via overloads:
@@ -163,6 +163,7 @@ export class TableBuilder<
       type: codecId,
       nativeType,
       ...ifDefined('typeParams', typeParams),
+      ...ifDefined('typeRef', typeRef),
       ...ifDefined('default', 'default' in options ? options.default : undefined),
     } as ColumnBuilderState<ColName, boolean, Descriptor['codecId']>;
     const newColumns = { ...this._columns, [name]: columnState } as Columns &

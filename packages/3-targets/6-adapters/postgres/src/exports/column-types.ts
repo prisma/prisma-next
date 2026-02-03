@@ -6,6 +6,7 @@
  */
 
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
+import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 
 export const textColumn: ColumnTypeDescriptor = {
   codecId: 'pg/text@1',
@@ -51,3 +52,25 @@ export const boolColumn: ColumnTypeDescriptor = {
   codecId: 'pg/bool@1',
   nativeType: 'bool',
 } as const;
+
+export function enumType<const Values extends readonly string[]>(
+  name: string,
+  values: Values,
+): StorageTypeInstance & { readonly typeParams: { readonly values: Values } } {
+  return {
+    codecId: 'pg/enum@1',
+    nativeType: name,
+    typeParams: { values },
+  } as const;
+}
+
+export function enumColumn<TypeName extends string>(
+  typeName: TypeName,
+  nativeType: string,
+): ColumnTypeDescriptor & { readonly typeRef: TypeName } {
+  return {
+    codecId: 'pg/enum@1',
+    nativeType,
+    typeRef: typeName,
+  };
+}

@@ -11,6 +11,7 @@ export type {
   MigrationPlanOperation,
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
+export { extractCodecControlHooks } from '../core/assembly';
 export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/control-instance';
 export {
   createMigrationPlan,
@@ -22,6 +23,7 @@ export {
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 // SQL-specific types
 export type {
+  CodecControlHooks,
   ComponentDatabaseDependencies,
   ComponentDatabaseDependency,
   CreateSqlMigrationPlanOptions,
@@ -47,6 +49,7 @@ export type {
   SqlPlannerFailureResult,
   SqlPlannerResult,
   SqlPlannerSuccessResult,
+  StorageTypePlanResult,
 } from '../core/migrations/types';
 
 /**

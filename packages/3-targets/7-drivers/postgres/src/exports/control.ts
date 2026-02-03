@@ -4,6 +4,7 @@ import type {
   ControlDriverInstance,
 } from '@prisma-next/core-control-plane/types';
 import { SqlQueryError } from '@prisma-next/sql-errors';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { redactDatabaseUrl } from '@prisma-next/utils/redact-db-url';
 import { Client } from 'pg';
 import { postgresDriverDescriptorMeta } from '../core/descriptor-meta';
@@ -71,7 +72,7 @@ const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', Postg
           why: normalized.message,
           fix: 'Verify the database URL, ensure the database is reachable, and confirm credentials/permissions',
           meta: {
-            ...(typeof code !== 'undefined' ? { code } : {}),
+            ...ifDefined('code', code),
             ...redacted,
           },
         });

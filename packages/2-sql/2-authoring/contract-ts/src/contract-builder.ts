@@ -1,6 +1,7 @@
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
 import type {
   ColumnBuilderState,
+  ContractBuilderState,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
@@ -23,6 +24,7 @@ import type {
   SqlContract,
   SqlMappings,
   SqlStorage,
+  StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { computeMappings } from './contract';
@@ -81,6 +83,7 @@ type BuildStorage<
       readonly string[] | undefined
     >
   >,
+  Types extends Record<string, StorageTypeInstance>,
 > = {
   readonly tables: {
     readonly [K in keyof Tables]: BuildStorageTable<
@@ -89,6 +92,7 @@ type BuildStorage<
       ExtractPrimaryKey<Tables[K]>
     >;
   };
+  readonly types: Types;
 };
 
 type BuildStorageTables<
@@ -129,10 +133,21 @@ class SqlContractBuilder<
     string,
     ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   > = Record<never, never>,
+  Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   CoreHash extends string | undefined = undefined,
   ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > extends ContractBuilder<Target, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
+  protected declare readonly state: ContractBuilderState<
+    Target,
+    Tables,
+    Models,
+    CoreHash,
+    ExtensionPacks,
+    Capabilities
+  > & {
+    readonly storageTypes?: Types;
+  };
   /**
    * This method is responsible for normalizing the contract IR by setting default values
    * for all required fields:
@@ -153,7 +168,7 @@ class SqlContractBuilder<
    */
   build(): Target extends string
     ? SqlContract<
-        BuildStorage<Tables>,
+        BuildStorage<Tables, Types>,
         BuildModels<Models>,
         BuildRelations<Models>,
         ContractBuilderMappings<CodecTypes>
@@ -172,7 +187,7 @@ class SqlContractBuilder<
     // Type helper to ensure literal types are preserved in return type
     type BuiltContract = Target extends string
       ? SqlContract<
-          BuildStorage<Tables>,
+          BuildStorage<Tables, Types>,
           BuildModels<Models>,
           BuildRelations<Models>,
           ContractBuilderMappings<CodecTypes>
@@ -216,6 +231,7 @@ class SqlContractBuilder<
         if (!columnState) continue;
         const codecId = columnState.type;
         const nativeType = columnState.nativeType;
+        const typeRef = columnState.typeRef;
 
         columns[columnName as keyof ColumnDefs] = {
           nativeType,
@@ -224,6 +240,7 @@ class SqlContractBuilder<
             boolean,
           ...ifDefined('typeParams', columnState.typeParams),
           ...ifDefined('default', columnState.default),
+          ...ifDefined('typeRef', typeRef),
         } as BuildStorageColumn<
           ColumnDefs[keyof ColumnDefs]['nullable'] & boolean,
           ColumnDefs[keyof ColumnDefs]['type']
@@ -272,7 +289,11 @@ class SqlContractBuilder<
       (storageTables as Mutable<BuildStorageTables<Tables>>)[tableName] = table;
     }
 
-    const storage = { tables: storageTables as BuildStorageTables<Tables> } as BuildStorage<Tables>;
+    const storageTypes = (this.state.storageTypes ?? {}) as Types;
+    const storage: BuildStorage<Tables, Types> = {
+      tables: storageTables as BuildStorageTables<Tables>,
+      types: storageTypes,
+    };
 
     // Build models - construct as partial first, then assert full type
     const modelsPartial: Partial<BuildModels<Models>> = {};
@@ -393,6 +414,7 @@ class SqlContractBuilder<
         Target,
         Tables,
         Models,
+        Types,
         CoreHash,
         ExtensionPacks,
         Capabilities
@@ -402,12 +424,22 @@ class SqlContractBuilder<
 
   override target<T extends string>(
     packRef: TargetPackRef<'sql', T>,
-  ): SqlContractBuilder<CodecTypes, T, Tables, Models, CoreHash, ExtensionPacks, Capabilities> {
+  ): SqlContractBuilder<
+    CodecTypes,
+    T,
+    Tables,
+    Models,
+    Types,
+    CoreHash,
+    ExtensionPacks,
+    Capabilities
+  > {
     return new SqlContractBuilder<
       CodecTypes,
       T,
       Tables,
       Models,
+      Types,
       CoreHash,
       ExtensionPacks,
       Capabilities
@@ -424,6 +456,7 @@ class SqlContractBuilder<
     Target,
     Tables,
     Models,
+    Types,
     CoreHash,
     ExtensionPacks,
     Capabilities
@@ -463,6 +496,7 @@ class SqlContractBuilder<
       Target,
       Tables,
       Models,
+      Types,
       CoreHash,
       ExtensionPacks,
       Capabilities
@@ -474,8 +508,17 @@ class SqlContractBuilder<
 
   override capabilities<C extends Record<string, Record<string, boolean>>>(
     capabilities: C,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, ExtensionPacks, C> {
-    return new SqlContractBuilder<CodecTypes, Target, Tables, Models, CoreHash, ExtensionPacks, C>({
+  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, Types, CoreHash, ExtensionPacks, C> {
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      Types,
+      CoreHash,
+      ExtensionPacks,
+      C
+    >({
       ...this.state,
       capabilities,
     });
@@ -483,12 +526,22 @@ class SqlContractBuilder<
 
   override coreHash<H extends string>(
     hash: H,
-  ): SqlContractBuilder<CodecTypes, Target, Tables, Models, H, ExtensionPacks, Capabilities> {
+  ): SqlContractBuilder<
+    CodecTypes,
+    Target,
+    Tables,
+    Models,
+    Types,
+    H,
+    ExtensionPacks,
+    Capabilities
+  > {
     return new SqlContractBuilder<
       CodecTypes,
       Target,
       Tables,
       Models,
+      Types,
       H,
       ExtensionPacks,
       Capabilities
@@ -513,6 +566,7 @@ class SqlContractBuilder<
     Target,
     Tables & Record<TableName, ReturnType<T['build']>>,
     Models,
+    Types,
     CoreHash,
     ExtensionPacks,
     Capabilities
@@ -527,6 +581,7 @@ class SqlContractBuilder<
       Target,
       Tables & Record<TableName, ReturnType<T['build']>>,
       Models,
+      Types,
       CoreHash,
       ExtensionPacks,
       Capabilities
@@ -557,6 +612,7 @@ class SqlContractBuilder<
     Target,
     Tables,
     Models & Record<ModelName, ReturnType<M['build']>>,
+    Types,
     CoreHash,
     ExtensionPacks,
     Capabilities
@@ -571,6 +627,7 @@ class SqlContractBuilder<
       Target,
       Tables,
       Models & Record<ModelName, ReturnType<M['build']>>,
+      Types,
       CoreHash,
       ExtensionPacks,
       Capabilities
@@ -578,6 +635,37 @@ class SqlContractBuilder<
       ...this.state,
       models: { ...this.state.models, [name]: modelState } as Models &
         Record<ModelName, ReturnType<M['build']>>,
+    });
+  }
+
+  storageType<Name extends string, Type extends StorageTypeInstance>(
+    name: Name,
+    typeInstance: Type,
+  ): SqlContractBuilder<
+    CodecTypes,
+    Target,
+    Tables,
+    Models,
+    Types & Record<Name, Type>,
+    CoreHash,
+    ExtensionPacks,
+    Capabilities
+  > {
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      Types & Record<Name, Type>,
+      CoreHash,
+      ExtensionPacks,
+      Capabilities
+    >({
+      ...this.state,
+      storageTypes: {
+        ...(this.state.storageTypes ?? {}),
+        [name]: typeInstance,
+      },
     });
   }
 }

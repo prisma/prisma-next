@@ -11,6 +11,7 @@ import type {
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { parsePostgresDefault } from './default-normalizer';
+import { pgEnumControlHooks } from './enum-control-hooks';
 
 /**
  * Postgres control plane adapter for control-plane operations like introspection.
@@ -338,7 +339,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       tables[tableName] = {
         name: tableName,
         columns,
-        ...(primaryKey ? { primaryKey } : {}),
+        ...ifDefined('primaryKey', primaryKey),
         foreignKeys,
         uniques,
         indexes,
@@ -357,11 +358,17 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
     const extensions = extensionsResult.rows.map((row) => row.extname);
 
+    const storageTypes =
+      (await pgEnumControlHooks.introspectTypes?.({ driver, schemaName: schema })) ?? {};
     // Build annotations with Postgres-specific metadata
     const annotations = {
       pg: {
         schema,
         version: await this.getPostgresVersion(driver),
+        ...ifDefined(
+          'storageTypes',
+          Object.keys(storageTypes).length > 0 ? storageTypes : undefined,
+        ),
       },
     };
 
