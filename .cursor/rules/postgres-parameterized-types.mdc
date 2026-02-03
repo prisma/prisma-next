@@ -1,0 +1,14 @@
+---
+description: Normalize Postgres formatted types and parameterized native types
+globs:
+  - "packages/3-targets/6-adapters/postgres/src/core/control-adapter.ts"
+  - "packages/2-sql/3-tooling/family/src/core/schema-verify/**"
+alwaysApply: false
+---
+
+# Postgres parameterized type normalization
+
+- When using `format_type`, only rely on it for parameterized types (strings with parentheses); keep base native types otherwise.
+- Normalize Postgres synonyms: `varchar` → `character varying`, `bpchar` → `character`, `varbit` → `bit varying`.
+- Normalize time zone aliases: `timestamp ... with time zone` → `timestamptz`, `time ... with time zone` → `timetz`, strip `without time zone`.
+- Schema verification should accept base native types when `typeParams` are present but the schema omits parameters.
