@@ -26,7 +26,12 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
           .insert(userTable, {
             email: param('email'),
           })
-          .returning(userColumns.id!, userColumns.email!)
+          .returning(
+            userColumns.id!,
+            userColumns.email,
+            userColumns.created_at!,
+            userColumns.update_at,
+          )
           .build({
             params: {
               email: 'e2e@example.com',
@@ -39,6 +44,9 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
         expect(insertRows[0]).toMatchObject({
           id: expect.any(Number),
           email: 'e2e@example.com',
+          // Note: dates are currently interpreted as strings, e.g., "2026-01-30T13:29:22.101Z"
+          created_at: expect.any(String),
+          update_at: null,
         });
 
         const firstRow = insertRows[0] as InsertRow | undefined;
@@ -53,11 +61,19 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
             email: param('newEmail'),
           })
           .where(userColumns.id!.eq(param('userId')))
-          .returning(userColumns.id!, userColumns.email!)
+          .returning(
+            userColumns.id!,
+            userColumns.email!,
+            userColumns.created_at!,
+            userColumns.update_at,
+          )
           .build({
             params: {
               newEmail: 'updated-e2e@example.com',
               userId,
+              // Note: dates are currently interpreted as strings, e.g., "2026-01-30T13:29:22.101Z"
+              created_at: expect.any(String),
+              update_at: null,
             },
           });
 
