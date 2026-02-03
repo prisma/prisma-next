@@ -38,6 +38,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * and returns the schema structure without type mapping or contract enrichment.
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
+   * Uses batched queries to minimize database round trips (7 queries instead of 5T+3).
+   *
    * @param driver - ControlDriverInstance<'sql', 'postgres'> instance for executing queries
    * @param contractIR - Optional contract IR for contract-guided introspection (filtering, optimization)
    * @param schema - Schema name to introspect (defaults to 'public')
@@ -48,25 +50,28 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     _contractIR?: unknown,
     schema = 'public',
   ): Promise<SqlSchemaIR> {
-    // Query tables
-    const tablesResult = await driver.query<{
-      table_name: string;
-    }>(
-      `SELECT table_name
-       FROM information_schema.tables
-       WHERE table_schema = $1
-         AND table_type = 'BASE TABLE'
-       ORDER BY table_name`,
-      [schema],
-    );
-
-    const tables: Record<string, SqlTableIR> = {};
-
-    for (const tableRow of tablesResult.rows) {
-      const tableName = tableRow.table_name;
-
-      // Query columns for this table
-      const columnsResult = await driver.query<{
+    // Execute all queries in parallel for efficiency (7 queries instead of 5T+3)
+    const [
+      tablesResult,
+      columnsResult,
+      pkResult,
+      fkResult,
+      uniqueResult,
+      indexResult,
+      extensionsResult,
+    ] = await Promise.all([
+      // Query all tables
+      driver.query<{ table_name: string }>(
+        `SELECT table_name
+         FROM information_schema.tables
+         WHERE table_schema = $1
+           AND table_type = 'BASE TABLE'
+         ORDER BY table_name`,
+        [schema],
+      ),
+      // Query all columns for all tables in schema
+      driver.query<{
+        table_name: string;
         column_name: string;
         data_type: string;
         udt_name: string;
@@ -78,6 +83,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         formatted_type: string | null;
       }>(
         `SELECT
+           c.table_name,
            column_name,
            data_type,
            udt_name,
@@ -98,15 +104,152 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            AND a.attname = c.column_name
            AND a.attnum > 0
            AND NOT a.attisdropped
-         WHERE table_schema = $1
-           AND table_name = $2
-         ORDER BY ordinal_position`,
-        [schema, tableName],
-      );
+         WHERE c.table_schema = $1
+         ORDER BY c.table_name, c.ordinal_position`,
+        [schema],
+      ),
+      // Query all primary keys for all tables in schema
+      driver.query<{
+        table_name: string;
+        constraint_name: string;
+        column_name: string;
+        ordinal_position: number;
+      }>(
+        `SELECT
+           tc.table_name,
+           tc.constraint_name,
+           kcu.column_name,
+           kcu.ordinal_position
+         FROM information_schema.table_constraints tc
+         JOIN information_schema.key_column_usage kcu
+           ON tc.constraint_name = kcu.constraint_name
+           AND tc.table_schema = kcu.table_schema
+           AND tc.table_name = kcu.table_name
+         WHERE tc.table_schema = $1
+           AND tc.constraint_type = 'PRIMARY KEY'
+         ORDER BY tc.table_name, kcu.ordinal_position`,
+        [schema],
+      ),
+      // Query all foreign keys for all tables in schema
+      driver.query<{
+        table_name: string;
+        constraint_name: string;
+        column_name: string;
+        ordinal_position: number;
+        referenced_table_schema: string;
+        referenced_table_name: string;
+        referenced_column_name: string;
+      }>(
+        `SELECT
+           tc.table_name,
+           tc.constraint_name,
+           kcu.column_name,
+           kcu.ordinal_position,
+           ccu.table_schema AS referenced_table_schema,
+           ccu.table_name AS referenced_table_name,
+           ccu.column_name AS referenced_column_name
+         FROM information_schema.table_constraints tc
+         JOIN information_schema.key_column_usage kcu
+           ON tc.constraint_name = kcu.constraint_name
+           AND tc.table_schema = kcu.table_schema
+           AND tc.table_name = kcu.table_name
+         JOIN information_schema.constraint_column_usage ccu
+           ON ccu.constraint_name = tc.constraint_name
+           AND ccu.table_schema = tc.table_schema
+         WHERE tc.table_schema = $1
+           AND tc.constraint_type = 'FOREIGN KEY'
+         ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
+        [schema],
+      ),
+      // Query all unique constraints for all tables in schema (excluding PKs)
+      driver.query<{
+        table_name: string;
+        constraint_name: string;
+        column_name: string;
+        ordinal_position: number;
+      }>(
+        `SELECT
+           tc.table_name,
+           tc.constraint_name,
+           kcu.column_name,
+           kcu.ordinal_position
+         FROM information_schema.table_constraints tc
+         JOIN information_schema.key_column_usage kcu
+           ON tc.constraint_name = kcu.constraint_name
+           AND tc.table_schema = kcu.table_schema
+           AND tc.table_name = kcu.table_name
+         WHERE tc.table_schema = $1
+           AND tc.constraint_type = 'UNIQUE'
+         ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
+        [schema],
+      ),
+      // Query all indexes for all tables in schema (excluding constraints)
+      driver.query<{
+        tablename: string;
+        indexname: string;
+        indisunique: boolean;
+        attname: string;
+        attnum: number;
+      }>(
+        `SELECT
+           i.tablename,
+           i.indexname,
+           ix.indisunique,
+           a.attname,
+           a.attnum
+         FROM pg_indexes i
+         JOIN pg_class ic ON ic.relname = i.indexname
+         JOIN pg_namespace ins ON ins.oid = ic.relnamespace AND ins.nspname = $1
+         JOIN pg_index ix ON ix.indexrelid = ic.oid
+         JOIN pg_class t ON t.oid = ix.indrelid
+         JOIN pg_namespace tn ON tn.oid = t.relnamespace AND tn.nspname = $1
+         LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey) AND a.attnum > 0
+         WHERE i.schemaname = $1
+           AND NOT EXISTS (
+             SELECT 1
+             FROM information_schema.table_constraints tc
+             WHERE tc.table_schema = $1
+               AND tc.table_name = i.tablename
+               AND tc.constraint_name = i.indexname
+           )
+         ORDER BY i.tablename, i.indexname, a.attnum`,
+        [schema],
+      ),
+      // Query extensions
+      driver.query<{ extname: string }>(
+        `SELECT extname
+         FROM pg_extension
+         ORDER BY extname`,
+        [],
+      ),
+    ]);
 
+    // Group results by table name for efficient lookup
+    const columnsByTable = groupBy(columnsResult.rows, 'table_name');
+    const pksByTable = groupBy(pkResult.rows, 'table_name');
+    const fksByTable = groupBy(fkResult.rows, 'table_name');
+    const uniquesByTable = groupBy(uniqueResult.rows, 'table_name');
+    const indexesByTable = groupBy(indexResult.rows, 'tablename');
+
+    // Get set of PK constraint names per table (to exclude from uniques)
+    const pkConstraintsByTable = new Map<string, Set<string>>();
+    for (const row of pkResult.rows) {
+      let constraints = pkConstraintsByTable.get(row.table_name);
+      if (!constraints) {
+        constraints = new Set();
+        pkConstraintsByTable.set(row.table_name, constraints);
+      }
+      constraints.add(row.constraint_name);
+    }
+
+    const tables: Record<string, SqlTableIR> = {};
+
+    for (const tableRow of tablesResult.rows) {
+      const tableName = tableRow.table_name;
+
+      // Process columns for this table
       const columns: Record<string, SqlColumnIR> = {};
-      for (const colRow of columnsResult.rows) {
-        // Build native type string from catalog data
+      for (const colRow of columnsByTable.get(tableName) ?? []) {
         let nativeType = colRow.udt_name;
         const formattedType = colRow.formatted_type
           ? normalizeFormattedType(colRow.formatted_type, colRow.data_type, colRow.udt_name)
@@ -135,90 +278,31 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           name: colRow.column_name,
           nativeType,
           nullable: colRow.is_nullable === 'YES',
-          // Store raw default expression - normalization happens in comparison layer
           ...ifDefined('default', colRow.column_default ?? undefined),
         };
       }
 
-      // Query primary key
-      const pkResult = await driver.query<{
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-      }>(
-        `SELECT
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         WHERE tc.table_schema = $1
-           AND tc.table_name = $2
-           AND tc.constraint_type = 'PRIMARY KEY'
-         ORDER BY kcu.ordinal_position`,
-        [schema, tableName],
-      );
-
-      const primaryKeyColumns = pkResult.rows
+      // Process primary key
+      const pkRows = pksByTable.get(tableName) ?? [];
+      const primaryKeyColumns = pkRows
         .sort((a, b) => a.ordinal_position - b.ordinal_position)
         .map((row) => row.column_name);
       const primaryKey: PrimaryKey | undefined =
         primaryKeyColumns.length > 0
           ? {
               columns: primaryKeyColumns,
-              ...(pkResult.rows[0]?.constraint_name
-                ? { name: pkResult.rows[0].constraint_name }
-                : {}),
+              ...(pkRows[0]?.constraint_name ? { name: pkRows[0].constraint_name } : {}),
             }
           : undefined;
 
-      // Query foreign keys
-      const fkResult = await driver.query<{
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-        referenced_table_schema: string;
-        referenced_table_name: string;
-        referenced_column_name: string;
-      }>(
-        `SELECT
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position,
-           ccu.table_schema AS referenced_table_schema,
-           ccu.table_name AS referenced_table_name,
-           ccu.column_name AS referenced_column_name
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         JOIN information_schema.constraint_column_usage ccu
-           ON ccu.constraint_name = tc.constraint_name
-           AND ccu.table_schema = tc.table_schema
-         WHERE tc.table_schema = $1
-           AND tc.table_name = $2
-           AND tc.constraint_type = 'FOREIGN KEY'
-         ORDER BY tc.constraint_name, kcu.ordinal_position`,
-        [schema, tableName],
-      );
-
+      // Process foreign keys
       const foreignKeysMap = new Map<
         string,
-        {
-          columns: string[];
-          referencedTable: string;
-          referencedColumns: string[];
-          name: string;
-        }
+        { columns: string[]; referencedTable: string; referencedColumns: string[]; name: string }
       >();
-      for (const fkRow of fkResult.rows) {
+      for (const fkRow of fksByTable.get(tableName) ?? []) {
         const existing = foreignKeysMap.get(fkRow.constraint_name);
         if (existing) {
-          // Multi-column FK - add column
           existing.columns.push(fkRow.column_name);
           existing.referencedColumns.push(fkRow.referenced_column_name);
         } else {
@@ -239,43 +323,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         }),
       );
 
-      // Query unique constraints (excluding PK)
-      const uniqueResult = await driver.query<{
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-      }>(
-        `SELECT
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         WHERE tc.table_schema = $1
-           AND tc.table_name = $2
-           AND tc.constraint_type = 'UNIQUE'
-           AND tc.constraint_name NOT IN (
-             SELECT constraint_name
-             FROM information_schema.table_constraints
-             WHERE table_schema = $1
-               AND table_name = $2
-               AND constraint_type = 'PRIMARY KEY'
-           )
-         ORDER BY tc.constraint_name, kcu.ordinal_position`,
-        [schema, tableName],
-      );
-
-      const uniquesMap = new Map<
-        string,
-        {
-          columns: string[];
-          name: string;
+      // Process unique constraints (excluding those that are also PKs)
+      const pkConstraints = pkConstraintsByTable.get(tableName) ?? new Set();
+      const uniquesMap = new Map<string, { columns: string[]; name: string }>();
+      for (const uniqueRow of uniquesByTable.get(tableName) ?? []) {
+        // Skip if this constraint is also a primary key
+        if (pkConstraints.has(uniqueRow.constraint_name)) {
+          continue;
         }
-      >();
-      for (const uniqueRow of uniqueResult.rows) {
         const existing = uniquesMap.get(uniqueRow.constraint_name);
         if (existing) {
           existing.columns.push(uniqueRow.column_name);
@@ -291,48 +346,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         name: uq.name,
       }));
 
-      // Query indexes (excluding PK and unique constraints)
-      const indexResult = await driver.query<{
-        indexname: string;
-        indisunique: boolean;
-        attname: string;
-        attnum: number;
-      }>(
-        `SELECT
-           i.indexname,
-           ix.indisunique,
-           a.attname,
-           a.attnum
-         FROM pg_indexes i
-         JOIN pg_class ic ON ic.relname = i.indexname
-         JOIN pg_namespace ins ON ins.oid = ic.relnamespace AND ins.nspname = $1
-         JOIN pg_index ix ON ix.indexrelid = ic.oid
-         JOIN pg_class t ON t.oid = ix.indrelid
-         JOIN pg_namespace tn ON tn.oid = t.relnamespace AND tn.nspname = $1
-         LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey) AND a.attnum > 0
-         WHERE i.schemaname = $1
-           AND i.tablename = $2
-           AND NOT EXISTS (
-             SELECT 1
-             FROM information_schema.table_constraints tc
-             WHERE tc.table_schema = $1
-               AND tc.table_name = $2
-               AND tc.constraint_name = i.indexname
-           )
-         ORDER BY i.indexname, a.attnum`,
-        [schema, tableName],
-      );
-
-      const indexesMap = new Map<
-        string,
-        {
-          columns: string[];
-          name: string;
-          unique: boolean;
-        }
-      >();
-      for (const idxRow of indexResult.rows) {
-        // Skip rows where attname is null (system columns or invalid attnum)
+      // Process indexes
+      const indexesMap = new Map<string, { columns: string[]; name: string; unique: boolean }>();
+      for (const idxRow of indexesByTable.get(tableName) ?? []) {
         if (!idxRow.attname) {
           continue;
         }
@@ -363,21 +379,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    // Query extensions
-    const extensionsResult = await driver.query<{
-      extname: string;
-    }>(
-      `SELECT extname
-       FROM pg_extension
-       ORDER BY extname`,
-      [],
-    );
-
     const extensions = extensionsResult.rows.map((row) => row.extname);
 
     const storageTypes =
       (await pgEnumControlHooks.introspectTypes?.({ driver, schemaName: schema })) ?? {};
-    // Build annotations with Postgres-specific metadata
+
     const annotations = {
       pg: {
         schema,
@@ -433,4 +439,22 @@ function normalizeFormattedType(formattedType: string, dataType: string, udtName
     return formattedType.replace(' without time zone', '').trim();
   }
   return formattedType;
+}
+
+/**
+ * Groups an array of objects by a specified key.
+ * Returns a Map for O(1) lookup by group key.
+ */
+function groupBy<T, K extends keyof T>(items: readonly T[], key: K): Map<T[K], T[]> {
+  const map = new Map<T[K], T[]>();
+  for (const item of items) {
+    const groupKey = item[key];
+    let group = map.get(groupKey);
+    if (!group) {
+      group = [];
+      map.set(groupKey, group);
+    }
+    group.push(item);
+  }
+  return map;
 }

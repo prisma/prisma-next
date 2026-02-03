@@ -22,7 +22,8 @@ const createMockDriver = (
       return { rows: [{ table_name: 'user' }] as Row[] };
     }
     if (sql.includes('information_schema.columns')) {
-      return { rows: columns as Row[] };
+      // Add table_name to each column for batched query grouping
+      return { rows: columns.map((col) => ({ ...col, table_name: 'user' })) as Row[] };
     }
     if (sql.includes('PRIMARY KEY')) {
       return { rows: [] as Row[] };
