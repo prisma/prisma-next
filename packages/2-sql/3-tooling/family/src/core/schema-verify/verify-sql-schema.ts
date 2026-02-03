@@ -903,26 +903,49 @@ function renderExpectedNativeType(
   return nativeType;
 }
 
+/**
+ * Pre-computed lookup map for simple prefix-based type normalization.
+ * Maps short Postgres type names to their canonical SQL names.
+ * Using a Map for O(1) lookup instead of multiple startsWith checks.
+ */
+const TYPE_PREFIX_MAP: ReadonlyMap<string, string> = new Map([
+  ['varchar', 'character varying'],
+  ['bpchar', 'character'],
+  ['varbit', 'bit varying'],
+]);
+
+/**
+ * Normalizes a schema native type to its canonical form for comparison.
+ *
+ * Uses a pre-computed lookup map for simple prefix replacements (O(1))
+ * and handles complex temporal type normalization separately.
+ */
 function normalizeSchemaNativeType(nativeType: string): string {
   const trimmed = nativeType.trim();
-  if (trimmed.startsWith('varchar')) {
-    return trimmed.replace('varchar', 'character varying');
+
+  // Fast path: check simple prefix replacements using the lookup map
+  for (const [prefix, replacement] of TYPE_PREFIX_MAP) {
+    if (trimmed.startsWith(prefix)) {
+      return replacement + trimmed.slice(prefix.length);
+    }
   }
-  if (trimmed.startsWith('bpchar')) {
-    return trimmed.replace('bpchar', 'character');
+
+  // Temporal types with time zone handling
+  // Check for 'with time zone' suffix first (more specific)
+  if (trimmed.includes(' with time zone')) {
+    if (trimmed.startsWith('timestamp')) {
+      return 'timestamptz' + trimmed.slice(9).replace(' with time zone', '');
+    }
+    if (trimmed.startsWith('time')) {
+      return 'timetz' + trimmed.slice(4).replace(' with time zone', '');
+    }
   }
-  if (trimmed.startsWith('varbit')) {
-    return trimmed.replace('varbit', 'bit varying');
-  }
-  if (trimmed.startsWith('timestamp') && trimmed.includes('with time zone')) {
-    return trimmed.replace('timestamp', 'timestamptz').replace(' with time zone', '').trim();
-  }
-  if (trimmed.startsWith('time') && trimmed.includes('with time zone')) {
-    return trimmed.replace('time', 'timetz').replace(' with time zone', '').trim();
-  }
+
+  // Handle 'without time zone' suffix - just strip it
   if (trimmed.includes(' without time zone')) {
-    return trimmed.replace(' without time zone', '').trim();
+    return trimmed.replace(' without time zone', '');
   }
+
   return trimmed;
 }
 

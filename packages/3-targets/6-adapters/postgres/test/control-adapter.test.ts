@@ -118,6 +118,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   column_name: 'id',
                   data_type: 'integer',
                   udt_name: 'int4',
@@ -127,6 +128,7 @@ describe('PostgresControlAdapter', () => {
                   numeric_scale: null,
                 },
                 {
+                  table_name: 'user',
                   column_name: 'email',
                   data_type: 'character varying',
                   udt_name: 'varchar',
@@ -142,6 +144,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   constraint_name: 'user_pkey',
                   column_name: 'id',
                   ordinal_position: 1,
@@ -201,6 +204,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   column_name: 'text_col',
                   data_type: 'character varying',
                   udt_name: 'varchar',
@@ -258,6 +262,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   column_name: 'price',
                   data_type: 'numeric',
                   udt_name: 'numeric',
@@ -315,6 +320,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   column_name: 'amount',
                   data_type: 'numeric',
                   udt_name: 'numeric',
@@ -372,6 +378,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   column_name: 'value',
                   data_type: 'numeric',
                   udt_name: 'numeric',
@@ -421,6 +428,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('information_schema.columns'),
           rows: [
             {
+              table_name: 'user',
               column_name: 'flags',
               data_type: 'bit',
               udt_name: 'bit',
@@ -454,6 +462,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('information_schema.columns'),
           rows: [
             {
+              table_name: 'post',
               column_name: 'id',
               data_type: 'integer',
               udt_name: 'int4',
@@ -463,6 +472,7 @@ describe('PostgresControlAdapter', () => {
               numeric_scale: null,
             },
             {
+              table_name: 'post',
               column_name: 'user_id',
               data_type: 'integer',
               udt_name: 'int4',
@@ -477,6 +487,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('PRIMARY KEY'),
           rows: [
             {
+              table_name: 'post',
               constraint_name: 'post_pkey',
               column_name: 'id',
               ordinal_position: 1,
@@ -487,6 +498,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('FOREIGN KEY'),
           rows: [
             {
+              table_name: 'post',
               constraint_name: 'post_user_id_fkey',
               column_name: 'user_id',
               ordinal_position: 1,
@@ -522,6 +534,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('information_schema.columns'),
           rows: [
             {
+              table_name: 'order',
               column_name: 'user_id',
               data_type: 'integer',
               udt_name: 'int4',
@@ -531,6 +544,7 @@ describe('PostgresControlAdapter', () => {
               numeric_scale: null,
             },
             {
+              table_name: 'order',
               column_name: 'account_id',
               data_type: 'integer',
               udt_name: 'int4',
@@ -545,6 +559,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('PRIMARY KEY'),
           rows: [
             {
+              table_name: 'order',
               constraint_name: 'order_pkey',
               column_name: 'user_id',
               ordinal_position: 1,
@@ -555,6 +570,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('FOREIGN KEY'),
           rows: [
             {
+              table_name: 'order',
               constraint_name: 'order_account_fkey',
               column_name: 'user_id',
               ordinal_position: 1,
@@ -563,6 +579,7 @@ describe('PostgresControlAdapter', () => {
               referenced_column_name: 'user_id',
             },
             {
+              table_name: 'order',
               constraint_name: 'order_account_fkey',
               column_name: 'account_id',
               ordinal_position: 2,
@@ -598,6 +615,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('information_schema.columns'),
           rows: [
             {
+              table_name: 'user',
               column_name: 'id',
               data_type: 'integer',
               udt_name: 'int4',
@@ -607,6 +625,7 @@ describe('PostgresControlAdapter', () => {
               numeric_scale: null,
             },
             {
+              table_name: 'user',
               column_name: 'email',
               data_type: 'character varying',
               udt_name: 'varchar',
@@ -618,11 +637,10 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: (sql) =>
-            sql.includes("constraint_type = 'PRIMARY KEY'") &&
-            !sql.includes("constraint_type = 'UNIQUE'"),
+          match: includes('PRIMARY KEY'),
           rows: [
             {
+              table_name: 'user',
               constraint_name: 'user_pkey',
               column_name: 'id',
               ordinal_position: 1,
@@ -631,9 +649,10 @@ describe('PostgresControlAdapter', () => {
         },
         { match: includes('FOREIGN KEY'), rows: [] },
         {
-          match: (sql) => sql.includes("constraint_type = 'UNIQUE'") && sql.includes('NOT IN'),
+          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
           rows: [
             {
+              table_name: 'user',
               constraint_name: 'user_email_key',
               column_name: 'email',
               ordinal_position: 1,
@@ -663,6 +682,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('information_schema.columns'),
           rows: [
             {
+              table_name: 'user',
               column_name: 'email',
               data_type: 'character varying',
               udt_name: 'varchar',
@@ -672,6 +692,7 @@ describe('PostgresControlAdapter', () => {
               numeric_scale: null,
             },
             {
+              table_name: 'user',
               column_name: 'tenant_id',
               data_type: 'integer',
               udt_name: 'int4',
@@ -683,21 +704,21 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: (sql) =>
-            sql.includes("constraint_type = 'PRIMARY KEY'") &&
-            !sql.includes("constraint_type = 'UNIQUE'"),
+          match: includes('PRIMARY KEY'),
           rows: [],
         },
         { match: includes('FOREIGN KEY'), rows: [] },
         {
-          match: (sql) => sql.includes("constraint_type = 'UNIQUE'") && sql.includes('NOT IN'),
+          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
           rows: [
             {
+              table_name: 'user',
               constraint_name: 'user_email_tenant_key',
               column_name: 'email',
               ordinal_position: 1,
             },
             {
+              table_name: 'user',
               constraint_name: 'user_email_tenant_key',
               column_name: 'tenant_id',
               ordinal_position: 2,
@@ -727,6 +748,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('information_schema.columns'),
           rows: [
             {
+              table_name: 'user',
               column_name: 'id',
               data_type: 'integer',
               udt_name: 'int4',
@@ -736,6 +758,7 @@ describe('PostgresControlAdapter', () => {
               numeric_scale: null,
             },
             {
+              table_name: 'user',
               column_name: 'name',
               data_type: 'character varying',
               udt_name: 'varchar',
@@ -750,6 +773,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('PRIMARY KEY'),
           rows: [
             {
+              table_name: 'user',
               constraint_name: 'user_pkey',
               column_name: 'id',
               ordinal_position: 1,
@@ -762,6 +786,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('pg_indexes'),
           rows: [
             {
+              tablename: 'user',
               indexname: 'user_name_idx',
               indisunique: false,
               attname: 'name',
@@ -792,6 +817,7 @@ describe('PostgresControlAdapter', () => {
           match: includes('information_schema.columns'),
           rows: [
             {
+              table_name: 'user',
               column_name: 'email',
               data_type: 'character varying',
               udt_name: 'varchar',
@@ -801,6 +827,7 @@ describe('PostgresControlAdapter', () => {
               numeric_scale: null,
             },
             {
+              table_name: 'user',
               column_name: 'tenant_id',
               data_type: 'integer',
               udt_name: 'int4',
@@ -821,12 +848,14 @@ describe('PostgresControlAdapter', () => {
           match: includes('pg_indexes'),
           rows: [
             {
+              tablename: 'user',
               indexname: 'user_email_tenant_idx',
               indisunique: false,
               attname: 'email',
               attnum: 1,
             },
             {
+              tablename: 'user',
               indexname: 'user_email_tenant_idx',
               indisunique: false,
               attname: 'tenant_id',
@@ -862,6 +891,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   column_name: 'id',
                   data_type: 'integer',
                   udt_name: 'int4',
@@ -877,6 +907,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   constraint_name: 'user_pkey',
                   column_name: 'id',
                   ordinal_position: 1,
@@ -894,12 +925,14 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  tablename: 'user',
                   indexname: 'user_idx',
                   indisunique: false,
                   attname: null,
                   attnum: 0,
                 },
                 {
+                  tablename: 'user',
                   indexname: 'user_idx',
                   indisunique: false,
                   attname: 'id',
@@ -1049,6 +1082,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   column_name: 'id',
                   data_type: 'integer',
                   udt_name: 'int4',
@@ -1103,6 +1137,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   column_name: 'id',
                   data_type: 'integer',
                   udt_name: 'int4',
@@ -1118,6 +1153,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'user',
                   constraint_name: '',
                   column_name: 'id',
                   ordinal_position: 1,
