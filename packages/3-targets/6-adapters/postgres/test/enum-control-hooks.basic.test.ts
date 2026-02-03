@@ -144,6 +144,50 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
     ]);
   });
 
+  it('adds missing enum value before existing when only next exists', () => {
+    const contract = createTestContract({
+      types: {
+        Role: {
+          codecId: ENUM_CODEC_ID,
+          nativeType: 'role',
+          typeParams: { values: ['A', 'B'] },
+        },
+      },
+    });
+
+    const schema = createTestSchema({
+      role: {
+        codecId: ENUM_CODEC_ID,
+        nativeType: 'role',
+        typeParams: { values: ['B'] },
+      },
+    });
+
+    const result = pgEnumControlHooks.planTypeOperations?.({
+      typeName: 'Role',
+      typeInstance: {
+        codecId: ENUM_CODEC_ID,
+        nativeType: 'role',
+        typeParams: { values: ['A', 'B'] },
+      },
+      contract,
+      schema,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+    });
+
+    expect(result?.operations).toMatchObject([
+      {
+        id: 'type.Role.value.A',
+        operationClass: 'widening',
+        execute: [
+          {
+            sql: 'ALTER TYPE "public"."role" ADD VALUE IF NOT EXISTS \'A\' BEFORE \'B\'',
+          },
+        ],
+      },
+    ]);
+  });
+
   it('rebuilds enum when values are reordered', () => {
     const contract = createTestContract({
       tables: {
@@ -227,6 +271,69 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
         }),
       ]),
     );
+  });
+
+  it('throws when enum value exceeds length limit', () => {
+    const longValue = 'a'.repeat(64);
+    const contract = createTestContract({
+      types: {
+        Role: {
+          codecId: ENUM_CODEC_ID,
+          nativeType: 'role',
+          typeParams: { values: [longValue] },
+        },
+      },
+    });
+
+    expect(() =>
+      pgEnumControlHooks.planTypeOperations?.({
+        typeName: 'Role',
+        typeInstance: {
+          codecId: ENUM_CODEC_ID,
+          nativeType: 'role',
+          typeParams: { values: [longValue] },
+        },
+        contract,
+        schema: createTestSchema(),
+        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      }),
+    ).toThrow('exceeds PostgreSQL');
+  });
+
+  it('throws when enum type name is too long for rebuild', () => {
+    const longTypeName = 'a'.repeat(60);
+    const contract = createTestContract({
+      types: {
+        Role: {
+          codecId: ENUM_CODEC_ID,
+          nativeType: longTypeName,
+          typeParams: { values: ['B', 'A'] },
+        },
+      },
+    });
+
+    const schema = createTestSchema({
+      [longTypeName]: {
+        codecId: ENUM_CODEC_ID,
+        nativeType: longTypeName,
+        typeParams: { values: ['A', 'B'] },
+      },
+    });
+
+    expect(() =>
+      pgEnumControlHooks.planTypeOperations?.({
+        typeName: 'Role',
+        typeInstance: {
+          codecId: ENUM_CODEC_ID,
+          nativeType: longTypeName,
+          typeParams: { values: ['B', 'A'] },
+        },
+        contract,
+        schema,
+        schemaName: 'public',
+        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      }),
+    ).toThrow('too long for rebuild operation');
   });
 });
 

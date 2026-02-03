@@ -245,4 +245,155 @@ describe('adapter-postgres codecs', () => {
       expect(decoded).toBe(value);
     });
   });
+
+  describe('character codec', () => {
+    const charCodec = codecDefinitions.character.codec as {
+      encode: (value: string) => string;
+      decode: (wire: string) => string;
+    };
+
+    it('encodes string as-is', () => {
+      const value = 'A';
+      const encoded = charCodec.encode(value);
+      expect(encoded).toBe(value);
+    });
+
+    it('decodes string as-is', () => {
+      const value = 'Z';
+      const decoded = charCodec.decode(value);
+      expect(decoded).toBe(value);
+    });
+  });
+
+  describe('character varying codec', () => {
+    const varcharCodec = codecDefinitions['character varying'].codec as {
+      encode: (value: string) => string;
+      decode: (wire: string) => string;
+    };
+
+    it('encodes string as-is', () => {
+      const value = 'hello';
+      const encoded = varcharCodec.encode(value);
+      expect(encoded).toBe(value);
+    });
+
+    it('decodes string as-is', () => {
+      const value = 'world';
+      const decoded = varcharCodec.decode(value);
+      expect(decoded).toBe(value);
+    });
+  });
+
+  describe('numeric codec', () => {
+    const numericCodec = codecDefinitions.numeric.codec as {
+      encode: (value: string) => string;
+      decode: (wire: string | number) => string;
+    };
+
+    it('encodes string as-is', () => {
+      const value = '123.45';
+      const encoded = numericCodec.encode(value);
+      expect(encoded).toBe(value);
+    });
+
+    it('decodes number to string', () => {
+      const decoded = numericCodec.decode(42);
+      expect(decoded).toBe('42');
+    });
+  });
+
+  describe('time codec', () => {
+    const timeCodec = codecDefinitions.time.codec as {
+      encode: (value: string) => string;
+      decode: (wire: string) => string;
+    };
+
+    it('encodes string as-is', () => {
+      const value = '12:34:56';
+      const encoded = timeCodec.encode(value);
+      expect(encoded).toBe(value);
+    });
+
+    it('decodes string as-is', () => {
+      const value = '23:59:59';
+      const decoded = timeCodec.decode(value);
+      expect(decoded).toBe(value);
+    });
+  });
+
+  describe('timetz codec', () => {
+    const timetzCodec = codecDefinitions.timetz.codec as {
+      encode: (value: string) => string;
+      decode: (wire: string) => string;
+    };
+
+    it('encodes string as-is', () => {
+      const value = '12:34:56+02';
+      const encoded = timetzCodec.encode(value);
+      expect(encoded).toBe(value);
+    });
+
+    it('decodes string as-is', () => {
+      const value = '23:59:59-05';
+      const decoded = timetzCodec.decode(value);
+      expect(decoded).toBe(value);
+    });
+  });
+
+  describe('bit codec', () => {
+    const bitCodec = codecDefinitions.bit.codec as {
+      encode: (value: string) => string;
+      decode: (wire: string) => string;
+    };
+
+    it('encodes string as-is', () => {
+      const value = '1010';
+      const encoded = bitCodec.encode(value);
+      expect(encoded).toBe(value);
+    });
+
+    it('decodes string as-is', () => {
+      const value = '0101';
+      const decoded = bitCodec.decode(value);
+      expect(decoded).toBe(value);
+    });
+  });
+
+  describe('bit varying codec', () => {
+    const varbitCodec = codecDefinitions['bit varying'].codec as {
+      encode: (value: string) => string;
+      decode: (wire: string) => string;
+    };
+
+    it('encodes string as-is', () => {
+      const value = '11110000';
+      const encoded = varbitCodec.encode(value);
+      expect(encoded).toBe(value);
+    });
+
+    it('decodes string as-is', () => {
+      const value = '00001111';
+      const decoded = varbitCodec.decode(value);
+      expect(decoded).toBe(value);
+    });
+  });
+
+  describe('interval codec', () => {
+    const intervalCodec = codecDefinitions.interval.codec as {
+      encode: (value: string) => string;
+      decode: (wire: string) => string;
+    };
+
+    it('encodes string as-is', () => {
+      const value = '1 day';
+      const encoded = intervalCodec.encode(value);
+      expect(encoded).toBe(value);
+    });
+
+    it('decodes string as-is', () => {
+      const value = '2 hours';
+      const decoded = intervalCodec.decode(value);
+      expect(decoded).toBe(value);
+    });
+  });
 });
