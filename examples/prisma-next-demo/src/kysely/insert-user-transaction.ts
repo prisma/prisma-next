@@ -25,8 +25,11 @@ export async function insertUserTransaction(userId: number, runtime: Runtime) {
 
       throw new Error('Simulated error to trigger rollback');
     })
-    .catch(() => {
-      // Ignore error
+    .catch((err) => {
+      if (err.message !== 'Simulated error to trigger rollback') {
+        // Ignore error
+        throw err;
+      }
     });
 
   return kysely.selectFrom('user').selectAll().where('id', '=', userId).executeTakeFirst();

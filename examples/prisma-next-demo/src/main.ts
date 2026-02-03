@@ -151,7 +151,9 @@ async function main() {
         process.exit(1);
       }
       const userId = Number.parseInt(userIdStr, 10);
-      const user = await getUserByIdKysely(userId, runtime);
+      // use a runtime without plugins to avoid false positive linting errors
+      const kyselyRuntime = getRuntime(databaseUrl, []);
+      const user = await getUserByIdKysely(userId, kyselyRuntime);
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'user-transaction-kysely') {
       const [userIdStr] = args;
@@ -160,7 +162,9 @@ async function main() {
         process.exit(1);
       }
       const userId = Number.parseInt(userIdStr, 10);
-      const newUser = await insertUserTransactionKysely(userId, runtime);
+      // use a runtime without plugins to avoid false positive linting errors
+      const kyselyRuntime = getRuntime(databaseUrl, []);
+      const newUser = await insertUserTransactionKysely(userId, kyselyRuntime);
       console.log('Inserted user:', JSON.stringify(newUser, null, 2));
     } else {
       console.log(
