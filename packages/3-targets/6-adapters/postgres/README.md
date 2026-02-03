@@ -27,6 +27,7 @@ Provide PostgreSQL-specific adapter implementation, codecs, and capabilities. En
 - **Codec Definitions**: Define PostgreSQL codecs for type conversion
   - Wire format to JavaScript type decoding
   - JavaScript type to wire format encoding
+- **Storage Type Control Hooks**: Provide control-plane hooks for contract-defined storage types (e.g., enums)
 - **Codec Types**: Export TypeScript types for PostgreSQL codecs
 - **Descriptors**: Provide adapter descriptors declaring capabilities and codec type imports
 
@@ -97,7 +98,7 @@ flowchart TD
 **Codecs (`codecs.ts`)**
 - PostgreSQL codec definitions
 - Type conversion between wire format and JavaScript
-- Supports PostgreSQL types: `int2`, `int4`, `int8`, `float4`, `float8`, `text`, `timestamp`, `timestamptz`, `bool`
+- Supports PostgreSQL types: `int2`, `int4`, `int8`, `float4`, `float8`, `text`, `timestamp`, `timestamptz`, `bool`, `enum`
 
 **Types (`types.ts`)**
 - PostgreSQL-specific types and utilities
@@ -121,6 +122,9 @@ flowchart TD
 
 **Types Export (`types.ts`)**
 - Re-exports PostgreSQL-specific types
+
+**Column Types Export (`column-types.ts`)**
+- Exports column descriptors for built-in types and enum helpers (`enumType`, `enumColumn(typeRef, nativeType)`)
 
 ## Dependencies
 
@@ -180,6 +184,7 @@ The adapter declares the following PostgreSQL capabilities:
 - **`lateral: true`** - Supports LATERAL joins for `includeMany` nested array includes
 - **`jsonAgg: true`** - Supports JSON aggregation functions (`json_agg`) for `includeMany`
 - **`returning: true`** - Supports RETURNING clauses for DML operations (INSERT, UPDATE, DELETE)
+- **`sql.enums: true`** - Supports contract-defined enum storage types
 
 **Important**: Capabilities must be declared in **both** places:
 

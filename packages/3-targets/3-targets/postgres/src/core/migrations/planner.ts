@@ -1,6 +1,11 @@
-import { parsePostgresDefault } from '@prisma-next/adapter-postgres/control';
+import {
+  escapeLiteral,
+  parsePostgresDefault,
+  quoteIdentifier,
+} from '@prisma-next/adapter-postgres/control';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
+  CodecControlHooks,
   MigrationOperationPolicy,
   SqlMigrationPlanner,
   SqlMigrationPlannerPlanOptions,
@@ -9,6 +14,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import {
   createMigrationPlan,
+  extractCodecControlHooks,
   plannerFailure,
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
@@ -26,9 +32,10 @@ import type {
   StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
 
-type OperationClass = 'extension' | 'table' | 'unique' | 'index' | 'foreignKey';
+type OperationClass = 'extension' | 'type' | 'table' | 'unique' | 'index' | 'foreignKey';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -90,11 +97,21 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       return plannerFailure(classification.conflicts);
     }
 
+    // Extract codec control hooks once at entry point for reuse across all operations.
+    // This avoids repeated iteration over frameworkComponents for each method that needs hooks.
+    const codecHooks = extractCodecControlHooks(options.frameworkComponents);
+
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+
+    const storageTypePlan = this.buildStorageTypeOperations(options, schemaName, codecHooks);
+    if (storageTypePlan.conflicts.length > 0) {
+      return plannerFailure(storageTypePlan.conflicts);
+    }
 
     // Build extension operations from component-owned database dependencies
     operations.push(
       ...this.buildDatabaseDependencyOperations(options),
+      ...storageTypePlan.operations,
       ...this.buildTableOperations(options.contract.storage.tables, options.schema, schemaName),
       ...this.buildColumnOperations(options.contract.storage.tables, options.schema, schemaName),
       ...this.buildPrimaryKeyOperations(
@@ -116,7 +133,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       origin: null,
       destination: {
         coreHash: options.contract.coreHash,
-        ...(options.contract.profileHash ? { profileHash: options.contract.profileHash } : {}),
+        ...ifDefined('profileHash', options.contract.profileHash),
       },
       operations,
     });
@@ -172,6 +189,55 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     }
 
     return operations;
+  }
+
+  private buildStorageTypeOperations(
+    options: PlannerOptionsWithComponents,
+    schemaName: string,
+    codecHooks: Map<string, CodecControlHooks>,
+  ): {
+    readonly operations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+    readonly conflicts: readonly SqlPlannerConflict[];
+  } {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    const conflicts: SqlPlannerConflict[] = [];
+    const storageTypes = options.contract.storage.types ?? {};
+
+    for (const [typeName, typeInstance] of sortedEntries(storageTypes)) {
+      const hook = codecHooks.get(typeInstance.codecId);
+      const planResult = hook?.planTypeOperations?.({
+        typeName,
+        typeInstance,
+        contract: options.contract,
+        schema: options.schema,
+        schemaName,
+        policy: options.policy,
+      });
+      if (!planResult) {
+        continue;
+      }
+      for (const operation of planResult.operations) {
+        if (!options.policy.allowedOperationClasses.includes(operation.operationClass)) {
+          conflicts.push({
+            kind: 'missingButNonAdditive',
+            summary: `Storage type "${typeName}" requires "${operation.operationClass}" operation "${operation.id}"`,
+            location: {
+              type: typeName,
+            },
+          });
+          continue;
+        }
+        operations.push({
+          ...operation,
+          target: {
+            id: operation.target.id,
+            details: this.buildTargetDetails('type', typeName, schemaName),
+          },
+        });
+      }
+    }
+
+    return { operations, conflicts };
   }
   private collectDependencies(
     options: PlannerOptionsWithComponents,
@@ -531,7 +597,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       schema,
       objectType,
       name,
-      ...(table ? { table } : {}),
+      ...ifDefined('table', table),
     };
   }
 
@@ -596,16 +662,16 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
     const meta =
       issue.expected || issue.actual
         ? Object.freeze({
-            ...(issue.expected ? { expected: issue.expected } : {}),
-            ...(issue.actual ? { actual: issue.actual } : {}),
+            ...ifDefined('expected', issue.expected),
+            ...ifDefined('actual', issue.actual),
           })
         : undefined;
 
     return {
       kind,
       summary: issue.message,
-      ...(location ? { location } : {}),
-      ...(meta ? { meta } : {}),
+      ...ifDefined('location', location),
+      ...ifDefined('meta', meta),
     };
   }
 }
@@ -722,16 +788,6 @@ function qualifyTableName(schema: string, table: string): string {
 function toRegclassLiteral(schema: string, name: string): string {
   const regclass = `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
   return `'${escapeLiteral(regclass)}'`;
-}
-
-/** Escapes and quotes a SQL identifier (table, column, schema name). */
-function quoteIdentifier(identifier: string): string {
-  // TypeScript enforces string type - no runtime check needed for internal callers
-  return `"${identifier.replace(/"/g, '""')}"`;
-}
-
-function escapeLiteral(value: string): string {
-  return value.replace(/'/g, "''");
 }
 
 function sortedEntries<V>(record: Readonly<Record<string, V>>): Array<[string, V]> {
@@ -869,6 +925,8 @@ function hasForeignKey(table: SqlSchemaIR['tables'][string], fk: ForeignKey): bo
 
 function isAdditiveIssue(issue: SchemaIssue): boolean {
   switch (issue.kind) {
+    case 'type_missing':
+    case 'type_values_mismatch':
     case 'missing_table':
     case 'missing_column':
     case 'extension_missing':

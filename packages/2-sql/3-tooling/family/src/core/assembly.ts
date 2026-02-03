@@ -1,5 +1,6 @@
 import type {
   NormalizedTypeRenderer,
+  TargetBoundComponentDescriptor,
   TypeRenderer,
 } from '@prisma-next/contract/framework-components';
 import { normalizeRenderer } from '@prisma-next/contract/framework-components';
@@ -12,18 +13,47 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import type { OperationRegistry, OperationSignature } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
+import type { CodecControlHooks } from './migrations/types';
 
+type SqlControlDescriptor =
+  | ControlTargetDescriptor<'sql', string>
+  | ControlAdapterDescriptor<'sql', string>
+  | ControlExtensionDescriptor<'sql', string>;
+
+function addUniqueId(ids: string[], seen: Set<string>, id: string): void {
+  if (!seen.has(id)) {
+    ids.push(id);
+    seen.add(id);
+  }
+}
+
+function assertUniqueCodecOwner(options: {
+  readonly codecId: string;
+  readonly owners: Map<string, string>;
+  readonly descriptorId: string;
+  readonly entityLabel: string;
+  readonly entityOwnershipLabel: string;
+}): void {
+  const existingOwner = options.owners.get(options.codecId);
+  if (existingOwner !== undefined) {
+    throw new Error(
+      `Duplicate ${options.entityLabel} for codecId "${options.codecId}". ` +
+        `Descriptor "${options.descriptorId}" conflicts with "${existingOwner}". ` +
+        `Each codecId can only have one ${options.entityOwnershipLabel}.`,
+    );
+  }
+}
+
+// ============================================================================
+// Operation Registry Assembly
+// ============================================================================
 /**
  * Assembles an operation registry from descriptors (adapter, target, extensions).
  * Loops over descriptors, extracts operations, converts them using the provided
  * conversion function, and registers them in a new registry.
  */
 export function assembleOperationRegistry(
-  descriptors: ReadonlyArray<
-    | ControlTargetDescriptor<'sql', string>
-    | ControlAdapterDescriptor<'sql', string>
-    | ControlExtensionDescriptor<'sql', string>
-  >,
+  descriptors: ReadonlyArray<SqlControlDescriptor>,
   convertOperationManifest: (manifest: OperationManifest) => OperationSignature,
 ): OperationRegistry {
   const registry = createOperationRegistry();
@@ -39,15 +69,14 @@ export function assembleOperationRegistry(
   return registry;
 }
 
+// ============================================================================
+// Type Import Extraction
+// ============================================================================
 /**
  * Extracts codec type imports from descriptors for contract.d.ts generation.
  */
 export function extractCodecTypeImports(
-  descriptors: ReadonlyArray<
-    | ControlTargetDescriptor<'sql', string>
-    | ControlAdapterDescriptor<'sql', string>
-    | ControlExtensionDescriptor<'sql', string>
-  >,
+  descriptors: ReadonlyArray<SqlControlDescriptor>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -69,11 +98,7 @@ export function extractCodecTypeImports(
  * Extracts operation type imports from descriptors for contract.d.ts generation.
  */
 export function extractOperationTypeImports(
-  descriptors: ReadonlyArray<
-    | ControlTargetDescriptor<'sql', string>
-    | ControlAdapterDescriptor<'sql', string>
-    | ControlExtensionDescriptor<'sql', string>
-  >,
+  descriptors: ReadonlyArray<SqlControlDescriptor>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 
@@ -88,6 +113,9 @@ export function extractOperationTypeImports(
   return imports;
 }
 
+// ============================================================================
+// Extension ID Extraction
+// ============================================================================
 /**
  * Extracts extension IDs from descriptors in deterministic order:
  * [adapter.id, target.id, ...extensions.map(e => e.id)]
@@ -102,28 +130,22 @@ export function extractExtensionIds(
   const seen = new Set<string>();
 
   // Add adapter first
-  if (!seen.has(adapter.id)) {
-    ids.push(adapter.id);
-    seen.add(adapter.id);
-  }
+  addUniqueId(ids, seen, adapter.id);
 
   // Add target second
-  if (!seen.has(target.id)) {
-    ids.push(target.id);
-    seen.add(target.id);
-  }
+  addUniqueId(ids, seen, target.id);
 
   // Add extensions in order
   for (const ext of extensions) {
-    if (!seen.has(ext.id)) {
-      ids.push(ext.id);
-      seen.add(ext.id);
-    }
+    addUniqueId(ids, seen, ext.id);
   }
 
   return ids;
 }
 
+// ============================================================================
+// Parameterized Renderers
+// ============================================================================
 /**
  * Extracts and normalizes parameterized codec renderers from descriptors.
  * Templates are compiled to functions at this layer.
@@ -134,13 +156,10 @@ export function extractExtensionIds(
  * @returns Map from codecId to normalized renderer
  */
 export function extractParameterizedRenderers(
-  descriptors: ReadonlyArray<
-    | ControlTargetDescriptor<'sql', string>
-    | ControlAdapterDescriptor<'sql', string>
-    | ControlExtensionDescriptor<'sql', string>
-  >,
+  descriptors: ReadonlyArray<SqlControlDescriptor>,
 ): Map<string, NormalizedTypeRenderer> {
   const renderers = new Map<string, NormalizedTypeRenderer>();
+  // Codec owner: the single descriptor allowed to define a codecId renderer or hooks.
   const owners = new Map<string, string>(); // codecId -> descriptor.id for error messages
 
   for (const descriptor of descriptors) {
@@ -149,21 +168,83 @@ export function extractParameterizedRenderers(
 
     const parameterized: Record<string, TypeRenderer> = codecTypes.parameterized;
     for (const [codecId, renderer] of Object.entries(parameterized)) {
-      const existingOwner = owners.get(codecId);
-      if (existingOwner !== undefined) {
-        throw new Error(
-          `Duplicate parameterized renderer for codecId "${codecId}". ` +
-            `Descriptor "${descriptor.id}" conflicts with "${existingOwner}". ` +
-            'Each codecId can only have one renderer.',
-        );
-      }
-
+      assertUniqueCodecOwner({
+        codecId,
+        owners,
+        descriptorId: descriptor.id,
+        entityLabel: 'parameterized renderer',
+        entityOwnershipLabel: 'renderer',
+      });
       renderers.set(codecId, normalizeRenderer(codecId, renderer));
       owners.set(codecId, descriptor.id);
     }
   }
 
   return renderers;
+}
+
+type CodecControlHooksMap = Record<string, CodecControlHooks>;
+
+/**
+ * Type guard to check if a descriptor has codec control plane hooks.
+ * Returns true if descriptor.types.codecTypes.controlPlaneHooks is a non-null object.
+ *
+ * @param descriptor - Component descriptor to check (adapter, target, or extension)
+ * @returns True if the descriptor has control plane hooks attached
+ */
+function hasCodecControlHooks(descriptor: unknown): descriptor is {
+  readonly id: string;
+  readonly types: {
+    readonly codecTypes: {
+      readonly controlPlaneHooks: CodecControlHooksMap;
+    };
+  };
+} {
+  if (typeof descriptor !== 'object' || descriptor === null) {
+    return false;
+  }
+  const d = descriptor as { types?: { codecTypes?: { controlPlaneHooks?: unknown } } };
+  const hooks = d.types?.codecTypes?.controlPlaneHooks;
+  return hooks !== null && hooks !== undefined && typeof hooks === 'object';
+}
+
+// ============================================================================
+// Codec Control Hooks
+// ============================================================================
+/**
+ * Extracts codec control hooks from descriptors.
+ *
+ * Throws an error if multiple descriptors provide hooks for the same codecId.
+ */
+export function extractCodecControlHooks(
+  descriptors: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
+): Map<string, CodecControlHooks> {
+  const hooks = new Map<string, CodecControlHooks>();
+  // Codec owner: the single descriptor allowed to define a codecId renderer or hooks.
+  const owners = new Map<string, string>();
+
+  for (const descriptor of descriptors) {
+    if (typeof descriptor !== 'object' || descriptor === null) {
+      continue;
+    }
+    if (!hasCodecControlHooks(descriptor)) {
+      continue;
+    }
+    const controlPlaneHooks = descriptor.types.codecTypes.controlPlaneHooks;
+    for (const [codecId, hook] of Object.entries(controlPlaneHooks)) {
+      assertUniqueCodecOwner({
+        codecId,
+        owners,
+        descriptorId: descriptor.id,
+        entityLabel: 'control hooks',
+        entityOwnershipLabel: 'owner',
+      });
+      hooks.set(codecId, hook);
+      owners.set(codecId, descriptor.id);
+    }
+  }
+
+  return hooks;
 }
 
 /**
@@ -173,11 +254,7 @@ export function extractParameterizedRenderers(
  * @returns Array of type import specs (may contain duplicates; caller should deduplicate)
  */
 export function extractParameterizedTypeImports(
-  descriptors: ReadonlyArray<
-    | ControlTargetDescriptor<'sql', string>
-    | ControlAdapterDescriptor<'sql', string>
-    | ControlExtensionDescriptor<'sql', string>
-  >,
+  descriptors: ReadonlyArray<SqlControlDescriptor>,
 ): ReadonlyArray<TypesImportSpec> {
   const imports: TypesImportSpec[] = [];
 

@@ -17,6 +17,7 @@ import type {
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { extractCodecControlHooks } from '../assembly';
 import type { ComponentDatabaseDependency } from '../migrations/types';
 import {
   computeCounts,
@@ -88,6 +89,51 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   });
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
+
+  // Verify storage type instances via codec control hooks (pure, deterministic)
+  const storageTypes = contract.storage.types ?? {};
+  const storageTypeEntries = Object.entries(storageTypes);
+  if (storageTypeEntries.length > 0) {
+    const controlHooks = extractCodecControlHooks(options.frameworkComponents);
+    const typeNodes: SchemaVerificationNode[] = [];
+    for (const [typeName, typeInstance] of storageTypeEntries) {
+      const hook = controlHooks.get(typeInstance.codecId);
+      const typeIssues = hook?.verifyType
+        ? hook.verifyType({ typeName, typeInstance, schema })
+        : [];
+      if (typeIssues.length > 0) {
+        issues.push(...typeIssues);
+      }
+      const typeStatus = typeIssues.length > 0 ? 'fail' : 'pass';
+      const typeCode = typeIssues.length > 0 ? (typeIssues[0]?.kind ?? '') : '';
+      typeNodes.push({
+        status: typeStatus,
+        kind: 'storageType',
+        name: `type ${typeName}`,
+        contractPath: `storage.types.${typeName}`,
+        code: typeCode,
+        message:
+          typeIssues.length > 0
+            ? `${typeIssues.length} issue${typeIssues.length === 1 ? '' : 's'}`
+            : '',
+        expected: undefined,
+        actual: undefined,
+        children: [],
+      });
+    }
+    const typesStatus = typeNodes.some((n) => n.status === 'fail') ? 'fail' : 'pass';
+    rootChildren.push({
+      status: typesStatus,
+      kind: 'storageTypes',
+      name: 'types',
+      contractPath: 'storage.types',
+      code: typesStatus === 'fail' ? 'type_mismatch' : '',
+      message: '',
+      expected: undefined,
+      actual: undefined,
+      children: typeNodes,
+    });
+  }
 
   const databaseDependencies = collectDependenciesFromFrameworkComponents(
     options.frameworkComponents,

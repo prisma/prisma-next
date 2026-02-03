@@ -15,6 +15,7 @@ import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { readMarker } from '@prisma-next/family-sql/verify';
 import { SqlQueryError } from '@prisma-next/sql-errors';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { ok, okVoid } from '@prisma-next/utils/result';
 import type { PostgresPlanTargetDetails } from './planner';
@@ -373,13 +374,13 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     return Object.freeze({
       id: operation.id,
       label: operation.label,
-      ...(operation.summary ? { summary: operation.summary } : {}),
+      ...ifDefined('summary', operation.summary),
       operationClass: operation.operationClass,
       target: operation.target, // Already frozen from plan creation
       precheck: Object.freeze([]),
       execute: Object.freeze([]),
       postcheck: frozenPostcheck,
-      ...(operation.meta || mergedMeta ? { meta: mergedMeta } : {}),
+      ...ifDefined('meta', operation.meta || mergedMeta ? mergedMeta : undefined),
     });
   }
 

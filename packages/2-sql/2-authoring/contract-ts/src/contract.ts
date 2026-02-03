@@ -210,7 +210,6 @@ export function computeMappings(
 function validateContractLogic(structurallyValidatedContract: SqlContract<SqlStorage>): void {
   const { storage, models } = structurallyValidatedContract;
   const tableNames = new Set(Object.keys(storage.tables));
-  const typeInstanceNames = new Set(Object.keys(storage.types ?? {}));
 
   // Validate storage.types if present
   if (storage.types) {
@@ -241,11 +240,26 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
         );
       }
 
-      // Validate typeRef points to an existing storage.types key
-      if (column.typeRef !== undefined && !typeInstanceNames.has(column.typeRef)) {
-        throw new Error(
-          `Column "${columnName}" in table "${tableName}" references non-existent type instance "${column.typeRef}" (not found in storage.types)`,
-        );
+      // Validate typeRef points to an existing storage.types key and matches codecId/nativeType
+      if (column.typeRef !== undefined) {
+        const referencedType = storage.types?.[column.typeRef];
+        if (!referencedType) {
+          throw new Error(
+            `Column "${columnName}" in table "${tableName}" references non-existent type instance "${column.typeRef}" (not found in storage.types)`,
+          );
+        }
+
+        if (column.codecId !== referencedType.codecId) {
+          throw new Error(
+            `Column "${columnName}" in table "${tableName}" has codecId "${column.codecId}" but references type instance "${column.typeRef}" with codecId "${referencedType.codecId}"`,
+          );
+        }
+
+        if (column.nativeType !== referencedType.nativeType) {
+          throw new Error(
+            `Column "${columnName}" in table "${tableName}" has nativeType "${column.nativeType}" but references type instance "${column.typeRef}" with nativeType "${referencedType.nativeType}"`,
+          );
+        }
       }
     }
   }

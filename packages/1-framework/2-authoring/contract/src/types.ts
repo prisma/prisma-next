@@ -9,6 +9,8 @@ export type BuildStorageColumn<Nullable extends boolean, Type extends string> = 
   readonly nativeType: string;
   readonly codecId: Type;
   readonly nullable: Nullable;
+  readonly typeParams?: Record<string, unknown>;
+  readonly typeRef?: string;
 };
 
 export type ExtractColumns<

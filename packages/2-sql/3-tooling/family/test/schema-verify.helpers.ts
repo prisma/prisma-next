@@ -17,13 +17,14 @@ export const emptyTypeMetadataRegistry = new Map<string, { nativeType?: string }
 export function createTestContract(
   tables: Record<string, StorageTable>,
   extensionPacks: Record<string, unknown> = {},
+  storageTypes?: SqlStorage['types'],
 ): SqlContract<SqlStorage> {
   return {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
     coreHash: 'sha256:test',
-    storage: { tables },
+    storage: { tables, ...ifDefined('types', storageTypes) },
     models: {},
     relations: {},
     mappings: {
