@@ -1,3 +1,4 @@
+import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { pgEnumControlHooks } from './enum-control-hooks';
 
 export const postgresAdapterDescriptorMeta = {
@@ -26,7 +27,7 @@ export const postgresAdapterDescriptorMeta = {
         alias: 'PgTypes',
       },
       parameterized: {
-        'pg/enum@1': {
+        [PG_ENUM_CODEC_ID]: {
           kind: 'function',
           render: (params: Record<string, unknown>) => {
             const values = params['values'];
@@ -38,7 +39,7 @@ export const postgresAdapterDescriptorMeta = {
         },
       },
       controlPlaneHooks: {
-        'pg/enum@1': pgEnumControlHooks,
+        [PG_ENUM_CODEC_ID]: pgEnumControlHooks,
       },
     },
     storage: [

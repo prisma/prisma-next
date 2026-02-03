@@ -7,6 +7,7 @@
 
 /**
  * Error thrown when an invalid SQL identifier or literal is detected.
+ * Boundary layers map this to structured envelopes.
  */
 export class SqlEscapeError extends Error {
   constructor(

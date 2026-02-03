@@ -2,6 +2,7 @@ import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { escapeLiteral, qualifyName, quoteIdentifier, validateEnumValueLength } from './sql-utils';
 
 /**
@@ -11,8 +12,6 @@ import { escapeLiteral, qualifyName, quoteIdentifier, validateEnumValueLength } 
  * - Verifies enum types in schema IR
  * - Introspects enum types from the database
  */
-const ENUM_CODEC_ID = 'pg/enum@1';
-
 type EnumRow = {
   schema_name: string;
   type_name: string;
@@ -72,7 +71,7 @@ function readExistingEnumValues(schema: SqlSchemaIR, nativeType: string): readon
   ] as Record<string, StorageTypeInstance> | undefined;
 
   const existing = storageTypes?.[nativeType];
-  if (!existing || existing.codecId !== ENUM_CODEC_ID) {
+  if (!existing || existing.codecId !== PG_ENUM_CODEC_ID) {
     return null;
   }
   return getEnumValues(existing);
@@ -294,7 +293,7 @@ function collectEnumColumnsFromContract(
     for (const [columnName, column] of Object.entries(table.columns)) {
       if (
         column.typeRef === typeName ||
-        (column.nativeType === nativeType && column.codecId === ENUM_CODEC_ID)
+        (column.nativeType === nativeType && column.codecId === PG_ENUM_CODEC_ID)
       ) {
         columns.push({ table: tableName, column: columnName });
       }
@@ -658,7 +657,7 @@ export const pgEnumControlHooks: CodecControlHooks = {
         continue;
       }
       types[row.type_name] = {
-        codecId: ENUM_CODEC_ID,
+        codecId: PG_ENUM_CODEC_ID,
         nativeType: row.type_name,
         typeParams: { values: row.values },
       };
