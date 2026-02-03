@@ -10,26 +10,30 @@
 export type { CodecTypes } from '../core/codecs';
 export { dataTypes } from '../core/codecs';
 
-export type Char<N extends number> = string & { readonly __charLength?: N };
-export type Varchar<N extends number> = string & { readonly __varcharLength?: N };
-export type Numeric<P extends number, S extends number | undefined = undefined> = string & {
-  readonly __numericPrecision?: P;
-  readonly __numericScale?: S;
+type Branded<T, Shape extends Record<string, unknown>> = T & {
+  readonly [K in keyof Shape]?: Shape[K];
 };
-export type Bit<N extends number> = string & { readonly __bitLength?: N };
-export type VarBit<N extends number> = string & { readonly __varbitLength?: N };
-export type Timestamp<P extends number | undefined = undefined> = string & {
-  readonly __timestampPrecision?: P;
-};
-export type Timestamptz<P extends number | undefined = undefined> = string & {
-  readonly __timestamptzPrecision?: P;
-};
-export type Time<P extends number | undefined = undefined> = string & {
-  readonly __timePrecision?: P;
-};
-export type Timetz<P extends number | undefined = undefined> = string & {
-  readonly __timetzPrecision?: P;
-};
-export type Interval<P extends number | undefined = undefined> = string & {
-  readonly __intervalPrecision?: P;
-};
+
+type BrandedString<Shape extends Record<string, unknown>> = Branded<string, Shape>;
+
+export type Char<N extends number> = BrandedString<{ __charLength: N }>;
+export type Varchar<N extends number> = BrandedString<{ __varcharLength: N }>;
+export type Numeric<P extends number, S extends number | undefined = undefined> = BrandedString<{
+  __numericPrecision: P;
+  __numericScale: S;
+}>;
+export type Bit<N extends number> = BrandedString<{ __bitLength: N }>;
+export type VarBit<N extends number> = BrandedString<{ __varbitLength: N }>;
+export type Timestamp<P extends number | undefined = undefined> = BrandedString<{
+  __timestampPrecision: P;
+}>;
+export type Timestamptz<P extends number | undefined = undefined> = BrandedString<{
+  __timestamptzPrecision: P;
+}>;
+export type Time<P extends number | undefined = undefined> = BrandedString<{ __timePrecision: P }>;
+export type Timetz<P extends number | undefined = undefined> = BrandedString<{
+  __timetzPrecision: P;
+}>;
+export type Interval<P extends number | undefined = undefined> = BrandedString<{
+  __intervalPrecision: P;
+}>;

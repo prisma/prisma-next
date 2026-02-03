@@ -87,7 +87,7 @@ describe('end-to-end includeMany and leftJoin queries', () => {
             posts: [],
           });
 
-          expectTypeOf<Row['posts']>({} as Row['posts']).toEqualTypeOf([] as Row['posts']);
+          expectTypeOf<Row['posts']>().toEqualTypeOf<Array<{ id: number; title: string }>>();
         },
       );
     },
