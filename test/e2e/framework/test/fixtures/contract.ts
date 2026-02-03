@@ -1,9 +1,17 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import {
+  bitColumn,
   boolColumn,
+  charColumn,
   int4Column,
+  intervalColumn,
+  numericColumn,
   textColumn,
+  timeColumn,
   timestamptzColumn,
+  timetzColumn,
+  varbitColumn,
+  varcharColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import postgresPack from '@prisma-next/target-postgres/pack';
 // Use relative import to avoid module resolution issues in test context
@@ -17,7 +25,7 @@ export const contract = defineContract<CodecTypes>()
         type: int4Column,
         default: { kind: 'function', expression: 'autoincrement()' },
       })
-      .column('email', { type: textColumn, nullable: false })
+      .column('email', { type: varcharColumn(255), nullable: false })
       .column('created_at', {
         type: timestamptzColumn,
         default: { kind: 'function', expression: 'now()' },
@@ -54,6 +62,27 @@ export const contract = defineContract<CodecTypes>()
         default: { kind: 'function', expression: 'now()' },
       })
       .column('update_at', { type: timestamptzColumn, nullable: true })
+      .primaryKey(['id']),
+  )
+  .table('param_types', (t) =>
+    t
+      .column('id', {
+        type: int4Column,
+        default: { kind: 'function', expression: 'autoincrement()' },
+      })
+      .column('name', { type: varcharColumn(255), nullable: true })
+      .column('code', { type: charColumn(16), nullable: true })
+      .column('price', { type: numericColumn(10, 2), nullable: true })
+      .column('flags', { type: bitColumn(8), nullable: true })
+      .column('bits', { type: varbitColumn(12), nullable: true })
+      .column('created_at', {
+        type: timestamptzColumn,
+        nullable: true,
+        typeParams: { precision: 3 },
+      })
+      .column('starts_at', { type: timeColumn(2), nullable: true })
+      .column('starts_at_tz', { type: timetzColumn(2), nullable: true })
+      .column('duration', { type: intervalColumn(6), nullable: true })
       .primaryKey(['id']),
   )
   .model('User', 'user', (m) =>

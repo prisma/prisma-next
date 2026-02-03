@@ -75,6 +75,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         numeric_precision: number | null;
         numeric_scale: number | null;
         column_default: string | null;
+        formatted_type: string | null;
       }>(
         `SELECT
            column_name,
@@ -84,8 +85,19 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            character_maximum_length,
            numeric_precision,
            numeric_scale,
-           column_default
-         FROM information_schema.columns
+           column_default,
+           format_type(a.atttypid, a.atttypmod) AS formatted_type
+         FROM information_schema.columns c
+         JOIN pg_catalog.pg_class cl
+           ON cl.relname = c.table_name
+         JOIN pg_catalog.pg_namespace ns
+           ON ns.nspname = c.table_schema
+           AND ns.oid = cl.relnamespace
+         JOIN pg_catalog.pg_attribute a
+           ON a.attrelid = cl.oid
+           AND a.attname = c.column_name
+           AND a.attnum > 0
+           AND NOT a.attisdropped
          WHERE table_schema = $1
            AND table_name = $2
          ORDER BY ordinal_position`,
@@ -96,7 +108,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       for (const colRow of columnsResult.rows) {
         // Build native type string from catalog data
         let nativeType = colRow.udt_name;
-        if (colRow.data_type === 'character varying' || colRow.data_type === 'character') {
+        const formattedType = colRow.formatted_type
+          ? normalizeFormattedType(colRow.formatted_type, colRow.data_type, colRow.udt_name)
+          : null;
+        if (formattedType?.includes('(')) {
+          nativeType = formattedType;
+        } else if (colRow.data_type === 'character varying' || colRow.data_type === 'character') {
           if (colRow.character_maximum_length) {
             nativeType = `${colRow.data_type}(${colRow.character_maximum_length})`;
           } else {
@@ -391,4 +408,29 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const match = versionString.match(/PostgreSQL (\d+\.\d+)/);
     return match?.[1] ?? 'unknown';
   }
+}
+
+function normalizeFormattedType(formattedType: string, dataType: string, udtName: string): string {
+  if (formattedType.startsWith('varchar')) {
+    return formattedType.replace('varchar', 'character varying');
+  }
+  if (formattedType.startsWith('bpchar')) {
+    return formattedType.replace('bpchar', 'character');
+  }
+  if (formattedType.startsWith('varbit')) {
+    return formattedType.replace('varbit', 'bit varying');
+  }
+  if (dataType === 'timestamp with time zone' || udtName === 'timestamptz') {
+    return formattedType.replace('timestamp', 'timestamptz').replace(' with time zone', '').trim();
+  }
+  if (dataType === 'timestamp without time zone' || udtName === 'timestamp') {
+    return formattedType.replace(' without time zone', '').trim();
+  }
+  if (dataType === 'time with time zone' || udtName === 'timetz') {
+    return formattedType.replace('time', 'timetz').replace(' with time zone', '').trim();
+  }
+  if (dataType === 'time without time zone' || udtName === 'time') {
+    return formattedType.replace(' without time zone', '').trim();
+  }
+  return formattedType;
 }

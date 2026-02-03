@@ -18,7 +18,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
-import type { ComponentDatabaseDependency } from '../migrations/types';
+import type { CodecControlHooks, ComponentDatabaseDependency } from '../migrations/types';
 import {
   computeCounts,
   verifyDatabaseDependencies,
@@ -78,6 +78,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   const { contract, schema, strict, context, typeMetadataRegistry, normalizeDefault } = options;
   const startTime = Date.now();
 
+  // Extract codec control hooks once at entry point for reuse
+  const codecHooks = extractCodecControlHooks(options.frameworkComponents);
+
   const { contractCoreHash, contractProfileHash, contractTarget } =
     extractContractMetadata(contract);
   const { issues, rootChildren } = verifySchemaTables({
@@ -85,6 +88,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     schema,
     strict,
     typeMetadataRegistry,
+    codecHooks,
     ...(normalizeDefault ? { normalizeDefault } : {}),
   });
 
@@ -209,9 +213,10 @@ function verifySchemaTables(options: {
   schema: SqlSchemaIR;
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
-  const { contract, schema, strict, typeMetadataRegistry, normalizeDefault } = options;
+  const { contract, schema, strict, typeMetadataRegistry, codecHooks, normalizeDefault } = options;
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
   const contractTables = contract.storage.tables;
@@ -249,6 +254,7 @@ function verifySchemaTables(options: {
       issues,
       strict,
       typeMetadataRegistry,
+      codecHooks,
       ...(normalizeDefault ? { normalizeDefault } : {}),
     });
     rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
@@ -288,6 +294,7 @@ function verifyTableChildren(options: {
   issues: SchemaIssue[];
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
 }): SchemaVerificationNode[] {
   const {
@@ -298,6 +305,7 @@ function verifyTableChildren(options: {
     issues,
     strict,
     typeMetadataRegistry,
+    codecHooks,
     normalizeDefault,
   } = options;
   const tableChildren: SchemaVerificationNode[] = [];
@@ -308,6 +316,7 @@ function verifyTableChildren(options: {
     tablePath,
     issues,
     typeMetadataRegistry,
+    codecHooks,
     ...(normalizeDefault ? { normalizeDefault } : {}),
   });
   if (columnNodes.length > 0) {
@@ -417,6 +426,7 @@ function collectContractColumnNodes(options: {
   tablePath: string;
   issues: SchemaIssue[];
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
 }): SchemaVerificationNode[] {
   const {
@@ -426,6 +436,7 @@ function collectContractColumnNodes(options: {
     tablePath,
     issues,
     typeMetadataRegistry,
+    codecHooks,
     normalizeDefault,
   } = options;
   const columnNodes: SchemaVerificationNode[] = [];
@@ -464,6 +475,7 @@ function collectContractColumnNodes(options: {
         columnPath,
         issues,
         typeMetadataRegistry,
+        codecHooks,
         ...(normalizeDefault ? { normalizeDefault } : {}),
       }),
     );
@@ -512,6 +524,7 @@ function verifyColumn(options: {
   columnPath: string;
   issues: SchemaIssue[];
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
 }): SchemaVerificationNode {
   const {
@@ -521,15 +534,18 @@ function verifyColumn(options: {
     schemaColumn,
     columnPath,
     issues,
+    codecHooks,
     normalizeDefault,
   } = options;
   const columnChildren: SchemaVerificationNode[] = [];
   let columnStatus: VerificationStatus = 'pass';
 
-  const contractNativeType = contractColumn.nativeType;
-  const schemaNativeType = schemaColumn.nativeType;
+  const contractNativeType = renderExpectedNativeType(contractColumn, codecHooks);
+  const schemaNativeType = normalizeSchemaNativeType(schemaColumn.nativeType);
 
-  if (contractNativeType !== schemaNativeType) {
+  const allowBaseTypeMatch =
+    contractColumn.typeParams !== undefined && schemaNativeType === contractColumn.nativeType;
+  if (contractNativeType !== schemaNativeType && !allowBaseTypeMatch) {
     issues.push({
       kind: 'type_mismatch',
       table: tableName,
@@ -566,16 +582,16 @@ function verifyColumn(options: {
         actual: undefined,
         children: [],
       });
-    } else if (typeMetadata.nativeType && typeMetadata.nativeType !== contractNativeType) {
+    } else if (typeMetadata.nativeType && typeMetadata.nativeType !== contractColumn.nativeType) {
       columnChildren.push({
         status: 'warn',
         kind: 'type',
         name: 'type_consistency',
         contractPath: `${columnPath}.codecId`,
         code: 'type_consistency_warning',
-        message: `codecId "${contractColumn.codecId}" maps to nativeType "${typeMetadata.nativeType}" in registry, but contract has "${contractNativeType}"`,
+        message: `codecId "${contractColumn.codecId}" maps to nativeType "${typeMetadata.nativeType}" in registry, but contract has "${contractColumn.nativeType}"`,
         expected: typeMetadata.nativeType,
-        actual: contractNativeType,
+        actual: contractColumn.nativeType,
         children: [],
       });
     }
@@ -856,6 +872,58 @@ function collectDependenciesFromFrameworkComponents<T extends string>(
     }
   }
   return dependencies;
+}
+
+/**
+ * Renders the expected native type for a contract column, expanding parameterized types
+ * using codec control hooks when available.
+ *
+ * This function delegates to the `expandNativeType` hook if the codec provides one,
+ * ensuring that the SQL family layer remains dialect-agnostic while allowing
+ * target-specific adapters (like Postgres) to provide their own expansion logic.
+ */
+function renderExpectedNativeType(
+  contractColumn: SqlContract<SqlStorage>['storage']['tables'][string]['columns'][string],
+  codecHooks: Map<string, CodecControlHooks>,
+): string {
+  const { codecId, nativeType, typeParams } = contractColumn;
+
+  // If no typeParams or codecId, return the base native type
+  if (!typeParams || !codecId) {
+    return nativeType;
+  }
+
+  // Try to use the codec's expandNativeType hook if available
+  const hooks = codecHooks.get(codecId);
+  if (hooks?.expandNativeType) {
+    return hooks.expandNativeType({ nativeType, codecId, typeParams });
+  }
+
+  // Fallback: return base native type if no hook is available
+  return nativeType;
+}
+
+function normalizeSchemaNativeType(nativeType: string): string {
+  const trimmed = nativeType.trim();
+  if (trimmed.startsWith('varchar')) {
+    return trimmed.replace('varchar', 'character varying');
+  }
+  if (trimmed.startsWith('bpchar')) {
+    return trimmed.replace('bpchar', 'character');
+  }
+  if (trimmed.startsWith('varbit')) {
+    return trimmed.replace('varbit', 'bit varying');
+  }
+  if (trimmed.startsWith('timestamp') && trimmed.includes('with time zone')) {
+    return trimmed.replace('timestamp', 'timestamptz').replace(' with time zone', '').trim();
+  }
+  if (trimmed.startsWith('time') && trimmed.includes('with time zone')) {
+    return trimmed.replace('time', 'timetz').replace(' with time zone', '').trim();
+  }
+  if (trimmed.includes(' without time zone')) {
+    return trimmed.replace(' without time zone', '').trim();
+  }
+  return trimmed;
 }
 
 /**

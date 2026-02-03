@@ -293,7 +293,8 @@ export function createExecutionContext<
     }
   }
 
-  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(contributors);
+  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(contributors
+  );
 
   if (parameterizedCodecDescriptors.size > 0) {
     validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);

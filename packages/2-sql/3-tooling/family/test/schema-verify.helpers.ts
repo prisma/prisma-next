@@ -1,10 +1,12 @@
 /**
  * Shared test helpers for schema verification tests.
  */
+import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migrations/types';
 
 /**
  * Empty type metadata registry for tests that don't need codec warnings.
@@ -126,4 +128,101 @@ export function createSchemaTable(
     return { ...result, primaryKey: options.primaryKey };
   }
   return result;
+}
+
+/**
+ * Mock implementation of expandNativeType for Postgres parameterized types.
+ * This mirrors the implementation in @prisma-next/adapter-postgres for testing purposes.
+ */
+function mockExpandParameterizedNativeType(input: ExpandNativeTypeInput): string {
+  const { nativeType, codecId, typeParams } = input;
+
+  if (!typeParams || !codecId) {
+    return nativeType;
+  }
+
+  const isValidNumber = (v: unknown): v is number =>
+    typeof v === 'number' && Number.isFinite(v) && Number.isInteger(v) && v >= 0;
+
+  // Length-parameterized types: char, varchar, bit, varbit
+  const lengthCodecs = new Set(['pg/char@1', 'pg/varchar@1', 'pg/bit@1', 'pg/varbit@1']);
+  if (lengthCodecs.has(codecId)) {
+    const length = typeParams['length'];
+    if (isValidNumber(length)) {
+      return `${nativeType}(${length})`;
+    }
+    return nativeType;
+  }
+
+  // Numeric with precision and optional scale
+  if (codecId === 'pg/numeric@1') {
+    const precision = typeParams['precision'];
+    const scale = typeParams['scale'];
+
+    if (isValidNumber(precision)) {
+      if (isValidNumber(scale)) {
+        return `${nativeType}(${precision},${scale})`;
+      }
+      return `${nativeType}(${precision})`;
+    }
+    return nativeType;
+  }
+
+  // Temporal types with precision
+  const temporalCodecs = new Set([
+    'pg/timestamp@1',
+    'pg/timestamptz@1',
+    'pg/time@1',
+    'pg/timetz@1',
+    'pg/interval@1',
+  ]);
+  if (temporalCodecs.has(codecId)) {
+    const precision = typeParams['precision'];
+    if (isValidNumber(precision)) {
+      return `${nativeType}(${precision})`;
+    }
+    return nativeType;
+  }
+
+  return nativeType;
+}
+
+/**
+ * Creates a mock framework component with expandNativeType hook for Postgres parameterized types.
+ * Use this in tests that need to verify parameterized type expansion behavior.
+ */
+export function createMockPostgresComponent(): TargetBoundComponentDescriptor<'sql', 'postgres'> {
+  // Create hooks for each parameterized codec type
+  const parameterizedCodecIds = [
+    'pg/char@1',
+    'pg/varchar@1',
+    'pg/bit@1',
+    'pg/varbit@1',
+    'pg/numeric@1',
+    'pg/timestamp@1',
+    'pg/timestamptz@1',
+    'pg/time@1',
+    'pg/timetz@1',
+    'pg/interval@1',
+  ];
+
+  const controlHooks: Record<string, CodecControlHooks> = {};
+  for (const codecId of parameterizedCodecIds) {
+    controlHooks[codecId] = {
+      expandNativeType: mockExpandParameterizedNativeType,
+    };
+  }
+
+  return {
+    kind: 'adapter',
+    familyId: 'sql',
+    targetId: 'postgres',
+    id: 'postgres-mock',
+    version: '1.0.0',
+    types: {
+      codecTypes: {
+        controlPlaneHooks: controlHooks,
+      },
+    },
+  } as TargetBoundComponentDescriptor<'sql', 'postgres'>;
 }

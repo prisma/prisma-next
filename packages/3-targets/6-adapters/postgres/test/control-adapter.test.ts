@@ -413,6 +413,39 @@ describe('PostgresControlAdapter', () => {
       expect(result.tables['user']?.columns['value']?.nativeType).toBe('numeric');
     });
 
+    it('uses formatted_type for bit length', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'user' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              column_name: 'flags',
+              data_type: 'bit',
+              udt_name: 'bit',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'bit(8)',
+            },
+          ],
+        },
+        { match: includes('PRIMARY KEY'), rows: [] },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('pg_enum'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.tables['user']?.columns['flags']?.nativeType).toBe('bit(8)');
+    });
+
     it('handles foreign keys', async () => {
       const adapter = new PostgresControlAdapter();
       const mockDriver = createMockDriver([
