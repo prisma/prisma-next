@@ -38,6 +38,13 @@ const contract = Object.freeze(
 );
 
 describe('createPostgresAdapter', () => {
+  it('exposes parameterized codecs', () => {
+    const adapter = createPostgresAdapter();
+    const codecs = adapter.parameterizedCodecs();
+
+    expect(codecs.some((codec) => codec.codecId === 'pg/numeric@1')).toBe(true);
+  });
+
   it('lowers select AST into canonical SQL with positional params', () => {
     const adapter = createPostgresAdapter();
 

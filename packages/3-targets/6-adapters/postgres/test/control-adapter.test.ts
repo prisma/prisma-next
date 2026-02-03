@@ -454,6 +454,112 @@ describe('PostgresControlAdapter', () => {
       expect(result.tables['user']?.columns['flags']?.nativeType).toBe('bit(8)');
     });
 
+    it('normalizes formatted_type variants', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'user' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'user',
+              column_name: 'name',
+              data_type: 'character varying',
+              udt_name: 'varchar',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'varchar(255)',
+            },
+            {
+              table_name: 'user',
+              column_name: 'code',
+              data_type: 'character',
+              udt_name: 'bpchar',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'bpchar(4)',
+            },
+            {
+              table_name: 'user',
+              column_name: 'flags',
+              data_type: 'bit varying',
+              udt_name: 'varbit',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'varbit(6)',
+            },
+            {
+              table_name: 'user',
+              column_name: 'seen_at',
+              data_type: 'timestamp with time zone',
+              udt_name: 'timestamptz',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'timestamp(3) with time zone',
+            },
+            {
+              table_name: 'user',
+              column_name: 'created_at',
+              data_type: 'timestamp without time zone',
+              udt_name: 'timestamp',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'timestamp(6) without time zone',
+            },
+            {
+              table_name: 'user',
+              column_name: 'local_time',
+              data_type: 'time without time zone',
+              udt_name: 'time',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'time(0) without time zone',
+            },
+            {
+              table_name: 'user',
+              column_name: 'zoned_time',
+              data_type: 'time with time zone',
+              udt_name: 'timetz',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'time(2) with time zone',
+            },
+          ],
+        },
+        { match: includes('PRIMARY KEY'), rows: [] },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('pg_enum'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.tables['user']?.columns['name']?.nativeType).toBe('character varying(255)');
+      expect(result.tables['user']?.columns['code']?.nativeType).toBe('character(4)');
+      expect(result.tables['user']?.columns['flags']?.nativeType).toBe('bit varying(6)');
+      expect(result.tables['user']?.columns['seen_at']?.nativeType).toBe('timestamptz(3)');
+      expect(result.tables['user']?.columns['created_at']?.nativeType).toBe('timestamp(6)');
+      expect(result.tables['user']?.columns['local_time']?.nativeType).toBe('time(0)');
+      expect(result.tables['user']?.columns['zoned_time']?.nativeType).toBe('timetz(2)');
+    });
+
     it('handles foreign keys', async () => {
       const adapter = new PostgresControlAdapter();
       const mockDriver = createMockDriver([
