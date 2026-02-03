@@ -29,7 +29,7 @@ test('inferred row types are correct', () => {
     .build();
 
   type Row = ResultType<typeof plan>;
-  expectTypeOf<Row['id']>({} as Row['id']).toEqualTypeOf(0 as Row['id']);
-  expectTypeOf<Row['email']>({} as Row['email']).toExtend<string>();
+  expectTypeOf<Row['id']>().toEqualTypeOf<Contract['models']['User']['fields']['id']>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<Contract['models']['User']['fields']['email']>();
   void plan; // Used as a type in ResultType<typeof plan>
 });

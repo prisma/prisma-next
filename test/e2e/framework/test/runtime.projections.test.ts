@@ -46,15 +46,10 @@ describe('end-to-end nested projection queries', () => {
           expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
           type Row = ResultType<typeof plan>;
-          expectTypeOf<Row>({} as Row).toExtend<{
+          expectTypeOf<Row>().toExtend<{
             name: string;
             post: { title: number };
           }>();
-          expectTypeOf<Row['name']>({} as Row['name']).toExtend<string>();
-          expectTypeOf<Row['post']>({} as Row['post']).toEqualTypeOf({} as Row['post']);
-          expectTypeOf<Row['post']['title']>({} as Row['post']['title']).toEqualTypeOf(
-            0 as Row['post']['title'],
-          );
 
           const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
           expect(flatRow0['name']).toBe('ada@example.com');
@@ -114,26 +109,15 @@ describe('end-to-end nested projection queries', () => {
           expect(rows[0]).toEqual(expect.not.objectContaining({ a: expect.anything() }));
 
           type Row = ResultType<typeof plan>;
-          expectTypeOf<Row>({} as Row).toExtend<{
+          expectTypeOf<Row>().toExtend<{
             a: { b: { c: number } };
           }>();
-          expectTypeOf<Row['a']>({} as Row['a']).toEqualTypeOf({} as Row['a']);
-          expectTypeOf<Row['a']['b']>({} as Row['a']['b']).toEqualTypeOf({} as Row['a']['b']);
-          expectTypeOf<Row['a']['b']['c']>({} as Row['a']['b']['c']).toEqualTypeOf(
-            0 as Row['a']['b']['c'],
-          );
 
           const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
           expect(flatRow0['a_b_c']).toBe(1);
-          expect({ a: { b: { c: flatRow0['a_b_c'] } } }).toEqual({
-            a: { b: { c: 1 } },
-          });
 
           const flatRow1 = (rows[1] ?? {}) as Record<string, unknown>;
           expect(flatRow1['a_b_c']).toBe(2);
-          expect({ a: { b: { c: flatRow1['a_b_c'] } } }).toEqual({
-            a: { b: { c: 2 } },
-          });
 
           expect(plan.meta.projection).toEqual({
             a_b_c: 'user.id',
