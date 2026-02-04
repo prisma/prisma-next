@@ -29,15 +29,17 @@ async function seedTestData(
       const email = data.users[i]!;
       const id = i + 1;
       const createdAt = new Date();
+      const kind = i === 0 ? 'admin' : 'user';
 
       const plan = sql({ context: executionContext })
         .insert(userTable, {
           id: param('id'),
           email: param('email'),
           createdAt: param('createdAt'),
+          kind: param('kind'),
         })
         .returning(userTable.columns['id']!)
-        .build({ params: { id, email, createdAt } });
+        .build({ params: { id, email, createdAt, kind } });
 
       for await (const row of runtime.execute(plan)) {
         userIds.push((row as { id: number }).id);
@@ -206,7 +208,7 @@ describe('ORM integration tests', () => {
         try {
           const { ormCreateUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormCreateUser(
-            { id: 1, email: 'alice@example.com', createdAt: new Date() },
+            { id: 1, email: 'alice@example.com', createdAt: new Date(), kind: 'admin' },
             runtime,
           );
 

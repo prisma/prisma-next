@@ -11,6 +11,7 @@ export async function getUsers(runtime: Runtime, limit = 10) {
       id: userTable.columns.id,
       email: userTable.columns.email,
       createdAt: userTable.columns.createdAt,
+      kind: userTable.columns.kind,
     })
     .limit(limit)
     .build();

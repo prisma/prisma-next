@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:8250c76f669e4f9d7aa8dbec3337ba408412024019297b8aa40339e80ff9d388",
+  "coreHash": "sha256:82a5eedba0cffd694a22952212ac3bc7b1a0a93c499656e1e46834b16ce70c7e",
   "profileHash": "sha256:fc74c4c3a1401c2ffd528ee1bd61b0ac57af7bdd5e77d39d567389afcb1027bd",
   "models": {
     "Post": {
@@ -38,6 +38,9 @@
         },
         "id": {
           "column": "id"
+        },
+        "kind": {
+          "column": "kind"
         }
       },
       "relations": {},
@@ -56,7 +59,8 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz"
+            "nativeType": "timestamptz",
+            "nullable": false
           },
           "embedding": {
             "codecId": "pg/vector@1",
@@ -69,7 +73,8 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
           },
           "title": {
             "codecId": "pg/text@1",
@@ -110,7 +115,8 @@
               "expression": "now()",
               "kind": "function"
             },
-            "nativeType": "timestamptz"
+            "nativeType": "timestamptz",
+            "nullable": false
           },
           "email": {
             "codecId": "pg/text@1",
@@ -122,7 +128,13 @@
               "expression": "autoincrement()",
               "kind": "function"
             },
-            "nativeType": "int4"
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "kind": {
+            "codecId": "pg/enum@1",
+            "nativeType": "user_type",
+            "typeRef": "user_type"
           }
         },
         "foreignKeys": [],
@@ -133,6 +145,18 @@
           ]
         },
         "uniques": []
+      }
+    },
+    "types": {
+      "user_type": {
+        "codecId": "pg/enum@1",
+        "nativeType": "user_type",
+        "typeParams": {
+          "values": [
+            "admin",
+            "user"
+          ]
+        }
       }
     }
   },

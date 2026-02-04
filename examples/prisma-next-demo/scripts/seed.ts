@@ -38,6 +38,7 @@ async function main() {
         id: param('id'),
         email: param('email'),
         createdAt: param('createdAt'),
+        kind: param('kind'),
       })
       .returning(userColumns.id, userColumns.email)
       .build({
@@ -45,6 +46,7 @@ async function main() {
           id: 1,
           email: 'alice@example.com',
           createdAt: new Date(),
+          kind: 'admin',
         },
       });
 
@@ -55,6 +57,7 @@ async function main() {
         id: param('id'),
         email: param('email'),
         createdAt: param('createdAt'),
+        kind: param('kind'),
       })
       .returning(userColumns.id, userColumns.email)
       .build({
@@ -62,6 +65,7 @@ async function main() {
           id: 2,
           email: 'bob@example.com',
           createdAt: new Date(),
+          kind: 'user',
         },
       });
 

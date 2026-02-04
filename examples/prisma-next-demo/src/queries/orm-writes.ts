@@ -3,10 +3,12 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { orm } from '../prisma/query';
 
 export async function ormCreateUser(
-  data: { id: number; email: string; createdAt: Date },
+  data: { id: number; email: string; createdAt: Date; kind: 'admin' | 'user' },
   runtime: Runtime,
 ) {
-  const plan = orm.user().create({ id: data.id, email: data.email, createdAt: data.createdAt });
+  const plan = orm
+    .user()
+    .create({ id: data.id, email: data.email, createdAt: data.createdAt, kind: data.kind });
 
   // Drain the result stream (DML operations don't return rows without RETURNING)
   for await (const _row of runtime.execute(plan)) {

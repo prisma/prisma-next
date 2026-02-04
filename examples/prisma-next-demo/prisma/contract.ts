@@ -1,5 +1,7 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import {
+  enumColumn,
+  enumType,
   int4Column,
   textColumn,
   timestamptzColumn,
@@ -14,6 +16,7 @@ type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
 
 export const contract = defineContract<AllCodecTypes>()
   .target(postgresPack)
+  .storageType('user_type', enumType('user_type', ['admin', 'user']))
   .table('user', (t) =>
     t
       .column('id', {
@@ -26,6 +29,10 @@ export const contract = defineContract<AllCodecTypes>()
         type: timestamptzColumn,
         nullable: false,
         default: { kind: 'function', expression: 'now()' },
+      })
+      .column('kind', {
+        type: enumColumn('user_type', 'user_type'),
+        nullable: false,
       })
       .primaryKey(['id']),
   )
@@ -52,6 +59,7 @@ export const contract = defineContract<AllCodecTypes>()
       .field('id', 'id')
       .field('email', 'email')
       .field('createdAt', 'createdAt')
+      .field('kind', 'kind')
       .relation('posts', {
         toModel: 'Post',
         toTable: 'post',
