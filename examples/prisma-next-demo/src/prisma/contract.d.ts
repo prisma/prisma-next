@@ -15,7 +15,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type CoreHash =
-  CoreHashBase<'sha256:8250c76f669e4f9d7aa8dbec3337ba408412024019297b8aa40339e80ff9d388'>;
+  CoreHashBase<'sha256:82a5eedba0cffd694a22952212ac3bc7b1a0a93c499656e1e46834b16ce70c7e'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:fc74c4c3a1401c2ffd528ee1bd61b0ac57af7bdd5e77d39d567389afcb1027bd'>;
 
@@ -41,6 +41,11 @@ export type Contract = SqlContract<
           readonly createdAt: {
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
+          };
+          readonly kind: {
+            readonly nativeType: 'user_type';
+            readonly codecId: 'pg/enum@1';
             readonly nullable: false;
           };
         };
@@ -89,7 +94,13 @@ export type Contract = SqlContract<
         ];
       };
     };
-    readonly types: Record<string, never>;
+    readonly types: {
+      readonly user_type: {
+        readonly codecId: 'pg/enum@1';
+        readonly nativeType: 'user_type';
+        readonly typeParams: { readonly values: readonly ['admin', 'user'] };
+      };
+    };
   },
   {
     readonly User: {
@@ -98,6 +109,7 @@ export type Contract = SqlContract<
         readonly id: CodecTypes['pg/int4@1']['output'];
         readonly email: CodecTypes['pg/text@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly kind: 'admin' | 'user';
       };
     };
     readonly Post: {
@@ -141,6 +153,7 @@ export type Contract = SqlContract<
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
+        readonly kind: 'kind';
       };
       readonly Post: {
         readonly id: 'id';
@@ -155,6 +168,7 @@ export type Contract = SqlContract<
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
+        readonly kind: 'kind';
       };
       readonly post: {
         readonly id: 'id';
