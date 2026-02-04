@@ -752,6 +752,10 @@ function buildColumnTypeSql(column: StorageColumn): string {
     }
   }
 
+  if (column.typeRef) {
+    return quoteIdentifier(column.nativeType);
+  }
+
   return renderParameterizedTypeSql(column) ?? column.nativeType;
 }
 
