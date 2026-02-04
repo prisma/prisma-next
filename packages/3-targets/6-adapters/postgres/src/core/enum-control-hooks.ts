@@ -52,6 +52,32 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 /**
+ * Parses a PostgreSQL array value into a JavaScript string array.
+ *
+ * PostgreSQL's `pg` library may return `array_agg` results either as:
+ * - A JavaScript array (when type parsers are configured)
+ * - A string in PostgreSQL array literal format: `{value1,value2,...}`
+ *
+ * This function handles both cases for robustness.
+ *
+ * @param value - The value to parse (array or PostgreSQL array string)
+ * @returns A string array, or null if the value cannot be parsed
+ */
+export function parsePostgresArray(value: unknown): string[] | null {
+  if (isStringArray(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.startsWith('{') && value.endsWith('}')) {
+    const inner = value.slice(1, -1);
+    if (inner === '') {
+      return [];
+    }
+    return inner.split(',').map((v) => v.trim());
+  }
+  return null;
+}
+
+/**
  * Extracts enum values from a StorageTypeInstance.
  * Returns null if values are missing or invalid.
  */
@@ -653,13 +679,17 @@ export const pgEnumControlHooks: CodecControlHooks = {
     const result = await driver.query<EnumRow>(ENUM_INTROSPECT_QUERY, [namespace]);
     const types: Record<string, StorageTypeInstance> = {};
     for (const row of result.rows) {
-      if (!isStringArray(row.values)) {
-        continue;
+      const values = parsePostgresArray(row.values);
+      if (!values) {
+        throw new Error(
+          `Failed to parse enum values for type "${row.type_name}": ` +
+            `unexpected format: ${JSON.stringify(row.values)}`,
+        );
       }
       types[row.type_name] = {
         codecId: PG_ENUM_CODEC_ID,
         nativeType: row.type_name,
-        typeParams: { values: row.values },
+        typeParams: { values },
       };
     }
     return types;
