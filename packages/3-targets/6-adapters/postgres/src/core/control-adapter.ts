@@ -250,7 +250,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       // Process columns for this table
       const columns: Record<string, SqlColumnIR> = {};
       for (const colRow of columnsByTable.get(tableName) ?? []) {
-        let nativeType = colRow.udt_name;
+        let nativeType: string;
         const formattedType = colRow.formatted_type
           ? normalizeFormattedType(colRow.formatted_type, colRow.data_type, colRow.udt_name)
           : null;
