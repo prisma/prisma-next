@@ -1,7 +1,46 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import { pgEnumControlHooks } from '../src/core/enum-control-hooks';
+import { parsePostgresArray, pgEnumControlHooks } from '../src/core/enum-control-hooks';
 import { createTestContract, createTestSchema, ENUM_CODEC_ID } from './test-utils';
+
+describe('parsePostgresArray', () => {
+  it('returns array as-is when input is already a string array', () => {
+    expect(parsePostgresArray(['USER', 'ADMIN'])).toEqual(['USER', 'ADMIN']);
+  });
+
+  it('parses PostgreSQL array literal format', () => {
+    expect(parsePostgresArray('{USER,ADMIN}')).toEqual(['USER', 'ADMIN']);
+  });
+
+  it('handles empty PostgreSQL array literal', () => {
+    expect(parsePostgresArray('{}')).toEqual([]);
+  });
+
+  it('handles single value PostgreSQL array literal', () => {
+    expect(parsePostgresArray('{USER}')).toEqual(['USER']);
+  });
+
+  it('trims whitespace from values', () => {
+    expect(parsePostgresArray('{ USER , ADMIN }')).toEqual(['USER', 'ADMIN']);
+  });
+
+  it('returns null for non-array non-string values', () => {
+    expect(parsePostgresArray(123)).toBeNull();
+    expect(parsePostgresArray(null)).toBeNull();
+    expect(parsePostgresArray(undefined)).toBeNull();
+    expect(parsePostgresArray({ key: 'value' })).toBeNull();
+  });
+
+  it('returns null for strings not in array format', () => {
+    expect(parsePostgresArray('USER')).toBeNull();
+    expect(parsePostgresArray('USER,ADMIN')).toBeNull();
+  });
+
+  it('returns null for arrays containing non-strings', () => {
+    expect(parsePostgresArray([1, 2, 3])).toBeNull();
+    expect(parsePostgresArray(['USER', 123])).toBeNull();
+  });
+});
 
 describe('pgEnumControlHooks.planTypeOperations', () => {
   it('returns empty operations when values are missing', () => {
@@ -294,19 +333,21 @@ describe('pgEnumControlHooks.verifyType', () => {
 });
 
 describe('pgEnumControlHooks.introspectTypes', () => {
-  it('introspects enum storage types', async () => {
-    const driver: ControlDriverInstance<'sql', string> = {
+  function createMockDriver(
+    rows: Array<{ schema_name: string; type_name: string; values: unknown }>,
+  ): ControlDriverInstance<'sql', string> {
+    return {
       familyId: 'sql',
       targetId: 'postgres',
-      query: async <Row>() =>
-        ({
-          rows: [
-            { schema_name: 'public', type_name: 'role', values: ['USER', 'ADMIN'] },
-            { schema_name: 'public', type_name: 'invalid', values: [1, 2] },
-          ],
-        }) as { readonly rows: Row[] },
+      query: async <Row>() => ({ rows }) as { readonly rows: Row[] },
       close: async () => {},
     };
+  }
+
+  it('introspects enum storage types', async () => {
+    const driver = createMockDriver([
+      { schema_name: 'public', type_name: 'role', values: ['USER', 'ADMIN'] },
+    ]);
 
     if (!pgEnumControlHooks.introspectTypes) {
       throw new Error('introspectTypes missing');
@@ -321,5 +362,53 @@ describe('pgEnumControlHooks.introspectTypes', () => {
         typeParams: { values: ['USER', 'ADMIN'] },
       },
     });
+  });
+
+  it('introspects enum with PostgreSQL array string format', async () => {
+    const driver = createMockDriver([
+      { schema_name: 'public', type_name: 'status', values: '{PENDING,ACTIVE,CLOSED}' },
+    ]);
+
+    if (!pgEnumControlHooks.introspectTypes) {
+      throw new Error('introspectTypes missing');
+    }
+
+    const types = await pgEnumControlHooks.introspectTypes({ driver, schemaName: 'public' });
+
+    expect(types).toMatchObject({
+      status: {
+        codecId: ENUM_CODEC_ID,
+        nativeType: 'status',
+        typeParams: { values: ['PENDING', 'ACTIVE', 'CLOSED'] },
+      },
+    });
+  });
+
+  it('throws when enum values cannot be parsed', async () => {
+    const driver = createMockDriver([
+      { schema_name: 'public', type_name: 'invalid', values: [1, 2] },
+    ]);
+
+    if (!pgEnumControlHooks.introspectTypes) {
+      throw new Error('introspectTypes missing');
+    }
+
+    await expect(
+      pgEnumControlHooks.introspectTypes({ driver, schemaName: 'public' }),
+    ).rejects.toThrow('Failed to parse enum values for type "invalid"');
+  });
+
+  it('throws with descriptive message showing the unexpected format', async () => {
+    const driver = createMockDriver([
+      { schema_name: 'public', type_name: 'broken', values: { nested: 'object' } },
+    ]);
+
+    if (!pgEnumControlHooks.introspectTypes) {
+      throw new Error('introspectTypes missing');
+    }
+
+    await expect(
+      pgEnumControlHooks.introspectTypes({ driver, schemaName: 'public' }),
+    ).rejects.toThrow('unexpected format: {"nested":"object"}');
   });
 });
