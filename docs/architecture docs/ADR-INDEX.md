@@ -47,6 +47,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 016 | Adapter SPI for Lowering | Defines stable adapter interface for SQL lowering and dialect-specific behavior | [ADR 016 - Adapter SPI for Lowering.md](adrs/ADR%20016%20-%20Adapter%20SPI%20for%20Lowering.md) |
 | 030 | Result decoding & codecs registry | Establishes codec registry for type-safe result decoding and parameter encoding | [ADR 030 - Result decoding & codecs registry.md](adrs/ADR%20030%20-%20Result%20decoding%20&%20codecs%20registry.md) |
 | 031 | Adapter capability discovery & negotiation | Defines capability discovery and negotiation flow between adapters and runtime | [ADR 031 - Adapter capability discovery & negotiation.md](adrs/ADR%20031%20-%20Adapter%20capability%20discovery%20&%20negotiation.md) |
+| 155 | Driver/Codec boundary and lowering responsibilities | Separates lowering vs codec encoding/decoding vs driver transport; standardizes codec↔driver boundary values as `string \| Uint8Array \| null` | [ADR 155 - Driver Codec Boundary and Lowering Responsibilities.md](adrs/ADR%20155%20-%20Driver%20Codec%20Boundary%20and%20Lowering%20Responsibilities.md) |
 
 ## Migration System
 
