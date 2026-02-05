@@ -42,7 +42,17 @@ Note: we call it a “set” because that’s the mental model, but some storage
 
 ## What problem are we solving?
 
-Two things go wrong if we treat “enum” as one portable primitive.
+The primary problem is: **how do we provide a framework-mediated emulation of enums on databases that don’t have a native enum representation?**
+
+Postgres native enums can be implemented as a target-owned storage type with a dedicated codec (`pg/enum@1`) and control-plane hooks. That approach doesn’t generalize to targets that simply don’t have “enum types” as a storage primitive, and we don’t want to force the contract to pretend that they do.
+
+So we need a portable mechanism that:
+
+- expresses the allowed values explicitly in the contract
+- provides a storage enforcement strategy we can apply across targets (ADR 156’s sets + `inSet` checks)
+- gives the execution plane one shared way to discover/validate “allowed values”, without making each lane reinvent enum logic
+
+If we don’t do this, two secondary problems show up quickly.
 
 First, we end up with an ambiguous contract:
 
