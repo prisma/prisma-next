@@ -11,7 +11,7 @@ const UUID_OSSP_PATTERN = /^uuid_generate_v4\s*\(\s*\)$/i;
 const TRUE_PATTERN = /^true$/i;
 const FALSE_PATTERN = /^false$/i;
 const NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
-const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::[\w\s]+(?:\(\d+\))?)?$/;
+const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/;
 
 /**
  * Parses a raw Postgres column default expression into a normalized ColumnDefault.

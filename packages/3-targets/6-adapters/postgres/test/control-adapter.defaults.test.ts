@@ -285,6 +285,10 @@ describe('parsePostgresDefault normalizer', () => {
       kind: 'literal',
       expression: "'hello'::text",
     });
+    expect(parsePostgresDefault('\'ok\'::"BillingState"')).toEqual({
+      kind: 'literal',
+      expression: '\'ok\'::"BillingState"',
+    });
     expect(parsePostgresDefault("'Hello''s'::text")).toEqual({
       kind: 'literal',
       expression: "'Hello''s'::text",
