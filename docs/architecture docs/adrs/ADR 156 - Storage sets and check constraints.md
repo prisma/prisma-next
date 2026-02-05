@@ -15,7 +15,7 @@ This ADR defines the storage-side building blocks:
 - `storage.sets`: named sets of allowed values
 - `tables.*.checks[]`: explicit check constraints that can reference a set (starting with an `IN`-set constraint)
 
-Enum authoring UX and enum-as-a-feature remain a separate discussion (see `docs/Execution Enums.md`).
+Enum authoring UX and enum-as-a-feature remain a separate discussion (see ADR 157).
 
 ## Problem
 
@@ -145,5 +145,5 @@ If we do this, `storage.sets.*.values` should be treated as an **ordered** canon
 ## Related
 
 - ADR 155 — Driver/Codec boundary value representation and responsibilities
-- `docs/Execution Enums.md` (design note for enum authoring and behavior)
+- ADR 157 — Execution enums
 
