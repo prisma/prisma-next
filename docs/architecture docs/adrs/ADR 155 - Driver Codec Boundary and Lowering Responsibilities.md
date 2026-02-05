@@ -1,38 +1,44 @@
 # ADR 155 — Driver/Codec boundary value representation and responsibilities
 
-Prisma Next executes parameterized query Plans: adapters lower intent to SQL with placeholders, the runtime encodes values, and drivers bind values and execute against the database.
+Prisma Next executes parameterized query Plans:
 
-That sounds simple, but in practice we’ve been mixing responsibilities between adapters, codecs, and drivers. As a result:
+- lanes build an AST and a separate `params[]` array (no SQL literal concatenation)
+- adapters lower AST → SQL text with placeholders
+- codecs encode parameters and decode rows
+- drivers bind `sql + params` and execute against the database
 
-- codec implementations start depending on what a particular JS driver library happens to return (`Date`, `string`, `number`, etc.)
+In practice, we’ve been mixing responsibilities between adapters, codecs, and drivers. That creates a representational failure:
+
+- codec implementations start depending on what a particular underlying JS database library returns (`Date`, `string`, `number`, etc.)
 - driver swapping becomes “best effort”
-- upcoming features that need deterministic value serialization (for example, value sets) have no stable representation to build on
+- features that need deterministic value serialization (for example, value sets) have no stable representation to build on
 
-This ADR makes those boundaries explicit and enforceable.
+This ADR standardizes the boundaries so components remain composable and swappable.
 
-## Problem statement
+## What problem are we solving?
 
-We currently conflate three separate concepts:
+We’re separating three things that are easy to conflate:
 
-1. **Lowering:** converting an AST/intent into SQL text (dialect-specific)
-2. **Value encoding/decoding:** converting JS/domain values into values that can be bound to placeholders, and converting returned row values into JS/domain values
-3. **Transport:** binding parameters and executing SQL via a driver/library
+1. **Lowering**: converting intent (AST) into SQL text (dialect-specific)
+2. **Value encoding/decoding**: converting between JS/domain values and bindable/returnable values
+3. **Transport**: binding parameters and executing SQL via a driver/library
 
-When these are conflated, we get a representational failure:
+If these responsibilities are not explicit, we get accidental coupling:
 
-- Codecs are contributed by many components (adapters, targets, extension packs), but the wire shapes they have to deal with are determined by whichever driver library is currently used.
-- Drivers are intended to be swappable, but swapping driver libraries changes wire shapes and silently invalidates codecs.
+- Codecs can be contributed by many components (adapters, targets, extension packs), but “wire values” are determined by whichever underlying JS library a driver wrapper uses.
+- Drivers are intended to be swappable, but swapping underlying libraries changes wire shapes and silently invalidates codec assumptions.
 
-We also explicitly do **not** want to solve this by inlining SQL literals (string concatenation). Parameterization is a core architecture constraint (safety, plan identity stability, and correctness).
+Finally: we explicitly do **not** solve this by inlining SQL literals. Parameterization is a core architecture constraint for safety and stability.
 
 ## Design constraints (the “why” behind the decision)
 
-- **Parameterized Plans:** we execute `sql + params`, not “SQL with values substituted”.
-- **Codecs are component-provided:** adapters, targets, and extension packs can contribute codecs; codecs are not “owned by the driver”.
-- **Drivers are swappable:** a Prisma Next driver is a wrapper around an underlying library (e.g. `pg`), and we want to be able to swap that wrapper/library without rewriting codec logic.
-- **No SQL literal codecs:** codecs must not generate SQL fragments; SQL text is produced by lowering.
+- **Parameterized Plans**: we execute `sql + params`, not “SQL with values substituted”.
+- **Lowering must be value-independent**: adapters must not call `encode(value)` or otherwise depend on runtime values to decide SQL shape. Plans and lowering should be stable across different parameter values.
+- **Codecs are component-provided**: adapters, targets, and extension packs can contribute codecs; codecs are not owned by drivers.
+- **Drivers are swappable**: a Prisma Next driver is a wrapper around an underlying library (e.g. `pg`); swapping that wrapper should not require rewriting codecs.
+- **No SQL literal codecs**: codecs do not generate SQL fragments; SQL text is produced by lowering.
 
-Taken together, these constraints force a single conclusion: the boundary between codecs and drivers must be standardized.
+Taken together, these constraints force a single conclusion: the codec↔driver value boundary must be standardized.
 
 ## Evidence in the current codebase (what’s leaking today)
 
@@ -101,11 +107,15 @@ This is a strong indicator of the problem: it shows we already need lowering to 
 
 ## Decision (what we standardize)
 
-### Responsibilities: lowering vs codecs vs drivers
+This ADR standardizes:
 
-We standardize responsibilities into three stages:
+- who owns lowering vs encoding vs transport
+- the canonical value representation at the codec↔driver boundary
+- where we enforce compatibility so adapters don’t need codec-specific knowledge
 
-#### 1) Lowering (adapter responsibility)
+### Responsibilities (who does what)
+
+#### Lowering (adapter responsibility)
 
 Adapters render **SQL text** from AST/intent plus contract context:
 
@@ -115,7 +125,12 @@ Adapters render **SQL text** from AST/intent plus contract context:
 
 Adapters do **not** serialize JS values into SQL literals.
 
-#### 2) Encoding/decoding (codec responsibility)
+Adapters also do **not** inspect codec implementations or encoded parameter values to decide casts. Cast decisions are based on:
+
+- **SQL context** (is the parameter already typed by a target column? is it an operator/function argument?)
+- **type intent** available from the contract/plan (e.g. `ParamDescriptor.nativeType`, column refs)
+
+#### Encoding/decoding (codec responsibility)
 
 Codecs translate:
 
@@ -123,7 +138,7 @@ Codecs translate:
 
 Codecs do **not** render SQL text.
 
-#### 3) Transport and normalization (driver responsibility)
+#### Transport and normalization (driver responsibility)
 
 Drivers (Prisma Next wrappers around DB libraries) are responsible for:
 
@@ -133,42 +148,61 @@ Drivers (Prisma Next wrappers around DB libraries) are responsible for:
 
 Drivers do **not** lower AST and do **not** inject casts.
 
+### Execution pipeline (order of operations)
+
+This is the end-to-end order the system follows:
+
+1. The lane builds an AST and stores JS/domain parameter values separately in `params[]`.
+2. The adapter lowers the AST to SQL text with placeholders and (when needed) explicit casts.
+3. The runtime encodes the JS/domain params using codecs into boundary values (`string | Uint8Array | null`).
+4. The driver binds and executes `sql + encodedParams` and normalizes returned row values into boundary values.
+5. The runtime decodes boundary row values back into JS/domain values using codecs.
+
+The key point is that (2) happens before (3): lowering decisions are based on **SQL context + type intent** from the contract/Plan, not on runtime values.
+
 ### Canonical codec↔driver boundary value representation
 
-We standardize the boundary between codecs and drivers as:
+The boundary between codecs and drivers is standardized as:
 
 - parameter values: `string | Uint8Array | null`
 - row values: `string | Uint8Array | null`
 
 Meaning:
 
-- `string` is the canonical **text form** for the type (as defined by the codec policy for that `codecId`).
+- `string` is the canonical **text form** for the type (as defined by the codec’s policy for that `codecId`).
 - `Uint8Array` is an opaque **binary blob** when a codec/target chooses a binary representation.
 - `null` is SQL `NULL`.
 
 This intentionally excludes driver-library-specific JS types (`Date`, `bigint`, `Buffer`, custom wrappers).
 
+### Encoding shape: codecs do not alternate text vs binary for a `codecId`
+
+Although the boundary type is a union, we do **not** want a single codec to alternate between text and binary representations for the same `codecId` based on runtime values.
+
+Instead, each codec should effectively behave like one of these:
+
+- **text codec:** encodes non-null values to `string`
+- **binary codec:** encodes non-null values to `Uint8Array`
+
+`null` remains meaningful at the boundary as the representation of SQL `NULL`. In practice, runtime code can (and often should) short-circuit nullability before calling `encode`/`decode`.
+
 ### Type intent lives in SQL (and plan metadata), not in parameter values
 
-An easy mistake is to assume that a parameter value (the `string | Uint8Array | null`) must also carry “what type it is” (e.g. the column’s `nativeType`). We deliberately do **not** put type information into the value.
-
-Instead:
-
-- The adapter (during lowering) is responsible for making the database parse bound parameters correctly.
-- For Postgres, this commonly means emitting explicit casts in SQL (e.g. `$1::vector`, `$1::uuid`, `$1::int8`) when inference would otherwise be ambiguous.
+Parameter values do not carry “what type they are”. The adapter (during lowering) is responsible for making the database parse bound parameters correctly. For Postgres, this commonly means emitting explicit casts in SQL (e.g. `$1::vector`, `$1::uuid`, `$1::int8`) when inference would otherwise be ambiguous.
 
 Plans already have a place to carry type information separately from values (e.g. param descriptors / codec IDs). Lowering and runtime encoding can use that metadata without turning parameters into “typed objects” or SQL literal fragments.
 
-### How this ensures “codecs from any component” + “drivers are swappable”
+### Compatibility enforcement happens during contract authoring
 
-This is the central compatibility mechanism:
+We expect users (via PSL/TS authoring) to select codecs for columns. To keep adapters and drivers generic, codec↔column compatibility is validated when building/emitting/validating the contract:
 
-- Codecs can come from any component, because they always speak the same boundary representation.
-- Drivers can be swapped, because drivers are required to normalize into that boundary representation.
+- a column chooses a `codecId` and a target-native type name (`nativeType`)
+- a codec declares which target-native type names it supports (e.g. `targetTypes`)
+- contract authoring/validation rejects incompatible combinations early
 
-Swapping a driver should not require auditing codecs; it should require the driver to pass conformance.
+This avoids pushing codec-specific logic into adapters at lowering time and prevents late, driver-specific failures at runtime.
 
-### Conformance and enforcement
+### Conformance and enforcement (drivers)
 
 This is a behavioral contract, not just a TS type alias. We enforce it via:
 
@@ -220,14 +254,21 @@ This example mirrors the current pgvector codec behavior (pgvector text format l
 
 ### Flow
 
-#### A) Lane produces a parameterized intent
+#### A) Lane produces an AST with parameter references
 
-- params: `[[0.1, 1, 42]]`
-- no SQL literal substitution
+Instead of concatenating SQL with literals, the lane produces an AST that includes a parameter reference node (conceptually `ParamRef(1)`) and carries the JS value separately in the Plan:
+
+- AST value position: `ParamRef(1)`
+- Plan `params`: `[[0.1, 1, 42]]`
 
 #### B) Adapter lowers intent to SQL text
 
-- SQL: `INSERT INTO "post" ("embedding") VALUES ($1::vector)`
+- SQL:
+
+```sql
+INSERT INTO "post" ("embedding") VALUES ($1::vector)
+```
+
 - `::vector` cast is emitted during lowering so the DB parses a text parameter as a `vector`
 
 #### C) Codec encodes the JS value to a canonical boundary value
@@ -309,16 +350,22 @@ This example shows a different target with different adapter semantics:
 
 ### Flow
 
-#### A) Lane produces a parameterized intent
+#### A) Lane produces an AST with parameter references
 
-- params: `[BigDec("1234.567890123456789012345678901")]`
-- no SQL literal substitution
+The lane produces an AST with a parameter reference (conceptually `ParamRef(1)`) and stores the JS value in the Plan’s `params[]`:
+
+- AST value position: `ParamRef(1)`
+- Plan `params`: `[BigDec("1234.567890123456789012345678901")]`
 
 #### B) Adapter lowers intent to SQL text
 
 For many inserts, MySQL can infer the type from the target column. But when we want deterministic parsing behavior (and to avoid relying on driver/library heuristics), the adapter can emit an explicit cast:
 
-- SQL: `INSERT INTO \`orders\` (\`total\`) VALUES (CAST(? AS DECIMAL(65,30)))`
+- SQL:
+
+```sql
+INSERT INTO `orders` (`total`) VALUES (CAST(? AS DECIMAL(65,30)))
+```
 
 The exact cast form is dialect-specific; the point is that the adapter owns it.
 
@@ -371,5 +418,6 @@ Many MySQL libraries return DECIMAL columns as strings (to avoid precision loss)
 
 - ADR 016 — Adapter SPI for Lowering
 - ADR 030 — Result decoding & codecs registry
+- ADR 026 — Conformance Kit Certification
 - ADR 011 — Unified Plan Model
 
