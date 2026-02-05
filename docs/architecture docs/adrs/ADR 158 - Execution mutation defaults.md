@@ -6,7 +6,7 @@ We want to support **execution-time value generation** for columns during mutati
 
 Prisma Next already has a clear notion of **database column defaults** under `storage.tables.*.columns.*.default`. That is the right place for defaults the **database** provides (literals, `now()`, `gen_random_uuid()`, sequences, etc.).
 
-However, a generator like `cuid()` is not something the database provides. It is a rule for how the **execution plane authors a mutation** when a value is omitted.
+However, a generator like `cuid()` is not something the database provides. It is a rule for how the **execution plane fills omitted values** when authoring a mutation.
 
 This ADR introduces a contract representation for these **mutation defaults** while preserving the separation between DB-verifiable storage facts and execution-plane authoring semantics.
 
@@ -25,7 +25,7 @@ We specifically need:
 
 - a place to record mutation-default intent that is addressable by **(table, column)** so SQL lanes can use it
 - one shared implementation so lanes don’t drift
-- a hashing/verification story where changing mutation defaults does **not** force database marker churn
+- a hashing/verification story where changing mutation defaults does **not** force unnecessary database marker updates
 
 ## Design constraints
 
@@ -33,7 +33,7 @@ We specifically need:
 - **Table/column addressing**: SQL lanes operate on tables and columns; mutation defaults must be discoverable without consulting models.
 - **Shared execution behavior**: we don’t want each lane reimplementing defaulting rules.
 - **Generator compatibility**: a generator must be compatible with the backing column type (at minimum by `codecId`, and later by column facets like length/precision when available).
-- **No unnecessary DB re-signing**: edits to execution-only semantics (like mutation defaults) must not require updating DB marker verification state.
+- **No unnecessary marker updates**: edits to execution-only semantics (like mutation defaults) must not require updating DB marker verification state.
 
 ## Decision
 
@@ -42,7 +42,7 @@ We specifically need:
 We introduce a new top-level sibling section alongside `storage`:
 
 - `storage`: DB-satisfied facts and constraints (tables, columns, keys, indexes, FKs, DB defaults)
-- `execution`: declarative execution-plane semantics used when authoring and executing Plans (no executable code)
+- `execution`: declarative execution-plane semantics used when authoring and executing Plans (no generator implementations embedded in the contract)
 
 Mutation defaults live at:
 
@@ -53,6 +53,8 @@ Each default is keyed by a reference to a storage column:
 - `ref: { table, column }`
 
 This makes the feature usable from SQL lanes and other table-centric consumers.
+
+This ADR defines defaults for create mutations (`onCreate`). Additional scopes (for example, update/upsert behavior) are future work.
 
 ### 2) Execution-plane behavior is provided as a shared helper (via `ExecutionContext`)
 
@@ -70,13 +72,17 @@ Lanes call this once per mutation and then build a Plan normally.
 
 Mutation defaults refer to generators by stable IDs (built-in + extension-provided).
 
+Key design decision: generators produce JS/domain values for columns. Those values are then encoded as bound parameters via the column codec as part of normal Plan execution (see ADR 155).
+
 Generators must be registered with:
 
 - an implementation (to produce values at execution time)
 - a static descriptor used for validation, for example:
-  - output shape (string/number/etc.)
+  - JS/domain output shape (must be accepted by the backing column codec’s `encode`)
   - optional constraints (maxLength, etc.)
   - supported column codecs (or a predicate over `{ codecId, nativeType, typeParams, ... }`)
+
+The contract stores only generator references (for example `{ kind: "generator", id: "cuid" }`), not executable code. Implementations live in the generator registry provided by the execution plane (built-ins and extension packs).
 
 During execution context creation, we validate that every mutation default’s generator is compatible with its backing column.
 
@@ -89,6 +95,7 @@ When authoring a mutation:
 1. **Caller-provided value wins** (including explicit `null` when allowed).
 2. Else, apply **execution mutation default** from `execution.mutations.defaults`.
 3. Else, allow **database default** to apply by omitting the column when `storage.tables.*.columns.*.default` exists.
+4. Else, if the column is non-nullable, fail mutation authoring with a missing required value error.
 
 If both an execution mutation default and a database default exist for the same column, the execution default shadows the database default. This is allowed, but authoring/validation should emit a diagnostic to reduce accidental ambiguity.
 
@@ -96,7 +103,7 @@ If both an execution mutation default and a database default exist for the same 
 
 Today, the contract’s hashing split (for example, `coreHash` vs `profileHash`) is too coarse for execution-only semantics.
 
-Mutation defaults change how the execution plane fills omitted values, but they do **not** change what the database must satisfy. We should not have to re-sign the database marker for those edits.
+Mutation defaults change how the execution plane fills omitted values, but they do **not** change what the database must satisfy. We should not have to update the database marker for those edits.
 
 ### Proposed hash model: section-owned hashes
 
@@ -184,7 +191,7 @@ flowchart TD
 - Storage remains DB-verifiable and marker semantics stay crisp.
 - Mutation defaults work for SQL lanes (table/column addressing).
 - One shared defaulting implementation reduces drift across lanes.
-- Execution-only changes don’t cause DB marker churn.
+- Execution-only changes don’t require database marker updates.
 
 ### Costs
 

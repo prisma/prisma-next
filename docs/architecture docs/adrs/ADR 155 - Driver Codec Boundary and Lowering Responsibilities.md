@@ -7,15 +7,23 @@ Prisma Next executes parameterized query Plans:
 - codecs encode parameters and decode rows
 - drivers bind `sql + params` and execute against the database
 
-In practice, we’ve been mixing responsibilities between adapters, codecs, and drivers. That creates a representational failure:
+In practice, we’ve been mixing responsibilities between adapters, codecs, and drivers. That creates hidden coupling:
 
 - codec implementations start depending on what a particular underlying JS database library returns (`Date`, `string`, `number`, etc.)
 - driver swapping becomes “best effort”
-- features that need deterministic value serialization (for example, value sets) have no stable representation to build on
+- features that need deterministic value serialization (for example, `storage.sets` in ADR 156) have no stable representation to build on
 
 This ADR standardizes the boundaries so components remain composable and swappable.
 
 **Terminology note:** in Prisma Next, a **driver** is our component that speaks to an underlying database library (e.g. `pg`). This ADR uses “driver” in that Prisma Next sense (not “the underlying library”).
+
+Quick glossary (for this ADR):
+
+- **Plan**: `{ sql, params, meta }` artifact produced by lanes and executed by the runtime.
+- **lane**: an authoring surface (SQL DSL, raw SQL, ORM) that produces Plans.
+- **adapter**: lowers an AST to SQL text for a dialect (placeholders, casts, syntax).
+- **codec**: encodes params and decodes rows.
+- **driver**: binds `sql + params` and executes via an underlying DB library, normalizing values at the boundary.
 
 ## What problem are we solving?
 
@@ -27,8 +35,8 @@ We’re separating three things that are easy to conflate:
 
 If these responsibilities are not explicit, we get accidental coupling:
 
-- Codecs can be contributed by many components (adapters, targets, extension packs), but “wire values” are determined by whichever underlying JS library a driver uses.
-- Drivers are intended to be swappable, but swapping underlying libraries changes wire shapes and silently invalidates codec assumptions.
+- Codecs can be contributed by many components (adapters, targets, extension packs), but driver boundary values are determined by whichever underlying JS library a driver uses.
+- Drivers are intended to be swappable, but swapping underlying libraries changes those boundary value shapes and silently invalidates codec assumptions.
 
 Finally: we explicitly do **not** solve this by inlining SQL literals. Parameterization is a core architecture constraint for safety and stability.
 
@@ -36,11 +44,12 @@ Finally: we explicitly do **not** solve this by inlining SQL literals. Parameter
 
 - **Parameterized Plans**: we execute `sql + params`, not “SQL with values substituted”.
 - **Lowering must be value-independent**: adapters must not call `encode(value)` or otherwise depend on runtime values to decide SQL shape. Plans and lowering should be stable across different parameter values.
+  - Lowering can use type metadata (for example `codecId`, `nativeType`, and column references), but not the runtime value in `params[]`.
 - **Codecs are component-provided**: adapters, targets, and extension packs can contribute codecs; codecs are not owned by drivers.
 - **Drivers are swappable**: a Prisma Next driver is a wrapper around an underlying library (e.g. `pg`); swapping that wrapper should not require rewriting codecs.
 - **No SQL literal codecs**: codecs do not generate SQL fragments; SQL text is produced by lowering.
 
-Taken together, these constraints force a single conclusion: the codec↔driver value boundary must be standardized.
+These constraints imply the codec↔driver value boundary must be standardized.
 
 ## Evidence in the current codebase (what’s leaking today)
 
@@ -58,7 +67,7 @@ return `[${value.join(',')}]`;
 
 This is a problem because “vector values are formatted as pgvector text strings” may be true, but “required by the pg library” is not a contract we want codecs to depend on. It makes swapping the underlying library a codec-audit exercise.
 
-### Codecs accept driver-specific JS wire types (`Date`)
+### Codecs accept driver-specific JS types (`Date`)
 
 Timestamp codecs accept `string | Date`:
 
@@ -71,7 +80,7 @@ decode: (wire: string | Date): string => {
 }
 ```
 
-That union exists because some JS libraries return timestamps as `Date`. But a different driver library might return strings or a different wrapper type. When the wire contract shifts, codecs shift.
+That union exists because some JS libraries return timestamps as `Date`. But a different driver library might return strings or a different wrapper type. When the driver boundary contract shifts, codecs shift.
 
 ### Scalar codecs assume a particular parsing configuration (`int8`)
 
@@ -105,7 +114,7 @@ The Postgres adapter already emits `::vector` for `pg/vector@1` params:
 if (columnMeta?.codecId === VECTOR_CODEC_ID) return `$${ref.index}::vector`;
 ```
 
-This is a strong indicator of the problem: it shows we already need lowering to carry SQL type intent (casts), separate from value encoding.
+This shows we already need lowering to carry SQL type intent (casts), separate from value encoding.
 
 ## Decision (what we standardize)
 
@@ -171,11 +180,12 @@ The boundary between codecs and drivers is standardized as:
 
 Meaning:
 
-- `string` is the canonical **text form** for the type (as defined by the codec’s policy for that `codecId`).
+- `string` is the canonical string encoding for the type (as defined by the codec’s policy for that `codecId`).
 - `Uint8Array` is an opaque **binary blob** when a codec/target chooses a binary representation.
 - `null` is SQL `NULL`.
 
 This intentionally excludes driver-library-specific JS types (`Date`, `bigint`, `Buffer`, custom wrappers).
+In Node, `Buffer` is a `Uint8Array`; drivers may accept `Buffer` internally but must expose `Uint8Array` at the boundary.
 
 ### Encoding shape: codecs do not alternate text vs binary for a `codecId`
 
@@ -221,16 +231,16 @@ Because substitution turns “data” into “code” again. Modern database pro
 
 This ADR is specifically about keeping that parameterized architecture while still allowing codecs and drivers to be independently swappable components.
 
-### “What is ‘canonical text form’?”
+### “What is ‘canonical string encoding’?”
 
 It means: for a given `codecId`, the codec defines a deterministic string representation that is accepted by the database when bound (often with an adapter-emitted cast) and that can be decoded back into a JS/domain value.
 
 Examples in the current system:
 
 - `pg/vector@1` uses pgvector’s text format like `"[0.1,1,42]"`.
-- timestamp codecs already lean toward ISO strings for determinism (`Date` is accepted as input today but is not a desirable wire type).
+- timestamp codecs already lean toward ISO strings for determinism (`Date` is accepted as input today but is not a desirable driver boundary type).
 
-Canonical text is the key ingredient we need later for deterministic contract literal serialization (e.g. value sets), because it is stable across driver libraries.
+Canonical string encoding is what we need later for deterministic contract literal serialization (for example `storage.sets`), because it is stable across driver libraries.
 
 ### “Does this mean all types are sent as strings?”
 
@@ -406,10 +416,10 @@ Many MySQL libraries return DECIMAL columns as strings (to avoid precision loss)
 
 ### Benefits
 
-- Codec implementations stop depending on driver-library-specific “wire types”.
+- Codec implementations stop depending on driver-library-specific boundary types.
 - Swapping drivers becomes realistic: conforming drivers work with the same codec registry.
 - Lowering remains the single owner of SQL text details (including casts), preserving parameterization and plan identity stability.
-- The canonical boundary representation becomes a stable foundation for deterministic literal serialization in future features (for example, value sets).
+- The canonical boundary representation becomes a stable foundation for deterministic literal serialization in future features (for example `storage.sets`).
 
 ### Costs
 

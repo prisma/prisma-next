@@ -111,7 +111,7 @@ This is intentionally not a general-purpose SQL expression system in the contrac
 
 `storage.sets` and `checks[]` are storage facts the database must satisfy.
 
-Under the `storageHash` / `executionHash` model:
+Under the `storageHash` / `executionHash` model (see ADR 158):
 
 - changing `storage.sets.*.values` is a **storage change** and must change `storageHash`
 - changes to execution-only helpers derived from storage do not need to affect marker verification

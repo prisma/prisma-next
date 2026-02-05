@@ -42,7 +42,7 @@ Note: we call it a “set” because that’s the mental model, but some storage
 
 ## What problem are we solving?
 
-The primary problem is: **how do we provide a framework-mediated emulation of enums on databases that don’t have a native enum representation?**
+The primary problem is: **how do we provide enum behavior on databases that don’t have a native enum representation?**
 
 Postgres native enums can be implemented as a target-owned storage type with a dedicated codec (`pg/enum@1`) and control-plane hooks. That approach doesn’t generalize to targets that simply don’t have “enum types” as a storage primitive, and we don’t want to force the contract to pretend that they do.
 
