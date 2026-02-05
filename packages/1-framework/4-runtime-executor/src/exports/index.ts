@@ -18,9 +18,12 @@ export type {
   Severity,
 } from '../plugins/types';
 export type {
+  RuntimeConnection,
   RuntimeCore,
   RuntimeCoreOptions,
+  RuntimeQueryable,
   RuntimeTelemetryEvent,
+  RuntimeTransaction,
   RuntimeVerifyOptions,
   TelemetryOutcome,
 } from '../runtime-core';

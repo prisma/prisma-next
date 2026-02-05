@@ -378,8 +378,19 @@ describe('createRuntime', () => {
       },
     };
 
-    await expect(runtime.execute(plan).toArray()).rejects.toMatchObject({
-      code: 'RUNTIME.DRIVER_MISSING',
-    });
+    const connection = await runtime.connection();
+    const tx = await connection.transaction();
+    for (const promise of [
+      runtime.execute(plan).toArray(),
+      connection.execute(plan).toArray(),
+      connection.release(),
+      tx.execute(plan).toArray(),
+      tx.commit(),
+      tx.rollback(),
+    ]) {
+      await expect(promise).rejects.toMatchObject({
+        code: 'RUNTIME.DRIVER_MISSING',
+      });
+    }
   });
 });
