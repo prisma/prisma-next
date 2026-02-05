@@ -18,6 +18,9 @@ catalogs:
     gray-matter:
       specifier: ^4.0.3
       version: 4.0.3
+    kysely:
+      specifier: 0.28.10
+      version: 0.28.10
     pg:
       specifier: 8.16.3
       version: 8.16.3
@@ -98,6 +101,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../packages/2-sql/3-tooling/family
+      '@prisma-next/integration-kysely':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/integration-kysely
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../packages/2-sql/1-core/contract
@@ -125,6 +131,9 @@ importers:
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
+      kysely:
+        specifier: 'catalog:'
+        version: 0.28.10
       pg:
         specifier: 'catalog:'
         version: 8.16.3
@@ -1209,12 +1218,21 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/contract
+      '@prisma-next/core-execution-plane':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/runtime/execution-plane
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/7-drivers/postgres
       '@prisma-next/extension-pgvector':
         specifier: workspace:*
         version: link:../pgvector
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../2-sql/3-tooling/family
+      '@prisma-next/runtime-executor':
+        specifier: workspace:*
+        version: link:../../1-framework/4-runtime-executor
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../2-sql/1-core/contract
@@ -1224,6 +1242,9 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../2-sql/4-lanes/relational-core
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../../2-sql/5-runtime
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../3-targets/3-targets/postgres
@@ -1236,9 +1257,15 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../0-config/tsdown
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.16.0
       kysely:
-        specifier: ^0.28.10
+        specifier: 'catalog:'
         version: 0.28.10
+      pg:
+        specifier: 'catalog:'
+        version: 8.16.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
@@ -1577,6 +1604,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../packages/2-sql/3-tooling/family
+      '@prisma-next/integration-kysely':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/integration-kysely
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/shared/operations
@@ -1617,6 +1647,9 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.16.0
+      kysely:
+        specifier: 'catalog:'
+        version: 0.28.10
       pg:
         specifier: 'catalog:'
         version: 8.16.3

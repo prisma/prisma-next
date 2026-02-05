@@ -23,6 +23,8 @@
  */
 import 'dotenv/config';
 import { type as arktype } from 'arktype';
+import { getUserById as getUserByIdKysely } from './kysely/get-user-by-id';
+import { insertUserTransaction as insertUserTransactionKysely } from './kysely/insert-user-transaction';
 import { getRuntime } from './prisma/runtime';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
@@ -142,12 +144,34 @@ async function main() {
         }
         throw error; // Re-throw to show the full error stack
       }
+    } else if (cmd === 'user-kysely') {
+      const [userIdStr] = args;
+      if (!userIdStr) {
+        console.error('Usage: pnpm start -- user-kysely <userId>');
+        process.exit(1);
+      }
+      const userId = Number.parseInt(userIdStr, 10);
+      // use a runtime without plugins to avoid false positive linting errors
+      const kyselyRuntime = getRuntime(databaseUrl, []);
+      const user = await getUserByIdKysely(userId, kyselyRuntime);
+      console.log(JSON.stringify(user, null, 2));
+    } else if (cmd === 'user-transaction-kysely') {
+      const [userIdStr] = args;
+      if (!userIdStr) {
+        console.error('Usage: pnpm start -- user-transaction-kysely <userId>');
+        process.exit(1);
+      }
+      const userId = Number.parseInt(userIdStr, 10);
+      // use a runtime without plugins to avoid false positive linting errors
+      const kyselyRuntime = getRuntime(databaseUrl, []);
+      const newUser = await insertUserTransactionKysely(userId, kyselyRuntime);
+      console.log('Inserted user:', JSON.stringify(newUser, null, 2));
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | ' +
           'users-with-posts [limit] | users-paginate [cursor] [limit] | ' +
           'users-paginate-back <cursor> [limit] | similarity-search <queryVector> [limit] | ' +
-          'budget-violation]',
+          'budget-violation | user-kysely <userId> | user-transaction-kysely <userId>]',
       );
       process.exit(1);
     }
