@@ -15,6 +15,8 @@ In practice, we’ve been mixing responsibilities between adapters, codecs, and 
 
 This ADR standardizes the boundaries so components remain composable and swappable.
 
+**Terminology note:** in Prisma Next, a **driver** is our component that speaks to an underlying database library (e.g. `pg`). This ADR uses “driver” in that Prisma Next sense (not “the underlying library”).
+
 ## What problem are we solving?
 
 We’re separating three things that are easy to conflate:
@@ -25,7 +27,7 @@ We’re separating three things that are easy to conflate:
 
 If these responsibilities are not explicit, we get accidental coupling:
 
-- Codecs can be contributed by many components (adapters, targets, extension packs), but “wire values” are determined by whichever underlying JS library a driver wrapper uses.
+- Codecs can be contributed by many components (adapters, targets, extension packs), but “wire values” are determined by whichever underlying JS library a driver uses.
 - Drivers are intended to be swappable, but swapping underlying libraries changes wire shapes and silently invalidates codec assumptions.
 
 Finally: we explicitly do **not** solve this by inlining SQL literals. Parameterization is a core architecture constraint for safety and stability.
@@ -82,7 +84,7 @@ const pgInt8Codec = codec<'pg/int8@1', number, number>({ encode: (v) => v, decod
 
 Many Postgres JS libraries return `int8` as **strings** by default to avoid precision loss. If the underlying library returns strings, this codec is wrong. That’s the exact failure mode we want to eliminate.
 
-### The current Postgres driver wrapper does not normalize row values
+### The current Postgres driver does not normalize row values
 
 The driver yields rows directly from `pg` without normalization:
 
@@ -236,9 +238,9 @@ Not necessarily. Strings are the default because they are portable and determini
 
 This ADR does not require us to implement type-specific binary encodings for every scalar (that would recreate driver protocol complexity in codecs). The binary path is for true blob-like values or cases where a target explicitly chooses it.
 
-### “How does a driver wrapper actually normalize values?”
+### “How does a driver actually normalize values?”
 
-Each Prisma Next driver wrapper is allowed to configure its underlying library and/or post-process values so the wrapper outputs only `string | Uint8Array | null`.
+Each Prisma Next driver is allowed to configure its underlying library and/or post-process values so the driver outputs only `string | Uint8Array | null`.
 
 For example, if an underlying library returns timestamps as `Date`, the wrapper would convert them to ISO strings before the codec layer sees them.
 
@@ -386,7 +388,7 @@ The database parses the bound string into a DECIMAL value according to the SQL c
 
 #### E) Driver returns canonical row values
 
-Many MySQL libraries return DECIMAL columns as strings (to avoid precision loss). Under this ADR, the driver wrapper must normalize to the canonical boundary, which already allows `string`.
+Many MySQL libraries return DECIMAL columns as strings (to avoid precision loss). Under this ADR, the driver must normalize to the canonical boundary, which already allows `string`.
 
 - row value: `"1234.567890123456789012345678901"`
 
