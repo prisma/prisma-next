@@ -11,7 +11,12 @@ export async function insertUserTransaction(userId: number, runtime: Runtime) {
 
   await kysely
     .insertInto('user')
-    .values({ id: userId, email: 'jane@doe.com', createdAt: new Date().toISOString() })
+    .values({
+      id: userId,
+      kind: 'user',
+      email: 'jane@doe.com',
+      createdAt: new Date().toISOString(),
+    })
     .execute();
 
   await kysely
