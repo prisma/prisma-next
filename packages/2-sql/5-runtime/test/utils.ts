@@ -109,7 +109,7 @@ export async function writeTestContractMarker(
  * Wraps the adapter in an SqlRuntimeAdapterDescriptor with static contributions
  * derived from the adapter's codec registry.
  */
-function createTestAdapterDescriptor(
+export function createTestAdapterDescriptor(
   adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
 ): SqlRuntimeAdapterDescriptor<'postgres'> {
   const codecRegistry = adapter.profile.codecs();
@@ -131,7 +131,7 @@ function createTestAdapterDescriptor(
 /**
  * Creates a test target descriptor with empty static contributions.
  */
-function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
+export function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
   return {
     kind: 'target' as const,
     id: 'postgres',
@@ -174,7 +174,7 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
 export function createTestStackInstance(options?: {
   extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   driver?: RuntimeDriverDescriptor<'sql', 'postgres', SqlRuntimeDriverInstance<'postgres'>>;
-}): ReturnType<typeof instantiateExecutionStack> {
+}) {
   const stack = createExecutionStack({
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(createStubAdapter()),

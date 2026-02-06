@@ -4,11 +4,16 @@ import {
   instantiateExecutionStack,
 } from '@prisma-next/core-execution-plane/stack';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import type { Runtime } from '../src/exports';
-import { createExecutionContext, createRuntime } from '../src/exports';
-import { createStubAdapter, createTestContract } from './utils';
+import { createRuntime } from '../src/exports';
+import {
+  createStubAdapter,
+  createTestAdapterDescriptor,
+  createTestContext,
+  createTestContract,
+  createTestTargetDescriptor,
+} from './utils';
 
 class MockDriver {
   private rows: ReadonlyArray<Record<string, unknown>> = [];
@@ -17,10 +22,10 @@ class MockDriver {
     this.rows = rows;
   }
 
-  async query(
+  async query<Row = Record<string, unknown>>(
     _sql: string,
-    _params: readonly unknown[],
-  ): Promise<{ rows: ReadonlyArray<unknown> }> {
+    _params?: readonly unknown[],
+  ): Promise<{ rows: ReadonlyArray<Row> }> {
     return { rows: [] };
   }
 
@@ -31,6 +36,10 @@ class MockDriver {
     for (const row of this.rows) {
       yield row as Row;
     }
+  }
+
+  async acquireConnection(): Promise<never> {
+    throw new Error('Not implemented in mock');
   }
 
   async connect(): Promise<void> {}
@@ -64,43 +73,15 @@ const fixtureContract = createTestContract({
 
 function createTestRuntime(mockDriver: MockDriver): Runtime {
   const adapter = createStubAdapter();
-  const codecRegistry = adapter.profile.codecs();
   const stack = createExecutionStack({
-    target: {
-      kind: 'target',
-      id: 'postgres',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      codecs: () => createCodecRegistry(),
-      operationSignatures: () => [],
-      parameterizedCodecs: () => [],
-      create() {
-        return { familyId: 'sql' as const, targetId: 'postgres' as const };
-      },
-    },
-    adapter: {
-      kind: 'adapter',
-      id: 'test-adapter',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      codecs: () => codecRegistry,
-      operationSignatures: () => [],
-      parameterizedCodecs: () => [],
-      create() {
-        return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
-      },
-    },
+    target: createTestTargetDescriptor(),
+    adapter: createTestAdapterDescriptor(adapter),
     extensionPacks: [],
   });
   const stackInstance = instantiateExecutionStack(stack);
-  const context = createExecutionContext({
-    contract: fixtureContract,
-    stack: stackInstance.stack as never,
-  });
+  const context = createTestContext(fixtureContract, adapter);
   return createRuntime({
-    stackInstance,
+    stackInstance: stackInstance as never,
     context,
     driver: mockDriver,
     verify: { mode: 'onFirstUse', requireMarker: false },
