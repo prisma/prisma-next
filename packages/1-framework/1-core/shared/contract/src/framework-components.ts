@@ -151,11 +151,6 @@ export function normalizeRenderer(codecId: string, renderer: TypeRenderer): Norm
 
 /**
  * Declarative fields that describe component metadata.
- * These fields are owned directly by descriptors (not nested under a manifest).
- *
- * Note: Operations are NOT included in component metadata. Operations with lowering
- * (like SQL operations) are family-owned and contributed via family-specific descriptor
- * methods (e.g., `operationSignatures()` for SQL descriptors).
  */
 export interface ComponentMetadata {
   /** Component version (semver) */
