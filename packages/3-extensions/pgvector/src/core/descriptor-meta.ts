@@ -61,8 +61,3 @@ export const pgvectorPackMeta = {
     ],
   },
 } as const;
-
-/**
- * @deprecated Use pgvectorOperationSignature instead.
- */
-export const pgvectorRuntimeOperation = pgvectorOperationSignature;
