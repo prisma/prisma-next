@@ -22,7 +22,7 @@ export const executionStack = createExecutionStack({
 
 export const executionContext = createExecutionContext({
   contract,
-  stack: executionStack,
+  stack: executionStack as never,
 });
 
 export const schema = schemaBuilder(executionContext);

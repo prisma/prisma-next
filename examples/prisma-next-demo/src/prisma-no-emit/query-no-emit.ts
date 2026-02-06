@@ -22,7 +22,7 @@ export const executionStack = createExecutionStack({
 export const executionStackInstance = instantiateExecutionStack(executionStack);
 export const executionContext = createExecutionContext({
   contract,
-  stack: executionStack,
+  stack: executionStack as never,
 });
 
 export const sql = sqlBuilder<typeof contract>({
