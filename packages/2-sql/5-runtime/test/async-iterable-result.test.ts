@@ -158,10 +158,8 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
     const rows = await result.toArray();
 
     expect(rows.length).toBe(1);
-    if (rows[0]) {
-      expect(typeof rows[0].id).toBe('number');
-      expect(typeof rows[0].email).toBe('string');
-    }
+    expect(typeof rows[0]!.id).toBe('number');
+    expect(typeof rows[0]!.email).toBe('string');
 
     await runtime.close();
   });
