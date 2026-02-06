@@ -1,9 +1,7 @@
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeExtensionDescriptor,
-  SqlRuntimeExtensionInstance,
 } from '@prisma-next/sql-runtime';
 import { type as arktype } from 'arktype';
 import { codecDefinitions } from '../core/codecs';
@@ -35,11 +33,7 @@ const parameterizedCodecDescriptors = [
   RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
 >;
 
-/**
- * Creates the codec registry from codec definitions.
- * Used for static contributions on the descriptor.
- */
-function createPgvectorCodecRegistry(): CodecRegistry {
+function createPgvectorCodecRegistry() {
   const registry = createCodecRegistry();
   for (const def of Object.values(codecDefinitions)) {
     registry.register(def.codec);
@@ -47,18 +41,6 @@ function createPgvectorCodecRegistry(): CodecRegistry {
   return registry;
 }
 
-/**
- * pgvector SQL runtime extension descriptor.
- * Implements SqlRuntimeExtensionDescriptor with required static contributions.
- *
- * The extension contributes:
- * - codecs: pg/vector@1 codec for vector type
- * - operations: cosineDistance operation for vector similarity search
- * - parameterizedCodecs: vector params schema for length validation
- *
- * Static contributions are available on both the descriptor and the instance
- * for backwards compatibility with createExecutionContext.
- */
 const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   kind: 'extension' as const,
   id: pgvectorPackMeta.id,
@@ -68,14 +50,10 @@ const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   codecs: createPgvectorCodecRegistry,
   operationSignatures: () => [pgvectorOperationSignature],
   parameterizedCodecs: () => parameterizedCodecDescriptors,
-  create(): SqlRuntimeExtensionInstance<'postgres'> {
+  create() {
     return {
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
-      // Provide codecs and operations on instance for backwards compatibility
-      // with createExecutionContext which reads from instances
-      codecs: createPgvectorCodecRegistry,
-      operations: () => [pgvectorOperationSignature],
     };
   },
 };

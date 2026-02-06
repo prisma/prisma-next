@@ -157,24 +157,13 @@ export interface SqlExecutionStack<TTargetId extends string = string> {
 
 /**
  * SQL runtime extension instance.
- * Extends the framework RuntimeExtensionInstance with SQL-specific hooks
- * for contributing codecs and operations to the runtime context.
+ * Identity-only — contributions (codecs, operations, parameterized codecs)
+ * live on the **descriptor**, not the instance.
  *
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
  */
 export interface SqlRuntimeExtensionInstance<TTargetId extends string>
-  extends RuntimeExtensionInstance<'sql', TTargetId> {
-  /** Returns codecs to register in the runtime context. */
-  codecs?(): CodecRegistry;
-  /** Returns operations to register in the runtime context. */
-  operations?(): ReadonlyArray<SqlOperationSignature>;
-  /**
-   * Returns parameterized codec descriptors for type validation and helper creation.
-   * Uses unknown for type parameters to allow any concrete descriptor types.
-   */
-  // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
-  parameterizedCodecs?(): ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
-}
+  extends RuntimeExtensionInstance<'sql', TTargetId> {}
 
 // ============================================================================
 // SQL Runtime Adapter Instance

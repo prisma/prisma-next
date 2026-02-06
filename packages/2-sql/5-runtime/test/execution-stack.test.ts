@@ -6,7 +6,6 @@ import type {
   ExecutionContext,
   SqlRuntimeAdapterDescriptor,
   SqlRuntimeExtensionDescriptor,
-  SqlRuntimeExtensionInstance,
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { createTestContract } from './utils';
@@ -103,7 +102,7 @@ function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgre
     codecs: () => registry,
     operationSignatures: () => operations,
     parameterizedCodecs: () => [],
-    create(): SqlRuntimeExtensionInstance<'postgres'> {
+    create() {
       return {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,

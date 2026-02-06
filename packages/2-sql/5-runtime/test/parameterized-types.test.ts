@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeExtensionDescriptor,
-  SqlRuntimeExtensionInstance,
 } from '../src/sql-context';
 import { createStubAdapter, createTestContext } from './utils';
 
@@ -136,12 +135,10 @@ describe('parameterized types', () => {
         codecs: () => registry,
         operationSignatures: () => [],
         parameterizedCodecs: () => parameterizedCodecs,
-        create(): SqlRuntimeExtensionInstance<'postgres'> {
+        create() {
           return {
             familyId: 'sql' as const,
             targetId: 'postgres' as const,
-            codecs: () => registry,
-            parameterizedCodecs: () => parameterizedCodecs,
           };
         },
       };
@@ -264,12 +261,10 @@ describe('parameterized types', () => {
         codecs: () => registry,
         operationSignatures: () => [],
         parameterizedCodecs: () => parameterizedCodecs,
-        create(): SqlRuntimeExtensionInstance<'postgres'> {
+        create() {
           return {
             familyId: 'sql' as const,
             targetId: 'postgres' as const,
-            codecs: () => registry,
-            parameterizedCodecs: () => parameterizedCodecs,
           };
         },
       };
@@ -325,12 +320,10 @@ describe('parameterized types', () => {
         codecs: () => registry,
         operationSignatures: () => [],
         parameterizedCodecs: () => parameterizedCodecs,
-        create(): SqlRuntimeExtensionInstance<'postgres'> {
+        create() {
           return {
             familyId: 'sql' as const,
             targetId: 'postgres' as const,
-            codecs: () => registry,
-            parameterizedCodecs: () => parameterizedCodecs,
           };
         },
       };
@@ -390,12 +383,10 @@ describe('parameterized types', () => {
         codecs: () => registry,
         operationSignatures: () => [],
         parameterizedCodecs: () => parameterizedCodecs,
-        create(): SqlRuntimeExtensionInstance<'postgres'> {
+        create() {
           return {
             familyId: 'sql' as const,
             targetId: 'postgres' as const,
-            codecs: () => registry,
-            parameterizedCodecs: () => parameterizedCodecs,
           };
         },
       };
@@ -451,12 +442,10 @@ describe('parameterized types', () => {
         codecs: () => registry,
         operationSignatures: () => [],
         parameterizedCodecs: () => parameterizedCodecs,
-        create(): SqlRuntimeExtensionInstance<'postgres'> {
+        create() {
           return {
             familyId: 'sql' as const,
             targetId: 'postgres' as const,
-            codecs: () => registry,
-            parameterizedCodecs: () => parameterizedCodecs,
           };
         },
       };
@@ -518,11 +507,10 @@ describe('parameterized types', () => {
           codecs: () => createCodecRegistry(),
           operationSignatures: () => [],
           parameterizedCodecs: () => parameterizedCodecs,
-          create(): SqlRuntimeExtensionInstance<'postgres'> {
+          create() {
             return {
               familyId: 'sql' as const,
               targetId: 'postgres' as const,
-              parameterizedCodecs: () => parameterizedCodecs,
             };
           },
         };

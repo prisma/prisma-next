@@ -8,7 +8,6 @@ import {
   type SqlExecutionStack,
   type SqlRuntimeAdapterDescriptor,
   type SqlRuntimeExtensionDescriptor,
-  type SqlRuntimeExtensionInstance,
   type SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 
@@ -137,7 +136,7 @@ function createTestExtensionDescriptor(options?: {
     codecs: () => codecRegistry,
     operationSignatures: () => operationsArray,
     parameterizedCodecs: () => [],
-    create(): SqlRuntimeExtensionInstance<'postgres'> {
+    create() {
       return {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
