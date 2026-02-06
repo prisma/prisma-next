@@ -10,14 +10,6 @@ import type {
   SqlControlExtensionDescriptor,
 } from './migrations/types';
 
-/**
- * SQL family descriptor implementation.
- * Provides the SQL family hook and factory method.
- *
- * Note: The stack's descriptors must implement SqlControlStaticContributions
- * (i.e., have operationSignatures() methods). This is enforced by the SQL
- * descriptor types (SqlControlTargetDescriptor, SqlControlAdapterDescriptor, etc.).
- */
 export class SqlFamilyDescriptor
   implements ControlFamilyDescriptor<'sql', SqlControlFamilyInstance>
 {
@@ -30,12 +22,6 @@ export class SqlFamilyDescriptor
   create<TTargetId extends string>(
     stack: ControlPlaneStack<'sql', TTargetId>,
   ): SqlControlFamilyInstance {
-    // Note: driver is not passed here because SqlFamilyInstance operations
-    // (validate, emit, etc.) don't require DB connectivity. Commands that
-    // need the driver (verify, introspect) get it directly from the stack.
-    //
-    // Assert that the stack's descriptors implement SqlControlStaticContributions.
-    // This is a runtime contract: SQL descriptors must provide operationSignatures().
     const target = stack.target as unknown as SqlControlDescriptorWithContributions;
     const adapter = stack.adapter as unknown as SqlControlAdapterDescriptor<TTargetId>;
     const extensionPacks =

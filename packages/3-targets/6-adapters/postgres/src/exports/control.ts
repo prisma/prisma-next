@@ -5,11 +5,6 @@ import { parsePostgresDefault } from '../core/default-normalizer';
 import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
 import { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError } from '../core/sql-utils';
 
-/**
- * Postgres adapter descriptor for CLI config.
- * Implements SqlControlAdapterDescriptor with required operationSignatures().
- * The adapter does not contribute operations (empty array).
- */
 const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
   ...postgresAdapterDescriptorMeta,
   operationSignatures: () => [],

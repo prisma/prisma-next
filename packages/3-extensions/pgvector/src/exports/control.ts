@@ -6,10 +6,6 @@ import type {
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { pgvectorOperationSignature, pgvectorPackMeta } from '../core/descriptor-meta';
 
-/**
- * Pure verification hook: checks whether the 'vector' extension is installed
- * based on the in-memory schema IR (no DB I/O).
- */
 function verifyVectorExtensionInstalled(schema: SqlSchemaIR): readonly SchemaIssue[] {
   if (!schema.extensions.includes('vector')) {
     return [
@@ -23,10 +19,6 @@ function verifyVectorExtensionInstalled(schema: SqlSchemaIR): readonly SchemaIss
   return [];
 }
 
-/**
- * Database dependencies for the pgvector extension.
- * Declares the 'vector' Postgres extension as a required dependency.
- */
 const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
   init: [
     {
@@ -64,10 +56,6 @@ const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
   ],
 };
 
-/**
- * pgvector extension descriptor for CLI config.
- * Implements SqlControlExtensionDescriptor with required operationSignatures().
- */
 const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   ...pgvectorPackMeta,
   operationSignatures: () => [pgvectorOperationSignature],

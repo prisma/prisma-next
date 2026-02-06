@@ -21,9 +21,6 @@ const vectorParamsSchema = arktype({
   return true;
 });
 
-/**
- * Pre-allocated parameterized codec descriptors to avoid per-call allocations.
- */
 const parameterizedCodecDescriptors = [
   {
     codecId: VECTOR_CODEC_ID,

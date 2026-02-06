@@ -12,11 +12,6 @@ import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 
-/**
- * Postgres target descriptor for CLI config.
- * Implements SqlControlTargetDescriptor with required operationSignatures().
- * The target does not contribute operations (empty array).
- */
 const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =
   {
     ...postgresTargetDescriptorMeta,

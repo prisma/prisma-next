@@ -8,10 +8,6 @@ const cosineLowering = {
   template: '1 - ({{self}} <=> {{arg0}})',
 } as const;
 
-/**
- * Shared operation definition used by both control-plane and runtime descriptors.
- * Frozen to prevent accidental mutation.
- */
 const cosineDistanceOperation = Object.freeze({
   method: 'cosineDistance',
   args: [{ kind: 'param' }],
@@ -19,22 +15,11 @@ const cosineDistanceOperation = Object.freeze({
   lowering: cosineLowering,
 } as const);
 
-/**
- * The canonical pgvector operation signature.
- * Used by both control-plane and runtime descriptors via operationSignatures().
- */
 export const pgvectorOperationSignature: SqlOperationSignature = {
   forTypeId: pgvectorTypeId,
   ...cosineDistanceOperation,
 };
 
-/**
- * Shared descriptor metadata for pgvector extension.
- * Contains identity, capabilities, and type information.
- *
- * Note: Operations are NOT included here. Descriptors must implement
- * operationSignatures() method to contribute operations to the registry.
- */
 export const pgvectorPackMeta = {
   kind: 'extension',
   id: 'pgvector',
