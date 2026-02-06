@@ -153,7 +153,7 @@ function createTestSetup() {
     stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
   });
 
-  return { stackInstance, context, driver };
+  return { stackInstance: stackInstance as never, context, driver };
 }
 
 describe('createRuntime', () => {
