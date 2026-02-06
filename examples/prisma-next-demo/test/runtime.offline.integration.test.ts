@@ -17,9 +17,7 @@ describe('static context (no runtime)', () => {
     // while building query plans from the static context.
     const adapterSpy = vi.spyOn(executionStack.adapter, 'create');
     const targetSpy = vi.spyOn(executionStack.target, 'create');
-    const extensionSpies = executionStack.extensionPacks.map((ext) =>
-      vi.spyOn(ext, 'create'),
-    );
+    const extensionSpies = executionStack.extensionPacks.map((ext) => vi.spyOn(ext, 'create'));
 
     // Build a query plan — must NOT trigger any descriptor instantiation
     sql.from(tables.user).select({ id: tables.user.columns.id }).limit(1).build();
