@@ -1,0 +1,21 @@
+---
+description: SQL runtime static context + operations layering decisions
+globs:
+  - "packages/2-sql/**"
+  - "packages/3-targets/**/src/exports/runtime.ts"
+  - "packages/3-extensions/**/src/exports/runtime.ts"
+alwaysApply: false
+---
+
+- **Static contributions are required** on SQL runtime-plane descriptors (target/adapter/extension):
+  - `codecs()`
+  - `operationSignatures()`
+  - `parameterizedCodecs()`
+- **Do not normalize** missing contributions inside `@prisma-next/sql-runtime` (no `?.()` / `?? empty`).
+  - If a descriptor has no contributions, it must return empty values directly in the descriptor module.
+- **`createExecutionContext` is descriptor-only**: it must not call `create()` on targets/adapters/extensions.
+- **`createRuntime` is wafer-thin**: caller provides `ExecutionStackInstance`, `ExecutionContext`, and a `SqlDriver`.
+  - Do not add driver instantiation/attachment to `ExecutionStackInstance` until after TML-1837.
+- **Operations layering**:
+  - Framework (`@prisma-next/operations`) stays family-agnostic (no lowering).
+  - Family-owned operation definitions (e.g. `SqlOperationSignature` with SQL lowering) must not live in `@prisma-next/contract` metadata.

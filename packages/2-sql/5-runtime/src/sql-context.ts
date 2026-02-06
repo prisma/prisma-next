@@ -2,6 +2,7 @@ import { checkContractComponentRequirements } from '@prisma-next/contract/framew
 import type {
   RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
+  RuntimeDriverInstance,
   RuntimeExtensionDescriptor,
   RuntimeExtensionInstance,
   RuntimeTargetDescriptor,
