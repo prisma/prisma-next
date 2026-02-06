@@ -3,7 +3,7 @@ import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { expectType } from '@prisma-next/test-utils/typed-expectations';
+import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 
@@ -98,7 +98,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       frameworkComponents,
     });
 
-    expectType(result.kind === 'success');
+    expectNarrowedType(result.kind === 'success');
     expect(result.plan.operations.map((op) => op.id)).toEqual(['type.Role', 'table.user']);
   });
 
@@ -268,7 +268,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       frameworkComponents,
     });
 
-    expectType(result.kind === 'success');
+    expectNarrowedType(result.kind === 'success');
 
     const tableOp = result.plan.operations.find((op) => op.id === 'table.user');
     expect(tableOp).toBeDefined();

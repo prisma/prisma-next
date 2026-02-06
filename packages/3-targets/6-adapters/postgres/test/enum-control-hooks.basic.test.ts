@@ -1,5 +1,5 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
-import { expectType } from '@prisma-next/test-utils/typed-expectations';
+import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import { parsePostgresArray, pgEnumControlHooks } from '../src/core/enum-control-hooks';
 import { createTestContract, createTestSchema, ENUM_CODEC_ID } from './test-utils';
@@ -457,7 +457,7 @@ describe('pgEnumControlHooks.introspectTypes', () => {
       { schema_name: 'public', type_name: 'role', values: ['USER', 'ADMIN'] },
     ]);
 
-    expectType(pgEnumControlHooks.introspectTypes, 'introspectTypes missing');
+    expectNarrowedType(pgEnumControlHooks.introspectTypes, 'introspectTypes missing');
 
     const types = await pgEnumControlHooks.introspectTypes({ driver, schemaName: 'public' });
 
@@ -475,7 +475,7 @@ describe('pgEnumControlHooks.introspectTypes', () => {
       { schema_name: 'public', type_name: 'status', values: '{PENDING,ACTIVE,CLOSED}' },
     ]);
 
-    expectType(pgEnumControlHooks.introspectTypes, 'introspectTypes missing');
+    expectNarrowedType(pgEnumControlHooks.introspectTypes, 'introspectTypes missing');
 
     const types = await pgEnumControlHooks.introspectTypes({ driver, schemaName: 'public' });
 
@@ -493,7 +493,7 @@ describe('pgEnumControlHooks.introspectTypes', () => {
       { schema_name: 'public', type_name: 'invalid', values: [1, 2] },
     ]);
 
-    expectType(pgEnumControlHooks.introspectTypes, 'introspectTypes missing');
+    expectNarrowedType(pgEnumControlHooks.introspectTypes, 'introspectTypes missing');
 
     await expect(
       pgEnumControlHooks.introspectTypes({ driver, schemaName: 'public' }),
@@ -505,7 +505,7 @@ describe('pgEnumControlHooks.introspectTypes', () => {
       { schema_name: 'public', type_name: 'broken', values: { nested: 'object' } },
     ]);
 
-    expectType(pgEnumControlHooks.introspectTypes, 'introspectTypes missing');
+    expectNarrowedType(pgEnumControlHooks.introspectTypes, 'introspectTypes missing');
 
     await expect(
       pgEnumControlHooks.introspectTypes({ driver, schemaName: 'public' }),
