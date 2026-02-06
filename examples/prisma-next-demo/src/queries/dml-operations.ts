@@ -1,6 +1,6 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { sql, tables } from '../prisma/query';
+import { sql, tables } from '../prisma/context';
 
 export async function insertUser(email: string, runtime: Runtime) {
   const userTable = tables.user;

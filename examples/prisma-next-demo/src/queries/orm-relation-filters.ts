@@ -1,6 +1,6 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { orm } from '../prisma/query';
+import { orm } from '../prisma/context';
 import { collect } from './utils';
 
 export async function ormGetUsersWithPosts(runtime: Runtime) {

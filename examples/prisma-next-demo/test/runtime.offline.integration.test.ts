@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sql, tables } from '../src/prisma/query';
+import { sql, tables } from '../src/prisma/context';
 
 describe('when no runtime is available', () => {
   it('can still build query plans from static context', () => {
