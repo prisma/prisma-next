@@ -27,65 +27,22 @@ import type {
 import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
 
-/**
- * Runtime parameterized codec descriptor.
- * Provides validation schema and optional init hook for codecs that support type parameters.
- * Used at runtime to validate typeParams and create type helpers.
- */
 export interface RuntimeParameterizedCodecDescriptor<
   TParams = Record<string, unknown>,
   THelper = unknown,
 > {
-  /** The codec ID this descriptor applies to (e.g., 'pg/vector@1') */
   readonly codecId: string;
-
-  /**
-   * Arktype schema for validating typeParams.
-   * The schema is used to validate both storage.types entries and inline column typeParams.
-   */
   readonly paramsSchema: Type<TParams>;
-
-  /**
-   * Optional init hook called during runtime context creation.
-   * Receives validated params and returns a helper object to be stored in context.types.
-   * If not provided, the validated params are stored directly.
-   */
   readonly init?: (params: TParams) => THelper;
 }
 
-/**
- * Static contributions surface for SQL runtime-plane descriptors.
- *
- * This interface defines the methods that targets, adapters, and extensions
- * must implement to contribute codecs, operations, and parameterized codec
- * descriptors to the ExecutionContext.
- *
- * All methods are **required** (non-optional). If a descriptor has nothing
- * to contribute, it returns empty values. This design:
- * - Ensures consistent API across all descriptor types
- * - Eliminates null-checking and defaulting in context creation
- * - Makes contributions explicit and discoverable
- */
 export interface SqlStaticContributions {
-  /** Returns codecs to register in the runtime context. */
   readonly codecs: () => CodecRegistry;
-  /** Returns operation signatures to register in the runtime context. */
   readonly operationSignatures: () => ReadonlyArray<SqlOperationSignature>;
-  /**
-   * Returns parameterized codec descriptors for type validation and helper creation.
-   * Uses unknown for type parameters to allow any concrete descriptor types.
-   */
   // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
   readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
 }
 
-/**
- * SQL runtime target descriptor.
- * Extends RuntimeTargetDescriptor with required static contributions.
- *
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- * @template TTargetInstance - The target instance type
- */
 export interface SqlRuntimeTargetDescriptor<
   TTargetId extends string = string,
   TTargetInstance extends RuntimeTargetInstance<'sql', TTargetId> = RuntimeTargetInstance<
@@ -95,13 +52,6 @@ export interface SqlRuntimeTargetDescriptor<
 > extends RuntimeTargetDescriptor<'sql', TTargetId, TTargetInstance>,
     SqlStaticContributions {}
 
-/**
- * SQL runtime adapter descriptor.
- * Extends RuntimeAdapterDescriptor with required static contributions.
- *
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- * @template TAdapterInstance - The adapter instance type
- */
 export interface SqlRuntimeAdapterDescriptor<
   TTargetId extends string = string,
   TAdapterInstance extends RuntimeAdapterInstance<'sql', TTargetId> = RuntimeAdapterInstance<
@@ -111,57 +61,27 @@ export interface SqlRuntimeAdapterDescriptor<
 > extends RuntimeAdapterDescriptor<'sql', TTargetId, TAdapterInstance>,
     SqlStaticContributions {}
 
-/**
- * SQL runtime extension descriptor.
- * Extends RuntimeExtensionDescriptor with required static contributions.
- *
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- * @template TExtensionInstance - The extension instance type
- */
 export interface SqlRuntimeExtensionDescriptor<TTargetId extends string = string>
   extends RuntimeExtensionDescriptor<'sql', TTargetId, SqlRuntimeExtensionInstance<TTargetId>>,
     SqlStaticContributions {
   create(): SqlRuntimeExtensionInstance<TTargetId>;
 }
 
-/**
- * A descriptors-only SQL execution stack for static context creation.
- * All descriptors implement SqlStaticContributions, so context can be
- * derived without calling create() on any component.
- */
 export interface SqlExecutionStack<TTargetId extends string = string> {
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId>;
   readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
 }
 
-/**
- * SQL runtime extension instance.
- * Identity-only — contributions (codecs, operations, parameterized codecs)
- * live on the **descriptor**, not the instance.
- *
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- */
 export interface SqlRuntimeExtensionInstance<TTargetId extends string>
   extends RuntimeExtensionInstance<'sql', TTargetId> {}
 
-/**
- * SQL runtime adapter instance interface.
- * Combines RuntimeAdapterInstance identity with SQL Adapter behavior.
- * The instance IS an Adapter (via intersection), not HAS an adapter property.
- *
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- */
 export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = RuntimeAdapterInstance<
   'sql',
   TTargetId
 > &
   Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
 
-/**
- * SQL runtime driver instance type.
- * Combines identity properties with SQL driver behavior methods.
- */
 export type SqlRuntimeDriverInstance<TTargetId extends string = string> = RuntimeDriverInstance<
   'sql',
   TTargetId
@@ -220,10 +140,6 @@ export function assertExecutionStackContractRequirements(
   }
 }
 
-/**
- * Validates typeParams against the codec's paramsSchema.
- * @throws RuntimeErrorEnvelope with code RUNTIME.TYPE_PARAMS_INVALID if validation fails
- */
 function validateTypeParams(
   typeParams: Record<string, unknown>,
   codecDescriptor: RuntimeParameterizedCodecDescriptor,
@@ -244,11 +160,6 @@ function validateTypeParams(
   return result as Record<string, unknown>;
 }
 
-/**
- * Collects parameterized codec descriptors from descriptors with static contributions.
- * Returns a map of codecId → descriptor for quick lookup.
- * @throws RuntimeErrorEnvelope with code RUNTIME.DUPLICATE_PARAMETERIZED_CODEC if duplicate codecIds are found
- */
 function collectParameterizedCodecDescriptors(
   contributors: ReadonlyArray<SqlStaticContributions>,
 ): Map<string, RuntimeParameterizedCodecDescriptor> {
@@ -270,17 +181,6 @@ function collectParameterizedCodecDescriptors(
   return descriptors;
 }
 
-/**
- * Initializes type helpers from storage.types using codec descriptors.
- *
- * For each named type instance in `storage.types`:
- * - If a codec descriptor exists with an `init` hook: calls the hook and stores the result
- * - Otherwise: stores the full type instance metadata directly (codecId, nativeType, typeParams)
- *
- * This matches the typing in `ExtractSchemaTypes<Contract>` which extracts
- * `Contract['storage']['types']` directly, ensuring runtime values match static types
- * when no init hook transforms the value.
- */
 function initializeTypeHelpers(
   storageTypes: Record<string, StorageTypeInstance> | undefined,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
@@ -295,20 +195,16 @@ function initializeTypeHelpers(
     const descriptor = codecDescriptors.get(typeInstance.codecId);
 
     if (descriptor) {
-      // Validate typeParams against the codec's schema
       const validatedParams = validateTypeParams(typeInstance.typeParams, descriptor, {
         typeName,
       });
 
-      // Call init hook if provided, otherwise store full type instance
       if (descriptor.init) {
         helpers[typeName] = descriptor.init(validatedParams);
       } else {
-        // No init hook: expose full type instance metadata (matches contract typing)
         helpers[typeName] = typeInstance;
       }
     } else {
-      // No descriptor found: expose full type instance (no validation possible)
       helpers[typeName] = typeInstance;
     }
   }
@@ -316,10 +212,6 @@ function initializeTypeHelpers(
   return helpers;
 }
 
-/**
- * Validates inline column typeParams across all tables.
- * @throws RuntimeErrorEnvelope with code RUNTIME.TYPE_PARAMS_INVALID if validation fails
- */
 function validateColumnTypeParams(
   storage: SqlStorage,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
