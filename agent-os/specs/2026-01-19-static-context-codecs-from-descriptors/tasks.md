@@ -124,25 +124,25 @@ Rules:
 - [x] Update `examples/prisma-next-demo/src/main.ts` to use the new runtime wiring.
 - [x] Add smoke coverage: importing query roots does not instantiate adapter/extensions.
 
-## 6) Tests
+## 6) Tests ✅
 
 ### 6.1 Unit: descriptor-based derivation + parity
 
-- [ ] Add unit test asserting descriptor-based context derivation includes expected codec IDs and operations.
-- [ ] Add unit test asserting adapter descriptor `codecs()` matches adapter instance `profile.codecs()` codec IDs (parity).
+- [x] Add unit test asserting descriptor-based context derivation includes expected codec IDs and operations.
+- [x] Add unit test asserting adapter descriptor `codecs()` matches adapter instance `profile.codecs()` codec IDs (parity).
 
 ### 6.2 Unit: parameterized codec validation
 
-- [ ] Add unit test for validation against `storage.types`.
-- [ ] Add unit test for validation against inline column `typeParams`.
+- [x] Add unit test for validation against `storage.types`.
+- [x] Add unit test for validation against inline column `typeParams`.
 
 ### 6.3 Unit: `types` is always present
 
-- [ ] Add unit test asserting `ExecutionContext.types` exists even when no parameterized codecs are registered.
+- [x] Add unit test asserting `ExecutionContext.types` exists even when no parameterized codecs are registered.
 
 ### 6.4 Integration/demo smoke
 
-- [ ] Update/extend demo integration test(s) to:
+- [x] Update/extend demo integration test(s) to:
   - import static `context.ts` without runtime instantiation side-effects
   - execute query successfully when `DATABASE_URL` is provided
 
