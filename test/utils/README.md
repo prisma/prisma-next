@@ -164,16 +164,30 @@ Type-safe assertion helpers that wrap Vitest's `expect` API.
 
 **Available helpers:**
 - `expectDefined<T>(value)`: Asserts that a value is defined (not `undefined`)
+- `expectType(value, message?)`: Asserts truthiness and narrows the type. Use as a replacement for `if`-based type narrowing in tests.
 
 **Usage:**
 ```typescript
-import { expectDefined } from '@prisma-next/test-utils/typed-expectations';
+import { expectDefined, expectType } from '@prisma-next/test-utils/typed-expectations';
 
 it('handles defined values', () => {
   const value: string | undefined = getValue();
   expectDefined(value);
   // TypeScript now knows value is string, not undefined
   const length = value.length; // Type-safe!
+});
+
+it('narrows discriminated unions', () => {
+  const result = planner.plan({ ... });
+  expectType(result.kind === 'success', 'expected planner success');
+  // result is now narrowed to the success branch
+  expect(result.plan.operations).toHaveLength(2);
+});
+
+it('narrows optional properties', () => {
+  expectType(hooks.introspectTypes, 'introspectTypes missing');
+  // hooks.introspectTypes is now narrowed to non-nullable
+  const types = await hooks.introspectTypes({ driver, schemaName: 'public' });
 });
 ```
 
