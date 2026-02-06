@@ -1,10 +1,3 @@
-/**
- * Dynamic Runtime Wiring (Emitted Contract Workflow)
- *
- * This module handles all runtime instantiation: stack instantiation,
- * driver construction, and runtime creation. It imports static setup
- * from context.ts and adds only the dynamic parts.
- */
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { budgets, createRuntime, type Plugin, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
