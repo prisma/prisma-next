@@ -1,3 +1,4 @@
+import type { TargetDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   ControlFamilyDescriptor,
   ControlPlaneStack,
@@ -22,7 +23,8 @@ export class SqlFamilyDescriptor
   create<TTargetId extends string>(
     stack: ControlPlaneStack<'sql', TTargetId>,
   ): SqlControlFamilyInstance {
-    const target = stack.target as unknown as SqlControlDescriptorWithContributions;
+    const target = stack.target as unknown as TargetDescriptor<'sql', TTargetId> &
+      SqlControlDescriptorWithContributions;
     const adapter = stack.adapter as unknown as SqlControlAdapterDescriptor<TTargetId>;
     const extensionPacks =
       stack.extensionPacks as unknown as readonly SqlControlExtensionDescriptor<TTargetId>[];

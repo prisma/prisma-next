@@ -1,4 +1,7 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type {
+  TargetBoundComponentDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
@@ -215,7 +218,7 @@ export interface SqlControlFamilyInstance
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
 interface CreateSqlFamilyInstanceOptions<TTargetId extends string> {
-  readonly target: SqlControlDescriptorWithContributions;
+  readonly target: TargetDescriptor<'sql', TTargetId> & SqlControlDescriptorWithContributions;
   readonly adapter: SqlControlAdapterDescriptor<TTargetId>;
   readonly extensionPacks: readonly SqlControlExtensionDescriptor<TTargetId>[];
 }
