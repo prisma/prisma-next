@@ -1,20 +1,5 @@
 import type { RenderTypeContext, TypesImportSpec } from './types';
 
-// ============================================================================
-// Type Renderer Types (for parameterized codec emission)
-// ============================================================================
-//
-// TypeRenderer supports author-friendly authoring (template strings) that are
-// normalized to functions during pack assembly. The emitter only receives
-// normalized (function-form) renderers.
-//
-// Lifecycle:
-//   1. Authoring: Descriptor author uses template string or function
-//   2. Assembly: Templates are compiled to functions via normalizeRenderer()
-//   3. Emission: Emitter calls normalized render functions
-//
-// ============================================================================
-
 /**
  * A template-based type renderer (structured form).
  * Uses mustache-style placeholders (e.g., `Vector<{{length}}>`) that are
@@ -163,35 +148,6 @@ export function normalizeRenderer(codecId: string, renderer: TypeRenderer): Norm
     render: (params, ctx) => interpolateTypeTemplate(template, params, ctx),
   };
 }
-
-// ============================================================================
-// Framework Component Descriptor Base Types
-// ============================================================================
-//
-// Prisma Next uses a modular architecture where functionality is composed from
-// discrete "components". Each component has a descriptor that identifies it and
-// provides metadata. These base types define the shared structure for all
-// component descriptors across both control-plane (CLI/tooling) and runtime-plane.
-//
-// Component Hierarchy:
-//
-//   Family (e.g., 'sql', 'document')
-//     └── Target (e.g., 'postgres', 'mysql', 'mongodb')
-//           ├── Adapter (protocol/dialect implementation)
-//           ├── Driver (connection/execution layer)
-//           └── Extension (optional capabilities like pgvector)
-//
-// Key design decisions:
-// - "Component" terminology separates framework building blocks from delivery
-//   mechanism ("pack" refers to how components are packaged/distributed)
-// - `kind` is extensible (Kind extends string) - no closed union, allowing
-//   ecosystem authors to define new component kinds
-// - Target-bound descriptors are generic in TFamilyId and TTargetId for type-safe
-//   composition (e.g., TypeScript rejects Postgres adapter with MySQL target)
-// - Descriptors own declarative fields directly (version, types, operations, etc.)
-//   rather than nesting them under a `manifest` property
-//
-// ============================================================================
 
 /**
  * Declarative fields that describe component metadata.
@@ -585,17 +541,6 @@ export type TargetBoundComponentDescriptor<TFamilyId extends string, TTargetId e
   | AdapterDescriptor<TFamilyId, TTargetId>
   | DriverDescriptor<TFamilyId, TTargetId>
   | ExtensionDescriptor<TFamilyId, TTargetId>;
-
-// ============================================================================
-// Framework Component Instance Base Types
-// ============================================================================
-//
-// These are minimal, identity-only interfaces for component instances.
-// They carry the component's identity (familyId, targetId) without any
-// behavior methods. Plane-specific interfaces (ControlFamilyInstance,
-// RuntimeFamilyInstance, etc.) extend these bases and add domain actions.
-//
-// ============================================================================
 
 /**
  * Base interface for family instances.

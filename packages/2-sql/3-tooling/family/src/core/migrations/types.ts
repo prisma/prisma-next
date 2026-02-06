@@ -32,10 +32,6 @@ import type { SqlControlFamilyInstance } from '../control-instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
 
-// ============================================================================
-// SQL Control Static Contributions
-// ============================================================================
-
 /**
  * Static contributions surface for SQL control-plane descriptors.
  *
@@ -52,10 +48,6 @@ export interface SqlControlStaticContributions {
   /** Returns operation signatures to register in the operation registry. */
   readonly operationSignatures: () => ReadonlyArray<SqlOperationSignature>;
 }
-
-// ============================================================================
-// Component Database Dependencies
-// ============================================================================
 
 /**
  * A single database dependency declared by a framework component.
@@ -105,10 +97,6 @@ export interface DatabaseDependencyProvider {
   readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
 }
 
-// ============================================================================
-// Storage Type Control Hooks
-// ============================================================================
-
 export interface StorageTypePlanResult<TTargetDetails> {
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
 }
@@ -145,10 +133,6 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
   }) => Promise<Record<string, StorageTypeInstance>>;
 }
 
-// ============================================================================
-// SQL Control Extension Descriptor
-// ============================================================================
-
 /**
  * SQL-specific extension descriptor with required static contributions and optional database dependencies.
  * Extends the core ControlExtensionDescriptor with SQL-specific metadata.
@@ -176,10 +160,6 @@ export interface SqlControlExtensionDescriptor<TTargetId extends string>
 export interface SqlControlAdapterDescriptor<TTargetId extends string>
   extends ControlAdapterDescriptor<'sql', TTargetId>,
     SqlControlStaticContributions {}
-
-// ============================================================================
-// SQL-Specific Plan Types
-// ============================================================================
 
 /**
  * A single step in a SQL migration operation (precheck, execute, or postcheck).
@@ -238,10 +218,6 @@ export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
   readonly meta?: AnyRecord;
 }
-
-// ============================================================================
-// SQL-Specific Planner Types
-// ============================================================================
 
 /**
  * Specific conflict kinds for SQL migrations.
@@ -325,10 +301,6 @@ export interface SqlMigrationPlannerPlanOptions {
 export interface SqlMigrationPlanner<TTargetDetails> {
   plan(options: SqlMigrationPlannerPlanOptions): SqlPlannerResult<TTargetDetails>;
 }
-
-// ============================================================================
-// SQL-Specific Runner Types
-// ============================================================================
 
 /**
  * Callbacks for SQL migration runner execution.
@@ -416,10 +388,6 @@ export interface SqlMigrationRunner<TTargetDetails> {
   ): Promise<SqlMigrationRunnerResult>;
 }
 
-// ============================================================================
-// SQL Control Target Descriptor
-// ============================================================================
-
 /**
  * SQL control target descriptor with migration support and required static contributions.
  * Extends the core ControlTargetDescriptor with SQL-specific migration methods.
@@ -446,10 +414,6 @@ export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDet
    */
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }
-
-// ============================================================================
-// Helper Types
-// ============================================================================
 
 /**
  * Options for creating a SQL migration plan.

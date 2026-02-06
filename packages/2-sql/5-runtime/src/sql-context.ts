@@ -27,10 +27,6 @@ import type {
 import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
 
-// ============================================================================
-// Runtime Parameterized Codec Descriptor Types
-// ============================================================================
-
 /**
  * Runtime parameterized codec descriptor.
  * Provides validation schema and optional init hook for codecs that support type parameters.
@@ -57,10 +53,6 @@ export interface RuntimeParameterizedCodecDescriptor<
   readonly init?: (params: TParams) => THelper;
 }
 
-// ============================================================================
-// SQL Static Contributions Interface
-// ============================================================================
-
 /**
  * Static contributions surface for SQL runtime-plane descriptors.
  *
@@ -86,10 +78,6 @@ export interface SqlStaticContributions {
   // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
   readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
 }
-
-// ============================================================================
-// SQL Runtime Descriptor Types (extend core types with static contributions)
-// ============================================================================
 
 /**
  * SQL runtime target descriptor.
@@ -136,10 +124,6 @@ export interface SqlRuntimeExtensionDescriptor<TTargetId extends string = string
   create(): SqlRuntimeExtensionInstance<TTargetId>;
 }
 
-// ============================================================================
-// SQL Execution Stack (descriptors-only)
-// ============================================================================
-
 /**
  * A descriptors-only SQL execution stack for static context creation.
  * All descriptors implement SqlStaticContributions, so context can be
@@ -151,10 +135,6 @@ export interface SqlExecutionStack<TTargetId extends string = string> {
   readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
 }
 
-// ============================================================================
-// SQL Runtime Extension Types
-// ============================================================================
-
 /**
  * SQL runtime extension instance.
  * Identity-only — contributions (codecs, operations, parameterized codecs)
@@ -164,10 +144,6 @@ export interface SqlExecutionStack<TTargetId extends string = string> {
  */
 export interface SqlRuntimeExtensionInstance<TTargetId extends string>
   extends RuntimeExtensionInstance<'sql', TTargetId> {}
-
-// ============================================================================
-// SQL Runtime Adapter Instance
-// ============================================================================
 
 /**
  * SQL runtime adapter instance interface.
@@ -243,10 +219,6 @@ export function assertExecutionStackContractRequirements(
     );
   }
 }
-
-// ============================================================================
-// Parameterized Type Validation
-// ============================================================================
 
 /**
  * Validates typeParams against the codec's paramsSchema.

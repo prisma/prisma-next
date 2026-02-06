@@ -33,9 +33,6 @@ function assertUniqueCodecOwner(options: {
   }
 }
 
-// ============================================================================
-// Operation Registry Assembly
-// ============================================================================
 /**
  * Descriptor type that provides static contributions for SQL control plane assembly.
  * Includes component identity (id, types) plus required operationSignatures() method.
@@ -71,9 +68,6 @@ export function assembleOperationRegistry(
   return registry;
 }
 
-// ============================================================================
-// Type Import Extraction
-// ============================================================================
 /**
  * Descriptor shape for type extraction functions.
  * Only requires the fields used for type imports and metadata.
@@ -131,9 +125,6 @@ export function extractOperationTypeImports(
   return imports;
 }
 
-// ============================================================================
-// Extension ID Extraction
-// ============================================================================
 /**
  * Extracts extension IDs from descriptors in deterministic order:
  * [adapter.id, target.id, ...extensions.map(e => e.id)]
@@ -161,9 +152,6 @@ export function extractExtensionIds(
   return ids;
 }
 
-// ============================================================================
-// Parameterized Renderers
-// ============================================================================
 /**
  * Extracts and normalizes parameterized codec renderers from descriptors.
  * Templates are compiled to functions at this layer.
@@ -226,9 +214,6 @@ function hasCodecControlHooks(descriptor: unknown): descriptor is {
   return hooks !== null && hooks !== undefined && typeof hooks === 'object';
 }
 
-// ============================================================================
-// Codec Control Hooks
-// ============================================================================
 /**
  * Extracts codec control hooks from descriptors.
  *
