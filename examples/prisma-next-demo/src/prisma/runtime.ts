@@ -1,11 +1,11 @@
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { budgets, createRuntime, type Plugin, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
-import { executionContext, executionStack } from './context';
+import { context, executionStack } from './context';
 
 export function getRuntime(
   databaseUrl: string,
-  plugins: Plugin<typeof executionContext.contract>[] = [
+  plugins: Plugin<typeof context.contract>[] = [
     budgets({
       maxRows: 10_000,
       defaultTableRows: 10_000,
@@ -28,7 +28,7 @@ export function getRuntime(
 
   return createRuntime({
     stackInstance,
-    context: executionContext,
+    context,
     driver,
     verify: {
       mode: 'onFirstUse',

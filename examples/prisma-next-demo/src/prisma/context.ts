@@ -19,12 +19,12 @@ export const executionStack = createSqlExecutionStack({
   extensionPacks: [pgvectorDescriptor],
 });
 
-export const executionContext = createExecutionContext({
+export const context = createExecutionContext({
   contract,
   stack: executionStack,
 });
 
-export const schema = schemaBuilder(executionContext);
+export const schema = schemaBuilder(context);
 export const tables = schema.tables;
-export const sql = sqlBuilder({ context: executionContext });
-export const orm = ormBuilder({ context: executionContext });
+export const sql = sqlBuilder({ context });
+export const orm = ormBuilder({ context });

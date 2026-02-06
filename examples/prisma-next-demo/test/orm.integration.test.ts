@@ -4,11 +4,11 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { executionContext } from '../src/prisma/context';
+import { context } from '../src/prisma/context';
 import { getRuntime } from '../src/prisma/runtime';
 import { initTestDatabase } from './utils/control-client';
 
-const { contract } = executionContext;
+const { contract } = context;
 
 /**
  * Seeds test data using the runtime and query DSL.
@@ -17,7 +17,7 @@ async function seedTestData(
   runtime: Runtime,
   data: { users?: string[]; posts?: Array<{ title: string; userIndex: number }> },
 ): Promise<{ userIds: string[] }> {
-  const tables = schema(executionContext).tables;
+  const tables = schema(context).tables;
   const userTable = tables['user']!;
   const postTable = tables['post']!;
 
@@ -31,7 +31,7 @@ async function seedTestData(
       const createdAt = new Date();
       const kind = i === 0 ? 'admin' : 'user';
 
-      const plan = sql({ context: executionContext })
+      const plan = sql({ context })
         .insert(userTable, {
           id: param('id'),
           email: param('email'),
@@ -57,7 +57,7 @@ async function seedTestData(
       const id = `post_${String(i + 1).padStart(3, '0')}`;
       const createdAt = new Date();
 
-      const plan = sql({ context: executionContext })
+      const plan = sql({ context })
         .insert(postTable, {
           id: param('id'),
           title: param('title'),
