@@ -35,7 +35,7 @@ The `ext-*` pattern is deprecated and should not be used for new packages.
 
 ## Rationale
 
-1. **Consistency with other prefixes**: Aligns with `adapter-postgres`, `driver-postgres`, `target-postgres`, `compat-prisma` which all use full words.
+1. **Consistency with other prefixes**: Aligns with `adapter-postgres`, `driver-postgres`, `target-postgres` which all use full words.
 
 2. **Single source of truth**: One pattern eliminates ambiguity in documentation, tooling, and user expectations.
 

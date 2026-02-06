@@ -313,7 +313,6 @@ packages/
     7-drivers/
       postgres/          # Postgres driver
   3-extensions/          # Domain 3: Extensions
-    compat-prisma/       # Prisma ORM compatibility layer
     pgvector/            # pgvector extension pack
 ```
 

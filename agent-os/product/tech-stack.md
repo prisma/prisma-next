@@ -54,7 +54,6 @@
 
 #### Extensions
 - **`@prisma-next/extension-pgvector`** - pgvector extension pack (vector types, ops, codecs)
-- **`@prisma-next/compat-prisma`** - Prisma ORM compatibility layer
 
 #### Test Packages
 - **`@prisma-next/integration-tests`** - Cross-package integration tests
