@@ -82,11 +82,15 @@ export function createTestRuntime<TContract extends SqlContract<SqlStorage>>(
     contract,
     stack: stack as never,
   });
+  const driverDescriptor = stack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
   const pool = new Pool({ connectionString });
   const runtime = createRuntime({
     stackInstance,
     context,
-    driver: stack.driver!.create({
+    driver: driverDescriptor.create({
       connect: { pool },
       cursor: { disabled: true },
     }),

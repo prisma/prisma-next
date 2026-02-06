@@ -5,10 +5,15 @@ import { executionContext, executionStack, executionStackInstance } from './quer
 export function getRuntime(databaseUrl: string): Runtime {
   const pool = new Pool({ connectionString: databaseUrl });
 
+  const driverDescriptor = executionStack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+
   return createRuntime({
     stackInstance: executionStackInstance,
     context: executionContext,
-    driver: executionStack.driver!.create({
+    driver: driverDescriptor.create({
       connect: { pool },
       cursor: { disabled: true },
     }),

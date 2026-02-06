@@ -44,11 +44,15 @@ export function getPrismaNextRuntime(): Runtime {
       stack: stack as never,
     });
 
+    const driverDescriptor = stack.driver;
+    if (!driverDescriptor) {
+      throw new Error('Driver descriptor missing from execution stack');
+    }
+
     runtime = createRuntime({
       stackInstance,
       context,
-      // driver is guaranteed to exist — postgresDriver is passed to createExecutionStack above
-      driver: stack.driver!.create({
+      driver: driverDescriptor.create({
         connect: { client },
         cursor: { disabled: true },
       }),

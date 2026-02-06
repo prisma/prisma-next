@@ -18,8 +18,12 @@ const executionStackInstance = instantiateExecutionStack(executionStack);
 import { initTestDatabase } from './utils/control-client';
 
 function createTestDriver(connectionString: string) {
+  const driverDescriptor = executionStack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
   const pool = new Pool({ connectionString });
-  return executionStack.driver!.create({ connect: { pool }, cursor: { disabled: true } });
+  return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
 }
 
 const { contract } = executionContext;

@@ -17,7 +17,11 @@ export function getRuntime(
   const pool = new Pool({ connectionString: databaseUrl });
 
   const stackInstance = instantiateExecutionStack(executionStack);
-  const driver = executionStack.driver!.create({
+  const driverDescriptor = executionStack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+  const driver = driverDescriptor.create({
     connect: { pool },
     cursor: { disabled: true },
   });

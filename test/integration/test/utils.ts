@@ -56,10 +56,15 @@ export function createTestRuntime(
     stack: stack as never,
   });
 
+  const driverDescriptor = stack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+
   return createRuntime({
     stackInstance,
     context,
-    driver: stack.driver!.create(driverOptions),
+    driver: driverDescriptor.create(driverOptions),
     verify,
     ...(options?.plugins ? { plugins: options.plugins } : {}),
     ...(options?.mode ? { mode: options.mode } : {}),
