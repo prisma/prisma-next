@@ -102,27 +102,27 @@ Rules:
   - instantiation inside `createRuntime`
 - [x] Do not attempt to add `driver` to `ExecutionStackInstance` (defer until after TML-1837).
 
-## 5) Demo refactor: split static `context.ts` and dynamic `runtime.ts`
+## 5) Demo refactor: split static `context.ts` and dynamic `runtime.ts` ✅
 
 ### 5.1 Add `examples/prisma-next-demo/src/prisma/context.ts`
 
-- [ ] Validate/load the demo contract via `validateContract<Contract>(contractJson)`.
-- [ ] Define a descriptors-only execution stack configuration (target/adapter/driver descriptor/extensions).
-- [ ] Create `executionContext = createExecutionContext({ contract, stack })`.
-- [ ] Export query roots: `schema`, `tables`, `sql`, `orm`.
-- [ ] Export minimal runtime wiring inputs (e.g., `stack`, `executionContext`) without instantiating anything.
+- [x] Validate/load the demo contract via `validateContract<Contract>(contractJson)`.
+- [x] Define a descriptors-only execution stack configuration (target/adapter/driver descriptor/extensions).
+- [x] Create `executionContext = createExecutionContext({ contract, stack })`.
+- [x] Export query roots: `schema`, `tables`, `sql`, `orm`.
+- [x] Export minimal runtime wiring inputs (e.g., `stack`, `executionContext`) without instantiating anything.
 
 ### 5.2 Update `examples/prisma-next-demo/src/prisma/runtime.ts`
 
-- [ ] Import static exports from `context.ts`.
-- [ ] Instantiate stack via `instantiateExecutionStack(stack)` (adapter/extensions).
-- [ ] Create `driver` via `stack.driver.create(driverOptions)` (or provide an explicit offline driver in tests).
-- [ ] Call wafer-thin `createRuntime({ stackInstance, context: executionContext, driver, ... })`.
+- [x] Import static exports from `context.ts`.
+- [x] Instantiate stack via `instantiateExecutionStack(stack)` (adapter/extensions).
+- [x] Create `driver` via `stack.driver.create(driverOptions)` (or provide an explicit offline driver in tests).
+- [x] Call wafer-thin `createRuntime({ stackInstance, context: executionContext, driver, ... })`.
 
 ### 5.3 Update demo entrypoints/tests
 
-- [ ] Update `examples/prisma-next-demo/src/main.ts` to use the new runtime wiring.
-- [ ] Add smoke coverage: importing query roots does not instantiate adapter/extensions.
+- [x] Update `examples/prisma-next-demo/src/main.ts` to use the new runtime wiring.
+- [x] Add smoke coverage: importing query roots does not instantiate adapter/extensions.
 
 ## 6) Tests
 
