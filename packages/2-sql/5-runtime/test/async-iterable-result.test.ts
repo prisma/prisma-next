@@ -3,7 +3,6 @@ import {
   createExecutionStack,
   instantiateExecutionStack,
 } from '@prisma-next/core-execution-plane/stack';
-import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -63,22 +62,9 @@ const fixtureContract = createTestContract({
   mappings: { codecTypes: {}, operationTypes: {} },
 });
 
-function createTestRuntime(driver: MockDriver): Runtime {
+function createTestRuntime(mockDriver: MockDriver): Runtime {
   const adapter = createStubAdapter();
   const codecRegistry = adapter.profile.codecs();
-  const driverDescriptor: RuntimeDriverDescriptor<'sql', 'postgres'> = {
-    kind: 'driver',
-    id: 'test-driver',
-    version: '0.0.1',
-    familyId: 'sql' as const,
-    targetId: 'postgres' as const,
-    create() {
-      return Object.assign(driver, {
-        familyId: 'sql' as const,
-        targetId: 'postgres' as const,
-      });
-    },
-  };
   const stack = createExecutionStack({
     target: {
       kind: 'target',
@@ -106,7 +92,6 @@ function createTestRuntime(driver: MockDriver): Runtime {
         return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
       },
     },
-    driver: driverDescriptor,
     extensionPacks: [],
   });
   const stackInstance = instantiateExecutionStack(stack);
@@ -116,9 +101,8 @@ function createTestRuntime(driver: MockDriver): Runtime {
   });
   return createRuntime({
     stackInstance,
-    contract: fixtureContract,
     context,
-    driverOptions: {},
+    driver: mockDriver,
     verify: { mode: 'onFirstUse', requireMarker: false },
   });
 }
