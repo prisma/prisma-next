@@ -146,10 +146,10 @@ Rules:
   - import static `context.ts` without runtime instantiation side-effects
   - execute query successfully when `DATABASE_URL` is provided
 
-## 7) Docs & ADR updates
+## 7) Docs & ADR updates ✅
 
-- [ ] Update affected package READMEs (notably `@prisma-next/sql-runtime`) to match new APIs.
-- [ ] Update architecture docs and ADRs to reflect:
+- [x] Update affected package READMEs (notably `@prisma-next/sql-runtime`) to match new APIs.
+- [x] Update architecture docs and ADRs to reflect:
   - operations are family-owned when they include lowering
   - framework contract layer no longer defines operation manifests
   - descriptor-based static context derivation
