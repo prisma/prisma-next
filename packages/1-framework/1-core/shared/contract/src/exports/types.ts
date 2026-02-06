@@ -28,4 +28,4 @@ export type {
   TypesImportSpec,
   ValidationContext,
 } from '../types';
-export { isDocumentContract } from '../types';
+export { coreHash, isDocumentContract, profileHash } from '../types';

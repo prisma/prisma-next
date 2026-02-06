@@ -33,12 +33,20 @@ export interface RenderTypeContext {
  */
 export type CoreHashBase<THash extends string> = THash & Brand<'CoreHash'>;
 
+export function coreHash<const T extends string>(value: T): CoreHashBase<T> {
+  return value as CoreHashBase<T>;
+}
+
 /**
  * Base type for profile contract hashes.
  * Emitted contract.d.ts files use this with the hash value as a type parameter:
  * `type ProfileHash = ProfileHashBase<'sha256:def456...'>`
  */
 export type ProfileHashBase<THash extends string> = THash & Brand<'ProfileHash'>;
+
+export function profileHash<const T extends string>(value: T): ProfileHashBase<T> {
+  return value as ProfileHashBase<T>;
+}
 
 export interface ContractBase<
   TCoreHash extends CoreHashBase<string> = CoreHashBase<string>,
