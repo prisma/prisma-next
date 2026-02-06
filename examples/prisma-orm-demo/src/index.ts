@@ -30,17 +30,7 @@ const [cmd, ...args] = argv;
     process.exit(1);
   }
 
-  // Cleanup
   await prisma.$disconnect();
-  // Close Prisma Next runtime if using compat layer
-  // Note: runtime.close() is only available when using Prisma Next compat layer
-  if (
-    'runtime' in prisma &&
-    prisma.runtime &&
-    typeof (prisma.runtime as { close?: () => Promise<void> }).close === 'function'
-  ) {
-    await (prisma.runtime as { close: () => Promise<void> }).close();
-  }
 })().catch((error) => {
   console.error(error);
   process.exit(1);
