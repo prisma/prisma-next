@@ -12,6 +12,7 @@ import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { BinaryBuilder } from '@prisma-next/sql-relational-core/types';
+import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
@@ -81,22 +82,21 @@ describe('delete with vector operations', () => {
       template: '${self} <=> ${arg0}',
     },
   };
-  const mockVectorExtensionDescriptor: import('@prisma-next/sql-runtime').SqlRuntimeExtensionDescriptor<'postgres'> =
-    {
-      kind: 'extension' as const,
-      id: 'mock-vector-ext',
-      version: '0.0.1',
+  const mockVectorExtensionDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
+    kind: 'extension' as const,
+    id: 'mock-vector-ext',
+    version: '0.0.1',
+    familyId: 'sql' as const,
+    targetId: 'postgres' as const,
+    codecs: () => createCodecRegistry(),
+    operationSignatures: () => [cosineDistanceOp],
+    parameterizedCodecs: () => [],
+    create: () => ({
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
-      codecs: () => createCodecRegistry(),
-      operationSignatures: () => [cosineDistanceOp],
-      parameterizedCodecs: () => [],
-      create: () => ({
-        familyId: 'sql' as const,
-        targetId: 'postgres' as const,
-        operations: () => [cosineDistanceOp],
-      }),
-    };
+      operations: () => [cosineDistanceOp],
+    }),
+  };
   const contextWithOps = createTestContext(contractWithVector, adapterWithOps, {
     extensionPacks: [mockVectorExtensionDescriptor],
   });
