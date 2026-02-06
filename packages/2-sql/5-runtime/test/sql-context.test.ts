@@ -1,3 +1,4 @@
+import postgresRuntimeAdapterDescriptor from '@prisma-next/adapter-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -213,6 +214,93 @@ describe('createExecutionContext', () => {
 
     expect(context.codecs.has('pg/int4@1')).toBe(true);
     expect(context.codecs.has('test/ext@1')).toBe(false);
+  });
+});
+
+describe('comprehensive descriptor-based derivation', () => {
+  it('includes all expected codec IDs and operations from target, adapter, and extensions', () => {
+    const targetCodecRegistry = createCodecRegistry();
+    targetCodecRegistry.register(
+      codec({
+        typeId: 'target/special@1',
+        targetTypes: ['special'],
+        encode: (v: string) => v,
+        decode: (w: string) => w,
+      }),
+    );
+
+    const targetOps: SqlOperationSignature[] = [
+      {
+        forTypeId: 'target/special@1',
+        method: 'targetOp',
+        args: [],
+        returns: { kind: 'builtin' as const, type: 'string' as const },
+        lowering: {
+          targetFamily: 'sql' as const,
+          strategy: 'function' as const,
+          template: 'target_fn()',
+        },
+      },
+    ];
+
+    const target: SqlRuntimeTargetDescriptor<'postgres'> = {
+      kind: 'target' as const,
+      id: 'postgres',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      codecs: () => targetCodecRegistry,
+      operationSignatures: () => targetOps,
+      parameterizedCodecs: () => [],
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+
+    const stack: SqlExecutionStack<'postgres'> = {
+      target,
+      adapter: createTestAdapterDescriptor(),
+      extensionPacks: [createTestExtensionDescriptor({ hasCodecs: true, hasOperations: true })],
+    };
+
+    const context = createExecutionContext({ contract: testContract, stack });
+
+    expect(context.codecs.has('target/special@1')).toBe(true);
+    expect(context.codecs.has('pg/int4@1')).toBe(true);
+    expect(context.codecs.has('test/ext@1')).toBe(true);
+
+    expect(context.operations.byType('target/special@1').length).toBe(1);
+    expect(context.operations.byType('target/special@1')[0]?.method).toBe('targetOp');
+    expect(context.operations.byType('test/ext@1').length).toBe(1);
+    expect(context.operations.byType('test/ext@1')[0]?.method).toBe('testOp');
+  });
+});
+
+describe('adapter descriptor / instance codec parity', () => {
+  it('descriptor codecs() matches adapter instance profile.codecs() codec IDs', () => {
+    const descriptorCodecIds = new Set(
+      [...postgresRuntimeAdapterDescriptor.codecs().values()].map((c) => c.typeId),
+    );
+
+    const adapterInstance = postgresRuntimeAdapterDescriptor.create();
+    const instanceCodecIds = new Set(
+      [...adapterInstance.profile.codecs().values()].map((c) => c.typeId),
+    );
+
+    expect(descriptorCodecIds.size).toBeGreaterThan(0);
+    expect(descriptorCodecIds).toEqual(instanceCodecIds);
+  });
+});
+
+describe('context.types presence', () => {
+  it('exists as empty object when no parameterized codecs are registered', () => {
+    const context = createExecutionContext({
+      contract: testContract,
+      stack: createStack(),
+    });
+
+    expect(context.types).toBeDefined();
+    expect(context.types).toEqual({});
   });
 });
 
