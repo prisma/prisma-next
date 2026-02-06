@@ -1,4 +1,5 @@
 ---
+description: Mermaid diagram compatibility guidelines for docs
 globs: ["**/*.md"]
 alwaysApply: false
 ---
