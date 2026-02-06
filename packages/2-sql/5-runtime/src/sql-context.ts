@@ -73,10 +73,6 @@ export interface RuntimeParameterizedCodecDescriptor<
  * - Ensures consistent API across all descriptor types
  * - Eliminates null-checking and defaulting in context creation
  * - Makes contributions explicit and discoverable
- *
- * Note: The method is named `operationSignatures()` rather than `operations()`
- * to avoid conflict with `ComponentMetadata.operations` property inherited from
- * base descriptor interfaces.
  */
 export interface SqlStaticContributions {
   /** Returns codecs to register in the runtime context. */
