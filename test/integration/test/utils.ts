@@ -58,9 +58,8 @@ export function createTestRuntime(
 
   return createRuntime({
     stackInstance,
-    contract,
     context,
-    driverOptions,
+    driver: stack.driver!.create(driverOptions),
     verify,
     ...(options?.plugins ? { plugins: options.plugins } : {}),
     ...(options?.mode ? { mode: options.mode } : {}),

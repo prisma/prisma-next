@@ -1,18 +1,17 @@
 import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
-import { executionContext, executionStackInstance } from './query-no-emit';
+import { executionContext, executionStack, executionStackInstance } from './query-no-emit';
 
 export function getRuntime(databaseUrl: string): Runtime {
   const pool = new Pool({ connectionString: databaseUrl });
 
   return createRuntime({
     stackInstance: executionStackInstance,
-    contract: executionContext.contract,
     context: executionContext,
-    driverOptions: {
+    driver: executionStack.driver!.create({
       connect: { pool },
       cursor: { disabled: true },
-    },
+    }),
     verify: {
       mode: 'onFirstUse',
       requireMarker: false,

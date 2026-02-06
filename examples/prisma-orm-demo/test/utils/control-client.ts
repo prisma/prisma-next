@@ -85,12 +85,11 @@ export function createTestRuntime<TContract extends SqlContract<SqlStorage>>(
   const pool = new Pool({ connectionString });
   const runtime = createRuntime({
     stackInstance,
-    contract,
     context,
-    driverOptions: {
+    driver: stack.driver!.create({
       connect: { pool },
       cursor: { disabled: true },
-    },
+    }),
     verify: { mode: 'onFirstUse', requireMarker: false },
     plugins: budgetConfig ? [budgets(budgetConfig)] : [],
   });

@@ -46,12 +46,11 @@ export function getPrismaNextRuntime(): Runtime {
 
     runtime = createRuntime({
       stackInstance,
-      contract,
       context,
-      driverOptions: {
+      driver: stack.driver!.create({
         connect: { client },
         cursor: { disabled: true },
-      },
+      }),
       verify: {
         mode: 'onFirstUse',
         requireMarker: false,

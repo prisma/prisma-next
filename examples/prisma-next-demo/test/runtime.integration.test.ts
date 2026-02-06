@@ -9,7 +9,11 @@ import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { executionContext, executionStackInstance } from '../src/prisma/execution-context';
+import {
+  executionContext,
+  executionStack,
+  executionStackInstance,
+} from '../src/prisma/execution-context';
 import { getRuntime } from '../src/prisma/runtime';
 import { initTestDatabase } from './utils/control-client';
 
@@ -119,12 +123,11 @@ describe('runtime execute integration', () => {
           const pool = new Pool({ connectionString });
           return createRuntime({
             stackInstance: executionStackInstance,
-            contract,
             context,
-            driverOptions: {
+            driver: executionStack.driver!.create({
               connect: { pool },
               cursor: { disabled: true },
-            },
+            }),
             verify: { mode: 'always', requireMarker: true },
             plugins: [
               budgets({
@@ -267,12 +270,11 @@ describe('runtime execute integration', () => {
         const pool = new Pool({ connectionString });
         const runtime = createRuntime({
           stackInstance: executionStackInstance,
-          contract,
           context,
-          driverOptions: {
+          driver: executionStack.driver!.create({
             connect: { pool },
             cursor: { disabled: true },
-          },
+          }),
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
@@ -349,12 +351,11 @@ describe('runtime execute integration', () => {
         const pool = new Pool({ connectionString });
         const runtime = createRuntime({
           stackInstance: executionStackInstance,
-          contract,
           context,
-          driverOptions: {
+          driver: executionStack.driver!.create({
             connect: { pool },
             cursor: { disabled: true },
-          },
+          }),
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
