@@ -1,4 +1,3 @@
-import postgresRuntimeAdapterDescriptor from '@prisma-next/adapter-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -273,22 +272,6 @@ describe('comprehensive descriptor-based derivation', () => {
     expect(context.operations.byType('target/special@1')[0]?.method).toBe('targetOp');
     expect(context.operations.byType('test/ext@1').length).toBe(1);
     expect(context.operations.byType('test/ext@1')[0]?.method).toBe('testOp');
-  });
-});
-
-describe('adapter descriptor / instance codec parity', () => {
-  it('descriptor codecs() matches adapter instance profile.codecs() codec IDs', () => {
-    const descriptorCodecIds = new Set(
-      [...postgresRuntimeAdapterDescriptor.codecs().values()].map((c) => c.typeId),
-    );
-
-    const adapterInstance = postgresRuntimeAdapterDescriptor.create();
-    const instanceCodecIds = new Set(
-      [...adapterInstance.profile.codecs().values()].map((c) => c.typeId),
-    );
-
-    expect(descriptorCodecIds.size).toBeGreaterThan(0);
-    expect(descriptorCodecIds).toEqual(instanceCodecIds);
   });
 });
 

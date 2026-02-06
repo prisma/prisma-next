@@ -26,7 +26,6 @@
     "arktype": "^2.1.26"
   },
   "devDependencies": {
-    "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@types/pg": "catalog:",
