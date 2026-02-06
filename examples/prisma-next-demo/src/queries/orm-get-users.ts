@@ -9,6 +9,7 @@ export async function ormGetUsers(limit: number, runtime: Runtime) {
       id: u.id,
       email: u.email,
       createdAt: u.createdAt,
+      kind: u.kind,
     }))
     .orderBy((u) => u.createdAt.desc())
     .take(limit)

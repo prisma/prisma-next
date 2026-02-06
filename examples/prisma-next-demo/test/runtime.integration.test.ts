@@ -36,13 +36,15 @@ async function seedTestData(
   if (data.users) {
     for (let i = 0; i < data.users.length; i++) {
       const email = data.users[i]!;
+      const kind = i === 0 ? 'admin' : 'user';
 
       const plan = sql({ context: executionContext })
         .insert(userTable, {
           email: param('email'),
+          kind: param('kind'),
         })
         .returning(userTable.columns['id']!)
-        .build({ params: { email } });
+        .build({ params: { email, kind } });
 
       type InsertedRow = ResultType<typeof plan>;
       for await (const row of runtime.execute(plan)) {
