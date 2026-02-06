@@ -75,7 +75,7 @@ const matchesGlobPattern = (group, pattern) => {
       return true;
     }
 
-    // Check if one pattern is a prefix of the other (handles cases like packages/3-extensions/** vs packages/3-extensions/compat-prisma/**)
+    // Check if one pattern is a prefix of the other
     const exceptionBase = pattern.replace(/\/\*\*$/, '').replace(/\*$/, '');
     const groupBase = glob.replace(/\/\*\*$/, '').replace(/\*$/, '');
 

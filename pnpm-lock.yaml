@@ -189,9 +189,6 @@ importers:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/6-adapters/postgres
-      '@prisma-next/compat-prisma':
-        specifier: workspace:*
-        version: link:../../packages/3-extensions/compat-prisma
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/shared/contract
@@ -1136,64 +1133,6 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../0-config/tsconfig
-      '@types/pg':
-        specifier: 'catalog:'
-        version: 8.16.0
-      pg:
-        specifier: 'catalog:'
-        version: 8.16.3
-      tsup:
-        specifier: 'catalog:'
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
-
-  packages/3-extensions/compat-prisma:
-    dependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:*
-        version: link:../../3-targets/6-adapters/postgres
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../1-framework/1-core/shared/contract
-      '@prisma-next/core-execution-plane':
-        specifier: workspace:*
-        version: link:../../1-framework/1-core/runtime/execution-plane
-      '@prisma-next/driver-postgres':
-        specifier: workspace:*
-        version: link:../../3-targets/7-drivers/postgres
-      '@prisma-next/sql-contract':
-        specifier: workspace:*
-        version: link:../../2-sql/1-core/contract
-      '@prisma-next/sql-lane':
-        specifier: workspace:*
-        version: link:../../2-sql/4-lanes/sql-lane
-      '@prisma-next/sql-relational-core':
-        specifier: workspace:*
-        version: link:../../2-sql/4-lanes/relational-core
-      '@prisma-next/sql-runtime':
-        specifier: workspace:*
-        version: link:../../2-sql/5-runtime
-      '@prisma-next/target-postgres':
-        specifier: workspace:*
-        version: link:../../3-targets/3-targets/postgres
-    devDependencies:
-      '@prisma-next/sql-contract-ts':
-        specifier: workspace:*
-        version: link:../../2-sql/2-authoring/contract-ts
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../../../test/utils
-      '@prisma-next/tsconfig':
-        specifier: workspace:*
-        version: link:../../0-config/tsconfig
-      '@prisma/dev':
-        specifier: 'catalog:'
-        version: 0.19.1(typescript@5.9.3)
       '@types/pg':
         specifier: 'catalog:'
         version: 8.16.0

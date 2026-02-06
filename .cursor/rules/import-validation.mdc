@@ -78,13 +78,7 @@ Dependency Cruiser (`dependency-cruiser.config.mjs`) uses data-driven configurat
        "runtime": {
          "allow": ["shared", "runtime"],
          "forbid": ["migration"],
-         "exceptions": [
-           {
-             "from": "packages/extensions/compat-prisma/**",
-             "to": "packages/sql/**",
-             "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages"
-           }
-         ]
+         "exceptions": []
        }
      }
    }
@@ -135,13 +129,7 @@ When a package needs to temporarily import across plane boundaries (e.g., during
     "runtime": {
       "allow": ["shared", "runtime"],
       "forbid": ["migration"],
-      "exceptions": [
-        {
-          "from": "packages/extensions/compat-prisma/**",
-          "to": "packages/sql/**",
-          "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API"
-        }
-      ]
+      "exceptions": []
     }
   }
 }

@@ -14,7 +14,6 @@ Extension packs live under `packages/3-extensions/` with domain-specific subfold
 ```
 packages/
   3-extensions/              # Domain 3: Extensions
-    compat-prisma/           # Prisma ORM compatibility layer
     pgvector/                # pgvector extension pack
     sql/                     # SQL-specific extensions (if needed)
       <name>/
@@ -24,7 +23,6 @@ packages/
 
 **Examples:**
 - `packages/3-extensions/pgvector/` → `@prisma-next/extension-pgvector`
-- `packages/3-extensions/compat-prisma/` → `@prisma-next/compat-prisma`
 - `packages/3-extensions/sql/views/` → `@prisma-next/extension-sql-views` (future)
 
 ## Required package.json Metadata

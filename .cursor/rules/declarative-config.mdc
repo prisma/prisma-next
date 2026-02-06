@@ -41,13 +41,7 @@ const createPlaneRules = () => {
   "planeRules": {
     "migration": {
       "forbid": ["runtime"],
-      "exceptions": [
-        {
-          "from": "packages/extensions/compat-prisma/**",
-          "to": "packages/sql/**",
-          "reason": "compat-prisma is a compatibility layer..."
-        }
-      ]
+      "exceptions": []
     }
   }
 }

@@ -53,7 +53,7 @@ packages/
     postgres-driver/     (Postgres driver)
     # mysql/, sqlite/ can mirror postgres/ structure
   extensions/
-    compat-prisma/       (optional facades/shims if needed later)
+    pgvector/            (pgvector extension pack)
   document/
     # future document family mirrors sql/ layout
 ```

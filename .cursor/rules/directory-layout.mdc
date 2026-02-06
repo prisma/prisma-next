@@ -33,7 +33,6 @@ packages/
     4-lanes/             # Layer 4: Lanes
     5-runtime/           # Layer 5: Runtime
   3-extensions/          # Domain 3: Extensions
-    compat-prisma/
     pgvector/
   3-targets/             # Domain 3: Targets
     3-targets/           # Layer 3: Target descriptors

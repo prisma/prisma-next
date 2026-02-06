@@ -117,8 +117,6 @@ The extensions domain (`packages/3-extensions/`) contains ecosystem extensions a
 
 ```
 * 3-extensions
-|-- compat-prisma/ (runtime plane)
-|   |-- → @prisma-next/compat-prisma
 |-- pgvector/ (multi-plane)
     |-- → @prisma-next/extension-pgvector
 ```
@@ -268,9 +266,6 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 **Drivers (Runtime Plane):**
 - `packages/3-targets/7-drivers/postgres/` → `@prisma-next/driver-postgres` - Postgres driver
 
-**Compatibility (Runtime Plane):**
-- `packages/3-extensions/compat-prisma/` → `@prisma-next/compat-prisma` (compat layer that lives alongside adapters)
-
 ## Naming Conventions
 
 ### Published Package Names
@@ -312,7 +307,6 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/3-targets/3-targets/postgres/` | `@prisma-next/target-postgres` |
 | `packages/3-targets/6-adapters/postgres/` | `@prisma-next/adapter-postgres` |
 | `packages/3-targets/7-drivers/postgres/` | `@prisma-next/driver-postgres` |
-| `packages/3-extensions/compat-prisma/` | `@prisma-next/compat-prisma` |
 | `packages/3-extensions/pgvector/` | `@prisma-next/extension-pgvector` |
 
 ## Dependency Rules
