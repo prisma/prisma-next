@@ -41,7 +41,7 @@ export function getPrismaNextRuntime(): Runtime {
 
     const context = createExecutionContext({
       contract,
-      stackInstance,
+      stack,
     });
 
     runtime = createRuntime({

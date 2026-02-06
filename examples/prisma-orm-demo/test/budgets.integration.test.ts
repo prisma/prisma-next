@@ -1,8 +1,5 @@
 import postgresAdapterRuntime from '@prisma-next/adapter-postgres/runtime';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
+import { createExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
@@ -24,7 +21,6 @@ const executionStack = createExecutionStack({
   adapter: postgresAdapterRuntime,
   extensionPacks: [],
 });
-const executionStackInstance = instantiateExecutionStack(executionStack);
 
 /**
  * Creates a runtime context for the given contract.
@@ -32,7 +28,7 @@ const executionStackInstance = instantiateExecutionStack(executionStack);
 function createContext(contractForContext: typeof contract) {
   return createExecutionContext({
     contract: contractForContext,
-    stackInstance: executionStackInstance,
+    stack: executionStack,
   });
 }
 
