@@ -58,9 +58,6 @@ graph TB
             Tgt_Adapter_Runtime[3-targets/6-adapters/postgres/runtime<br/>Runtime factories]
         end
 
-        subgraph "Extensions Domain - Runtime"
-            Ext_Compat[3-extensions/compat-prisma<br/>Prisma ORM compat]
-        end
     end
 
     %% Layer dependencies (downward flow)
@@ -90,8 +87,6 @@ graph TB
     Tgt_Adapter_Runtime --> SQL_Runtime
     Tgt_Adapter_Core --> SQL_Contract
 
-    Ext_Compat -.->|exception| SQL_Lanes
-
     %% Plane boundaries (no cross-plane imports except shared)
     FW_Tooling_CLI -.->|can import| FW_Core_Plan
     FW_Tooling_CLI -.->|can import| FW_Core_Ops
@@ -120,7 +115,6 @@ graph TB
     style SQL_Adapters fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
     style SQL_Drivers fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
     style Tgt_Adapter_Runtime fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
-    style Ext_Compat fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
 ```
 
 ## Simplified Layer Flow Diagram
@@ -170,13 +164,6 @@ graph LR
         Tgt_Core --> SQL_Core
     end
 
-    subgraph "Extensions Domain"
-        direction TB
-        Ext_Compat[Compat<br/>runtime]
-
-        Ext_Compat -.->|exception| SQL_Lanes
-    end
-
     style FW_Core fill:#e1f5ff
     style SQL_Core fill:#e1f5ff
     style Tgt_Core fill:#e1f5ff
@@ -193,7 +180,6 @@ graph LR
     style SQL_Adapters fill:#e8f5e9
     style SQL_Drivers fill:#e8f5e9
     style Tgt_Runtime fill:#e8f5e9
-    style Ext_Compat fill:#e8f5e9
 ```
 
 ## Plane Boundaries Diagram
@@ -252,5 +238,6 @@ core → authoring → tooling → lanes → runtime → adapters → drivers
 - Framework domain is target-agnostic and can be imported by any target family
 
 ### Exceptions
-- `extensions/compat-prisma` can import from SQL packages (documented exception for compatibility layer)
+
+None currently.
 

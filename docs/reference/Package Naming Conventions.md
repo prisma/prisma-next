@@ -89,7 +89,6 @@ Planes (shared, migration, runtime) appear as subdirectories only when a layer c
 
 | Directory | Package Name |
 |-----------|--------------|
-| `packages/3-extensions/compat-prisma/` | `@prisma-next/compat-prisma` |
 | `packages/3-extensions/pgvector/` | `@prisma-next/extension-pgvector` |
 
 ## Workspace Dependencies

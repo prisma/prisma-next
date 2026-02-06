@@ -54,7 +54,7 @@ Prisma Next organizes packages using a three-dimensional architecture:
 - `packages/framework/` - **Framework**: Target-agnostic core (contracts, operations, runtime-executor)
 - `packages/sql/` - **SQL Family**: SQL-specific implementations (operations, lanes, runtime)
 - `packages/targets/` - **Targets**: Concrete adapters and drivers (postgres-adapter, postgres-driver)
-- `packages/extensions/` - **Extensions**: Optional capability packs (pgvector, compat-prisma)
+- `packages/extensions/` - **Extensions**: Optional capability packs (pgvector)
 
 **Layers** (what responsibility within domain):
 ```
@@ -91,7 +91,7 @@ prisma-next/
 │   ├── framework/              # Target-agnostic (contract, operations, cli, runtime-executor)
 │   ├── sql/                    # SQL family (sql-contract, sql-operations, sql-lane, sql-runtime)
 │   ├── targets/                # Concrete implementations (postgres-adapter, postgres-driver)
-│   └── extensions/             # Extension packs (pgvector, compat-prisma)
+│   └── extensions/             # Extension packs (pgvector)
 ├── examples/
 │   ├── prisma-next-demo/       # Main demo using Prisma Next
 │   └── prisma-orm-demo/        # Prisma ORM compatibility demo
