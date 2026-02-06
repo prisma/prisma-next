@@ -1,5 +1,6 @@
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
 import { describe, expect, it } from 'vitest';
@@ -47,7 +48,7 @@ function createParamTypesTestContract(
           foreignKeys: [],
         },
       },
-      ...(options?.types ? { types: options.types } : {}),
+      ...ifDefined('types', options?.types),
     },
     extensionPacks: {},
     capabilities: {},
@@ -112,7 +113,7 @@ describe('parameterized types', () => {
         {
           codecId: 'pg/vector@1',
           paramsSchema: options?.paramsSchema ?? vectorParamsSchema,
-          ...(options?.init ? { init: options.init } : {}),
+          ...ifDefined('init', options?.init),
         },
       ];
 

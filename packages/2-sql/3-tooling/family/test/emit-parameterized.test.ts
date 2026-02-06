@@ -1,5 +1,7 @@
+import type { TargetDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TypeRenderEntry, TypeRenderer, TypesImportSpec } from '@prisma-next/contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
@@ -20,9 +22,14 @@ import type {
  * - Type imports for parameterized types are defined in `types.codecTypes.typeImports`
  */
 
-function createMockTarget(): SqlControlDescriptorWithContributions {
+function createMockTarget(): TargetDescriptor<'sql', 'postgres'> &
+  SqlControlDescriptorWithContributions {
   return {
+    kind: 'target',
     id: 'postgres',
+    version: '0.0.1',
+    familyId: 'sql',
+    targetId: 'postgres',
     operationSignatures: () => [],
     types: {},
   };
@@ -72,7 +79,7 @@ function createMockExtensionWithParameterizedCodec(
         parameterized: {
           [config.codecId]: config.renderer,
         },
-        ...(config.typesImport ? { typeImports: [config.typesImport] } : {}),
+        ...ifDefined('typeImports', config.typesImport ? [config.typesImport] : undefined),
       },
     },
   };
