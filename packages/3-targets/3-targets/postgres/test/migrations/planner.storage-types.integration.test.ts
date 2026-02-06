@@ -1,6 +1,6 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { expectType } from '@prisma-next/test-utils/typed-expectations';
+import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -92,7 +92,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
         frameworkComponents,
       });
 
-      expectType(planResult.kind === 'success');
+      expectNarrowedType(planResult.kind === 'success');
 
       // Verify plan includes type operation before table operation
       const operationIds = planResult.plan.operations.map((op) => op.id);
@@ -164,7 +164,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
           frameworkComponents,
         });
 
-        expectType(planResult.kind === 'success');
+        expectNarrowedType(planResult.kind === 'success');
 
         // Should not include type.Role operation since it already exists
         const operationIds = planResult.plan.operations.map((op) => op.id);
@@ -193,7 +193,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
           frameworkComponents,
         });
 
-        expectType(planResult.kind === 'success');
+        expectNarrowedType(planResult.kind === 'success');
 
         // Should include operation to add ADMIN value
         const operationIds = planResult.plan.operations.map((op) => op.id);

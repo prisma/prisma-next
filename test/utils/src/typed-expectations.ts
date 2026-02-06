@@ -11,10 +11,10 @@ export function expectDefined<T>(value: T | undefined): asserts value is T {
  * @example
  * ```typescript
  * const result = planner.plan(...);
- * expectType(result.kind === 'success', 'expected planner success');
+ * expectNarrowedType(result.kind === 'success', 'expected planner success');
  * // result is now narrowed to the success branch
  * ```
  */
-export function expectType(value: unknown, message?: string): asserts value {
+export function expectNarrowedType(value: unknown, message?: string): asserts value {
   expect(value, message).toBeTruthy();
 }
