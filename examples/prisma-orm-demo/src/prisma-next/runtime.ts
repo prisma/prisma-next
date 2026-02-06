@@ -47,6 +47,7 @@ export function getPrismaNextRuntime(): Runtime {
     runtime = createRuntime({
       stackInstance,
       context,
+      // driver is guaranteed to exist — postgresDriver is passed to createExecutionStack above
       driver: stack.driver!.create({
         connect: { client },
         cursor: { disabled: true },
