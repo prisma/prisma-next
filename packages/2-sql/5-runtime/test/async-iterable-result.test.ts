@@ -5,6 +5,7 @@ import {
 } from '@prisma-next/core-execution-plane/stack';
 import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import type { Runtime } from '../src/exports';
 import { createExecutionContext, createRuntime } from '../src/exports';
@@ -64,6 +65,7 @@ const fixtureContract = createTestContract({
 
 function createTestRuntime(driver: MockDriver): Runtime {
   const adapter = createStubAdapter();
+  const codecRegistry = adapter.profile.codecs();
   const driverDescriptor: RuntimeDriverDescriptor<'sql', 'postgres'> = {
     kind: 'driver',
     id: 'test-driver',
@@ -84,6 +86,9 @@ function createTestRuntime(driver: MockDriver): Runtime {
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
+      codecs: () => createCodecRegistry(),
+      operationSignatures: () => [],
+      parameterizedCodecs: () => [],
       create() {
         return { familyId: 'sql' as const, targetId: 'postgres' as const };
       },
@@ -94,6 +99,9 @@ function createTestRuntime(driver: MockDriver): Runtime {
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
+      codecs: () => codecRegistry,
+      operationSignatures: () => [],
+      parameterizedCodecs: () => [],
       create() {
         return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
       },
@@ -102,7 +110,10 @@ function createTestRuntime(driver: MockDriver): Runtime {
     extensionPacks: [],
   });
   const stackInstance = instantiateExecutionStack(stack);
-  const context = createExecutionContext({ contract: fixtureContract, stackInstance });
+  const context = createExecutionContext({
+    contract: fixtureContract,
+    stack: stackInstance.stack as never,
+  });
   return createRuntime({
     stackInstance,
     contract: fixtureContract,

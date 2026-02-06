@@ -1,9 +1,7 @@
 import { checkContractComponentRequirements } from '@prisma-next/contract/framework-components';
-import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
-  RuntimeDriverInstance,
   RuntimeExtensionDescriptor,
   RuntimeExtensionInstance,
   RuntimeTargetDescriptor,
@@ -142,6 +140,21 @@ export interface SqlRuntimeExtensionDescriptor<TTargetId extends string = string
 }
 
 // ============================================================================
+// SQL Execution Stack (descriptors-only)
+// ============================================================================
+
+/**
+ * A descriptors-only SQL execution stack for static context creation.
+ * All descriptors implement SqlStaticContributions, so context can be
+ * derived without calling create() on any component.
+ */
+export interface SqlExecutionStack<TTargetId extends string = string> {
+  readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
+  readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId>;
+  readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
+}
+
+// ============================================================================
 // SQL Runtime Extension Types
 // ============================================================================
 
@@ -197,13 +210,7 @@ export type { ExecutionContext, TypeHelperRegistry };
 
 export function assertExecutionStackContractRequirements(
   contract: SqlContract<SqlStorage>,
-  stack: ExecutionStackInstance<
-    'sql',
-    string,
-    SqlRuntimeAdapterInstance<string>,
-    RuntimeDriverInstance<'sql', string>,
-    SqlRuntimeExtensionInstance<string>
-  >['stack'],
+  stack: SqlExecutionStack,
 ): void {
   const providedComponentIds = new Set<string>([
     stack.target.id,
@@ -280,28 +287,25 @@ function validateTypeParams(
 }
 
 /**
- * Collects parameterized codec descriptors from extension instances.
+ * Collects parameterized codec descriptors from descriptors with static contributions.
  * Returns a map of codecId → descriptor for quick lookup.
  * @throws RuntimeErrorEnvelope with code RUNTIME.DUPLICATE_PARAMETERIZED_CODEC if duplicate codecIds are found
  */
 function collectParameterizedCodecDescriptors(
-  extensionInstances: ReadonlyArray<SqlRuntimeExtensionInstance<string>>,
+  contributors: ReadonlyArray<SqlStaticContributions>,
 ): Map<string, RuntimeParameterizedCodecDescriptor> {
   const descriptors = new Map<string, RuntimeParameterizedCodecDescriptor>();
 
-  for (const extInstance of extensionInstances) {
-    const paramCodecs = extInstance.parameterizedCodecs?.();
-    if (paramCodecs) {
-      for (const descriptor of paramCodecs) {
-        if (descriptors.has(descriptor.codecId)) {
-          throw runtimeError(
-            'RUNTIME.DUPLICATE_PARAMETERIZED_CODEC',
-            `Duplicate parameterized codec descriptor for codecId '${descriptor.codecId}'.`,
-            { codecId: descriptor.codecId },
-          );
-        }
-        descriptors.set(descriptor.codecId, descriptor);
+  for (const contributor of contributors) {
+    for (const descriptor of contributor.parameterizedCodecs()) {
+      if (descriptors.has(descriptor.codecId)) {
+        throw runtimeError(
+          'RUNTIME.DUPLICATE_PARAMETERIZED_CODEC',
+          `Duplicate parameterized codec descriptor for codecId '${descriptor.codecId}'.`,
+          { codecId: descriptor.codecId },
+        );
       }
+      descriptors.set(descriptor.codecId, descriptor);
     }
   }
 
@@ -379,46 +383,31 @@ export function createExecutionContext<
   TTargetId extends string = string,
 >(options: {
   readonly contract: TContract;
-  readonly stackInstance: ExecutionStackInstance<
-    'sql',
-    TTargetId,
-    SqlRuntimeAdapterInstance<TTargetId>,
-    RuntimeDriverInstance<'sql', TTargetId>,
-    SqlRuntimeExtensionInstance<TTargetId>
-  >;
+  readonly stack: SqlExecutionStack<TTargetId>;
 }): ExecutionContext<TContract> {
-  const { contract, stackInstance } = options;
-  const { adapter: adapterInstance, extensionPacks: extensionInstances } = stackInstance;
+  const { contract, stack } = options;
 
-  assertExecutionStackContractRequirements(contract, stackInstance.stack);
+  assertExecutionStackContractRequirements(contract, stack);
 
   const codecRegistry = createCodecRegistry();
   const operationRegistry = createOperationRegistry();
 
-  const adapterCodecs = adapterInstance.profile.codecs();
-  for (const codec of adapterCodecs.values()) {
-    codecRegistry.register(codec);
-  }
+  const contributors: SqlStaticContributions[] = [
+    stack.target,
+    stack.adapter,
+    ...stack.extensionPacks,
+  ];
 
-  for (const extInstance of extensionInstances) {
-    const extCodecs = extInstance.codecs?.();
-    if (extCodecs) {
-      for (const codec of extCodecs.values()) {
-        codecRegistry.register(codec);
-      }
+  for (const contributor of contributors) {
+    for (const c of contributor.codecs().values()) {
+      codecRegistry.register(c);
     }
-
-    const extOperations = extInstance.operations?.();
-    if (extOperations) {
-      for (const operation of extOperations) {
-        operationRegistry.register(operation);
-      }
+    for (const operation of contributor.operationSignatures()) {
+      operationRegistry.register(operation);
     }
   }
 
-  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(
-    extensionInstances as ReadonlyArray<SqlRuntimeExtensionInstance<string>>,
-  );
+  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(contributors);
 
   if (parameterizedCodecDescriptors.size > 0) {
     validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);

@@ -16,6 +16,7 @@ export { lowerSqlPlan } from '../lower-sql-plan';
 export type {
   ExecutionContext,
   RuntimeParameterizedCodecDescriptor,
+  SqlExecutionStack,
   SqlRuntimeAdapterDescriptor,
   SqlRuntimeAdapterInstance,
   SqlRuntimeDriverInstance,

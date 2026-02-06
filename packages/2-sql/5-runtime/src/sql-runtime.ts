@@ -33,6 +33,7 @@ import { validateCodecRegistryCompleteness } from './codecs/validation';
 import { lowerSqlPlan } from './lower-sql-plan';
 import type {
   ExecutionContext,
+  SqlExecutionStack,
   SqlRuntimeAdapterInstance,
   SqlRuntimeExtensionInstance,
 } from './sql-context';
@@ -274,13 +275,16 @@ export function createRuntime<TContract extends SqlContract<SqlStorage>, TTarget
 ): Runtime {
   const { stackInstance, contract, context, driverOptions, verify, plugins, mode, log } = options;
 
-  assertExecutionStackContractRequirements(contract, stackInstance.stack);
+  assertExecutionStackContractRequirements(
+    contract,
+    stackInstance.stack as unknown as SqlExecutionStack,
+  );
 
   const resolvedContext =
     context ??
     createExecutionContext({
       contract,
-      stackInstance,
+      stack: stackInstance.stack as unknown as SqlExecutionStack,
     });
 
   // NOTE: Driver instantiation is handled here (instead of in instantiateExecutionStack) because

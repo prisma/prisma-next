@@ -2,11 +2,7 @@ import {
   createExecutionStack,
   instantiateExecutionStack,
 } from '@prisma-next/core-execution-plane/stack';
-import type {
-  RuntimeAdapterDescriptor,
-  RuntimeDriverDescriptor,
-  RuntimeTargetDescriptor,
-} from '@prisma-next/core-execution-plane/types';
+import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   CodecRegistry,
@@ -16,7 +12,12 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
-import type { SqlRuntimeAdapterInstance, SqlRuntimeDriverInstance } from '../src/sql-context';
+import type {
+  SqlRuntimeAdapterDescriptor,
+  SqlRuntimeAdapterInstance,
+  SqlRuntimeDriverInstance,
+  SqlRuntimeTargetDescriptor,
+} from '../src/sql-context';
 import { createExecutionContext } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 
@@ -97,13 +98,16 @@ function createMockDriver(): SqlDriver {
   };
 }
 
-function createTestTargetDescriptor(): RuntimeTargetDescriptor<'sql', 'postgres'> {
+function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
   return {
     kind: 'target',
     id: 'postgres',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    codecs: () => createCodecRegistry(),
+    operationSignatures: () => [],
+    parameterizedCodecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -112,13 +116,17 @@ function createTestTargetDescriptor(): RuntimeTargetDescriptor<'sql', 'postgres'
 
 function createTestAdapterDescriptor(
   adapter: ReturnType<typeof createStubAdapter>,
-): RuntimeAdapterDescriptor<'sql', 'postgres', SqlRuntimeAdapterInstance<'postgres'>> {
+): SqlRuntimeAdapterDescriptor<'postgres'> {
+  const codecRegistry = adapter.profile.codecs();
   return {
     kind: 'adapter',
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    codecs: () => codecRegistry,
+    operationSignatures: () => [],
+    parameterizedCodecs: () => [],
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },
@@ -166,7 +174,7 @@ describe('createRuntime', () => {
     const { stackInstance } = createTestStackInstance();
     const context = createExecutionContext({
       contract: testContract,
-      stackInstance,
+      stack: stackInstance.stack as never,
     });
 
     const runtime = createRuntime({

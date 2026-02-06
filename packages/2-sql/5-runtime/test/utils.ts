@@ -20,9 +20,11 @@ import {
 } from '../src/exports';
 import type {
   ExecutionContext,
+  SqlRuntimeAdapterDescriptor,
   SqlRuntimeAdapterInstance,
   SqlRuntimeDriverInstance,
   SqlRuntimeExtensionDescriptor,
+  SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 
 /**
@@ -104,56 +106,41 @@ export async function writeTestContractMarker(
 
 /**
  * Creates a test adapter descriptor from a raw adapter.
- * This wraps the adapter in a descriptor for descriptor-first context creation in tests.
- * The adapter instance IS an Adapter (via intersection), with identity properties added.
+ * Wraps the adapter in an SqlRuntimeAdapterDescriptor with static contributions
+ * derived from the adapter's codec registry.
  */
 function createTestAdapterDescriptor(
   adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
-): {
-  readonly kind: 'adapter';
-  readonly id: string;
-  readonly version: string;
-  readonly familyId: 'sql';
-  readonly targetId: 'postgres';
-  create(): SqlRuntimeAdapterInstance<'postgres'>;
-} {
+): SqlRuntimeAdapterDescriptor<'postgres'> {
+  const codecRegistry = adapter.profile.codecs();
   return {
     kind: 'adapter' as const,
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    codecs: () => codecRegistry,
+    operationSignatures: () => [],
+    parameterizedCodecs: () => [],
     create(): SqlRuntimeAdapterInstance<'postgres'> {
-      // Return an object that combines identity properties with the adapter's methods
-      return Object.assign(
-        {
-          familyId: 'sql' as const,
-          targetId: 'postgres' as const,
-        },
-        adapter,
-      );
+      return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
     },
   };
 }
 
 /**
- * Creates a test target descriptor.
- * This is a minimal descriptor for descriptor-first context creation in tests.
+ * Creates a test target descriptor with empty static contributions.
  */
-function createTestTargetDescriptor(): {
-  readonly kind: 'target';
-  readonly id: string;
-  readonly version: string;
-  readonly familyId: 'sql';
-  readonly targetId: 'postgres';
-  create(): { readonly familyId: 'sql'; readonly targetId: 'postgres' };
-} {
+function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
   return {
     kind: 'target' as const,
     id: 'postgres',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    codecs: () => createCodecRegistry(),
+    operationSignatures: () => [],
+    parameterizedCodecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -174,13 +161,14 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
     extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   },
 ): ExecutionContext<TContract> {
-  const stack = createExecutionStack({
-    target: createTestTargetDescriptor(),
-    adapter: createTestAdapterDescriptor(adapter),
-    extensionPacks: options?.extensionPacks ?? [],
+  return createExecutionContext({
+    contract,
+    stack: {
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(adapter),
+      extensionPacks: options?.extensionPacks ?? [],
+    },
   });
-  const stackInstance = instantiateExecutionStack(stack);
-  return createExecutionContext({ contract, stackInstance });
 }
 
 export function createTestStackInstance(options?: {
