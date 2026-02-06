@@ -46,7 +46,7 @@ pnpm start -- users
 
 Uses contract directly from TypeScript:
 
-- **Files**: `src/prisma/runtime-no-emit.ts`, `src/prisma/query-no-emit.ts`, `src/main-no-emit.ts`
+- **Files**: `src/prisma-no-emit/runtime-no-emit.ts`, `src/prisma-no-emit/context-no-emit.ts`, `src/main-no-emit.ts`
 - **Contract source**: `prisma/contract.ts` (direct import)
 - **Usage**: `pnpm start:no-emit -- [command]`
 - **Benefits**:
