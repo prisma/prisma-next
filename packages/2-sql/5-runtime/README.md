@@ -73,16 +73,51 @@ for await (const row of runtime.execute(plan)) {
 
 ## Exports
 
+### Runtime
+
 - `createRuntime` - Create a SQL runtime instance
+- `Runtime` - Runtime instance type
+- `CreateRuntimeOptions` - Options for `createRuntime`
+- `RuntimeVerifyOptions` - Verification mode configuration
+- `RuntimeTelemetryEvent`, `TelemetryOutcome` - Telemetry event types
+
+### Context
+
 - `createExecutionContext` - Create an execution context from contract + descriptors-only stack
 - `ExecutionContext` - Context type for SQL operations
+- `TypeHelperRegistry` - Registry for type helper lookup
+
+### Descriptors & Stack
+
 - `SqlStaticContributions` - Interface for descriptor-level static contributions (codecs, operations, parameterized codecs)
 - `SqlRuntimeTargetDescriptor`, `SqlRuntimeAdapterDescriptor`, `SqlRuntimeExtensionDescriptor` - Structural descriptor types requiring `SqlStaticContributions`
+- `SqlRuntimeAdapterInstance`, `SqlRuntimeDriverInstance`, `SqlRuntimeExtensionInstance` - Instance types
 - `SqlExecutionStack` - Descriptors-only stack type for static context creation
-- `budgets`, `lints` - SQL-compatible plugins (re-exported from runtime-executor)
-- `readContractMarker`, `writeContractMarker` - SQL marker statements
+- `RuntimeParameterizedCodecDescriptor` - Parameterized codec descriptor type
+
+### Codecs
+
 - `validateCodecRegistryCompleteness` - Codec validation
+- `extractCodecIds` - Extract codec IDs from a contract
+- `validateContractCodecMappings` - Validate contract codec mappings against registry
+
+### SQL Marker
+
+- `readContractMarker`, `writeContractMarker` - SQL marker statements
+- `ensureSchemaStatement`, `ensureTableStatement` - DDL statements for marker table setup
+- `SqlStatement` - SQL statement type
+
+### Plan Lowering
+
 - `lowerSqlPlan` - SQL plan lowering via adapter
+
+### Plugins (re-exported from `@prisma-next/runtime-executor`)
+
+- `budgets`, `lints` - SQL-compatible plugins
+- `BudgetsOptions`, `LintsOptions` - Plugin option types
+- `Plugin`, `PluginContext` - Plugin interface types
+- `AfterExecuteResult` - Plugin hook result type
+- `Log` - Log entry type
 
 ## Architecture
 
@@ -128,9 +163,8 @@ The SQL runtime uses stable error codes for programmatic error handling:
 - `RUNTIME.MISSING_EXTENSION_PACK` — Contract requires an extension pack not provided in stack
 - `RUNTIME.DUPLICATE_PARAMETERIZED_CODEC` — Multiple extensions registered same parameterized codec
 - `RUNTIME.TYPE_PARAMS_INVALID` — Type parameters fail codec schema validation
-- `RUNTIME.DRIVER_MISSING` — Driver not provided but required for operation
-- `RUNTIME.DRIVER_OPTIONS_WITHOUT_DESCRIPTOR` — Driver options provided but no driver descriptor in stack
-- `RUNTIME.INVALID_DRIVER_INSTANCE` — Driver instance does not implement SqlDriver interface
+- `RUNTIME.CODEC_MISSING` — Required codec not found in registry
+- `RUNTIME.DECODE_FAILED` — Row decoding failed
 
 All errors follow the repo's error envelope convention with `code`, `category`, `severity`, and optional `details`.
 
