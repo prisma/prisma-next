@@ -8,8 +8,17 @@ import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { readContractMarker } from './sql-marker';
 
+type MarkerReaderStatementProvider = {
+  markerReaderStatement?: () => { readonly sql: string; readonly params: readonly unknown[] };
+};
+
 class SqlMarkerReader implements MarkerReader {
+  constructor(private readonly provider?: MarkerReaderStatementProvider) {}
+
   readMarkerStatement(): MarkerStatement {
+    if (this.provider?.markerReaderStatement) {
+      return this.provider.markerReaderStatement();
+    }
     return readContractMarker();
   }
 }
@@ -20,9 +29,9 @@ export class SqlFamilyAdapter<TContract extends SqlContract<SqlStorage>>
   readonly contract: TContract;
   readonly markerReader: MarkerReader;
 
-  constructor(contract: TContract) {
+  constructor(contract: TContract, markerProvider?: MarkerReaderStatementProvider) {
     this.contract = contract;
-    this.markerReader = new SqlMarkerReader();
+    this.markerReader = new SqlMarkerReader(markerProvider);
   }
 
   validatePlan(plan: ExecutionPlan, contract: TContract): void {

@@ -102,6 +102,30 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
   };
 }
 
+export function readMarkerSqlForTarget(targetId: string): {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+} {
+  if (targetId === 'sqlite') {
+    return {
+      sql: `select
+        core_hash,
+        profile_hash,
+        contract_json,
+        canonical_version,
+        updated_at,
+        app_tag,
+        meta
+      from prisma_contract_marker
+      where id = ?1`,
+      params: [1],
+    };
+  }
+
+  // Default: Postgres marker location per ADR 021.
+  return readMarkerSql();
+}
+
 /**
  * Reads the contract marker from the database using the provided driver.
  * Returns the parsed marker record or null if no marker is found.
@@ -113,7 +137,7 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
 export async function readMarker(
   driver: ControlDriverInstance<'sql', string>,
 ): Promise<ContractMarkerRecord | null> {
-  const markerStatement = readMarkerSql();
+  const markerStatement = readMarkerSqlForTarget(driver.targetId);
 
   try {
     const queryResult = await driver.query<{
@@ -142,7 +166,9 @@ export async function readMarker(
     // PostgreSQL error code 42P01 = undefined_table
     if (
       error instanceof Error &&
-      (error.message.includes('does not exist') || (error as { code?: string }).code === '42P01')
+      (error.message.includes('does not exist') ||
+        error.message.includes('no such table') ||
+        (error as { code?: string }).code === '42P01')
     ) {
       return null;
     }

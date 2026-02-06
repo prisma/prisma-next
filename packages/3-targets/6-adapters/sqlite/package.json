@@ -1,0 +1,69 @@
+{
+  "name": "@prisma-next/adapter-sqlite",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
+  },
+  "dependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/contract-authoring": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
+    "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-operations": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-schema-ir": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
+    "arktype": "^2.0.0"
+  },
+  "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    "./adapter": {
+      "types": "./dist/exports/adapter.d.ts",
+      "import": "./dist/exports/adapter.js"
+    },
+    "./types": {
+      "types": "./dist/exports/types.d.ts",
+      "import": "./dist/exports/types.js"
+    },
+    "./codec-types": {
+      "types": "./dist/exports/codec-types.d.ts",
+      "import": "./dist/exports/codec-types.js"
+    },
+    "./column-types": {
+      "types": "./dist/exports/column-types.d.ts",
+      "import": "./dist/exports/column-types.js"
+    },
+    "./control": {
+      "types": "./dist/exports/control.d.ts",
+      "import": "./dist/exports/control.js"
+    },
+    "./runtime": {
+      "types": "./dist/exports/runtime.d.ts",
+      "import": "./dist/exports/runtime.js"
+    }
+  }
+}

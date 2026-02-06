@@ -4,6 +4,7 @@
   "type": "module",
   "sideEffects": false,
   "files": [
+    "bin",
     "dist",
     "src"
   ],
@@ -18,7 +19,7 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "bin": {
-    "prisma-next": "./dist/cli.js"
+    "prisma-next": "./bin/prisma-next.js"
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",

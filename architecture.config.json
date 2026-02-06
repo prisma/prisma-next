@@ -109,6 +109,18 @@
       "plane": "runtime"
     },
     {
+      "glob": "packages/3-targets/3-targets/sqlite/src/exports/control.ts",
+      "domain": "extensions",
+      "layer": "targets",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/3-targets/3-targets/sqlite/src/exports/runtime.ts",
+      "domain": "extensions",
+      "layer": "targets",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/3-targets/6-adapters/postgres/src/core/**",
       "domain": "targets",
       "layer": "adapters",
@@ -127,6 +139,24 @@
       "plane": "runtime"
     },
     {
+      "glob": "packages/3-targets/6-adapters/sqlite/src/core/**",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-targets/6-adapters/sqlite/src/exports/control.ts",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/3-targets/6-adapters/sqlite/src/exports/runtime.ts",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/3-targets/7-drivers/postgres/src/exports/control.ts",
       "domain": "targets",
       "layer": "drivers",
@@ -134,6 +164,18 @@
     },
     {
       "glob": "packages/3-targets/7-drivers/postgres/src/exports/runtime.ts",
+      "domain": "targets",
+      "layer": "drivers",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-targets/7-drivers/sqlite/src/exports/control.ts",
+      "domain": "targets",
+      "layer": "drivers",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/3-targets/7-drivers/sqlite/src/exports/runtime.ts",
       "domain": "targets",
       "layer": "drivers",
       "plane": "runtime"
@@ -176,6 +218,54 @@
     },
     {
       "glob": "packages/3-extensions/pgvector/src/exports/operation-types.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/sqlite-vector/src/core/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/sqlite-vector/src/types/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/sqlite-vector/src/exports/control.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/3-extensions/sqlite-vector/src/exports/runtime.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-extensions/sqlite-vector/src/exports/codec-types.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/sqlite-vector/src/exports/operation-types.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/sqlite-vector/src/exports/column-types.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/sqlite-vector/src/exports/pack.ts",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "shared"

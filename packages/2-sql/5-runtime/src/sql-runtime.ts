@@ -124,7 +124,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     this.codecRegistry = context.codecs;
     this.codecRegistryValidated = false;
 
-    const familyAdapter = new SqlFamilyAdapter(context.contract);
+    const familyAdapter = new SqlFamilyAdapter(context.contract, adapter as unknown as object);
 
     const coreOptions: RuntimeCoreOptions<
       TContract,

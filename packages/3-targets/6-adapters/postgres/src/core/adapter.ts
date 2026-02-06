@@ -250,9 +250,10 @@ function renderOperation(expr: OperationExpr, contract?: PostgresContract): stri
   });
 
   let result = expr.lowering.template;
-  result = result.replace(/\$\{self\}/g, self);
+  // Support both runtime `${self}` templates and manifest-safe `{{self}}` templates.
+  result = result.replace(/\$\{self\}|\{\{self\}\}/g, self);
   for (let i = 0; i < args.length; i++) {
-    result = result.replace(new RegExp(`\\$\\{arg${i}\\}`, 'g'), args[i] ?? '');
+    result = result.replace(new RegExp(`\\$\\{arg${i}\\}|\\{\\{arg${i}\\}\\}`, 'g'), args[i] ?? '');
   }
 
   if (expr.lowering.strategy === 'function') {

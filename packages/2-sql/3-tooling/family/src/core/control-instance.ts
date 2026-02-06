@@ -21,11 +21,6 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import {
-  ensureSchemaStatement,
-  ensureTableStatement,
-  writeContractMarker,
-} from '@prisma-next/sql-runtime';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
@@ -645,9 +640,10 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           : contractCoreHash;
       const contractTarget = contract.target;
 
-      // Ensure marker schema and table exist
-      await driver.query(ensureSchemaStatement.sql, ensureSchemaStatement.params);
-      await driver.query(ensureTableStatement.sql, ensureTableStatement.params);
+      // Ensure marker tables exist (target-specific per ADR 021).
+      for (const stmt of ensureMarkerInfrastructureStatements(contractTarget)) {
+        await driver.query(stmt.sql, stmt.params);
+      }
 
       // Read existing marker
       const existingMarker = await readMarker(driver);
@@ -659,7 +655,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
       if (!existingMarker) {
         // No marker exists - insert new one
-        const write = writeContractMarker({
+        const write = writeMarkerStatements(contractTarget, {
           coreHash: contractCoreHash,
           profileHash: contractProfileHash,
           contractJson: contractIR,
@@ -682,7 +678,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             coreHash: existingCoreHash,
             profileHash: existingProfileHash,
           };
-          const write = writeContractMarker({
+          const write = writeMarkerStatements(contractTarget, {
             coreHash: contractCoreHash,
             profileHash: contractProfileHash,
             contractJson: contractIR,
@@ -910,4 +906,162 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       };
     },
   };
+}
+
+// ============================================================================
+// Marker SQL (ADR 021)
+// ============================================================================
+
+type SqlStatement = { readonly sql: string; readonly params: readonly unknown[] };
+
+type WriteMarkerInput = {
+  readonly coreHash: string;
+  readonly profileHash: string;
+  readonly contractJson?: unknown;
+  readonly canonicalVersion?: number | null;
+  readonly appTag?: string | null;
+  readonly meta?: Record<string, unknown>;
+};
+
+function ensureMarkerInfrastructureStatements(targetId: string): readonly SqlStatement[] {
+  if (targetId === 'sqlite') {
+    return [
+      {
+        sql: `create table if not exists prisma_contract_marker (
+          id integer primary key,
+          core_hash text not null,
+          profile_hash text not null,
+          contract_json text,
+          canonical_version integer,
+          updated_at text not null default (CURRENT_TIMESTAMP),
+          app_tag text,
+          meta text not null default '{}'
+        )`,
+        params: [],
+      },
+    ];
+  }
+
+  // Default: Postgres schema + table.
+  return [
+    { sql: 'create schema if not exists prisma_contract', params: [] },
+    {
+      sql: `create table if not exists prisma_contract.marker (
+        id smallint primary key default 1,
+        core_hash text not null,
+        profile_hash text not null,
+        contract_json jsonb,
+        canonical_version int,
+        updated_at timestamptz not null default now(),
+        app_tag text,
+        meta jsonb not null default '{}'
+      )`,
+      params: [],
+    },
+  ];
+}
+
+function writeMarkerStatements(
+  targetId: string,
+  input: WriteMarkerInput,
+): { readonly insert: SqlStatement; readonly update: SqlStatement } {
+  if (targetId === 'sqlite') {
+    const params: readonly unknown[] = [
+      1,
+      input.coreHash,
+      input.profileHash,
+      jsonParam(input.contractJson),
+      input.canonicalVersion ?? null,
+      input.appTag ?? null,
+      jsonParam(input.meta ?? {}),
+    ];
+
+    return {
+      insert: {
+        sql: `insert into prisma_contract_marker (
+          id,
+          core_hash,
+          profile_hash,
+          contract_json,
+          canonical_version,
+          updated_at,
+          app_tag,
+          meta
+        ) values (
+          ?1,
+          ?2,
+          ?3,
+          ?4,
+          ?5,
+          CURRENT_TIMESTAMP,
+          ?6,
+          ?7
+        )`,
+        params,
+      },
+      update: {
+        sql: `update prisma_contract_marker set
+          core_hash = ?2,
+          profile_hash = ?3,
+          contract_json = ?4,
+          canonical_version = ?5,
+          updated_at = CURRENT_TIMESTAMP,
+          app_tag = ?6,
+          meta = ?7
+        where id = ?1`,
+        params,
+      },
+    };
+  }
+
+  const params: readonly unknown[] = [
+    1,
+    input.coreHash,
+    input.profileHash,
+    jsonParam(input.contractJson),
+    input.canonicalVersion ?? null,
+    input.appTag ?? null,
+    jsonParam(input.meta ?? {}),
+  ];
+
+  return {
+    insert: {
+      sql: `insert into prisma_contract.marker (
+        id,
+        core_hash,
+        profile_hash,
+        contract_json,
+        canonical_version,
+        updated_at,
+        app_tag,
+        meta
+      ) values (
+        $1,
+        $2,
+        $3,
+        $4::jsonb,
+        $5,
+        now(),
+        $6,
+        $7::jsonb
+      )`,
+      params,
+    },
+    update: {
+      sql: `update prisma_contract.marker set
+        core_hash = $2,
+        profile_hash = $3,
+        contract_json = $4::jsonb,
+        canonical_version = $5,
+        updated_at = now(),
+        app_tag = $6,
+        meta = $7::jsonb
+      where id = $1`,
+      params,
+    },
+  };
+}
+
+function jsonParam(value: unknown): string {
+  return JSON.stringify(value ?? null);
 }

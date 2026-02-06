@@ -10,6 +10,9 @@ export interface CodecMeta {
       readonly postgres?: {
         readonly nativeType: string; // e.g. 'integer', 'text', 'vector', 'timestamp with time zone'
       };
+      readonly sqlite?: {
+        readonly nativeType: string; // e.g. 'integer', 'text', 'real'
+      };
     };
   };
 }

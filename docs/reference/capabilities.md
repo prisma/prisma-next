@@ -4,6 +4,26 @@ This document defines the canonical capability keys and reserved namespaces used
 
 Capabilities describe **what the database environment can do**. Adapters report capabilities at connect time, and the runtime negotiates them with extension packs. The contract only **declares requirements** (`contract.capabilities`) and pins the resulting `profileHash`; it does not define capabilities.
 
+## Implementation Note (Current Prototype)
+
+The current Prisma Next implementation stores contract capability requirements **per target**:
+
+- Lanes gate features via `contract.capabilities[contract.target]` (keys like `returning`, `lateral`, `jsonAgg`).
+- Extension packs typically declare required flags under the same target key (e.g. `sqlitevector/cosine` under `sqlite`).
+
+The `sql.*` namespace model described below is the long-term intended shape for adapter capability advertisement and negotiation. It is not yet the shape used by lane gating.
+
+Example contract capabilities (today):
+
+```json
+{
+  "capabilities": {
+    "postgres": { "returning": true, "lateral": true, "jsonAgg": true, "pgvector/cosine": true },
+    "sqlite": { "returning": true, "lateral": true, "jsonAgg": true, "sqlitevector/cosine": true }
+  }
+}
+```
+
 ## Adapter (database) capabilities
 
 Adapter-reported features of the database runtime. These are not contract-owned; they are discovered and negotiated.

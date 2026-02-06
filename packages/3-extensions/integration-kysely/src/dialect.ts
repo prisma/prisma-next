@@ -6,7 +6,14 @@ import type {
   Kysely,
   QueryCompiler,
 } from 'kysely';
-import { PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler } from 'kysely';
+import {
+  PostgresAdapter,
+  PostgresIntrospector,
+  PostgresQueryCompiler,
+  SqliteAdapter,
+  SqliteIntrospector,
+  SqliteQueryCompiler,
+} from 'kysely';
 import type { KyselyPrismaDialectConfig } from './config.js';
 import { KyselyPrismaDriver } from './driver.js';
 
@@ -37,6 +44,14 @@ function matchDialect(config: KyselyPrismaDialectConfig) {
       createDriver: () => new KyselyPrismaDriver(config),
       createIntrospector: (db: Kysely<unknown>) => new PostgresIntrospector(db),
       createQueryCompiler: () => new PostgresQueryCompiler(),
+    };
+  }
+  if (config.contract.target === 'sqlite') {
+    return {
+      createAdapter: () => new SqliteAdapter(),
+      createDriver: () => new KyselyPrismaDriver(config),
+      createIntrospector: (db: Kysely<unknown>) => new SqliteIntrospector(db),
+      createQueryCompiler: () => new SqliteQueryCompiler(),
     };
   }
   throw new Error(`Unsupported database target: ${config.contract.target}`);

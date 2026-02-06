@@ -38,9 +38,14 @@
 
     { "path": "./packages/3-extensions/compat-prisma" },
     { "path": "./packages/3-extensions/pgvector" },
+    { "path": "./packages/3-extensions/sqlite-vector" },
 
     { "path": "./packages/3-targets/3-targets/postgres" },
     { "path": "./packages/3-targets/6-adapters/postgres" },
-    { "path": "./packages/3-targets/7-drivers/postgres" }
+    { "path": "./packages/3-targets/7-drivers/postgres" },
+
+    { "path": "./packages/3-targets/3-targets/sqlite" },
+    { "path": "./packages/3-targets/6-adapters/sqlite" },
+    { "path": "./packages/3-targets/7-drivers/sqlite" }
   ]
 }

@@ -1,0 +1,57 @@
+{
+  "name": "@prisma-next/target-sqlite",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "description": "SQLite target pack for Prisma Next",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
+  },
+  "dependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
+    "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-errors": "workspace:*",
+    "@prisma-next/sql-schema-ir": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
+    "arktype": "^2.0.0"
+  },
+  "devDependencies": {
+    "@prisma-next/adapter-sqlite": "workspace:*",
+    "@prisma-next/driver-sqlite": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "files": [
+    "dist",
+    "src",
+    "packs"
+  ],
+  "exports": {
+    "./control": {
+      "types": "./dist/exports/control.d.ts",
+      "import": "./dist/exports/control.js"
+    },
+    "./runtime": {
+      "types": "./dist/exports/runtime.d.ts",
+      "import": "./dist/exports/runtime.js"
+    },
+    "./pack": {
+      "types": "./dist/exports/pack.d.ts",
+      "import": "./dist/exports/pack.js"
+    }
+  }
+}
