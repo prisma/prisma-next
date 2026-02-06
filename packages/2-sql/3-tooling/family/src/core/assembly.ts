@@ -33,10 +33,6 @@ function assertUniqueCodecOwner(options: {
   }
 }
 
-/**
- * Descriptor type that provides static contributions for SQL control plane assembly.
- * Includes component identity (id, types) plus required operationSignatures() method.
- */
 export interface SqlControlDescriptorWithContributions extends SqlControlStaticContributions {
   readonly id: string;
   readonly types?: {
@@ -49,10 +45,6 @@ export interface SqlControlDescriptorWithContributions extends SqlControlStaticC
   };
 }
 
-/**
- * Assembles an operation registry from descriptors with static contributions.
- * Loops over descriptors, calls operationSignatures(), and registers them in a new registry.
- */
 export function assembleOperationRegistry(
   descriptors: ReadonlyArray<SqlControlDescriptorWithContributions>,
 ): OperationRegistry {
@@ -68,10 +60,6 @@ export function assembleOperationRegistry(
   return registry;
 }
 
-/**
- * Descriptor shape for type extraction functions.
- * Only requires the fields used for type imports and metadata.
- */
 interface DescriptorWithTypes {
   readonly id: string;
   readonly types?: {
@@ -84,9 +72,6 @@ interface DescriptorWithTypes {
   };
 }
 
-/**
- * Extracts codec type imports from descriptors for contract.d.ts generation.
- */
 export function extractCodecTypeImports(
   descriptors: ReadonlyArray<DescriptorWithTypes>,
 ): ReadonlyArray<TypesImportSpec> {
@@ -106,9 +91,6 @@ export function extractCodecTypeImports(
   return imports;
 }
 
-/**
- * Extracts operation type imports from descriptors for contract.d.ts generation.
- */
 export function extractOperationTypeImports(
   descriptors: ReadonlyArray<DescriptorWithTypes>,
 ): ReadonlyArray<TypesImportSpec> {
@@ -125,11 +107,6 @@ export function extractOperationTypeImports(
   return imports;
 }
 
-/**
- * Extracts extension IDs from descriptors in deterministic order:
- * [adapter.id, target.id, ...extensions.map(e => e.id)]
- * Deduplicates while preserving stable order.
- */
 export function extractExtensionIds(
   adapter: { readonly id: string },
   target: { readonly id: string },
@@ -138,13 +115,9 @@ export function extractExtensionIds(
   const ids: string[] = [];
   const seen = new Set<string>();
 
-  // Add adapter first
   addUniqueId(ids, seen, adapter.id);
-
-  // Add target second
   addUniqueId(ids, seen, target.id);
 
-  // Add extensions in order
   for (const ext of extensions) {
     addUniqueId(ids, seen, ext.id);
   }
@@ -152,21 +125,11 @@ export function extractExtensionIds(
   return ids;
 }
 
-/**
- * Extracts and normalizes parameterized codec renderers from descriptors.
- * Templates are compiled to functions at this layer.
- *
- * Throws an error if multiple descriptors provide a renderer for the same codecId.
- * This is intentional - duplicate codecId is a hard error, not a silent override.
- *
- * @returns Map from codecId to normalized renderer
- */
 export function extractParameterizedRenderers(
   descriptors: ReadonlyArray<DescriptorWithTypes>,
 ): Map<string, NormalizedTypeRenderer> {
   const renderers = new Map<string, NormalizedTypeRenderer>();
-  // Codec owner: the single descriptor allowed to define a codecId renderer or hooks.
-  const owners = new Map<string, string>(); // codecId -> descriptor.id for error messages
+  const owners = new Map<string, string>();
 
   for (const descriptor of descriptors) {
     const codecTypes = descriptor.types?.codecTypes;
@@ -191,13 +154,6 @@ export function extractParameterizedRenderers(
 
 type CodecControlHooksMap = Record<string, CodecControlHooks>;
 
-/**
- * Type guard to check if a descriptor has codec control plane hooks.
- * Returns true if descriptor.types.codecTypes.controlPlaneHooks is a non-null object.
- *
- * @param descriptor - Component descriptor to check (adapter, target, or extension)
- * @returns True if the descriptor has control plane hooks attached
- */
 function hasCodecControlHooks(descriptor: unknown): descriptor is {
   readonly id: string;
   readonly types: {
@@ -214,16 +170,10 @@ function hasCodecControlHooks(descriptor: unknown): descriptor is {
   return hooks !== null && hooks !== undefined && typeof hooks === 'object';
 }
 
-/**
- * Extracts codec control hooks from descriptors.
- *
- * Throws an error if multiple descriptors provide hooks for the same codecId.
- */
 export function extractCodecControlHooks(
   descriptors: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>,
 ): Map<string, CodecControlHooks> {
   const hooks = new Map<string, CodecControlHooks>();
-  // Codec owner: the single descriptor allowed to define a codecId renderer or hooks.
   const owners = new Map<string, string>();
 
   for (const descriptor of descriptors) {
@@ -250,12 +200,6 @@ export function extractCodecControlHooks(
   return hooks;
 }
 
-/**
- * Extracts parameterized type imports from descriptors for contract.d.ts generation.
- * These are type imports needed by parameterized codec renderers.
- *
- * @returns Array of type import specs (may contain duplicates; caller should deduplicate)
- */
 export function extractParameterizedTypeImports(
   descriptors: ReadonlyArray<DescriptorWithTypes>,
 ): ReadonlyArray<TypesImportSpec> {
