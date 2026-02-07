@@ -16,6 +16,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/runtime';
 import sql from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlExecutionStack } from '@prisma-next/sql-runtime';
 import { budgets, createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
 import postgresTargetRuntime from '@prisma-next/target-postgres/runtime';
@@ -78,9 +79,14 @@ export function createTestRuntime<TContract extends SqlContract<SqlStorage>>(
     extensionPacks: [],
   });
   const stackInstance = instantiateExecutionStack(stack);
+  const sqlStack: SqlExecutionStack = {
+    target: postgresTargetRuntime,
+    adapter: postgresAdapterRuntime,
+    extensionPacks: [],
+  };
   const context = createExecutionContext({
     contract,
-    stack: stack as never,
+    stack: sqlStack,
   });
   const driverDescriptor = stack.driver;
   if (!driverDescriptor) {
