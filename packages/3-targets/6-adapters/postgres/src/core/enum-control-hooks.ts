@@ -58,7 +58,9 @@ function isStringArray(value: unknown): value is string[] {
  * - A JavaScript array (when type parsers are configured)
  * - A string in PostgreSQL array literal format: `{value1,value2,...}`
  *
- * This function handles both cases for robustness.
+ * Handles PostgreSQL's quoting rules for array elements:
+ * - Elements containing commas, double quotes, backslashes, or whitespace are double-quoted
+ * - Inside quoted elements, `\"` represents `"` and `\\` represents `\`
  *
  * @param value - The value to parse (array or PostgreSQL array string)
  * @returns A string array, or null if the value cannot be parsed
@@ -72,9 +74,45 @@ export function parsePostgresArray(value: unknown): string[] | null {
     if (inner === '') {
       return [];
     }
-    return inner.split(',').map((v) => v.trim());
+    return parseArrayElements(inner);
   }
   return null;
+}
+
+function parseArrayElements(input: string): string[] {
+  const result: string[] = [];
+  let i = 0;
+  while (i < input.length) {
+    if (input[i] === ',') {
+      i++;
+      continue;
+    }
+    if (input[i] === '"') {
+      i++;
+      let element = '';
+      while (i < input.length && input[i] !== '"') {
+        if (input[i] === '\\' && i + 1 < input.length) {
+          i++;
+          element += input[i];
+        } else {
+          element += input[i];
+        }
+        i++;
+      }
+      i++;
+      result.push(element);
+    } else {
+      const nextComma = input.indexOf(',', i);
+      if (nextComma === -1) {
+        result.push(input.slice(i).trim());
+        i = input.length;
+      } else {
+        result.push(input.slice(i, nextComma).trim());
+        i = nextComma;
+      }
+    }
+  }
+  return result;
 }
 
 /**

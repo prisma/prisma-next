@@ -41,6 +41,27 @@ describe('parsePostgresArray', () => {
     expect(parsePostgresArray([1, 2, 3])).toBeNull();
     expect(parsePostgresArray(['USER', 123])).toBeNull();
   });
+
+  it('handles quoted values containing commas', () => {
+    expect(parsePostgresArray('{"has,comma",ADMIN}')).toEqual(['has,comma', 'ADMIN']);
+  });
+
+  it('handles quoted values with escaped double quotes', () => {
+    expect(parsePostgresArray('{"say \\"hello\\"",ADMIN}')).toEqual(['say "hello"', 'ADMIN']);
+  });
+
+  it('handles quoted values with escaped backslashes', () => {
+    expect(parsePostgresArray('{"path\\\\dir",ADMIN}')).toEqual(['path\\dir', 'ADMIN']);
+  });
+
+  it('handles mixed quoted and unquoted values', () => {
+    expect(parsePostgresArray('{SIMPLE,"has,comma","with \\"quotes\\"",PLAIN}')).toEqual([
+      'SIMPLE',
+      'has,comma',
+      'with "quotes"',
+      'PLAIN',
+    ]);
+  });
 });
 
 describe('pgEnumControlHooks.planTypeOperations', () => {
