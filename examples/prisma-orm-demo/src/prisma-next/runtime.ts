@@ -39,6 +39,9 @@ export function getPrismaNextRuntime(): Runtime {
 
     const stackInstance = instantiateExecutionStack(stack);
 
+    // Cast needed: createExecutionStack's generic inference broadens SqlRuntimeTargetDescriptor
+    // (et al.) to RuntimeTargetDescriptor, losing the SqlStaticContributions interface that
+    // createExecutionContext requires. The concrete descriptors above do satisfy SqlExecutionStack.
     const context = createExecutionContext({
       contract,
       stack: stack as never,
