@@ -42,7 +42,7 @@ export type Contract = SqlContract<
           };
           readonly email: {
             readonly nativeType: 'character varying';
-            readonly codecId: 'pg/varchar@1';
+            readonly codecId: 'sql/varchar@1';
             readonly nullable: false;
           };
           readonly created_at: {
@@ -141,12 +141,12 @@ export type Contract = SqlContract<
           };
           readonly name: {
             readonly nativeType: 'character varying';
-            readonly codecId: 'pg/varchar@1';
+            readonly codecId: 'sql/varchar@1';
             readonly nullable: true;
           };
           readonly code: {
             readonly nativeType: 'character';
-            readonly codecId: 'pg/char@1';
+            readonly codecId: 'sql/char@1';
             readonly nullable: true;
           };
           readonly price: {

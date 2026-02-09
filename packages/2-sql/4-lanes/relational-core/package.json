@@ -20,6 +20,7 @@
     "@prisma-next/plan": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
+    "arktype": "^2.1.29",
     "ts-toolbelt": "^9.6.0"
   },
   "devDependencies": {

@@ -18,20 +18,6 @@ import type {
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relational-core/ast';
-import type { Type } from 'arktype';
-import { type as arktype } from 'arktype';
-import {
-  PG_BIT_CODEC_ID,
-  PG_CHAR_CODEC_ID,
-  PG_INTERVAL_CODEC_ID,
-  PG_NUMERIC_CODEC_ID,
-  PG_TIME_CODEC_ID,
-  PG_TIMESTAMP_CODEC_ID,
-  PG_TIMESTAMPTZ_CODEC_ID,
-  PG_TIMETZ_CODEC_ID,
-  PG_VARBIT_CODEC_ID,
-  PG_VARCHAR_CODEC_ID,
-} from './codec-ids';
 import { codecDefinitions } from './codecs';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
@@ -50,54 +36,29 @@ const defaultCapabilities = Object.freeze({
   },
 });
 
+type AdapterCodec = (typeof codecDefinitions)[keyof typeof codecDefinitions]['codec'];
+type ParameterizedCodec = AdapterCodec & {
+  readonly paramsSchema: NonNullable<AdapterCodec['paramsSchema']>;
+};
+
 type AdapterParameterizedCodecDescriptor<TParams = Record<string, unknown>> = {
   readonly codecId: string;
-  readonly paramsSchema: Type<TParams>;
+  readonly paramsSchema: NonNullable<AdapterCodec['paramsSchema']>;
   readonly init?: (params: TParams) => unknown;
 };
 
-/**
- * Schema for length-parameterized types (char, varchar, bit, varbit).
- * Length must be a positive integer. PostgreSQL's max for varchar is 10485760.
- */
-const lengthParamsSchema = arktype({
-  length: 'number.integer > 0',
-});
-
-/**
- * Schema for numeric type parameters.
- * - precision: 1-1000 (PostgreSQL max)
- * - scale: 0 to precision (optional)
- * Note: We can't express scale <= precision with Arktype alone, so validation
- * of that constraint happens in the shared expandParameterizedNativeType utility.
- */
-const numericParamsSchema = arktype({
-  precision: 'number.integer > 0 & number.integer <= 1000',
-  'scale?': 'number.integer >= 0',
-});
-
-/**
- * Schema for temporal precision parameters (timestamp, time, interval).
- * PostgreSQL allows precision 0-6 for fractional seconds.
- */
-const precisionParamsSchema = arktype({
-  'precision?': 'number.integer >= 0 & number.integer <= 6',
-});
-
-const parameterizedCodecs: ReadonlyArray<
-  AdapterParameterizedCodecDescriptor<Record<string, unknown>>
-> = [
-  { codecId: PG_CHAR_CODEC_ID, paramsSchema: lengthParamsSchema },
-  { codecId: PG_VARCHAR_CODEC_ID, paramsSchema: lengthParamsSchema },
-  { codecId: PG_NUMERIC_CODEC_ID, paramsSchema: numericParamsSchema },
-  { codecId: PG_BIT_CODEC_ID, paramsSchema: lengthParamsSchema },
-  { codecId: PG_VARBIT_CODEC_ID, paramsSchema: lengthParamsSchema },
-  { codecId: PG_TIMESTAMP_CODEC_ID, paramsSchema: precisionParamsSchema },
-  { codecId: PG_TIMESTAMPTZ_CODEC_ID, paramsSchema: precisionParamsSchema },
-  { codecId: PG_TIME_CODEC_ID, paramsSchema: precisionParamsSchema },
-  { codecId: PG_TIMETZ_CODEC_ID, paramsSchema: precisionParamsSchema },
-  { codecId: PG_INTERVAL_CODEC_ID, paramsSchema: precisionParamsSchema },
-];
+const parameterizedCodecs: ReadonlyArray<AdapterParameterizedCodecDescriptor> = Object.values(
+  codecDefinitions,
+)
+  .map((definition) => definition.codec)
+  .filter((codec): codec is ParameterizedCodec => codec.paramsSchema !== undefined)
+  .map((codec) =>
+    Object.freeze({
+      codecId: codec.id,
+      paramsSchema: codec.paramsSchema,
+      ...(codec.init ? { init: codec.init } : {}),
+    }),
+  );
 
 class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, PostgresLoweredStatement> {
   // These fields make the adapter instance structurally compatible with

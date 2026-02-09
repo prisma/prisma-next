@@ -68,7 +68,7 @@ describe('end-to-end nested projection queries', () => {
           });
 
           expect(plan.meta.projectionTypes).toEqual({
-            name: 'pg/varchar@1',
+            name: 'sql/varchar@1',
             post_title: 'pg/int4@1',
           });
         },

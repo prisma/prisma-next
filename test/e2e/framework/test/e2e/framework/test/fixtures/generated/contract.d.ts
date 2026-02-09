@@ -22,7 +22,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type CoreHash =
-  CoreHashBase<'sha256:cd70aef8a80b1d6d61a1722752d1f67def063f398151c5ea255678e6d8dd4c70'>;
+  CoreHashBase<'sha256:e94295d382f9f0039fd471957cd02770f1a75031240660195def8854d2385962'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61'>;
 
@@ -42,7 +42,7 @@ export type Contract = SqlContract<
           };
           readonly email: {
             readonly nativeType: 'character varying';
-            readonly codecId: 'pg/varchar@1';
+            readonly codecId: 'sql/varchar@1';
             readonly nullable: false;
           };
           readonly created_at: {
@@ -141,12 +141,12 @@ export type Contract = SqlContract<
           };
           readonly name: {
             readonly nativeType: 'character varying';
-            readonly codecId: 'pg/varchar@1';
+            readonly codecId: 'sql/varchar@1';
             readonly nullable: true;
           };
           readonly code: {
             readonly nativeType: 'character';
-            readonly codecId: 'pg/char@1';
+            readonly codecId: 'sql/char@1';
             readonly nullable: true;
           };
           readonly price: {

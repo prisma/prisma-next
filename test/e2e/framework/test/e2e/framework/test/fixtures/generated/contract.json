@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:cd70aef8a80b1d6d61a1722752d1f67def063f398151c5ea255678e6d8dd4c70",
+  "coreHash": "sha256:e94295d382f9f0039fd471957cd02770f1a75031240660195def8854d2385962",
   "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
     "Comment": {
@@ -128,7 +128,7 @@
             }
           },
           "code": {
-            "codecId": "pg/char@1",
+            "codecId": "sql/char@1",
             "nativeType": "character",
             "nullable": true,
             "typeParams": {
@@ -169,7 +169,7 @@
             "nullable": false
           },
           "name": {
-            "codecId": "pg/varchar@1",
+            "codecId": "sql/varchar@1",
             "nativeType": "character varying",
             "nullable": true,
             "typeParams": {
@@ -270,7 +270,7 @@
             "nullable": false
           },
           "email": {
-            "codecId": "pg/varchar@1",
+            "codecId": "sql/varchar@1",
             "nativeType": "character varying",
             "typeParams": {
               "length": 255

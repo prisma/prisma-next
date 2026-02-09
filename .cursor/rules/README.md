@@ -59,7 +59,6 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/postgres-lateral-patterns.mdc` — LATERAL/json_agg patterns
 - `.cursor/rules/include-many-patterns.mdc` — includeMany type inference
 - `.cursor/rules/sql-types-imports.mdc` — SQL types import path (use @prisma-next/sql-contract/types)
-- `.cursor/rules/postgres-parameterized-types.mdc` — Parameterized type normalization in Postgres control/verify
 
 ## TypeScript & Typing
 - `.cursor/rules/typescript-patterns.mdc` — TS patterns index (short)
