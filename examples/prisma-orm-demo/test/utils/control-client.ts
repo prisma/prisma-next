@@ -8,15 +8,17 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresAdapterRuntime from '@prisma-next/adapter-postgres/runtime';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/runtime';
 import sql from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { budgets, createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
+import {
+  budgets,
+  createExecutionContext,
+  createRuntime,
+  createSqlExecutionStack,
+} from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
 import postgresTargetRuntime from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
@@ -71,7 +73,7 @@ export function createTestRuntime<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,
   budgetConfig?: { maxRows: number; defaultTableRows: number; tableRows: Record<string, number> },
 ): TestRuntime {
-  const stack = createExecutionStack({
+  const stack = createSqlExecutionStack({
     target: postgresTargetRuntime,
     adapter: postgresAdapterRuntime,
     driver: postgresDriverDescriptor,

@@ -1,13 +1,14 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { PostgresDriverOptions } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Log, Plugin, Runtime, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
-import { createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
+import {
+  createExecutionContext,
+  createRuntime,
+  createSqlExecutionStack,
+} from '@prisma-next/sql-runtime';
 import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Client } from 'pg';
@@ -42,7 +43,7 @@ export function createTestRuntime(
       }
     : { mode: 'onFirstUse', requireMarker: false };
 
-  const stack = createExecutionStack({
+  const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
