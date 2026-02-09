@@ -20,12 +20,9 @@ export const executionStack = createExecutionStack({
   extensionPacks: [pgvectorDescriptor],
 });
 
-// Cast needed: createExecutionStack's generic inference broadens SqlRuntimeTargetDescriptor
-// (et al.) to RuntimeTargetDescriptor, losing the SqlStaticContributions interface that
-// createExecutionContext requires. The concrete descriptors above do satisfy SqlExecutionStack.
 export const executionContext = createExecutionContext({
   contract,
-  stack: executionStack as never,
+  stack: executionStack,
 });
 
 export const schema = schemaBuilder(executionContext);
