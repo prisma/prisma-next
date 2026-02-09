@@ -452,4 +452,146 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
     expect(result.ok).toBe(true);
     expect(result.schema.issues).toHaveLength(0);
   });
+
+  it('matches when contract includes enum cast and DB also returns enum cast', () => {
+    const contract = createTestContract({
+      Organization: createContractTable({
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: { kind: 'literal', expression: '\'atRisk\'::"BillingState"' },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Organization: createSchemaTable('Organization', {
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: '\'atRisk\'::"BillingState"',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('matches when contract has cast-free literal but DB returns enum cast', () => {
+    const contract = createTestContract({
+      Organization: createContractTable({
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: { kind: 'literal', expression: "'atRisk'" },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Organization: createSchemaTable('Organization', {
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: '\'atRisk\'::"BillingState"',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('matches when contract has enum cast but DB returns cast-free literal', () => {
+    const contract = createTestContract({
+      Organization: createContractTable({
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: { kind: 'literal', expression: '\'atRisk\'::"BillingState"' },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Organization: createSchemaTable('Organization', {
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: "'atRisk'",
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('detects value mismatch even when both have enum casts', () => {
+    const contract = createTestContract({
+      Organization: createContractTable({
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: { kind: 'literal', expression: '\'active\'::"BillingState"' },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Organization: createSchemaTable('Organization', {
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: '\'suspended\'::"BillingState"',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.schema.issues).toContainEqual(
+      expect.objectContaining({
+        kind: 'default_mismatch',
+        table: 'Organization',
+        column: 'billingState',
+      }),
+    );
+  });
 });

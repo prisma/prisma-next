@@ -905,10 +905,13 @@ function columnDefaultsEqual(
     return false;
   }
   if (contractDefault.kind === 'literal' && normalizedSchema.kind === 'literal') {
-    const normalizeLiteral = (expr: string) => expr.trim();
-    return (
-      normalizeLiteral(contractDefault.expression) === normalizeLiteral(normalizedSchema.expression)
-    );
+    // Normalize both sides: the contract expression may also contain a type cast
+    // (e.g. 'atRisk'::"BillingState") that the normalizer strips, so run the
+    // normalizer on the contract expression too for a fair comparison.
+    const normalizedContract = normalizer(contractDefault.expression, nativeType ?? '');
+    const contractExpr = (normalizedContract?.expression ?? contractDefault.expression).trim();
+    const schemaExpr = normalizedSchema.expression.trim();
+    return contractExpr === schemaExpr;
   }
   if (contractDefault.kind === 'function' && normalizedSchema.kind === 'function') {
     // Normalize function expressions for comparison (case-insensitive, whitespace-tolerant)
