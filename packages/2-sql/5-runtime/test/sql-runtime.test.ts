@@ -1,7 +1,12 @@
+import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
 import {
   createExecutionStack,
   instantiateExecutionStack,
 } from '@prisma-next/core-execution-plane/stack';
+import type {
+  RuntimeDriverInstance,
+  RuntimeExtensionInstance,
+} from '@prisma-next/core-execution-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   CodecRegistry,
@@ -146,14 +151,21 @@ function createTestSetup() {
     adapter: adapterDescriptor,
     extensionPacks: [],
   });
-  const stackInstance = instantiateExecutionStack(stack);
+  type SqlTestStackInstance = ExecutionStackInstance<
+    'sql',
+    'postgres',
+    SqlRuntimeAdapterInstance<'postgres'>,
+    RuntimeDriverInstance<'sql', 'postgres'>,
+    RuntimeExtensionInstance<'sql', 'postgres'>
+  >;
+  const stackInstance = instantiateExecutionStack(stack) as SqlTestStackInstance;
 
   const context = createExecutionContext({
     contract: testContract,
     stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
   });
 
-  return { stackInstance: stackInstance as never, context, driver };
+  return { stackInstance, context, driver };
 }
 
 describe('createRuntime', () => {
