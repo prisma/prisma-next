@@ -81,15 +81,15 @@ See `architecture.config.json` for the complete mapping and `pnpm lint:deps` to 
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { sql } from '@prisma-next/sql-lane/sql';
-import { createExecutionStack, instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import { createExecutionContext } from '@prisma-next/sql-runtime';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
-const stack = createExecutionStack({ target: postgresTarget, adapter: postgresAdapter, extensionPacks: [] });
+const stack = createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter, extensionPacks: [] });
 const stackInstance = instantiateExecutionStack(stack);
 const context = createExecutionContext({ contract, stackInstance });
 
