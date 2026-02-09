@@ -36,6 +36,16 @@ describe('expandParameterizedNativeType', () => {
     expect(result).toBe('character(12)');
   });
 
+  it('expands length-parameterized sql/varchar types', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'character varying',
+      codecId: 'sql/varchar@1',
+      typeParams: { length: 32 },
+    });
+
+    expect(result).toBe('character varying(32)');
+  });
+
   it('returns nativeType for invalid length parameter', () => {
     const result = expandParameterizedNativeType({
       nativeType: 'character',

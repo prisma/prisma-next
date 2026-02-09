@@ -128,7 +128,7 @@
             }
           },
           "code": {
-            "codecId": "pg/char@1",
+            "codecId": "sql/char@1",
             "nativeType": "character",
             "nullable": true,
             "typeParams": {
@@ -169,7 +169,7 @@
             "nullable": false
           },
           "name": {
-            "codecId": "pg/varchar@1",
+            "codecId": "sql/varchar@1",
             "nativeType": "character varying",
             "nullable": true,
             "typeParams": {
@@ -270,7 +270,7 @@
             "nullable": false
           },
           "email": {
-            "codecId": "pg/varchar@1",
+            "codecId": "sql/varchar@1",
             "nativeType": "character varying",
             "typeParams": {
               "length": 255

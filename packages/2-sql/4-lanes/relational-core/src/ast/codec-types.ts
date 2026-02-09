@@ -1,3 +1,4 @@
+import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
 /**
@@ -20,7 +21,13 @@ export interface CodecMeta {
  * Codecs are pure, synchronous functions with no side effects or IO.
  * They provide deterministic conversion between database wire types and JS values.
  */
-export interface Codec<Id extends string = string, TWire = unknown, TJs = unknown> {
+export interface Codec<
+  Id extends string = string,
+  TWire = unknown,
+  TJs = unknown,
+  TParams = Record<string, unknown>,
+  THelper = unknown,
+> {
   /**
    * Namespaced codec identifier in format 'namespace/name@version'
    * Examples: 'pg/text@1', 'pg/uuid@1', 'pg/timestamptz@1'
@@ -38,6 +45,17 @@ export interface Codec<Id extends string = string, TWire = unknown, TJs = unknow
    * Used for schema introspection and verification.
    */
   readonly meta?: CodecMeta;
+
+  /**
+   * Optional params schema for parameterized codecs.
+   * If provided, typeParams are validated against this schema.
+   */
+  readonly paramsSchema?: Type<TParams>;
+
+  /**
+   * Optional init hook for building helper types from validated params.
+   */
+  readonly init?: (params: TParams) => THelper;
 
   /**
    * Decode a wire value (from database) to JavaScript type.
@@ -157,17 +175,27 @@ class CodecRegistryImpl implements CodecRegistry {
 /**
  * Codec factory - creates a codec with typeId and encode/decode functions.
  */
-export function codec<Id extends string, TWire, TJs>(config: {
+export function codec<
+  Id extends string,
+  TWire,
+  TJs,
+  TParams = Record<string, unknown>,
+  THelper = unknown,
+>(config: {
   typeId: Id;
   targetTypes: readonly string[];
   encode: (value: TJs) => TWire;
   decode: (wire: TWire) => TJs;
   meta?: CodecMeta;
-}): Codec<Id, TWire, TJs> {
+  paramsSchema?: Type<TParams>;
+  init?: (params: TParams) => THelper;
+}): Codec<Id, TWire, TJs, TParams, THelper> {
   return {
     id: config.typeId,
     targetTypes: config.targetTypes,
     ...(config.meta ? { meta: config.meta } : {}),
+    ...(config.paramsSchema ? { paramsSchema: config.paramsSchema } : {}),
+    ...(config.init ? { init: config.init } : {}),
     encode: config.encode,
     decode: config.decode,
   };

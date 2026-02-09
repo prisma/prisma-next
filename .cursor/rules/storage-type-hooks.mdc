@@ -13,8 +13,10 @@ alwaysApply: false
 - Represent custom storage types via `storage.types` and column `typeRef`
 - Implement planning/verification/introspection in codec-owned hooks
 - Use schema annotations for target-specific introspection data
+- Prefer adapter `format_type()` output when expanding parameterized native types
 
 ## Avoid
 
 - Adding enum-specific fields to `SqlSchemaIR`
 - Framework-level enum abstractions or codecId branching in shared SQL layers
+- Treating missing type parameters as a successful match when the contract declares them

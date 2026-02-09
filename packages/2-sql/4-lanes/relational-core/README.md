@@ -26,6 +26,7 @@ Provide shared relational primitives (schema builders, column builders, paramete
 - **Operations Registry**: Attaches registered operations as methods on column builders
 - **Execution Context Types**: Defines the context shape used by query lanes
 - **Type Definitions**: Defines TypeScript types for column builders, operations, and projections
+- **Codec Registry Types**: Defines codec interfaces and base SQL codec definitions
 
 **Non-goals:**
 - Query DSL construction (sql-lane)
@@ -99,6 +100,7 @@ flowchart TD
 - **`@prisma-next/operations`**: Operation registry used by schema builders
 - **`@prisma-next/plan`**: Plan error helpers (`planInvalid`, `planUnsupported`) and `RuntimeError` type
 - **`@prisma-next/sql-contract`**: SQL contract types (via `@prisma-next/sql-contract/types`)
+- **`arktype`**: Parameter schema typing for codec definitions
 
 **Note**: This package does not depend on specific adapters (e.g., `@prisma-next/adapter-postgres`). Test fixtures define `CodecTypes` inline to remain adapter-agnostic and avoid cyclic dependencies.
 

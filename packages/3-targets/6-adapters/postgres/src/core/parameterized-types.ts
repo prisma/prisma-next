@@ -19,6 +19,8 @@ import {
   PG_TIMETZ_CODEC_ID,
   PG_VARBIT_CODEC_ID,
   PG_VARCHAR_CODEC_ID,
+  SQL_CHAR_CODEC_ID,
+  SQL_VARCHAR_CODEC_ID,
 } from './codec-ids';
 
 /**
@@ -32,6 +34,8 @@ export interface ExpandNativeTypeInput {
 
 /** Set of codec IDs that use the 'length' parameter */
 const LENGTH_CODEC_IDS: Set<string> = new Set([
+  SQL_CHAR_CODEC_ID,
+  SQL_VARCHAR_CODEC_ID,
   PG_CHAR_CODEC_ID,
   PG_VARCHAR_CODEC_ID,
   PG_BIT_CODEC_ID,

@@ -98,10 +98,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   const storageTypes = contract.storage.types ?? {};
   const storageTypeEntries = Object.entries(storageTypes);
   if (storageTypeEntries.length > 0) {
-    const controlHooks = extractCodecControlHooks(options.frameworkComponents);
     const typeNodes: SchemaVerificationNode[] = [];
     for (const [typeName, typeInstance] of storageTypeEntries) {
-      const hook = controlHooks.get(typeInstance.codecId);
+      const hook = codecHooks.get(typeInstance.codecId);
       const typeIssues = hook?.verifyType
         ? hook.verifyType({ typeName, typeInstance, schema })
         : [];
@@ -543,9 +542,7 @@ function verifyColumn(options: {
   const contractNativeType = renderExpectedNativeType(contractColumn, codecHooks);
   const schemaNativeType = normalizeSchemaNativeType(schemaColumn.nativeType);
 
-  const allowBaseTypeMatch =
-    contractColumn.typeParams !== undefined && schemaNativeType === contractColumn.nativeType;
-  if (contractNativeType !== schemaNativeType && !allowBaseTypeMatch) {
+  if (contractNativeType !== schemaNativeType) {
     issues.push({
       kind: 'type_mismatch',
       table: tableName,
@@ -702,7 +699,7 @@ function buildColumnsNode(
   columnNodes: SchemaVerificationNode[],
 ): SchemaVerificationNode {
   return {
-    status: mergeStatusFromChildren(columnNodes, 'pass'),
+    status: aggregateChildState(columnNodes, 'pass').status,
     kind: 'columns',
     name: 'columns',
     contractPath: `${tablePath}.columns`,
@@ -719,7 +716,7 @@ function buildTableNode(
   tablePath: string,
   tableChildren: SchemaVerificationNode[],
 ): SchemaVerificationNode {
-  const tableStatus = mergeStatusFromChildren(tableChildren, 'pass');
+  const tableStatus = aggregateChildState(tableChildren, 'pass').status;
   const tableFailureMessages = tableChildren
     .filter((child) => child.status === 'fail' && child.message)
     .map((child) => child.message)
@@ -748,7 +745,7 @@ function buildTableNode(
 
 function buildRootNode(rootChildren: SchemaVerificationNode[]): SchemaVerificationNode {
   return {
-    status: mergeStatusFromChildren(rootChildren, 'pass'),
+    status: aggregateChildState(rootChildren, 'pass').status,
     kind: 'contract',
     name: 'contract',
     contractPath: '',
@@ -799,17 +796,6 @@ function aggregateChildState(
   }
 
   return { status, failureMessages, firstCode };
-}
-
-/**
- * @deprecated Use aggregateChildState for better performance when you need multiple values.
- * Kept for backward compatibility with callers that only need status.
- */
-function mergeStatusFromChildren(
-  children: SchemaVerificationNode[],
-  fallback: VerificationStatus,
-): VerificationStatus {
-  return aggregateChildState(children, fallback).status;
 }
 
 function validateFrameworkComponentsForExtensions(

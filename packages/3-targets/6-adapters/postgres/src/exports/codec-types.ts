@@ -11,7 +11,7 @@ export type { CodecTypes } from '../core/codecs';
 export { dataTypes } from '../core/codecs';
 
 type Branded<T, Shape extends Record<string, unknown>> = T & {
-  readonly [K in keyof Shape]?: Shape[K];
+  readonly [K in keyof Shape]: Shape[K];
 };
 
 type BrandedString<Shape extends Record<string, unknown>> = Branded<string, Shape>;

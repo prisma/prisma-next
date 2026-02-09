@@ -98,6 +98,8 @@ flowchart TD
 **Codecs (`codecs.ts`)**
 - PostgreSQL codec definitions
 - Type conversion between wire format and JavaScript
+- SQL base codecs: `sql/char`, `sql/varchar`, `sql/int`, `sql/float`
+- PostgreSQL aliases for base codecs: `pg/char`, `pg/varchar`, `pg/int`, `pg/float`
 - Supports PostgreSQL types: `int2`, `int4`, `int8`, `float4`, `float8`, `text`, `bool`, `enum`
 - Parameterized types: `character(n)`, `character varying(n)`, `numeric(p,s)`, `bit(n)`, `bit varying(n)`, `timestamp(p)`, `timestamptz(p)`, `time(p)`, `timetz(p)`, `interval(p)`
 

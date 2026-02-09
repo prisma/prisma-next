@@ -132,7 +132,13 @@ export function createSchemaTable(
 
 /**
  * Mock implementation of expandNativeType for Postgres parameterized types.
- * This mirrors the implementation in @prisma-next/adapter-postgres for testing purposes.
+ *
+ * IMPORTANT: This mirrors the real implementation in
+ * `@prisma-next/adapter-postgres/src/core/parameterized-types.ts` (`expandParameterizedNativeType`).
+ * If a new parameterized codec type is added there, this mock must be updated to match.
+ *
+ * We cannot import the real function because this package (family-sql, Layer 3 Tooling)
+ * must not depend on the postgres adapter (Layer 6 Adapters).
  */
 function mockExpandParameterizedNativeType(input: ExpandNativeTypeInput): string {
   const { nativeType, codecId, typeParams } = input;
@@ -145,7 +151,14 @@ function mockExpandParameterizedNativeType(input: ExpandNativeTypeInput): string
     typeof v === 'number' && Number.isFinite(v) && Number.isInteger(v) && v >= 0;
 
   // Length-parameterized types: char, varchar, bit, varbit
-  const lengthCodecs = new Set(['pg/char@1', 'pg/varchar@1', 'pg/bit@1', 'pg/varbit@1']);
+  const lengthCodecs = new Set([
+    'sql/char@1',
+    'sql/varchar@1',
+    'pg/char@1',
+    'pg/varchar@1',
+    'pg/bit@1',
+    'pg/varbit@1',
+  ]);
   if (lengthCodecs.has(codecId)) {
     const length = typeParams['length'];
     if (isValidNumber(length)) {
@@ -194,6 +207,8 @@ function mockExpandParameterizedNativeType(input: ExpandNativeTypeInput): string
 export function createMockPostgresComponent(): TargetBoundComponentDescriptor<'sql', 'postgres'> {
   // Create hooks for each parameterized codec type
   const parameterizedCodecIds = [
+    'sql/char@1',
+    'sql/varchar@1',
     'pg/char@1',
     'pg/varchar@1',
     'pg/bit@1',

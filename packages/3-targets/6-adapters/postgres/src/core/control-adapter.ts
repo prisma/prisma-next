@@ -254,7 +254,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         const formattedType = colRow.formatted_type
           ? normalizeFormattedType(colRow.formatted_type, colRow.data_type, colRow.udt_name)
           : null;
-        if (formattedType?.includes('(')) {
+        if (formattedType) {
           nativeType = formattedType;
         } else if (colRow.data_type === 'character varying' || colRow.data_type === 'character') {
           if (colRow.character_maximum_length) {
@@ -417,6 +417,24 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 }
 
 function normalizeFormattedType(formattedType: string, dataType: string, udtName: string): string {
+  if (formattedType === 'integer') {
+    return 'int4';
+  }
+  if (formattedType === 'smallint') {
+    return 'int2';
+  }
+  if (formattedType === 'bigint') {
+    return 'int8';
+  }
+  if (formattedType === 'real') {
+    return 'float4';
+  }
+  if (formattedType === 'double precision') {
+    return 'float8';
+  }
+  if (formattedType === 'boolean') {
+    return 'bool';
+  }
   if (formattedType.startsWith('varchar')) {
     return formattedType.replace('varchar', 'character varying');
   }
