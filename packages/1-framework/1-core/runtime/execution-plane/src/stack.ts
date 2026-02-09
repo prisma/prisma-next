@@ -117,15 +117,12 @@ export function createExecutionStack<
   readonly adapter: TAdapterDescriptor;
   readonly driver?: TDriverDescriptor | undefined;
   readonly extensionPacks?: readonly TExtensionDescriptor[] | undefined;
-}): Omit<
-  ExecutionStack<
-    FamilyIdOf<TTargetDescriptor>,
-    TargetIdOf<TTargetDescriptor>,
-    TAdapterInstance,
-    TDriverInstance,
-    TExtensionInstance
-  >,
-  'target' | 'adapter' | 'driver' | 'extensionPacks'
+}): ExecutionStack<
+  FamilyIdOf<TTargetDescriptor>,
+  TargetIdOf<TTargetDescriptor>,
+  TAdapterInstance,
+  TDriverInstance,
+  TExtensionInstance
 > & {
   readonly target: TTargetDescriptor;
   readonly adapter: TAdapterDescriptor;
