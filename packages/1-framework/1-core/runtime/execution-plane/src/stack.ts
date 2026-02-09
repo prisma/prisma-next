@@ -35,24 +35,6 @@ export interface ExecutionStack<
   >[];
 }
 
-type FamilyIdOf<TTargetDescriptor> =
-  TTargetDescriptor extends RuntimeTargetDescriptor<
-    infer TFamilyId,
-    infer _TTargetId,
-    infer _TTargetInstance
-  >
-    ? TFamilyId
-    : never;
-
-type TargetIdOf<TTargetDescriptor> =
-  TTargetDescriptor extends RuntimeTargetDescriptor<
-    infer _TFamilyId,
-    infer TTargetId,
-    infer _TTargetInstance
-  >
-    ? TTargetId
-    : never;
-
 export interface ExecutionStackInstance<
   TFamilyId extends string,
   TTargetId extends string,
@@ -82,34 +64,26 @@ export interface ExecutionStackInstance<
 }
 
 export function createExecutionStack<
-  TTargetDescriptor extends RuntimeTargetDescriptor<string, string>,
-  TAdapterInstance extends RuntimeAdapterInstance<
-    FamilyIdOf<TTargetDescriptor>,
-    TargetIdOf<TTargetDescriptor>
+  TFamilyId extends string,
+  TTargetId extends string,
+  TTargetInstance extends RuntimeTargetInstance<TFamilyId, TTargetId>,
+  TTargetDescriptor extends RuntimeTargetDescriptor<TFamilyId, TTargetId, TTargetInstance>,
+  TAdapterInstance extends RuntimeAdapterInstance<TFamilyId, TTargetId>,
+  TAdapterDescriptor extends RuntimeAdapterDescriptor<TFamilyId, TTargetId, TAdapterInstance>,
+  TDriverInstance extends RuntimeDriverInstance<TFamilyId, TTargetId> = RuntimeDriverInstance<
+    TFamilyId,
+    TTargetId
   >,
-  TAdapterDescriptor extends RuntimeAdapterDescriptor<
-    FamilyIdOf<TTargetDescriptor>,
-    TargetIdOf<TTargetDescriptor>,
-    TAdapterInstance
-  >,
-  TDriverInstance extends RuntimeDriverInstance<
-    FamilyIdOf<TTargetDescriptor>,
-    TargetIdOf<TTargetDescriptor>
-  > = RuntimeDriverInstance<FamilyIdOf<TTargetDescriptor>, TargetIdOf<TTargetDescriptor>>,
   TDriverDescriptor extends
-    | RuntimeDriverDescriptor<
-        FamilyIdOf<TTargetDescriptor>,
-        TargetIdOf<TTargetDescriptor>,
-        TDriverInstance
-      >
+    | RuntimeDriverDescriptor<TFamilyId, TTargetId, TDriverInstance>
     | undefined = undefined,
   TExtensionInstance extends RuntimeExtensionInstance<
-    FamilyIdOf<TTargetDescriptor>,
-    TargetIdOf<TTargetDescriptor>
-  > = RuntimeExtensionInstance<FamilyIdOf<TTargetDescriptor>, TargetIdOf<TTargetDescriptor>>,
+    TFamilyId,
+    TTargetId
+  > = RuntimeExtensionInstance<TFamilyId, TTargetId>,
   TExtensionDescriptor extends RuntimeExtensionDescriptor<
-    FamilyIdOf<TTargetDescriptor>,
-    TargetIdOf<TTargetDescriptor>,
+    TFamilyId,
+    TTargetId,
     TExtensionInstance
   > = never,
 >(input: {
@@ -117,13 +91,7 @@ export function createExecutionStack<
   readonly adapter: TAdapterDescriptor;
   readonly driver?: TDriverDescriptor | undefined;
   readonly extensionPacks?: readonly TExtensionDescriptor[] | undefined;
-}): ExecutionStack<
-  FamilyIdOf<TTargetDescriptor>,
-  TargetIdOf<TTargetDescriptor>,
-  TAdapterInstance,
-  TDriverInstance,
-  TExtensionInstance
-> & {
+}): ExecutionStack<TFamilyId, TTargetId, TAdapterInstance, TDriverInstance, TExtensionInstance> & {
   readonly target: TTargetDescriptor;
   readonly adapter: TAdapterDescriptor;
   readonly driver: TDriverDescriptor | undefined;
