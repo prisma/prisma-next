@@ -78,7 +78,7 @@ function createTestRuntime(mockDriver: MockDriver): Runtime {
   const stackInstance = instantiateExecutionStack(stack);
   const context = createTestContext(fixtureContract, adapter);
   return createRuntime({
-    stackInstance: stackInstance as never,
+    stackInstance: stackInstance,
     context,
     driver: mockDriver,
     verify: { mode: 'onFirstUse', requireMarker: false },
