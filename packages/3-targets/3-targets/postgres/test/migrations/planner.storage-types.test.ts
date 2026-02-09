@@ -1,4 +1,5 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import { coreHash } from '@prisma-next/contract/types';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -52,7 +53,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:contract' as never,
+      coreHash: coreHash('sha256:contract'),
       storage: {
         tables: {
           user: {
@@ -141,7 +142,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:contract' as never,
+      coreHash: coreHash('sha256:contract'),
       storage: {
         tables: {},
         types: {
@@ -222,7 +223,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:contract' as never,
+      coreHash: coreHash('sha256:contract'),
       storage: {
         tables: {
           user: {

@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
@@ -25,7 +26,7 @@ const testContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   targetFamily: 'sql',
   target: 'postgres',
-  coreHash: 'sha256:test' as never,
+  coreHash: coreHash('sha256:test'),
   models: {},
   relations: {},
   storage: { tables: {} },

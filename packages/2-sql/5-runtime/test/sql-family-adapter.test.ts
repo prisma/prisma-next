@@ -1,4 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { SqlFamilyAdapter } from '../src/sql-family-adapter';
@@ -8,7 +9,7 @@ const testContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   targetFamily: 'sql',
   target: 'postgres',
-  coreHash: 'sha256:test-hash' as never,
+  coreHash: coreHash('sha256:test-hash'),
   models: {},
   relations: {},
   storage: { tables: {} },

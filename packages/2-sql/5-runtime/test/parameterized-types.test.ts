@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -33,7 +34,7 @@ function createParamTypesTestContract(
     schemaVersion: '1',
     targetFamily: 'sql',
     target: 'postgres',
-    coreHash: 'sha256:test' as never,
+    coreHash: coreHash('sha256:test'),
     models: {},
     relations: {},
     storage: {

@@ -1,4 +1,5 @@
 import type { ExecutionPlan, ResultType } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -268,8 +269,8 @@ export function createTestContract<T extends SqlContract<SqlStorage>>(
     extensionPacks: contract.extensionPacks ?? {},
     meta: contract.meta ?? {},
     sources: contract.sources ?? {},
-    coreHash: (contract.coreHash ?? 'sha256:testcore') satisfies string as never,
-    profileHash: (contract.profileHash ?? 'sha256:testprofile') satisfies string as never,
+    coreHash: coreHash(contract.coreHash ?? 'sha256:testcore'),
+    profileHash: profileHash(contract.profileHash ?? 'sha256:testprofile'),
   } satisfies SqlContract as never;
 }
 
@@ -277,7 +278,7 @@ export function createTestContract<T extends SqlContract<SqlStorage>>(
 export {
   collectAsync,
   createDevDatabase,
-  type DevDatabase,
   teardownTestDatabase,
   withClient,
+  type DevDatabase,
 } from '@prisma-next/test-utils';

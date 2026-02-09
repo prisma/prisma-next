@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { DeleteAst } from '@prisma-next/sql-relational-core/ast';
@@ -16,7 +17,7 @@ describe('delete builder', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test' as never,
+    coreHash: coreHash('sha256:test'),
     models: {
       User: {
         storage: { table: 'user' },

@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
@@ -11,7 +12,7 @@ describe('insert builder', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test' as never,
+    coreHash: coreHash('sha256:test'),
     models: {
       User: {
         storage: { table: 'user' },

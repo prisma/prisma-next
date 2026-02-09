@@ -1,4 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   LoweredStatement,
@@ -23,7 +24,7 @@ describe('plan assembly', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test' as never,
+    coreHash: coreHash('sha256:test'),
     models: {},
     storage: {
       tables: {
