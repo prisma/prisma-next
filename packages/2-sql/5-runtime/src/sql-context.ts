@@ -110,21 +110,13 @@ export type SqlRuntimeDriverInstance<TTargetId extends string = string> = Runtim
 
 export function createSqlExecutionStack<TTargetId extends string>(options: {
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
-  readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId, SqlRuntimeAdapterInstance<TTargetId>>;
+  readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId>;
   readonly driver?:
     | RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>
     | undefined;
   readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[] | undefined;
 }): SqlExecutionStackWithDriver<TTargetId> {
-  return createExecutionStack<
-    SqlRuntimeTargetDescriptor<TTargetId>,
-    SqlRuntimeAdapterInstance<TTargetId>,
-    SqlRuntimeAdapterDescriptor<TTargetId>,
-    SqlRuntimeDriverInstance<TTargetId>,
-    RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>> | undefined,
-    SqlRuntimeExtensionInstance<TTargetId>,
-    SqlRuntimeExtensionDescriptor<TTargetId>
-  >({
+  return createExecutionStack({
     target: options.target,
     adapter: options.adapter,
     driver: options.driver,
