@@ -1,15 +1,18 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,
   type SqlExecutionStack,
-  type SqlRuntimeAdapterDescriptor,
   type SqlRuntimeExtensionDescriptor,
   type SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
+import {
+  createStubAdapter,
+  createTestAdapterDescriptor,
+  createTestTargetDescriptor,
+} from './utils';
 
 const testContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -28,67 +31,6 @@ const testContract: SqlContract<SqlStorage> = {
     operationTypes: {},
   },
 };
-
-function createStubCodecs(): CodecRegistry {
-  const registry = createCodecRegistry();
-  registry.register(
-    codec({
-      typeId: 'pg/int4@1',
-      targetTypes: ['int4'],
-      encode: (v: number) => v,
-      decode: (w: number) => w,
-    }),
-  );
-  return registry;
-}
-
-function createTestAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> {
-  const codecRegistry = createStubCodecs();
-  return {
-    kind: 'adapter' as const,
-    id: 'test-adapter',
-    version: '0.0.1',
-    familyId: 'sql' as const,
-    targetId: 'postgres' as const,
-    codecs: () => codecRegistry,
-    operationSignatures: () => [],
-    parameterizedCodecs: () => [],
-    create() {
-      return {
-        familyId: 'sql' as const,
-        targetId: 'postgres' as const,
-        profile: {
-          id: 'test-profile',
-          target: 'postgres',
-          capabilities: {},
-          codecs: () => codecRegistry,
-        },
-        lower() {
-          return {
-            profileId: 'test-profile',
-            body: Object.freeze({ sql: '', params: [] }),
-          };
-        },
-      };
-    },
-  };
-}
-
-function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
-  return {
-    kind: 'target' as const,
-    id: 'postgres',
-    version: '0.0.1',
-    familyId: 'sql' as const,
-    targetId: 'postgres' as const,
-    codecs: () => createCodecRegistry(),
-    operationSignatures: () => [],
-    parameterizedCodecs: () => [],
-    create() {
-      return { familyId: 'sql' as const, targetId: 'postgres' as const };
-    },
-  };
-}
 
 function createTestExtensionDescriptor(options?: {
   hasCodecs?: boolean;
@@ -150,7 +92,7 @@ function createStack(options?: {
 }): SqlExecutionStack<'postgres'> {
   return {
     target: createTestTargetDescriptor(),
-    adapter: createTestAdapterDescriptor(),
+    adapter: createTestAdapterDescriptor(createStubAdapter()),
     extensionPacks: options?.extensionPacks ?? [],
   };
 }
@@ -257,7 +199,7 @@ describe('comprehensive descriptor-based derivation', () => {
 
     const stack: SqlExecutionStack<'postgres'> = {
       target,
-      adapter: createTestAdapterDescriptor(),
+      adapter: createTestAdapterDescriptor(createStubAdapter()),
       extensionPacks: [createTestExtensionDescriptor({ hasCodecs: true, hasOperations: true })],
     };
 
