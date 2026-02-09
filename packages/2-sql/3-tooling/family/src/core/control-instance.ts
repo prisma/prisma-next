@@ -218,9 +218,12 @@ export interface SqlControlFamilyInstance
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
 interface CreateSqlFamilyInstanceOptions<TTargetId extends string> {
-  readonly target: TargetDescriptor<'sql', TTargetId> & SqlControlDescriptorWithContributions;
-  readonly adapter: SqlControlAdapterDescriptor<TTargetId>;
-  readonly extensionPacks: readonly SqlControlExtensionDescriptor<TTargetId>[];
+  readonly target: TargetDescriptor<'sql', TTargetId> &
+    SqlControlDescriptorWithContributions &
+    DescriptorWithStorageTypes;
+  readonly adapter: SqlControlAdapterDescriptor<TTargetId> & DescriptorWithStorageTypes;
+  readonly extensionPacks: readonly (SqlControlExtensionDescriptor<TTargetId> &
+    DescriptorWithStorageTypes)[];
 }
 
 function isSqlControlAdapter<TTargetId extends string>(
@@ -298,9 +301,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const parameterizedTypeImports = extractParameterizedTypeImports(descriptors);
 
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
-    target: target as DescriptorWithStorageTypes,
-    adapter: adapter as DescriptorWithStorageTypes & { readonly targetId: string },
-    extensionPacks: extensions as readonly DescriptorWithStorageTypes[],
+    target,
+    adapter,
+    extensionPacks: extensions,
   });
 
   function stripMappings(contract: unknown): unknown {
