@@ -1,7 +1,7 @@
 import { createExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { createExecutionContext } from '../src/exports';
+import { createExecutionContext, createSqlExecutionStack } from '../src/exports';
 import type {
   ExecutionContext,
   SqlRuntimeAdapterDescriptor,
@@ -141,5 +141,26 @@ describe('createExecutionStack', () => {
     expect(context.codecs.get('pg/uuid@1')).toBeDefined();
     expect(context.operations.byType('pg/text@1')).toHaveLength(1);
     expect(context.types).toEqual({});
+  });
+});
+
+describe('createSqlExecutionStack', () => {
+  it('preserves descriptor references and defaults extensions', () => {
+    const target = createStubTargetDescriptor();
+    const adapter = createStubAdapterDescriptor();
+    const stack = createSqlExecutionStack({ target, adapter });
+
+    expect(stack.target).toBe(target);
+    expect(stack.adapter).toBe(adapter);
+    expect(stack.extensionPacks).toEqual([]);
+  });
+
+  it('keeps extension packs intact', () => {
+    const target = createStubTargetDescriptor();
+    const adapter = createStubAdapterDescriptor();
+    const extension = createStubExtensionDescriptor();
+    const stack = createSqlExecutionStack({ target, adapter, extensionPacks: [extension] });
+
+    expect(stack.extensionPacks).toEqual([extension]);
   });
 });

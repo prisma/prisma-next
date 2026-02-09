@@ -1,12 +1,9 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
 import type { Runtime } from '../src/exports';
-import { createRuntime } from '../src/exports';
+import { createRuntime, createSqlExecutionStack } from '../src/exports';
 import {
   createStubAdapter,
   createTestAdapterDescriptor,
@@ -73,7 +70,7 @@ const fixtureContract = createTestContract({
 
 function createTestRuntime(mockDriver: MockDriver): Runtime {
   const adapter = createStubAdapter();
-  const stack = createExecutionStack({
+  const stack = createSqlExecutionStack({
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(adapter),
     extensionPacks: [],

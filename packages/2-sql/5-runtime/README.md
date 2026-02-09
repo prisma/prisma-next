@@ -41,11 +41,11 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import { createExecutionStack, instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import { createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { createExecutionContext, createRuntime, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 
 const contract = validateContract<Contract>(contractJson);
-const stack = createExecutionStack({
+const stack = createSqlExecutionStack({
   target: postgresTarget,
   adapter: postgresAdapter,
   driver: postgresDriver,
@@ -84,6 +84,7 @@ for await (const row of runtime.execute(plan)) {
 ### Context
 
 - `createExecutionContext` - Create an execution context from contract + descriptors-only stack
+- `createSqlExecutionStack` - SQL-specific stack factory that preserves descriptor types
 - `ExecutionContext` - Context type for SQL operations
 - `TypeHelperRegistry` - Registry for type helper lookup
 
@@ -93,6 +94,7 @@ for await (const row of runtime.execute(plan)) {
 - `SqlRuntimeTargetDescriptor`, `SqlRuntimeAdapterDescriptor`, `SqlRuntimeExtensionDescriptor` - Structural descriptor types requiring `SqlStaticContributions`
 - `SqlRuntimeAdapterInstance`, `SqlRuntimeDriverInstance`, `SqlRuntimeExtensionInstance` - Instance types
 - `SqlExecutionStack` - Descriptors-only stack type for static context creation
+- `SqlExecutionStackWithDriver` - Descriptor stack including driver for runtime instantiation
 - `RuntimeParameterizedCodecDescriptor` - Parameterized codec descriptor type
 
 ### Codecs

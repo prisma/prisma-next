@@ -1,7 +1,9 @@
 import { checkContractComponentRequirements } from '@prisma-next/contract/framework-components';
+import { createExecutionStack, type ExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
+  RuntimeDriverDescriptor,
   RuntimeDriverInstance,
   RuntimeExtensionDescriptor,
   RuntimeExtensionInstance,
@@ -54,10 +56,10 @@ export interface SqlRuntimeTargetDescriptor<
 
 export interface SqlRuntimeAdapterDescriptor<
   TTargetId extends string = string,
-  TAdapterInstance extends RuntimeAdapterInstance<'sql', TTargetId> = RuntimeAdapterInstance<
+  TAdapterInstance extends RuntimeAdapterInstance<
     'sql',
     TTargetId
-  >,
+  > = SqlRuntimeAdapterInstance<TTargetId>,
 > extends RuntimeAdapterDescriptor<'sql', TTargetId, TAdapterInstance>,
     SqlStaticContributions {}
 
@@ -73,6 +75,24 @@ export interface SqlExecutionStack<TTargetId extends string = string> {
   readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
 }
 
+export type SqlExecutionStackWithDriver<TTargetId extends string = string> = Omit<
+  ExecutionStack<
+    'sql',
+    TTargetId,
+    SqlRuntimeAdapterInstance<TTargetId>,
+    SqlRuntimeDriverInstance<TTargetId>,
+    SqlRuntimeExtensionInstance<TTargetId>
+  >,
+  'target' | 'adapter' | 'driver' | 'extensionPacks'
+> & {
+  readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
+  readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId, SqlRuntimeAdapterInstance<TTargetId>>;
+  readonly driver:
+    | RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>
+    | undefined;
+  readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
+};
+
 export interface SqlRuntimeExtensionInstance<TTargetId extends string>
   extends RuntimeExtensionInstance<'sql', TTargetId> {}
 
@@ -87,6 +107,30 @@ export type SqlRuntimeDriverInstance<TTargetId extends string = string> = Runtim
   TTargetId
 > &
   SqlDriver;
+
+export function createSqlExecutionStack<TTargetId extends string>(options: {
+  readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
+  readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId, SqlRuntimeAdapterInstance<TTargetId>>;
+  readonly driver?:
+    | RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>
+    | undefined;
+  readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[] | undefined;
+}): SqlExecutionStackWithDriver<TTargetId> {
+  return createExecutionStack<
+    SqlRuntimeTargetDescriptor<TTargetId>,
+    SqlRuntimeAdapterInstance<TTargetId>,
+    SqlRuntimeAdapterDescriptor<TTargetId>,
+    SqlRuntimeDriverInstance<TTargetId>,
+    RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>> | undefined,
+    SqlRuntimeExtensionInstance<TTargetId>,
+    SqlRuntimeExtensionDescriptor<TTargetId>
+  >({
+    target: options.target,
+    adapter: options.adapter,
+    driver: options.driver,
+    extensionPacks: options.extensionPacks,
+  });
+}
 
 export type { ExecutionContext, TypeHelperRegistry };
 

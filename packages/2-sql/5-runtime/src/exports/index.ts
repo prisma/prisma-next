@@ -17,6 +17,7 @@ export type {
   ExecutionContext,
   RuntimeParameterizedCodecDescriptor,
   SqlExecutionStack,
+  SqlExecutionStackWithDriver,
   SqlRuntimeAdapterDescriptor,
   SqlRuntimeAdapterInstance,
   SqlRuntimeDriverInstance,
@@ -26,7 +27,7 @@ export type {
   SqlStaticContributions,
   TypeHelperRegistry,
 } from '../sql-context';
-export { createExecutionContext } from '../sql-context';
+export { createExecutionContext, createSqlExecutionStack } from '../sql-context';
 export type { SqlStatement } from '../sql-marker';
 export {
   ensureSchemaStatement,

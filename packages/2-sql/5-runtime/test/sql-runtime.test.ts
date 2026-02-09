@@ -1,8 +1,5 @@
 import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeDriverInstance,
   RuntimeExtensionInstance,
@@ -21,7 +18,7 @@ import type {
   SqlRuntimeAdapterInstance,
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
-import { createExecutionContext } from '../src/sql-context';
+import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 
 const testContract: SqlContract<SqlStorage> = {
@@ -146,7 +143,7 @@ function createTestSetup() {
   const targetDescriptor = createTestTargetDescriptor();
   const adapterDescriptor = createTestAdapterDescriptor(adapter);
 
-  const stack = createExecutionStack({
+  const stack = createSqlExecutionStack({
     target: targetDescriptor,
     adapter: adapterDescriptor,
     extensionPacks: [],
