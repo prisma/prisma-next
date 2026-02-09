@@ -1,15 +1,14 @@
-import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type {
+  TargetBoundComponentDescriptor,
+  TargetDescriptor,
+} from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { OperationManifest } from '@prisma-next/contract/pack-manifest-types';
 import type { ContractMarkerRecord, TypesImportSpec } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/core-control-plane/emission';
 import type { CoreSchemaView, SchemaTreeNode } from '@prisma-next/core-control-plane/schema-view';
 import type {
-  ControlAdapterDescriptor,
   ControlDriverInstance,
-  ControlExtensionDescriptor,
   ControlFamilyInstance,
-  ControlTargetDescriptor,
   EmitContractResult,
   OperationContext,
   SignDatabaseResult,
@@ -20,7 +19,6 @@ import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -35,59 +33,16 @@ import {
   extractOperationTypeImports,
   extractParameterizedRenderers,
   extractParameterizedTypeImports,
+  type SqlControlDescriptorWithContributions,
 } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
+import type {
+  SqlControlAdapterDescriptor,
+  SqlControlExtensionDescriptor,
+} from './migrations/types';
 import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds, readMarker } from './verify';
 
-/**
- * Converts an OperationManifest (descriptor declarative data) to a SqlOperationSignature.
- * This is SQL-family-specific conversion logic used by instance creation and test utilities.
- */
-export function convertOperationManifest(manifest: OperationManifest): SqlOperationSignature {
-  return {
-    forTypeId: manifest.for,
-    method: manifest.method,
-    args: manifest.args.map((arg: OperationManifest['args'][number]) => {
-      if (arg.kind === 'typeId') {
-        if (!arg.type) {
-          throw new Error('typeId arg must have type property');
-        }
-        return { kind: 'typeId' as const, type: arg.type };
-      }
-      if (arg.kind === 'param') {
-        return { kind: 'param' as const };
-      }
-      if (arg.kind === 'literal') {
-        return { kind: 'literal' as const };
-      }
-      throw new Error(`Invalid arg kind: ${(arg as { kind: unknown }).kind}`);
-    }),
-    returns: (() => {
-      if (manifest.returns.kind === 'typeId') {
-        return { kind: 'typeId' as const, type: manifest.returns.type };
-      }
-      if (manifest.returns.kind === 'builtin') {
-        return {
-          kind: 'builtin' as const,
-          type: manifest.returns.type as 'number' | 'boolean' | 'string',
-        };
-      }
-      throw new Error(`Invalid return kind: ${(manifest.returns as { kind: unknown }).kind}`);
-    })(),
-    lowering: {
-      targetFamily: 'sql',
-      strategy: manifest.lowering.strategy,
-      template: manifest.lowering.template,
-    },
-    ...(manifest.capabilities ? { capabilities: manifest.capabilities } : {}),
-  };
-}
-
-/**
- * Extracts codec type IDs used in contract storage tables.
- * Uses type guards to safely access SQL-specific structure without importing SQL types.
- */
 function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
   const typeIds = new Set<string>();
 
@@ -129,9 +84,6 @@ function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
   return Array.from(typeIds).sort();
 }
 
-/**
- * Creates a VerifyDatabaseResult object with common structure.
- */
 function createVerifyResult(options: {
   ok: boolean;
   code?: string;
@@ -202,10 +154,6 @@ function createVerifyResult(options: {
   return result;
 }
 
-/**
- * Type metadata for SQL storage types.
- * Maps contract storage type IDs to native database types.
- */
 interface SqlTypeMetadata {
   readonly typeId: string;
   readonly familyId: 'sql';
@@ -213,15 +161,8 @@ interface SqlTypeMetadata {
   readonly nativeType?: string;
 }
 
-/**
- * Registry mapping type IDs to their metadata.
- * Keyed by contract storage type ID (e.g., 'pg/int4@1').
- */
 type SqlTypeMetadataRegistry = Map<string, SqlTypeMetadata>;
 
-/**
- * State fields for SQL family instance that hold assembly data.
- */
 interface SqlFamilyInstanceState {
   readonly operationRegistry: OperationRegistry;
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
@@ -230,9 +171,6 @@ interface SqlFamilyInstanceState {
   readonly typeMetadataRegistry: SqlTypeMetadataRegistry;
 }
 
-/**
- * Options for schema verification.
- */
 export interface SchemaVerifyOptions {
   readonly driver: ControlDriverInstance<'sql', string>;
   readonly contractIR: unknown;
@@ -245,23 +183,11 @@ export interface SchemaVerifyOptions {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
-/**
- * SQL control family instance interface.
- * Extends ControlFamilyInstance with SQL-specific domain actions.
- */
 export interface SqlControlFamilyInstance
   extends ControlFamilyInstance<'sql'>,
     SqlFamilyInstanceState {
-  /**
-   * Validates a contract JSON and returns a validated ContractIR (without mappings).
-   * Mappings are runtime-only and should not be part of ContractIR.
-   */
   validateContractIR(contractJson: unknown): ContractIR;
 
-  /**
-   * Verifies the database marker against the contract.
-   * Compares target, coreHash, and profileHash.
-   */
   verify(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
     readonly contractIR: unknown;
@@ -270,17 +196,8 @@ export interface SqlControlFamilyInstance
     readonly configPath?: string;
   }): Promise<VerifyDatabaseResult>;
 
-  /**
-   * Verifies the database schema against the contract.
-   * Compares contract requirements against live database schema.
-   */
   schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult>;
 
-  /**
-   * Signs the database with the contract marker.
-   * Writes or updates the contract marker if schema verification passes.
-   * This operation is idempotent - if the marker already matches, no changes are made.
-   */
   sign(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
     readonly contractIR: unknown;
@@ -288,51 +205,25 @@ export interface SqlControlFamilyInstance
     readonly configPath?: string;
   }): Promise<SignDatabaseResult>;
 
-  /**
-   * Introspects the database schema and returns a family-specific schema IR.
-   *
-   * This is a read-only operation that returns a snapshot of the live database schema.
-   * The method is family-owned and delegates to target/adapter-specific introspectors
-   * to perform the actual schema introspection.
-   *
-   * @param options - Introspection options
-   * @param options.driver - Control plane driver for database connection
-   * @param options.contractIR - Optional contract IR for contract-guided introspection.
-   *   When provided, families may use it for filtering, optimization, or validation
-   *   during introspection. The contract IR does not change the meaning of "what exists"
-   *   in the database - it only guides how introspection is performed.
-   * @returns Promise resolving to the family-specific Schema IR (e.g., `SqlSchemaIR` for SQL).
-   *   The IR represents the complete schema snapshot at the time of introspection.
-   */
   introspect(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
     readonly contractIR?: unknown;
   }): Promise<SqlSchemaIR>;
 
-  /**
-   * Projects a SQL Schema IR into a core schema view for CLI visualization.
-   * Converts SqlSchemaIR (tables, columns, indexes, extensions) into a tree structure.
-   */
   toSchemaView(schema: SqlSchemaIR): CoreSchemaView;
 
-  /**
-   * Emits contract JSON and DTS as strings.
-   * Uses the instance's preassembled state (operation registry, type imports, extension IDs).
-   * Handles stripping mappings and validation internally.
-   */
   emitContract(options: { readonly contractIR: ContractIR | unknown }): Promise<EmitContractResult>;
 }
 
-/**
- * SQL family instance type.
- * Maintains backward compatibility with FamilyInstance while implementing SqlControlFamilyInstance.
- */
 export type SqlFamilyInstance = SqlControlFamilyInstance;
 
 interface CreateSqlFamilyInstanceOptions<TTargetId extends string> {
-  readonly target: ControlTargetDescriptor<'sql', TTargetId>;
-  readonly adapter: ControlAdapterDescriptor<'sql', TTargetId>;
-  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', TTargetId>[];
+  readonly target: TargetDescriptor<'sql', TTargetId> &
+    SqlControlDescriptorWithContributions &
+    DescriptorWithStorageTypes;
+  readonly adapter: SqlControlAdapterDescriptor<TTargetId> & DescriptorWithStorageTypes;
+  readonly extensionPacks: readonly (SqlControlExtensionDescriptor<TTargetId> &
+    DescriptorWithStorageTypes)[];
 }
 
 function isSqlControlAdapter<TTargetId extends string>(
@@ -346,28 +237,32 @@ function isSqlControlAdapter<TTargetId extends string>(
   );
 }
 
-/**
- * Builds a SQL type metadata registry from extension pack manifests.
- * Collects type metadata from target, adapter, and extension pack manifests.
- *
- * @param options - Descriptors for target, adapter, and extensions
- * @returns Registry mapping type IDs to their metadata, filtered by targetId
- */
+interface DescriptorWithStorageTypes {
+  readonly targetId?: string | undefined;
+  readonly types?:
+    | {
+        readonly storage?:
+          | ReadonlyArray<{
+              readonly typeId: string;
+              readonly familyId: string;
+              readonly targetId: string;
+              readonly nativeType?: string | undefined;
+            }>
+          | undefined;
+      }
+    | undefined;
+}
+
 function buildSqlTypeMetadataRegistry(options: {
-  readonly target: ControlTargetDescriptor<'sql', string>;
-  readonly adapter: ControlAdapterDescriptor<'sql', string>;
-  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', string>[];
+  readonly target: DescriptorWithStorageTypes;
+  readonly adapter: DescriptorWithStorageTypes & { readonly targetId: string };
+  readonly extensionPacks: readonly DescriptorWithStorageTypes[];
 }): SqlTypeMetadataRegistry {
   const { target, adapter, extensionPacks: extensions } = options;
   const registry = new Map<string, SqlTypeMetadata>();
-
-  // Get targetId from adapter (they should match)
   const targetId = adapter.targetId;
-
-  // Collect descriptors to iterate over
   const descriptors = [target, adapter, ...extensions];
 
-  // Iterate over each descriptor's types
   for (const descriptor of descriptors) {
     const types = descriptor.types;
     const storageTypes = types?.storage;
@@ -376,11 +271,8 @@ function buildSqlTypeMetadataRegistry(options: {
       continue;
     }
 
-    // Filter for SQL family and matching targetId
     for (const storageType of storageTypes) {
       if (storageType.familyId === 'sql' && storageType.targetId === targetId) {
-        // Use existing entry if present, otherwise create new one
-        // Later entries (extensions) can override earlier ones (adapter/target)
         registry.set(storageType.typeId, {
           typeId: storageType.typeId,
           familyId: 'sql',
@@ -394,38 +286,27 @@ function buildSqlTypeMetadataRegistry(options: {
   return registry;
 }
 
-/**
- * Creates a SQL family instance for control-plane operations.
- */
 export function createSqlFamilyInstance<TTargetId extends string>(
   options: CreateSqlFamilyInstanceOptions<TTargetId>,
 ): SqlFamilyInstance {
   const { target, adapter, extensionPacks: extensions = [] } = options;
 
-  // Build descriptors array for assembly
-  // Assembly functions only use manifest and id, so we can pass Control*Descriptor types directly
-  const descriptors = [target, adapter, ...extensions];
+  const descriptors: SqlControlDescriptorWithContributions[] = [target, adapter, ...extensions];
 
-  // Assemble operation registry, type imports, extension IDs, and parameterized renderers
-  const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+  const operationRegistry = assembleOperationRegistry(descriptors);
   const codecTypeImports = extractCodecTypeImports(descriptors);
   const operationTypeImports = extractOperationTypeImports(descriptors);
   const extensionIds = extractExtensionIds(adapter, target, extensions);
   const parameterizedRenderers = extractParameterizedRenderers(descriptors);
   const parameterizedTypeImports = extractParameterizedTypeImports(descriptors);
 
-  // Build type metadata registry from manifests
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
     target,
     adapter,
     extensionPacks: extensions,
   });
 
-  /**
-   * Strips mappings from a contract (mappings are runtime-only).
-   */
   function stripMappings(contract: unknown): unknown {
-    // Type guard to check if contract has mappings
     if (typeof contract === 'object' && contract !== null && 'mappings' in contract) {
       const { mappings: _mappings, ...contractIR } = contract as {
         mappings?: unknown;
@@ -445,10 +326,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     typeMetadataRegistry,
 
     validateContractIR(contractJson: unknown): ContractIR {
-      // Validate the contract (this normalizes and validates structure/logic)
       const validated = validateContract<SqlContract<SqlStorage>>(contractJson);
-      // Strip mappings before returning ContractIR (mappings are runtime-only)
-      // The validated contract has all required ContractIR properties
       const { mappings: _mappings, ...contractIR } = validated;
       return contractIR as ContractIR;
     },
@@ -463,7 +341,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const { driver, contractIR, expectedTargetId, contractPath, configPath } = verifyOptions;
       const startTime = Date.now();
 
-      // Type guard to ensure contract has required properties
       if (
         typeof contractIR !== 'object' ||
         contractIR === null ||
@@ -475,7 +352,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         throw new Error('Contract is missing required fields: coreHash or target');
       }
 
-      // Extract contract hashes and target
       const contractCoreHash = contractIR.coreHash;
       const contractProfileHash =
         'profileHash' in contractIR && typeof contractIR.profileHash === 'string'
@@ -483,20 +359,12 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           : undefined;
       const contractTarget = contractIR.target;
 
-      // Read marker from database
       const marker = await readMarker(driver);
 
-      // Compute codec coverage (optional)
       let missingCodecs: readonly string[] | undefined;
       let codecCoverageSkipped = false;
-      const supportedTypeIds = collectSupportedCodecTypeIds<'sql', string>([
-        adapter,
-        target,
-        ...extensions,
-      ]);
+      const supportedTypeIds = collectSupportedCodecTypeIds([adapter, target, ...extensions]);
       if (supportedTypeIds.length === 0) {
-        // Helper is present but returns empty (MVP behavior)
-        // Coverage check is skipped - missingCodecs remains undefined
         codecCoverageSkipped = true;
       } else {
         const supportedSet = new Set(supportedTypeIds);
@@ -507,7 +375,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         }
       }
 
-      // Check marker presence
       if (!marker) {
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
@@ -525,7 +392,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         });
       }
 
-      // Compare target
       if (contractTarget !== expectedTargetId) {
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
@@ -545,7 +411,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         });
       }
 
-      // Compare hashes
       if (marker.coreHash !== contractCoreHash) {
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
@@ -564,7 +429,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         });
       }
 
-      // Compare profile hash if present
       if (contractProfileHash && marker.profileHash !== contractProfileHash) {
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
@@ -583,7 +447,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         });
       }
 
-      // Success - all checks passed
       const totalTime = Date.now() - startTime;
       return createVerifyResult({
         ok: true,
@@ -603,17 +466,14 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
       const { driver, contractIR, strict, context, frameworkComponents } = options;
 
-      // Validate contractIR as SqlContract<SqlStorage>
       const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
 
-      // Introspect live schema (DB I/O)
       const controlAdapter = adapter.create();
       if (!isSqlControlAdapter(controlAdapter)) {
         throw new Error('Adapter does not implement SqlControlAdapter.introspect()');
       }
       const schemaIR = await controlAdapter.introspect(driver, contractIR);
 
-      // Pure verification (no I/O) - delegates to extracted pure function
       return verifySqlSchema({
         contract,
         schema: schemaIR,
@@ -621,7 +481,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ...ifDefined('context', context),
         typeMetadataRegistry,
         frameworkComponents,
-        // Wire up target-specific normalizer if available
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
       });
     },
@@ -634,10 +493,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const { driver, contractIR, contractPath, configPath } = options;
       const startTime = Date.now();
 
-      // Validate contractIR as SqlContract<SqlStorage>
       const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
 
-      // Extract contract hashes and target
       const contractCoreHash = contract.coreHash;
       const contractProfileHash =
         'profileHash' in contract && typeof contract.profileHash === 'string'
@@ -645,20 +502,16 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           : contractCoreHash;
       const contractTarget = contract.target;
 
-      // Ensure marker schema and table exist
       await driver.query(ensureSchemaStatement.sql, ensureSchemaStatement.params);
       await driver.query(ensureTableStatement.sql, ensureTableStatement.params);
 
-      // Read existing marker
       const existingMarker = await readMarker(driver);
 
-      // Determine if we need to write/update marker
       let markerCreated = false;
       let markerUpdated = false;
       let previousHashes: { coreHash?: string; profileHash?: string } | undefined;
 
       if (!existingMarker) {
-        // No marker exists - insert new one
         const write = writeContractMarker({
           coreHash: contractCoreHash,
           profileHash: contractProfileHash,
@@ -668,16 +521,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         await driver.query(write.insert.sql, write.insert.params);
         markerCreated = true;
       } else {
-        // Marker exists - check if hashes differ
         const existingCoreHash = existingMarker.coreHash;
         const existingProfileHash = existingMarker.profileHash;
 
-        // Compare hashes (use strict equality to ensure exact match)
         const coreHashMatches = existingCoreHash === contractCoreHash;
         const profileHashMatches = existingProfileHash === contractProfileHash;
 
         if (!coreHashMatches || !profileHashMatches) {
-          // Hashes differ - update marker and capture previous hashes for output
           previousHashes = {
             coreHash: existingCoreHash,
             profileHash: existingProfileHash,
@@ -691,10 +541,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           await driver.query(write.update.sql, write.update.params);
           markerUpdated = true;
         }
-        // If hashes match, no-op (idempotent) - previousHashes remains undefined
       }
 
-      // Build summary message
       let summary: string;
       if (markerCreated) {
         summary = 'Database signed (marker created)';
@@ -752,17 +600,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
       const rootLabel = 'contract';
 
-      // Build table nodes
       const tableNodes: readonly SchemaTreeNode[] = Object.entries(schema.tables).map(
         ([tableName, table]: [string, SqlTableIR]) => {
           const children: SchemaTreeNode[] = [];
 
-          // Add column nodes grouped under "columns"
           const columnNodes: SchemaTreeNode[] = [];
           for (const [columnName, column] of Object.entries(table.columns)) {
-            // Always display nativeType for introspection (database state)
             const typeDisplay = column.nativeType;
-            // Tree label shows only nullability; defaults are in meta for JSON/programmatic access
             const nullability = column.nullable ? 'nullable' : 'not nullable';
             const label = `${columnName}: ${typeDisplay} (${nullability})`;
             columnNodes.push({
@@ -777,7 +621,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             });
           }
 
-          // Add "columns" grouping node if there are columns
           if (columnNodes.length > 0) {
             children.push({
               kind: 'collection',
@@ -787,7 +630,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             });
           }
 
-          // Add primary key node if present
           if (table.primaryKey) {
             const pkColumns = table.primaryKey.columns.join(', ');
             children.push({
@@ -801,7 +643,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             });
           }
 
-          // Add unique constraint nodes
           for (const unique of table.uniques) {
             const name = unique.name ?? `${tableName}_${unique.columns.join('_')}_unique`;
             const label = `unique ${name}`;
@@ -816,7 +657,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             });
           }
 
-          // Add index nodes
           for (const index of table.indexes) {
             const name = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
             const label = index.unique ? `unique index ${name}` : `index ${name}`;
@@ -831,7 +671,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             });
           }
 
-          // Build table meta
           const tableMeta: Record<string, unknown> = {};
           if (table.primaryKey) {
             tableMeta['primaryKey'] = table.primaryKey.columns;
@@ -859,14 +698,12 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         },
       );
 
-      // Add extension nodes (format: "extensionName extension is enabled")
       const extensionNodes: readonly SchemaTreeNode[] = schema.extensions.map((extName) => ({
         kind: 'extension',
         id: `extension-${extName}`,
         label: `${extName} extension is enabled`,
       }));
 
-      // Combine all children
       const rootChildren = [...tableNodes, ...extensionNodes];
 
       const rootNode: SchemaTreeNode = {
@@ -882,10 +719,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
 
     async emitContract({ contractIR }): Promise<EmitContractResult> {
-      // Strip mappings if present (mappings are runtime-only)
       const contractWithoutMappings = stripMappings(contractIR);
-
-      // Validate and normalize the contract
       const validatedIR = this.validateContractIR(contractWithoutMappings);
 
       const result = await emit(

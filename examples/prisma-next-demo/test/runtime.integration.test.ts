@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: non-null assertions are fine for tests */
 
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
@@ -9,9 +10,21 @@ import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { executionContext, executionStackInstance } from '../src/prisma/execution-context';
+import { executionContext, executionStack } from '../src/prisma/context';
 import { getRuntime } from '../src/prisma/runtime';
+
+const executionStackInstance = instantiateExecutionStack(executionStack);
+
 import { initTestDatabase } from './utils/control-client';
+
+function createTestDriver(connectionString: string) {
+  const driverDescriptor = executionStack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+  const pool = new Pool({ connectionString });
+  return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+}
 
 const { contract } = executionContext;
 
@@ -116,15 +129,10 @@ describe('runtime execute integration', () => {
         });
 
         const createRuntimeInstance = () => {
-          const pool = new Pool({ connectionString });
           return createRuntime({
             stackInstance: executionStackInstance,
-            contract,
             context,
-            driverOptions: {
-              connect: { pool },
-              cursor: { disabled: true },
-            },
+            driver: createTestDriver(connectionString),
             verify: { mode: 'always', requireMarker: true },
             plugins: [
               budgets({
@@ -264,15 +272,10 @@ describe('runtime execute integration', () => {
         });
 
         const context = executionContext;
-        const pool = new Pool({ connectionString });
         const runtime = createRuntime({
           stackInstance: executionStackInstance,
-          contract,
           context,
-          driverOptions: {
-            connect: { pool },
-            cursor: { disabled: true },
-          },
+          driver: createTestDriver(connectionString),
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
@@ -346,15 +349,10 @@ describe('runtime execute integration', () => {
         });
 
         const context = executionContext;
-        const pool = new Pool({ connectionString });
         const runtime = createRuntime({
           stackInstance: executionStackInstance,
-          contract,
           context,
-          driverOptions: {
-            connect: { pool },
-            cursor: { disabled: true },
-          },
+          driver: createTestDriver(connectionString),
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({

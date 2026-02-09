@@ -156,7 +156,25 @@ export interface RuntimeExtensionInstance<
 }
 ```
 
-Families define richer behavior interfaces (e.g., SQL’s AST lowering adapter and SQL driver execution methods). Concrete runtime instances are typically intersections of the identity interface with a family-specific behavior interface:
+Families define richer behavior interfaces (e.g., SQL’s AST lowering adapter and SQL driver execution methods).
+
+### SQL family: static contributions on descriptors
+
+The SQL family extends base execution-plane descriptors with `SqlStaticContributions` — a required interface for descriptor-level static context derivation:
+
+```ts
+interface SqlStaticContributions {
+  codecs(): CodecRegistry
+  operationSignatures(): ReadonlyArray<SqlOperationSignature>
+  parameterizedCodecs(): ReadonlyArray<RuntimeParameterizedCodecDescriptor>
+}
+```
+
+SQL runtime-plane descriptors (`SqlRuntimeTargetDescriptor`, `SqlRuntimeAdapterDescriptor`, `SqlRuntimeExtensionDescriptor`) all implement this interface. This enables `createExecutionContext({ contract, stack })` to build codec registries, operation registries, and type helper registries from descriptor contributions without calling `create()` on any component.
+
+Extension instances are identity-only (`familyId` + `targetId`); contributions (codecs, operations, parameterized codecs) live exclusively on descriptors. This separation ensures that importing query roots (which depend on `ExecutionContext`) does not trigger side effects from adapter or extension instantiation.
+
+Concrete runtime instances are typically intersections of the identity interface with a family-specific behavior interface:
 
 ```ts
 export type PostgresRuntimeDriver = RuntimeDriverInstance<'sql', 'postgres'> & SqlDriver;
@@ -245,6 +263,7 @@ Non-goals for this ADR:
 - **Cross-family reuse**: Shared tooling (runtime factories, test harnesses) can rely on a small set of core interfaces
 - **Future-proofing**: Adding new targets/families is a matter of implementing descriptors and instances, not inventing new shapes
 - **Mirror control plane**: Execution plane pattern mirrors control plane pattern, making the system easier to understand
+- **Static context derivation**: SQL descriptors provide codecs, operations, and types statically via `SqlStaticContributions`, enabling side-effect-free query root imports
 
 ### Risks and mitigations
 

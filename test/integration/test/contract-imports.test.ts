@@ -9,7 +9,6 @@ import { emit } from '@prisma-next/emitter';
 import { createContractIR } from '@prisma-next/emitter/test/utils';
 import {
   assembleOperationRegistry,
-  convertOperationManifest,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
@@ -132,7 +131,7 @@ describe('contract.d.ts imports resolution', () => {
       });
 
       const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
-      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractExtensionIds(adapter, target, extensions);
@@ -262,7 +261,7 @@ type UserIdColumn = UserColumns['id'];
       });
 
       const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
-      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractExtensionIds(adapter, target, extensions);

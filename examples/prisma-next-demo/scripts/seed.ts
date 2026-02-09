@@ -18,7 +18,7 @@ import 'dotenv/config';
 
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { schema, sql } from '../src/prisma/query';
+import { schema, sql } from '../src/prisma/context';
 import { getRuntime } from '../src/prisma/runtime';
 
 async function main() {

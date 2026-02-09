@@ -1,5 +1,5 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { sql, tables } from '../prisma/query';
+import { sql, tables } from '../prisma/context';
 import { collect } from './utils';
 
 /**

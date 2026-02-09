@@ -4,7 +4,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { executionContext } from '../src/prisma/execution-context';
+import { executionContext } from '../src/prisma/context';
 import { getRuntime } from '../src/prisma/runtime';
 import { initTestDatabase } from './utils/control-client';
 

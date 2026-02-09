@@ -22,6 +22,8 @@
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-errors": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "arktype": "^2.0.0"

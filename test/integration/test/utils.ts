@@ -1,13 +1,14 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { PostgresDriverOptions } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Log, Plugin, Runtime, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
-import { createExecutionContext, createRuntime } from '@prisma-next/sql-runtime';
+import {
+  createExecutionContext,
+  createRuntime,
+  createSqlExecutionStack,
+} from '@prisma-next/sql-runtime';
 import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import type { Client } from 'pg';
@@ -17,7 +18,7 @@ export interface CreateTestRuntimeOptions {
     mode: 'onFirstUse' | 'startup' | 'always';
     requireMarker?: boolean;
   };
-  readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<string>[];
+  readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<'postgres'>[];
   readonly plugins?: readonly Plugin[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
@@ -42,7 +43,7 @@ export function createTestRuntime(
       }
     : { mode: 'onFirstUse', requireMarker: false };
 
-  const stack = createExecutionStack({
+  const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
@@ -53,14 +54,18 @@ export function createTestRuntime(
 
   const context = createExecutionContext({
     contract,
-    stackInstance,
+    stack,
   });
+
+  const driverDescriptor = stack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
 
   return createRuntime({
     stackInstance,
-    contract,
     context,
-    driverOptions,
+    driver: driverDescriptor.create(driverOptions),
     verify,
     ...(options?.plugins ? { plugins: options.plugins } : {}),
     ...(options?.mode ? { mode: options.mode } : {}),

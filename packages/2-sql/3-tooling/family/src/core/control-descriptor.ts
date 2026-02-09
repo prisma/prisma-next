@@ -1,14 +1,16 @@
+import type { TargetDescriptor } from '@prisma-next/contract/framework-components';
 import type {
   ControlFamilyDescriptor,
   ControlPlaneStack,
 } from '@prisma-next/core-control-plane/types';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
+import type { SqlControlDescriptorWithContributions } from './assembly';
 import { createSqlFamilyInstance, type SqlControlFamilyInstance } from './control-instance';
+import type {
+  SqlControlAdapterDescriptor,
+  SqlControlExtensionDescriptor,
+} from './migrations/types';
 
-/**
- * SQL family descriptor implementation.
- * Provides the SQL family hook and factory method.
- */
 export class SqlFamilyDescriptor
   implements ControlFamilyDescriptor<'sql', SqlControlFamilyInstance>
 {
@@ -21,13 +23,15 @@ export class SqlFamilyDescriptor
   create<TTargetId extends string>(
     stack: ControlPlaneStack<'sql', TTargetId>,
   ): SqlControlFamilyInstance {
-    // Note: driver is not passed here because SqlFamilyInstance operations
-    // (validate, emit, etc.) don't require DB connectivity. Commands that
-    // need the driver (verify, introspect) get it directly from the stack.
+    const target = stack.target as unknown as TargetDescriptor<'sql', TTargetId> &
+      SqlControlDescriptorWithContributions;
+    const adapter = stack.adapter as unknown as SqlControlAdapterDescriptor<TTargetId>;
+    const extensionPacks =
+      stack.extensionPacks as unknown as readonly SqlControlExtensionDescriptor<TTargetId>[];
     return createSqlFamilyInstance({
-      target: stack.target,
-      adapter: stack.adapter,
-      extensionPacks: stack.extensionPacks,
+      target,
+      adapter,
+      extensionPacks,
     });
   }
 }

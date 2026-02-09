@@ -64,6 +64,7 @@ function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
     familyId: 'sql',
     targetId: 'postgres',
     version: '0.0.0-test',
+    operationSignatures: () => [],
     databaseDependencies: { init: [pgvectorDependency] },
     create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
   };
@@ -200,6 +201,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       familyId: 'sql',
       targetId: 'postgres',
       version: '0.0.0-test',
+      operationSignatures: () => [],
       // No databaseDependencies - planner should work without them
       databaseDependencies: {},
       create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,

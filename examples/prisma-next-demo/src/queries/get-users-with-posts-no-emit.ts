@@ -1,5 +1,5 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { sql, tables } from '../prisma-no-emit/query-no-emit';
+import { sql, tables } from '../prisma-no-emit/context';
 import { collect } from './utils';
 
 export async function getUsersWithPosts(runtime: Runtime, limit = 10) {

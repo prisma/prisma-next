@@ -11,6 +11,7 @@ export type {
   MigrationPlanOperation,
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
+export type { SqlControlDescriptorWithContributions } from '../core/assembly';
 export { extractCodecControlHooks } from '../core/assembly';
 export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/control-instance';
 export {
@@ -27,7 +28,9 @@ export type {
   ComponentDatabaseDependencies,
   ComponentDatabaseDependency,
   CreateSqlMigrationPlanOptions,
+  SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
+  SqlControlStaticContributions,
   SqlControlTargetDescriptor,
   SqlMigrationPlan,
   SqlMigrationPlanContractInfo,
@@ -52,8 +55,4 @@ export type {
   StorageTypePlanResult,
 } from '../core/migrations/types';
 
-/**
- * SQL family descriptor for control plane (CLI/config).
- * Provides the SQL family hook and conversion helpers.
- */
 export default new SqlFamilyDescriptor();

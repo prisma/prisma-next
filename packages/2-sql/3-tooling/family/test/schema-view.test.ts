@@ -1,29 +1,30 @@
-import type {
-  ControlAdapterDescriptor,
-  ControlTargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
+import type { TargetDescriptor } from '@prisma-next/contract/framework-components';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
+import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
+import type { SqlControlAdapterDescriptor } from '../src/core/migrations/types';
 
-function createMockTarget(): ControlTargetDescriptor<'sql', 'postgres'> {
+function createMockTarget(): TargetDescriptor<'sql', 'postgres'> &
+  SqlControlDescriptorWithContributions {
   return {
     kind: 'target',
     id: 'postgres',
     version: '0.0.1',
     familyId: 'sql',
     targetId: 'postgres',
-    create: () => ({ familyId: 'sql' as const, targetId: 'postgres' as const }),
+    operationSignatures: () => [],
   };
 }
 
-function createMockAdapter(): ControlAdapterDescriptor<'sql', 'postgres'> {
+function createMockAdapter(): SqlControlAdapterDescriptor<'postgres'> {
   return {
     kind: 'adapter',
     id: 'postgres',
     version: '0.0.1',
     familyId: 'sql',
     targetId: 'postgres',
+    operationSignatures: () => [],
     create: () => ({ familyId: 'sql', targetId: 'postgres' }),
   };
 }

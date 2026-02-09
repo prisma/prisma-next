@@ -1,15 +1,12 @@
-import type { SqlOperationSignature } from '@prisma-next/sql-operations';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeExtensionDescriptor,
-  SqlRuntimeExtensionInstance,
 } from '@prisma-next/sql-runtime';
 import { type as arktype } from 'arktype';
 import { codecDefinitions } from '../core/codecs';
 import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from '../core/constants';
-import { pgvectorPackMeta, pgvectorRuntimeOperation } from '../core/descriptor-meta';
+import { pgvectorOperationSignature, pgvectorPackMeta } from '../core/descriptor-meta';
 
 const vectorParamsSchema = arktype({
   length: 'number',
@@ -24,9 +21,6 @@ const vectorParamsSchema = arktype({
   return true;
 });
 
-/**
- * Pre-allocated parameterized codec descriptors to avoid per-call allocations.
- */
 const parameterizedCodecDescriptors = [
   {
     codecId: VECTOR_CODEC_ID,
@@ -36,46 +30,28 @@ const parameterizedCodecDescriptors = [
   RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
 >;
 
-/**
- * pgvector SQL runtime extension instance.
- * Provides codecs and operations for vector data type and similarity operations.
- */
-class PgVectorRuntimeExtensionInstance implements SqlRuntimeExtensionInstance<'postgres'> {
-  readonly familyId = 'sql' as const;
-  readonly targetId = 'postgres' as const;
-
-  codecs(): CodecRegistry {
-    const registry = createCodecRegistry();
-    // Register all codecs from codecDefinitions
-    for (const def of Object.values(codecDefinitions)) {
-      registry.register(def.codec);
-    }
-    return registry;
+function createPgvectorCodecRegistry() {
+  const registry = createCodecRegistry();
+  for (const def of Object.values(codecDefinitions)) {
+    registry.register(def.codec);
   }
-
-  operations(): ReadonlyArray<SqlOperationSignature> {
-    return [pgvectorRuntimeOperation];
-  }
-
-  parameterizedCodecs(): ReadonlyArray<
-    RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
-  > {
-    return parameterizedCodecDescriptors;
-  }
+  return registry;
 }
 
-/**
- * pgvector SQL runtime extension descriptor.
- * Provides metadata and factory for creating runtime extension instances.
- */
 const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   kind: 'extension' as const,
   id: pgvectorPackMeta.id,
   version: pgvectorPackMeta.version,
   familyId: 'sql' as const,
   targetId: 'postgres' as const,
-  create(): SqlRuntimeExtensionInstance<'postgres'> {
-    return new PgVectorRuntimeExtensionInstance();
+  codecs: createPgvectorCodecRegistry,
+  operationSignatures: () => [pgvectorOperationSignature],
+  parameterizedCodecs: () => parameterizedCodecDescriptors,
+  create() {
+    return {
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+    };
   },
 };
 

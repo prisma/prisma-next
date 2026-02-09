@@ -6,7 +6,6 @@ import { loadContractFromTs } from '@prisma-next/cli';
 import { emit } from '@prisma-next/emitter';
 import {
   assembleOperationRegistry,
-  convertOperationManifest,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
@@ -39,7 +38,7 @@ describe('emit command functionality', () => {
   const buildEmitterArtifacts = () => {
     const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
     return {
-      operationRegistry: assembleOperationRegistry(descriptors, convertOperationManifest),
+      operationRegistry: assembleOperationRegistry(descriptors),
       codecTypeImports: extractCodecTypeImports(descriptors),
       operationTypeImports: extractOperationTypeImports(descriptors),
       extensionIds: extractExtensionIds(adapter, target, extensions),
