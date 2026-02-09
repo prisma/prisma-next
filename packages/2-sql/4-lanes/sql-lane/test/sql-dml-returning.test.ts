@@ -17,7 +17,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
-import type { CodecTypes, Contract } from './fixtures/contract.d';
+import type { Contract } from './fixtures/contract.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -78,7 +78,7 @@ describe('returning() capability gating', () => {
       adapter,
     );
     expect(() => {
-      sql<Contract, CodecTypes>({ context: contextWithoutReturning })
+      sql<Contract>({ context: contextWithoutReturning })
         .insert(tables.user, {
           email: param('email'),
         })
@@ -103,7 +103,7 @@ describe('returning() capability gating', () => {
       adapter,
     );
     expect(() => {
-      sql<Contract, CodecTypes>({ context: contextWithReturningFalse })
+      sql<Contract>({ context: contextWithReturningFalse })
         .insert(tables.user, {
           email: param('email'),
         })
@@ -124,7 +124,7 @@ describe('returning() capability gating', () => {
     };
 
     const contextWithReturning = createTestContext(contractWithReturning as Contract, adapter);
-    const plan = sql<Contract, CodecTypes>({ context: contextWithReturning })
+    const plan = sql<Contract>({ context: contextWithReturning })
       .insert(tables.user, {
         email: param('email'),
       })
@@ -153,7 +153,7 @@ describe('returning() capability gating', () => {
       adapter,
     );
     expect(() => {
-      sql<Contract, CodecTypes>({ context: contextWithoutReturning })
+      sql<Contract>({ context: contextWithoutReturning })
         .update(tables.user, {
           email: param('newEmail'),
         })
@@ -178,7 +178,7 @@ describe('returning() capability gating', () => {
       adapter,
     );
     expect(() => {
-      sql<Contract, CodecTypes>({ context: contextWithoutReturning })
+      sql<Contract>({ context: contextWithoutReturning })
         .delete(tables.user)
         .where(userColumns.id.eq(param('userId')))
         .returning(userColumns.id, userColumns.email);
