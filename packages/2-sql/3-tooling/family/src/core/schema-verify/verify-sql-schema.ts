@@ -110,8 +110,8 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     strict,
     typeMetadataRegistry,
     codecHooks,
-    ...(normalizeDefault ? { normalizeDefault } : {}),
-    ...(normalizeNativeType ? { normalizeNativeType } : {}),
+    ...ifDefined('normalizeDefault', normalizeDefault),
+    ...ifDefined('normalizeNativeType', normalizeNativeType),
   });
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
@@ -285,8 +285,8 @@ function verifySchemaTables(options: {
       strict,
       typeMetadataRegistry,
       codecHooks,
-      ...(normalizeDefault ? { normalizeDefault } : {}),
-      ...(normalizeNativeType ? { normalizeNativeType } : {}),
+      ...ifDefined('normalizeDefault', normalizeDefault),
+      ...ifDefined('normalizeNativeType', normalizeNativeType),
     });
     rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
   }
@@ -350,8 +350,8 @@ function verifyTableChildren(options: {
     issues,
     typeMetadataRegistry,
     codecHooks,
-    ...(normalizeDefault ? { normalizeDefault } : {}),
-    ...(normalizeNativeType ? { normalizeNativeType } : {}),
+    ...ifDefined('normalizeDefault', normalizeDefault),
+    ...ifDefined('normalizeNativeType', normalizeNativeType),
   });
   if (columnNodes.length > 0) {
     tableChildren.push(buildColumnsNode(tablePath, columnNodes));
@@ -512,8 +512,8 @@ function collectContractColumnNodes(options: {
         issues,
         typeMetadataRegistry,
         codecHooks,
-        ...(normalizeDefault ? { normalizeDefault } : {}),
-        ...(normalizeNativeType ? { normalizeNativeType } : {}),
+        ...ifDefined('normalizeDefault', normalizeDefault),
+        ...ifDefined('normalizeNativeType', normalizeNativeType),
       }),
     );
   }

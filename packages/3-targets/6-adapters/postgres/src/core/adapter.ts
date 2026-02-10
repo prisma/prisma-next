@@ -19,6 +19,7 @@ import type {
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { codecDefinitions } from './codecs';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
@@ -49,7 +50,7 @@ const parameterizedCodecs: ReadonlyArray<CodecParamsDescriptor> = Object.values(
     Object.freeze({
       codecId: codec.id,
       paramsSchema: codec.paramsSchema,
-      ...(codec.init ? { init: codec.init } : {}),
+      ...ifDefined('init', codec.init),
     }),
   );
 

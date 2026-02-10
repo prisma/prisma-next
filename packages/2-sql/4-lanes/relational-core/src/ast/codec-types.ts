@@ -1,3 +1,4 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
@@ -218,9 +219,9 @@ export function codec<
   return {
     id: config.typeId,
     targetTypes: config.targetTypes,
-    ...(config.meta ? { meta: config.meta } : {}),
-    ...(config.paramsSchema ? { paramsSchema: config.paramsSchema } : {}),
-    ...(config.init ? { init: config.init } : {}),
+    ...ifDefined('meta', config.meta),
+    ...ifDefined('paramsSchema', config.paramsSchema),
+    ...ifDefined('init', config.init),
     encode: config.encode,
     decode: config.decode,
   };
