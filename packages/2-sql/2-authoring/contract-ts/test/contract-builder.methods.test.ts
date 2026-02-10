@@ -229,6 +229,61 @@ describe('contract builder methods', () => {
     });
     expect(contract.storage.tables.user.columns.role.typeRef).toBe('Role');
   });
+
+  it('adds execution defaults for generated columns', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) =>
+        t
+          .generated('id', {
+            type: int4Column,
+            generated: { kind: 'generator', id: 'uuidv4' },
+          })
+          .column('email', { type: columnDescriptor('pg/text@1') })
+          .primaryKey(['id']),
+      )
+      .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
+      .build();
+
+    expect(contract.execution?.mutations.defaults).toEqual([
+      {
+        ref: { table: 'user', column: 'id' },
+        onCreate: { kind: 'generator', id: 'uuidv4' },
+      },
+    ]);
+  });
+
+  it('sorts execution defaults by table and column', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('zebra', (t) =>
+        t
+          .generated('zId', {
+            type: int4Column,
+            generated: { kind: 'generator', id: 'ulid' },
+          })
+          .primaryKey(['zId']),
+      )
+      .table('alpha', (t) =>
+        t
+          .generated('bId', {
+            type: int4Column,
+            generated: { kind: 'generator', id: 'uuidv7' },
+          })
+          .generated('aId', {
+            type: int4Column,
+            generated: { kind: 'generator', id: 'cuid2' },
+          })
+          .primaryKey(['aId']),
+      )
+      .build();
+
+    expect(contract.execution?.mutations.defaults.map((entry) => entry.ref)).toEqual([
+      { table: 'alpha', column: 'aId' },
+      { table: 'alpha', column: 'bId' },
+      { table: 'zebra', column: 'zId' },
+    ]);
+  });
 });
 
 describe('extensionPacks', () => {

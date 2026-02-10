@@ -57,6 +57,19 @@ describe('irHeader', () => {
     expect(header.targetFamily).toBe('document');
     expect(header.target).toBe('mongodb');
   });
+
+  it.each([
+    [{ executionHash: 'sha256:exec123' }, 'executionHash', 'sha256:exec123'],
+    [{ profileHash: 'sha256:profile123' }, 'profileHash', 'sha256:profile123'],
+  ] as const)('includes %s when provided', (optionalProps, propertyName, expectedValue) => {
+    const header = irHeader({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:abc123',
+      ...optionalProps,
+    });
+    expect(header[propertyName]).toBe(expectedValue);
+  });
 });
 
 describe('irMeta', () => {
@@ -364,5 +377,36 @@ describe('contractIR', () => {
     expect(ir.storage).toEqual(storage);
     expect(ir.models).toEqual(models);
     expect(ir.relations).toEqual(relations);
+  });
+
+  it('creates ContractIR with execution section when provided', () => {
+    const header = irHeader({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:abc123',
+      executionHash: 'sha256:exec123',
+    });
+    const meta = irMeta({});
+    const execution = {
+      mutations: {
+        defaults: [
+          {
+            ref: { table: 'user', column: 'id' },
+            onCreate: { kind: 'generator', id: 'uuidv4' },
+          },
+        ],
+      },
+    };
+
+    const ir = contractIR({
+      header,
+      meta,
+      storage: { tables: {} },
+      models: {},
+      relations: {},
+      execution,
+    });
+
+    expect(ir.execution).toEqual(execution);
   });
 });

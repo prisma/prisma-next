@@ -346,4 +346,57 @@ describe('mutation builder generated defaults', () => {
 
     expect(plan.params).toContain('user_1');
   });
+
+  it('applies generated defaults for update when onUpdate is present', () => {
+    const contractWithUpdateDefault = {
+      ...contract,
+      execution: {
+        mutations: {
+          defaults: [
+            ...(contract.execution?.mutations.defaults ?? []),
+            {
+              ref: { table: 'user', column: 'id' },
+              onUpdate: { kind: 'generator', id: 'uuidv7' },
+            },
+          ],
+        },
+      },
+    } as GeneratedContract;
+    const updateContext = createTestContext(contractWithUpdateDefault, adapter);
+    const updateTables = schema<GeneratedContract>(updateContext).tables;
+    const updateUserTable = updateTables.user;
+    const updateUserColumns = updateUserTable.columns;
+
+    const plan = sql<GeneratedContract, CodecTypes>({ context: updateContext })
+      .update(updateUserTable, {
+        email: param('email'),
+      })
+      .where(updateUserColumns.id.eq(param('id')))
+      .build({ params: { id: 'user_1', email: 'updated@example.com' } });
+
+    expect(plan.ast).toMatchObject({
+      kind: 'update',
+      set: expect.objectContaining({
+        id: expect.any(Object),
+        email: expect.any(Object),
+      }),
+    });
+    expect(plan.params).toHaveLength(3);
+  });
+
+  it('supports calling returning before where for update', () => {
+    const updateUserColumns = tables.user.columns;
+    const plan = sql<GeneratedContract, CodecTypes>({ context })
+      .update(userTable, {
+        email: param('email'),
+      })
+      .returning(updateUserColumns.id)
+      .where(updateUserColumns.id.eq(param('id')))
+      .build({ params: { id: 'user_1', email: 'updated@example.com' } });
+
+    expect(plan.ast).toMatchObject({
+      kind: 'update',
+      returning: [createColumnRef('user', 'id')],
+    });
+  });
 });

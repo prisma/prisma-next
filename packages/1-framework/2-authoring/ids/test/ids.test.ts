@@ -12,29 +12,38 @@ describe('@prisma-next/ids', () => {
     });
   });
 
-  it('generates values for uuidv4', () => {
-    const value = generateId({ id: 'uuidv4' });
-    expect(typeof value).toBe('string');
-    expect(value).not.toBe('');
+  it.each([
+    ['ulid', ulid],
+    ['nanoid', nanoid],
+    ['uuidv7', uuidv7],
+    ['uuidv4', uuidv4],
+    ['cuid2', cuid2],
+    ['ksuid', ksuid],
+  ] as const)('builds generated spec for %s', (id, buildSpec) => {
+    const spec = buildSpec();
+    expect(spec.generated.id).toBe(id);
   });
 
-  it('builds generated specs for all supported ids', () => {
-    const specs = {
-      ulid: ulid(),
-      nanoid: nanoid(),
-      uuidv7: uuidv7(),
-      uuidv4: uuidv4(),
-      cuid2: cuid2(),
-      ksuid: ksuid(),
-    };
-
-    for (const [id, spec] of Object.entries(specs)) {
-      expect(spec.generated.id).toBe(id);
-    }
+  it.each([
+    'ulid',
+    'nanoid',
+    'uuidv7',
+    'uuidv4',
+    'cuid2',
+    'ksuid',
+  ] as const)('generates values for %s', (id) => {
+    const value = generateId({ id });
+    expect(typeof value).toBe('string');
+    expect(value).not.toBe('');
   });
 
   it('stores generator options in execution defaults', () => {
     const spec = nanoid({ size: 12 });
     expect(spec.generated.params).toEqual({ size: 12 });
+  });
+
+  it('applies generator params at runtime', () => {
+    const value = generateId({ id: 'nanoid', params: { size: 12 } });
+    expect(value).toHaveLength(12);
   });
 });

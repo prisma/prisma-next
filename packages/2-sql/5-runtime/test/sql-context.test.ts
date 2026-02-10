@@ -230,6 +230,27 @@ describe('context.types presence', () => {
 });
 
 describe('contract/stack validation errors', () => {
+  it('throws RUNTIME.CONTRACT_FAMILY_MISMATCH when contract targetFamily differs from stack', () => {
+    const mismatchedFamilyContract = {
+      ...testContract,
+      targetFamily: 'document',
+    } as unknown as SqlContract<SqlStorage>;
+
+    expect(() =>
+      createExecutionContext({ contract: mismatchedFamilyContract, stack: createStack() }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.CONTRACT_FAMILY_MISMATCH',
+        category: 'RUNTIME',
+        severity: 'error',
+        details: {
+          actual: 'document',
+          expected: 'sql',
+        },
+      }),
+    );
+  });
+
   it('throws RUNTIME.CONTRACT_TARGET_MISMATCH when contract target differs from stack', () => {
     const mismatchedContract: SqlContract<SqlStorage> = {
       ...testContract,
@@ -292,5 +313,80 @@ describe('contract/stack validation errors', () => {
         },
       }),
     );
+  });
+});
+
+describe('applyMutationDefaults', () => {
+  const contractWithDefaults: SqlContract<SqlStorage> = {
+    ...testContract,
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
+    execution: {
+      mutations: {
+        defaults: [
+          {
+            ref: { table: 'user', column: 'id' },
+            onCreate: { kind: 'generator', id: 'nanoid', params: { size: 8 } },
+          },
+          {
+            ref: { table: 'user', column: 'slug' },
+            onUpdate: { kind: 'generator', id: 'nanoid', params: { size: 6 } },
+          },
+        ],
+      },
+    },
+  };
+
+  it('applies create defaults with generator params', () => {
+    const context = createExecutionContext({
+      contract: contractWithDefaults,
+      stack: createStack(),
+    });
+
+    const applied = context.applyMutationDefaults({
+      op: 'create',
+      table: 'user',
+      values: {},
+    });
+
+    expect(applied).toEqual([
+      {
+        column: 'id',
+        value: expect.any(String),
+      },
+    ]);
+    expect((applied[0]?.value as string).length).toBe(8);
+  });
+
+  it('applies update defaults from onUpdate', () => {
+    const context = createExecutionContext({
+      contract: contractWithDefaults,
+      stack: createStack(),
+    });
+
+    const applied = context.applyMutationDefaults({
+      op: 'update',
+      table: 'user',
+      values: {},
+    });
+
+    expect(applied).toEqual([
+      {
+        column: 'slug',
+        value: expect.any(String),
+      },
+    ]);
+    expect((applied[0]?.value as string).length).toBe(6);
   });
 });

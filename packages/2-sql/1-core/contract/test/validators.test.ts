@@ -54,6 +54,25 @@ describe('SQL contract validators', () => {
       } as unknown;
       expect(() => validateStorage(invalid)).toThrow();
     });
+
+    it('throws when both typeParams and typeRef are provided', () => {
+      const invalid = {
+        tables: {
+          user: {
+            columns: {
+              id: {
+                nativeType: 'int4',
+                codecId: 'pg/int4@1',
+                nullable: false,
+                typeParams: { precision: 32 },
+                typeRef: 'someType',
+              },
+            },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(invalid)).toThrow(/either typeParams or typeRef, not both/);
+    });
   });
 
   describe('validateModel', () => {
