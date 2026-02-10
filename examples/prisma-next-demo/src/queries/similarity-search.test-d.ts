@@ -1,3 +1,4 @@
+import type { Char } from '@prisma-next/adapter-postgres/codec-types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { expectTypeOf, test } from 'vitest';
@@ -27,6 +28,6 @@ test('ResultType correctly infers number for cosineDistance operation result', (
 
   // Verify that distance is correctly inferred as number
   expectTypeOf<Row['distance']>().toEqualTypeOf<number>();
-  expectTypeOf<Row['id']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['id']>().toEqualTypeOf<Char<36>>();
   expectTypeOf<Row['title']>().toEqualTypeOf<string>();
 });

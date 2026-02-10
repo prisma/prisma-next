@@ -11,28 +11,30 @@ type GeneratedColumnDescriptor = {
   readonly typeParams?: Record<string, unknown>;
 };
 
-/**
- * Note: we're going to update `pg/text` to a more generic `sql/char` type once
- * https://github.com/prisma/prisma-next/pull/139/ lands in `main`.
- */
 const generatedColumnDescriptors: Record<GeneratedValueSpec['id'], GeneratedColumnDescriptor> = {
   ulid: {
-    type: { codecId: 'pg/text@1', nativeType: 'text' },
+    type: { codecId: 'sql/char@1', nativeType: 'character' },
+    typeParams: { length: 26 },
   },
   nanoid: {
-    type: { codecId: 'pg/text@1', nativeType: 'text' },
+    type: { codecId: 'sql/char@1', nativeType: 'character' },
+    typeParams: { length: 21 },
   },
   uuidv7: {
-    type: { codecId: 'pg/text@1', nativeType: 'text' },
+    type: { codecId: 'sql/char@1', nativeType: 'character' },
+    typeParams: { length: 36 },
   },
   uuidv4: {
-    type: { codecId: 'pg/text@1', nativeType: 'text' },
+    type: { codecId: 'sql/char@1', nativeType: 'character' },
+    typeParams: { length: 36 },
   },
   cuid2: {
-    type: { codecId: 'pg/text@1', nativeType: 'text' },
+    type: { codecId: 'sql/char@1', nativeType: 'character' },
+    typeParams: { length: 24 },
   },
   ksuid: {
-    type: { codecId: 'pg/text@1', nativeType: 'text' },
+    type: { codecId: 'sql/char@1', nativeType: 'character' },
+    typeParams: { length: 27 },
   },
 };
 

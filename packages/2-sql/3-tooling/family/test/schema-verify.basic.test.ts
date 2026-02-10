@@ -44,7 +44,7 @@ describe('verifySqlSchema - basic', () => {
         schemaVersion: '1',
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test' as never,
+        storageHash: 'sha256:test' as never,
         storage: {
           tables: {
             user: {
@@ -105,7 +105,7 @@ describe('verifySqlSchema - basic', () => {
         schemaVersion: '1',
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test' as never,
+        storageHash: 'sha256:test' as never,
         storage: {
           tables: {
             user: {

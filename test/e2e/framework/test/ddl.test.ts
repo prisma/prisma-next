@@ -25,7 +25,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
 
         CREATE TABLE "public"."event" (
           "created_at" timestamptz DEFAULT now() NOT NULL,
-          "id" text NOT NULL,
+          "id" character(36) NOT NULL,
           "name" text NOT NULL,
           PRIMARY KEY ("id")
         );

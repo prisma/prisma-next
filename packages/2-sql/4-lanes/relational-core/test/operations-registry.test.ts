@@ -1347,7 +1347,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -1389,7 +1389,7 @@ describe('operations-registry', () => {
       contractInput: {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test-hash',
+        storageHash: 'test-hash',
         storage: {
           tables: {
             user: {
@@ -1415,7 +1415,7 @@ describe('operations-registry', () => {
       contractInput: {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test-hash',
+        storageHash: 'test-hash',
         storage: {
           tables: {
             user: {
@@ -1446,7 +1446,7 @@ describe('operations-registry', () => {
       contractInput: {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test-hash',
+        storageHash: 'test-hash',
         storage: {
           tables: {
             user: {
@@ -1526,7 +1526,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -1573,7 +1573,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -1634,7 +1634,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
