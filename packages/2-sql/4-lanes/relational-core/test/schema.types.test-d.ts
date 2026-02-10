@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { expectTypeOf, test } from 'vitest';
@@ -121,7 +122,7 @@ const contractWithTypes: ContractWithTypes = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  coreHash: 'sha256:test' as never,
+  coreHash: coreHash('sha256:test'),
   storage: {
     tables: {
       test: {
@@ -277,7 +278,7 @@ test('schema.types is generic record when contract does not specify types', () =
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test' as never,
+    coreHash: coreHash('sha256:test'),
     storage: {
       tables: {
         test: {

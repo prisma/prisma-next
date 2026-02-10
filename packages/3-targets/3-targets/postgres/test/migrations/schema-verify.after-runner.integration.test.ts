@@ -1,3 +1,4 @@
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -108,8 +109,8 @@ describe.sequential('Schema verification after runner - integration', () => {
         schemaVersion: '1',
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:contract-with-defaults' as never,
-        profileHash: 'sha256:profile-with-defaults' as never,
+        coreHash: coreHash('sha256:contract-with-defaults'),
+        profileHash: profileHash('sha256:profile-with-defaults'),
         storage: {
           tables: {
             user: {
