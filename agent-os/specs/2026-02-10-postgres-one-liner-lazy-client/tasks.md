@@ -21,18 +21,18 @@ Principles:
 
 ### Add new shared export path
 
-1. [ ] Implement `validateContract` in shared-plane package:
+1. [x] Implement `validateContract` in shared-plane package:
    - **Package**: `packages/2-sql/1-core/contract` (`@prisma-next/sql-contract`)
    - **New entrypoint**: `src/exports/validate.ts` exporting `validateContract<TContract extends SqlContract<SqlStorage>>(value: unknown): TContract`
    - **Wire exports**: add `./validate` entry to `packages/2-sql/1-core/contract/package.json` `exports`
-2. [ ] Ensure shared `validateContract` does not introduce new dependency cycles (keep deps inside `@prisma-next/sql-contract` + `arktype`).
+2. [x] Ensure shared `validateContract` does not introduce new dependency cycles (keep deps inside `@prisma-next/sql-contract` + `arktype`).
 
 ### Repo-wide callsite update (explicit breaking change)
 
-3. [ ] Update imports from:
+3. [x] Update imports from:
    - **Old**: `@prisma-next/sql-contract-ts/contract`
    - **New**: `@prisma-next/sql-contract/validate`
-4. [ ] Touch points (non-exhaustive; verify with repo-wide search):
+4. [x] Touch points (non-exhaustive; verify with repo-wide search):
    - **Examples**
      - `examples/prisma-next-demo/src/prisma/context.ts`
      - `examples/prisma-orm-demo/src/prisma-next/runtime.ts`
@@ -56,13 +56,13 @@ Principles:
      - `test/integration/test/kysely.test.ts`
      - `packages/2-sql/3-tooling/family/src/core/control-instance.ts`
      - `packages/3-extensions/pgvector/README.md` (if it shows usage snippet)
-5. [ ] Remove old export (no shims):
+5. [x] Remove old export (no shims):
    - Update `packages/2-sql/2-authoring/contract-ts/src/exports/contract.ts` to stop exporting `validateContract`
    - If `./contract` entrypoint becomes redundant, remove/reshape it as appropriate (no compatibility reexports)
 
 ### Minimal validation for this milestone
 
-6. [ ] Run targeted checks:
+6. [x] Run targeted checks:
    - `pnpm -F @prisma-next/sql-contract test`
    - `pnpm -F @prisma-next/sql-contract-ts test` (ensure removal doesn’t break authoring package)
    - `pnpm lint:deps` (layering/import validation)
