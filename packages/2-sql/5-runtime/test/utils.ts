@@ -278,7 +278,7 @@ export function createTestContract<T extends SqlContract<SqlStorage>>(
 export {
   collectAsync,
   createDevDatabase,
+  type DevDatabase,
   teardownTestDatabase,
   withClient,
-  type DevDatabase,
 } from '@prisma-next/test-utils';
