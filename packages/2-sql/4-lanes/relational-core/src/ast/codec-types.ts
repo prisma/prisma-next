@@ -2,6 +2,31 @@ import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
 /**
+ * Descriptor for parameterized codecs that require type parameter validation.
+ * Shared between adapter (compile-time) and runtime layers to avoid duplication.
+ *
+ * @template TParams - The shape of the type parameters (e.g., `{ length: number }`)
+ * @template THelper - The type returned by the optional `init` hook
+ */
+export interface CodecParamsDescriptor<TParams = Record<string, unknown>, THelper = unknown> {
+  /** The codec ID this descriptor applies to (e.g., 'pg/vector@1') */
+  readonly codecId: string;
+
+  /**
+   * Arktype schema for validating typeParams.
+   * Used to validate both storage.types entries and inline column typeParams.
+   */
+  readonly paramsSchema: Type<TParams>;
+
+  /**
+   * Optional init hook called during runtime context creation.
+   * Receives validated params and returns a helper object to be stored in context.types.
+   * If not provided, the validated params are stored directly.
+   */
+  readonly init?: (params: TParams) => THelper;
+}
+
+/**
  * Codec metadata for database-specific type information.
  * Used for schema introspection and verification.
  */

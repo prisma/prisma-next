@@ -2,6 +2,7 @@ import type {
   Adapter,
   AdapterProfile,
   BinaryExpr,
+  CodecParamsDescriptor,
   ColumnRef,
   DeleteAst,
   IncludeRef,
@@ -41,15 +42,7 @@ type ParameterizedCodec = AdapterCodec & {
   readonly paramsSchema: NonNullable<AdapterCodec['paramsSchema']>;
 };
 
-type AdapterParameterizedCodecDescriptor<TParams = Record<string, unknown>> = {
-  readonly codecId: string;
-  readonly paramsSchema: NonNullable<AdapterCodec['paramsSchema']>;
-  readonly init?: (params: TParams) => unknown;
-};
-
-const parameterizedCodecs: ReadonlyArray<AdapterParameterizedCodecDescriptor> = Object.values(
-  codecDefinitions,
-)
+const parameterizedCodecs: ReadonlyArray<CodecParamsDescriptor> = Object.values(codecDefinitions)
   .map((definition) => definition.codec)
   .filter((codec): codec is ParameterizedCodec => codec.paramsSchema !== undefined)
   .map((codec) =>
@@ -84,7 +77,7 @@ class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, Postgre
     });
   }
 
-  parameterizedCodecs(): ReadonlyArray<AdapterParameterizedCodecDescriptor> {
+  parameterizedCodecs(): ReadonlyArray<CodecParamsDescriptor> {
     return parameterizedCodecs;
   }
 

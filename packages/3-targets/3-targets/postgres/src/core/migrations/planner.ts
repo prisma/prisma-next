@@ -1,6 +1,7 @@
 import {
   escapeLiteral,
   expandParameterizedNativeType,
+  normalizeSchemaNativeType,
   parsePostgresDefault,
   quoteIdentifier,
 } from '@prisma-next/adapter-postgres/control';
@@ -615,6 +616,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
+      normalizeNativeType: normalizeSchemaNativeType,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
 

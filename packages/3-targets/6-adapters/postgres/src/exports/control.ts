@@ -16,6 +16,7 @@ const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
 
 export default postgresAdapterDescriptor;
 
+export { normalizeSchemaNativeType } from '../core/control-adapter';
 export {
   escapeLiteral,
   expandParameterizedNativeType,

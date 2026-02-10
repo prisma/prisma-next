@@ -38,6 +38,13 @@ export type DefaultNormalizer = (
 ) => ColumnDefault | undefined;
 
 /**
+ * Function type for normalizing schema native types to canonical form for comparison.
+ * Target-specific implementations handle dialect-specific type name variations
+ * (e.g., Postgres 'varchar' → 'character varying', 'timestamptz' normalization).
+ */
+export type NativeTypeNormalizer = (nativeType: string) => string;
+
+/**
  * Options for the pure schema verification function.
  */
 export interface VerifySqlSchemaOptions {
@@ -62,6 +69,12 @@ export interface VerifySqlSchemaOptions {
    * with contract defaults (ColumnDefault objects).
    */
   readonly normalizeDefault?: DefaultNormalizer;
+  /**
+   * Optional target-specific normalizer for schema native type names.
+   * When provided, schema native types are normalized before comparison
+   * with contract native types (e.g., Postgres 'varchar' → 'character varying').
+   */
+  readonly normalizeNativeType?: NativeTypeNormalizer;
 }
 
 /**
@@ -75,7 +88,15 @@ export interface VerifySqlSchemaOptions {
  * @returns VerifyDatabaseSchemaResult with verification tree and issues
  */
 export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabaseSchemaResult {
-  const { contract, schema, strict, context, typeMetadataRegistry, normalizeDefault } = options;
+  const {
+    contract,
+    schema,
+    strict,
+    context,
+    typeMetadataRegistry,
+    normalizeDefault,
+    normalizeNativeType,
+  } = options;
   const startTime = Date.now();
 
   // Extract codec control hooks once at entry point for reuse
@@ -90,6 +111,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     typeMetadataRegistry,
     codecHooks,
     ...(normalizeDefault ? { normalizeDefault } : {}),
+    ...(normalizeNativeType ? { normalizeNativeType } : {}),
   });
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
@@ -214,8 +236,17 @@ function verifySchemaTables(options: {
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
+  normalizeNativeType?: NativeTypeNormalizer;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
-  const { contract, schema, strict, typeMetadataRegistry, codecHooks, normalizeDefault } = options;
+  const {
+    contract,
+    schema,
+    strict,
+    typeMetadataRegistry,
+    codecHooks,
+    normalizeDefault,
+    normalizeNativeType,
+  } = options;
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
   const contractTables = contract.storage.tables;
@@ -255,6 +286,7 @@ function verifySchemaTables(options: {
       typeMetadataRegistry,
       codecHooks,
       ...(normalizeDefault ? { normalizeDefault } : {}),
+      ...(normalizeNativeType ? { normalizeNativeType } : {}),
     });
     rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
   }
@@ -295,6 +327,7 @@ function verifyTableChildren(options: {
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
+  normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -306,6 +339,7 @@ function verifyTableChildren(options: {
     typeMetadataRegistry,
     codecHooks,
     normalizeDefault,
+    normalizeNativeType,
   } = options;
   const tableChildren: SchemaVerificationNode[] = [];
   const columnNodes = collectContractColumnNodes({
@@ -317,6 +351,7 @@ function verifyTableChildren(options: {
     typeMetadataRegistry,
     codecHooks,
     ...(normalizeDefault ? { normalizeDefault } : {}),
+    ...(normalizeNativeType ? { normalizeNativeType } : {}),
   });
   if (columnNodes.length > 0) {
     tableChildren.push(buildColumnsNode(tablePath, columnNodes));
@@ -427,6 +462,7 @@ function collectContractColumnNodes(options: {
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
+  normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -437,6 +473,7 @@ function collectContractColumnNodes(options: {
     typeMetadataRegistry,
     codecHooks,
     normalizeDefault,
+    normalizeNativeType,
   } = options;
   const columnNodes: SchemaVerificationNode[] = [];
 
@@ -476,6 +513,7 @@ function collectContractColumnNodes(options: {
         typeMetadataRegistry,
         codecHooks,
         ...(normalizeDefault ? { normalizeDefault } : {}),
+        ...(normalizeNativeType ? { normalizeNativeType } : {}),
       }),
     );
   }
@@ -525,6 +563,7 @@ function verifyColumn(options: {
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
+  normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode {
   const {
     tableName,
@@ -535,12 +574,14 @@ function verifyColumn(options: {
     issues,
     codecHooks,
     normalizeDefault,
+    normalizeNativeType,
   } = options;
   const columnChildren: SchemaVerificationNode[] = [];
   let columnStatus: VerificationStatus = 'pass';
 
   const contractNativeType = renderExpectedNativeType(contractColumn, codecHooks);
-  const schemaNativeType = normalizeSchemaNativeType(schemaColumn.nativeType);
+  const schemaNativeType =
+    normalizeNativeType?.(schemaColumn.nativeType) ?? schemaColumn.nativeType;
 
   if (contractNativeType !== schemaNativeType) {
     issues.push({
@@ -887,52 +928,6 @@ function renderExpectedNativeType(
 
   // Fallback: return base native type if no hook is available
   return nativeType;
-}
-
-/**
- * Pre-computed lookup map for simple prefix-based type normalization.
- * Maps short Postgres type names to their canonical SQL names.
- * Using a Map for O(1) lookup instead of multiple startsWith checks.
- */
-const TYPE_PREFIX_MAP: ReadonlyMap<string, string> = new Map([
-  ['varchar', 'character varying'],
-  ['bpchar', 'character'],
-  ['varbit', 'bit varying'],
-]);
-
-/**
- * Normalizes a schema native type to its canonical form for comparison.
- *
- * Uses a pre-computed lookup map for simple prefix replacements (O(1))
- * and handles complex temporal type normalization separately.
- */
-function normalizeSchemaNativeType(nativeType: string): string {
-  const trimmed = nativeType.trim();
-
-  // Fast path: check simple prefix replacements using the lookup map
-  for (const [prefix, replacement] of TYPE_PREFIX_MAP) {
-    if (trimmed.startsWith(prefix)) {
-      return replacement + trimmed.slice(prefix.length);
-    }
-  }
-
-  // Temporal types with time zone handling
-  // Check for 'with time zone' suffix first (more specific)
-  if (trimmed.includes(' with time zone')) {
-    if (trimmed.startsWith('timestamp')) {
-      return 'timestamptz' + trimmed.slice(9).replace(' with time zone', '');
-    }
-    if (trimmed.startsWith('time')) {
-      return 'timetz' + trimmed.slice(4).replace(' with time zone', '');
-    }
-  }
-
-  // Handle 'without time zone' suffix - just strip it
-  if (trimmed.includes(' without time zone')) {
-    return trimmed.replace(' without time zone', '');
-  }
-
-  return trimmed;
 }
 
 /**
