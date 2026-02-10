@@ -1,6 +1,6 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { orm } from '../prisma/db';
+import { db } from '../prisma/db';
 import { collect } from './utils';
 
 /**
@@ -8,11 +8,11 @@ import { collect } from './utils';
  * Uses the ID column as the cursor for stable, efficient pagination
  */
 export async function ormGetUsersByIdCursor(
-  cursor: string | null,
+  cursor: number | null,
   pageSize: number,
   runtime: Runtime,
 ) {
-  let builder = orm
+  let builder = db.orm
     .user()
     .select((u) => ({
       id: u.id,
@@ -42,7 +42,7 @@ export async function ormGetUsersByTimestampCursor(
   pageSize: number,
   runtime: Runtime,
 ) {
-  let builder = orm
+  let builder = db.orm
     .user()
     .select((u) => ({
       id: u.id,
@@ -67,8 +67,8 @@ export async function ormGetUsersByTimestampCursor(
  * Backward pagination (previous page)
  * Fetches records before the cursor, useful for "previous page" navigation
  */
-export async function ormGetUsersBackward(cursor: string, pageSize: number, runtime: Runtime) {
-  const plan = orm
+export async function ormGetUsersBackward(cursor: number, pageSize: number, runtime: Runtime) {
+  const plan = db.orm
     .user()
     .where((u) => u.id.lt(param('cursor')))
     .select((u) => ({
@@ -97,6 +97,6 @@ export async function ormGetUsersFirstPage(pageSize: number, runtime: Runtime) {
  * Pagination helper: Get next page
  * Convenience function for getting the next page after a cursor
  */
-export async function ormGetUsersNextPage(lastId: string, pageSize: number, runtime: Runtime) {
+export async function ormGetUsersNextPage(lastId: number, pageSize: number, runtime: Runtime) {
   return ormGetUsersByIdCursor(lastId, pageSize, runtime);
 }

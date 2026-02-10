@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "One-liner lazy Postgres client composition for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -29,8 +29,9 @@
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
     "@types/pg": "catalog:",
-    "tsup": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -38,10 +39,11 @@
     "dist",
     "src"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "exports": {
-    "./runtime": {
-      "types": "./dist/exports/runtime.d.ts",
-      "import": "./dist/exports/runtime.js"
-    }
+    "./runtime": "./dist/runtime.mjs",
+    "./package.json": "./package.json"
   }
 }

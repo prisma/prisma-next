@@ -2,14 +2,14 @@
 
 This document covers standard patterns for working with Prisma Next queries, including table access, type inference, and common usage patterns.
 
-## Export `tables` from `query.ts`
+## Keep a single `db.ts` entrypoint
 
-**Standard Practice**: Always export `tables` from your `query.ts` file as a convenience export for better developer experience.
+**Standard Practice**: Keep one `db.ts` entrypoint that creates `db` once via `postgres(...)`, then import `db` in query modules.
 
-**✅ CORRECT: Export tables from query.ts**
+**✅ CORRECT: Build `db` in one file**
 
 ```typescript
-// src/prisma/query.ts
+// src/prisma/db.ts
 import postgres from '@prisma-next/postgres/runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
@@ -18,42 +18,40 @@ const db = postgres<Contract>({
   contractJson,
   url: process.env['DATABASE_URL']!,
 });
-
-export const sql = db.sql;
-export const schema = db.schema;
-export const tables = schema.tables;  // Convenience export
 ```
 
 **Why?**
-- Shorter, more readable: `tables.user` instead of `schema.tables.user`
-- Consistent pattern across the codebase
-- Better DX: less nesting, easier to type
-- Users naturally expect this pattern
+- One obvious runtime entrypoint for app code
+- Keeps static query roots and runtime boundary together (`db.runtime()`)
+- Reduces drift from re-exported aliases as surfaces evolve
 
-## Import and Use `tables`
+## Import and use `db`
 
-**Pattern**: Import `tables` directly from `query.ts` and optionally extract table/column variables for reuse.
+**Pattern**: Import `db` directly and optionally extract table/column locals for reuse.
 
 **✅ CORRECT: Direct access (shorter, more readable)**
 
 ```typescript
-import { sql, tables } from '../prisma/query';
+import { db } from '../prisma/db';
 
-const plan = sql
-  .from(tables.user)
-  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
+const plan = db.sql
+  .from(db.schema.tables.user)
+  .select({
+    id: db.schema.tables.user.columns.id,
+    email: db.schema.tables.user.columns.email,
+  })
   .build();
 ```
 
 **✅ CORRECT: Extract variables for reuse (common pattern)**
 
 ```typescript
-import { sql, tables } from '../prisma/query';
+import { db } from '../prisma/db';
 
-const userTable = tables.user;
+const userTable = db.schema.tables.user;
 const userColumns = userTable.columns;
 
-const plan = sql
+const plan = db.sql
   .from(userTable)
   .select({ id: userColumns.id, email: userColumns.email })
   .build();
@@ -76,12 +74,15 @@ const plan = sql
 **✅ CORRECT: Extract row type from plan**
 
 ```typescript
-import { sql, tables } from '../prisma/query';
+import { db } from '../prisma/db';
 import type { ResultType } from '@prisma-next/sql-query/types';
 
-const plan = sql
-  .from(tables.user)
-  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
+const plan = db.sql
+  .from(db.schema.tables.user)
+  .select({
+    id: db.schema.tables.user.columns.id,
+    email: db.schema.tables.user.columns.email,
+  })
   .build();
 
 type UserRow = ResultType<typeof plan>;  // { id: number; email: string }
@@ -90,9 +91,9 @@ type UserRow = ResultType<typeof plan>;  // { id: number; email: string }
 **✅ CORRECT: Extract type before execution**
 
 ```typescript
-const plan = sql
-  .insert(tables.user, { email: param('email') })
-  .returning(tables.user.columns.id, tables.user.columns.email)
+const plan = db.sql
+  .insert(db.schema.tables.user, { email: param('email') })
+  .returning(db.schema.tables.user.columns.id, db.schema.tables.user.columns.email)
   .build({ params: { email: 'alice@example.com' } });
 
 type InsertRow = ResultType<typeof plan>;  // { id: number; email: string }
@@ -110,15 +111,15 @@ const result = await collectRows<InsertRow>(plan);
 ### DML Operations with Returning
 
 ```typescript
-import { sql, tables } from '../prisma/query';
+import { db } from '../prisma/db';
 import { param } from '@prisma-next/sql-query/param';
 import type { ResultType } from '@prisma-next/sql-query/types';
 
-const userTable = tables.user;
+const userTable = db.schema.tables.user;
 const userColumns = userTable.columns;
 
 // Insert with returning
-const insertPlan = sql
+const insertPlan = db.sql
   .insert(userTable, { email: param('email') })
   .returning(userColumns.id, userColumns.email)
   .build({ params: { email: 'alice@example.com' } });
@@ -130,14 +131,14 @@ const result = await collectRows<InsertRow>(insertPlan);
 ### Queries with Joins
 
 ```typescript
-import { sql, tables } from '../prisma/query';
+import { db } from '../prisma/db';
 import { param } from '@prisma-next/sql-query/param';
 import type { ResultType } from '@prisma-next/sql-query/types';
 
-const userTable = tables.user;
-const postTable = tables.post;
+const userTable = db.schema.tables.user;
+const postTable = db.schema.tables.post;
 
-const plan = sql
+const plan = db.sql
   .from(userTable)
   .innerJoin(postTable, (on) => on.eqCol(userTable.columns.id, postTable.columns.userId))
   .where(userTable.columns.active.eq(param('active')))
@@ -154,13 +155,13 @@ type JoinedRow = ResultType<typeof plan>;
 ### Queries with includeMany
 
 ```typescript
-import { sql, tables } from '../prisma/query';
+import { db } from '../prisma/db';
 import type { ResultType } from '@prisma-next/sql-query/types';
 
-const userTable = tables.user;
-const postTable = tables.post;
+const userTable = db.schema.tables.user;
+const postTable = db.schema.tables.post;
 
-const plan = sql
+const plan = db.sql
   .from(userTable)
   .includeMany(
     postTable,
@@ -295,15 +296,16 @@ const deletePlan = o.user().delete(
 
 ## Anti-Patterns
 
-**❌ WRONG: Don't import schema and access tables through it**
+**❌ WRONG: Don't create extra aliases for one-off usage**
 
 ```typescript
-import { schema, sql } from '../prisma/query';
+import { db } from '../prisma/db';
 
-// Don't do this - use the exported tables instead
-const plan = sql
-  .from(schema.tables.user)  // Too verbose
-  .select({ id: schema.tables.user.columns.id })
+const userTable = db.schema.tables.user;
+const userColumns = userTable.columns;
+const plan = db.sql
+  .from(userTable)
+  .select({ id: userColumns.id })
   .build();
 ```
 
@@ -332,8 +334,8 @@ const plan = sql
 
 ## Summary
 
-1. **Always export `tables`** from `query.ts` as a convenience export
-2. **Import `tables` directly** from `query.ts` instead of accessing through `schema`
+1. **Use one `db.ts` entrypoint** for config and runtime boundary
+2. **Import `db` directly** in query modules
 3. **Extract variables** when tables/columns are reused multiple times
 4. **Use `ResultType<typeof plan>`** to extract row types from plans
 5. **Use direct access** for single-use queries to keep code concise

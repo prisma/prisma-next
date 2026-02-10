@@ -8,12 +8,42 @@ interface BindingInput {
   readonly pg?: Pool | Client;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function isPool(binding: Pool | Client): binding is Pool {
   return binding instanceof PgPool;
 }
 
 function isClient(binding: Pool | Client): binding is Client {
   return binding instanceof PgClient;
+}
+
+function isPoolLike(binding: unknown): binding is Pool {
+  if (!isRecord(binding)) {
+    return false;
+  }
+  return (
+    typeof binding['connect'] === 'function' &&
+    typeof binding['query'] === 'function' &&
+    typeof binding['end'] === 'function' &&
+    typeof binding['totalCount'] === 'number' &&
+    typeof binding['idleCount'] === 'number' &&
+    typeof binding['waitingCount'] === 'number'
+  );
+}
+
+function isClientLike(binding: unknown): binding is Client {
+  if (!isRecord(binding)) {
+    return false;
+  }
+  return (
+    typeof binding['connect'] === 'function' &&
+    typeof binding['query'] === 'function' &&
+    typeof binding['end'] === 'function' &&
+    isRecord(binding['connectionParameters'])
+  );
 }
 
 function hasRuntimeBinding(options: BindingInput): boolean {
@@ -54,7 +84,15 @@ export function resolvePostgresBinding(options: BindingInput): PostgresBinding {
     return { kind: 'pgClient', client: options.pg };
   }
 
-  throw new Error('Unable to determine pg binding type');
+  if (isPoolLike(options.pg)) {
+    return { kind: 'pgPool', pool: options.pg };
+  }
+
+  if (isClientLike(options.pg)) {
+    return { kind: 'pgClient', client: options.pg };
+  }
+
+  throw new Error('Unable to determine pg binding type; use explicit binding.kind');
 }
 
 export type { PostgresTargetId };

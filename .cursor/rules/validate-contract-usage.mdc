@@ -110,5 +110,5 @@ This mistake commonly appears in:
 
 ## Related Documentation
 
-- See `packages/2-sql/2-authoring/contract-ts/src/contract.ts` for implementation details
-- See `packages/2-sql/2-authoring/contract-ts/README.md` for usage examples
+- See `packages/2-sql/1-core/contract/src/validate.ts` for implementation details
+- See `packages/2-sql/1-core/contract/README.md` for usage examples

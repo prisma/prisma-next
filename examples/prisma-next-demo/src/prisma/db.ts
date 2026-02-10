@@ -17,9 +17,3 @@ export const db = postgres<Contract>({
     }),
   ],
 });
-
-export const context = db.context;
-export const schema = db.schema;
-export const tables = db.schema.tables;
-export const sql = db.sql;
-export const orm = db.orm;

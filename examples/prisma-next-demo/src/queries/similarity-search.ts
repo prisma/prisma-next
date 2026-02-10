@@ -1,7 +1,7 @@
-import type { ResultType } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
+import type { AnyExpressionSource, AnyOrderBuilder } from '@prisma-next/sql-relational-core/types';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { sql, tables } from '../prisma/db';
+import { db } from '../prisma/db';
 import { collect } from './utils';
 
 /**
@@ -9,25 +9,28 @@ import { collect } from './utils';
  * Returns the top N posts ordered by similarity (closest first).
  */
 export async function similaritySearch(queryVector: number[], runtime: Runtime, limit = 10) {
-  const postTable = tables.post;
+  const postTable = db.schema.tables['post'];
+  if (!postTable) {
+    throw new Error('post table not found');
+  }
+  const postColumns = postTable.columns;
+  const cosineDistance = (
+    postColumns['embedding'] as unknown as { cosineDistance: (arg: unknown) => unknown }
+  ).cosineDistance;
+  const distanceExpr = cosineDistance(param('queryVector')) as AnyExpressionSource & {
+    asc(): AnyOrderBuilder;
+  };
 
-  const queryParam = param('queryVector');
-  const distanceExpr = postTable.columns.embedding.cosineDistance(queryParam);
-
-  const plan = sql
+  const plan = db.sql
     .from(postTable)
     .select({
-      id: postTable.columns.id,
-      title: postTable.columns.title,
+      id: postColumns.id,
+      title: postColumns.title,
       distance: distanceExpr,
     })
     .orderBy(distanceExpr.asc())
     .limit(limit)
     .build({ params: { queryVector } });
-
-  type Row = ResultType<typeof plan>;
-  // @ts-expect-error - This is to test the type inference
-  type _Test = Row['distance']; // This is correctly inferred as number
 
   return collect(runtime.execute(plan));
 }

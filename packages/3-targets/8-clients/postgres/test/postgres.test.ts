@@ -141,4 +141,28 @@ describe('postgres', () => {
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
     expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
   });
+
+  it('throws for multiple binding inputs during client construction', () => {
+    expect(() =>
+      postgres({
+        contract,
+        url: 'postgres://localhost:5432/db',
+        binding: { kind: 'url', url: 'postgres://localhost:5432/db2' },
+      }),
+    ).toThrow('Provide only one binding input');
+    expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
+    expect(mocks.createRuntime).not.toHaveBeenCalled();
+    expect(mocks.poolCtor).not.toHaveBeenCalled();
+  });
+
+  it('throws for missing binding input during client construction', () => {
+    expect(() =>
+      postgres({
+        contract,
+      }),
+    ).toThrow('Provide one binding input');
+    expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
+    expect(mocks.createRuntime).not.toHaveBeenCalled();
+    expect(mocks.poolCtor).not.toHaveBeenCalled();
+  });
 });

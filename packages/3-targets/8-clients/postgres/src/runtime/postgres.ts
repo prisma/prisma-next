@@ -41,6 +41,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
   options: PostgresOptions<TContract>,
 ): PostgresClient<TContract> {
   const contract = resolveContract(options);
+  const binding = resolvePostgresBinding(options);
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
@@ -70,7 +71,6 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
         return runtimeInstance;
       }
 
-      const binding = resolvePostgresBinding(options);
       const stackInstance = instantiateExecutionStack(stack);
       const driverDescriptor = stack.driver;
       if (!driverDescriptor) {

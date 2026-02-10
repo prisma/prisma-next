@@ -1,12 +1,12 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { sql, tables } from '../prisma/db';
+import { db } from '../prisma/db';
 import { collect } from './utils';
 
 export async function getUsersWithPosts(runtime: Runtime, limit = 10) {
-  const userTable = tables.user;
-  const postTable = tables.post;
+  const userTable = db.schema.tables.user;
+  const postTable = db.schema.tables.post;
 
-  const plan = sql
+  const plan = db.sql
     .from(userTable)
     .includeMany(
       postTable,
