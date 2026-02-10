@@ -181,7 +181,7 @@ describe('select builder edge cases', () => {
       table: 'post',
       column: 'userId',
       toExpr: () => createColumnRef('post', 'userId'),
-    } as typeof userColumns.id;
+    } as unknown as typeof userColumns.id;
     const builder = sql<Contract, CodecTypes>({ context: joinContext }).from(userTable);
     const joined = builder[joinMethod](postTable, (on) => on.eqCol(userColumns.id, postUserId));
     const plan = joined

@@ -1,3 +1,10 @@
+function ifDefined<K extends string, V>(
+  key: K,
+  value: V | undefined,
+): Record<never, never> | { [P in K]: V } {
+  return value !== undefined ? ({ [key]: value } as { [P in K]: V }) : {};
+}
+
 /**
  * ContractIR types and factories for building contract intermediate representation.
  * ContractIR is family-agnostic and used by authoring, emitter, and no-emit runtime.
@@ -50,8 +57,8 @@ export function irHeader(opts: {
     target: opts.target,
     targetFamily: opts.targetFamily,
     storageHash: opts.storageHash,
-    ...(opts.executionHash !== undefined && { executionHash: opts.executionHash }),
-    ...(opts.profileHash !== undefined && { profileHash: opts.profileHash }),
+    ...ifDefined('executionHash', opts.executionHash),
+    ...ifDefined('profileHash', opts.profileHash),
   };
 }
 
@@ -117,6 +124,6 @@ export function contractIR<
     storage: opts.storage,
     models: opts.models,
     relations: opts.relations,
-    ...(opts.execution !== undefined && { execution: opts.execution }),
+    ...ifDefined('execution', opts.execution),
   };
 }

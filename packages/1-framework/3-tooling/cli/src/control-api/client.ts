@@ -9,6 +9,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { executeDbInit } from './operations/db-init';
@@ -346,7 +347,7 @@ class ControlClientImpl implements ControlClient {
         driver,
         contractIR,
         contractPath: options.contractPath ?? '',
-        ...(options.configPath ? { configPath: options.configPath } : {}),
+        ...ifDefined('configPath', options.configPath),
       });
 
       onProgress?.({
@@ -566,7 +567,7 @@ class ControlClientImpl implements ControlClient {
 
       return ok({
         storageHash: emitResult.storageHash,
-        ...(emitResult.executionHash ? { executionHash: emitResult.executionHash } : {}),
+        ...ifDefined('executionHash', emitResult.executionHash),
         profileHash: emitResult.profileHash,
         contractJson: emitResult.contractJson,
         contractDts: emitResult.contractDts,

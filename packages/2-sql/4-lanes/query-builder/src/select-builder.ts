@@ -43,7 +43,7 @@ export class SelectBuilder<
   select(
     arg: never,
   ): PreviousFunctionReceivedBadInputError<'[error] invalid input in previous `select()` call'>;
-  select(..._args: any[]): any {
+  select(..._args: unknown[]): unknown {
     // TODO: do runtime stuff.
     return this;
   }

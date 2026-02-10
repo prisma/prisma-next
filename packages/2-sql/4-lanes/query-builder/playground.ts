@@ -58,6 +58,7 @@ declare const contract: SqlContract<
 
 declare const wrongTable: TableReference<'comments', StorageHash>;
 declare const allTable: TableReference<string, StorageHash>;
+// biome-ignore lint/suspicious/noExplicitAny: intentionally testing any as a table name type parameter
 declare const anyTable: TableReference<any, StorageHash>;
 declare const neverTable: TableReference<never, StorageHash>;
 declare const customTable: { '~name': 'users' };
@@ -95,6 +96,7 @@ root
   // @ts-expect-error
   .build();
 root
+  // biome-ignore lint/suspicious/noExplicitAny: intentionally testing any cast for type-level behavior
   .from(allTable as any)
   // @ts-expect-error
   .build();

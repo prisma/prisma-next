@@ -36,6 +36,10 @@ type GeneratedColumnOptions<Descriptor extends ColumnTypeDescriptor> = Omit<
   NonNullableColumnOptions<Descriptor>,
   'default' | 'nullable'
 > & {
+  /**
+   * Generated columns are always non-nullable and use mutation-time defaults
+   * that the runtime injects when the column is omitted from insert input.
+   */
   nullable?: false;
   generated: ExecutionMutationDefaultValue;
 };

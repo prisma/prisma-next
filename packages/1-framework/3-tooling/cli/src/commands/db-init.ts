@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
@@ -82,14 +83,10 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
         fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
         meta: {
           code: 'MARKER_ORIGIN_MISMATCH',
-          ...(failure.marker?.storageHash ? { markerStorageHash: failure.marker.storageHash } : {}),
-          ...(failure.destination?.storageHash
-            ? { destinationStorageHash: failure.destination.storageHash }
-            : {}),
-          ...(failure.marker?.profileHash ? { markerProfileHash: failure.marker.profileHash } : {}),
-          ...(failure.destination?.profileHash
-            ? { destinationProfileHash: failure.destination.profileHash }
-            : {}),
+          ...ifDefined('markerStorageHash', failure.marker?.storageHash),
+          ...ifDefined('destinationStorageHash', failure.destination?.storageHash),
+          ...ifDefined('markerProfileHash', failure.marker?.profileHash),
+          ...ifDefined('destinationProfileHash', failure.destination?.profileHash),
         },
       },
     );
@@ -243,7 +240,7 @@ async function executeDbInitCommand(
         targetId: config.target.targetId,
         destination: {
           storageHash: result.value.marker?.storageHash ?? '',
-          ...(profileHash ? { profileHash } : {}),
+          ...ifDefined('profileHash', profileHash),
         },
         operations: result.value.plan.operations.map((op) => ({
           id: op.id,
@@ -263,9 +260,7 @@ async function executeDbInitCommand(
         ? {
             marker: {
               storageHash: result.value.marker.storageHash,
-              ...(result.value.marker.profileHash
-                ? { profileHash: result.value.marker.profileHash }
-                : {}),
+              ...ifDefined('profileHash', result.value.marker.profileHash),
             },
           }
         : {}),

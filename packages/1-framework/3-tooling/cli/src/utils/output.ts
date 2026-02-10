@@ -1,4 +1,5 @@
 import { relative } from 'node:path';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { bgGreen, blue, bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { Command } from 'commander';
 import stringWidth from 'string-width';
@@ -116,7 +117,7 @@ export function formatEmitJson(result: EmitContractResult): string {
   const output = {
     ok: true,
     storageHash: result.storageHash,
-    ...(result.executionHash ? { executionHash: result.executionHash } : {}),
+    ...ifDefined('executionHash', result.executionHash),
     ...(result.profileHash ? { profileHash: result.profileHash } : {}),
     outDir: result.outDir,
     files: result.files,

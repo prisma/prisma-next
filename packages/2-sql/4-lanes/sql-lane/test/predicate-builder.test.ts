@@ -183,7 +183,7 @@ describe('buildWhereExpr', () => {
   it.each([
     [true, 'isNull'],
     [false, 'isNotNull'],
-  ] as const)('builds null-check expressions for %s', (isNull) => {
+  ] as const)('builds null-check expressions for %s', (isNull, _operator) => {
     const nullCheck = {
       kind: 'nullCheck' as const,
       expr: createColumnRef('user', 'deletedAt'),

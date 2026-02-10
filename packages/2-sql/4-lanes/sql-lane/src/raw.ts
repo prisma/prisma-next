@@ -15,6 +15,13 @@ import type {
 
 const RAW_OPTIONS_SENTINEL = Symbol('rawOptions');
 
+function ifDefined<K extends string, V>(
+  key: K,
+  value: V | undefined,
+): Record<never, never> | { [P in K]: V } {
+  return value !== undefined ? ({ [key]: value } as { [P in K]: V }) : {};
+}
+
 type TemplateInvocation = {
   readonly sql: string;
   readonly params: readonly unknown[];
@@ -143,7 +150,7 @@ function buildRawMeta(args: RawMetaBuildArgs): PlanMeta {
     target: contract.target,
     targetFamily: contract.targetFamily,
     storageHash: contract.storageHash,
-    ...(contract.profileHash !== undefined ? { profileHash: contract.profileHash } : {}),
+    ...ifDefined('profileHash', contract.profileHash),
     lane: 'raw',
     paramDescriptors: Object.freeze([...paramDescriptors]),
     ...(options?.annotations ? { annotations: Object.freeze({ ...options.annotations }) } : {}),

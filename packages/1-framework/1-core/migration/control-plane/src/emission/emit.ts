@@ -72,7 +72,7 @@ export async function emit(
     models: ir.models,
     relations: ir.relations,
     storage: ir.storage,
-    ...(ir.execution ? { execution: ir.execution } : {}),
+    ...ifDefined('execution', ir.execution),
     extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
     meta: ir.meta,
@@ -91,7 +91,7 @@ export async function emit(
     ...ir,
     schemaVersion: contractJson.schemaVersion,
     storageHash,
-    ...(executionHash ? { executionHash } : {}),
+    ...ifDefined('executionHash', executionHash),
     profileHash,
   };
 
@@ -122,7 +122,7 @@ export async function emit(
 
   const contractTypeHashes = {
     storageHash,
-    ...(executionHash ? { executionHash } : {}),
+    ...ifDefined('executionHash', executionHash),
     profileHash,
   };
   const contractDtsRaw = targetFamily.generateContractTypes(
@@ -143,7 +143,7 @@ export async function emit(
     contractJson: contractJsonString,
     contractDts,
     storageHash,
-    ...(executionHash ? { executionHash } : {}),
+    ...ifDefined('executionHash', executionHash),
     profileHash,
   };
 }

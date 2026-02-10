@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { canonicalizeContract } from './canonicalization';
 
 type ContractInput = {
@@ -69,7 +70,7 @@ export function computeExecutionHash(contract: ContractInput): string {
     sources: {},
     capabilities: {},
     meta: {},
-    ...(contract.execution ? { execution: contract.execution } : {}),
+    ...ifDefined('execution', contract.execution),
   };
   const canonical = canonicalizeContract(executionContract);
   return computeHash(canonical);

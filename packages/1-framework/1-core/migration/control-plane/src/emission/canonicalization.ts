@@ -1,5 +1,6 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 type NormalizedContract = {
   schemaVersion: string;
@@ -252,24 +253,18 @@ export function canonicalizeContract(
     models: ir.models,
     relations: ir.relations,
     storage: ir.storage,
-    ...(ir.execution ? { execution: ir.execution } : {}),
+    ...ifDefined('execution', ir.execution),
     extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
     meta: ir.meta,
     sources: ir.sources,
   };
-
-  if (ir.storageHash !== undefined) {
-    normalized.storageHash = ir.storageHash;
-  }
-
-  if (ir.executionHash !== undefined) {
-    normalized.executionHash = ir.executionHash;
-  }
-
-  if (ir.profileHash !== undefined) {
-    normalized.profileHash = ir.profileHash;
-  }
+  Object.assign(
+    normalized,
+    ifDefined('storageHash', ir.storageHash),
+    ifDefined('executionHash', ir.executionHash),
+    ifDefined('profileHash', ir.profileHash),
+  );
 
   const withDefaultsOmitted = omitDefaults(normalized, []) as NormalizedContract;
   const withSortedIndexes = sortIndexesAndUniques(withDefaultsOmitted.storage);
