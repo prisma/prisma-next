@@ -8,6 +8,7 @@ export * from '../ast/join';
 export * from '../ast/order';
 export * from '../ast/predicate';
 export * from '../ast/select';
+export * from '../ast/sql-codecs';
 export * from '../ast/types';
 export * from '../ast/update';
 export * from '../ast/util';

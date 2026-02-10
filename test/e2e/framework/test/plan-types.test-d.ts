@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Varchar } from '@prisma-next/adapter-postgres/codec-types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -29,7 +30,13 @@ test('inferred row types are correct', () => {
     .build();
 
   type Row = ResultType<typeof plan>;
-  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
-  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['id']>().toEqualTypeOf<Contract['models']['User']['fields']['id']>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<Contract['models']['User']['fields']['email']>();
   void plan; // Used as a type in ResultType<typeof plan>
+});
+
+test('parameterized varchar uses branded type', () => {
+  type Email = Contract['models']['User']['fields']['email'];
+  expectTypeOf<Email>().toEqualTypeOf<Varchar<255>>();
+  expectTypeOf<Email>().not.toEqualTypeOf<string>();
 });

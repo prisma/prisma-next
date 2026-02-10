@@ -18,7 +18,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
-import type { ComponentDatabaseDependency } from '../migrations/types';
+import type { CodecControlHooks, ComponentDatabaseDependency } from '../migrations/types';
 import {
   computeCounts,
   verifyDatabaseDependencies,
@@ -36,6 +36,13 @@ export type DefaultNormalizer = (
   rawDefault: string,
   nativeType: string,
 ) => ColumnDefault | undefined;
+
+/**
+ * Function type for normalizing schema native types to canonical form for comparison.
+ * Target-specific implementations handle dialect-specific type name variations
+ * (e.g., Postgres 'varchar' → 'character varying', 'timestamptz' normalization).
+ */
+export type NativeTypeNormalizer = (nativeType: string) => string;
 
 /**
  * Options for the pure schema verification function.
@@ -62,6 +69,12 @@ export interface VerifySqlSchemaOptions {
    * with contract defaults (ColumnDefault objects).
    */
   readonly normalizeDefault?: DefaultNormalizer;
+  /**
+   * Optional target-specific normalizer for schema native type names.
+   * When provided, schema native types are normalized before comparison
+   * with contract native types (e.g., Postgres 'varchar' → 'character varying').
+   */
+  readonly normalizeNativeType?: NativeTypeNormalizer;
 }
 
 /**
@@ -75,8 +88,19 @@ export interface VerifySqlSchemaOptions {
  * @returns VerifyDatabaseSchemaResult with verification tree and issues
  */
 export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabaseSchemaResult {
-  const { contract, schema, strict, context, typeMetadataRegistry, normalizeDefault } = options;
+  const {
+    contract,
+    schema,
+    strict,
+    context,
+    typeMetadataRegistry,
+    normalizeDefault,
+    normalizeNativeType,
+  } = options;
   const startTime = Date.now();
+
+  // Extract codec control hooks once at entry point for reuse
+  const codecHooks = extractCodecControlHooks(options.frameworkComponents);
 
   const { contractCoreHash, contractProfileHash, contractTarget } =
     extractContractMetadata(contract);
@@ -85,7 +109,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     schema,
     strict,
     typeMetadataRegistry,
-    ...(normalizeDefault ? { normalizeDefault } : {}),
+    codecHooks,
+    ...ifDefined('normalizeDefault', normalizeDefault),
+    ...ifDefined('normalizeNativeType', normalizeNativeType),
   });
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
@@ -94,10 +120,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   const storageTypes = contract.storage.types ?? {};
   const storageTypeEntries = Object.entries(storageTypes);
   if (storageTypeEntries.length > 0) {
-    const controlHooks = extractCodecControlHooks(options.frameworkComponents);
     const typeNodes: SchemaVerificationNode[] = [];
     for (const [typeName, typeInstance] of storageTypeEntries) {
-      const hook = controlHooks.get(typeInstance.codecId);
+      const hook = codecHooks.get(typeInstance.codecId);
       const typeIssues = hook?.verifyType
         ? hook.verifyType({ typeName, typeInstance, schema })
         : [];
@@ -209,9 +234,19 @@ function verifySchemaTables(options: {
   schema: SqlSchemaIR;
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
+  normalizeNativeType?: NativeTypeNormalizer;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
-  const { contract, schema, strict, typeMetadataRegistry, normalizeDefault } = options;
+  const {
+    contract,
+    schema,
+    strict,
+    typeMetadataRegistry,
+    codecHooks,
+    normalizeDefault,
+    normalizeNativeType,
+  } = options;
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
   const contractTables = contract.storage.tables;
@@ -249,7 +284,9 @@ function verifySchemaTables(options: {
       issues,
       strict,
       typeMetadataRegistry,
-      ...(normalizeDefault ? { normalizeDefault } : {}),
+      codecHooks,
+      ...ifDefined('normalizeDefault', normalizeDefault),
+      ...ifDefined('normalizeNativeType', normalizeNativeType),
     });
     rootChildren.push(buildTableNode(tableName, tablePath, tableChildren));
   }
@@ -288,7 +325,9 @@ function verifyTableChildren(options: {
   issues: SchemaIssue[];
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
+  normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -298,7 +337,9 @@ function verifyTableChildren(options: {
     issues,
     strict,
     typeMetadataRegistry,
+    codecHooks,
     normalizeDefault,
+    normalizeNativeType,
   } = options;
   const tableChildren: SchemaVerificationNode[] = [];
   const columnNodes = collectContractColumnNodes({
@@ -308,7 +349,9 @@ function verifyTableChildren(options: {
     tablePath,
     issues,
     typeMetadataRegistry,
-    ...(normalizeDefault ? { normalizeDefault } : {}),
+    codecHooks,
+    ...ifDefined('normalizeDefault', normalizeDefault),
+    ...ifDefined('normalizeNativeType', normalizeNativeType),
   });
   if (columnNodes.length > 0) {
     tableChildren.push(buildColumnsNode(tablePath, columnNodes));
@@ -417,7 +460,9 @@ function collectContractColumnNodes(options: {
   tablePath: string;
   issues: SchemaIssue[];
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
+  normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
   const {
     contractTable,
@@ -426,7 +471,9 @@ function collectContractColumnNodes(options: {
     tablePath,
     issues,
     typeMetadataRegistry,
+    codecHooks,
     normalizeDefault,
+    normalizeNativeType,
   } = options;
   const columnNodes: SchemaVerificationNode[] = [];
 
@@ -464,7 +511,9 @@ function collectContractColumnNodes(options: {
         columnPath,
         issues,
         typeMetadataRegistry,
-        ...(normalizeDefault ? { normalizeDefault } : {}),
+        codecHooks,
+        ...ifDefined('normalizeDefault', normalizeDefault),
+        ...ifDefined('normalizeNativeType', normalizeNativeType),
       }),
     );
   }
@@ -512,7 +561,9 @@ function verifyColumn(options: {
   columnPath: string;
   issues: SchemaIssue[];
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
+  codecHooks: Map<string, CodecControlHooks>;
   normalizeDefault?: DefaultNormalizer;
+  normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode {
   const {
     tableName,
@@ -521,13 +572,16 @@ function verifyColumn(options: {
     schemaColumn,
     columnPath,
     issues,
+    codecHooks,
     normalizeDefault,
+    normalizeNativeType,
   } = options;
   const columnChildren: SchemaVerificationNode[] = [];
   let columnStatus: VerificationStatus = 'pass';
 
-  const contractNativeType = contractColumn.nativeType;
-  const schemaNativeType = schemaColumn.nativeType;
+  const contractNativeType = renderExpectedNativeType(contractColumn, codecHooks);
+  const schemaNativeType =
+    normalizeNativeType?.(schemaColumn.nativeType) ?? schemaColumn.nativeType;
 
   if (contractNativeType !== schemaNativeType) {
     issues.push({
@@ -566,16 +620,16 @@ function verifyColumn(options: {
         actual: undefined,
         children: [],
       });
-    } else if (typeMetadata.nativeType && typeMetadata.nativeType !== contractNativeType) {
+    } else if (typeMetadata.nativeType && typeMetadata.nativeType !== contractColumn.nativeType) {
       columnChildren.push({
         status: 'warn',
         kind: 'type',
         name: 'type_consistency',
         contractPath: `${columnPath}.codecId`,
         code: 'type_consistency_warning',
-        message: `codecId "${contractColumn.codecId}" maps to nativeType "${typeMetadata.nativeType}" in registry, but contract has "${contractNativeType}"`,
+        message: `codecId "${contractColumn.codecId}" maps to nativeType "${typeMetadata.nativeType}" in registry, but contract has "${contractColumn.nativeType}"`,
         expected: typeMetadata.nativeType,
-        actual: contractNativeType,
+        actual: contractColumn.nativeType,
         children: [],
       });
     }
@@ -686,7 +740,7 @@ function buildColumnsNode(
   columnNodes: SchemaVerificationNode[],
 ): SchemaVerificationNode {
   return {
-    status: mergeStatusFromChildren(columnNodes, 'pass'),
+    status: aggregateChildState(columnNodes, 'pass').status,
     kind: 'columns',
     name: 'columns',
     contractPath: `${tablePath}.columns`,
@@ -703,7 +757,7 @@ function buildTableNode(
   tablePath: string,
   tableChildren: SchemaVerificationNode[],
 ): SchemaVerificationNode {
-  const tableStatus = mergeStatusFromChildren(tableChildren, 'pass');
+  const tableStatus = aggregateChildState(tableChildren, 'pass').status;
   const tableFailureMessages = tableChildren
     .filter((child) => child.status === 'fail' && child.message)
     .map((child) => child.message)
@@ -732,7 +786,7 @@ function buildTableNode(
 
 function buildRootNode(rootChildren: SchemaVerificationNode[]): SchemaVerificationNode {
   return {
-    status: mergeStatusFromChildren(rootChildren, 'pass'),
+    status: aggregateChildState(rootChildren, 'pass').status,
     kind: 'contract',
     name: 'contract',
     contractPath: '',
@@ -783,17 +837,6 @@ function aggregateChildState(
   }
 
   return { status, failureMessages, firstCode };
-}
-
-/**
- * @deprecated Use aggregateChildState for better performance when you need multiple values.
- * Kept for backward compatibility with callers that only need status.
- */
-function mergeStatusFromChildren(
-  children: SchemaVerificationNode[],
-  fallback: VerificationStatus,
-): VerificationStatus {
-  return aggregateChildState(children, fallback).status;
 }
 
 function validateFrameworkComponentsForExtensions(
@@ -856,6 +899,35 @@ function collectDependenciesFromFrameworkComponents<T extends string>(
     }
   }
   return dependencies;
+}
+
+/**
+ * Renders the expected native type for a contract column, expanding parameterized types
+ * using codec control hooks when available.
+ *
+ * This function delegates to the `expandNativeType` hook if the codec provides one,
+ * ensuring that the SQL family layer remains dialect-agnostic while allowing
+ * target-specific adapters (like Postgres) to provide their own expansion logic.
+ */
+function renderExpectedNativeType(
+  contractColumn: SqlContract<SqlStorage>['storage']['tables'][string]['columns'][string],
+  codecHooks: Map<string, CodecControlHooks>,
+): string {
+  const { codecId, nativeType, typeParams } = contractColumn;
+
+  // If no typeParams or codecId, return the base native type
+  if (!typeParams || !codecId) {
+    return nativeType;
+  }
+
+  // Try to use the codec's expandNativeType hook if available
+  const hooks = codecHooks.get(codecId);
+  if (hooks?.expandNativeType) {
+    return hooks.expandNativeType({ nativeType, codecId, typeParams });
+  }
+
+  // Fallback: return base native type if no hook is available
+  return nativeType;
 }
 
 /**
