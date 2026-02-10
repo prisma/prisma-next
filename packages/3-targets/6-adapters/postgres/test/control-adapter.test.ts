@@ -1,6 +1,6 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import { describe, expect, it } from 'vitest';
-import { PostgresControlAdapter } from '../src/core/control-adapter';
+import { normalizeSchemaNativeType, PostgresControlAdapter } from '../src/core/control-adapter';
 
 type QueryHandler = {
   readonly match: (sql: string) => boolean;
@@ -1295,6 +1295,188 @@ describe('PostgresControlAdapter', () => {
         columns: ['id'],
       });
       expect(result.tables['user']?.primaryKey?.name).toBeUndefined();
+    });
+
+    it('normalizes integer/float/bool formatted types', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'metrics' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'metrics',
+              column_name: 'id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'integer',
+            },
+            {
+              table_name: 'metrics',
+              column_name: 'small',
+              data_type: 'smallint',
+              udt_name: 'int2',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'smallint',
+            },
+            {
+              table_name: 'metrics',
+              column_name: 'big',
+              data_type: 'bigint',
+              udt_name: 'int8',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'bigint',
+            },
+            {
+              table_name: 'metrics',
+              column_name: 'real_col',
+              data_type: 'real',
+              udt_name: 'float4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'real',
+            },
+            {
+              table_name: 'metrics',
+              column_name: 'double_col',
+              data_type: 'double precision',
+              udt_name: 'float8',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'double precision',
+            },
+            {
+              table_name: 'metrics',
+              column_name: 'active',
+              data_type: 'boolean',
+              udt_name: 'bool',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'boolean',
+            },
+          ],
+        },
+        { match: includes('PRIMARY KEY'), rows: [] },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.tables['metrics']?.columns['id']?.nativeType).toBe('int4');
+      expect(result.tables['metrics']?.columns['small']?.nativeType).toBe('int2');
+      expect(result.tables['metrics']?.columns['big']?.nativeType).toBe('int8');
+      expect(result.tables['metrics']?.columns['real_col']?.nativeType).toBe('float4');
+      expect(result.tables['metrics']?.columns['double_col']?.nativeType).toBe('float8');
+      expect(result.tables['metrics']?.columns['active']?.nativeType).toBe('bool');
+    });
+
+    it('sorts multi-column primary key by ordinal position and skips PK from uniques', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'user' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'user',
+              column_name: 'tenant_id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              table_name: 'user',
+              column_name: 'id',
+              data_type: 'integer',
+              udt_name: 'int4',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+          ],
+        },
+        {
+          match: includes('PRIMARY KEY'),
+          rows: [
+            {
+              table_name: 'user',
+              constraint_name: 'user_pkey',
+              column_name: 'id',
+              ordinal_position: 2,
+            },
+            {
+              table_name: 'user',
+              constraint_name: 'user_pkey',
+              column_name: 'tenant_id',
+              ordinal_position: 1,
+            },
+          ],
+        },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        {
+          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
+          rows: [
+            {
+              table_name: 'user',
+              constraint_name: 'user_pkey',
+              column_name: 'tenant_id',
+              ordinal_position: 1,
+            },
+          ],
+        },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.tables['user']?.primaryKey).toEqual({
+        columns: ['tenant_id', 'id'],
+        name: 'user_pkey',
+      });
+      expect(result.tables['user']?.uniques).toEqual([]);
+    });
+  });
+
+  describe('normalizeSchemaNativeType', () => {
+    it.each([
+      { input: 'varchar(255)', expected: 'character varying(255)' },
+      { input: 'bpchar(2)', expected: 'character(2)' },
+      { input: 'varbit(8)', expected: 'bit varying(8)' },
+      { input: 'timestamp with time zone', expected: 'timestamptz' },
+      { input: 'timestamp(3) with time zone', expected: 'timestamptz(3)' },
+      { input: 'time with time zone', expected: 'timetz' },
+      { input: 'time(1) with time zone', expected: 'timetz(1)' },
+      { input: 'timestamp without time zone', expected: 'timestamp' },
+      { input: 'time without time zone', expected: 'time' },
+      { input: 'numeric(10,2)', expected: 'numeric(10,2)' },
+    ])('normalizes $input -> $expected', ({ input, expected }) => {
+      expect(normalizeSchemaNativeType(input)).toBe(expected);
     });
   });
 });

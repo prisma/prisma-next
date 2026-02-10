@@ -396,4 +396,56 @@ describe('adapter-postgres codecs', () => {
       expect(decoded).toBe(value);
     });
   });
+
+  describe('metadata and params schema', () => {
+    it.each([
+      { scalar: 'character', nativeType: 'character' },
+      { scalar: 'character varying', nativeType: 'character varying' },
+      { scalar: 'integer', nativeType: 'integer' },
+      { scalar: 'double precision', nativeType: 'double precision' },
+      { scalar: 'int4', nativeType: 'integer' },
+      { scalar: 'float8', nativeType: 'double precision' },
+      { scalar: 'bit varying', nativeType: 'bit varying' },
+    ])('sets postgres nativeType metadata for $scalar', ({ scalar, nativeType }) => {
+      const codec = codecDefinitions[scalar].codec as {
+        meta?: { db?: { sql?: { postgres?: { nativeType?: string } } } };
+      };
+      expect(codec.meta?.db?.sql?.postgres?.nativeType).toBe(nativeType);
+    });
+
+    it.each([
+      { scalar: 'character', hasParamsSchema: true },
+      { scalar: 'character varying', hasParamsSchema: true },
+      { scalar: 'numeric', hasParamsSchema: true },
+      { scalar: 'timestamp', hasParamsSchema: true },
+      { scalar: 'timestamptz', hasParamsSchema: true },
+      { scalar: 'time', hasParamsSchema: true },
+      { scalar: 'timetz', hasParamsSchema: true },
+      { scalar: 'bit', hasParamsSchema: true },
+      { scalar: 'bit varying', hasParamsSchema: true },
+      { scalar: 'interval', hasParamsSchema: true },
+      { scalar: 'text', hasParamsSchema: false },
+      { scalar: 'enum', hasParamsSchema: false },
+      { scalar: 'bool', hasParamsSchema: false },
+      { scalar: 'int4', hasParamsSchema: false },
+    ])('tracks params schema presence for $scalar', ({ scalar, hasParamsSchema }) => {
+      const codec = codecDefinitions[scalar].codec as {
+        paramsSchema?: unknown;
+      };
+      expect(codec.paramsSchema !== undefined).toBe(hasParamsSchema);
+    });
+  });
+
+  describe('numeric codec decode', () => {
+    const numericCodec = codecDefinitions.numeric.codec as {
+      decode: (wire: string | number) => string;
+    };
+
+    it.each([
+      { wire: 42, expected: '42' },
+      { wire: '123.45', expected: '123.45' },
+    ])('decodes $wire to $expected', ({ wire, expected }) => {
+      expect(numericCodec.decode(wire)).toBe(expected);
+    });
+  });
 });

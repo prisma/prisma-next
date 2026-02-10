@@ -1,3 +1,4 @@
+import type { Type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { codec, createCodecRegistry, defineCodecs } from '../../src/ast/codec-types';
 
@@ -50,15 +51,43 @@ describe('codec factory', () => {
     expect(testCodec.meta).toEqual({ db: { sql: { postgres: { nativeType: 'text' } } } });
   });
 
-  it('creates codec without meta property', () => {
+  it.each([
+    {
+      label: 'without meta',
+      config: {},
+      check: (testCodec: ReturnType<typeof codec>) => {
+        expect(testCodec.meta).toBeUndefined();
+      },
+    },
+    {
+      label: 'with paramsSchema',
+      config: {
+        paramsSchema: {} as unknown as Type<{ readonly precision: number }>,
+      },
+      check: (testCodec: ReturnType<typeof codec>) => {
+        expect(testCodec.paramsSchema).toBeDefined();
+      },
+    },
+    {
+      label: 'with init',
+      config: {
+        init: (params: { precision: number }) => ({ normalized: params.precision }),
+      },
+      check: (testCodec: ReturnType<typeof codec>) => {
+        expect(testCodec.init).toBeDefined();
+        expect(testCodec.init?.({ precision: 12 })).toEqual({ normalized: 12 });
+      },
+    },
+  ])('creates codec $label', ({ config, check }) => {
     const testCodec = codec({
-      typeId: 'test/no-meta@1',
+      typeId: 'test/optional@1',
       targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string) => wire,
+      ...config,
     });
 
-    expect(testCodec.meta).toBeUndefined();
+    check(testCodec);
   });
 });
 

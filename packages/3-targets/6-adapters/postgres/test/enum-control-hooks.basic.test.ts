@@ -1,4 +1,5 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import { parsePostgresArray, pgEnumControlHooks } from '../src/core/enum-control-hooks';
@@ -396,6 +397,94 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
       }),
     ).toThrow('too long for rebuild operation');
   });
+
+  it('includes schema-only enum columns in rebuild prechecks', () => {
+    const contract = createTestContract({
+      tables: {
+        user: {
+          columns: {
+            role: {
+              codecId: ENUM_CODEC_ID,
+              nativeType: 'role',
+              nullable: false,
+              typeRef: 'Role',
+            },
+          },
+          primaryKey: { columns: ['role'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+      types: {
+        Role: {
+          codecId: ENUM_CODEC_ID,
+          nativeType: 'role',
+          typeParams: { values: ['USER'] },
+        },
+      },
+    });
+
+    const schema: SqlSchemaIR = {
+      tables: {
+        user: {
+          name: 'user',
+          columns: {
+            role: { name: 'role', nativeType: 'role', nullable: false },
+          },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        audit: {
+          name: 'audit',
+          columns: {
+            role: { name: 'role', nativeType: 'role', nullable: false },
+          },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+      extensions: [],
+      annotations: {
+        pg: {
+          storageTypes: {
+            role: {
+              codecId: ENUM_CODEC_ID,
+              nativeType: 'role',
+              typeParams: { values: ['USER', 'ADMIN'] },
+            },
+          },
+        },
+      },
+    };
+
+    const result = pgEnumControlHooks.planTypeOperations?.({
+      typeName: 'Role',
+      typeInstance: {
+        codecId: ENUM_CODEC_ID,
+        nativeType: 'role',
+        typeParams: { values: ['USER'] },
+      },
+      contract,
+      schema,
+      schemaName: 'public',
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+    });
+
+    expect(result?.operations).toHaveLength(1);
+    expect(result?.operations[0]?.id).toBe('type.Role.rebuild');
+    expect(result?.operations[0]?.precheck).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          description: expect.stringContaining(
+            'ensure no rows in audit.role contain removed values',
+          ),
+        }),
+      ]),
+    );
+  });
 });
 
 describe('pgEnumControlHooks.verifyType', () => {
@@ -531,5 +620,22 @@ describe('pgEnumControlHooks.introspectTypes', () => {
     await expect(
       pgEnumControlHooks.introspectTypes({ driver, schemaName: 'public' }),
     ).rejects.toThrow('unexpected format: {"nested":"object"}');
+  });
+
+  it('defaults schema name to public when undefined', async () => {
+    const expectedRows = [{ schema_name: 'public', type_name: 'role', values: ['USER'] }];
+    const driver: ControlDriverInstance<'sql', string> = {
+      familyId: 'sql',
+      targetId: 'postgres',
+      query: async <Row>(_, params?: unknown[]) => {
+        expect(params).toEqual(['public']);
+        return { rows: expectedRows } as { readonly rows: Row[] };
+      },
+      close: async () => {},
+    };
+
+    expectNarrowedType(pgEnumControlHooks.introspectTypes, 'introspectTypes missing');
+    const types = await pgEnumControlHooks.introspectTypes({ driver, schemaName: undefined });
+    expect(types['role']?.nativeType).toBe('role');
   });
 });

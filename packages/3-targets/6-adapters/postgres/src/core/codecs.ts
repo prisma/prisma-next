@@ -13,6 +13,7 @@
 
 import type { Codec, CodecMeta } from '@prisma-next/sql-relational-core/ast';
 import { codec, defineCodecs, sqlCodecDefinitions } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { type as arktype } from 'arktype';
 import {
   PG_BIT_CODEC_ID,
@@ -60,17 +61,17 @@ function aliasCodec<
   base: Codec<string, TWire, TJs, TParams, THelper>,
   options: {
     readonly typeId: Id;
-    readonly targetTypes?: readonly string[];
+    readonly targetTypes: readonly string[];
     readonly meta?: CodecMeta;
   },
 ): Codec<Id, TWire, TJs, TParams, THelper> {
   return {
     id: options.typeId,
-    targetTypes: options.targetTypes ?? base.targetTypes,
-    ...(options.meta ? { meta: options.meta } : {}),
-    ...(base.paramsSchema ? { paramsSchema: base.paramsSchema } : {}),
-    ...(base.init ? { init: base.init } : {}),
-    ...(base.encode ? { encode: base.encode } : {}),
+    targetTypes: options.targetTypes,
+    ...ifDefined('meta', options.meta),
+    ...ifDefined('paramsSchema', base.paramsSchema),
+    ...ifDefined('init', base.init),
+    ...ifDefined('encode', base.encode),
     decode: base.decode,
   };
 }
