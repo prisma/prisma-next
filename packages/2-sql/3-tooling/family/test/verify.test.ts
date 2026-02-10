@@ -16,7 +16,7 @@ describe('marker parser', () => {
     const result = parseContractMarkerRow(row);
 
     expect(result).toEqual({
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
       profileHash: 'sha256:def456',
       contractJson: { target: 'postgres' },
       canonicalVersion: 1,
@@ -35,7 +35,7 @@ describe('marker parser', () => {
     const result = parseContractMarkerRow(row);
 
     expect(result).toEqual({
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
       profileHash: 'sha256:def456',
       contractJson: null,
       canonicalVersion: null,

@@ -85,7 +85,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           profile_hash: string;
         }>('select core_hash, profile_hash from prisma_contract.marker where id = $1', [1]);
         expect(markerRow.rows[0]).toMatchObject({
-          core_hash: contract.coreHash,
+          core_hash: contract.storageHash,
           profile_hash: contract.profileHash,
         });
 
@@ -96,7 +96,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           'select destination_core_hash, operations from prisma_contract.ledger order by id desc limit 1',
         );
         expect(ledgerRow.rows[0]).toMatchObject({
-          destination_core_hash: contract.coreHash,
+          destination_core_hash: contract.storageHash,
         });
         expect(Array.isArray(ledgerRow.rows[0]?.operations)).toBe(true);
       },

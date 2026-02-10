@@ -1,4 +1,5 @@
 import { checkContractComponentRequirements } from '@prisma-next/contract/framework-components';
+import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { createExecutionStack, type ExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
   RuntimeAdapterDescriptor,
@@ -10,6 +11,7 @@ import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
 } from '@prisma-next/core-execution-plane/types';
+import { generateId } from '@prisma-next/ids/runtime';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
@@ -24,7 +26,9 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
+  AppliedMutationDefault,
   ExecutionContext,
+  MutationDefaultsOptions,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
 import { type as arktype } from 'arktype';
@@ -268,6 +272,51 @@ function validateColumnTypeParams(
   }
 }
 
+function computeExecutionDefaultValue(spec: ExecutionMutationDefaultValue): unknown {
+  switch (spec.kind) {
+    case 'generator':
+      return generateId(spec.params ? { id: spec.id, params: spec.params } : { id: spec.id });
+  }
+}
+
+function applyMutationDefaults(
+  contract: SqlContract<SqlStorage>,
+  options: MutationDefaultsOptions,
+): ReadonlyArray<AppliedMutationDefault> {
+  const defaults = contract.execution?.mutations.defaults ?? [];
+  if (defaults.length === 0) {
+    return [];
+  }
+
+  const applied: AppliedMutationDefault[] = [];
+  const appliedColumns = new Set<string>();
+
+  for (const mutationDefault of defaults) {
+    if (mutationDefault.ref.table !== options.table) {
+      continue;
+    }
+
+    const defaultSpec =
+      options.op === 'create' ? mutationDefault.onCreate : mutationDefault.onUpdate;
+    if (!defaultSpec) {
+      continue;
+    }
+
+    const columnName = mutationDefault.ref.column;
+    if (Object.hasOwn(options.values, columnName) || appliedColumns.has(columnName)) {
+      continue;
+    }
+
+    applied.push({
+      column: columnName,
+      value: computeExecutionDefaultValue(defaultSpec),
+    });
+    appliedColumns.add(columnName);
+  }
+
+  return applied;
+}
+
 export function createExecutionContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   TTargetId extends string = string,
@@ -310,5 +359,6 @@ export function createExecutionContext<
     operations: operationRegistry,
     codecs: codecRegistry,
     types,
+    applyMutationDefaults: (options) => applyMutationDefaults(contract, options),
   };
 }

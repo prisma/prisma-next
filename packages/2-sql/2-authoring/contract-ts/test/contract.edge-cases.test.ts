@@ -8,7 +8,7 @@ describe('validateContract edge cases', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: null,
@@ -23,7 +23,7 @@ describe('validateContract edge cases', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {},
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -36,7 +36,7 @@ describe('validateContract edge cases', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {
         User: {
           storage: { table: 'user' },
@@ -70,7 +70,7 @@ describe('validateContract edge cases', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -93,7 +93,7 @@ describe('validateContract edge cases', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {
         User: {
           storage: { table: 'user' },
@@ -132,7 +132,7 @@ describe('validateContract edge cases', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {
         User: {
           storage: { table: 'user' },
@@ -171,7 +171,7 @@ describe('validateContract edge cases', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {
         User: {
           storage: { table: 'user' },
@@ -211,7 +211,7 @@ describe('validateContract edge cases', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {
         User: {
           storage: { table: 'user' },

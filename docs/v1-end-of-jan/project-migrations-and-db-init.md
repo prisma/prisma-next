@@ -19,7 +19,7 @@ This project owns how contracts become database schema and how schema evolution 
     - Creates the baseline schema for the v1 hero app, including:
       - All core tables and indexes needed by the example,
       - PGVector extension, column type(s), and index(es) required by the PGVector flow.
-    - Writes the contract marker (including `coreHash`/`profileHash`) into the database.
+    - Writes the contract marker (including `storageHash`/`profileHash`) into the database.
   - Handles basic existing-schema scenarios for v1:
     - Fails clearly if the database is non-empty in ways that conflict with the contract.
     - Is safe to re-run in obvious “idempotent” cases (e.g. marker already matches and schema unchanged).
@@ -35,7 +35,7 @@ This project owns how contracts become database schema and how schema evolution 
 - **Marker / contract / ledger shape defined for Console/Studio**
   - The schema and tables used to store:
     - The current contract,
-    - Marker (`coreHash`, `profileHash`, adapter profile, etc.),
+    - Marker (`storageHash`, `profileHash`, adapter profile, etc.),
     - A minimal append-only migration ledger,
   - Are:
     - Documented for other teams (Console/Studio),

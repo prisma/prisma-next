@@ -179,4 +179,48 @@ describe('buildWhereExpr', () => {
       buildWhereExpr(contract, binary as ReturnType<typeof userColumns.id.eq>, {}, [], []),
     ).toThrow('Unknown column nonexistent');
   });
+
+  it.each([
+    [true, 'isNull'],
+    [false, 'isNotNull'],
+  ] as const)('builds null-check expressions for %s', (isNull, _operator) => {
+    const nullCheck = {
+      kind: 'nullCheck' as const,
+      expr: createColumnRef('user', 'deletedAt'),
+      isNull,
+    };
+
+    const result = buildWhereExpr(contract, nullCheck, {}, [], []);
+    expect(result.expr).toEqual({
+      kind: 'nullCheck',
+      expr: createColumnRef('user', 'deletedAt'),
+      isNull,
+    });
+    expect(result.paramName).toBe('');
+    expect(result.codecId).toBeUndefined();
+  });
+
+  it('throws when null-check references unknown table', () => {
+    const nullCheck = {
+      kind: 'nullCheck' as const,
+      expr: createColumnRef('missing_table', 'id'),
+      isNull: true,
+    };
+
+    expect(() => buildWhereExpr(contract, nullCheck, {}, [], [])).toThrow(
+      'Unknown table missing_table',
+    );
+  });
+
+  it('throws when null-check references unknown column', () => {
+    const nullCheck = {
+      kind: 'nullCheck' as const,
+      expr: createColumnRef('user', 'missing_column'),
+      isNull: true,
+    };
+
+    expect(() => buildWhereExpr(contract, nullCheck, {}, [], [])).toThrow(
+      'Unknown column missing_column',
+    );
+  });
 });

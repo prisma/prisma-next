@@ -26,6 +26,7 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 - **SQL Contract Validation**: Implements SQL-specific contract validation (`validateContractStructure`, `validateContractLogic`, `validateContract`) and normalization
 - **SQL Contract JSON Schema**: Provides JSON schema for validating contract structure in IDEs and tooling
 - **Composition Layer**: Composes the target-agnostic builder core from `@prisma-next/contract-authoring` with SQL-specific types and validation logic
+- **Generated Defaults**: Supports client-generated defaults via `ColumnDefault.kind = 'generated'` in contract authoring
 
 ## Package Status
 

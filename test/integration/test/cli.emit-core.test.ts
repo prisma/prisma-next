@@ -108,7 +108,7 @@ describe('emit integration', () => {
         ast: expect.anything(),
         params: expect.anything(),
         meta: expect.objectContaining({
-          coreHash: result.coreHash,
+          storageHash: result.storageHash,
         }),
       });
 
@@ -175,7 +175,7 @@ describe('emit integration', () => {
       const contractJson2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
 
       expect(contractJson1).toEqual(contractJson2);
-      expect(result1.coreHash).toBe(result2.coreHash);
+      expect(result1.storageHash).toBe(result2.storageHash);
     },
     timeouts.typeScriptCompilation,
   );

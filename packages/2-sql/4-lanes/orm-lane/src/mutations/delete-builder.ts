@@ -60,7 +60,7 @@ export function buildDeletePlan<
     meta: {
       target: context.contract.target,
       targetFamily: context.contract.targetFamily,
-      coreHash: context.contract.coreHash,
+      storageHash: context.contract.storageHash,
       lane: 'orm',
       refs: {
         tables: [tableName],

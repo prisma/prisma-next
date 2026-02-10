@@ -149,4 +149,51 @@ describe('select builder edge cases', () => {
       createBinaryExpr('eq', createColumnRef('user', 'id'), createColumnRef('user', 'createdAt')),
     );
   });
+
+  it.each([
+    ['innerJoin', 'inner'],
+    ['leftJoin', 'left'],
+    ['rightJoin', 'right'],
+    ['fullJoin', 'full'],
+  ] as const)('builds query with %s', (joinMethod, expectedJoinType) => {
+    const contractWithJoinTable = {
+      ...contract,
+      storage: {
+        ...contract.storage,
+        tables: {
+          ...contract.storage.tables,
+          post: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    } as Contract;
+    const joinContext = createTestContext(contractWithJoinTable, adapter);
+    const postTable = createTableRef('post');
+    const postUserId = {
+      ...userColumns.id,
+      table: 'post',
+      column: 'userId',
+      toExpr: () => createColumnRef('post', 'userId'),
+    } as unknown as typeof userColumns.id;
+    const builder = sql<Contract, CodecTypes>({ context: joinContext }).from(userTable);
+    const joined = builder[joinMethod](postTable, (on) => on.eqCol(userColumns.id, postUserId));
+    const plan = joined
+      .select({
+        id: userColumns.id,
+      })
+      .build();
+
+    const ast = plan.ast as SelectAst;
+    expect(ast.joins?.[0]).toMatchObject({
+      kind: 'join',
+      joinType: expectedJoinType,
+    });
+  });
 });

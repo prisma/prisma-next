@@ -89,7 +89,7 @@ describe('runtime execute integration', () => {
   it('throws when marker hash mismatches contract', async () => {
     const mismatchedContract: SqlContract<SqlStorage> = {
       ...fixtureContract,
-      coreHash: coreHash('sha256:mismatch'),
+      storageHash: coreHash('sha256:mismatch'),
     };
 
     const runtime = createTestRuntime(
@@ -233,34 +233,38 @@ describe('runtime execute integration', () => {
     expect(telemetry).toMatchObject({ outcome: 'runtime-error', lane: 'raw' });
   });
 
-  it('respects unbounded select severity override', async () => {
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      {
-        verify: { mode: 'onFirstUse', requireMarker: true },
-        plugins: [
-          budgets({
-            severities: { rowCount: 'warn' },
-          }),
-        ],
-        mode: 'permissive',
-      },
-    );
+  it(
+    'respects unbounded select severity override',
+    async () => {
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+          plugins: [
+            budgets({
+              severities: { rowCount: 'warn' },
+            }),
+          ],
+          mode: 'permissive',
+        },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const rawPlan = sql({ context }).raw`
+      const context = createTestContext(fixtureContract, adapter);
+      const rawPlan = sql({ context }).raw`
       select id from "user"
     `;
 
-    await drainPlanExecution(runtime, rawPlan);
+      await drainPlanExecution(runtime, rawPlan);
 
-    const telemetry = runtime.telemetry();
-    expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
-  });
+      const telemetry = runtime.telemetry();
+      expect(telemetry).toMatchObject({ outcome: 'success', lane: 'raw' });
+    },
+    timeouts.databaseOperation,
+  );
 
   it(
     'attaches explain estimates when enabled',

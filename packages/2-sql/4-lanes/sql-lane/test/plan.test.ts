@@ -431,4 +431,67 @@ describe('buildMeta', () => {
     expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'id' });
     expect(meta.refs?.tables).toContain('post');
   });
+
+  it('builds meta with null-check where clause', () => {
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id'],
+        columns: [userColumns.id],
+      },
+      where: {
+        kind: 'nullCheck',
+        expr: createColumnRef('user', 'deletedAt'),
+        isNull: true,
+      },
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'deletedAt' });
+  });
+
+  it('builds meta with include null-check childWhere', () => {
+    const includes = [
+      {
+        alias: 'posts',
+        table: createTableRef('post'),
+        on: {
+          kind: 'join-on' as const,
+          left: userColumns.id,
+          right: userColumns.id,
+        } as unknown as JoinOnPredicate,
+        childProjection: {
+          aliases: ['id'],
+          columns: [userColumns.id],
+        },
+        childWhere: {
+          kind: 'nullCheck' as const,
+          expr: createColumnRef('user', 'deletedAt'),
+          isNull: false,
+        },
+      },
+    ];
+
+    const meta = buildMeta({
+      contract,
+      table: tableRef,
+      projection: {
+        aliases: ['id', 'posts'],
+        columns: [
+          userColumns.id,
+          {
+            kind: 'column' as const,
+            table: 'post',
+            column: '',
+            columnMeta: { nativeType: 'jsonb', codecId: 'core/json@1', nullable: true },
+          } as AnyColumnBuilder,
+        ],
+      },
+      includes,
+      paramDescriptors: [],
+    });
+
+    expect(meta.refs?.columns).toContainEqual({ table: 'user', column: 'deletedAt' });
+  });
 });

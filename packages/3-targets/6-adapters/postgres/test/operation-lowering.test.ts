@@ -7,7 +7,7 @@ import type { PostgresContract } from '../src/core/types';
 const contract = validateContract<PostgresContract>({
   target: 'postgres',
   targetFamily: 'sql',
-  coreHash: 'test-hash',
+  storageHash: 'test-hash',
   storage: {
     tables: {
       user: {

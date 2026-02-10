@@ -58,7 +58,7 @@ describe('control client integration', () => {
 
           expect(verifyResult).toMatchObject({
             ok: true,
-            contract: { coreHash: expect.anything() },
+            contract: { storageHash: expect.anything() },
           });
         } finally {
           await client.close();

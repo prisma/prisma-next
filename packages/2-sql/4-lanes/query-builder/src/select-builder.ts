@@ -34,7 +34,7 @@ export class SelectBuilder<
       >
     : PreviousFunctionReceivedBadInputError<'[error] selecting all columns via `*` results in ambiguity when multiple tables are involved in the query'>;
   select<TTableName extends keyof TTables & string>(
-    asterisk: TableAsterisk<TTableName, TContract['coreHash']>,
+    asterisk: TableAsterisk<TTableName, TContract['storageHash']>,
   ): SelectBuilder<
     TContract,
     TTables,
@@ -44,7 +44,7 @@ export class SelectBuilder<
     arg: never,
   ): PreviousFunctionReceivedBadInputError<'[error] invalid input in previous `select()` call'>;
   // biome-ignore lint/suspicious/noExplicitAny: implementation signature must be compatible with all overloads
-  select(..._args: any[]): any {
+  select(..._args: unknown[]): unknown {
     // TODO: do runtime stuff.
     return this;
   }

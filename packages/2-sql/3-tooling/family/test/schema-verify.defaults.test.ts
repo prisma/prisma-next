@@ -1,4 +1,5 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import type { DefaultNormalizer } from '../src/core/schema-verify/verify-sql-schema';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
@@ -192,6 +193,48 @@ describe('verifySqlSchema - defaults', () => {
       typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       // No normalizer provided
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('ignores generated defaults during verification', () => {
+    const baseContract = createTestContract({
+      user: createContractTable({
+        id: {
+          nativeType: 'text',
+          nullable: false,
+        },
+      }),
+    });
+    const contract = {
+      ...baseContract,
+      execution: {
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'id' },
+              onCreate: { kind: 'generator', id: 'uuidv4' },
+            },
+          ],
+        },
+      },
+    } satisfies SqlContract<SqlStorage>;
+
+    const schema = createTestSchemaIR({
+      user: createSchemaTable('user', {
+        id: { nativeType: 'text', nullable: false },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
     });
 
     expect(result.ok).toBe(true);

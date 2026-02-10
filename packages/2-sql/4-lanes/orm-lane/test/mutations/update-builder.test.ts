@@ -16,7 +16,7 @@ describe('update builder', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: coreHash('sha256:test'),
+    storageHash: coreHash('sha256:test'),
     models: {
       User: {
         storage: { table: 'user' },
@@ -61,6 +61,7 @@ describe('update builder', () => {
     operations: createOperationRegistry(),
     codecs: createCodecRegistry(),
     types: {},
+    applyMutationDefaults: () => [],
   };
 
   const getModelAccessor: () => ModelColumnAccessor<

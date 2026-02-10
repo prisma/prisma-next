@@ -133,7 +133,7 @@ describe('emitter round-trip', () => {
       const result2 = await emit(ir2, options, mockSqlHook);
 
       expect(result1.contractJson).toBe(result2.contractJson);
-      expect(result1.coreHash).toBe(result2.coreHash);
+      expect(result1.storageHash).toBe(result2.storageHash);
     },
     timeouts.typeScriptCompilation,
   );
@@ -230,7 +230,7 @@ describe('emitter round-trip', () => {
     const result2 = await emit(ir2, options, mockSqlHook);
 
     expect(result1.contractJson).toBe(result2.contractJson);
-    expect(result1.coreHash).toBe(result2.coreHash);
+    expect(result1.storageHash).toBe(result2.storageHash);
   });
 
   it('round-trip with nullable fields', async () => {
@@ -289,7 +289,7 @@ describe('emitter round-trip', () => {
     const result2 = await emit(ir2, options, mockSqlHook);
 
     expect(result1.contractJson).toBe(result2.contractJson);
-    expect(result1.coreHash).toBe(result2.coreHash);
+    expect(result1.storageHash).toBe(result2.storageHash);
 
     const parsed2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
     const storage = parsed2['storage'] as Record<string, unknown>;
@@ -364,7 +364,7 @@ describe('emitter round-trip', () => {
     const result2 = await emit(ir2, options, mockSqlHook);
 
     expect(result1.contractJson).toBe(result2.contractJson);
-    expect(result1.coreHash).toBe(result2.coreHash);
+    expect(result1.storageHash).toBe(result2.storageHash);
     expect(result1.profileHash).toBe(result2.profileHash);
   });
 });

@@ -85,7 +85,7 @@ export class KyselyPrismaConnection implements DatabaseConnection {
       meta: {
         target: this.#contract.target,
         targetFamily: this.#contract.targetFamily,
-        coreHash: this.#contract.coreHash,
+        storageHash: this.#contract.storageHash,
         ...(this.#contract.profileHash !== undefined
           ? { profileHash: this.#contract.profileHash }
           : {}),

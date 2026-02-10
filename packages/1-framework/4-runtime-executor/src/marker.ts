@@ -74,7 +74,7 @@ export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
     : new Date();
 
   return {
-    coreHash: validatedRow.core_hash,
+    storageHash: validatedRow.core_hash,
     profileHash: validatedRow.profile_hash,
     contractJson: validatedRow.contract_json ?? null,
     canonicalVersion: validatedRow.canonical_version ?? null,

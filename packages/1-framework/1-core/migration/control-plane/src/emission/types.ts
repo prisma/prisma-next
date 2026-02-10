@@ -22,6 +22,7 @@ export interface EmitOptions {
 export interface EmitResult {
   readonly contractJson: string;
   readonly contractDts: string;
-  readonly coreHash: string;
+  readonly storageHash: string;
+  readonly executionHash?: string;
   readonly profileHash: string;
 }

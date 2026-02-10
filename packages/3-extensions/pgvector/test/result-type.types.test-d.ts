@@ -126,7 +126,7 @@ test('ResultType infers Vector<1536> | null for parameterized nullable vector co
   const contractWithVector = validateContract<ContractWithNullableVector>({
     target: 'postgres',
     targetFamily: 'sql' as const,
-    coreHash: 'sha256:test-core',
+    storageHash: 'sha256:test-core',
     profileHash: 'sha256:test-profile',
     storage: {
       tables: {
@@ -211,7 +211,7 @@ test('ResultType infers Vector<1536> for parameterized non-nullable vector colum
   const contractWithVector = validateContract<ContractWithNonNullableVector>({
     target: 'postgres',
     targetFamily: 'sql' as const,
-    coreHash: 'sha256:test-core',
+    storageHash: 'sha256:test-core',
     profileHash: 'sha256:test-profile',
     storage: {
       tables: {
@@ -285,7 +285,7 @@ test('cosineDistance remains available on parameterized vector columns', () => {
   const contractWithVector = validateContract<ContractWithNonNullableVector>({
     target: 'postgres',
     targetFamily: 'sql' as const,
-    coreHash: 'sha256:test-core',
+    storageHash: 'sha256:test-core',
     profileHash: 'sha256:test-profile',
     storage: {
       tables: {

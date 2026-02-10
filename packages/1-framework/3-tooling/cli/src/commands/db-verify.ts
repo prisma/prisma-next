@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
@@ -54,8 +55,8 @@ function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredErro
     }
     if (verifyResult.code === 'PN-RTM-3002') {
       return errorHashMismatch({
-        expected: verifyResult.contract.coreHash,
-        ...(verifyResult.marker?.coreHash ? { actual: verifyResult.marker.coreHash } : {}),
+        expected: verifyResult.contract.storageHash,
+        ...ifDefined('actual', verifyResult.marker?.storageHash),
       });
     }
     if (verifyResult.code === 'PN-RTM-3003') {

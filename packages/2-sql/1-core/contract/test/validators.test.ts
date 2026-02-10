@@ -54,6 +54,25 @@ describe('SQL contract validators', () => {
       } as unknown;
       expect(() => validateStorage(invalid)).toThrow();
     });
+
+    it('throws when both typeParams and typeRef are provided', () => {
+      const invalid = {
+        tables: {
+          user: {
+            columns: {
+              id: {
+                nativeType: 'int4',
+                codecId: 'pg/int4@1',
+                nullable: false,
+                typeParams: { precision: 32 },
+                typeRef: 'someType',
+              },
+            },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(invalid)).toThrow(/either typeParams or typeRef, not both/);
+    });
   });
 
   describe('validateModel', () => {
@@ -104,7 +123,7 @@ describe('SQL contract validators', () => {
       };
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         models: m,
       });
@@ -118,7 +137,7 @@ describe('SQL contract validators', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
       });
       const invalid = { ...c, targetFamily: undefined } as unknown;
@@ -132,7 +151,7 @@ describe('SQL contract validators', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
       });
       const invalid = { ...c, targetFamily: 'document' } as unknown;
@@ -146,25 +165,25 @@ describe('SQL contract validators', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
       });
       const invalid = { ...c, target: undefined } as unknown;
       expect(() => validateSqlContract(invalid)).toThrow(/target/);
     });
 
-    it('throws on missing coreHash', () => {
+    it('throws on missing storageHash', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),
       });
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
       });
-      const invalid = { ...c, coreHash: undefined } as unknown;
-      expect(() => validateSqlContract(invalid)).toThrow(/coreHash/);
+      const invalid = { ...c, storageHash: undefined } as unknown;
+      expect(() => validateSqlContract(invalid)).toThrow(/storageHash/);
     });
 
     it('throws on missing storage', () => {
@@ -174,7 +193,7 @@ describe('SQL contract validators', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
       });
       const invalid = { ...c, storage: undefined } as unknown;
@@ -188,7 +207,7 @@ describe('SQL contract validators', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
       });
       const invalid = { ...c, models: undefined } as unknown;
@@ -202,7 +221,7 @@ describe('SQL contract validators', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         profileHash: 'sha256:def456',
         storage: s,
       });
@@ -216,7 +235,7 @@ describe('SQL contract validators', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         capabilities: {
           postgres: {
@@ -234,7 +253,7 @@ describe('SQL contract validators', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         extensionPacks: {
           postgres: {
@@ -253,7 +272,7 @@ describe('SQL contract validators', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         meta: {
           generated: true,
@@ -269,7 +288,7 @@ describe('SQL contract validators', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         sources: {
           userView: {

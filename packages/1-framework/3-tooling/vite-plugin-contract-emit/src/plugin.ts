@@ -85,7 +85,7 @@ export function prismaVitePlugin(
         return null;
       }
 
-      log(`Emitted contract (coreHash: ${result.coreHash.slice(0, 8)}...)`);
+      log(`Emitted contract (storageHash: ${result.storageHash.slice(0, 8)}...)`);
       log(`  → ${result.files.json}`, 'debug');
       log(`  → ${result.files.dts}`, 'debug');
 

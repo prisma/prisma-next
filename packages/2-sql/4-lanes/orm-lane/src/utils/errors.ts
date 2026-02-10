@@ -61,6 +61,10 @@ export function errorUpdateRequiresFields(): never {
   throw planInvalid('update() requires at least one field');
 }
 
+export function errorGeneratedFieldNotWritable(fieldName: string): never {
+  throw planInvalid(`Field ${fieldName} is generated and cannot be set manually`);
+}
+
 export function errorIncludeRequiresCapabilities(): never {
   throw planInvalid('includeMany requires lateral and jsonAgg capabilities');
 }

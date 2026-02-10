@@ -391,7 +391,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     if (!marker) {
       return false;
     }
-    if (marker.coreHash !== plan.destination.coreHash) {
+    if (marker.storageHash !== plan.destination.storageHash) {
       return false;
     }
     if (plan.destination.profileHash && marker.profileHash !== plan.destination.profileHash) {
@@ -438,10 +438,10 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       }
       return runnerFailure(
         'MARKER_ORIGIN_MISMATCH',
-        `Existing contract marker (${marker.coreHash}) does not match plan origin (no marker expected).`,
+        `Existing contract marker (${marker.storageHash}) does not match plan origin (no marker expected).`,
         {
           meta: {
-            markerCoreHash: marker.coreHash,
+            markerStorageHash: marker.storageHash,
             expectedOrigin: null,
           },
         },
@@ -451,22 +451,22 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     if (!marker) {
       return runnerFailure(
         'MARKER_ORIGIN_MISMATCH',
-        `Missing contract marker: expected origin core hash ${origin.coreHash}.`,
+        `Missing contract marker: expected origin storage hash ${origin.storageHash}.`,
         {
           meta: {
-            expectedOriginCoreHash: origin.coreHash,
+            expectedOriginStorageHash: origin.storageHash,
           },
         },
       );
     }
-    if (marker.coreHash !== origin.coreHash) {
+    if (marker.storageHash !== origin.storageHash) {
       return runnerFailure(
         'MARKER_ORIGIN_MISMATCH',
-        `Existing contract marker (${marker.coreHash}) does not match plan origin (${origin.coreHash}).`,
+        `Existing contract marker (${marker.storageHash}) does not match plan origin (${origin.storageHash}).`,
         {
           meta: {
-            markerCoreHash: marker.coreHash,
-            expectedOriginCoreHash: origin.coreHash,
+            markerStorageHash: marker.storageHash,
+            expectedOriginStorageHash: origin.storageHash,
           },
         },
       );
@@ -490,14 +490,14 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     destination: SqlMigrationPlanContractInfo,
     contract: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['destinationContract'],
   ): Result<void, SqlMigrationRunnerFailure> {
-    if (destination.coreHash !== contract.coreHash) {
+    if (destination.storageHash !== contract.storageHash) {
       return runnerFailure(
         'DESTINATION_CONTRACT_MISMATCH',
-        `Plan destination core hash (${destination.coreHash}) does not match provided contract core hash (${contract.coreHash}).`,
+        `Plan destination storage hash (${destination.storageHash}) does not match provided contract storage hash (${contract.storageHash}).`,
         {
           meta: {
-            planCoreHash: destination.coreHash,
-            contractCoreHash: contract.coreHash,
+            planStorageHash: destination.storageHash,
+            contractStorageHash: contract.storageHash,
           },
         },
       );
@@ -527,11 +527,11 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
     const writeStatements = buildWriteMarkerStatements({
-      coreHash: options.plan.destination.coreHash,
+      storageHash: options.plan.destination.storageHash,
       profileHash:
         options.plan.destination.profileHash ??
         options.destinationContract.profileHash ??
-        options.plan.destination.coreHash,
+        options.plan.destination.storageHash,
       contractJson: options.destinationContract,
       canonicalVersion: null,
       meta: {},
@@ -547,13 +547,13 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     executedOperations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[],
   ): Promise<void> {
     const ledgerStatement = buildLedgerInsertStatement({
-      originCoreHash: existingMarker?.coreHash ?? null,
+      originStorageHash: existingMarker?.storageHash ?? null,
       originProfileHash: existingMarker?.profileHash ?? null,
-      destinationCoreHash: options.plan.destination.coreHash,
+      destinationStorageHash: options.plan.destination.storageHash,
       destinationProfileHash:
         options.plan.destination.profileHash ??
         options.destinationContract.profileHash ??
-        options.plan.destination.coreHash,
+        options.plan.destination.storageHash,
       contractJsonBefore: existingMarker?.contractJson ?? null,
       contractJsonAfter: options.destinationContract,
       operations: executedOperations,

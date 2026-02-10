@@ -80,7 +80,7 @@ describe('emit command', () => {
       const parsed = JSON.parse(jsonOutput);
       expect(parsed).toMatchObject({
         ok: true,
-        coreHash: expect.any(String),
+        storageHash: expect.any(String),
         outDir: expect.any(String),
         files: {
           json: expect.any(String),
@@ -360,7 +360,7 @@ describe('emit command', () => {
       const parsed = JSON.parse(jsonOutput);
       expect(parsed).toMatchObject({
         ok: true,
-        coreHash: expect.any(String),
+        storageHash: expect.any(String),
         profileHash: expect.any(String),
         outDir: expect.any(String),
         files: {

@@ -53,7 +53,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: coreHash('sha256:contract'),
+      storageHash: coreHash('sha256:contract'),
       storage: {
         tables: {
           user: {
@@ -142,7 +142,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: coreHash('sha256:contract'),
+      storageHash: coreHash('sha256:contract'),
       storage: {
         tables: {},
         types: {
@@ -223,7 +223,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: coreHash('sha256:contract'),
+      storageHash: coreHash('sha256:contract'),
       storage: {
         tables: {
           user: {

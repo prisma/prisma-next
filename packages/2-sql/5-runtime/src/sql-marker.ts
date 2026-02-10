@@ -6,7 +6,7 @@ export interface SqlStatement {
 }
 
 export interface WriteMarkerInput {
-  readonly coreHash: string;
+  readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson?: unknown;
   readonly canonicalVersion?: number;
@@ -57,7 +57,7 @@ export interface WriteContractMarkerStatements {
 export function writeContractMarker(input: WriteMarkerInput): WriteContractMarkerStatements {
   const baseParams: readonly unknown[] = [
     1,
-    input.coreHash,
+    input.storageHash,
     input.profileHash,
     input.contractJson ?? null,
     input.canonicalVersion ?? null,

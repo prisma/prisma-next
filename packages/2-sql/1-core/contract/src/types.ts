@@ -1,8 +1,10 @@
 import type {
   ColumnDefault,
   ContractBase,
-  CoreHashBase,
+  ExecutionHashBase,
+  ExecutionSection,
   ProfileHashBase,
+  StorageHashBase,
 } from '@prisma-next/contract/types';
 
 /**
@@ -121,14 +123,16 @@ export type SqlContract<
   M extends Record<string, unknown> = Record<string, unknown>,
   R extends Record<string, unknown> = Record<string, unknown>,
   Map extends SqlMappings = SqlMappings,
-  TCoreHash extends CoreHashBase<string> = CoreHashBase<string>,
+  TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
+  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> = ContractBase<TCoreHash, TProfileHash> & {
+> = ContractBase<TStorageHash, TExecutionHash, TProfileHash> & {
   readonly targetFamily: string;
   readonly storage: S;
   readonly models: M;
   readonly relations: R;
   readonly mappings: Map;
+  readonly execution?: ExecutionSection;
 };
 
 export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> =

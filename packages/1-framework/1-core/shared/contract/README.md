@@ -14,7 +14,7 @@ This package provides the foundational type definitions for Prisma Next, includi
 - **Core Contract Types**: Defines framework-level contract types (`ContractBase`, `Source`, `FamilyInstance`) that are shared across all target families
 - **Framework Component Model**: Provides base descriptor interfaces (`FamilyDescriptor`, `TargetDescriptor`, `AdapterDescriptor`, `DriverDescriptor`, `ExtensionDescriptor`) and identity instance bases (`FamilyInstance`, `TargetInstance`, `AdapterInstance`, `DriverInstance`, `ExtensionInstance`) that plane-specific types extend
 - **Document Family Types**: Provides TypeScript types for document target family contracts (`DocumentContract`)
-- **Shared Column Defaults**: Defines `ColumnDefault` for db-agnostic defaults (literal expression and function) reused across family contracts and authoring builders
+- **Shared Column Defaults**: Defines `ColumnDefault` for db-agnostic defaults (literal and function) reused across family contracts and authoring builders
 - **JSON Schema Validation**: Provides JSON Schemas for validating contract structure in IDEs and tooling
 - **Type Guards**: Provides runtime type guards for narrowing contract types (`isDocumentContract`)
 - **Emitter Types**: Defines emitter SPI types (`TargetFamilyHook`, `ValidationContext`, `TypesImportSpec`) that are shared between emitter and control plane
@@ -55,7 +55,7 @@ function processContract(contract: DocumentContract) {
 
 // Use ContractMarkerRecord for database marker operations
 function processMarker(marker: ContractMarkerRecord) {
-  console.log(marker.coreHash, marker.profileHash);
+  console.log(marker.storageHash, marker.profileHash);
 }
 
 // Use emitter types for implementing family hooks
@@ -150,7 +150,7 @@ For document targets (MongoDB, Firestore, etc.):
   "schemaVersion": "1",
   "target": "mongodb",
   "targetFamily": "document",
-  "coreHash": "sha256:...",
+  "storageHash": "sha256:...",
   "storage": {
     "document": {
       "collections": {
@@ -175,7 +175,7 @@ For document targets (MongoDB, Firestore, etc.):
   "schemaVersion": "1",
   "target": "postgres",
   "targetFamily": "sql",
-  "coreHash": "sha256:...",
+  "storageHash": "sha256:...",
   "storage": {
     "tables": {
       "user": {
@@ -208,7 +208,8 @@ All contracts share these common fields:
 - **`schemaVersion`** (required): Contract schema version (currently `"1"`)
 - **`target`** (required): Database target identifier (e.g., `"postgres"`, `"mongo"`, `"firestore"`)
 - **`targetFamily`** (required): Target family classification (`"document"` for document contracts)
-- **`coreHash`** (required): SHA-256 hash of the core schema structure
+- **`storageHash`** (required): SHA-256 hash of the storage schema structure
+- **`executionHash`** (optional): SHA-256 hash of execution-time mutation defaults
 - **`profileHash`** (optional): SHA-256 hash of the capability profile
 - **`capabilities`** (optional): Capability flags declared by the contract
 - **`extensionPacks`** (optional): Extension packs and their configuration

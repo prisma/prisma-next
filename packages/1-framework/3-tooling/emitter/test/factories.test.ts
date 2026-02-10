@@ -7,13 +7,13 @@ describe('emitter factories', () => {
       const header = irHeader({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
       });
       expect(header).toEqual({
         schemaVersion: '1',
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
       });
     });
 
@@ -21,14 +21,14 @@ describe('emitter factories', () => {
       const header = irHeader({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         profileHash: 'sha256:def456',
       });
       expect(header).toEqual({
         schemaVersion: '1',
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         profileHash: 'sha256:def456',
       });
     });
@@ -37,7 +37,7 @@ describe('emitter factories', () => {
       const header = irHeader({
         target: 'mongodb',
         targetFamily: 'document',
-        coreHash: 'sha256:xyz789',
+        storageHash: 'sha256:xyz789',
       });
       expect(header.targetFamily).toBe('document');
       expect(header.target).toBe('mongodb');
@@ -149,7 +149,7 @@ describe('emitter factories', () => {
       const header = irHeader({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
       });
       const meta = irMeta({
         capabilities: {
@@ -171,7 +171,7 @@ describe('emitter factories', () => {
       expect(ir.schemaVersion).toBe('1');
       expect(ir.target).toBe('postgres');
       expect(ir.targetFamily).toBe('sql');
-      // Note: coreHash is not part of ContractIR (it's computed by emitter)
+      // Note: storageHash is not part of ContractIR (it's computed by emitter)
       expect(ir.storage).toEqual(storage);
       expect(ir.models).toEqual(models);
       expect(ir.relations).toEqual(relations);
@@ -187,7 +187,7 @@ describe('emitter factories', () => {
       const header = irHeader({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         profileHash: 'sha256:def456',
       });
       const meta = irMeta({});
@@ -213,7 +213,7 @@ describe('emitter factories', () => {
       const header = irHeader({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
       });
       const meta = irMeta({
         capabilities: {
@@ -251,7 +251,7 @@ describe('emitter factories', () => {
       const header = irHeader({
         target: 'mongodb',
         targetFamily: 'document',
-        coreHash: 'sha256:xyz789',
+        storageHash: 'sha256:xyz789',
       });
       const meta = irMeta({});
       const storage = { document: { collections: {} } };

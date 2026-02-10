@@ -118,7 +118,7 @@ describe('family instance sign', () => {
               updated: false,
             },
             contract: {
-              coreHash: validatedContract.coreHash,
+              storageHash: validatedContract.storageHash,
             },
           });
           expect(result.timings.total).toBeGreaterThanOrEqual(0);
@@ -126,7 +126,7 @@ describe('family instance sign', () => {
           // Verify marker was written to database
           const marker = await readMarker(driver);
           expect(marker).not.toBeNull();
-          expect(marker?.coreHash).toBe(validatedContract.coreHash);
+          expect(marker?.storageHash).toBe(validatedContract.storageHash);
         } finally {
           await driver.close();
         }
@@ -158,7 +158,7 @@ describe('family instance sign', () => {
         `);
         // Write initial marker with different hash
         const write = writeContractMarker({
-          coreHash: 'sha256:old-hash',
+          storageHash: 'sha256:old-hash',
           profileHash: 'sha256:old-profile-hash',
           contractJson: { target: 'postgres' },
           canonicalVersion: 1,
@@ -198,12 +198,12 @@ describe('family instance sign', () => {
               created: false,
               updated: true,
               previous: {
-                coreHash: 'sha256:old-hash',
+                storageHash: 'sha256:old-hash',
                 profileHash: 'sha256:old-profile-hash',
               },
             },
             contract: {
-              coreHash: validatedContract.coreHash,
+              storageHash: validatedContract.storageHash,
             },
           });
           expect(result.summary).toContain('Database signed (marker updated from');
@@ -212,8 +212,8 @@ describe('family instance sign', () => {
           // Verify marker was updated in database
           const marker = await readMarker(driver);
           expect(marker).not.toBeNull();
-          expect(marker?.coreHash).toBe(validatedContract.coreHash);
-          expect(marker?.coreHash).not.toBe('sha256:old-hash');
+          expect(marker?.storageHash).toBe(validatedContract.storageHash);
+          expect(marker?.storageHash).not.toBe('sha256:old-hash');
         } finally {
           await driver.close();
         }
@@ -294,7 +294,7 @@ describe('family instance sign', () => {
               updated: false,
             },
             contract: {
-              coreHash: validatedContract.coreHash,
+              storageHash: validatedContract.storageHash,
             },
           });
           expect(secondResult.marker.previous).toBeUndefined();

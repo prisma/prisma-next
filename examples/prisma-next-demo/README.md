@@ -10,6 +10,7 @@ This demo shows:
 - Contract verification and marker management
 - Native Prisma Next patterns and best practices
 - **Two workflows**: Emit workflow (JSON-based) and No-Emit workflow (TypeScript-based)
+- Client-generated UUID identifiers via `@prisma-next/ids`
 
 ## Comparison
 

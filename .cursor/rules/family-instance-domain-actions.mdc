@@ -19,7 +19,7 @@ When implementing domain actions on family instances:
 ```typescript
 // Import pure helper functions from core
 import { canonicalizeContract } from '@prisma-next/core-control-plane/emission/canonicalization';
-import { computeCoreHash, computeProfileHash } from '@prisma-next/core-control-plane/emission/hashing';
+import { computeExecutionHash, computeProfileHash, computeStorageHash } from '@prisma-next/core-control-plane/emission/hashing';
 import { format } from 'prettier';
 
 // Inline the domain action orchestration
@@ -30,7 +30,8 @@ async emitContract({ contractIR }): Promise<EmitContractResult> {
   // ... validation logic ...
 
   // Use helper functions
-  const coreHash = computeCoreHash(contractJson);
+  const storageHash = computeStorageHash(contractJson);
+  const executionHash = computeExecutionHash(contractJson);
   const profileHash = computeProfileHash(contractJson);
   const contractJsonString = JSON.stringify(
     { ...JSON.parse(canonicalizeContract(contractWithHashes)), _generated: {...} },
@@ -44,7 +45,7 @@ async emitContract({ contractIR }): Promise<EmitContractResult> {
     { parser: 'typescript', ... }
   );
 
-  return { contractJson: contractJsonString, contractDts, coreHash, profileHash };
+  return { contractJson: contractJsonString, contractDts, storageHash, executionHash, profileHash };
 }
 ```
 
@@ -73,7 +74,7 @@ async emitContract({ contractIR }): Promise<EmitContractResult> {
 
 **Import (pure helper functions):**
 - `canonicalizeContract()` - Pure canonicalization logic
-- `computeCoreHash()`, `computeProfileHash()` - Pure hashing logic
+- `computeStorageHash()`, `computeExecutionHash()`, `computeProfileHash()` - Pure hashing logic
 - `format()` from prettier - Pure formatting
 - Other pure utility functions
 
@@ -88,7 +89,7 @@ async emitContract({ contractIR }): Promise<EmitContractResult> {
 
 Core control plane provides:
 - **Types**: `FamilyInstance`, `EmitContractResult`, `VerifyDatabaseResult`, etc.
-- **Helper functions**: Pure utilities like `canonicalizeContract`, `computeCoreHash`
+- **Helper functions**: Pure utilities like `canonicalizeContract`, `computeStorageHash`
 - **Error factories**: Structured error creation
 
 Core control plane does **not** provide:
@@ -98,7 +99,7 @@ Core control plane does **not** provide:
 ## Example: SQL Family Instance
 
 The SQL family instance's `emitContract()` method:
-- Imports helper functions: `canonicalizeContract`, `computeCoreHash`, `computeProfileHash`
+- Imports helper functions: `canonicalizeContract`, `computeStorageHash`, `computeExecutionHash`, `computeProfileHash`
 - Inlines validation, orchestration, and result assembly
 - Uses the instance's preassembled state (operation registry, type imports, extension IDs)
 - Calls the SQL family hook for type generation

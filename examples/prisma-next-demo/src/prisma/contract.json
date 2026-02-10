@@ -2,8 +2,35 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:82a5eedba0cffd694a22952212ac3bc7b1a0a93c499656e1e46834b16ce70c7e",
+  "storageHash": "sha256:82a5eedba0cffd694a22952212ac3bc7b1a0a93c499656e1e46834b16ce70c7e",
+  "executionHash": "sha256:82a5eedba0cffd694a22952212ac3bc7b1a0a93c499656e1e46834b16ce70c7e",
   "profileHash": "sha256:fc74c4c3a1401c2ffd528ee1bd61b0ac57af7bdd5e77d39d567389afcb1027bd",
+  "execution": {
+    "mutations": {
+      "defaults": [
+        {
+          "ref": {
+            "table": "post",
+            "column": "id"
+          },
+          "onCreate": {
+            "kind": "generator",
+            "id": "uuidv4"
+          }
+        },
+        {
+          "ref": {
+            "table": "user",
+            "column": "id"
+          },
+          "onCreate": {
+            "kind": "generator",
+            "id": "uuidv4"
+          }
+        }
+      ]
+    }
+  },
   "models": {
     "Post": {
       "fields": {
@@ -68,12 +95,8 @@
             "nullable": true
           },
           "id": {
-            "codecId": "pg/int4@1",
-            "default": {
-              "expression": "autoincrement()",
-              "kind": "function"
-            },
-            "nativeType": "int4",
+            "codecId": "pg/text@1",
+            "nativeType": "text",
             "nullable": false
           },
           "title": {
@@ -81,8 +104,8 @@
             "nativeType": "text"
           },
           "userId": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4"
+            "codecId": "pg/text@1",
+            "nativeType": "text"
           }
         },
         "foreignKeys": [
@@ -123,12 +146,8 @@
             "nativeType": "text"
           },
           "id": {
-            "codecId": "pg/int4@1",
-            "default": {
-              "expression": "autoincrement()",
-              "kind": "function"
-            },
-            "nativeType": "int4",
+            "codecId": "pg/text@1",
+            "nativeType": "text",
             "nullable": false
           },
           "kind": {
@@ -162,7 +181,6 @@
   },
   "capabilities": {
     "postgres": {
-      "defaults.autoincrement": true,
       "defaults.now": true,
       "jsonAgg": true,
       "lateral": true,

@@ -12,6 +12,7 @@ This package provides the ORM query builder that compiles model-based queries to
 - **Include compilation**: ORM includes compile to SQL lane primitives like `includeMany`
 - **Relation filters**: Filter queries by related model properties (`some`, `none`, `every`)
 - **Model accessors**: Type-safe access to models and their columns/relations
+- **Generated defaults**: Auto-fills client-generated columns on create and blocks manual writes on update
 
 ## Dependencies
 

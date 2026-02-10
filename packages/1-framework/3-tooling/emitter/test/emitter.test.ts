@@ -111,7 +111,7 @@ describe('emitter', () => {
       };
 
       const result = await emit(ir, options, mockSqlHook);
-      expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(result.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
       expect(result.contractDts).toContain('export type Contract');
       expect(result.contractDts).toContain('CodecTypes');
 

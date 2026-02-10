@@ -3,7 +3,7 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { sql, tables } from '../prisma/context';
 import { collect } from './utils';
 
-export async function getUserById(userId: number, runtime: Runtime) {
+export async function getUserById(userId: string, runtime: Runtime) {
   const userTable = tables.user;
 
   const plan = sql

@@ -128,7 +128,7 @@ describe('emitter integration', () => {
 
       const result = await emit(ir, options, mockSqlHook);
 
-      expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(result.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
       expect(result.contractDts).toContain('export type Contract');
       expect(result.contractDts).toContain('CodecTypes');
       expect(result.contractDts).toContain('LaneCodecTypes');
@@ -138,7 +138,7 @@ describe('emitter integration', () => {
         schemaVersion: '1',
         targetFamily: 'sql',
         target: 'postgres',
-        coreHash: result.coreHash,
+        storageHash: result.storageHash,
         storage: {
           tables: {
             user: expect.anything(),
@@ -197,7 +197,7 @@ describe('emitter integration', () => {
     const result1 = await emit(ir, options, mockSqlHook);
     const result2 = await emit(ir, options, mockSqlHook);
 
-    expect(result1.coreHash).toBe(result2.coreHash);
+    expect(result1.storageHash).toBe(result2.storageHash);
     expect(result1.contractDts).toBe(result2.contractDts);
     expect(result1.contractJson).toBe(result2.contractJson);
   });
@@ -271,7 +271,7 @@ describe('emitter integration', () => {
       const result2 = await emit(ir2, options, mockSqlHook);
 
       expect(result1.contractJson).toBe(result2.contractJson);
-      expect(result1.coreHash).toBe(result2.coreHash);
+      expect(result1.storageHash).toBe(result2.storageHash);
     },
     timeouts.typeScriptCompilation,
   );

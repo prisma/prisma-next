@@ -23,6 +23,13 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           PRIMARY KEY ("id")
         );
 
+        CREATE TABLE "public"."event" (
+          "created_at" timestamptz DEFAULT now() NOT NULL,
+          "id" text NOT NULL,
+          "name" text NOT NULL,
+          PRIMARY KEY ("id")
+        );
+
         CREATE TABLE "public"."param_types" (
           "bits" bit varying(12),
           "code" character(16),

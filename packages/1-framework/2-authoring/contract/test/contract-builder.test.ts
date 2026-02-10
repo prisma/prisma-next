@@ -49,9 +49,9 @@ describe('ContractBuilder', () => {
     expect(withCapabilities).not.toBe(builder);
   });
 
-  it('manages coreHash state', () => {
+  it('manages storageHash state', () => {
     const builder = defineContract();
-    const withHash = builder.coreHash('sha256:test');
+    const withHash = builder.storageHash('sha256:test');
     expect(withHash).toBeInstanceOf(ContractBuilder);
     expect(withHash).not.toBe(builder);
   });

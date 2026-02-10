@@ -73,7 +73,7 @@ describe('prismaVitePlugin', () => {
       const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
       mockExecute.mockResolvedValue({
-        coreHash: 'abc123',
+        storageHash: 'abc123',
         profileHash: 'def456',
         files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
       });
@@ -100,7 +100,7 @@ describe('prismaVitePlugin', () => {
       const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
       mockExecute.mockResolvedValue({
-        coreHash: 'abc123',
+        storageHash: 'abc123',
         profileHash: 'def456',
         files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
       });
@@ -129,7 +129,7 @@ describe('prismaVitePlugin', () => {
       const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
       mockExecute.mockResolvedValue({
-        coreHash: 'abc123',
+        storageHash: 'abc123',
         profileHash: 'def456',
         files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
       });
@@ -152,7 +152,7 @@ describe('prismaVitePlugin', () => {
       const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
       mockExecute.mockResolvedValue({
-        coreHash: 'abc123',
+        storageHash: 'abc123',
         profileHash: 'def456',
         files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
       });
@@ -179,7 +179,7 @@ describe('prismaVitePlugin', () => {
       const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
       mockExecute.mockResolvedValue({
-        coreHash: 'abc123',
+        storageHash: 'abc123',
         profileHash: 'def456',
         files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
       });
@@ -204,7 +204,7 @@ describe('prismaVitePlugin', () => {
       const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
       mockExecute.mockResolvedValue({
-        coreHash: 'abc123',
+        storageHash: 'abc123',
         profileHash: 'def456',
         files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
       });
@@ -252,7 +252,7 @@ describe('prismaVitePlugin', () => {
       const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
       mockExecute.mockResolvedValue({
-        coreHash: 'abc123',
+        storageHash: 'abc123',
         profileHash: 'def456',
         files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
       });
@@ -292,7 +292,7 @@ describe('prismaVitePlugin', () => {
       const { executeContractEmit } = await import('@prisma-next/cli/control-api');
       const mockExecute = vi.mocked(executeContractEmit);
       mockExecute.mockResolvedValue({
-        coreHash: 'abc123',
+        storageHash: 'abc123',
         profileHash: 'def456',
         files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
       });
