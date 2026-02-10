@@ -1,5 +1,6 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -25,8 +26,8 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  storageHash: 'sha256:codecs-test-core' as never,
-  profileHash: 'sha256:codecs-test-profile' as never,
+  storageHash: coreHash('sha256:codecs-test-core'),
+  profileHash: profileHash('sha256:codecs-test-profile'),
   storage: {
     tables: {
       test_data: {

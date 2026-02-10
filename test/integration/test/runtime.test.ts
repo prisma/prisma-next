@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -88,7 +89,7 @@ describe('runtime execute integration', () => {
   it('throws when marker hash mismatches contract', async () => {
     const mismatchedContract: SqlContract<SqlStorage> = {
       ...fixtureContract,
-      storageHash: 'sha256:mismatch' as never,
+      storageHash: coreHash('sha256:mismatch'),
     };
 
     const runtime = createTestRuntime(

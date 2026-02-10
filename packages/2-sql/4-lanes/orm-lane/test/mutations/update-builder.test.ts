@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import { createOperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { UpdateAst } from '@prisma-next/sql-relational-core/ast';
@@ -15,7 +16,7 @@ describe('update builder', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'sha256:test' as never,
+    storageHash: coreHash('sha256:test'),
     models: {
       User: {
         storage: { table: 'user' },

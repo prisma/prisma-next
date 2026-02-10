@@ -36,7 +36,6 @@
   "exports": {
     "./framework-components": "./dist/framework-components.mjs",
     "./ir": "./dist/ir.mjs",
-    "./pack-manifest-types": "./dist/pack-manifest-types.mjs",
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
   }

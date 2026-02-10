@@ -39,6 +39,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/prefer-object-matcher.mdc` — Prefer object matchers over multiple individual expect().toBe() calls
 - `.cursor/rules/use-ast-factories.mdc` — Use factory functions for creating AST nodes instead of manual object creation
 - `.cursor/rules/use-contract-ir-factories.mdc` — Use factory functions for ContractIR objects in tests
+- `.cursor/rules/use-hash-constructors.mdc` — Use `coreHash()`/`profileHash()` constructors instead of `as never` casts
 - `.cursor/rules/cli-error-handling.mdc` — CLI command error handling patterns
 - `.cursor/rules/cli-e2e-test-patterns.mdc` — CLI e2e test fixture patterns using shared fixture app
 - `.cursor/rules/cli-test-fixture-cleanup.mdc` — Avoid committing generated CLI test fixtures

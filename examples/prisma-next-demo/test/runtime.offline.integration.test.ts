@@ -1,32 +1,31 @@
-import { createRuntime } from '@prisma-next/sql-runtime';
-import { describe, expect, it } from 'vitest';
-import { executionContext, executionStackInstance } from '../src/prisma/execution-context';
-import { sql, tables } from '../src/prisma/query';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { executionStack, sql, tables } from '../src/prisma/context';
 
-describe('when no driver is available', () => {
-  it('can still build query plans', async () => {
-    const runtime = createRuntime({
-      stackInstance: executionStackInstance,
-      contract: executionContext.contract,
-      context: executionContext,
-      verify: { mode: 'onFirstUse', requireMarker: false },
+describe('static context (no runtime)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('can build query plans from static context', () => {
+    const plan = sql.from(tables.user).select({ id: tables.user.columns.id }).limit(1).build();
+
+    expect(plan).toMatchObject({
+      ast: { kind: 'select' },
+      meta: { lane: 'dsl' },
     });
+  });
 
-    try {
-      const plan = sql.from(tables.user).select({ id: tables.user.columns.id }).limit(1).build();
+  it('importing query roots does not instantiate adapter or extensions', () => {
+    const adapterSpy = vi.spyOn(executionStack.adapter, 'create');
+    const targetSpy = vi.spyOn(executionStack.target, 'create');
+    const extensionSpies = executionStack.extensionPacks.map((ext) => vi.spyOn(ext, 'create'));
 
-      expect(plan).toMatchObject({
-        ast: { kind: 'select' },
-        meta: { lane: 'dsl' },
-      });
+    sql.from(tables.user).select({ id: tables.user.columns.id }).limit(1).build();
 
-      await expect(async () => {
-        for await (const _row of runtime.execute(plan)) {
-          // offline runtime should not execute
-        }
-      }).rejects.toMatchObject({ code: 'RUNTIME.DRIVER_MISSING' });
-    } finally {
-      await runtime.close();
+    expect(targetSpy).not.toHaveBeenCalled();
+    expect(adapterSpy).not.toHaveBeenCalled();
+    for (const spy of extensionSpies) {
+      expect(spy).not.toHaveBeenCalled();
     }
   });
 });

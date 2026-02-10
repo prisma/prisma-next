@@ -1,3 +1,4 @@
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   ComponentDatabaseDependency,
   SqlControlExtensionDescriptor,
@@ -64,6 +65,7 @@ function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
     familyId: 'sql',
     targetId: 'postgres',
     version: '0.0.0-test',
+    operationSignatures: () => [],
     databaseDependencies: { init: [pgvectorDependency] },
     create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
   };
@@ -74,8 +76,8 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'sha256:contract' as never,
-    profileHash: 'sha256:profile' as never,
+    storageHash: coreHash('sha256:contract'),
+    profileHash: profileHash('sha256:profile'),
     storage: {
       tables: {
         user: {
@@ -200,6 +202,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       familyId: 'sql',
       targetId: 'postgres',
       version: '0.0.0-test',
+      operationSignatures: () => [],
       // No databaseDependencies - planner should work without them
       databaseDependencies: {},
       create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
@@ -339,8 +342,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
+      storageHash: coreHash('sha256:test-defaults'),
+      profileHash: profileHash('sha256:test-defaults-profile'),
       storage: {
         tables: {
           [tableName]: {

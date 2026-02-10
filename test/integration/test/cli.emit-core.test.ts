@@ -8,7 +8,6 @@ import type { ContractIR } from '@prisma-next/contract/ir';
 import { emit } from '@prisma-next/emitter';
 import {
   assembleOperationRegistry,
-  convertOperationManifest,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
@@ -56,7 +55,7 @@ describe('emit integration', () => {
       } = getSqlDescriptorBundle();
 
       // Assemble operation registry and extract type imports from descriptors
-      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractExtensionIds(
@@ -131,7 +130,7 @@ describe('emit integration', () => {
         extensions: extensionDescriptors,
         descriptors,
       } = getSqlDescriptorBundle();
-      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractExtensionIds(

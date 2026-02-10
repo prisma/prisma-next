@@ -1,3 +1,4 @@
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
@@ -19,8 +20,8 @@ const contractWithEnum: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  storageHash: 'sha256:enum-test' as never,
-  profileHash: 'sha256:profile' as never,
+  storageHash: coreHash('sha256:enum-test'),
+  profileHash: profileHash('sha256:profile'),
   storage: {
     tables: {
       user: {

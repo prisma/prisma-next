@@ -40,12 +40,20 @@ export type StorageHashBase<THash extends string> = THash & Brand<'StorageHash'>
  */
 export type ExecutionHashBase<THash extends string> = THash & Brand<'ExecutionHash'>;
 
+export function coreHash<const T extends string>(value: T): CoreHashBase<T> {
+  return value as CoreHashBase<T>;
+}
+
 /**
  * Base type for profile contract hashes.
  * Emitted contract.d.ts files use this with the hash value as a type parameter:
  * `type ProfileHash = ProfileHashBase<'sha256:def456...'>`
  */
 export type ProfileHashBase<THash extends string> = THash & Brand<'ProfileHash'>;
+
+export function profileHash<const T extends string>(value: T): ProfileHashBase<T> {
+  return value as ProfileHashBase<T>;
+}
 
 export interface ContractBase<
   TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
@@ -347,31 +355,6 @@ export interface TargetFamilyHook {
     },
     options?: GenerateContractTypesOptions,
   ): string;
-}
-
-// Extension pack manifest types - moved from @prisma-next/core-control-plane to shared location
-export type ArgSpecManifest =
-  | { readonly kind: 'typeId'; readonly type: string }
-  | { readonly kind: 'param' }
-  | { readonly kind: 'literal' };
-
-export type ReturnSpecManifest =
-  | { readonly kind: 'typeId'; readonly type: string }
-  | { readonly kind: 'builtin'; readonly type: 'number' | 'boolean' | 'string' };
-
-export interface LoweringSpecManifest {
-  readonly targetFamily: 'sql';
-  readonly strategy: 'infix' | 'function';
-  readonly template: string;
-}
-
-export interface OperationManifest {
-  readonly for: string;
-  readonly method: string;
-  readonly args: ReadonlyArray<ArgSpecManifest>;
-  readonly returns: ReturnSpecManifest;
-  readonly lowering: LoweringSpecManifest;
-  readonly capabilities?: ReadonlyArray<string>;
 }
 
 // ============================================================================

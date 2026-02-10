@@ -1,14 +1,12 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
   budgets,
   createExecutionContext,
   createRuntime,
+  createSqlExecutionStack,
   type Runtime,
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
@@ -30,7 +28,7 @@ export function getPrismaNextRuntime(): Runtime {
 
     const contract = validateContract<Contract>(contractJson);
 
-    const stack = createExecutionStack({
+    const stack = createSqlExecutionStack({
       target: postgresTarget,
       adapter: postgresAdapter,
       driver: postgresDriver,
@@ -41,17 +39,21 @@ export function getPrismaNextRuntime(): Runtime {
 
     const context = createExecutionContext({
       contract,
-      stackInstance,
+      stack,
     });
+
+    const driverDescriptor = stack.driver;
+    if (!driverDescriptor) {
+      throw new Error('Driver descriptor missing from execution stack');
+    }
 
     runtime = createRuntime({
       stackInstance,
-      contract,
       context,
-      driverOptions: {
+      driver: driverDescriptor.create({
         connect: { client },
         cursor: { disabled: true },
-      },
+      }),
       verify: {
         mode: 'onFirstUse',
         requireMarker: false,

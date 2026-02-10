@@ -1,6 +1,6 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { sql, tables } from '../prisma/query';
+import { sql, tables } from '../prisma/context';
 import { collect } from './utils';
 
 export async function getUserById(userId: string, runtime: Runtime) {

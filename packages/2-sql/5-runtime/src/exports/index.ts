@@ -16,13 +16,18 @@ export { lowerSqlPlan } from '../lower-sql-plan';
 export type {
   ExecutionContext,
   RuntimeParameterizedCodecDescriptor,
+  SqlExecutionStack,
+  SqlExecutionStackWithDriver,
+  SqlRuntimeAdapterDescriptor,
   SqlRuntimeAdapterInstance,
   SqlRuntimeDriverInstance,
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeExtensionInstance,
+  SqlRuntimeTargetDescriptor,
+  SqlStaticContributions,
   TypeHelperRegistry,
 } from '../sql-context';
-export { createExecutionContext } from '../sql-context';
+export { createExecutionContext, createSqlExecutionStack } from '../sql-context';
 export type { SqlStatement } from '../sql-marker';
 export {
   ensureSchemaStatement,

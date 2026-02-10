@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
   BinaryExpr,
@@ -25,7 +26,7 @@ function createTestContract(): SqlContract<SqlStorage> {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: 'sha256:test' as never,
+    storageHash: coreHash('sha256:test'),
     models: {},
     storage: {
       tables: {
