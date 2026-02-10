@@ -79,7 +79,7 @@ See `architecture.config.json` for the complete mapping and `pnpm lint:deps` to 
 ### Query Pattern
 
 ```typescript
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';

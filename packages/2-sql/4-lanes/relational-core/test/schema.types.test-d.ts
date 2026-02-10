@@ -1,6 +1,6 @@
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { expectTypeOf, test } from 'vitest';
 import { schema } from '../src/schema';
 import type { Contract } from './fixtures/contract.d';

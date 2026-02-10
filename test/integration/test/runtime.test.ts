@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import { budgets, lints } from '@prisma-next/sql-runtime';

@@ -12,8 +12,8 @@ import {
   extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';

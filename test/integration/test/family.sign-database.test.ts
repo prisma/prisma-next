@@ -6,7 +6,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { readMarker } from '@prisma-next/family-sql/verify';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
   ensureSchemaStatement,

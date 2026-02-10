@@ -1,5 +1,5 @@
 import postgresAdapterRuntime from '@prisma-next/adapter-postgres/runtime';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';

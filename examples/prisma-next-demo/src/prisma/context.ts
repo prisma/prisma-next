@@ -1,7 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvectorDescriptor from '@prisma-next/extension-pgvector/runtime';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-lane';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';

@@ -1,5 +1,5 @@
 import type { SqlContract, SqlMappings } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   int4Column as int4ColumnType,
   textColumn as textColumnType,

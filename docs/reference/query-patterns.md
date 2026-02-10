@@ -11,7 +11,7 @@ This document covers standard patterns for working with Prisma Next queries, inc
 ```typescript
 // src/prisma/query.ts
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane/sql';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
@@ -198,7 +198,7 @@ type UserWithPosts = ResultType<typeof plan>;
 
 ```typescript
 import { orm } from '@prisma-next/orm-lane/orm';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';

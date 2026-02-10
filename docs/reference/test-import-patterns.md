@@ -39,7 +39,7 @@ import { defineContract } from '@prisma-next/sql-query/contract-builder';
 ```typescript
 // packages/integration-tests/test/contract.test.ts
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 ```
 
 **Why?**

@@ -288,7 +288,7 @@ type UserIdColumn = UserColumns['id'];
 
       // Create a comprehensive test file that uses all exported types
       const testFileContent = `import type { Contract, CodecTypes, Tables, Models, Relations } from './contract.d.ts';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import contractJson from './contract.json' with { type: 'json' };
 
 // Verify we can validate the contract

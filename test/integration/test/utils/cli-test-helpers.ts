@@ -10,7 +10,7 @@ import {
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { afterEach, beforeEach } from 'vitest';
 // Note: executeCommand and other test helpers are re-exported at the bottom of this file
 // They come from the CLI package's test utilities but are not exported from the package
