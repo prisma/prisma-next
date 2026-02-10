@@ -38,6 +38,10 @@
       "types": "./dist/exports/validators.d.ts",
       "import": "./dist/exports/validators.js"
     },
+    "./validate": {
+      "types": "./dist/exports/validate.d.ts",
+      "import": "./dist/exports/validate.js"
+    },
     "./factories": {
       "types": "./dist/exports/factories.d.ts",
       "import": "./dist/exports/factories.js"

@@ -9,7 +9,7 @@ This package provides TypeScript type definitions, Arktype validators, and facto
 ## Responsibilities
 
 - **SQL Contract Types**: Defines SQL-specific contract types (`SqlContract`, `SqlStorage`, `StorageTable`, `ModelDefinition`, `SqlMappings`) that extend framework-level contract types
-- **Contract Validation**: Provides Arktype-based validators for structural validation of SQL contracts, storage, and models
+- **Contract Validation**: Provides Arktype-based structural validators and the shared `validateContract` entrypoint for runtime-safe contract validation
 - **IR Factories**: Provides pure factory functions for constructing contract IR structures in tests and authoring
 - **Shared Plane Access**: Enables both migration-plane and runtime-plane packages to import SQL contract types without violating plane boundaries
 
@@ -41,7 +41,7 @@ import type {
   SqlStorage,
   StorageTable,
   ModelDefinition,
-} from '@prisma-next/sql-contract/exports/types';
+} from '@prisma-next/sql-contract/types';
 ```
 
 ### Validators
@@ -49,7 +49,7 @@ import type {
 Validate contract structures using Arktype validators:
 
 ```typescript
-import { validateSqlContract, validateStorage, validateModel } from '@prisma-next/sql-contract/exports/validators';
+import { validateSqlContract, validateStorage, validateModel } from '@prisma-next/sql-contract/validators';
 
 // Validate a complete contract
 const contract = validateSqlContract<Contract>(contractJson);
@@ -61,12 +61,20 @@ const storage = validateStorage(storageJson);
 const model = validateModel(modelJson);
 ```
 
+Validate JSON-emitted contracts with mapping + logic checks:
+
+```typescript
+import { validateContract } from '@prisma-next/sql-contract/validate';
+
+const contract = validateContract<Contract>(contractJson);
+```
+
 ### Factories
 
 Use factory functions to construct contract IR structures in tests:
 
 ```typescript
-import { col, table, storage, model, contract, pk, unique, index, fk } from '@prisma-next/sql-contract/exports/factories';
+import { col, table, storage, model, contract, pk, unique, index, fk } from '@prisma-next/sql-contract/factories';
 
 // Create a column (nativeType, codecId, nullable)
 const idColumn = col('int4', 'pg/int4@1', false);
@@ -104,9 +112,10 @@ const c = contract({
 
 ## Exports
 
-- `./exports/types`: TypeScript type definitions
-- `./exports/validators`: Arktype validators for structural validation
-- `./exports/factories`: Factory functions for constructing contract IR
+- `./types`: TypeScript type definitions
+- `./validators`: Arktype validators for structural validation
+- `./validate`: Shared `validateContract` helper for JSON imports
+- `./factories`: Factory functions for constructing contract IR
 
 ## Architecture
 
