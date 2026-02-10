@@ -398,7 +398,10 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('metadata and params schema', () => {
-    it.each([
+    const postgresNativeTypeCases: ReadonlyArray<{
+      scalar: keyof typeof codecDefinitions;
+      nativeType: string;
+    }> = [
       { scalar: 'character', nativeType: 'character' },
       { scalar: 'character varying', nativeType: 'character varying' },
       { scalar: 'integer', nativeType: 'integer' },
@@ -406,14 +409,22 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'int4', nativeType: 'integer' },
       { scalar: 'float8', nativeType: 'double precision' },
       { scalar: 'bit varying', nativeType: 'bit varying' },
-    ])('sets postgres nativeType metadata for $scalar', ({ scalar, nativeType }) => {
+    ];
+
+    it.each(postgresNativeTypeCases)('sets postgres nativeType metadata for $scalar', ({
+      scalar,
+      nativeType,
+    }) => {
       const codec = codecDefinitions[scalar].codec as {
         meta?: { db?: { sql?: { postgres?: { nativeType?: string } } } };
       };
       expect(codec.meta?.db?.sql?.postgres?.nativeType).toBe(nativeType);
     });
 
-    it.each([
+    const paramsSchemaPresenceCases: ReadonlyArray<{
+      scalar: keyof typeof codecDefinitions;
+      hasParamsSchema: boolean;
+    }> = [
       { scalar: 'character', hasParamsSchema: true },
       { scalar: 'character varying', hasParamsSchema: true },
       { scalar: 'numeric', hasParamsSchema: true },
@@ -428,18 +439,33 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'enum', hasParamsSchema: false },
       { scalar: 'bool', hasParamsSchema: false },
       { scalar: 'int4', hasParamsSchema: false },
-    ])('tracks params schema presence for $scalar', ({ scalar, hasParamsSchema }) => {
+    ];
+
+    it.each(paramsSchemaPresenceCases)('tracks params schema presence for $scalar', ({
+      scalar,
+      hasParamsSchema,
+    }) => {
       const codec = codecDefinitions[scalar].codec as {
         paramsSchema?: unknown;
       };
       expect(codec.paramsSchema !== undefined).toBe(hasParamsSchema);
     });
 
-    it.each([
+    const initHookCases: ReadonlyArray<{
+      scalar: keyof typeof codecDefinitions;
+      hasInit: boolean;
+      expected: { kind: 'fixed' | 'variable'; maxLength: number } | undefined;
+    }> = [
       { scalar: 'character', hasInit: true, expected: { kind: 'fixed', maxLength: 12 } },
       { scalar: 'character varying', hasInit: true, expected: { kind: 'variable', maxLength: 64 } },
       { scalar: 'numeric', hasInit: false, expected: undefined },
-    ])('tracks init hook presence for $scalar', ({ scalar, hasInit, expected }) => {
+    ];
+
+    it.each(initHookCases)('tracks init hook presence for $scalar', ({
+      scalar,
+      hasInit,
+      expected,
+    }) => {
       const codec = codecDefinitions[scalar].codec as {
         init?: (params: { length: number }) => unknown;
       };

@@ -55,8 +55,8 @@ describe('codec factory', () => {
     {
       label: 'without meta',
       config: {},
-      check: (testCodec: ReturnType<typeof codec>) => {
-        expect(testCodec.meta).toBeUndefined();
+      check: (testCodec: unknown) => {
+        expect((testCodec as { readonly meta?: unknown }).meta).toBeUndefined();
       },
     },
     {
@@ -64,8 +64,8 @@ describe('codec factory', () => {
       config: {
         paramsSchema: {} as unknown as Type<{ readonly precision: number }>,
       },
-      check: (testCodec: ReturnType<typeof codec>) => {
-        expect(testCodec.paramsSchema).toBeDefined();
+      check: (testCodec: unknown) => {
+        expect((testCodec as { readonly paramsSchema?: unknown }).paramsSchema).toBeDefined();
       },
     },
     {
@@ -73,9 +73,14 @@ describe('codec factory', () => {
       config: {
         init: (params: { precision: number }) => ({ normalized: params.precision }),
       },
-      check: (testCodec: ReturnType<typeof codec>) => {
-        expect(testCodec.init).toBeDefined();
-        expect(testCodec.init?.({ precision: 12 })).toEqual({ normalized: 12 });
+      check: (testCodec: unknown) => {
+        const codecWithInit = testCodec as {
+          readonly init?: (params: { readonly precision: number }) => {
+            readonly normalized: number;
+          };
+        };
+        expect(codecWithInit.init).toBeDefined();
+        expect(codecWithInit.init?.({ precision: 12 })).toEqual({ normalized: 12 });
       },
     },
   ])('creates codec $label', ({ config, check }) => {

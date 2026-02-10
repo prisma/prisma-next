@@ -23,7 +23,13 @@ describe('sql-codecs', () => {
     });
   });
 
-  it.each([
+  const codecDefinitionCases: ReadonlyArray<{
+    scalar: keyof typeof sqlCodecDefinitions;
+    id: string;
+    targetTypes: readonly string[];
+    hasParamsSchema: boolean;
+    hasInit: boolean;
+  }> = [
     {
       scalar: 'char',
       id: SQL_CHAR_CODEC_ID,
@@ -52,7 +58,15 @@ describe('sql-codecs', () => {
       hasParamsSchema: false,
       hasInit: false,
     },
-  ])('defines codec for $scalar', ({ scalar, id, targetTypes, hasParamsSchema, hasInit }) => {
+  ];
+
+  it.each(codecDefinitionCases)('defines codec for $scalar', ({
+    scalar,
+    id,
+    targetTypes,
+    hasParamsSchema,
+    hasInit,
+  }) => {
     const definition = sqlCodecDefinitions[scalar];
     expect(definition.typeId).toBe(id);
     expect(definition.scalar).toBe(scalar);
@@ -70,7 +84,12 @@ describe('sql-codecs', () => {
     });
   });
 
-  it.each([
+  const codecRoundTripCases: ReadonlyArray<{
+    scalar: keyof typeof sqlCodecDefinitions;
+    input: string | number;
+    expectedEncoded: string | number;
+    expectedDecoded: string | number;
+  }> = [
     {
       scalar: 'char',
       input: 'A',
@@ -95,7 +114,9 @@ describe('sql-codecs', () => {
       expectedEncoded: 3.14,
       expectedDecoded: 3.14,
     },
-  ])('encodes and decodes $scalar values', ({
+  ];
+
+  it.each(codecRoundTripCases)('encodes and decodes $scalar values', ({
     scalar,
     input,
     expectedEncoded,

@@ -627,7 +627,7 @@ describe('pgEnumControlHooks.introspectTypes', () => {
     const driver: ControlDriverInstance<'sql', string> = {
       familyId: 'sql',
       targetId: 'postgres',
-      query: async <Row>(_, params?: unknown[]) => {
+      query: async <Row>(_sql: string, params?: unknown[]) => {
         expect(params).toEqual(['public']);
         return { rows: expectedRows } as { readonly rows: Row[] };
       },
@@ -635,7 +635,7 @@ describe('pgEnumControlHooks.introspectTypes', () => {
     };
 
     expectNarrowedType(pgEnumControlHooks.introspectTypes, 'introspectTypes missing');
-    const types = await pgEnumControlHooks.introspectTypes({ driver, schemaName: undefined });
+    const types = await pgEnumControlHooks.introspectTypes({ driver });
     expect(types['role']?.nativeType).toBe('role');
   });
 });
