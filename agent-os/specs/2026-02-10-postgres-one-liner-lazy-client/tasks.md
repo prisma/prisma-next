@@ -71,15 +71,15 @@ Principles:
 
 ## Milestone 2 — New package scaffolding: `@prisma-next/postgres`
 
-1. [ ] Create a new workspace package for the one-liner client:
+1. [x] Create a new workspace package for the one-liner client:
    - **Location**: `packages/3-targets/8-clients/postgres/` (new directory)
    - **Name**: `@prisma-next/postgres`
    - **Entry point**: `@prisma-next/postgres/runtime` (default export `postgres`)
-2. [ ] Scaffold minimal package boilerplate aligned with repo conventions:
+2. [x] Scaffold minimal package boilerplate aligned with repo conventions:
    - `package.json` with `exports` for `./runtime`
    - `biome.jsonc`, `tsconfig.json`, `tsconfig.build.json`, `tsup.config.ts`, `vitest.config.ts` (mirror nearby Postgres packages in `packages/3-targets/**/postgres`)
    - `src/exports/runtime.ts`
-3. [ ] Add `README.md` for the new package (doc-maintenance):
+3. [x] Add `README.md` for the new package (doc-maintenance):
    - Responsibilities + dependency list
    - Mermaid architecture diagram showing composition over target/adapter/driver + sql-runtime + core-execution-plane
    - Link to this spec
@@ -90,14 +90,14 @@ Principles:
 
 ### Types + binding normalization (pure, eager-safe)
 
-1. [ ] Add internal types and binding model:
+1. [x] Add internal types and binding model:
    - `src/runtime/types.ts`: `PostgresClient`, `PostgresOptions*`, `PostgresBinding`, `PostgresTargetId`
    - `src/runtime/binding.ts`: resolve `{ binding | url | pg }` into a single `PostgresBinding`
    - Validation: throw if multiple binding inputs are provided (still no runtime init)
 
 ### Static surface construction (runs inside `postgres(...)`)
 
-2. [ ] Implement `src/runtime/postgres.ts`:
+2. [x] Implement `src/runtime/postgres.ts`:
    - Validate contract:
      - If `contractJson` provided → `validateContract<TContract>(contractJson)` from `@prisma-next/sql-contract/validate`
      - Else use `contract` directly
@@ -117,19 +117,19 @@ Principles:
 
 ### Lazy runtime boundary (runs only inside `db.runtime()`)
 
-3. [ ] Implement runtime constructor inside `runtime()`:
+3. [x] Implement runtime constructor inside `runtime()`:
    - Instantiate stack: `instantiateExecutionStack(stack)` from `@prisma-next/core-execution-plane/stack`
    - Bind driver:
      - If binding is `url`: create `pg.Pool` inside `runtime()` (never earlier)
      - If binding is `pgPool` / `pgClient`: reuse provided object
    - Create runtime: `createRuntime({ stackInstance, context, driver, plugins, verify })` from `@prisma-next/sql-runtime`
    - Memoize runtime instance
-4. [ ] Set MVP verify defaults:
+4. [x] Set MVP verify defaults:
    - `verify: { mode: 'onFirstUse', requireMarker: false }` (unless repo has a canonical helper/default)
 
 ### Minimal automated validation (keep tiny)
 
-5. [ ] Add a minimal unit test in the new package asserting:
+5. [x] Add a minimal unit test in the new package asserting:
    - `postgres(...)` does not eagerly call `instantiateExecutionStack` / `createRuntime` / create `pg.Pool`
    - `db.runtime()` memoizes (same instance on subsequent calls)
 
@@ -137,18 +137,18 @@ Principles:
 
 ## Milestone 4 — Demo migration (primary validation)
 
-1. [ ] Collapse demo configuration to “one file, one call”:
+1. [x] Collapse demo configuration to “one file, one call”:
    - **Add**: `examples/prisma-next-demo/src/prisma/db.ts` (or `src/db.ts`) exporting `db`
    - **Use**: `import postgres from '@prisma-next/postgres/runtime'`
    - Contract workflow:
      - emitted: `contract.json` + `contract.d.ts` typed via `postgres<Contract>({ contractJson, url, ... })`
      - or TS-authored: `postgres({ contract, url, ... })`
-2. [ ] Update demo call sites to import static roots from `db`:
+2. [x] Update demo call sites to import static roots from `db`:
    - Replace direct `sql/schema/orm/context/runtime` wiring with `db.sql`, `db.schema`, `db.orm`, `db.context`
    - Ensure execution path calls `db.runtime()` only at the execution boundary
-3. [ ] Remove old demo wiring modules once unreferenced:
+3. [x] Remove old demo wiring modules once unreferenced:
    - `examples/prisma-next-demo/src/prisma/context.ts` (and any paired `runtime.ts`-style module if present)
-4. [ ] Smoke validate demo behavior:
+4. [x] Smoke validate demo behavior:
    - Demo loads without DB connection side effects at import-time
    - First query execution triggers runtime init via `db.runtime()`
 
@@ -156,11 +156,11 @@ Principles:
 
 ## Milestone 5 — Cleanup + docs consistency
 
-1. [ ] Update usage snippets to reflect new imports:
+1. [x] Update usage snippets to reflect new imports:
    - `AGENTS.md` query pattern snippet: use `@prisma-next/sql-contract/validate` and `@prisma-next/postgres/runtime` where appropriate
    - Docs/rules that mention `@prisma-next/sql-contract-ts/contract` or manual demo composition
-2. [ ] Run repo checks that are likely to catch regressions:
+2. [x] Run repo checks that are likely to catch regressions:
    - `pnpm test:packages` (or narrower filters if available)
    - `pnpm lint:deps`
-3. [ ] Ensure package READMEs remain accurate for touched packages (especially the new `@prisma-next/postgres`).
+3. [x] Ensure package READMEs remain accurate for touched packages (especially the new `@prisma-next/postgres`).
 
