@@ -65,7 +65,7 @@ describe('sql DSL builder', () => {
     expect(plan.params).toEqual([42]);
     expect(plan.meta).toMatchObject({
       target: 'postgres',
-      coreHash: contract.coreHash,
+      storageHash: contract.storageHash,
       lane: 'dsl',
       refs: {
         tables: ['user'],

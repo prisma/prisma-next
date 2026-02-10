@@ -1,8 +1,8 @@
-import { computeCoreHash, computeProfileHash } from '@prisma-next/core-control-plane/emission';
+import { computeProfileHash, computeStorageHash } from '@prisma-next/core-control-plane/emission';
 import { describe, expect, it } from 'vitest';
 
 describe('hashing', () => {
-  it('computes core hash', () => {
+  it('computes storage hash', () => {
     const contract = {
       schemaVersion: '1',
       targetFamily: 'sql',
@@ -16,7 +16,7 @@ describe('hashing', () => {
       sources: {},
     };
 
-    const hash = computeCoreHash(contract);
+    const hash = computeStorageHash(contract);
     expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
@@ -52,8 +52,8 @@ describe('hashing', () => {
       sources: {},
     };
 
-    const hash1 = computeCoreHash(contract);
-    const hash2 = computeCoreHash(contract);
+    const hash1 = computeStorageHash(contract);
+    const hash2 = computeStorageHash(contract);
     expect(hash1).toBe(hash2);
   });
 });

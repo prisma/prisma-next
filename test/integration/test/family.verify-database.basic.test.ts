@@ -151,8 +151,8 @@ describe('family instance verify - basic', () => {
 
             // Write marker matching contract
             const write = writeContractMarker({
-              coreHash: contractWithDb.coreHash,
-              profileHash: contractWithDb.profileHash ?? contractWithDb.coreHash,
+              storageHash: contractWithDb.storageHash,
+              profileHash: contractWithDb.profileHash ?? contractWithDb.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -168,7 +168,7 @@ describe('family instance verify - basic', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            coreHash: contractWithDb.coreHash,
+            storageHash: contractWithDb.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -221,10 +221,10 @@ describe('family instance verify - basic', () => {
             await executeStatement(client, ensureSchemaStatement);
             await executeStatement(client, ensureTableStatement);
 
-            // Write marker matching contract (using coreHash for profileHash since contract doesn't have it)
+            // Write marker matching contract (using storageHash for profileHash since contract doesn't have it)
             const write = writeContractMarker({
-              coreHash: contractWithDb.coreHash,
-              profileHash: contractWithDb.coreHash, // Use coreHash since contract doesn't have profileHash
+              storageHash: contractWithDb.storageHash,
+              profileHash: contractWithDb.storageHash, // Use storageHash since contract doesn't have profileHash
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -243,7 +243,7 @@ describe('family instance verify - basic', () => {
           expect(result).toMatchObject({
             ok: true,
             summary: 'Database matches contract',
-            contract: { coreHash: contractWithDb.coreHash },
+            contract: { storageHash: contractWithDb.storageHash },
             meta: { contractPath: expect.any(String) },
           });
           expect(result.contract.profileHash).toBeUndefined();

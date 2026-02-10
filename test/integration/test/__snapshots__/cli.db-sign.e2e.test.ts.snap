@@ -12,7 +12,7 @@ exports[`db sign command (e2e) > creates marker when schema matches contract 1`]
 
 ✔ Emitted contract.json → src/prisma/contract.json
 ✔ Emitted contract.d.ts → src/prisma/contract.d.ts
-  coreHash: sha256:e3f250f138efa05c53e7ffabef349301b35703594703ec97b9208f47a4a1154c
+  storageHash: sha256:ae0d55125b74cf19a56c0078b871641184d349b3d84d5c43df5c67334f576071
   profileHash: sha256:213e9b660e9ab4c8929c891c2c428437b100c39f01bb17c1705d2f7b89588dff
 ✔ Success
 prisma-next db sign → Sign the database with your contract so you can safely run queries
@@ -25,14 +25,14 @@ prisma-next db sign → Sign the database with your contract so you can safely r
 
 ✔ Database signed
   from: none
-  to:   sha256:e3f250f138efa05c53e7ffabef349301b35703594703ec97b9208f47a4a1154c"
+  to:   sha256:ae0d55125b74cf19a56c0078b871641184d349b3d84d5c43df5c67334f576071"
 `;
 
 exports[`db sign command (e2e) > outputs JSON envelope with real database 1`] = `
 {
   "contract": {
-    "coreHash": "sha256:e3f250f138efa05c53e7ffabef349301b35703594703ec97b9208f47a4a1154c",
     "profileHash": "sha256:213e9b660e9ab4c8929c891c2c428437b100c39f01bb17c1705d2f7b89588dff",
+    "storageHash": "sha256:ae0d55125b74cf19a56c0078b871641184d349b3d84d5c43df5c67334f576071",
   },
   "marker": {
     "created": true,

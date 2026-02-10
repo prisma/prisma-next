@@ -5,10 +5,13 @@ This glossary defines key terms related to Prisma Next's extensions, packs, and 
 ## Core Concepts
 
 ### Data Contract
-A canonical, verifiable JSON artifact that describes an application's data model, relationships, invariants, and policies. The data contract serves as a binding agreement between the application and database, and declares **required capabilities** under `contract.capabilities`. Serialized as `contract.json` and includes both `coreHash` and optional `profileHash`.
+A canonical, verifiable JSON artifact that describes an application's data model, relationships, invariants, and policies. The data contract serves as a binding agreement between the application and database, and declares **required capabilities** under `contract.capabilities`. Serialized as `contract.json` and includes `storageHash`, optional `executionHash`, and optional `profileHash`.
 
-### CoreHash
-A SHA-256 hash of the meaningful schema components (models, fields, relations, storage layout) that represents the logical data contract. Changes to business logic, constraints, or data model affect the `coreHash`. Used for contract verification and migration planning.
+### StorageHash
+A SHA-256 hash of the meaningful storage components (storage layout and related structural inputs) that represent the schema’s storage contract. Changes to schema structure that require migrations affect the `storageHash`. Used for contract verification and migration planning.
+
+### ExecutionHash
+A SHA-256 hash of execution defaults (for example, execution-time defaults or policies encoded under the `execution` section). Used to detect drift in execution semantics without altering the storage hash.
 
 ### ProfileHash
 A SHA-256 hash of the pinned capability profile derived from declared requirements, negotiated adapter capabilities, and optional adapter pins. It does not change the logical meaning of the data contract. The migration runner verifies that the database satisfies these requirements and writes the same `profileHash` to the marker. At runtime, equality with the marker is enforced.

@@ -27,11 +27,18 @@ export interface RenderTypeContext {
 }
 
 /**
- * Base type for core contract hashes.
+ * Base type for storage contract hashes.
  * Emitted contract.d.ts files use this with the hash value as a type parameter:
- * `type CoreHash = CoreHashBase<'sha256:abc123...'>`
+ * `type StorageHash = StorageHashBase<'sha256:abc123...'>`
  */
-export type CoreHashBase<THash extends string> = THash & Brand<'CoreHash'>;
+export type StorageHashBase<THash extends string> = THash & Brand<'StorageHash'>;
+
+/**
+ * Base type for execution contract hashes.
+ * Emitted contract.d.ts files use this with the hash value as a type parameter:
+ * `type ExecutionHash = ExecutionHashBase<'sha256:def456...'>`
+ */
+export type ExecutionHashBase<THash extends string> = THash & Brand<'ExecutionHash'>;
 
 /**
  * Base type for profile contract hashes.
@@ -41,18 +48,21 @@ export type CoreHashBase<THash extends string> = THash & Brand<'CoreHash'>;
 export type ProfileHashBase<THash extends string> = THash & Brand<'ProfileHash'>;
 
 export interface ContractBase<
-  TCoreHash extends CoreHashBase<string> = CoreHashBase<string>,
+  TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
+  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
 > {
   readonly schemaVersion: string;
   readonly target: string;
   readonly targetFamily: string;
-  readonly coreHash: TCoreHash;
+  readonly storageHash: TStorageHash;
+  readonly executionHash?: TExecutionHash | undefined;
   readonly profileHash?: TProfileHash | undefined;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensionPacks: Record<string, unknown>;
   readonly meta: Record<string, unknown>;
   readonly sources: Record<string, Source>;
+  readonly execution?: ExecutionSection;
 }
 
 export interface FieldType {
@@ -62,12 +72,35 @@ export interface FieldType {
   readonly properties?: Record<string, FieldType>;
 }
 
+export type GeneratedValueSpec = {
+  readonly id: 'ulid' | 'nanoid' | 'uuidv7' | 'uuidv4' | 'cuid2' | 'ksuid';
+  readonly params?: Record<string, unknown>;
+};
+
 export type ColumnDefault =
   | {
       readonly kind: 'literal';
       readonly expression: string;
     }
   | { readonly kind: 'function'; readonly expression: string };
+
+export type ExecutionMutationDefaultValue = {
+  readonly kind: 'generator';
+  readonly id: GeneratedValueSpec['id'];
+  readonly params?: Record<string, unknown>;
+};
+
+export type ExecutionMutationDefault = {
+  readonly ref: { readonly table: string; readonly column: string };
+  readonly onCreate?: ExecutionMutationDefaultValue;
+  readonly onUpdate?: ExecutionMutationDefaultValue;
+};
+
+export type ExecutionSection = {
+  readonly mutations: {
+    readonly defaults: ReadonlyArray<ExecutionMutationDefault>;
+  };
+};
 
 export interface Source {
   readonly readOnly: boolean;
@@ -105,9 +138,10 @@ export interface DocumentStorage {
 }
 
 export interface DocumentContract<
-  TCoreHash extends CoreHashBase<string> = CoreHashBase<string>,
+  TStorageHash extends StorageHashBase<string> = StorageHashBase<string>,
+  TExecutionHash extends ExecutionHashBase<string> = ExecutionHashBase<string>,
   TProfileHash extends ProfileHashBase<string> = ProfileHashBase<string>,
-> extends ContractBase<TCoreHash, TProfileHash> {
+> extends ContractBase<TStorageHash, TExecutionHash, TProfileHash> {
   // Accept string to work with JSON imports; runtime validation ensures 'document'
   readonly targetFamily: string;
   readonly storage: DocumentStorage;
@@ -137,7 +171,7 @@ export interface PlanRefs {
 export interface PlanMeta {
   readonly target: string;
   readonly targetFamily?: string;
-  readonly coreHash: string;
+  readonly storageHash: string;
   readonly profileHash?: string;
   readonly lane: string;
   readonly annotations?: {
@@ -203,7 +237,7 @@ export function isDocumentContract(contract: unknown): contract is DocumentContr
  * Represents the current contract identity for a database.
  */
 export interface ContractMarkerRecord {
-  readonly coreHash: string;
+  readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson: unknown | null;
   readonly canonicalVersion: number | null;
@@ -298,7 +332,7 @@ export interface TargetFamilyHook {
    * @param ir - Contract IR
    * @param codecTypeImports - Array of codec type import specs
    * @param operationTypeImports - Array of operation type import specs
-   * @param hashes - Contract hash values (coreHash and profileHash)
+   * @param hashes - Contract hash values (storageHash, executionHash, profileHash)
    * @param options - Additional options including parameterized type renderers
    * @returns Generated TypeScript type definitions as string
    */
@@ -306,7 +340,11 @@ export interface TargetFamilyHook {
     ir: ContractIR,
     codecTypeImports: ReadonlyArray<TypesImportSpec>,
     operationTypeImports: ReadonlyArray<TypesImportSpec>,
-    hashes: { readonly coreHash: string; readonly profileHash: string },
+    hashes: {
+      readonly storageHash: string;
+      readonly executionHash?: string;
+      readonly profileHash: string;
+    },
     options?: GenerateContractTypesOptions,
   ): string;
 }

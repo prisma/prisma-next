@@ -129,8 +129,8 @@ function renderContract(c: ContractIR): string {
 
   return `
     <div class="hash">
-      <span class="hash-label">Contract Hash:</span>
-      <span class="hash-value">${c.coreHash}</span>
+      <span class="hash-label">Storage Hash:</span>
+      <span class="hash-value">${c.storageHash}</span>
     </div>
     <div class="section">
       <div class="section-title">Target: ${c.target}</div>

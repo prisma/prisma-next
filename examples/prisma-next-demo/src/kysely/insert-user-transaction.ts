@@ -1,9 +1,11 @@
+import { generateId } from '@prisma-next/ids/runtime';
 import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { Kysely } from 'kysely';
 import { executionContext } from '../prisma/execution-context';
 
-export async function insertUserTransaction(userId: number, runtime: Runtime) {
+export async function insertUserTransaction(runtime: Runtime) {
+  const userId = generateId({ id: 'uuidv4' });
   const contract = executionContext.contract;
   const kysely = new Kysely<KyselifyContract<typeof contract>>({
     dialect: new KyselyPrismaDialect({ runtime, contract }),

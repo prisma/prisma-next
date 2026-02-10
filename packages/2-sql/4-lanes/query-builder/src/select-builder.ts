@@ -34,7 +34,7 @@ export class SelectBuilder<
       >
     : PreviousFunctionReceivedBadInputError<'[error] selecting all columns via `*` results in ambiguity when multiple tables are involved in the query'>;
   select<TTableName extends keyof TTables & string>(
-    asterisk: TableAsterisk<TTableName, TContract['coreHash']>,
+    asterisk: TableAsterisk<TTableName, TContract['storageHash']>,
   ): SelectBuilder<
     TContract,
     TTables,

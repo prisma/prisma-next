@@ -81,34 +81,38 @@ describe('@prisma-next/driver-postgres', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it('handles non-Error exceptions in cursor path', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+  it(
+    'handles non-Error exceptions in cursor path',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as Pool },
-      cursor: { batchSize: 1 },
-    });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as Pool },
+        cursor: { batchSize: 1 },
+      });
 
-    cleanup = async () => {
-      await driver.close();
-    };
+      cleanup = async () => {
+        await driver.close();
+      };
 
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1)', ['test']);
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      await driver.query('insert into items(name) values ($1)', ['test']);
 
-    // The cursor path should handle non-Error exceptions and fall back to buffered
-    const rows: Array<{ id: number; name: string }> = [];
-    for await (const row of driver.execute<{ id: number; name: string }>({
-      sql: 'select id, name from items',
-    })) {
-      rows.push(row);
-    }
+      // The cursor path should handle non-Error exceptions and fall back to buffered
+      const rows: Array<{ id: number; name: string }> = [];
+      for await (const row of driver.execute<{ id: number; name: string }>({
+        sql: 'select id, name from items',
+      })) {
+        rows.push(row);
+      }
 
-    expect(rows.length).toBeGreaterThan(0);
-  });
+      expect(rows.length).toBeGreaterThan(0);
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it('throws error when client connection fails with non-already-connected error', async () => {
     const db = newDb();
@@ -163,36 +167,40 @@ describe('@prisma-next/driver-postgres', () => {
     client.connect = originalConnect;
   });
 
-  it('handles cursor read errors', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+  it(
+    'handles cursor read errors',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as Pool },
-      cursor: { batchSize: 1 },
-    });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as Pool },
+        cursor: { batchSize: 1 },
+      });
 
-    cleanup = async () => {
-      await driver.close();
-    };
+      cleanup = async () => {
+        await driver.close();
+      };
 
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
 
-    // Cursor read errors should be caught and handled by the execute method
-    // The driver should fall back to buffered mode if cursor fails
-    const rows: Array<{ id: number; name: string }> = [];
-    for await (const row of driver.execute<{ id: number; name: string }>({
-      sql: 'select id, name from items order by id asc',
-    })) {
-      rows.push(row);
-    }
+      // Cursor read errors should be caught and handled by the execute method
+      // The driver should fall back to buffered mode if cursor fails
+      const rows: Array<{ id: number; name: string }> = [];
+      for await (const row of driver.execute<{ id: number; name: string }>({
+        sql: 'select id, name from items order by id asc',
+      })) {
+        rows.push(row);
+      }
 
-    // Should get results even if cursor read had issues (fallback to buffered)
-    expect(rows.length).toBeGreaterThan(0);
-  });
+      // Should get results even if cursor read had issues (fallback to buffered)
+      expect(rows.length).toBeGreaterThan(0);
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it('handles cursor close errors', async () => {
     const db = newDb();

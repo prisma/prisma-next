@@ -254,7 +254,7 @@ export function buildMeta(args: MetaBuildArgs): PlanMeta {
     compact({
       target: args.contract.target,
       targetFamily: args.contract.targetFamily,
-      coreHash: args.contract.coreHash,
+      storageHash: args.contract.storageHash,
       lane: 'dsl',
       refs: {
         tables: Array.from(refsTables),

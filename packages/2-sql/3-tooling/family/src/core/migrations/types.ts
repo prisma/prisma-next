@@ -178,7 +178,7 @@ export interface SqlMigrationPlanOperation<TTargetDetails> extends MigrationPlan
  * Contract identity information for SQL migrations.
  */
 export interface SqlMigrationPlanContractInfo {
-  readonly coreHash: string;
+  readonly storageHash: string;
   readonly profileHash?: string;
 }
 

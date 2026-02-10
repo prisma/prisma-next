@@ -719,7 +719,7 @@ const invalid = { ...validContractInput, targetFamily: undefined } as any;
 // biome-ignore lint/suspicious/noExplicitAny: <reason>
 const invalid2 = { ...validContractInput, target: undefined } as any;
 // biome-ignore lint/suspicious/noExplicitAny: <reason>
-const invalid3 = { ...validContractInput, coreHash: undefined } as any;
+const invalid3 = { ...validContractInput, storageHash: undefined } as any;
 // ... many more
 ```
 
@@ -732,7 +732,7 @@ import { describe, expect, it } from 'vitest';
 // Now all as any usages in the file are allowed
 const invalid = { ...validContractInput, targetFamily: undefined } as any;
 const invalid2 = { ...validContractInput, target: undefined } as any;
-const invalid3 = { ...validContractInput, coreHash: undefined } as any;
+const invalid3 = { ...validContractInput, storageHash: undefined } as any;
 ```
 
 **When to use file-level disables:**

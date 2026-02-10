@@ -25,7 +25,7 @@ function createTestContract(): SqlContract<SqlStorage> {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test' as never,
+    storageHash: 'sha256:test' as never,
     models: {},
     storage: {
       tables: {

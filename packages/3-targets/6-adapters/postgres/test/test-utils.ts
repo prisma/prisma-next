@@ -19,7 +19,7 @@ export function createTestContract(storage: Partial<SqlStorage> = {}): SqlContra
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test' as never,
+    storageHash: 'sha256:test' as never,
     storage: {
       tables: {},
       types: {},

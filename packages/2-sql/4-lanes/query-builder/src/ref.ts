@@ -15,15 +15,15 @@ import type { TableReference, TableReferenceOutOfContractError } from './table-r
 export type Ref<TContract extends SqlContract> = {
   readonly [TableName in keyof TContract['storage']['tables'] & string]: TableReference<
     TableName,
-    TContract['coreHash']
+    TContract['storageHash']
   > & {
     readonly [ColumnName in Exclude<
       keyof TContract['storage']['tables'][TableName]['columns'],
       keyof TableReference
     > &
-      string]: ColumnReference<ColumnName, TableName, TContract['coreHash']>;
+      string]: ColumnReference<ColumnName, TableName, TContract['storageHash']>;
   } & {
-    readonly ['*']: TableAsterisk<TableName, TContract['coreHash']>;
+    readonly ['*']: TableAsterisk<TableName, TContract['storageHash']>;
   } & Record<
       PropertyKey,
       ColumnReferenceOutOfContractError<`[error] reference to a non-existing column in the '${TableName}' table`>

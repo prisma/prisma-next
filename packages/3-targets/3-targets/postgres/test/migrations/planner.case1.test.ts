@@ -74,7 +74,7 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:contract' as never,
+    storageHash: 'sha256:contract' as never,
     profileHash: 'sha256:profile' as never,
     storage: {
       tables: {
@@ -339,7 +339,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
+      storageHash: 'sha256:test-defaults' as never,
       profileHash: 'sha256:test-defaults-profile' as never,
       storage: {
         tables: {

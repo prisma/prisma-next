@@ -18,7 +18,7 @@
 - **Contract Format:** JSON with TypeScript definitions (contract.json + contract.d.ts)
 - **Validation:** Arktype for runtime validation with `.infer` type extraction
 - **Type Generation:** Custom TypeScript emitter producing lightweight types (not executable client)
-- **Hashing:** SHA-256 for contract verification (coreHash + profileHash)
+- **Hashing:** SHA-256 for contract verification (storageHash + optional executionHash + profileHash)
 
 ### Package Architecture
 
@@ -69,7 +69,7 @@
 - **Connection Pooling:** Native pg pooling
 
 ### Database Features
-- **Contract Marker:** Database table storing coreHash and profileHash
+- **Contract Marker:** Database table storing storageHash and profileHash
 - **Migration Ledger:** Append-only table recording applied migration edges
 - **Advisory Locks:** Used during migration apply for concurrency control
 - **Capability Discovery:** Runtime queries for database capabilities
@@ -120,7 +120,7 @@
 
 ### Telemetry & Observability
 - **Metrics:** Plugin-based telemetry collection
-- **Tracing:** Plan metadata includes coreHash, lane, refs, and annotations
+- **Tracing:** Plan metadata includes storageHash, lane, refs, and annotations
 - **Logging:** Machine-readable structured logs with stable error codes
 - **Error Taxonomy:** Categorized errors (PLAN/RUNTIME/ADAPTER/BUDGET/LINT/MIGRATION/CONTRACT)
 

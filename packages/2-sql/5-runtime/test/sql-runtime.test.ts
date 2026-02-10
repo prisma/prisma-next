@@ -24,7 +24,7 @@ const testContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   targetFamily: 'sql',
   target: 'postgres',
-  coreHash: 'sha256:test' as never,
+  storageHash: 'sha256:test' as never,
   models: {},
   relations: {},
   storage: { tables: {} },
@@ -372,7 +372,7 @@ describe('createRuntime', () => {
       meta: {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'sql',
         paramDescriptors: [],
       },

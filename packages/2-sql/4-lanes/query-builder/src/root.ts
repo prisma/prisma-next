@@ -29,7 +29,7 @@ export class Root<TContract extends SqlContract> {
   from<TName extends string>(
     table: string extends TName
       ? TableReferenceTooWideError<'[error] `root.from()` call received a table reference without a specific table name'>
-      : TableReference<TName, TContract['coreHash']>,
+      : TableReference<TName, TContract['storageHash']>,
   ): TName extends string
     ? SelectBuilder<TContract, Pick<TContract['storage']['tables'], TName>>
     : PreviousFunctionReceivedBadInputError<'[error] invalid table reference in previous `root.from()` call will probably cause runtime errors'>;

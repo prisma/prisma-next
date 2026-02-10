@@ -33,7 +33,7 @@ function createParamTypesTestContract(
     schemaVersion: '1',
     targetFamily: 'sql',
     target: 'postgres',
-    coreHash: 'sha256:test' as never,
+    storageHash: 'sha256:test' as never,
     models: {},
     relations: {},
     storage: {

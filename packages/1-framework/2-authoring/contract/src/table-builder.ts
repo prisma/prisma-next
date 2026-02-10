@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ColumnBuilderState,
@@ -32,6 +32,14 @@ interface NonNullableColumnOptions<Descriptor extends ColumnTypeDescriptor> {
   default?: ColumnDefault;
 }
 
+type GeneratedColumnOptions<Descriptor extends ColumnTypeDescriptor> = Omit<
+  NonNullableColumnOptions<Descriptor>,
+  'default' | 'nullable'
+> & {
+  nullable?: false;
+  generated: ExecutionMutationDefaultValue;
+};
+
 /**
  * Column options that enforce nullable/default mutual exclusivity.
  *
@@ -42,6 +50,8 @@ interface NonNullableColumnOptions<Descriptor extends ColumnTypeDescriptor> {
 type ColumnOptions<Descriptor extends ColumnTypeDescriptor> =
   | NullableColumnOptions<Descriptor>
   | NonNullableColumnOptions<Descriptor>;
+
+type NullableFromOptions<TOptions> = TOptions extends { nullable: true } ? true : false;
 
 interface TableBuilderInternalState<
   Name extends string,
@@ -150,6 +160,38 @@ export class TableBuilder<
     Columns & Record<ColName, ColumnBuilderState<ColName, boolean, Descriptor['codecId']>>,
     PrimaryKey
   > {
+    return this.columnInternal(name, options);
+  }
+
+  generated<ColName extends string, Descriptor extends ColumnTypeDescriptor>(
+    name: ColName,
+    options: GeneratedColumnOptions<Descriptor>,
+  ): TableBuilder<
+    Name,
+    Columns & Record<ColName, ColumnBuilderState<ColName, false, Descriptor['codecId']>>,
+    PrimaryKey
+  > {
+    const { generated, ...columnOptions } = options;
+    return this.columnInternal(name, columnOptions, generated);
+  }
+
+  private columnInternal<
+    ColName extends string,
+    Descriptor extends ColumnTypeDescriptor,
+    Options extends ColumnOptions<Descriptor>,
+  >(
+    name: ColName,
+    options: Options,
+    executionDefault?: ExecutionMutationDefaultValue,
+  ): TableBuilder<
+    Name,
+    Columns &
+      Record<
+        ColName,
+        ColumnBuilderState<ColName, NullableFromOptions<Options>, Descriptor['codecId']>
+      >,
+    PrimaryKey
+  > {
     const nullable = options.nullable ?? false;
     const { codecId, nativeType, typeParams: descriptorTypeParams, typeRef } = options.type;
     const typeParams = options.typeParams ?? descriptorTypeParams;
@@ -165,9 +207,13 @@ export class TableBuilder<
       ...ifDefined('typeParams', typeParams),
       ...ifDefined('typeRef', typeRef),
       ...ifDefined('default', 'default' in options ? options.default : undefined),
-    } as ColumnBuilderState<ColName, boolean, Descriptor['codecId']>;
+      ...ifDefined('executionDefault', executionDefault),
+    } as ColumnBuilderState<ColName, NullableFromOptions<Options>, Descriptor['codecId']>;
     const newColumns = { ...this._columns, [name]: columnState } as Columns &
-      Record<ColName, ColumnBuilderState<ColName, boolean, Descriptor['codecId']>>;
+      Record<
+        ColName,
+        ColumnBuilderState<ColName, NullableFromOptions<Options>, Descriptor['codecId']>
+      >;
     return new TableBuilder(
       this._state.name,
       newColumns,

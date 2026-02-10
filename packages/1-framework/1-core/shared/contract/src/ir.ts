@@ -6,12 +6,13 @@
 /**
  * ContractIR represents the intermediate representation of a contract.
  * It is family-agnostic and contains generic storage, models, and relations.
- * Note: coreHash and profileHash are computed by the emitter, not part of the IR.
+ * Note: storageHash/executionHash and profileHash are computed by the emitter, not part of the IR.
  */
 export interface ContractIR<
   TStorage extends Record<string, unknown> = Record<string, unknown>,
   TModels extends Record<string, unknown> = Record<string, unknown>,
   TRelations extends Record<string, unknown> = Record<string, unknown>,
+  TExecution extends Record<string, unknown> = Record<string, unknown>,
 > {
   readonly schemaVersion: string;
   readonly targetFamily: string;
@@ -19,6 +20,7 @@ export interface ContractIR<
   readonly models: TModels;
   readonly relations: TRelations;
   readonly storage: TStorage;
+  readonly execution?: TExecution;
   readonly extensionPacks: Record<string, unknown>;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly meta: Record<string, unknown>;
@@ -27,25 +29,28 @@ export interface ContractIR<
 
 /**
  * Creates the header portion of a ContractIR.
- * Contains schema version, target, target family, core hash, and optional profile hash.
+ * Contains schema version, target, target family, storage hash, and optional profile hash.
  */
 export function irHeader(opts: {
   target: string;
   targetFamily: string;
-  coreHash: string;
+  storageHash: string;
+  executionHash?: string | undefined;
   profileHash?: string | undefined;
 }): {
   readonly schemaVersion: string;
   readonly target: string;
   readonly targetFamily: string;
-  readonly coreHash: string;
+  readonly storageHash: string;
+  readonly executionHash?: string | undefined;
   readonly profileHash?: string | undefined;
 } {
   return {
     schemaVersion: '1',
     target: opts.target,
     targetFamily: opts.targetFamily,
-    coreHash: opts.coreHash,
+    storageHash: opts.storageHash,
+    ...(opts.executionHash !== undefined && { executionHash: opts.executionHash }),
     ...(opts.profileHash !== undefined && { profileHash: opts.profileHash }),
   };
 }
@@ -82,12 +87,14 @@ export function contractIR<
   TStorage extends Record<string, unknown>,
   TModels extends Record<string, unknown>,
   TRelations extends Record<string, unknown>,
+  TExecution extends Record<string, unknown>,
 >(opts: {
   header: {
     readonly schemaVersion: string;
     readonly target: string;
     readonly targetFamily: string;
-    readonly coreHash: string;
+    readonly storageHash: string;
+    readonly executionHash?: string | undefined;
     readonly profileHash?: string | undefined;
   };
   meta: {
@@ -99,8 +106,9 @@ export function contractIR<
   storage: TStorage;
   models: TModels;
   relations: TRelations;
-}): ContractIR<TStorage, TModels, TRelations> {
-  // ContractIR doesn't include coreHash or profileHash (those are computed by emitter)
+  execution?: TExecution;
+}): ContractIR<TStorage, TModels, TRelations, TExecution> {
+  // ContractIR doesn't include storageHash/executionHash or profileHash (those are computed by emitter)
   return {
     schemaVersion: opts.header.schemaVersion,
     target: opts.header.target,
@@ -109,5 +117,6 @@ export function contractIR<
     storage: opts.storage,
     models: opts.models,
     relations: opts.relations,
+    ...(opts.execution !== undefined && { execution: opts.execution }),
   };
 }

@@ -10,6 +10,19 @@ import type { CodecRegistry } from './ast/codec-types';
  */
 export type TypeHelperRegistry = Record<string, unknown>;
 
+export type MutationDefaultsOp = 'create' | 'update';
+
+export type AppliedMutationDefault = {
+  readonly column: string;
+  readonly value: unknown;
+};
+
+export type MutationDefaultsOptions = {
+  readonly op: MutationDefaultsOp;
+  readonly table: string;
+  readonly values: Record<string, unknown>;
+};
+
 /**
  * Minimal context interface for SQL query lanes.
  *
@@ -28,4 +41,9 @@ export interface ExecutionContext<
    * Schema builders expose these helpers via schema.types.
    */
   readonly types: TypeHelperRegistry;
+  /**
+   * Applies execution-time mutation defaults for the given table.
+   * Returns the applied defaults (caller-provided values always win).
+   */
+  applyMutationDefaults(options: MutationDefaultsOptions): ReadonlyArray<AppliedMutationDefault>;
 }

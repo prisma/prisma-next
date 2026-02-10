@@ -113,7 +113,7 @@ Guardrails (CI)
   - Require `refs` to enable: `no-unindexed-predicate`, `read-only-mutation`
 
 ## Plan & Runtime
-- Plan.meta (MVP): `{ target, coreHash, profileHash?, lane, refs{tables, columns[{table,column}]}, projection, annotations }` ([ADR 011](./architecture%20docs/adrs/ADR%20011%20-%20Unified%20Plan%20Model.md), [ADR 018](./architecture%20docs/adrs/ADR%20018%20-%20Plan%20Annotations%20Schema.md)).
+- Plan.meta (MVP): `{ target, storageHash, profileHash?, lane, refs{tables, columns[{table,column}]}, projection, annotations }` ([ADR 011](./architecture%20docs/adrs/ADR%20011%20-%20Unified%20Plan%20Model.md), [ADR 018](./architecture%20docs/adrs/ADR%20018%20-%20Plan%20Annotations%20Schema.md)).
 - Runtime verification mode: `onFirstUse` by default (construction has no side‑effects); explicit `runtime.verify()` throws `CONTRACT.MARKER_MISMATCH` ([ADR 021](./architecture%20docs/adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md)).
 - Plugins enabled in example runtime ([Runtime & Plugin Framework](./architecture%20docs/subsystems/4.%20Runtime%20%26%20Plugin%20Framework.md)):
   - `lints` (mode strict; [ADR 022](./architecture%20docs/adrs/ADR%20022%20-%20Lint%20Rule%20Taxonomy.md))

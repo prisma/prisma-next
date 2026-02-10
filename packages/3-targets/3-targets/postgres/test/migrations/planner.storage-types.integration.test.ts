@@ -19,7 +19,7 @@ const contractWithEnum: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  coreHash: 'sha256:enum-test' as never,
+  storageHash: 'sha256:enum-test' as never,
   profileHash: 'sha256:profile' as never,
   storage: {
     tables: {

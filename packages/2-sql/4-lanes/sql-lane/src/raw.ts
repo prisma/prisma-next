@@ -142,7 +142,7 @@ function buildRawMeta(args: RawMetaBuildArgs): PlanMeta {
   const meta: PlanMeta = {
     target: contract.target,
     targetFamily: contract.targetFamily,
-    coreHash: contract.coreHash,
+    storageHash: contract.storageHash,
     ...(contract.profileHash !== undefined ? { profileHash: contract.profileHash } : {}),
     lane: 'raw',
     paramDescriptors: Object.freeze([...paramDescriptors]),

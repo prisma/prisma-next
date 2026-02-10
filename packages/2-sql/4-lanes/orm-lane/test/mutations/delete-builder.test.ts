@@ -16,7 +16,7 @@ describe('delete builder', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test' as never,
+    storageHash: 'sha256:test' as never,
     models: {
       User: {
         storage: { table: 'user' },
@@ -59,6 +59,7 @@ describe('delete builder', () => {
     operations: createOperationRegistry(),
     codecs: createCodecRegistry(),
     types: {},
+    applyMutationDefaults: () => [],
   };
 
   const getModelAccessor: () => ModelColumnAccessor<

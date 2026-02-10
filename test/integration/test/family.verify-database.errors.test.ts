@@ -158,7 +158,7 @@ describe('family instance verify - errors', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            coreHash: contractWithDb.coreHash,
+            storageHash: contractWithDb.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -182,7 +182,7 @@ describe('family instance verify - errors', () => {
   );
 
   it(
-    'returns error when coreHash mismatch',
+    'returns error when storageHash mismatch',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         const testDirWithDb = createIntegrationTestDir();
@@ -199,8 +199,8 @@ describe('family instance verify - errors', () => {
 
             // Write marker with different hash
             const write = writeContractMarker({
-              coreHash: 'sha256:different-hash',
-              profileHash: contractWithDb.profileHash ?? contractWithDb.coreHash,
+              storageHash: 'sha256:different-hash',
+              profileHash: contractWithDb.profileHash ?? contractWithDb.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -216,7 +216,7 @@ describe('family instance verify - errors', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            coreHash: contractWithDb.coreHash,
+            storageHash: contractWithDb.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -227,7 +227,7 @@ describe('family instance verify - errors', () => {
             code: 'PN-RTM-3002',
             summary: 'Hash mismatch',
             contract: expectedContract,
-            marker: { coreHash: 'sha256:different-hash' },
+            marker: { storageHash: 'sha256:different-hash' },
           });
         } finally {
           if (existsSync(testDirWithDb)) {
@@ -257,7 +257,7 @@ describe('family instance verify - errors', () => {
 
             // Write marker with different profileHash
             const write = writeContractMarker({
-              coreHash: contractWithDb.coreHash,
+              storageHash: contractWithDb.storageHash,
               profileHash: 'sha256:different-profile-hash',
               contractJson: contractWithDb,
               canonicalVersion: 1,
@@ -274,7 +274,7 @@ describe('family instance verify - errors', () => {
           });
 
           const expectedContract: Record<string, unknown> = {
-            coreHash: contractWithDb.coreHash,
+            storageHash: contractWithDb.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;
@@ -298,7 +298,7 @@ describe('family instance verify - errors', () => {
   );
 
   it(
-    'handles invalid contract structure (missing coreHash or target)',
+    'handles invalid contract structure (missing storageHash or target)',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         const testDirWithDb = createIntegrationTestDir();
@@ -308,7 +308,7 @@ describe('family instance verify - errors', () => {
           const contract = createTestContract();
           await emitContract(contract, testDirWithDb);
 
-          // Create an invalid contract IR (missing coreHash/target)
+          // Create an invalid contract IR (missing storageHash/target)
           const invalidContractIR = {
             schemaVersion: '1',
             targetFamily: 'sql',
@@ -326,7 +326,7 @@ describe('family instance verify - errors', () => {
               dbUrl: connectionString,
               contractPath: join(testDirWithDb, 'output/contract.json'),
             }),
-          ).rejects.toThrow('Contract is missing required fields: coreHash or target');
+          ).rejects.toThrow('Contract is missing required fields: storageHash or target');
         } finally {
           if (existsSync(testDirWithDb)) {
             rmSync(testDirWithDb, { recursive: true, force: true });
@@ -353,8 +353,8 @@ describe('family instance verify - errors', () => {
             await executeStatement(client, ensureTableStatement);
 
             const write = writeContractMarker({
-              coreHash: contractWithDb.coreHash,
-              profileHash: contractWithDb.profileHash ?? contractWithDb.coreHash,
+              storageHash: contractWithDb.storageHash,
+              profileHash: contractWithDb.profileHash ?? contractWithDb.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -371,7 +371,7 @@ describe('family instance verify - errors', () => {
 
           // Should succeed but report missing codecs if contract uses types not in supported list
           const expectedContract: Record<string, unknown> = {
-            coreHash: contractWithDb.coreHash,
+            storageHash: contractWithDb.storageHash,
           };
           if (contractWithDb.profileHash) {
             expectedContract['profileHash'] = contractWithDb.profileHash;

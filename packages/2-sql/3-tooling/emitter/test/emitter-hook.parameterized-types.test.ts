@@ -19,7 +19,7 @@ function createContractIR(overrides: Partial<ContractIR>): ContractIR {
   };
 }
 
-const testHashes = { coreHash: 'test-core-hash', profileHash: 'test-profile-hash' };
+const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-hash' };
 
 describe('sql-target-family-hook parameterized type emission', () => {
   describe('columns with typeParams', () => {

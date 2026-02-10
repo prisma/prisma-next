@@ -565,7 +565,8 @@ class ControlClientImpl implements ControlClient {
       });
 
       return ok({
-        coreHash: emitResult.coreHash,
+        storageHash: emitResult.storageHash,
+        ...(emitResult.executionHash ? { executionHash: emitResult.executionHash } : {}),
         profileHash: emitResult.profileHash,
         contractJson: emitResult.contractJson,
         contractDts: emitResult.contractDts,

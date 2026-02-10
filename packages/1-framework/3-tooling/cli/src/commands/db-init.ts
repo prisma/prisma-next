@@ -57,12 +57,12 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
   if (failure.code === 'MARKER_ORIGIN_MISMATCH') {
     const mismatchParts: string[] = [];
     if (
-      failure.marker?.coreHash !== failure.destination?.coreHash &&
-      failure.marker?.coreHash &&
-      failure.destination?.coreHash
+      failure.marker?.storageHash !== failure.destination?.storageHash &&
+      failure.marker?.storageHash &&
+      failure.destination?.storageHash
     ) {
       mismatchParts.push(
-        `coreHash (marker: ${failure.marker.coreHash}, destination: ${failure.destination.coreHash})`,
+        `storageHash (marker: ${failure.marker.storageHash}, destination: ${failure.destination.storageHash})`,
       );
     }
     if (
@@ -82,9 +82,9 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
         fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
         meta: {
           code: 'MARKER_ORIGIN_MISMATCH',
-          ...(failure.marker?.coreHash ? { markerCoreHash: failure.marker.coreHash } : {}),
-          ...(failure.destination?.coreHash
-            ? { destinationCoreHash: failure.destination.coreHash }
+          ...(failure.marker?.storageHash ? { markerStorageHash: failure.marker.storageHash } : {}),
+          ...(failure.destination?.storageHash
+            ? { destinationStorageHash: failure.destination.storageHash }
             : {}),
           ...(failure.marker?.profileHash ? { markerProfileHash: failure.marker.profileHash } : {}),
           ...(failure.destination?.profileHash
@@ -242,7 +242,7 @@ async function executeDbInitCommand(
       plan: {
         targetId: config.target.targetId,
         destination: {
-          coreHash: result.value.marker?.coreHash ?? '',
+          storageHash: result.value.marker?.storageHash ?? '',
           ...(profileHash ? { profileHash } : {}),
         },
         operations: result.value.plan.operations.map((op) => ({
@@ -262,7 +262,7 @@ async function executeDbInitCommand(
       ...(result.value.marker
         ? {
             marker: {
-              coreHash: result.value.marker.coreHash,
+              storageHash: result.value.marker.storageHash,
               ...(result.value.marker.profileHash
                 ? { profileHash: result.value.marker.profileHash }
                 : {}),

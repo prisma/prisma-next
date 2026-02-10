@@ -12,7 +12,7 @@ export const contract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  coreHash: 'sha256:contract' as never,
+  storageHash: 'sha256:contract' as never,
   profileHash: 'sha256:profile' as never,
   storage: {
     tables: {
@@ -101,7 +101,7 @@ export function createFailingPlan() {
 }
 
 export function toPlanContractInfo(c: SqlContract<SqlStorage>) {
-  return { coreHash: c.coreHash, profileHash: c.profileHash! };
+  return { storageHash: c.storageHash, profileHash: c.profileHash! };
 }
 
 export async function executeStatement(

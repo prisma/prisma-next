@@ -108,7 +108,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         schemaVersion: '1',
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:contract-with-defaults' as never,
+        storageHash: 'sha256:contract-with-defaults' as never,
         profileHash: 'sha256:profile-with-defaults' as never,
         storage: {
           tables: {

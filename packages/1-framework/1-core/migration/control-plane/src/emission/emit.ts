@@ -3,7 +3,7 @@ import type { TargetFamilyHook, ValidationContext } from '@prisma-next/contract/
 import { ifDefined } from '@prisma-next/utils/defined';
 import { format } from 'prettier';
 import { canonicalizeContract } from './canonicalization';
-import { computeCoreHash, computeProfileHash } from './hashing';
+import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
 import type { EmitOptions, EmitResult } from './types';
 
 function validateCoreStructure(ir: ContractIR): void {
@@ -72,19 +72,26 @@ export async function emit(
     models: ir.models,
     relations: ir.relations,
     storage: ir.storage,
+    ...(ir.execution ? { execution: ir.execution } : {}),
     extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
     meta: ir.meta,
     sources: ir.sources,
   } as const;
 
-  const coreHash = computeCoreHash(contractJson);
+  const storageHash = computeStorageHash(contractJson);
+  const executionHash = ir.execution ? computeExecutionHash(contractJson) : undefined;
   const profileHash = computeProfileHash(contractJson);
 
-  const contractWithHashes: ContractIR & { coreHash?: string; profileHash?: string } = {
+  const contractWithHashes: ContractIR & {
+    storageHash?: string;
+    executionHash?: string;
+    profileHash?: string;
+  } = {
     ...ir,
     schemaVersion: contractJson.schemaVersion,
-    coreHash,
+    storageHash,
+    ...(executionHash ? { executionHash } : {}),
     profileHash,
   };
 
@@ -113,11 +120,16 @@ export async function emit(
         }
       : undefined;
 
+  const contractTypeHashes = {
+    storageHash,
+    ...(executionHash ? { executionHash } : {}),
+    profileHash,
+  };
   const contractDtsRaw = targetFamily.generateContractTypes(
     ir,
     codecTypeImports ?? [],
     operationTypeImports ?? [],
-    { coreHash, profileHash },
+    contractTypeHashes,
     generateOptions,
   );
   const contractDts = await format(contractDtsRaw, {
@@ -130,7 +142,8 @@ export async function emit(
   return {
     contractJson: contractJsonString,
     contractDts,
-    coreHash,
+    storageHash,
+    ...(executionHash ? { executionHash } : {}),
     profileHash,
   };
 }

@@ -96,7 +96,7 @@ withTempDir(({ createTempDir }) => {
               plan: {
                 targetId: expect.any(String),
                 destination: {
-                  coreHash: expect.any(String),
+                  storageHash: expect.any(String),
                 },
                 operations: expect.any(Array),
               },
@@ -105,7 +105,7 @@ withTempDir(({ createTempDir }) => {
                 operationsExecuted: expect.any(Number),
               },
               marker: {
-                coreHash: expect.any(String),
+                storageHash: expect.any(String),
               },
               summary: expect.any(String),
               timings: {
@@ -185,7 +185,7 @@ withTempDir(({ createTempDir }) => {
               plan: {
                 targetId: expect.any(String),
                 destination: {
-                  coreHash: expect.any(String),
+                  storageHash: expect.any(String),
                 },
                 operations: expect.any(Array),
               },
@@ -292,7 +292,7 @@ withTempDir(({ createTempDir }) => {
               plan: {
                 targetId: expect.any(String),
                 destination: {
-                  coreHash: expect.any(String),
+                  storageHash: expect.any(String),
                 },
                 operations: [], // Empty - no operations needed
               },
@@ -301,7 +301,7 @@ withTempDir(({ createTempDir }) => {
                 operationsExecuted: 0,
               },
               marker: {
-                coreHash: expect.any(String),
+                storageHash: expect.any(String),
                 profileHash: expect.any(String),
               },
               summary: 'Database already at target contract state',

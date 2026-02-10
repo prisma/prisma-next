@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:97998a9dc27b4ffdd7258e171236148b81c220a194d7adadbdb47ff28b476766",
+  "storageHash": "sha256:e6d9d401e7a4dd3af2c6f064c8bb663724628e681eea85232955b3fed03ca5da",
   "profileHash": "sha256:58a1990244c9a8cf20e2f77c60aa35d2f6ea9823f641b533a9e75abc8606819f",
   "models": {
     "Post": {

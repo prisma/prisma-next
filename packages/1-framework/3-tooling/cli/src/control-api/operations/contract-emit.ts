@@ -91,7 +91,8 @@ export async function executeContractEmit(
   await unlessAborted(writeFile(outputDtsPath, emitResult.contractDts, 'utf-8'));
 
   return {
-    coreHash: emitResult.coreHash,
+    storageHash: emitResult.storageHash,
+    ...(emitResult.executionHash ? { executionHash: emitResult.executionHash } : {}),
     profileHash: emitResult.profileHash,
     files: {
       json: outputJsonPath,

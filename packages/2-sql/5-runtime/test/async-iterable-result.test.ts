@@ -42,7 +42,7 @@ const fixtureContract = createTestContract({
   schemaVersion: '1',
   targetFamily: 'sql',
   target: 'postgres',
-  coreHash: 'test-hash',
+  storageHash: 'test-hash',
   profileHash: 'test-profile-hash',
   storage: {
     tables: {
@@ -127,7 +127,7 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
       meta: {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test-hash',
+        storageHash: 'test-hash',
         lane: 'sql',
         paramDescriptors: [],
       },
@@ -153,7 +153,7 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
       meta: {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test-hash',
+        storageHash: 'test-hash',
         lane: 'sql',
         paramDescriptors: [],
       },

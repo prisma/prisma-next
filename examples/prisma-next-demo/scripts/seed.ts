@@ -16,6 +16,7 @@
  */
 import 'dotenv/config';
 
+import { generateId } from '@prisma-next/ids/runtime';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { schema, sql } from '../src/prisma/query';
@@ -33,6 +34,9 @@ async function main() {
     const postColumns = postTable.columns;
 
     // Insert users
+    const aliceId = generateId({ id: 'uuidv4' });
+    const bobId = generateId({ id: 'uuidv4' });
+
     const alicePlan = sql
       .insert(userTable, {
         id: param('id'),
@@ -43,7 +47,7 @@ async function main() {
       .returning(userColumns.id, userColumns.email)
       .build({
         params: {
-          id: 1,
+          id: aliceId,
           email: 'alice@example.com',
           createdAt: new Date(),
           kind: 'admin',
@@ -62,7 +66,7 @@ async function main() {
       .returning(userColumns.id, userColumns.email)
       .build({
         params: {
-          id: 2,
+          id: bobId,
           email: 'bob@example.com',
           createdAt: new Date(),
           kind: 'user',
@@ -92,6 +96,10 @@ async function main() {
     };
 
     // Insert posts with embeddings
+    const post1Id = generateId({ id: 'uuidv4' });
+    const post2Id = generateId({ id: 'uuidv4' });
+    const post3Id = generateId({ id: 'uuidv4' });
+
     const post1Plan = sql
       .insert(postTable, {
         id: param('id'),
@@ -103,7 +111,7 @@ async function main() {
       .returning(postColumns.id, postColumns.title, postColumns.userId)
       .build({
         params: {
-          id: 1,
+          id: post1Id,
           title: 'First Post',
           userId: alice.id,
           embedding: generateEmbedding(1),
@@ -124,7 +132,7 @@ async function main() {
       .returning(postColumns.id, postColumns.title, postColumns.userId)
       .build({
         params: {
-          id: 2,
+          id: post2Id,
           title: 'Second Post',
           userId: alice.id,
           embedding: generateEmbedding(2),
@@ -145,7 +153,7 @@ async function main() {
       .returning(postColumns.id, postColumns.title, postColumns.userId)
       .build({
         params: {
-          id: 3,
+          id: post3Id,
           title: 'Third Post',
           userId: bob.id,
           embedding: generateEmbedding(3),

@@ -77,8 +77,8 @@ export async function setupTestDatabase(
   await executeStatement(client, ensureSchemaStatement);
   await executeStatement(client, ensureTableStatement);
   const write = writeContractMarker({
-    coreHash: contract.coreHash,
-    profileHash: contract.profileHash ?? contract.coreHash,
+    storageHash: contract.storageHash,
+    profileHash: contract.profileHash ?? contract.storageHash,
     contractJson: contract,
     canonicalVersion: 1,
   });
@@ -94,8 +94,8 @@ export async function writeTestContractMarker(
   contract: SqlContract<SqlStorage>,
 ): Promise<void> {
   const write = writeContractMarker({
-    coreHash: contract.coreHash,
-    profileHash: contract.profileHash ?? contract.coreHash,
+    storageHash: contract.storageHash,
+    profileHash: contract.profileHash ?? contract.storageHash,
     contractJson: contract,
     canonicalVersion: 1,
   });
@@ -264,26 +264,29 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
  * This helper allows tests to create contracts without depending on sql-query.
  */
 export function createTestContract<T extends SqlContract<SqlStorage>>(
-  contract: Partial<Omit<T, 'coreHash' | 'profileHash'>> & {
-    coreHash?: string | undefined;
+  contract: Partial<Omit<T, 'storageHash' | 'profileHash'>> & {
+    storageHash?: string | undefined;
     profileHash?: string | undefined;
   },
 ): T {
+  const { execution, ...rest } = contract;
+
   return {
-    ...contract,
-    schemaVersion: contract.schemaVersion ?? '1',
-    target: contract.target ?? 'postgres',
-    targetFamily: contract.targetFamily ?? 'sql',
-    storage: contract.storage ?? { tables: {} },
-    models: contract.models ?? {},
-    relations: contract.relations ?? {},
-    mappings: contract.mappings ?? { codecTypes: {}, operationTypes: {} },
-    capabilities: contract.capabilities ?? {},
-    extensionPacks: contract.extensionPacks ?? {},
-    meta: contract.meta ?? {},
-    sources: contract.sources ?? {},
-    coreHash: (contract.coreHash ?? 'sha256:testcore') satisfies string as never,
-    profileHash: (contract.profileHash ?? 'sha256:testprofile') satisfies string as never,
+    ...rest,
+    schemaVersion: rest.schemaVersion ?? '1',
+    target: rest.target ?? 'postgres',
+    targetFamily: rest.targetFamily ?? 'sql',
+    storage: rest.storage ?? { tables: {} },
+    models: rest.models ?? {},
+    relations: rest.relations ?? {},
+    mappings: rest.mappings ?? { codecTypes: {}, operationTypes: {} },
+    capabilities: rest.capabilities ?? {},
+    extensionPacks: rest.extensionPacks ?? {},
+    meta: rest.meta ?? {},
+    sources: rest.sources ?? {},
+    ...(execution ? { execution } : {}),
+    storageHash: (rest.storageHash ?? 'sha256:testcore') satisfies string as never,
+    profileHash: (rest.profileHash ?? 'sha256:testprofile') satisfies string as never,
   } satisfies SqlContract as never;
 }
 

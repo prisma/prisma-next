@@ -90,7 +90,7 @@ We have a working MVP and are targeting a public release aligned with the first 
 
 ### Contract‑First Architecture
 
-Unlike traditional ORMs that treat schemas as codegen fuel, Prisma Next defines schemas as verifiable contracts with cryptographic hashing. This enables drift detection, capability gating, and deterministic verification across environments. Both migration and query planes ingest the same `contract.json` and validate `coreHash` / `profileHash` against a database marker before acting.
+Unlike traditional ORMs that treat schemas as codegen fuel, Prisma Next defines schemas as verifiable contracts with cryptographic hashing. This enables drift detection, capability gating, and deterministic verification across environments. Both migration and query planes ingest the same `contract.json` and validate `storageHash` / `profileHash` against a database marker before acting.
 
 ### Machine‑Readable by Design
 

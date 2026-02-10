@@ -101,6 +101,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../packages/2-sql/3-tooling/family
+      '@prisma-next/ids':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/2-authoring/ids
       '@prisma-next/integration-kysely':
         specifier: workspace:*
         version: link:../../packages/3-extensions/integration-kysely
@@ -476,6 +479,34 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+
+  packages/1-framework/2-authoring/ids:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../1-core/shared/contract
+      '@prisma-next/contract-authoring':
+        specifier: workspace:*
+        version: link:../contract
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-core/shared/utils
+      uniku:
+        specifier: ^0.0.12
+        version: 0.0.12
+    devDependencies:
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      tsup:
+        specifier: 'catalog:'
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
 
   packages/1-framework/3-tooling/cli:
     dependencies:
@@ -1102,6 +1133,9 @@ importers:
       '@prisma-next/core-execution-plane':
         specifier: workspace:*
         version: link:../../1-framework/1-core/runtime/execution-plane
+      '@prisma-next/ids':
+        specifier: workspace:*
+        version: link:../../1-framework/2-authoring/ids
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/shared/operations
@@ -1470,6 +1504,9 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../../packages/2-sql/3-tooling/family
+      '@prisma-next/ids':
+        specifier: workspace:*
+        version: link:../../../packages/1-framework/2-authoring/ids
       '@prisma-next/integration-tests':
         specifier: workspace:*
         version: link:../../integration
@@ -2433,6 +2470,10 @@ packages:
 
   '@napi-rs/wasm-runtime@1.1.1':
     resolution: {integrity: sha512-p64ah1M1ld8xjWv3qbvFwHiFVWrq1yFvV4f7w+mzaqiR4IlSgkqhcRdHwsGgomwzBH51sRY4NEowLxnaBjcW/A==}
+
+  '@noble/hashes@2.0.1':
+    resolution: {integrity: sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==}
+    engines: {node: '>= 20.19.0'}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -3447,6 +3488,7 @@ packages:
 
   glob@10.4.5:
     resolution: {integrity: sha512-7Bv8RF0k6xjo7d4A/PxYLbUCfb6c+Vpd2/mB2yRDlew7Jb5hEXiCD9ibfO7wpk8i4sevK6DFny9h7EYbM3/sHg==}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   global-directory@4.0.1:
@@ -4543,6 +4585,10 @@ packages:
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
+  uniku@0.0.12:
+    resolution: {integrity: sha512-wqt0D/ZcBTDprQxlFpxDm4jCHlQyHWQ62PMXPF0AfU7oxHm4g5++7EY7/+uwApCMOhfzRE8fTf4WATe6lH1vkg==}
+    engines: {node: '>=24.13.0'}
+
   universalify@0.1.2:
     resolution: {integrity: sha512-rBJeI5CXAlmy1pV+617WB9J63U6XcazHHF2f2dbJix4XzpUF0RS3Zbj0FGIOCAva5P/d/GBOYaACQ1w+0azUkg==}
     engines: {node: '>= 4.0.0'}
@@ -5288,6 +5334,8 @@ snapshots:
       '@emnapi/runtime': 1.8.1
       '@tybys/wasm-util': 0.10.1
     optional: true
+
+  '@noble/hashes@2.0.1': {}
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -7330,6 +7378,10 @@ snapshots:
       quansync: 1.0.0
 
   undici-types@7.16.0: {}
+
+  uniku@0.0.12:
+    dependencies:
+      '@noble/hashes': 2.0.1
 
   universalify@0.1.2: {}
 

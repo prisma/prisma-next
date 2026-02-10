@@ -63,8 +63,7 @@ async function main() {
         console.error('Usage: pnpm start:no-emit -- user <userId>');
         process.exit(1);
       }
-      const userId = Number.parseInt(userIdStr, 10);
-      const user = await getUserById(userId, runtime);
+      const user = await getUserById(userIdStr, runtime);
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'posts') {
       const [userIdStr] = args;
@@ -72,8 +71,7 @@ async function main() {
         console.error('Usage: pnpm start:no-emit -- posts <userId>');
         process.exit(1);
       }
-      const userId = Number.parseInt(userIdStr, 10);
-      const posts = await getUserPosts(userId, runtime);
+      const posts = await getUserPosts(userIdStr, runtime);
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'users-with-posts') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;

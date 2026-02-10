@@ -35,8 +35,8 @@ describe('config loader', () => {
         hook: mockHook,
         create: () => ({
           familyId: 'sql',
-          verify: async () => ({ ok: true, summary: 'test', contract: { coreHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),
-          schemaVerify: async () => ({ ok: true, summary: 'test', contract: { coreHash: 'test' }, target: { expected: 'postgres' }, schema: { issues: [] }, timings: { total: 0 } }),
+          verify: async () => ({ ok: true, summary: 'test', contract: { storageHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),
+          schemaVerify: async () => ({ ok: true, summary: 'test', contract: { storageHash: 'test' }, target: { expected: 'postgres' }, schema: { issues: [] }, timings: { total: 0 } }),
           introspect: async () => ({ tables: {}, extensions: [] }),
         }),
       },
@@ -83,8 +83,8 @@ describe('config loader', () => {
             validateContractIR: (contract: unknown) => contract,
             create: () => ({
               familyId: 'sql',
-              verify: async () => ({ ok: true, summary: 'test', contract: { coreHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),
-              schemaVerify: async () => ({ ok: true, summary: 'test', contract: { coreHash: 'test' }, target: { expected: 'postgres' }, schema: { issues: [] }, timings: { total: 0 } }),
+              verify: async () => ({ ok: true, summary: 'test', contract: { storageHash: 'test' }, target: { expected: 'postgres' }, timings: { total: 0 } }),
+              schemaVerify: async () => ({ ok: true, summary: 'test', contract: { storageHash: 'test' }, target: { expected: 'postgres' }, schema: { issues: [] }, timings: { total: 0 } }),
               introspect: async () => ({ tables: {}, extensions: [] }),
             }),
           },

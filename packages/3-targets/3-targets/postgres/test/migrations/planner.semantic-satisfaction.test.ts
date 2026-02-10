@@ -231,7 +231,7 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:contract' as never,
+    storageHash: 'sha256:contract' as never,
     profileHash: 'sha256:profile' as never,
     storage: {
       tables: {},

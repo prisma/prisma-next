@@ -6,13 +6,13 @@ describe('irHeader', () => {
     const header = irHeader({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
     });
     expect(header).toEqual({
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
     });
   });
 
@@ -20,14 +20,14 @@ describe('irHeader', () => {
     const header = irHeader({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
       profileHash: 'sha256:def456',
     });
     expect(header).toEqual({
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
       profileHash: 'sha256:def456',
     });
   });
@@ -36,7 +36,7 @@ describe('irHeader', () => {
     const header = irHeader({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
       profileHash: undefined,
     });
     expect(header).not.toHaveProperty('profileHash');
@@ -44,7 +44,7 @@ describe('irHeader', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
     });
   });
 
@@ -52,7 +52,7 @@ describe('irHeader', () => {
     const header = irHeader({
       target: 'mongodb',
       targetFamily: 'document',
-      coreHash: 'sha256:xyz789',
+      storageHash: 'sha256:xyz789',
     });
     expect(header.targetFamily).toBe('document');
     expect(header.target).toBe('mongodb');
@@ -198,7 +198,7 @@ describe('contractIR', () => {
     const header = irHeader({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
     });
     const meta = irMeta({
       capabilities: {
@@ -235,7 +235,7 @@ describe('contractIR', () => {
     const header = irHeader({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
       profileHash: 'sha256:def456',
     });
     const meta = irMeta({});
@@ -262,7 +262,7 @@ describe('contractIR', () => {
     const header = irHeader({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:abc123',
+      storageHash: 'sha256:abc123',
     });
     const meta = irMeta({
       capabilities: {
@@ -300,7 +300,7 @@ describe('contractIR', () => {
     const header = irHeader({
       target: 'mongodb',
       targetFamily: 'document',
-      coreHash: 'sha256:xyz789',
+      storageHash: 'sha256:xyz789',
     });
     const meta = irMeta({});
     const storage = { document: { collections: {} } };
@@ -324,7 +324,7 @@ describe('contractIR', () => {
     const header = irHeader({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
     });
     const meta = irMeta({});
     const storage = {

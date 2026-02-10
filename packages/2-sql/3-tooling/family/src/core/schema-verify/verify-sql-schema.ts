@@ -78,7 +78,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   const { contract, schema, strict, context, typeMetadataRegistry, normalizeDefault } = options;
   const startTime = Date.now();
 
-  const { contractCoreHash, contractProfileHash, contractTarget } =
+  const { contractStorageHash, contractProfileHash, contractTarget } =
     extractContractMetadata(contract);
   const { issues, rootChildren } = verifySchemaTables({
     contract,
@@ -164,7 +164,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     ...ifDefined('code', code),
     summary,
     contract: {
-      coreHash: contractCoreHash,
+      storageHash: contractStorageHash,
       ...ifDefined('profileHash', contractProfileHash),
     },
     target: {
@@ -190,12 +190,12 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 type VerificationStatus = 'pass' | 'warn' | 'fail';
 
 function extractContractMetadata(contract: SqlContract<SqlStorage>): {
-  contractCoreHash: SqlContract<SqlStorage>['coreHash'];
+  contractStorageHash: SqlContract<SqlStorage>['storageHash'];
   contractProfileHash?: SqlContract<SqlStorage>['profileHash'];
   contractTarget: SqlContract<SqlStorage>['target'];
 } {
   return {
-    contractCoreHash: contract.coreHash,
+    contractStorageHash: contract.storageHash,
     contractProfileHash:
       'profileHash' in contract && typeof contract.profileHash === 'string'
         ? contract.profileHash
