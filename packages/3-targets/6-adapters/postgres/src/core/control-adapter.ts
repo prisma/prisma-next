@@ -454,10 +454,10 @@ export function normalizeSchemaNativeType(nativeType: string): string {
   // Check for 'with time zone' suffix first (more specific)
   if (trimmed.includes(' with time zone')) {
     if (trimmed.startsWith('timestamp')) {
-      return 'timestamptz' + trimmed.slice(9).replace(' with time zone', '');
+      return `timestamptz${trimmed.slice(9).replace(' with time zone', '')}`;
     }
     if (trimmed.startsWith('time')) {
-      return 'timetz' + trimmed.slice(4).replace(' with time zone', '');
+      return `timetz${trimmed.slice(4).replace(' with time zone', '')}`;
     }
   }
 
