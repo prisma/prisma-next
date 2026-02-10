@@ -434,6 +434,20 @@ describe('adapter-postgres codecs', () => {
       };
       expect(codec.paramsSchema !== undefined).toBe(hasParamsSchema);
     });
+
+    it.each([
+      { scalar: 'character', hasInit: true, expected: { kind: 'fixed', maxLength: 12 } },
+      { scalar: 'character varying', hasInit: true, expected: { kind: 'variable', maxLength: 64 } },
+      { scalar: 'numeric', hasInit: false, expected: undefined },
+    ])('tracks init hook presence for $scalar', ({ scalar, hasInit, expected }) => {
+      const codec = codecDefinitions[scalar].codec as {
+        init?: (params: { length: number }) => unknown;
+      };
+      expect(codec.init !== undefined).toBe(hasInit);
+      if (expected) {
+        expect(codec.init?.({ length: expected.maxLength })).toEqual(expected);
+      }
+    });
   });
 
   describe('numeric codec decode', () => {

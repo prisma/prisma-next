@@ -24,21 +24,41 @@ describe('sql-codecs', () => {
   });
 
   it.each([
-    { scalar: 'char', id: SQL_CHAR_CODEC_ID, targetTypes: ['char'], hasParamsSchema: true },
+    {
+      scalar: 'char',
+      id: SQL_CHAR_CODEC_ID,
+      targetTypes: ['char'],
+      hasParamsSchema: true,
+      hasInit: true,
+    },
     {
       scalar: 'varchar',
       id: SQL_VARCHAR_CODEC_ID,
       targetTypes: ['varchar'],
       hasParamsSchema: true,
+      hasInit: true,
     },
-    { scalar: 'int', id: SQL_INT_CODEC_ID, targetTypes: ['int'], hasParamsSchema: false },
-    { scalar: 'float', id: SQL_FLOAT_CODEC_ID, targetTypes: ['float'], hasParamsSchema: false },
-  ])('defines codec for $scalar', ({ scalar, id, targetTypes, hasParamsSchema }) => {
+    {
+      scalar: 'int',
+      id: SQL_INT_CODEC_ID,
+      targetTypes: ['int'],
+      hasParamsSchema: false,
+      hasInit: false,
+    },
+    {
+      scalar: 'float',
+      id: SQL_FLOAT_CODEC_ID,
+      targetTypes: ['float'],
+      hasParamsSchema: false,
+      hasInit: false,
+    },
+  ])('defines codec for $scalar', ({ scalar, id, targetTypes, hasParamsSchema, hasInit }) => {
     const definition = sqlCodecDefinitions[scalar];
     expect(definition.typeId).toBe(id);
     expect(definition.scalar).toBe(scalar);
     expect(definition.codec.targetTypes).toEqual(targetTypes);
     expect(definition.codec.paramsSchema !== undefined).toBe(hasParamsSchema);
+    expect(definition.codec.init !== undefined).toBe(hasInit);
   });
 
   it('exports data types mapped to codec IDs', () => {
@@ -88,5 +108,19 @@ describe('sql-codecs', () => {
 
     expect(codec.encode(input)).toBe(expectedEncoded);
     expect(codec.decode(input)).toBe(expectedDecoded);
+  });
+
+  it('initializes helpers for length-parameterized codecs', () => {
+    const charCodec = sqlCodecDefinitions.char.codec;
+    const varcharCodec = sqlCodecDefinitions.varchar.codec;
+
+    expect(charCodec.init?.({ length: 5 })).toEqual({
+      kind: 'fixed',
+      maxLength: 5,
+    });
+    expect(varcharCodec.init?.({ length: 255 })).toEqual({
+      kind: 'variable',
+      maxLength: 255,
+    });
   });
 });

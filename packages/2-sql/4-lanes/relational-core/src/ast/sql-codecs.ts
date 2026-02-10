@@ -10,12 +10,27 @@ const lengthParamsSchema = arktype({
   length: 'number.integer > 0',
 });
 
+type LengthTypeHelper = {
+  readonly kind: 'fixed' | 'variable';
+  readonly maxLength: number;
+};
+
+function createLengthTypeHelper(
+  kind: LengthTypeHelper['kind'],
+): (params: Record<string, unknown>) => LengthTypeHelper {
+  return (params) => ({
+    kind,
+    maxLength: params['length'] as number,
+  });
+}
+
 const sqlCharCodec = codec<typeof SQL_CHAR_CODEC_ID, string, string>({
   typeId: SQL_CHAR_CODEC_ID,
   targetTypes: ['char'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: lengthParamsSchema,
+  init: createLengthTypeHelper('fixed'),
 });
 
 const sqlVarcharCodec = codec<typeof SQL_VARCHAR_CODEC_ID, string, string>({
@@ -24,6 +39,7 @@ const sqlVarcharCodec = codec<typeof SQL_VARCHAR_CODEC_ID, string, string>({
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
   paramsSchema: lengthParamsSchema,
+  init: createLengthTypeHelper('variable'),
 });
 
 const sqlIntCodec = codec<typeof SQL_INT_CODEC_ID, number, number>({

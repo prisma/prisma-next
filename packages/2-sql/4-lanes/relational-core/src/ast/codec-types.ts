@@ -79,7 +79,15 @@ export interface Codec<
   readonly paramsSchema?: Type<TParams>;
 
   /**
-   * Optional init hook for building helper types from validated params.
+   * Optional init hook for building runtime helper state from validated params.
+   *
+   * Useful when parameterized types need derived data at runtime, for example:
+   * - normalize typeParams into a stable helper shape consumed by lanes/adapters
+   * - precompute reusable values once during context creation
+   * - avoid repeating typeParams parsing logic during query execution
+   *
+   * Example:
+   *   { length: 255 } -> { kind: 'variable', maxLength: 255 }
    */
   readonly init?: (params: TParams) => THelper;
 
