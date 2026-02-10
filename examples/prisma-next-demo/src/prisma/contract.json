@@ -2,35 +2,9 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:82a5eedba0cffd694a22952212ac3bc7b1a0a93c499656e1e46834b16ce70c7e",
-  "executionHash": "sha256:82a5eedba0cffd694a22952212ac3bc7b1a0a93c499656e1e46834b16ce70c7e",
-  "profileHash": "sha256:fc74c4c3a1401c2ffd528ee1bd61b0ac57af7bdd5e77d39d567389afcb1027bd",
-  "execution": {
-    "mutations": {
-      "defaults": [
-        {
-          "ref": {
-            "table": "post",
-            "column": "id"
-          },
-          "onCreate": {
-            "kind": "generator",
-            "id": "uuidv4"
-          }
-        },
-        {
-          "ref": {
-            "table": "user",
-            "column": "id"
-          },
-          "onCreate": {
-            "kind": "generator",
-            "id": "uuidv4"
-          }
-        }
-      ]
-    }
-  },
+  "storageHash": "sha256:c36c9d26c78f8bc59694a743717b94efbeacd71b5e038e9d8f63fb627a4693bb",
+  "executionHash": "sha256:8564aae6b2d73c1c37b71bce79fc4222405383e180e042b7596cae01d925804b",
+  "profileHash": "sha256:27cf0a2f9718e05d72553d6c0519ba1c2235c04fc96df2255d7a904571f47a57",
   "models": {
     "Post": {
       "fields": {
@@ -95,9 +69,11 @@
             "nullable": true
           },
           "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "typeParams": {
+              "length": 36
+            }
           },
           "title": {
             "codecId": "pg/text@1",
@@ -146,9 +122,11 @@
             "nativeType": "text"
           },
           "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "typeParams": {
+              "length": 36
+            }
           },
           "kind": {
             "codecId": "pg/enum@1",
@@ -177,6 +155,32 @@
           ]
         }
       }
+    }
+  },
+  "execution": {
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "post"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "user"
+          }
+        }
+      ]
     }
   },
   "capabilities": {
