@@ -17,7 +17,7 @@ describe('config loader', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-  });
+  }, timeouts.typeScriptCompilation);
 
   const createValidConfig = () => {
     return `const mockHook = {
@@ -142,25 +142,33 @@ describe('config loader', () => {
     await expect(loadConfig(configPath)).rejects.toThrow();
   });
 
-  it('throws error for invalid config structure', async () => {
-    const configPath = join(testDir, 'prisma-next.config.ts');
-    writeFileSync(
-      configPath,
-      `export default {
+  it(
+    'throws error for invalid config structure',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(
+        configPath,
+        `export default {
       // Missing required fields
     };`,
-      'utf-8',
-    );
+        'utf-8',
+      );
 
-    await expect(loadConfig(configPath)).rejects.toThrow();
-  });
+      await expect(loadConfig(configPath)).rejects.toThrow();
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('handles compilation errors from c12', async () => {
-    const configPath = join(testDir, 'prisma-next.config.ts');
-    // Create a file that will cause a compilation error
-    writeFileSync(configPath, 'export default { invalid syntax }', 'utf-8');
-    await expect(loadConfig(configPath)).rejects.toThrow();
-  });
+  it(
+    'handles compilation errors from c12',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      // Create a file that will cause a compilation error
+      writeFileSync(configPath, 'export default { invalid syntax }', 'utf-8');
+      await expect(loadConfig(configPath)).rejects.toThrow();
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   // Note: Validation tests for config structure are excluded because:
   // 1. config-loader.ts is excluded from coverage (mostly file I/O and error handling)

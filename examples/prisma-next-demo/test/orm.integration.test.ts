@@ -105,7 +105,7 @@ describe('ORM integration tests', () => {
         }
       });
     },
-    timeouts.typeScriptCompilation,
+    timeouts.spinUpPpgDev,
   );
 
   it(

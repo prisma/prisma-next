@@ -40,8 +40,8 @@ export type StorageHashBase<THash extends string> = THash & Brand<'StorageHash'>
  */
 export type ExecutionHashBase<THash extends string> = THash & Brand<'ExecutionHash'>;
 
-export function coreHash<const T extends string>(value: T): CoreHashBase<T> {
-  return value as CoreHashBase<T>;
+export function coreHash<const T extends string>(value: T): StorageHashBase<T> {
+  return value as StorageHashBase<T>;
 }
 
 /**

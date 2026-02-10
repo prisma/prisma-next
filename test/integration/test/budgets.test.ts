@@ -87,44 +87,48 @@ describe('budgets plugin integration', () => {
     await teardownTestDatabase(client, ['user']);
   }, timeouts.databaseOperation);
 
-  it('blocks unbounded DSL SELECT exceeding budget', async () => {
-    const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      {
-        verify: { mode: 'onFirstUse', requireMarker: false },
-        plugins: [
-          budgets({
-            maxRows: 50, // Lower budget to ensure unbounded query exceeds it
-            defaultTableRows: 10_000,
-            tableRows: { user: 10_000 },
-          }),
-        ],
-      },
-    );
+  it(
+    'blocks unbounded DSL SELECT exceeding budget',
+    async () => {
+      const adapter = createPostgresAdapter();
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: false },
+          plugins: [
+            budgets({
+              maxRows: 50, // Lower budget to ensure unbounded query exceeds it
+              defaultTableRows: 10_000,
+              tableRows: { user: 10_000 },
+            }),
+          ],
+        },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const tables = schema(context).tables;
-    const userTable = tables['user']!;
-    const userColumns = userTable.columns;
-    const builder = sql({ context });
-    const plan = builder
-      .from(userTable)
-      .select({ id: userColumns['id']!, email: userColumns['email']! })
-      .build();
+      const context = createTestContext(fixtureContract, adapter);
+      const tables = schema(context).tables;
+      const userTable = tables['user']!;
+      const userColumns = userTable.columns;
+      const builder = sql({ context });
+      const plan = builder
+        .from(userTable)
+        .select({ id: userColumns['id']!, email: userColumns['email']! })
+        .build();
 
-    // Unbounded SELECT should be blocked pre-exec (estimated 10_000 > maxRows 50)
-    await expect(async () => {
-      await drainPlanExecution(runtime, plan);
-    }).rejects.toMatchObject({
-      code: 'BUDGET.ROWS_EXCEEDED',
-      category: 'BUDGET',
-    });
-  });
+      // Unbounded SELECT should be blocked pre-exec (estimated 10_000 > maxRows 50)
+      await expect(async () => {
+        await drainPlanExecution(runtime, plan);
+      }).rejects.toMatchObject({
+        code: 'BUDGET.ROWS_EXCEEDED',
+        category: 'BUDGET',
+      });
+    },
+    timeouts.databaseOperation,
+  );
 
   it('blocks unbounded DSL SELECT when estimated equals budget', async () => {
     const adapter = createPostgresAdapter();

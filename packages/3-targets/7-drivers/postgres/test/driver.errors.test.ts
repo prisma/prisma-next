@@ -13,7 +13,7 @@ describe('@prisma-next/driver-postgres', () => {
       await cleanup();
       cleanup = undefined;
     }
-  });
+  }, timeouts.spinUpPpgDev);
 
   it(
     'handles query errors',
@@ -202,36 +202,40 @@ describe('@prisma-next/driver-postgres', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it('handles cursor close errors', async () => {
-    const db = newDb();
-    const { Pool } = db.adapters.createPg();
-    const pool = new Pool();
+  it(
+    'handles cursor close errors',
+    async () => {
+      const db = newDb();
+      const { Pool } = db.adapters.createPg();
+      const pool = new Pool();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { pool: pool as unknown as Pool },
-      cursor: { batchSize: 1 },
-    });
+      const driver = createPostgresDriverFromOptions({
+        connect: { pool: pool as unknown as Pool },
+        cursor: { batchSize: 1 },
+      });
 
-    cleanup = async () => {
-      await driver.close();
-    };
+      cleanup = async () => {
+        await driver.close();
+      };
 
-    await driver.connect();
-    await driver.query('create table items(id serial primary key, name text)');
-    await driver.query('insert into items(name) values ($1)', ['test']);
+      await driver.connect();
+      await driver.query('create table items(id serial primary key, name text)');
+      await driver.query('insert into items(name) values ($1)', ['test']);
 
-    // Cursor close errors should be caught in the finally block
-    // The driver should still complete execution successfully
-    const rows: Array<{ id: number; name: string }> = [];
-    for await (const row of driver.execute<{ id: number; name: string }>({
-      sql: 'select id, name from items',
-    })) {
-      rows.push(row);
-    }
+      // Cursor close errors should be caught in the finally block
+      // The driver should still complete execution successfully
+      const rows: Array<{ id: number; name: string }> = [];
+      for await (const row of driver.execute<{ id: number; name: string }>({
+        sql: 'select id, name from items',
+      })) {
+        rows.push(row);
+      }
 
-    // Should get results even if cursor close had issues
-    expect(rows.length).toBeGreaterThan(0);
-  });
+      // Should get results even if cursor close had issues
+      expect(rows.length).toBeGreaterThan(0);
+    },
+    timeouts.spinUpPpgDev,
+  );
 
   it('reuses already connected direct client without invoking connect', async () => {
     const client = {
