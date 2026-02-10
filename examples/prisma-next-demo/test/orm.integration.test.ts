@@ -1,14 +1,43 @@
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type { Runtime } from '@prisma-next/sql-runtime';
+import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
+import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { context } from '../src/prisma/context';
-import { getRuntime } from '../src/prisma/runtime';
+import { context, db } from '../src/prisma/db';
 import { initTestDatabase } from './utils/control-client';
 
 const { contract } = context;
+const executionStack = db.stack;
+const executionStackInstance = instantiateExecutionStack(executionStack);
+
+function createTestDriver(connectionString: string) {
+  const driverDescriptor = executionStack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+  const pool = new Pool({ connectionString });
+  return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+}
+
+function getRuntime(connectionString: string): Runtime {
+  return createRuntime({
+    stackInstance: executionStackInstance,
+    context,
+    driver: createTestDriver(connectionString),
+    verify: { mode: 'onFirstUse', requireMarker: false },
+    plugins: [
+      budgets({
+        maxRows: 10_000,
+        defaultTableRows: 10_000,
+        tableRows: { user: 10_000, post: 10_000 },
+        maxLatencyMs: 1_000,
+      }),
+    ],
+  });
+}
 
 /**
  * Seeds test data using the runtime and query DSL.

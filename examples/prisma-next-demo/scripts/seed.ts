@@ -18,12 +18,10 @@ import 'dotenv/config';
 
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { schema, sql } from '../src/prisma/context';
-import { getRuntime } from '../src/prisma/runtime';
+import { db, schema, sql } from '../src/prisma/db';
 
 async function main() {
-  // biome-ignore lint/style/noNonNullAssertion: don't care about type safety in seed script
-  const runtime = getRuntime(process.env['DATABASE_URL']!);
+  const runtime = db.runtime();
 
   try {
     const tables = schema.tables;

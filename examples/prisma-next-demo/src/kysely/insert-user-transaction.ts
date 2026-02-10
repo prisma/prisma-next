@@ -2,7 +2,7 @@ import { generateId } from '@prisma-next/ids/runtime';
 import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { Kysely } from 'kysely';
-import { context } from '../prisma/context';
+import { context } from '../prisma/db';
 
 export async function insertUserTransaction(runtime: Runtime) {
   const userId = generateId({ id: 'uuidv4' });

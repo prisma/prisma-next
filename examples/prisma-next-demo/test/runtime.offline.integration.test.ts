@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { executionStack, sql, tables } from '../src/prisma/context';
+import { db, sql, tables } from '../src/prisma/db';
 
 describe('static context (no runtime)', () => {
   afterEach(() => {
@@ -16,6 +16,7 @@ describe('static context (no runtime)', () => {
   });
 
   it('importing query roots does not instantiate adapter or extensions', () => {
+    const executionStack = db.stack;
     const adapterSpy = vi.spyOn(executionStack.adapter, 'create');
     const targetSpy = vi.spyOn(executionStack.target, 'create');
     const extensionSpies = executionStack.extensionPacks.map((ext) => vi.spyOn(ext, 'create'));

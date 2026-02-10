@@ -1,5 +1,5 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { orm } from '../prisma/context';
+import { orm } from '../prisma/db';
 import { collect } from './utils';
 
 export async function ormGetUsers(limit: number, runtime: Runtime) {

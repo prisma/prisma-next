@@ -10,9 +10,9 @@ import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { context, executionStack } from '../src/prisma/context';
-import { getRuntime } from '../src/prisma/runtime';
+import { context, db } from '../src/prisma/db';
 
+const executionStack = db.stack;
 const executionStackInstance = instantiateExecutionStack(executionStack);
 
 import { initTestDatabase } from './utils/control-client';
@@ -24,6 +24,26 @@ function createTestDriver(connectionString: string) {
   }
   const pool = new Pool({ connectionString });
   return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+}
+
+function getRuntime(
+  connectionString: string,
+  plugins = [
+    budgets({
+      maxRows: 10_000,
+      defaultTableRows: 10_000,
+      tableRows: { user: 10_000, post: 10_000 },
+      maxLatencyMs: 1_000,
+    }),
+  ],
+): Runtime {
+  return createRuntime({
+    stackInstance: executionStackInstance,
+    context,
+    driver: createTestDriver(connectionString),
+    verify: { mode: 'onFirstUse', requireMarker: false },
+    plugins,
+  });
 }
 
 const { contract } = context;

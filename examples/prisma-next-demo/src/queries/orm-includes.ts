@@ -1,7 +1,7 @@
 import type { ResultType } from '@prisma-next/contract/types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { orm } from '../prisma/context';
+import { orm } from '../prisma/db';
 import { collect } from './utils';
 
 export async function ormGetUsersWithPosts(limit: number, runtime: Runtime) {
