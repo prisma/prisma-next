@@ -12,6 +12,7 @@ import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type {
   Adapter,
+  CodecParamsDescriptor,
   CodecRegistry,
   LoweredStatement,
   QueryAst,
@@ -22,7 +23,6 @@ import type {
   ExecutionContext,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
-import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
 
 // ============================================================================
@@ -33,27 +33,14 @@ import { type as arktype } from 'arktype';
  * Runtime parameterized codec descriptor.
  * Provides validation schema and optional init hook for codecs that support type parameters.
  * Used at runtime to validate typeParams and create type helpers.
+ *
+ * This is a type alias for `CodecParamsDescriptor` from the AST layer,
+ * which is the shared definition used by both adapter and runtime.
  */
-export interface RuntimeParameterizedCodecDescriptor<
+export type RuntimeParameterizedCodecDescriptor<
   TParams = Record<string, unknown>,
   THelper = unknown,
-> {
-  /** The codec ID this descriptor applies to (e.g., 'pg/vector@1') */
-  readonly codecId: string;
-
-  /**
-   * Arktype schema for validating typeParams.
-   * The schema is used to validate both storage.types entries and inline column typeParams.
-   */
-  readonly paramsSchema: Type<TParams>;
-
-  /**
-   * Optional init hook called during runtime context creation.
-   * Receives validated params and returns a helper object to be stored in context.types.
-   * If not provided, the validated params are stored directly.
-   */
-  readonly init?: (params: TParams) => THelper;
-}
+> = CodecParamsDescriptor<TParams, THelper>;
 
 // ============================================================================
 // SQL Runtime Extension Types

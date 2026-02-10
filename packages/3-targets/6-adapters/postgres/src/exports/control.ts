@@ -22,6 +22,7 @@ const postgresAdapterDescriptor: ControlAdapterDescriptor<
 
 export default postgresAdapterDescriptor;
 
+export { normalizeSchemaNativeType } from '../core/control-adapter';
 export {
   escapeLiteral,
   expandParameterizedNativeType,
