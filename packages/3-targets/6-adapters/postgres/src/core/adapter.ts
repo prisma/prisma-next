@@ -18,10 +18,29 @@ import type {
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relational-core/ast';
+import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
 import { codecDefinitions } from './codecs';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
 const VECTOR_CODEC_ID = 'pg/vector@1' as const;
+
+function getCodecParamCast(codecId: string | undefined): string | undefined {
+  if (codecId === VECTOR_CODEC_ID) {
+    return 'vector';
+  }
+  if (codecId === PG_JSON_CODEC_ID) {
+    return 'json';
+  }
+  if (codecId === PG_JSONB_CODEC_ID) {
+    return 'jsonb';
+  }
+  return undefined;
+}
+
+function renderTypedParam(index: number, codecId: string | undefined): string {
+  const cast = getCodecParamCast(codecId);
+  return cast ? `$${index}::${cast}` : `$${index}`;
+}
 
 const defaultCapabilities = Object.freeze({
   postgres: {
@@ -200,13 +219,10 @@ function renderParam(
   tableName?: string,
   columnName?: string,
 ): string {
-  // Cast vector parameters to vector type for PostgreSQL
   if (contract && tableName && columnName) {
     const tableMeta = contract.storage.tables[tableName];
     const columnMeta = tableMeta?.columns[columnName];
-    if (columnMeta?.codecId === VECTOR_CODEC_ID) {
-      return `$${ref.index}::vector`;
-    }
+    return renderTypedParam(ref.index, columnMeta?.codecId);
   }
   return `$${ref.index}`;
 }
@@ -385,8 +401,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
   const values = Object.entries(ast.values).map(([colName, val]) => {
     if (val.kind === 'param') {
       const columnMeta = tableMeta?.columns[colName];
-      const isVector = columnMeta?.codecId === VECTOR_CODEC_ID;
-      return isVector ? `$${val.index}::vector` : `$${val.index}`;
+      return renderTypedParam(val.index, columnMeta?.codecId);
     }
     if (val.kind === 'col') {
       return `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
@@ -410,8 +425,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
     let value: string;
     if (val.kind === 'param') {
       const columnMeta = tableMeta?.columns[col];
-      const isVector = columnMeta?.codecId === VECTOR_CODEC_ID;
-      value = isVector ? `$${val.index}::vector` : `$${val.index}`;
+      value = renderTypedParam(val.index, columnMeta?.codecId);
     } else if (val.kind === 'col') {
       value = `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
     } else {

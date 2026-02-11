@@ -38,6 +38,14 @@ const contract = Object.freeze(
 );
 
 describe('createPostgresAdapter', () => {
+  it('exposes registered codecs on profile', () => {
+    const adapter = createPostgresAdapter();
+    const codecIds = [...adapter.profile.codecs().values()].map((codec) => codec.id);
+
+    expect(codecIds).toContain('pg/json@1');
+    expect(codecIds).toContain('pg/jsonb@1');
+  });
+
   it('lowers select AST into canonical SQL with positional params', () => {
     const adapter = createPostgresAdapter();
 
@@ -935,6 +943,78 @@ describe('createPostgresAdapter', () => {
       });
 
       expect(lowered.body.sql).toContain('$1::vector');
+    });
+  });
+
+  describe('json type casting', () => {
+    const jsonContract = Object.freeze(
+      validateContract<PostgresContract>({
+        target: 'postgres',
+        targetFamily: 'sql' as const,
+        coreHash: 'sha256:test-core',
+        profileHash: 'sha256:test-profile',
+        storage: {
+          tables: {
+            event: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                payload: { codecId: 'pg/jsonb@1', nativeType: 'jsonb', nullable: false },
+                raw: { codecId: 'pg/json@1', nativeType: 'json', nullable: true },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        models: {},
+        relations: {},
+        mappings: {},
+      }),
+    );
+
+    it('casts jsonb parameters in INSERT', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: InsertAst = {
+        kind: 'insert',
+        table: { kind: 'table', name: 'event' },
+        values: {
+          payload: { kind: 'param', index: 1, name: 'payload' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: jsonContract,
+        params: [{ kind: 'created' }],
+      });
+
+      expect(lowered.body.sql).toContain('$1::jsonb');
+    });
+
+    it('casts json parameters in UPDATE', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: UpdateAst = {
+        kind: 'update',
+        table: { kind: 'table', name: 'event' },
+        set: {
+          raw: { kind: 'param', index: 1, name: 'raw' },
+        },
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'event', column: 'id' },
+          right: { kind: 'param', index: 2, name: 'eventId' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: jsonContract,
+        params: [{ source: 'legacy' }, 1],
+      });
+
+      expect(lowered.body.sql).toContain('$1::json');
     });
   });
 

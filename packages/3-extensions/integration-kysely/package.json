@@ -13,7 +13,7 @@
     "lint:fix": "biome check --write .",
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "prepublishOnly": "pnpm build",
-    "test": "pnpm emit:check && vitest",
+    "test": "pnpm emit && vitest",
     "test:coverage": "vitest --coverage",
     "typecheck": "tsc --noEmit"
   },

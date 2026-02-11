@@ -15,6 +15,9 @@ catalogs:
     '@types/pg':
       specifier: 8.16.0
       version: 8.16.0
+    arktype:
+      specifier: ^2.1.29
+      version: 2.1.29
     gray-matter:
       specifier: ^4.0.3
       version: 4.0.3
@@ -1028,6 +1031,12 @@ importers:
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../1-core/operations
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/utils
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
       ts-toolbelt:
         specifier: ^9.6.0
         version: 9.6.0
@@ -1503,6 +1512,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../utils
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
@@ -1585,6 +1597,9 @@ importers:
       '@prisma-next/vite-plugin-contract-emit':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/vite-plugin-contract-emit
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -3456,6 +3471,7 @@ packages:
 
   glob@10.4.5:
     resolution: {integrity: sha512-7Bv8RF0k6xjo7d4A/PxYLbUCfb6c+Vpd2/mB2yRDlew7Jb5hEXiCD9ibfO7wpk8i4sevK6DFny9h7EYbM3/sHg==}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   global-directory@4.0.1:

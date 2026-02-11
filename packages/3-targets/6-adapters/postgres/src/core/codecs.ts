@@ -13,6 +13,14 @@
 
 import { codec, defineCodecs } from '@prisma-next/sql-relational-core/ast';
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { readonly [key: string]: JsonValue }
+  | readonly JsonValue[];
+
 // Create individual codec instances
 const pgTextCodec = codec({
   typeId: 'pg/text@1',
@@ -181,6 +189,38 @@ const pgEnumCodec = codec<'pg/enum@1', string, string>({
   decode: (wire) => wire,
 });
 
+const pgJsonCodec = codec<'pg/json@1', string | JsonValue, JsonValue>({
+  typeId: 'pg/json@1',
+  targetTypes: ['json'],
+  encode: (value) => JSON.stringify(value),
+  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'json',
+        },
+      },
+    },
+  },
+});
+
+const pgJsonbCodec = codec<'pg/jsonb@1', string | JsonValue, JsonValue>({
+  typeId: 'pg/jsonb@1',
+  targetTypes: ['jsonb'],
+  encode: (value) => JSON.stringify(value),
+  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'jsonb',
+        },
+      },
+    },
+  },
+});
+
 // Build codec definitions using the builder DSL
 const codecs = defineCodecs()
   .add('text', pgTextCodec)
@@ -192,7 +232,9 @@ const codecs = defineCodecs()
   .add('timestamp', pgTimestampCodec)
   .add('timestamptz', pgTimestamptzCodec)
   .add('bool', pgBoolCodec)
-  .add('enum', pgEnumCodec);
+  .add('enum', pgEnumCodec)
+  .add('json', pgJsonCodec)
+  .add('jsonb', pgJsonbCodec);
 
 // Export derived structures directly from codecs builder
 export const codecDefinitions = codecs.codecDefinitions;

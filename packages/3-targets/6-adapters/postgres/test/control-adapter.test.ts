@@ -413,6 +413,73 @@ describe('PostgresControlAdapter', () => {
       expect(result.tables['user']?.columns['value']?.nativeType).toBe('numeric');
     });
 
+    it('maps json and jsonb columns to native types', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+        familyId: 'sql',
+        targetId: 'postgres',
+        query: async <Row = Record<string, unknown>>(sql: string) => {
+          if (sql.includes('information_schema.tables')) {
+            return { rows: [{ table_name: 'event' }] as Row[] };
+          }
+          if (sql.includes('information_schema.columns')) {
+            return {
+              rows: [
+                {
+                  column_name: 'payload',
+                  data_type: 'jsonb',
+                  udt_name: 'jsonb',
+                  is_nullable: 'NO',
+                  character_maximum_length: null,
+                  numeric_precision: null,
+                  numeric_scale: null,
+                },
+                {
+                  column_name: 'raw',
+                  data_type: 'json',
+                  udt_name: 'json',
+                  is_nullable: 'YES',
+                  character_maximum_length: null,
+                  numeric_precision: null,
+                  numeric_scale: null,
+                },
+              ] as Row[],
+            };
+          }
+          if (sql.includes('PRIMARY KEY')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('FOREIGN KEY')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('UNIQUE')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('pg_indexes')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('pg_extension')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('pg_enum')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('version()')) {
+            return {
+              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+            };
+          }
+          return { rows: [] as Row[] };
+        },
+        close: async () => {},
+      };
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.tables['event']?.columns['payload']?.nativeType).toBe('jsonb');
+      expect(result.tables['event']?.columns['raw']?.nativeType).toBe('json');
+    });
+
     it('handles foreign keys', async () => {
       const adapter = new PostgresControlAdapter();
       const mockDriver = createMockDriver([
@@ -598,7 +665,7 @@ describe('PostgresControlAdapter', () => {
         },
         { match: includes('FOREIGN KEY'), rows: [] },
         {
-          match: (sql) => sql.includes("constraint_type = 'UNIQUE'") && sql.includes('NOT IN'),
+          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
           rows: [
             {
               constraint_name: 'user_email_key',
@@ -657,7 +724,7 @@ describe('PostgresControlAdapter', () => {
         },
         { match: includes('FOREIGN KEY'), rows: [] },
         {
-          match: (sql) => sql.includes("constraint_type = 'UNIQUE'") && sql.includes('NOT IN'),
+          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
           rows: [
             {
               constraint_name: 'user_email_tenant_key',

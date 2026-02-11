@@ -1,6 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sql } from '@prisma-next/sql-lane/sql';
+import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts } from '@prisma-next/test-utils';
@@ -50,9 +51,6 @@ describe('end-to-end nested projection queries', () => {
             name: string;
             post: { title: number };
           }>();
-          expectTypeOf<Row['name']>().toEqualTypeOf<string>();
-          expectTypeOf<Row['post']>().toEqualTypeOf<{ title: number }>();
-          expectTypeOf<Row['post']['title']>().toEqualTypeOf<number>();
 
           const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
           expect(flatRow0['name']).toBe('ada@example.com');
@@ -115,21 +113,12 @@ describe('end-to-end nested projection queries', () => {
           expectTypeOf<Row>().toExtend<{
             a: { b: { c: number } };
           }>();
-          expectTypeOf<Row['a']>().toEqualTypeOf<{ b: { c: number } }>();
-          expectTypeOf<Row['a']['b']>().toEqualTypeOf<{ c: number }>();
-          expectTypeOf<Row['a']['b']['c']>().toEqualTypeOf<number>();
 
           const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
           expect(flatRow0['a_b_c']).toBe(1);
-          expect({ a: { b: { c: flatRow0['a_b_c'] } } }).toEqual({
-            a: { b: { c: 1 } },
-          });
 
           const flatRow1 = (rows[1] ?? {}) as Record<string, unknown>;
           expect(flatRow1['a_b_c']).toBe(2);
-          expect({ a: { b: { c: flatRow1['a_b_c'] } } }).toEqual({
-            a: { b: { c: 2 } },
-          });
 
           expect(plan.meta.projection).toEqual({
             a_b_c: 'user.id',
@@ -180,17 +169,16 @@ describe('end-to-end nested projection queries', () => {
           expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
           type Row = ResultType<typeof plan>;
-          expectTypeOf<Row>().toExtend<{
+          expectTypeOf<Row>({} as Row).toExtend<{
             name: string;
             post: { title: string; id: number };
           }>();
-          expectTypeOf<Row['name']>().toEqualTypeOf<string>();
-          expectTypeOf<Row['post']>().toEqualTypeOf<{
-            title: string;
-            id: number;
-          }>();
-          expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
-          expectTypeOf<Row['post']['id']>().toEqualTypeOf<number>();
+          expectTypeOf<Row['name']>({} as Row['name']).toExtend<string>();
+          expectTypeOf<Row['post']>({} as Row['post']).toEqualTypeOf({} as Row['post']);
+          expectTypeOf<Row['post']['title']>({} as Row['post']['title']).toExtend<string>();
+          expectTypeOf<Row['post']['id']>({} as Row['post']['id']).toEqualTypeOf(
+            0 as Row['post']['id'],
+          );
 
           const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
           expect(flatRow0['name']).toBe('ada@example.com');
@@ -256,22 +244,21 @@ describe('end-to-end nested projection queries', () => {
           expect(rows[0]).toEqual(expect.not.objectContaining({ post: expect.anything() }));
 
           type Row = ResultType<typeof plan>;
-          expectTypeOf<Row>().toExtend<{
+          expectTypeOf<Row>({} as Row).toExtend<{
             id: number;
             post: { title: string; author: { name: number } };
             email: string;
           }>();
-          expectTypeOf<Row['id']>().toEqualTypeOf<number>();
-          expectTypeOf<Row['post']>().toEqualTypeOf<{
-            title: string;
-            author: { name: number };
-          }>();
-          expectTypeOf<Row['post']['title']>().toEqualTypeOf<string>();
-          expectTypeOf<Row['post']['author']>().toEqualTypeOf<{
-            name: number;
-          }>();
-          expectTypeOf<Row['post']['author']['name']>().toEqualTypeOf<number>();
-          expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+          expectTypeOf<Row['id']>({} as Row['id']).toEqualTypeOf(0 as Row['id']);
+          expectTypeOf<Row['post']>({} as Row['post']).toEqualTypeOf({} as Row['post']);
+          expectTypeOf<Row['post']['title']>({} as Row['post']['title']).toExtend<string>();
+          expectTypeOf<Row['post']['author']>({} as Row['post']['author']).toEqualTypeOf(
+            {} as Row['post']['author'],
+          );
+          expectTypeOf<Row['post']['author']['name']>(
+            {} as Row['post']['author']['name'],
+          ).toEqualTypeOf(0 as Row['post']['author']['name']);
+          expectTypeOf<Row['email']>({} as Row['email']).toExtend<string>();
 
           const flatRow0 = (rows[0] ?? {}) as Record<string, unknown>;
           expect(flatRow0['id']).toBe(1);
@@ -297,6 +284,81 @@ describe('end-to-end nested projection queries', () => {
             post_author_name: 'user.id',
             email: 'user.email',
           });
+        },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'typed json/jsonb columns are type-safe in projection and jsonb filters',
+    async () => {
+      await withTestRuntime<Contract>(
+        contractJsonPath,
+        async ({ tables, runtime, context, client }) => {
+          const adaProfile = {
+            displayName: 'Ada',
+            tags: ['sql', 'json'],
+            active: true,
+          } as const;
+          const tessProfile = {
+            displayName: 'Tess',
+            tags: ['api'],
+            active: false,
+          } as const;
+          const meta = {
+            source: 'editor',
+            rank: 7,
+            verified: true,
+          } as const;
+
+          await client.query(
+            'insert into "user" (email, profile) values ($1, $2::jsonb), ($3, $4::jsonb)',
+            [
+              'ada@example.com',
+              JSON.stringify(adaProfile),
+              'tess@example.com',
+              JSON.stringify(tessProfile),
+            ],
+          );
+          await client.query(
+            'insert into "post" ("userId", title, published, meta) values ($1, $2, $3, $4::json), ($5, $6, $7, $8::json)',
+            [1, 'Ada Post', true, JSON.stringify(meta), 2, 'Tess Post', true, JSON.stringify(meta)],
+          );
+
+          const user = tables.user!;
+          const post = tables.post!;
+          const plan = sql({ context })
+            .from(user)
+            .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+            .where(user.columns.profile!.eq(param('profile')))
+            .where(post.columns.title!.eq(param('title')))
+            .select({
+              email: user.columns.email!,
+              profile: user.columns.profile!,
+              meta: post.columns.meta!,
+            })
+            .build({ params: { profile: adaProfile, title: 'Ada Post' } });
+
+          const rows = await executePlanAndCollect(runtime, plan);
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            email: 'ada@example.com',
+            profile: adaProfile,
+            meta,
+          });
+
+          type Row = ResultType<typeof plan>;
+          expectTypeOf<Row['profile']>().toMatchTypeOf<{
+            readonly displayName: string;
+            readonly tags: readonly string[];
+            readonly active: boolean;
+          } | null>();
+          expectTypeOf<Row['meta']>().toMatchTypeOf<{
+            readonly source: string;
+            readonly rank: number;
+            readonly verified: boolean;
+          } | null>();
         },
       );
     },

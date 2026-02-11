@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:6bffbe54f87b253e12dd069d57a943d580662ed3da1aeb8bfd114fec3ea0e4d8",
+  "coreHash": "sha256:4637c0c817e4595a7040e66431f762b23a729584ccc3f31bb95a7ad154463f67",
   "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
     "Comment": {
@@ -36,6 +36,9 @@
         "id": {
           "column": "id"
         },
+        "meta": {
+          "column": "meta"
+        },
         "title": {
           "column": "title"
         },
@@ -61,6 +64,9 @@
         },
         "id": {
           "column": "id"
+        },
+        "profile": {
+          "column": "profile"
         },
         "updatedAt": {
           "column": "update_at"
@@ -137,6 +143,34 @@
             "nativeType": "int4",
             "nullable": false
           },
+          "meta": {
+            "codecId": "pg/json@1",
+            "nativeType": "json",
+            "nullable": true,
+            "typeParams": {
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "properties": {
+                  "rank": {
+                    "type": "number"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "verified": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "rank",
+                  "source",
+                  "verified"
+                ],
+                "type": "object"
+              },
+              "type": "{ rank: number, source: string, verified: boolean }"
+            }
+          },
           "published": {
             "codecId": "pg/bool@1",
             "nativeType": "bool"
@@ -187,6 +221,37 @@
             },
             "nativeType": "int4",
             "nullable": false
+          },
+          "profile": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": true,
+            "typeParams": {
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "properties": {
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "active",
+                  "displayName",
+                  "tags"
+                ],
+                "type": "object"
+              },
+              "type": "{ active: boolean, displayName: string, tags: string[] }"
+            }
           },
           "update_at": {
             "codecId": "pg/timestamptz@1",

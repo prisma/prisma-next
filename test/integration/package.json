@@ -33,7 +33,8 @@
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
-    "@prisma-next/utils": "workspace:*"
+    "@prisma-next/utils": "workspace:*",
+    "arktype": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",

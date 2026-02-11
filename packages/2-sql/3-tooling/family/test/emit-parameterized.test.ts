@@ -564,4 +564,83 @@ describe('emit parameterized codecs integration', () => {
       "import type { HalfVector } from '@prisma-next/extension-pgvector/vector-types'",
     );
   });
+
+  it('renders typed jsonb columns and falls back to codec output', async () => {
+    const target = createMockTarget();
+    const adapter: SqlControlAdapterDescriptor<'postgres'> = {
+      ...createMockAdapter(),
+      types: {
+        codecTypes: {
+          import: {
+            package: '@prisma-next/adapter-postgres/codec-types',
+            named: 'CodecTypes',
+            alias: 'PgCodecTypes',
+          },
+          parameterized: {
+            'pg/jsonb@1': {
+              kind: 'function',
+              render: (params: Record<string, unknown>) => {
+                const typeName = params['type'];
+                return typeof typeName === 'string' && typeName.length > 0 ? typeName : 'JsonValue';
+              },
+            },
+          },
+          typeImports: [
+            {
+              package: '@prisma-next/adapter-postgres/codec-types',
+              named: 'JsonValue',
+              alias: 'JsonValue',
+            },
+          ],
+        },
+      },
+    };
+
+    const familyInstance = createSqlFamilyInstance({
+      target,
+      adapter,
+      extensionPacks: [],
+    });
+
+    const contractIR = createTestContractIR({
+      models: {
+        Event: {
+          storage: { table: 'event' },
+          fields: {
+            payload: { column: 'payload' },
+            metadata: { column: 'metadata' },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          event: {
+            columns: {
+              payload: {
+                nativeType: 'jsonb',
+                codecId: 'pg/jsonb@1',
+                nullable: false,
+                typeParams: { type: 'AuditPayload' },
+              },
+              metadata: {
+                nativeType: 'jsonb',
+                codecId: 'pg/jsonb@1',
+                nullable: false,
+              },
+            },
+            primaryKey: { columns: [] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const result = await familyInstance.emitContract({ contractIR });
+
+    expect(result.contractDts).toContain('readonly payload: AuditPayload');
+    expect(result.contractDts).toContain("readonly metadata: CodecTypes['pg/jsonb@1']['output']");
+  });
 });

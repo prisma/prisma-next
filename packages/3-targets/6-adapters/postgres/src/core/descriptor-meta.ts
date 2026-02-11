@@ -1,5 +1,30 @@
-import { PG_ENUM_CODEC_ID } from './codec-ids';
+import { PG_ENUM_CODEC_ID, PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
 import { pgEnumControlHooks } from './enum-control-hooks';
+import { renderTypeScriptTypeFromJsonSchema } from './json-schema-type-expression';
+
+/**
+ * Validates that a type expression string is safe to embed in generated .d.ts files.
+ * Rejects expressions containing patterns that could inject executable code.
+ */
+function isSafeTypeExpression(expr: string): boolean {
+  return !/import\s*\(|require\s*\(|declare\s|export\s|eval\s*\(/.test(expr);
+}
+
+function renderJsonTypeExpression(params: Record<string, unknown>): string {
+  const typeName = params['type'];
+  if (typeof typeName === 'string' && typeName.trim().length > 0) {
+    const trimmed = typeName.trim();
+    if (!isSafeTypeExpression(trimmed)) {
+      return 'JsonValue';
+    }
+    return trimmed;
+  }
+  const schema = params['schema'];
+  if (schema && typeof schema === 'object') {
+    return renderTypeScriptTypeFromJsonSchema(schema);
+  }
+  return 'JsonValue';
+}
 
 export const postgresAdapterDescriptorMeta = {
   kind: 'adapter',
@@ -26,6 +51,13 @@ export const postgresAdapterDescriptorMeta = {
         named: 'CodecTypes',
         alias: 'PgTypes',
       },
+      typeImports: [
+        {
+          package: '@prisma-next/adapter-postgres/codec-types',
+          named: 'JsonValue',
+          alias: 'JsonValue',
+        },
+      ],
       parameterized: {
         [PG_ENUM_CODEC_ID]: {
           kind: 'function',
@@ -36,6 +68,14 @@ export const postgresAdapterDescriptorMeta = {
             }
             return values.map((value) => `'${String(value).replace(/'/g, "\\'")}'`).join(' | ');
           },
+        },
+        [PG_JSON_CODEC_ID]: {
+          kind: 'function',
+          render: renderJsonTypeExpression,
+        },
+        [PG_JSONB_CODEC_ID]: {
+          kind: 'function',
+          render: renderJsonTypeExpression,
         },
       },
       controlPlaneHooks: {
@@ -57,6 +97,8 @@ export const postgresAdapterDescriptorMeta = {
         nativeType: 'timestamptz',
       },
       { typeId: 'pg/bool@1', familyId: 'sql', targetId: 'postgres', nativeType: 'bool' },
+      { typeId: 'pg/json@1', familyId: 'sql', targetId: 'postgres', nativeType: 'json' },
+      { typeId: 'pg/jsonb@1', familyId: 'sql', targetId: 'postgres', nativeType: 'jsonb' },
     ],
   },
 } as const;

@@ -58,6 +58,7 @@ declare const contract: SqlContract<
 
 declare const wrongTable: TableReference<'comments', CoreHash>;
 declare const allTable: TableReference<string, CoreHash>;
+// biome-ignore lint/suspicious/noExplicitAny: playground tests type boundary with any table name
 declare const anyTable: TableReference<any, CoreHash>;
 declare const neverTable: TableReference<never, CoreHash>;
 declare const customTable: { '~name': 'users' };
@@ -95,7 +96,7 @@ root
   // @ts-expect-error
   .build();
 root
-  .from(allTable as any)
+  .from(allTable as unknown)
   // @ts-expect-error
   .build();
 root
