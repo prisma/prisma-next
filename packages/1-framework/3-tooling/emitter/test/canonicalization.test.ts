@@ -155,7 +155,7 @@ describe('canonicalization', () => {
     expect(result1).not.toBe(result2);
   });
 
-  it('sorts non-semantic arrays by canonical name', () => {
+  it('sorts indexes by canonical name', () => {
     const ir = createContractIR({
       storage: {
         tables: {
@@ -180,6 +180,60 @@ describe('canonicalization', () => {
     const indexes = user['indexes'] as Array<{ name: string }>;
     const indexNames = indexes.map((idx) => idx.name);
     expect(indexNames).toEqual(['user_email_idx', 'user_name_idx']);
+  });
+
+  it('sorts uniques by canonical name', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              username: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+            uniques: [
+              { columns: ['username'], name: 'user_username_key' },
+              { columns: ['email'], name: 'user_email_key' },
+            ],
+          },
+        },
+      },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const uniques = user['uniques'] as Array<{ name: string }>;
+    const uniqueNames = uniques.map((u) => u.name);
+    expect(uniqueNames).toEqual(['user_email_key', 'user_username_key']);
+  });
+
+  it('preserves column order in composite unique constraints', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              first_name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              last_name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+            uniques: [{ columns: ['last_name', 'first_name'], name: 'user_name_key' }],
+          },
+        },
+      },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const uniques = user['uniques'] as Array<{ columns: string[] }>;
+    expect(uniques[0]!.columns).toEqual(['last_name', 'first_name']);
   });
 
   it('sorts nested object keys lexicographically', () => {

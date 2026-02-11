@@ -48,6 +48,18 @@ describe('TableBuilder', () => {
     expect(table.uniques[1]).toEqual({ columns: ['email'], name: 'user_email_unique' });
   });
 
+  it('stores composite unique constraints in build()', () => {
+    const builder = createTable('user');
+    const table = builder
+      .column('first_name', { type: textColumn })
+      .column('last_name', { type: textColumn })
+      .unique(['first_name', 'last_name'])
+      .build();
+
+    expect(table.uniques).toHaveLength(1);
+    expect(table.uniques[0]).toEqual({ columns: ['first_name', 'last_name'] });
+  });
+
   it('stores indexes and emits them in build()', () => {
     const builder = createTable('user');
     const table = builder
