@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError } from '../src/core/sql-utils';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  escapeLiteral,
+  qualifyName,
+  quoteIdentifier,
+  SqlEscapeError,
+  validateEnumValueLength,
+} from '../src/core/sql-utils';
 
 describe('quoteIdentifier', () => {
   it('quotes simple identifiers', () => {
@@ -37,6 +43,20 @@ describe('quoteIdentifier', () => {
       expect((error as SqlEscapeError).value).toBe('table\\0name');
       expect((error as SqlEscapeError).kind).toBe('identifier');
     }
+  });
+
+  it('warns when identifier exceeds length limit', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const identifier = 'a'.repeat(64);
+
+    const result = quoteIdentifier(identifier);
+
+    expect(result).toBe(`"${identifier}"`);
+    expect(warnSpy).toHaveBeenCalledWith(
+      `Identifier "${identifier.slice(0, 20)}..." exceeds PostgreSQL's 63-character limit and will be truncated`,
+    );
+
+    warnSpy.mockRestore();
   });
 });
 
@@ -141,5 +161,16 @@ describe('type name security scenarios', () => {
     const maliciousSchema = 'public"; DROP SCHEMA public; --';
     // The double quotes get escaped, preventing injection
     expect(quoteIdentifier(maliciousSchema)).toBe('"public""; DROP SCHEMA public; --"');
+  });
+});
+
+describe('validateEnumValueLength', () => {
+  it('accepts values within the limit', () => {
+    expect(() => validateEnumValueLength('ok', 'Status')).not.toThrow();
+  });
+
+  it('throws when value exceeds the limit', () => {
+    const longValue = 'a'.repeat(64);
+    expect(() => validateEnumValueLength(longValue, 'Status')).toThrow(SqlEscapeError);
   });
 });

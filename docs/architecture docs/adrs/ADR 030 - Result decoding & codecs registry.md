@@ -55,7 +55,7 @@ If decoding fails at any stage, emit RUNTIME.DECODE_FAILED with `cause.origin = 
 
 ## Registry model
 - Global, versioned registry keyed by name = `'namespace/codec@version'`
-- Namespaces required to avoid collisions, e.g., `core/decimal@1`, `pg/numeric@1`, `vendorX/uuid@2`
+- Namespaces required to avoid collisions, e.g., `sql/char@1`, `pg/numeric@1`, `vendorX/uuid@2`
 - Each codec publishes:
   - `decode`, optional `encode`
   - `accepts`: predicate on wire value shape and optional driver OIDs/typeIds
@@ -64,14 +64,11 @@ If decoding fails at any stage, emit RUNTIME.DECODE_FAILED with `cause.origin = 
   - `deterministic`: true assertion and precisionNotes if applicable
 
 ## Built-in starter set
-- `core/int` for int2|int4|int8 → number | bigint
-- `core/float` for float4|float8 → number
-- `core/decimal` for numeric → Decimal with pluggable backend (decimal.js)
-- `core/iso-datetime` for timestamp|timestamptz → string ISO 8601
-- `core/date` for date → string ISO date
-- `core/bytes` for bytea → Uint8Array | Buffer
-- `core/json` for json|jsonb → any with deep-freeze optional
-- `core/enum` generated from contract enum variants
+- `sql/char` for char(n) → string
+- `sql/varchar` for varchar(n) → string
+- `sql/int` for integer types → number | bigint
+- `sql/float` for float4|float8 → number
+- `pg/char`, `pg/varchar`, `pg/int`, `pg/float` are aliases of the `sql/*` codecs for Postgres
 - `pg/interval` for interval → { months, days, microseconds } or string
 - `pg/uuid` for uuid → string
 
@@ -85,13 +82,12 @@ createRuntime({
   adapter: pgAdapter(),
   codecs: {
     // preferred implementations per scalar
-    decimal: 'core/decimal@1',
-    datetime: 'core/iso-datetime@1',
-    bytes: 'core/bytes@1',
+    int: 'sql/int@1',
+    float: 'sql/float@1',
     overrides: {
       // per-column override by table.column or projection alias
-      'user.createdAt': 'core/iso-datetime@1',
-      'orders.total': { name: 'core/decimal@1', config: { rounding: 'half-up', scale: 2 } }
+      'user.email': { name: 'sql/varchar@1', config: { length: 255 } },
+      'orders.code': { name: 'sql/char@1', config: { length: 8 } }
     }
   }
 })
@@ -103,7 +99,7 @@ createRuntime({
 ### Composition with contract
 
 - Contract scalars optionally carry codec and codecConfig
-- Enum scalars autogenerate core/enum with allowed variants
+- Enum scalars autogenerate adapter enum codecs (e.g., `pg/enum@1`) with allowed variants
 - Column nullability in contract enforces null passthrough before decoding
 - For JSON projections originating from SQL functions (json_agg), lanes may include annotations.projectionTypes to instruct nested decoding
 - **includeMany special handling**: The SQL DSL's `includeMany` feature marks include aliases in `meta.projection` with the special marker `include:alias` (e.g., `{ posts: 'include:posts' }`). The runtime detects this marker and parses JSON arrays from include aliases, converting `NULL` to empty arrays `[]` for consistency. Include aliases are excluded from codec assignments since they are JSON arrays, not scalar values.
@@ -114,8 +110,8 @@ DSL and ORM lanes can attach hints at projection time:
 
 ```typescript
 select({
-  total: t.order.total.hintCodec('core/decimal@1', { scale: 2 }),
-  payload: t.event.data.hintCodec('core/json@1')
+  total: t.order.total.hintCodec('pg/numeric@1', { precision: 10, scale: 2 }),
+  payload: t.event.data.hintCodec('pg/text@1')
 })
 ```
 
@@ -125,8 +121,8 @@ Raw lane can annotate the Plan JSON:
 {
   "annotations": {
     "codecs": {
-      "payload": "core/json@1",
-      "total": { "name": "core/decimal@1", "config": { "scale": 2 } }
+      "payload": "pg/text@1",
+      "total": { "name": "pg/numeric@1", "config": { "precision": 10, "scale": 2 } }
     }
   }
 }

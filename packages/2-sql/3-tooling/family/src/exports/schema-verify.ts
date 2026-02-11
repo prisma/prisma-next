@@ -12,5 +12,8 @@ export {
   isUniqueConstraintSatisfied,
   verifyDatabaseDependencies,
 } from '../core/schema-verify/verify-helpers';
-export type { VerifySqlSchemaOptions } from '../core/schema-verify/verify-sql-schema';
+export type {
+  NativeTypeNormalizer,
+  VerifySqlSchemaOptions,
+} from '../core/schema-verify/verify-sql-schema';
 export { verifySqlSchema } from '../core/schema-verify/verify-sql-schema';

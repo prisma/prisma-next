@@ -23,7 +23,7 @@ export type ExtractOutputType<
  * A type representing a selection of columns in a SQL `select` query in the
  * most generic form.
  */
-export type Selection = Record<string, SelectionValue<any, any>>;
+export type Selection = Record<string, SelectionValue<unknown, unknown>>;
 
 /**
  * A type representing the value of a selected column in a SQL `select` query.

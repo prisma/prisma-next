@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:6bffbe54f87b253e12dd069d57a943d580662ed3da1aeb8bfd114fec3ea0e4d8",
+  "coreHash": "sha256:e94295d382f9f0039fd471957cd02770f1a75031240660195def8854d2385962",
   "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
     "Comment": {
@@ -117,6 +117,100 @@
         },
         "uniques": []
       },
+      "param_types": {
+        "columns": {
+          "bits": {
+            "codecId": "pg/varbit@1",
+            "nativeType": "bit varying",
+            "nullable": true,
+            "typeParams": {
+              "length": 12
+            }
+          },
+          "code": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": true,
+            "typeParams": {
+              "length": 16
+            }
+          },
+          "created_at": {
+            "codecId": "pg/timestamptz@1",
+            "nativeType": "timestamptz",
+            "nullable": true,
+            "typeParams": {
+              "precision": 3
+            }
+          },
+          "duration": {
+            "codecId": "pg/interval@1",
+            "nativeType": "interval",
+            "nullable": true,
+            "typeParams": {
+              "precision": 6
+            }
+          },
+          "flags": {
+            "codecId": "pg/bit@1",
+            "nativeType": "bit",
+            "nullable": true,
+            "typeParams": {
+              "length": 8
+            }
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "default": {
+              "expression": "autoincrement()",
+              "kind": "function"
+            },
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "name": {
+            "codecId": "sql/varchar@1",
+            "nativeType": "character varying",
+            "nullable": true,
+            "typeParams": {
+              "length": 255
+            }
+          },
+          "price": {
+            "codecId": "pg/numeric@1",
+            "nativeType": "numeric",
+            "nullable": true,
+            "typeParams": {
+              "precision": 10,
+              "scale": 2
+            }
+          },
+          "starts_at": {
+            "codecId": "pg/time@1",
+            "nativeType": "time",
+            "nullable": true,
+            "typeParams": {
+              "precision": 2
+            }
+          },
+          "starts_at_tz": {
+            "codecId": "pg/timetz@1",
+            "nativeType": "timetz",
+            "nullable": true,
+            "typeParams": {
+              "precision": 2
+            }
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
       "post": {
         "columns": {
           "created_at": {
@@ -176,8 +270,11 @@
             "nullable": false
           },
           "email": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
+            "codecId": "sql/varchar@1",
+            "nativeType": "character varying",
+            "typeParams": {
+              "length": 255
+            }
           },
           "id": {
             "codecId": "pg/int4@1",

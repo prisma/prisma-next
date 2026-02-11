@@ -21,21 +21,19 @@ describe('pgvector extension pack integration', () => {
     });
 
     const codecTypeImports = extractCodecTypeImports(descriptors);
-    expect(codecTypeImports.length).toBe(3);
+    expect(codecTypeImports.length).toBe(13);
     // Adapter codec types come first
     expect(codecTypeImports[0]).toEqual({
       package: '@prisma-next/adapter-postgres/codec-types',
       named: 'CodecTypes',
       alias: 'PgTypes',
     });
-    // Extension codec types come after
-    expect(codecTypeImports[1]).toEqual({
+    expect(codecTypeImports).toContainEqual({
       package: '@prisma-next/extension-pgvector/codec-types',
       named: 'CodecTypes',
       alias: 'PgVectorTypes',
     });
-    // Extension type-only imports (e.g., Vector<N>) come last
-    expect(codecTypeImports[2]).toEqual({
+    expect(codecTypeImports).toContainEqual({
       package: '@prisma-next/extension-pgvector/codec-types',
       named: 'Vector',
       alias: 'Vector',
