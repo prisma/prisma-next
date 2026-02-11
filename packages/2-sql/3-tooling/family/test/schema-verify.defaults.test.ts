@@ -22,15 +22,24 @@ const testNormalizer: DefaultNormalizer = (rawDefault: string): ColumnDefault | 
     return { kind: 'function', expression: 'now()' };
   }
 
+  // Boolean literals
+  if (/^true$/i.test(trimmed)) {
+    return { kind: 'literal', expression: 'true' };
+  }
+  if (/^false$/i.test(trimmed)) {
+    return { kind: 'literal', expression: 'false' };
+  }
+
   // Numeric literals
   if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
     return { kind: 'literal', expression: trimmed };
   }
 
   // String literals: 'value'::type or just 'value'
-  const stringMatch = trimmed.match(/^'((?:[^']|'')*)'(?:::[\w\s]+(?:\(\d+\))?)?$/);
+  // Strip the ::type cast so the normalized expression matches what contract authors write.
+  const stringMatch = trimmed.match(/^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/);
   if (stringMatch?.[1] !== undefined) {
-    return { kind: 'literal', expression: trimmed };
+    return { kind: 'literal', expression: `'${stringMatch[1]}'` };
   }
 
   // Fallback
@@ -126,7 +135,7 @@ describe('verifySqlSchema - defaults', () => {
         label: {
           nativeType: 'text',
           nullable: false,
-          default: { kind: 'literal', expression: "'draft'::text" },
+          default: { kind: 'literal', expression: "'draft'" },
         },
       }),
     });
@@ -142,7 +151,7 @@ describe('verifySqlSchema - defaults', () => {
         label: {
           nativeType: 'text',
           nullable: false,
-          // Raw Postgres default with whitespace variation
+          // Raw Postgres default with type cast — normalizer strips ::text
           default: "  'draft'::text  ",
         },
       }),
@@ -196,5 +205,393 @@ describe('verifySqlSchema - defaults', () => {
 
     expect(result.ok).toBe(true);
     expect(result.schema.issues).toHaveLength(0);
+  });
+});
+
+describe('verifySqlSchema - string literal defaults with type casts', () => {
+  it('matches contract literal without cast to DB literal with ::text cast', () => {
+    const contract = createTestContract({
+      Environment: createContractTable({
+        provisionStatus: {
+          nativeType: 'text',
+          nullable: false,
+          default: { kind: 'literal', expression: "'ready'" },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Environment: createSchemaTable('Environment', {
+        provisionStatus: {
+          nativeType: 'text',
+          nullable: false,
+          default: "'ready'::text",
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('matches contract literal without cast to DB literal with ::character varying cast', () => {
+    const contract = createTestContract({
+      user: createContractTable({
+        role: {
+          nativeType: 'character varying',
+          nullable: false,
+          default: { kind: 'literal', expression: "'member'" },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      user: createSchemaTable('user', {
+        role: {
+          nativeType: 'character varying',
+          nullable: false,
+          default: "'member'::character varying",
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('matches contract literal without cast to DB literal with quoted enum cast', () => {
+    const contract = createTestContract({
+      Environment: createContractTable({
+        kind: {
+          nativeType: 'EnvironmentModelKind',
+          nullable: false,
+          default: { kind: 'literal', expression: "'production'" },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Environment: createSchemaTable('Environment', {
+        kind: {
+          nativeType: 'EnvironmentModelKind',
+          nullable: false,
+          default: '\'production\'::"EnvironmentModelKind"',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('matches contract literal without cast to DB literal with escaped quotes and cast', () => {
+    const contract = createTestContract({
+      post: createContractTable({
+        title: {
+          nativeType: 'text',
+          nullable: false,
+          default: { kind: 'literal', expression: "'it''s a default'" },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      post: createSchemaTable('post', {
+        title: {
+          nativeType: 'text',
+          nullable: false,
+          default: "'it''s a default'::text",
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('matches boolean literal true despite DB returning raw true', () => {
+    const contract = createTestContract({
+      Environment: createContractTable({
+        allowRemoteDatabases: {
+          nativeType: 'bool',
+          nullable: false,
+          default: { kind: 'literal', expression: 'true' },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Environment: createSchemaTable('Environment', {
+        allowRemoteDatabases: {
+          nativeType: 'bool',
+          nullable: false,
+          default: 'true',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('still detects actual value mismatch when both have casts', () => {
+    const contract = createTestContract({
+      Environment: createContractTable({
+        status: {
+          nativeType: 'text',
+          nullable: false,
+          default: { kind: 'literal', expression: "'active'" },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Environment: createSchemaTable('Environment', {
+        status: {
+          nativeType: 'text',
+          nullable: false,
+          default: "'inactive'::text",
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.schema.issues).toContainEqual(
+      expect.objectContaining({
+        kind: 'default_mismatch',
+        table: 'Environment',
+        column: 'status',
+      }),
+    );
+  });
+
+  it('matches contract literal with empty string default and ::text cast', () => {
+    const contract = createTestContract({
+      config: createContractTable({
+        value: {
+          nativeType: 'text',
+          nullable: false,
+          default: { kind: 'literal', expression: "''" },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      config: createSchemaTable('config', {
+        value: {
+          nativeType: 'text',
+          nullable: false,
+          default: "''::text",
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('matches when contract includes enum cast and DB also returns enum cast', () => {
+    const contract = createTestContract({
+      Organization: createContractTable({
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: { kind: 'literal', expression: '\'atRisk\'::"BillingState"' },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Organization: createSchemaTable('Organization', {
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: '\'atRisk\'::"BillingState"',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('matches when contract has cast-free literal but DB returns enum cast', () => {
+    const contract = createTestContract({
+      Organization: createContractTable({
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: { kind: 'literal', expression: "'atRisk'" },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Organization: createSchemaTable('Organization', {
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: '\'atRisk\'::"BillingState"',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('matches when contract has enum cast but DB returns cast-free literal', () => {
+    const contract = createTestContract({
+      Organization: createContractTable({
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: { kind: 'literal', expression: '\'atRisk\'::"BillingState"' },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Organization: createSchemaTable('Organization', {
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: "'atRisk'",
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('detects value mismatch even when both have enum casts', () => {
+    const contract = createTestContract({
+      Organization: createContractTable({
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: { kind: 'literal', expression: '\'active\'::"BillingState"' },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      Organization: createSchemaTable('Organization', {
+        billingState: {
+          nativeType: 'BillingState',
+          nullable: false,
+          default: '\'suspended\'::"BillingState"',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.schema.issues).toContainEqual(
+      expect.objectContaining({
+        kind: 'default_mismatch',
+        table: 'Organization',
+        column: 'billingState',
+      }),
+    );
   });
 });
