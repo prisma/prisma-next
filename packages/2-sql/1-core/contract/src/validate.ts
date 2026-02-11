@@ -87,12 +87,9 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
         );
       }
 
-      const referencedTable = contract.storage.tables[fk.references.table];
-      if (!referencedTable) {
-        throw new Error(
-          `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
-        );
-      }
+      const referencedTable = contract.storage.tables[
+        fk.references.table
+      ] as (typeof contract.storage.tables)[string];
       const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
       for (const colName of fk.references.columns) {
         if (!referencedColumnNames.has(colName)) {
@@ -112,6 +109,10 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
 }
 
 function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
+  if (typeof contract !== 'object' || contract === null) {
+    return contract as SqlContract<SqlStorage>;
+  }
+
   const contractObj = contract as Record<string, unknown>;
 
   let normalizedStorage = contractObj['storage'];
