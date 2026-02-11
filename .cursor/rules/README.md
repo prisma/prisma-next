@@ -37,6 +37,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/typed-contract-in-tests.mdc` — Use typed Contract from fixtures in integration tests
 - `.cursor/rules/vitest-expect-typeof.mdc` — Type test patterns
 - `.cursor/rules/prefer-object-matcher.mdc` — Prefer object matchers over multiple individual expect().toBe() calls
+- `.cursor/rules/no-tautological-tests.mdc` — Avoid tests that only restate fixture input structure
 - `.cursor/rules/use-ast-factories.mdc` — Use factory functions for creating AST nodes instead of manual object creation
 - `.cursor/rules/use-contract-ir-factories.mdc` — Use factory functions for ContractIR objects in tests
 - `.cursor/rules/cli-error-handling.mdc` — CLI command error handling patterns
