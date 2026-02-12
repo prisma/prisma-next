@@ -21,9 +21,7 @@ function validatePostgresUrl(url: string): string {
   return trimmed;
 }
 
-type BindingInput = PostgresBindingInput;
-
-export function resolvePostgresBinding(options: BindingInput): PostgresBinding {
+export function resolvePostgresBinding(options: PostgresBindingInput): PostgresBinding {
   const providedCount =
     Number(options.binding !== undefined) +
     Number(options.url !== undefined) +
@@ -43,7 +41,7 @@ export function resolvePostgresBinding(options: BindingInput): PostgresBinding {
 
   const pgBinding = options.pg;
   if (pgBinding === undefined) {
-    throw new Error('Provide one binding input: binding, url, or pg');
+    throw new Error('Invariant violation: expected pg binding after validation');
   }
 
   if (pgBinding instanceof PgPool) {
