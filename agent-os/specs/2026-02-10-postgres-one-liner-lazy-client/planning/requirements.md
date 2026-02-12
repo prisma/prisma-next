@@ -81,4 +81,4 @@ Key constraints:
 
 ### Visual assets
 
-Usage snippet provided in requirements discussion (no additional assets).
+- None.
