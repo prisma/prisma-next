@@ -29,7 +29,7 @@ const sqlFamilyDescriptor: ControlFamilyDescriptor<'sql'> = {
     emitContract: async () => ({
       contractDts: '',
       contractJson: '{}',
-      coreHash: '',
+      storageHash: '',
       profileHash: '',
     }),
     introspect: async () => ({}),
@@ -37,7 +37,7 @@ const sqlFamilyDescriptor: ControlFamilyDescriptor<'sql'> = {
     readMarker: async () => null,
     schemaVerify: async () => ({
       contract: {
-        coreHash: '',
+        storageHash: '',
       },
       ok: true,
       schema: {
@@ -72,7 +72,7 @@ const sqlFamilyDescriptor: ControlFamilyDescriptor<'sql'> = {
     }),
     sign: async () => ({
       contract: {
-        coreHash: '',
+        storageHash: '',
       },
       marker: {
         created: true,
@@ -97,7 +97,7 @@ const sqlFamilyDescriptor: ControlFamilyDescriptor<'sql'> = {
     }),
     verify: async () => ({
       contract: {
-        coreHash: '',
+        storageHash: '',
       },
       ok: true,
       summary: '',

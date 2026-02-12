@@ -3,7 +3,11 @@
 // To regenerate, run: prisma-next contract emit
 import type { CodecTypes as PgTypes } from '@prisma-next/adapter-postgres/codec-types';
 
-import type { CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
+import type {
+  ExecutionHashBase,
+  ProfileHashBase,
+  StorageHashBase,
+} from '@prisma-next/contract/types';
 import type {
   SqlContract,
   SqlStorage,
@@ -11,8 +15,10 @@ import type {
   ModelDefinition,
 } from '@prisma-next/sql-contract/types';
 
-export type CoreHash =
-  CoreHashBase<'sha256:ddc7ae4652bb5dec24056f58ebef47228f06948cffc0d394661d83aa3a82da7d'>;
+export type StorageHash =
+  StorageHashBase<'sha256:ddc7ae4652bb5dec24056f58ebef47228f06948cffc0d394661d83aa3a82da7d'>;
+export type ExecutionHash =
+  ExecutionHashBase<'sha256:ddc7ae4652bb5dec24056f58ebef47228f06948cffc0d394661d83aa3a82da7d'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:13a235d20f545252b6ae3d59951cebc566729bd4a3241dc092aa7f58f55a42c4'>;
 
@@ -88,7 +94,8 @@ export type Contract = SqlContract<
     codecTypes: PgTypes;
     operationTypes: Record<string, never>;
   },
-  CoreHash,
+  StorageHash,
+  ExecutionHash,
   ProfileHash
 >;
 

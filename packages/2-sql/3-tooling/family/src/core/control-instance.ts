@@ -88,7 +88,7 @@ function createVerifyResult(options: {
   ok: boolean;
   code?: string;
   summary: string;
-  contractCoreHash: string;
+  contractStorageHash: string;
   contractProfileHash?: string;
   marker?: ContractMarkerRecord;
   expectedTargetId: string;
@@ -99,8 +99,8 @@ function createVerifyResult(options: {
   contractPath: string;
   totalTime: number;
 }): VerifyDatabaseResult {
-  const contract: { coreHash: string; profileHash?: string } = {
-    coreHash: options.contractCoreHash,
+  const contract: { storageHash: string; profileHash?: string } = {
+    storageHash: options.contractStorageHash,
   };
   if (options.contractProfileHash) {
     contract.profileHash = options.contractProfileHash;
@@ -136,8 +136,8 @@ function createVerifyResult(options: {
   }
 
   if (options.marker) {
-    (result as { marker?: { coreHash: string; profileHash: string } }).marker = {
-      coreHash: options.marker.coreHash,
+    (result as { marker?: { storageHash: string; profileHash: string } }).marker = {
+      storageHash: options.marker.storageHash,
       profileHash: options.marker.profileHash,
     };
   }
@@ -344,15 +344,15 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       if (
         typeof contractIR !== 'object' ||
         contractIR === null ||
-        !('coreHash' in contractIR) ||
+        !('storageHash' in contractIR) ||
         !('target' in contractIR) ||
-        typeof contractIR.coreHash !== 'string' ||
+        typeof contractIR.storageHash !== 'string' ||
         typeof contractIR.target !== 'string'
       ) {
-        throw new Error('Contract is missing required fields: coreHash or target');
+        throw new Error('Contract is missing required fields: storageHash or target');
       }
 
-      const contractCoreHash = contractIR.coreHash;
+      const contractStorageHash = contractIR.storageHash;
       const contractProfileHash =
         'profileHash' in contractIR && typeof contractIR.profileHash === 'string'
           ? contractIR.profileHash
@@ -381,7 +381,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           ok: false,
           code: 'PN-RTM-3001',
           summary: 'Marker missing',
-          contractCoreHash,
+          contractStorageHash,
           expectedTargetId,
           contractPath,
           totalTime,
@@ -398,7 +398,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           ok: false,
           code: 'PN-RTM-3003',
           summary: 'Target mismatch',
-          contractCoreHash,
+          contractStorageHash,
           marker,
           expectedTargetId,
           actualTargetId: contractTarget,
@@ -411,13 +411,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         });
       }
 
-      if (marker.coreHash !== contractCoreHash) {
+      if (marker.storageHash !== contractStorageHash) {
         const totalTime = Date.now() - startTime;
         return createVerifyResult({
           ok: false,
           code: 'PN-RTM-3002',
           summary: 'Hash mismatch',
-          contractCoreHash,
+          contractStorageHash,
           marker,
           expectedTargetId,
           contractPath,
@@ -435,7 +435,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           ok: false,
           code: 'PN-RTM-3002',
           summary: 'Hash mismatch',
-          contractCoreHash,
+          contractStorageHash,
           contractProfileHash,
           marker,
           expectedTargetId,
@@ -451,7 +451,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       return createVerifyResult({
         ok: true,
         summary: 'Database matches contract',
-        contractCoreHash,
+        contractStorageHash,
         marker,
         expectedTargetId,
         contractPath,
@@ -497,11 +497,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
       const contract = validateContract<SqlContract<SqlStorage>>(contractIR);
 
-      const contractCoreHash = contract.coreHash;
+      const contractStorageHash = contract.storageHash;
       const contractProfileHash =
         'profileHash' in contract && typeof contract.profileHash === 'string'
           ? contract.profileHash
-          : contractCoreHash;
+          : contractStorageHash;
       const contractTarget = contract.target;
 
       await driver.query(ensureSchemaStatement.sql, ensureSchemaStatement.params);
@@ -511,11 +511,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
       let markerCreated = false;
       let markerUpdated = false;
-      let previousHashes: { coreHash?: string; profileHash?: string } | undefined;
+      let previousHashes: { storageHash?: string; profileHash?: string } | undefined;
 
       if (!existingMarker) {
         const write = writeContractMarker({
-          coreHash: contractCoreHash,
+          storageHash: contractStorageHash,
           profileHash: contractProfileHash,
           contractJson: contractIR,
           canonicalVersion: 1,
@@ -523,19 +523,19 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         await driver.query(write.insert.sql, write.insert.params);
         markerCreated = true;
       } else {
-        const existingCoreHash = existingMarker.coreHash;
+        const existingStorageHash = existingMarker.storageHash;
         const existingProfileHash = existingMarker.profileHash;
 
-        const coreHashMatches = existingCoreHash === contractCoreHash;
+        const storageHashMatches = existingStorageHash === contractStorageHash;
         const profileHashMatches = existingProfileHash === contractProfileHash;
 
-        if (!coreHashMatches || !profileHashMatches) {
+        if (!storageHashMatches || !profileHashMatches) {
           previousHashes = {
-            coreHash: existingCoreHash,
+            storageHash: existingStorageHash,
             profileHash: existingProfileHash,
           };
           const write = writeContractMarker({
-            coreHash: contractCoreHash,
+            storageHash: contractStorageHash,
             profileHash: contractProfileHash,
             contractJson: contractIR,
             canonicalVersion: existingMarker.canonicalVersion ?? 1,
@@ -549,7 +549,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       if (markerCreated) {
         summary = 'Database signed (marker created)';
       } else if (markerUpdated) {
-        summary = `Database signed (marker updated from ${previousHashes?.coreHash ?? 'unknown'})`;
+        summary = `Database signed (marker updated from ${previousHashes?.storageHash ?? 'unknown'})`;
       } else {
         summary = 'Database already signed with this contract';
       }
@@ -560,7 +560,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ok: true,
         summary,
         contract: {
-          coreHash: contractCoreHash,
+          storageHash: contractStorageHash,
           profileHash: contractProfileHash,
         },
         target: {
@@ -741,7 +741,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       return {
         contractJson: result.contractJson,
         contractDts: result.contractDts,
-        coreHash: result.coreHash,
+        storageHash: result.storageHash,
+        ...(result.executionHash ? { executionHash: result.executionHash } : {}),
         profileHash: result.profileHash,
       };
     },

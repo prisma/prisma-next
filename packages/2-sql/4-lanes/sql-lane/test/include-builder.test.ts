@@ -27,6 +27,8 @@ describe('IncludeChildBuilderImpl', () => {
   const context = createTestContext(contract, adapter);
   const codecTypes = contract.mappings.codecTypes;
   const tableRef = createTableRef('user');
+  const tables = schema<Contract>(context).tables;
+  const userColumns = tables.user.columns;
 
   it('throws when getState called without projection', () => {
     const builder = new IncludeChildBuilderImpl(contract, codecTypes, tableRef);
@@ -118,6 +120,38 @@ describe('IncludeChildBuilderImpl', () => {
       hasProjection: true,
       limit: 5,
     });
+  });
+
+  it.each([
+    [
+      'where',
+      (builder: IncludeChildBuilderImpl) => builder.where(userColumns.id.eq(param('userId'))),
+      (state: ReturnType<IncludeChildBuilderImpl['getState']>) => {
+        expect(state.childWhere).toBeDefined();
+      },
+    ],
+    [
+      'orderBy',
+      (builder: IncludeChildBuilderImpl) => builder.orderBy(userColumns.id.asc()),
+      (state: ReturnType<IncludeChildBuilderImpl['getState']>) => {
+        expect(state.childOrderBy).toBeDefined();
+      },
+    ],
+    [
+      'limit',
+      (builder: IncludeChildBuilderImpl) => builder.limit(3),
+      (state: ReturnType<IncludeChildBuilderImpl['getState']>) => {
+        expect(state.childLimit).toBe(3);
+      },
+    ],
+  ] as const)('preserves %s state when select is called later', (_name, apply, assertState) => {
+    const seeded = apply(new IncludeChildBuilderImpl(contract, codecTypes, tableRef));
+    const next = seeded.select({
+      id: userColumns.id,
+    });
+    const state = next.getState();
+    expect(state.childProjection).toBeDefined();
+    assertState(state);
   });
 
   it('throws when limit is negative', () => {

@@ -150,6 +150,31 @@ export class InsertBuilderImpl<
       values[columnName] = createParamRef(index, paramName);
     }
 
+    const appliedDefaults = this.context.applyMutationDefaults({
+      op: 'create',
+      table: this.table.name,
+      values,
+    });
+
+    for (const defaultValue of appliedDefaults) {
+      const columnMeta = contractTable.columns[defaultValue.column];
+      if (!columnMeta) {
+        errorUnknownColumn(defaultValue.column, this.table.name);
+      }
+
+      const index = paramValues.push(defaultValue.value);
+      paramCodecs[defaultValue.column] = columnMeta.codecId;
+      paramDescriptors.push({
+        name: defaultValue.column,
+        source: 'dsl',
+        refs: { table: this.table.name, column: defaultValue.column },
+        codecId: columnMeta.codecId,
+        nativeType: columnMeta.nativeType,
+        nullable: columnMeta.nullable,
+      });
+      values[defaultValue.column] = createParamRef(index, defaultValue.column);
+    }
+
     const returning: ColumnRef[] = this.returningColumns.map((col) => {
       // TypeScript can't narrow ColumnBuilder properly
       const c = col as unknown as { table: string; column: string };
@@ -298,6 +323,31 @@ export class UpdateBuilderImpl<
       });
 
       set[columnName] = createParamRef(index, paramName);
+    }
+
+    const appliedDefaults = this.context.applyMutationDefaults({
+      op: 'update',
+      table: this.table.name,
+      values: set,
+    });
+
+    for (const defaultValue of appliedDefaults) {
+      const columnMeta = contractTable.columns[defaultValue.column];
+      if (!columnMeta) {
+        errorUnknownColumn(defaultValue.column, this.table.name);
+      }
+
+      const index = paramValues.push(defaultValue.value);
+      paramCodecs[defaultValue.column] = columnMeta.codecId;
+      paramDescriptors.push({
+        name: defaultValue.column,
+        source: 'dsl',
+        refs: { table: this.table.name, column: defaultValue.column },
+        codecId: columnMeta.codecId,
+        nativeType: columnMeta.nativeType,
+        nullable: columnMeta.nullable,
+      });
+      set[defaultValue.column] = createParamRef(index, defaultValue.column);
     }
 
     const whereResult = buildWhereExpr(

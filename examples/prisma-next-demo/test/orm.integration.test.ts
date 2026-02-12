@@ -16,18 +16,18 @@ const { contract } = executionContext;
 async function seedTestData(
   runtime: Runtime,
   data: { users?: string[]; posts?: Array<{ title: string; userIndex: number }> },
-): Promise<{ userIds: number[] }> {
+): Promise<{ userIds: string[] }> {
   const tables = schema(executionContext).tables;
   const userTable = tables['user']!;
   const postTable = tables['post']!;
 
-  const userIds: number[] = [];
+  const userIds: string[] = [];
 
-  // Insert users (provide all required columns since contract doesn't have defaults)
+  // Insert users (SQL lane requires explicit values for generated IDs)
   if (data.users) {
     for (let i = 0; i < data.users.length; i++) {
       const email = data.users[i]!;
-      const id = i + 1;
+      const id = `user_${String(i + 1).padStart(3, '0')}`;
       const createdAt = new Date();
       const kind = i === 0 ? 'admin' : 'user';
 
@@ -42,7 +42,7 @@ async function seedTestData(
         .build({ params: { id, email, createdAt, kind } });
 
       for await (const row of runtime.execute(plan)) {
-        userIds.push((row as { id: number }).id);
+        userIds.push((row as { id: string }).id);
       }
     }
   }
@@ -54,7 +54,7 @@ async function seedTestData(
       const userId = userIds[post.userIndex];
       if (userId === undefined) continue;
 
-      const id = i + 1;
+      const id = `post_${String(i + 1).padStart(3, '0')}`;
       const createdAt = new Date();
 
       const plan = sql({ context: executionContext })
@@ -95,7 +95,7 @@ describe('ORM integration tests', () => {
 
           expect(users).toHaveLength(2);
           expect(users[0]).toMatchObject({
-            id: expect.any(Number),
+            id: expect.any(String),
             email: expect.any(String),
             createdAt: expect.anything(),
           });
@@ -105,7 +105,7 @@ describe('ORM integration tests', () => {
         }
       });
     },
-    timeouts.typeScriptCompilation,
+    timeouts.spinUpPpgDev,
   );
 
   it(
@@ -119,11 +119,11 @@ describe('ORM integration tests', () => {
           await seedTestData(runtime, { users: ['alice@example.com'] });
 
           const { ormGetUserById } = await import('../src/queries/orm-get-user-by-id');
-          const user = await ormGetUserById(1, runtime);
+          const user = await ormGetUserById('user_001', runtime);
 
           expect(user).not.toBeNull();
           expect(user).toMatchObject({
-            id: 1,
+            id: 'user_001',
             email: 'alice@example.com',
             createdAt: expect.anything(),
           });
@@ -208,7 +208,7 @@ describe('ORM integration tests', () => {
         try {
           const { ormCreateUser } = await import('../src/queries/orm-writes');
           const affectedRows = await ormCreateUser(
-            { id: 1, email: 'alice@example.com', createdAt: new Date(), kind: 'admin' },
+            { email: 'alice@example.com', createdAt: new Date(), kind: 'admin' },
             runtime,
           );
 
@@ -232,7 +232,11 @@ describe('ORM integration tests', () => {
           await seedTestData(runtime, { users: ['alice@example.com'] });
 
           const { ormUpdateUser } = await import('../src/queries/orm-writes');
-          const affectedRows = await ormUpdateUser(1, 'alice-updated@example.com', runtime);
+          const affectedRows = await ormUpdateUser(
+            'user_001',
+            'alice-updated@example.com',
+            runtime,
+          );
 
           expect(affectedRows).toBe(1);
         } finally {
@@ -254,7 +258,7 @@ describe('ORM integration tests', () => {
           await seedTestData(runtime, { users: ['alice@example.com'] });
 
           const { ormDeleteUser } = await import('../src/queries/orm-writes');
-          const affectedRows = await ormDeleteUser(1, runtime);
+          const affectedRows = await ormDeleteUser('user_001', runtime);
 
           expect(affectedRows).toBe(1);
         } finally {
@@ -280,21 +284,21 @@ describe('ORM integration tests', () => {
 
           const firstPage = await ormGetUsersByIdCursor(null, 3, runtime);
           expect(firstPage).toHaveLength(3);
-          expect(firstPage.map((u) => u.id)).toEqual([1, 2, 3]);
+          expect(firstPage.map((u) => u.id)).toEqual(['user_001', 'user_002', 'user_003']);
 
-          const secondPage = await ormGetUsersByIdCursor(3, 3, runtime);
+          const secondPage = await ormGetUsersByIdCursor('user_003', 3, runtime);
           expect(secondPage).toHaveLength(3);
-          expect(secondPage.map((u) => u.id)).toEqual([4, 5, 6]);
+          expect(secondPage.map((u) => u.id)).toEqual(['user_004', 'user_005', 'user_006']);
 
-          const thirdPage = await ormGetUsersByIdCursor(6, 3, runtime);
+          const thirdPage = await ormGetUsersByIdCursor('user_006', 3, runtime);
           expect(thirdPage).toHaveLength(3);
-          expect(thirdPage.map((u) => u.id)).toEqual([7, 8, 9]);
+          expect(thirdPage.map((u) => u.id)).toEqual(['user_007', 'user_008', 'user_009']);
 
-          const lastPage = await ormGetUsersByIdCursor(9, 3, runtime);
+          const lastPage = await ormGetUsersByIdCursor('user_009', 3, runtime);
           expect(lastPage).toHaveLength(1);
-          expect(lastPage.map((u) => u.id)).toEqual([10]);
+          expect(lastPage.map((u) => u.id)).toEqual(['user_010']);
 
-          const emptyPage = await ormGetUsersByIdCursor(10, 3, runtime);
+          const emptyPage = await ormGetUsersByIdCursor('user_010', 3, runtime);
           expect(emptyPage).toHaveLength(0);
         } finally {
           await runtime.close();
@@ -317,19 +321,19 @@ describe('ORM integration tests', () => {
 
           const { ormGetUsersBackward } = await import('../src/queries/orm-pagination');
 
-          const page = await ormGetUsersBackward(8, 3, runtime);
+          const page = await ormGetUsersBackward('user_008', 3, runtime);
           expect(page).toHaveLength(3);
-          expect(page.map((u) => u.id)).toEqual([7, 6, 5]);
+          expect(page.map((u) => u.id)).toEqual(['user_007', 'user_006', 'user_005']);
 
-          const earlierPage = await ormGetUsersBackward(4, 3, runtime);
+          const earlierPage = await ormGetUsersBackward('user_004', 3, runtime);
           expect(earlierPage).toHaveLength(3);
-          expect(earlierPage.map((u) => u.id)).toEqual([3, 2, 1]);
+          expect(earlierPage.map((u) => u.id)).toEqual(['user_003', 'user_002', 'user_001']);
 
-          const partialPage = await ormGetUsersBackward(2, 3, runtime);
+          const partialPage = await ormGetUsersBackward('user_002', 3, runtime);
           expect(partialPage).toHaveLength(1);
-          expect(partialPage.map((u) => u.id)).toEqual([1]);
+          expect(partialPage.map((u) => u.id)).toEqual(['user_001']);
 
-          const emptyPage = await ormGetUsersBackward(1, 3, runtime);
+          const emptyPage = await ormGetUsersBackward('user_001', 3, runtime);
           expect(emptyPage).toHaveLength(0);
         } finally {
           await runtime.close();

@@ -2,7 +2,8 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:e94295d382f9f0039fd471957cd02770f1a75031240660195def8854d2385962",
+  "storageHash": "sha256:ef6a470e5086b66b812a56c7505fe2a14d08d0a585a5090e47e578c3aea60d79",
+  "executionHash": "sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589",
   "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
     "Comment": {
@@ -26,6 +27,23 @@
       "relations": {},
       "storage": {
         "table": "comment"
+      }
+    },
+    "Event": {
+      "fields": {
+        "createdAt": {
+          "column": "created_at"
+        },
+        "id": {
+          "column": "id"
+        },
+        "name": {
+          "column": "name"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "event"
       }
     },
     "Post": {
@@ -106,6 +124,35 @@
             "codecId": "pg/timestamptz@1",
             "nativeType": "timestamptz",
             "nullable": true
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "event": {
+        "columns": {
+          "created_at": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
           }
         },
         "foreignKeys": [],
@@ -300,6 +347,22 @@
         },
         "uniques": []
       }
+    }
+  },
+  "execution": {
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv7",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "event"
+          }
+        }
+      ]
     }
   },
   "capabilities": {

@@ -267,7 +267,7 @@ describe('control-api', () => {
                 value: {
                   mode: 'apply',
                   execution: expect.anything(),
-                  marker: expect.objectContaining({ coreHash: expect.any(String) }),
+                  marker: expect.objectContaining({ storageHash: expect.any(String) }),
                   summary: expect.stringContaining('Applied'),
                 },
               });
@@ -366,7 +366,7 @@ describe('control-api', () => {
               });
 
               expect(signResult.ok).toBe(true);
-              expect(signResult.contract.coreHash).toBeDefined();
+              expect(signResult.contract.storageHash).toBeDefined();
             } finally {
               await client.close();
             }

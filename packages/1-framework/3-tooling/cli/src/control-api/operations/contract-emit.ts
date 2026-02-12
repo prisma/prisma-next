@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import { abortable } from '@prisma-next/utils/abortable';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing } from '../../utils/cli-errors';
@@ -91,7 +92,8 @@ export async function executeContractEmit(
   await unlessAborted(writeFile(outputDtsPath, emitResult.contractDts, 'utf-8'));
 
   return {
-    coreHash: emitResult.coreHash,
+    storageHash: emitResult.storageHash,
+    ...ifDefined('executionHash', emitResult.executionHash),
     profileHash: emitResult.profileHash,
     files: {
       json: outputJsonPath,

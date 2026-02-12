@@ -25,7 +25,7 @@ export async function ormGetUsersWithPosts(limit: number, runtime: Runtime) {
     }))
     .take(limit)
     .findMany({
-      params: { postId: 1 },
+      params: { postId: 'post_001' },
     });
   type Row = ResultType<typeof plan>;
   // @ts-expect-error - This is to test the type inference

@@ -16,9 +16,10 @@ import type {
 
 type ColumnDefaultLiteral = { readonly kind: 'literal'; readonly expression: string };
 type ColumnDefaultFunction = { readonly kind: 'function'; readonly expression: string };
-
 const literalKindSchema = type("'literal'");
 const functionKindSchema = type("'function'");
+const generatorKindSchema = type("'generator'");
+const generatorIdSchema = type("'ulid' | 'nanoid' | 'uuidv7' | 'uuidv4' | 'cuid2' | 'ksuid'");
 
 export const ColumnDefaultLiteralSchema = type.declare<ColumnDefaultLiteral>().type({
   kind: literalKindSchema,
@@ -31,6 +32,27 @@ export const ColumnDefaultFunctionSchema = type.declare<ColumnDefaultFunction>()
 });
 
 export const ColumnDefaultSchema = ColumnDefaultLiteralSchema.or(ColumnDefaultFunctionSchema);
+
+const ExecutionMutationDefaultValueSchema = type({
+  kind: generatorKindSchema,
+  id: generatorIdSchema,
+  'params?': 'Record<string, unknown>',
+});
+
+const ExecutionMutationDefaultSchema = type({
+  ref: {
+    table: 'string',
+    column: 'string',
+  },
+  'onCreate?': ExecutionMutationDefaultValueSchema,
+  'onUpdate?': ExecutionMutationDefaultValueSchema,
+});
+
+const ExecutionSchema = type({
+  mutations: {
+    defaults: ExecutionMutationDefaultSchema.array().readonly(),
+  },
+});
 
 const StorageColumnSchema = type({
   nativeType: 'string',
@@ -109,7 +131,8 @@ const SqlContractSchema = type({
   'schemaVersion?': "'1'",
   target: 'string',
   targetFamily: "'sql'",
-  coreHash: 'string',
+  storageHash: 'string',
+  'executionHash?': 'string',
   'profileHash?': 'string',
   'capabilities?': 'Record<string, Record<string, boolean>>',
   'extensionPacks?': 'Record<string, unknown>',
@@ -117,6 +140,7 @@ const SqlContractSchema = type({
   'sources?': 'Record<string, unknown>',
   models: type({ '[string]': ModelSchema }),
   storage: StorageSchema,
+  'execution?': ExecutionSchema,
 });
 
 /**

@@ -121,13 +121,13 @@ function createMockExtensionWithParameterizedRenderer(
 }
 
 function createTestContractIR(
-  overrides: Partial<ContractIR> & { coreHash?: string } = {},
-): ContractIR & { coreHash?: string } {
+  overrides: Partial<ContractIR> & { storageHash?: string } = {},
+): ContractIR & { storageHash?: string } {
   return {
     schemaVersion: '1',
     targetFamily: 'sql',
     target: 'postgres',
-    coreHash: 'sha256:placeholder',
+    storageHash: 'sha256:placeholder',
     models: {},
     relations: {},
     storage: { tables: {} },

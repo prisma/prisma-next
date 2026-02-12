@@ -7,7 +7,7 @@ describe('validateContract', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test',
+    storageHash: 'sha256:test',
     models: {},
     storage: {
       tables: {
@@ -63,7 +63,7 @@ describe('validateContract', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -92,7 +92,7 @@ describe('validateContract', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       relations: undefined,
       storage: {
@@ -119,7 +119,7 @@ describe('validateContract', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       relations: {},
       mappings: undefined,
@@ -150,7 +150,7 @@ describe('validateContract', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       relations: {},
       mappings: {},
@@ -176,7 +176,7 @@ describe('validateContract', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       relations: {},
       mappings: {},
@@ -219,7 +219,7 @@ describe('validateContract', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       relations: {},
       mappings: {},

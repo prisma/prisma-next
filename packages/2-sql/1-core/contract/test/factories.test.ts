@@ -268,12 +268,12 @@ describe('SQL contract factories', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
       });
       expect(c.target).toBe('postgres');
       expect(c.targetFamily).toBe('sql');
-      expect(c.coreHash).toBe('sha256:abc123');
+      expect(c.storageHash).toBe('sha256:abc123');
       expect(c.storage).toEqual(s);
       expect(c.models).toEqual({});
       expect(c.relations).toEqual({});
@@ -294,7 +294,7 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         models: m,
       });
@@ -313,7 +313,7 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         relations,
       });
@@ -327,7 +327,7 @@ describe('SQL contract factories', () => {
       const s = storage({ user: userTable });
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         profileHash: 'sha256:def456',
         storage: s,
       });
@@ -348,7 +348,7 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         capabilities,
       });
@@ -368,7 +368,7 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         extensionPacks,
       });
@@ -386,7 +386,7 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         meta,
       });
@@ -406,7 +406,7 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         sources,
       });
@@ -428,7 +428,7 @@ describe('SQL contract factories', () => {
       };
       const c = contract({
         target: 'postgres',
-        coreHash: 'sha256:abc123',
+        storageHash: 'sha256:abc123',
         storage: s,
         mappings,
       });

@@ -119,7 +119,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
   const existingMarker = await familyInstance.readMarker({ driver });
   if (existingMarker) {
     const markerMatchesDestination =
-      existingMarker.coreHash === migrationPlan.destination.coreHash &&
+      existingMarker.storageHash === migrationPlan.destination.storageHash &&
       (!migrationPlan.destination.profileHash ||
         existingMarker.profileHash === migrationPlan.destination.profileHash);
 
@@ -138,7 +138,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
           ? {
               execution: { operationsPlanned: 0, operationsExecuted: 0 },
               marker: {
-                coreHash: existingMarker.coreHash,
+                storageHash: existingMarker.storageHash,
                 profileHash: existingMarker.profileHash,
               },
             }
@@ -159,11 +159,11 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
       code: 'MARKER_ORIGIN_MISMATCH' as const,
       summary: 'Existing contract marker does not match plan destination',
       marker: {
-        coreHash: existingMarker.coreHash,
+        storageHash: existingMarker.storageHash,
         profileHash: existingMarker.profileHash,
       },
       destination: {
-        coreHash: migrationPlan.destination.coreHash,
+        storageHash: migrationPlan.destination.storageHash,
         profileHash: migrationPlan.destination.profileHash,
       },
       why: undefined,
@@ -271,10 +271,10 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     },
     marker: migrationPlan.destination.profileHash
       ? {
-          coreHash: migrationPlan.destination.coreHash,
+          storageHash: migrationPlan.destination.storageHash,
           profileHash: migrationPlan.destination.profileHash,
         }
-      : { coreHash: migrationPlan.destination.coreHash },
+      : { storageHash: migrationPlan.destination.storageHash },
     summary: `Applied ${execution.operationsExecuted} operation(s), marker written`,
   };
   return ok(result);

@@ -78,8 +78,8 @@ export async function setupTestDatabase(
   await executeStatement(client, ensureSchemaStatement);
   await executeStatement(client, ensureTableStatement);
   const write = writeContractMarker({
-    coreHash: contract.coreHash,
-    profileHash: contract.profileHash ?? contract.coreHash,
+    storageHash: contract.storageHash,
+    profileHash: contract.profileHash ?? contract.storageHash,
     contractJson: contract,
     canonicalVersion: 1,
   });
@@ -95,8 +95,8 @@ export async function writeTestContractMarker(
   contract: SqlContract<SqlStorage>,
 ): Promise<void> {
   const write = writeContractMarker({
-    coreHash: contract.coreHash,
-    profileHash: contract.profileHash ?? contract.coreHash,
+    storageHash: contract.storageHash,
+    profileHash: contract.profileHash ?? contract.storageHash,
     contractJson: contract,
     canonicalVersion: 1,
   });
@@ -250,28 +250,31 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
  * and returns the contract with proper typing.
  * This helper allows tests to create contracts without depending on sql-query.
  */
-export function createTestContract<T extends SqlContract<SqlStorage>>(
-  contract: Partial<Omit<T, 'coreHash' | 'profileHash'>> & {
-    coreHash?: string | undefined;
-    profileHash?: string | undefined;
+export function createTestContract(
+  contract: Partial<Omit<SqlContract<SqlStorage>, 'storageHash' | 'profileHash'>> & {
+    storageHash?: string;
+    profileHash?: string;
   },
-): T {
+): SqlContract<SqlStorage> {
+  const { execution, ...rest } = contract;
+
   return {
-    ...contract,
-    schemaVersion: contract.schemaVersion ?? '1',
-    target: contract.target ?? 'postgres',
-    targetFamily: contract.targetFamily ?? 'sql',
-    storage: contract.storage ?? { tables: {} },
-    models: contract.models ?? {},
-    relations: contract.relations ?? {},
-    mappings: contract.mappings ?? { codecTypes: {}, operationTypes: {} },
-    capabilities: contract.capabilities ?? {},
-    extensionPacks: contract.extensionPacks ?? {},
-    meta: contract.meta ?? {},
-    sources: contract.sources ?? {},
-    coreHash: coreHash(contract.coreHash ?? 'sha256:testcore'),
-    profileHash: profileHash(contract.profileHash ?? 'sha256:testprofile'),
-  } satisfies SqlContract as never;
+    ...rest,
+    schemaVersion: rest.schemaVersion ?? '1',
+    target: rest.target ?? 'postgres',
+    targetFamily: rest.targetFamily ?? 'sql',
+    storage: rest.storage ?? { tables: {} },
+    models: rest.models ?? {},
+    relations: rest.relations ?? {},
+    mappings: rest.mappings ?? { codecTypes: {}, operationTypes: {} },
+    capabilities: rest.capabilities ?? {},
+    extensionPacks: rest.extensionPacks ?? {},
+    meta: rest.meta ?? {},
+    sources: rest.sources ?? {},
+    ...(execution ? { execution } : {}),
+    storageHash: coreHash(rest.storageHash ?? 'sha256:testcore'),
+    profileHash: profileHash(rest.profileHash ?? 'sha256:testprofile'),
+  } satisfies SqlContract<SqlStorage>;
 }
 
 // Re-export generic utilities from test-utils

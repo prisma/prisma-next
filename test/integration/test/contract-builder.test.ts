@@ -29,7 +29,7 @@ describe('builder integration', () => {
       .model('User', 'user', (m) =>
         m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
       )
-      .coreHash('sha256:test-core')
+      .storageHash('sha256:test-core')
       .build();
 
     expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
@@ -39,7 +39,7 @@ describe('builder integration', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-core',
+      storageHash: 'sha256:test-core',
       storage: {
         tables: expect.objectContaining({
           user: expect.anything(),
@@ -132,7 +132,7 @@ describe('builder integration', () => {
       .model('User', 'user', (m) =>
         m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
       )
-      .coreHash('sha256:test-core')
+      .storageHash('sha256:test-core')
       .build();
 
     expect(contract.target).toBe('postgres');
@@ -152,7 +152,7 @@ describe('builder integration', () => {
       .model('User', 'user', (m) =>
         m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
       )
-      .coreHash('sha256:test-core')
+      .storageHash('sha256:test-core')
       .build();
 
     const adapter = createStubAdapter();
@@ -183,7 +183,7 @@ describe('builder integration', () => {
       .model('User', 'user', (m) =>
         m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
       )
-      .coreHash('sha256:test-core')
+      .storageHash('sha256:test-core')
       .build();
 
     expectTypeOf<ExtractCodecTypes<typeof contract>>().toEqualTypeOf<CodecTypes>();
@@ -205,10 +205,10 @@ describe('builder integration', () => {
     // Runtime checks
     expect(_plan.ast).toBeDefined();
     expect((_plan.ast as { kind: string })?.kind).toBe('select');
-    expect(_plan.meta.coreHash).toBe('sha256:test-core');
+    expect(_plan.meta.storageHash).toBe('sha256:test-core');
 
     // Type checks - verify plan types are specific
-    expectTypeOf(_plan.meta.coreHash).toEqualTypeOf<string>();
+    expectTypeOf(_plan.meta.storageHash).toEqualTypeOf<string>();
     // Note: plan.ast type checking is complex due to plan structure
     // We verify it exists at runtime above
 
@@ -236,7 +236,7 @@ describe('builder integration', () => {
       .model('User', 'user', (m) =>
         m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
       )
-      .coreHash('sha256:test-core')
+      .storageHash('sha256:test-core')
       .build();
 
     const adapter = createStubAdapter();
@@ -288,7 +288,7 @@ describe('builder integration', () => {
       .model('User', 'user', (m) =>
         m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
       )
-      .coreHash('sha256:test-core')
+      .storageHash('sha256:test-core')
       .build();
 
     const fixtureContract = validateContract<Contract>(contractJson);
@@ -413,7 +413,7 @@ describe('builder integration', () => {
               },
             }),
         )
-        .coreHash('sha256:test-core')
+        .storageHash('sha256:test-core')
         .build();
 
       // Runtime checks
@@ -509,7 +509,7 @@ describe('builder integration', () => {
               },
             }),
         )
-        .coreHash('sha256:test-core')
+        .storageHash('sha256:test-core')
         .build();
 
       // Runtime checks

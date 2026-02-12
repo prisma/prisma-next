@@ -120,7 +120,7 @@ export interface SqlMigrationPlanOperation<TTargetDetails> extends MigrationPlan
 }
 
 export interface SqlMigrationPlanContractInfo {
-  readonly coreHash: string;
+  readonly storageHash: string;
   readonly profileHash?: string;
 }
 

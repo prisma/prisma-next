@@ -65,7 +65,7 @@ withTempDir(({ createTempDir }) => {
         const parsed = JSON.parse(jsonOutput);
         expect(parsed).toMatchObject({
           ok: true,
-          coreHash: expect.any(String),
+          storageHash: expect.any(String),
           outDir: expect.any(String),
           files: {
             json: expect.any(String),
@@ -98,7 +98,7 @@ withTempDir(({ createTempDir }) => {
         // Verify JSON output matches actual files
         expect(parsed.files.json).toBe(contractJsonPath);
         expect(parsed.files.dts).toBe(contractDtsPath);
-        expect(parsed.coreHash).toBe(contractJson.coreHash);
+        expect(parsed.storageHash).toBe(contractJson.storageHash);
       },
       timeouts.typeScriptCompilation,
     );
@@ -134,7 +134,7 @@ withTempDir(({ createTempDir }) => {
         const parsed = JSON.parse(jsonOutput);
         expect(parsed).toMatchObject({
           ok: true,
-          coreHash: expect.any(String),
+          storageHash: expect.any(String),
           outDir: expect.any(String),
           files: {
             json: expect.any(String),

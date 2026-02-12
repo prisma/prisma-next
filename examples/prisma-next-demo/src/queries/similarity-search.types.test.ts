@@ -40,6 +40,6 @@ test('ResultType correctly infers number for cosineDistance operation result', (
 
   // Verify that distance is correctly inferred as number
   expectTypeOf<Row['distance']>().toEqualTypeOf<number>();
-  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['id']>().toEqualTypeOf<string>();
   expectTypeOf<Row['title']>().toEqualTypeOf<string>();
 });

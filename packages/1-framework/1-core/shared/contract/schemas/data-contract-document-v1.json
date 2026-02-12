@@ -24,10 +24,15 @@
       "enum": ["document"],
       "description": "Target family classification"
     },
-    "coreHash": {
+    "storageHash": {
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$",
-      "description": "SHA-256 hash of the core schema structure (models, fields, relations, storage layout)"
+      "description": "SHA-256 hash of the storage section (DB-satisfied expectations)"
+    },
+    "executionHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the execution section (client-side behavior)"
     },
     "profileHash": {
       "type": "string",
@@ -85,7 +90,7 @@
       "required": ["document"]
     }
   },
-  "required": ["schemaVersion", "target", "targetFamily", "coreHash", "storage"],
+  "required": ["schemaVersion", "target", "targetFamily", "storageHash", "storage"],
   "$defs": {
     "DocCollection": {
       "type": "object",

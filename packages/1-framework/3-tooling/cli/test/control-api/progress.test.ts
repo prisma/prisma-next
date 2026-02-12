@@ -29,7 +29,7 @@ describe('executeDbInit progress emission', () => {
           kind: 'success' as const,
           plan: {
             targetId: 'postgres',
-            destination: { coreHash: 'test-hash' },
+            destination: { storageHash: 'test-hash' },
             operations: [],
           },
         }),
@@ -100,7 +100,7 @@ describe('executeDbInit progress emission', () => {
           kind: 'success' as const,
           plan: {
             targetId: 'postgres',
-            destination: { coreHash: 'test-hash' },
+            destination: { storageHash: 'test-hash' },
             operations: mockOperations,
           },
         }),
@@ -178,7 +178,7 @@ describe('executeDbInit progress emission', () => {
           kind: 'success' as const,
           plan: {
             targetId: 'postgres',
-            destination: { coreHash: 'test-hash' },
+            destination: { storageHash: 'test-hash' },
             operations: [],
           },
         }),

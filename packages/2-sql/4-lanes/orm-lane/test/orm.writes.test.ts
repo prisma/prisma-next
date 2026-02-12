@@ -17,6 +17,7 @@ import { createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
 import { orm } from '../src/orm';
 import type { Contract } from './fixtures/contract.d';
+import type { GeneratedContract } from './fixtures/contract-generated.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -25,6 +26,13 @@ function loadContract(name: string): Contract {
   const contents = readFileSync(filePath, 'utf8');
   const contractJson = JSON.parse(contents);
   return validateContract<Contract>(contractJson);
+}
+
+function loadGeneratedContract(name: string): GeneratedContract {
+  const filePath = join(fixtureDir, `${name}.json`);
+  const contents = readFileSync(filePath, 'utf8');
+  const contractJson = JSON.parse(contents);
+  return validateContract<GeneratedContract>(contractJson);
 }
 
 function createStubAdapter(): Adapter<
@@ -291,5 +299,70 @@ describe('orm writes', () => {
     const planWithParams = plan as { params: unknown[] };
     // Params should include both data values and any extra params
     expect(planWithParams.params).toBeDefined();
+  });
+});
+
+describe('orm writes with generated defaults', () => {
+  const contract = loadGeneratedContract('contract-generated');
+  const adapter = createStubAdapter() as Adapter<
+    SelectAst | InsertAst | UpdateAst | DeleteAst,
+    GeneratedContract,
+    LoweredStatement
+  >;
+  const context = createTestContext(contract, adapter);
+  const o = orm<GeneratedContract>({ context });
+
+  it('generates missing values for generated defaults on create()', () => {
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const plan = (
+      builder as {
+        create: (data: Record<string, unknown>) => unknown;
+      }
+    ).create({ email: 'test@example.com' });
+
+    const ast = plan as { ast: InsertAst; params: unknown[] };
+    expect(ast.ast.values).toHaveProperty('id');
+    expect(ast.params.length).toBe(2);
+    expect(ast.params).toContain('test@example.com');
+    const generatedValue = ast.params.find((value) => value !== 'test@example.com');
+    expect(typeof generatedValue).toBe('string');
+    expect(generatedValue).not.toBe('');
+  });
+
+  it('accepts create() when generated columns are provided', () => {
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const plan = (
+      builder as {
+        create: (data: Record<string, unknown>) => unknown;
+      }
+    ).create({ id: 'user_1', email: 'test@example.com' });
+
+    const ast = plan as { ast: InsertAst; params: unknown[] };
+    expect(ast.ast.values).toHaveProperty('id');
+    expect(ast.params).toContain('user_1');
+  });
+
+  it('accepts update() when generated columns are provided', () => {
+    const builder = (o as unknown as { user: () => unknown }).user();
+    const plan = (
+      builder as {
+        update: (
+          where: (model: unknown) => unknown,
+          data: Record<string, unknown>,
+          options?: { params?: Record<string, unknown> },
+        ) => unknown;
+      }
+    ).update(
+      (u) => {
+        const model = u as { id: { eq: (p: unknown) => unknown } };
+        return model.id.eq(param('userId'));
+      },
+      { id: 'user_1' },
+      { params: { userId: 'user_1' } },
+    );
+
+    const ast = plan as { ast: UpdateAst; params: unknown[] };
+    expect(ast.ast.set).toHaveProperty('id');
+    expect(ast.params).toContain('user_1');
   });
 });

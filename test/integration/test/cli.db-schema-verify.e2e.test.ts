@@ -33,7 +33,7 @@ function createTestContract(
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test',
+    storageHash: 'sha256:test',
     storage: {
       tables: Object.fromEntries(
         Object.entries(tables).map(([name, { columns, uniques = [] }]) => [

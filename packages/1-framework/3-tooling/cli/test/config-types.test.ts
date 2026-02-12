@@ -24,14 +24,14 @@ describe('defineConfig', () => {
         verify: async () => ({
           ok: true,
           summary: 'test',
-          contract: { coreHash: 'test' },
+          contract: { storageHash: 'test' },
           target: { expected: 'postgres' },
           timings: { total: 0 },
         }),
         schemaVerify: async () => ({
           ok: true,
           summary: 'test',
-          contract: { coreHash: 'test' },
+          contract: { storageHash: 'test' },
           target: { expected: 'postgres' },
           schema: {
             issues: [],
@@ -53,7 +53,7 @@ describe('defineConfig', () => {
         sign: async () => ({
           ok: true,
           summary: 'test',
-          contract: { coreHash: 'test' },
+          contract: { storageHash: 'test' },
           target: { expected: 'postgres' },
           marker: { created: true, updated: false },
           timings: { total: 0 },
@@ -63,7 +63,7 @@ describe('defineConfig', () => {
         emitContract: async () => ({
           contractJson: '{}',
           contractDts: '',
-          coreHash: 'test',
+          storageHash: 'test',
           profileHash: 'test',
         }),
       }),

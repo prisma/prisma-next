@@ -8,12 +8,12 @@ import type { MarkerReader, MarkerStatement, RuntimeFamilyAdapter } from '../src
 interface MockContract {
   readonly target: string;
   readonly targetFamily: string;
-  readonly coreHash: string;
+  readonly storageHash: string;
   readonly profileHash?: string;
 }
 
 class MockMarkerReader implements MarkerReader {
-  private marker: { coreHash: string; profileHash: string } | null = null;
+  private marker: { storageHash: string; profileHash: string } | null = null;
 
   readMarkerStatement(): MarkerStatement {
     return {
@@ -22,11 +22,11 @@ class MockMarkerReader implements MarkerReader {
     };
   }
 
-  setMarker(coreHash: string, profileHash: string): void {
-    this.marker = { coreHash, profileHash };
+  setMarker(storageHash: string, profileHash: string): void {
+    this.marker = { storageHash, profileHash };
   }
 
-  getMarker(): { coreHash: string; profileHash: string } | null {
+  getMarker(): { storageHash: string; profileHash: string } | null {
     return this.marker;
   }
 }
@@ -86,9 +86,9 @@ class MockFamilyAdapter implements RuntimeFamilyAdapter<MockContract> {
         `Plan target ${plan.meta.target} does not match contract target ${contract.target}`,
       );
     }
-    if (plan.meta.coreHash !== contract.coreHash) {
+    if (plan.meta.storageHash !== contract.storageHash) {
       throw new Error(
-        `Plan coreHash ${plan.meta.coreHash} does not match contract coreHash ${contract.coreHash}`,
+        `Plan storageHash ${plan.meta.storageHash} does not match contract storageHash ${contract.storageHash}`,
       );
     }
   }
@@ -99,7 +99,7 @@ describe('runtime-core with mock family', () => {
     const contract: MockContract = {
       target: 'mock',
       targetFamily: 'mock',
-      coreHash: 'sha256:test-core',
+      storageHash: 'sha256:test-core',
       profileHash: 'sha256:test-profile',
     };
 
@@ -120,7 +120,7 @@ describe('runtime-core with mock family', () => {
       params: [],
       meta: {
         target: 'mock',
-        coreHash: 'sha256:test-core',
+        storageHash: 'sha256:test-core',
         lane: 'raw-sql',
         paramDescriptors: [],
       },
@@ -141,7 +141,7 @@ describe('runtime-core with mock family', () => {
     const contract: MockContract = {
       target: 'mock',
       targetFamily: 'mock',
-      coreHash: 'sha256:test-core',
+      storageHash: 'sha256:test-core',
     };
 
     const markerReader = new MockMarkerReader();
@@ -161,7 +161,7 @@ describe('runtime-core with mock family', () => {
       params: [],
       meta: {
         target: 'other',
-        coreHash: 'sha256:other-core',
+        storageHash: 'sha256:other-core',
         lane: 'raw-sql',
         paramDescriptors: [],
       },
@@ -180,7 +180,7 @@ describe('runtime-core with mock family', () => {
     const contract: MockContract = {
       target: 'mock',
       targetFamily: 'mock',
-      coreHash: 'sha256:test-core',
+      storageHash: 'sha256:test-core',
     };
 
     const markerReader = new MockMarkerReader();
@@ -226,7 +226,7 @@ describe('runtime-core with mock family', () => {
       params: [],
       meta: {
         target: 'mock',
-        coreHash: 'sha256:test-core',
+        storageHash: 'sha256:test-core',
         lane: 'raw-sql',
         paramDescriptors: [],
       },
@@ -247,7 +247,7 @@ describe('runtime-core with mock family', () => {
     const contract: MockContract = {
       target: 'mock',
       targetFamily: 'mock',
-      coreHash: 'sha256:test-core',
+      storageHash: 'sha256:test-core',
     };
 
     const markerReader = new MockMarkerReader();
@@ -269,7 +269,7 @@ describe('runtime-core with mock family', () => {
     const contract: MockContract = {
       target: 'mock',
       targetFamily: 'mock',
-      coreHash: 'sha256:test-core',
+      storageHash: 'sha256:test-core',
     };
 
     const markerReader = new MockMarkerReader();

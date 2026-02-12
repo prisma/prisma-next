@@ -213,7 +213,7 @@ withTempDir(({ createTempDir }) => {
             ok: true,
             summary: expect.any(String),
             contract: {
-              coreHash: expect.any(String),
+              storageHash: expect.any(String),
             },
             marker: {
               created: true,

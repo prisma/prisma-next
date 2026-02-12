@@ -274,7 +274,7 @@ export interface DbInitSuccess {
     readonly operationsExecuted: number;
   };
   readonly marker?: {
-    readonly coreHash: string;
+    readonly storageHash: string;
     readonly profileHash?: string;
   };
   readonly summary: string;
@@ -295,11 +295,11 @@ export interface DbInitFailure {
   readonly conflicts: ReadonlyArray<MigrationPlannerConflict> | undefined;
   readonly meta: Record<string, unknown> | undefined;
   readonly marker?: {
-    readonly coreHash?: string;
+    readonly storageHash?: string;
     readonly profileHash?: string;
   };
   readonly destination?: {
-    readonly coreHash: string;
+    readonly storageHash: string;
     readonly profileHash?: string | undefined;
   };
 }
@@ -315,8 +315,10 @@ export type DbInitResult = Result<DbInitSuccess, DbInitFailure>;
  * Contains the hashes and paths of emitted files.
  */
 export interface EmitSuccess {
-  /** Core hash of the emitted contract */
-  readonly coreHash: string;
+  /** Storage hash of the emitted contract */
+  readonly storageHash: string;
+  /** Execution hash of the emitted contract (if execution section exists) */
+  readonly executionHash?: string;
   /** Profile hash of the emitted contract (target-specific) */
   readonly profileHash: string;
   /** The emitted contract as JSON string */
@@ -366,8 +368,10 @@ export interface ContractEmitOptions {
  * Result from the standalone executeContractEmit function.
  */
 export interface ContractEmitResult {
-  /** Hash of the core contract (schema-level) */
-  readonly coreHash: string;
+  /** Hash of the storage contract (schema-level) */
+  readonly storageHash: string;
+  /** Hash of the execution contract (if execution section exists) */
+  readonly executionHash?: string;
   /** Hash of the profile (target+extensions) */
   readonly profileHash: string;
   /** Paths to the emitted files */
@@ -425,7 +429,7 @@ export interface ControlClient {
 
   /**
    * Verifies database marker matches the contract.
-   * Compares coreHash and profileHash.
+   * Compares storageHash and profileHash.
    *
    * @returns Structured result (ok: false for mismatch, not throwing)
    * @throws If not connected or infrastructure failure

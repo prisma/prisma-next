@@ -13,6 +13,7 @@ import {
   varbitColumn,
   varcharColumn,
 } from '@prisma-next/adapter-postgres/column-types';
+import { uuidv7 } from '@prisma-next/ids';
 import postgresPack from '@prisma-next/target-postgres/pack';
 // Use relative import to avoid module resolution issues in test context
 import { defineContract } from '../../../../../packages/2-sql/2-authoring/contract-ts/src/exports/contract-builder';
@@ -85,6 +86,16 @@ export const contract = defineContract<CodecTypes>()
       .column('duration', { type: intervalColumn(6), nullable: true })
       .primaryKey(['id']),
   )
+  .table('event', (t) =>
+    t
+      .generated('id', uuidv7())
+      .column('name', { type: textColumn, nullable: false })
+      .column('created_at', {
+        type: timestamptzColumn,
+        default: { kind: 'function', expression: 'now()' },
+      })
+      .primaryKey(['id']),
+  )
   .model('User', 'user', (m) =>
     m
       .field('id', 'id')
@@ -107,6 +118,9 @@ export const contract = defineContract<CodecTypes>()
       .field('content', 'content')
       .field('createdAt', 'created_at')
       .field('updatedAt', 'update_at'),
+  )
+  .model('Event', 'event', (m) =>
+    m.field('id', 'id').field('name', 'name').field('createdAt', 'created_at'),
   )
   .capabilities({
     postgres: {

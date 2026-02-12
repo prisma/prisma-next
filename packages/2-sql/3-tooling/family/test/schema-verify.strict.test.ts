@@ -87,7 +87,7 @@ describe('verifySqlSchema - result structure', () => {
       frameworkComponents: [],
     });
 
-    expect(result.contract.coreHash).toBe('sha256:test');
+    expect(result.contract.storageHash).toBe('sha256:test');
     expect(result.target.expected).toBe('postgres');
   });
 
