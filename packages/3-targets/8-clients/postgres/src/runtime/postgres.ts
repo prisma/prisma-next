@@ -15,12 +15,7 @@ import {
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Pool } from 'pg';
 import { resolvePostgresBinding } from './binding';
-import type {
-  PostgresClient,
-  PostgresOptions,
-  PostgresOptionsWithContract,
-  PostgresOptionsWithContractJson,
-} from './types';
+import type { PostgresClient, PostgresOptions, PostgresOptionsWithContractJson } from './types';
 
 function hasContractJson<TContract extends SqlContract<SqlStorage>>(
   options: PostgresOptions<TContract>,
@@ -31,12 +26,14 @@ function hasContractJson<TContract extends SqlContract<SqlStorage>>(
 function resolveContract<TContract extends SqlContract<SqlStorage>>(
   options: PostgresOptions<TContract>,
 ): TContract {
-  if (hasContractJson(options)) {
-    return validateContract<TContract>(options.contractJson);
-  }
-  return (options as PostgresOptionsWithContract<TContract>).contract;
+  const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
+  return validateContract<TContract>(contractInput);
 }
 
+/**
+ * Creates a lazy Postgres client from either `contractJson` or a TypeScript-authored `contract`.
+ * Static query surfaces are available immediately, while `runtime()` instantiates the driver/pool on first call.
+ */
 export default function postgres<TContract extends SqlContract<SqlStorage>>(
   options: PostgresOptions<TContract>,
 ): PostgresClient<TContract> {
@@ -54,7 +51,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     stack,
   });
 
-  const schema = schemaBuilder(context);
+  const schema: PostgresClient<TContract>['schema'] = schemaBuilder(context);
   const sql = sqlBuilder({ context });
   const orm = ormBuilder({ context });
 
@@ -62,7 +59,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
 
   return {
     sql,
-    schema: schema as PostgresClient<TContract>['schema'],
+    schema,
     orm,
     context,
     stack,
@@ -79,7 +76,13 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
 
       const connect =
         binding.kind === 'url'
-          ? { pool: new Pool({ connectionString: binding.url }) }
+          ? {
+              pool: new Pool({
+                connectionString: binding.url,
+                connectionTimeoutMillis: 20_000,
+                idleTimeoutMillis: 30_000,
+              }),
+            }
           : binding.kind === 'pgPool'
             ? { pool: binding.pool }
             : { client: binding.client };

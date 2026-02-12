@@ -6,5 +6,4 @@ export type {
   PostgresOptionsBase,
   PostgresOptionsWithContract,
   PostgresOptionsWithContractJson,
-  PostgresTargetId,
 } from '../runtime/types';

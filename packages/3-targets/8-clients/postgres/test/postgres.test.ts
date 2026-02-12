@@ -61,6 +61,7 @@ vi.mock('pg', () => {
   return { Pool, Client };
 });
 
+import { Client, Pool } from 'pg';
 import postgres from '../src/runtime/postgres';
 
 const contract: SqlContract<SqlStorage> = {
@@ -148,8 +149,8 @@ describe('postgres', () => {
         contract,
         url: 'postgres://localhost:5432/db',
         binding: { kind: 'url', url: 'postgres://localhost:5432/db2' },
-      }),
-    ).toThrow('Provide only one binding input');
+      } as unknown as Parameters<typeof postgres<typeof contract>>[0]),
+    ).toThrow('Provide one binding input');
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();
@@ -159,10 +160,129 @@ describe('postgres', () => {
     expect(() =>
       postgres({
         contract,
-      }),
+      } as unknown as Parameters<typeof postgres<typeof contract>>[0]),
     ).toThrow('Provide one binding input');
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();
+  });
+
+  it('validates contractJson input', () => {
+    const contractJson = { models: {} };
+
+    postgres({
+      contractJson,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expect(mocks.validateContract).toHaveBeenCalledTimes(1);
+    expect(mocks.validateContract).toHaveBeenCalledWith(contractJson);
+  });
+
+  it('validates direct contract input', () => {
+    postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expect(mocks.validateContract).toHaveBeenCalledTimes(1);
+    expect(mocks.validateContract).toHaveBeenCalledWith(contract);
+  });
+
+  it('creates pool from url with explicit defaults', () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    db.runtime();
+
+    expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
+    expect(mocks.poolCtor).toHaveBeenCalledWith({
+      connectionString: 'postgres://localhost:5432/db',
+      connectionTimeoutMillis: 20_000,
+      idleTimeoutMillis: 30_000,
+    });
+  });
+
+  it('accepts postgresql url scheme', () => {
+    postgres({
+      contract,
+      url: 'postgresql://localhost:5432/db',
+    }).runtime();
+
+    expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws for empty url binding', () => {
+    expect(() =>
+      postgres({
+        contract,
+        url: '   ',
+      }),
+    ).toThrow('Postgres URL must be a non-empty string');
+  });
+
+  it('throws for invalid url scheme', () => {
+    expect(() =>
+      postgres({
+        contract,
+        url: 'mysql://localhost:5432/db',
+      }),
+    ).toThrow('Postgres URL must use postgres:// or postgresql://');
+  });
+
+  it('uses pg pool binding', () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const db = postgres({
+      contract,
+      pg: pool,
+    });
+
+    db.runtime();
+
+    expect(mocks.driverCreate).toHaveBeenCalledWith({
+      connect: { pool },
+      cursor: { disabled: true },
+    });
+  });
+
+  it('uses pg client binding', () => {
+    const client = new Client();
+    const db = postgres({
+      contract,
+      pg: client,
+    });
+
+    db.runtime();
+
+    expect(mocks.driverCreate).toHaveBeenCalledWith({
+      connect: { client },
+      cursor: { disabled: true },
+    });
+  });
+
+  it('uses explicit binding object', () => {
+    const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
+    const db = postgres({
+      contract,
+      binding: { kind: 'pgPool', pool },
+    });
+
+    db.runtime();
+
+    expect(mocks.driverCreate).toHaveBeenCalledWith({
+      connect: { pool },
+      cursor: { disabled: true },
+    });
+  });
+
+  it('throws when pg input is neither Pool nor Client', () => {
+    expect(() =>
+      postgres({
+        contract,
+        pg: { query: () => {} } as unknown as Client,
+      }),
+    ).toThrow('Unable to determine pg binding type from pg input');
   });
 });

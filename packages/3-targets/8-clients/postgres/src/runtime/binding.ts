@@ -1,54 +1,28 @@
 import type { Client, Pool } from 'pg';
 import { Client as PgClient, Pool as PgPool } from 'pg';
-import type { PostgresBinding, PostgresTargetId } from './types';
+import type { PostgresBinding, PostgresBindingInput } from './types';
 
-interface BindingInput {
-  readonly binding?: PostgresBinding;
-  readonly url?: string;
-  readonly pg?: Pool | Client;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isPool(binding: Pool | Client): binding is Pool {
-  return binding instanceof PgPool;
-}
-
-function isClient(binding: Pool | Client): binding is Client {
-  return binding instanceof PgClient;
-}
-
-function isPoolLike(binding: unknown): binding is Pool {
-  if (!isRecord(binding)) {
-    return false;
+function validatePostgresUrl(url: string): string {
+  const trimmed = url.trim();
+  if (trimmed.length === 0) {
+    throw new Error('Postgres URL must be a non-empty string');
   }
-  return (
-    typeof binding['connect'] === 'function' &&
-    typeof binding['query'] === 'function' &&
-    typeof binding['end'] === 'function' &&
-    typeof binding['totalCount'] === 'number' &&
-    typeof binding['idleCount'] === 'number' &&
-    typeof binding['waitingCount'] === 'number'
-  );
-}
 
-function isClientLike(binding: unknown): binding is Client {
-  if (!isRecord(binding)) {
-    return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error('Postgres URL must be a valid URL');
   }
-  return (
-    typeof binding['connect'] === 'function' &&
-    typeof binding['query'] === 'function' &&
-    typeof binding['end'] === 'function' &&
-    isRecord(binding['connectionParameters'])
-  );
+
+  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
+    throw new Error('Postgres URL must use postgres:// or postgresql://');
+  }
+
+  return trimmed;
 }
 
-function hasRuntimeBinding(options: BindingInput): boolean {
-  return options.binding !== undefined || options.url !== undefined || options.pg !== undefined;
-}
+type BindingInput = Partial<PostgresBindingInput>;
 
 export function resolvePostgresBinding(options: BindingInput): PostgresBinding {
   const providedCount =
@@ -56,43 +30,29 @@ export function resolvePostgresBinding(options: BindingInput): PostgresBinding {
     Number(options.url !== undefined) +
     Number(options.pg !== undefined);
 
-  if (providedCount > 1) {
-    throw new Error('Provide only one binding input: binding, url, or pg');
-  }
-
-  if (!hasRuntimeBinding(options)) {
+  if (providedCount !== 1) {
     throw new Error('Provide one binding input: binding, url, or pg');
   }
 
-  if (options.binding) {
+  if (options.binding !== undefined) {
     return options.binding;
   }
 
-  if (options.url) {
-    return { kind: 'url', url: options.url };
+  if (options.url !== undefined) {
+    return { kind: 'url', url: validatePostgresUrl(options.url) };
   }
 
-  if (!options.pg) {
-    throw new Error('Provide one binding input: binding, url, or pg');
+  const pgBinding = options.pg as Pool | Client;
+
+  if (pgBinding instanceof PgPool) {
+    return { kind: 'pgPool', pool: pgBinding };
   }
 
-  if (isPool(options.pg)) {
-    return { kind: 'pgPool', pool: options.pg };
+  if (pgBinding instanceof PgClient) {
+    return { kind: 'pgClient', client: pgBinding };
   }
 
-  if (isClient(options.pg)) {
-    return { kind: 'pgClient', client: options.pg };
-  }
-
-  if (isPoolLike(options.pg)) {
-    return { kind: 'pgPool', pool: options.pg };
-  }
-
-  if (isClientLike(options.pg)) {
-    return { kind: 'pgClient', client: options.pg };
-  }
-
-  throw new Error('Unable to determine pg binding type; use explicit binding.kind');
+  throw new Error(
+    'Unable to determine pg binding type from pg input; use binding with explicit kind',
+  );
 }
-
-export type { PostgresTargetId };
