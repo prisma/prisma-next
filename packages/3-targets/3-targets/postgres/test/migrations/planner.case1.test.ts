@@ -177,7 +177,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:contract' as never,
+      storageHash: coreHash('sha256:contract'),
       profileHash: 'sha256:profile' as never,
       storage: {
         tables: {

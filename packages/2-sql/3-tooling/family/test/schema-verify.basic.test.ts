@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
@@ -44,7 +45,7 @@ describe('verifySqlSchema - basic', () => {
         schemaVersion: '1',
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test' as never,
+        storageHash: coreHash('sha256:test'),
         storage: {
           tables: {
             user: {
@@ -105,7 +106,7 @@ describe('verifySqlSchema - basic', () => {
         schemaVersion: '1',
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test' as never,
+        storageHash: coreHash('sha256:test'),
         storage: {
           tables: {
             user: {

@@ -138,29 +138,6 @@ export type Contract = SqlContract<
         indexes: readonly [];
         foreignKeys: readonly [];
       };
-      readonly event: {
-        columns: {
-          readonly id: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly name: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly created_at: {
-            readonly nativeType: 'timestamptz';
-            readonly codecId: 'pg/timestamptz@1';
-            readonly nullable: false;
-          };
-        };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
-      };
       readonly param_types: {
         columns: {
           readonly id: {
@@ -212,6 +189,29 @@ export type Contract = SqlContract<
             readonly nativeType: 'interval';
             readonly codecId: 'pg/interval@1';
             readonly nullable: true;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
+      };
+      readonly event: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly name: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly created_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
