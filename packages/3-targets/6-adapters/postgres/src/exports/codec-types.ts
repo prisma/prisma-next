@@ -26,14 +26,16 @@ type StandardSchemaLike = {
   };
 };
 
-type ResolveStandardSchemaOutput<P> = P extends {
-  readonly schema: {
-    readonly '~standard': { readonly types?: { readonly output?: infer Output } };
-  };
-}
-  ? Output extends undefined
-    ? JsonValue
-    : Output
+type ResolveStandardSchemaOutput<P> = P extends { readonly schema: infer Schema }
+  ? Schema extends { readonly infer: infer Output }
+    ? Output
+    : Schema extends {
+          readonly '~standard': { readonly types?: { readonly output?: infer Output } };
+        }
+      ? Output extends undefined
+        ? JsonValue
+        : Output
+      : JsonValue
   : JsonValue;
 
 export type CodecTypes = CoreCodecTypes & {

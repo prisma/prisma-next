@@ -2,6 +2,7 @@ import type {
   Adapter,
   AdapterProfile,
   BinaryExpr,
+  CodecParamsDescriptor,
   ColumnRef,
   DeleteAst,
   IncludeRef,
@@ -18,6 +19,7 @@ import type {
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
 import { codecDefinitions } from './codecs';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
@@ -55,6 +57,22 @@ const defaultCapabilities = Object.freeze({
   },
 });
 
+type AdapterCodec = (typeof codecDefinitions)[keyof typeof codecDefinitions]['codec'];
+type ParameterizedCodec = AdapterCodec & {
+  readonly paramsSchema: NonNullable<AdapterCodec['paramsSchema']>;
+};
+
+const parameterizedCodecs: ReadonlyArray<CodecParamsDescriptor> = Object.values(codecDefinitions)
+  .map((definition) => definition.codec)
+  .filter((codec): codec is ParameterizedCodec => codec.paramsSchema !== undefined)
+  .map((codec) =>
+    Object.freeze({
+      codecId: codec.id,
+      paramsSchema: codec.paramsSchema,
+      ...ifDefined('init', codec.init),
+    }),
+  );
+
 class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, PostgresLoweredStatement> {
   // These fields make the adapter instance structurally compatible with
   // RuntimeAdapterInstance<'sql', 'postgres'> without introducing a runtime-plane dependency.
@@ -77,6 +95,10 @@ class PostgresAdapterImpl implements Adapter<QueryAst, PostgresContract, Postgre
       capabilities: defaultCapabilities,
       codecs: () => this.codecRegistry,
     });
+  }
+
+  parameterizedCodecs(): ReadonlyArray<CodecParamsDescriptor> {
+    return parameterizedCodecs;
   }
 
   lower(ast: QueryAst, context: LowererContext<PostgresContract>) {

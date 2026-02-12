@@ -17,10 +17,10 @@ type LengthTypeHelper = {
 
 function createLengthTypeHelper(
   kind: LengthTypeHelper['kind'],
-): (params: { length: number }) => LengthTypeHelper {
+): (params: Record<string, unknown>) => LengthTypeHelper {
   return (params) => ({
     kind,
-    maxLength: params.length,
+    maxLength: params['length'] as number,
   });
 }
 

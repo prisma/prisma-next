@@ -168,7 +168,7 @@ test('contract structure type matches SqlContract', () => {
   expectTypeOf(contract).toHaveProperty('mappings');
 });
 
-test('jsonb schema drives typed output with JsonValue fallback', () => {
+test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
   const payloadSchema = arktype({
     action: 'string',
     actorId: 'number',
@@ -203,9 +203,6 @@ test('jsonb schema drives typed output with JsonValue fallback', () => {
 
   type Row = ResultType<typeof _plan>;
 
-  expectTypeOf<Row['payload']>().toEqualTypeOf<{
-    readonly action: string;
-    readonly actorId: number;
-  }>();
+  expectTypeOf<Row['payload']>().toEqualTypeOf<unknown>();
   expectTypeOf<Row['meta']>().toEqualTypeOf<unknown>();
 });

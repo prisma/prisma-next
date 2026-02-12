@@ -3,6 +3,16 @@
 // To regenerate, run: prisma-next contract emit
 import type { CodecTypes as PgTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { JsonValue } from '@prisma-next/adapter-postgres/codec-types';
+import type { Char } from '@prisma-next/adapter-postgres/codec-types';
+import type { Varchar } from '@prisma-next/adapter-postgres/codec-types';
+import type { Numeric } from '@prisma-next/adapter-postgres/codec-types';
+import type { Bit } from '@prisma-next/adapter-postgres/codec-types';
+import type { VarBit } from '@prisma-next/adapter-postgres/codec-types';
+import type { Timestamp } from '@prisma-next/adapter-postgres/codec-types';
+import type { Timestamptz } from '@prisma-next/adapter-postgres/codec-types';
+import type { Time } from '@prisma-next/adapter-postgres/codec-types';
+import type { Timetz } from '@prisma-next/adapter-postgres/codec-types';
+import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
 
 import type { CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
 import type {
@@ -32,8 +42,8 @@ export type Contract = SqlContract<
             readonly nullable: false;
           };
           readonly email: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
+            readonly nativeType: 'character varying';
+            readonly codecId: 'sql/varchar@1';
             readonly nullable: false;
           };
           readonly created_at: {
@@ -133,6 +143,64 @@ export type Contract = SqlContract<
         indexes: readonly [];
         foreignKeys: readonly [];
       };
+      readonly param_types: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+          };
+          readonly name: {
+            readonly nativeType: 'character varying';
+            readonly codecId: 'sql/varchar@1';
+            readonly nullable: true;
+          };
+          readonly code: {
+            readonly nativeType: 'character';
+            readonly codecId: 'sql/char@1';
+            readonly nullable: true;
+          };
+          readonly price: {
+            readonly nativeType: 'numeric';
+            readonly codecId: 'pg/numeric@1';
+            readonly nullable: true;
+          };
+          readonly flags: {
+            readonly nativeType: 'bit';
+            readonly codecId: 'pg/bit@1';
+            readonly nullable: true;
+          };
+          readonly bits: {
+            readonly nativeType: 'bit varying';
+            readonly codecId: 'pg/varbit@1';
+            readonly nullable: true;
+          };
+          readonly created_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: true;
+          };
+          readonly starts_at: {
+            readonly nativeType: 'time';
+            readonly codecId: 'pg/time@1';
+            readonly nullable: true;
+          };
+          readonly starts_at_tz: {
+            readonly nativeType: 'timetz';
+            readonly codecId: 'pg/timetz@1';
+            readonly nullable: true;
+          };
+          readonly duration: {
+            readonly nativeType: 'interval';
+            readonly codecId: 'pg/interval@1';
+            readonly nullable: true;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
+      };
     };
     readonly types: Record<string, never>;
   },
@@ -141,7 +209,7 @@ export type Contract = SqlContract<
       storage: { readonly table: 'user' };
       fields: {
         readonly id: CodecTypes['pg/int4@1']['output'];
-        readonly email: CodecTypes['pg/text@1']['output'];
+        readonly email: Varchar<255>;
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
         readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
         readonly profile: { active: boolean; displayName: string; tags: string[] } | null;

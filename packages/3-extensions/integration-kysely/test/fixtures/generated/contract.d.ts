@@ -3,6 +3,16 @@
 // To regenerate, run: prisma-next contract emit
 import type { CodecTypes as PgTypes } from '@prisma-next/adapter-postgres/codec-types';
 import type { JsonValue } from '@prisma-next/adapter-postgres/codec-types';
+import type { Char } from '@prisma-next/adapter-postgres/codec-types';
+import type { Varchar } from '@prisma-next/adapter-postgres/codec-types';
+import type { Numeric } from '@prisma-next/adapter-postgres/codec-types';
+import type { Bit } from '@prisma-next/adapter-postgres/codec-types';
+import type { VarBit } from '@prisma-next/adapter-postgres/codec-types';
+import type { Timestamp } from '@prisma-next/adapter-postgres/codec-types';
+import type { Timestamptz } from '@prisma-next/adapter-postgres/codec-types';
+import type { Time } from '@prisma-next/adapter-postgres/codec-types';
+import type { Timetz } from '@prisma-next/adapter-postgres/codec-types';
+import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
 import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
 import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';

@@ -98,7 +98,11 @@ flowchart TD
 **Codecs (`codecs.ts`)**
 - PostgreSQL codec definitions
 - Type conversion between wire format and JavaScript
+- SQL base codecs: `sql/char`, `sql/varchar`, `sql/int`, `sql/float`
+- PostgreSQL aliases for base codecs: `pg/char`, `pg/varchar`, `pg/int`, `pg/float`
+- Supports PostgreSQL types: `int2`, `int4`, `int8`, `float4`, `float8`, `text`, `bool`, `enum`
 - Supports PostgreSQL types: `int2`, `int4`, `int8`, `float4`, `float8`, `text`, `timestamp`, `timestamptz`, `bool`, `enum`, `json`, `jsonb`
+- Parameterized types: `character(n)`, `character varying(n)`, `numeric(p,s)`, `bit(n)`, `bit varying(n)`, `timestamp(p)`, `timestamptz(p)`, `time(p)`, `timetz(p)`, `interval(p)`
 
 **Types (`types.ts`)**
 - PostgreSQL-specific types and utilities
@@ -125,6 +129,8 @@ flowchart TD
 
 **Column Types Export (`column-types.ts`)**
 - Exports column descriptors for built-in types and enum helpers (`enumType`, `enumColumn(typeRef, nativeType)`)
+- Parameterized helpers: `charColumn(length)`, `varcharColumn(length)`, `numericColumn(precision, scale?)`, `bitColumn(length)`, `varbitColumn(length)`, `timeColumn(precision?)`, `timetzColumn(precision?)`, `intervalColumn(precision?)`
+
 - Exports JSON helpers:
   - `jsonColumn`, `jsonbColumn`
   - `json(schema?)`, `jsonb(schema?)` where `schema` is a Standard Schema value (e.g., Arktype)
