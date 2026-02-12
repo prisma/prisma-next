@@ -2,6 +2,7 @@
   "name": "@prisma-next/sql-contract",
   "version": "0.0.1",
   "type": "module",
+  "plane": "shared",
   "sideEffects": false,
   "description": "SQL contract types, validators, and IR factories for Prisma Next",
   "scripts": {

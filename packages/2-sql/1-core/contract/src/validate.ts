@@ -1,10 +1,16 @@
 import type { ModelDefinition, SqlContract, SqlMappings, SqlStorage } from './types';
 import { validateSqlContract } from './validators';
 
-function computeMappings(
-  models: Record<string, ModelDefinition>,
-  existingMappings?: Partial<SqlMappings>,
-): SqlMappings {
+type ResolvedMappings = {
+  modelToTable: Record<string, string>;
+  tableToModel: Record<string, string>;
+  fieldToColumn: Record<string, Record<string, string>>;
+  columnToField: Record<string, Record<string, string>>;
+  codecTypes: Record<string, { readonly output: unknown }>;
+  operationTypes: Record<string, Record<string, unknown>>;
+};
+
+function computeDefaultMappings(models: Record<string, ModelDefinition>): ResolvedMappings {
   const modelToTable: Record<string, string> = {};
   const tableToModel: Record<string, string> = {};
   const fieldToColumn: Record<string, Record<string, string>> = {};
@@ -29,12 +35,129 @@ function computeMappings(
   }
 
   return {
-    modelToTable: existingMappings?.modelToTable ?? modelToTable,
-    tableToModel: existingMappings?.tableToModel ?? tableToModel,
-    fieldToColumn: existingMappings?.fieldToColumn ?? fieldToColumn,
-    columnToField: existingMappings?.columnToField ?? columnToField,
-    codecTypes: existingMappings?.codecTypes ?? {},
-    operationTypes: existingMappings?.operationTypes ?? {},
+    modelToTable,
+    tableToModel,
+    fieldToColumn,
+    columnToField,
+    codecTypes: {},
+    operationTypes: {},
+  };
+}
+
+function assertInverseModelMappings(
+  modelToTable: Record<string, string>,
+  tableToModel: Record<string, string>,
+) {
+  for (const [model, table] of Object.entries(modelToTable)) {
+    if (tableToModel[table] !== model) {
+      throw new Error(
+        `Mappings override mismatch: modelToTable.${model}="${table}" is not mirrored in tableToModel`,
+      );
+    }
+  }
+  for (const [table, model] of Object.entries(tableToModel)) {
+    if (modelToTable[model] !== table) {
+      throw new Error(
+        `Mappings override mismatch: tableToModel.${table}="${model}" is not mirrored in modelToTable`,
+      );
+    }
+  }
+}
+
+function assertInverseFieldMappings(
+  fieldToColumn: Record<string, Record<string, string>>,
+  columnToField: Record<string, Record<string, string>>,
+  modelToTable: Record<string, string>,
+  tableToModel: Record<string, string>,
+) {
+  for (const [model, fields] of Object.entries(fieldToColumn)) {
+    const table = modelToTable[model];
+    if (!table) {
+      throw new Error(
+        `Mappings override mismatch: fieldToColumn references unknown model "${model}"`,
+      );
+    }
+    const reverseFields = columnToField[table];
+    if (!reverseFields) {
+      throw new Error(
+        `Mappings override mismatch: columnToField is missing table "${table}" for model "${model}"`,
+      );
+    }
+    for (const [field, column] of Object.entries(fields)) {
+      if (reverseFields[column] !== field) {
+        throw new Error(
+          `Mappings override mismatch: fieldToColumn.${model}.${field}="${column}" is not mirrored in columnToField.${table}`,
+        );
+      }
+    }
+  }
+
+  for (const [table, columns] of Object.entries(columnToField)) {
+    const model = tableToModel[table];
+    if (!model) {
+      throw new Error(
+        `Mappings override mismatch: columnToField references unknown table "${table}"`,
+      );
+    }
+    const forwardFields = fieldToColumn[model];
+    if (!forwardFields) {
+      throw new Error(
+        `Mappings override mismatch: fieldToColumn is missing model "${model}" for table "${table}"`,
+      );
+    }
+    for (const [column, field] of Object.entries(columns)) {
+      if (forwardFields[field] !== column) {
+        throw new Error(
+          `Mappings override mismatch: columnToField.${table}.${column}="${field}" is not mirrored in fieldToColumn.${model}`,
+        );
+      }
+    }
+  }
+}
+
+function mergeMappings(
+  defaults: ResolvedMappings,
+  existingMappings?: Partial<SqlMappings>,
+): ResolvedMappings {
+  const hasModelToTable = existingMappings?.modelToTable !== undefined;
+  const hasTableToModel = existingMappings?.tableToModel !== undefined;
+  if (hasModelToTable !== hasTableToModel) {
+    throw new Error(
+      'Mappings override mismatch: modelToTable and tableToModel must be provided together',
+    );
+  }
+
+  const hasFieldToColumn = existingMappings?.fieldToColumn !== undefined;
+  const hasColumnToField = existingMappings?.columnToField !== undefined;
+  if (hasFieldToColumn !== hasColumnToField) {
+    throw new Error(
+      'Mappings override mismatch: fieldToColumn and columnToField must be provided together',
+    );
+  }
+
+  const modelToTable: Record<string, string> = hasModelToTable
+    ? (existingMappings?.modelToTable ?? {})
+    : defaults.modelToTable;
+  const tableToModel: Record<string, string> = hasTableToModel
+    ? (existingMappings?.tableToModel ?? {})
+    : defaults.tableToModel;
+  assertInverseModelMappings(modelToTable, tableToModel);
+
+  const fieldToColumn: Record<string, Record<string, string>> = hasFieldToColumn
+    ? (existingMappings?.fieldToColumn ?? {})
+    : defaults.fieldToColumn;
+  const columnToField: Record<string, Record<string, string>> = hasColumnToField
+    ? (existingMappings?.columnToField ?? {})
+    : defaults.columnToField;
+  assertInverseFieldMappings(fieldToColumn, columnToField, modelToTable, tableToModel);
+
+  return {
+    modelToTable,
+    tableToModel,
+    fieldToColumn,
+    columnToField,
+    codecTypes: { ...defaults.codecTypes, ...(existingMappings?.codecTypes ?? {}) },
+    operationTypes: { ...defaults.operationTypes, ...(existingMappings?.operationTypes ?? {}) },
   };
 }
 
@@ -189,10 +312,10 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
   validateContractLogic(structurallyValid);
 
   const existingMappings = (structurallyValid as { mappings?: Partial<SqlMappings> }).mappings;
-  const mappings = computeMappings(
+  const defaultMappings = computeDefaultMappings(
     structurallyValid.models as Record<string, ModelDefinition>,
-    existingMappings,
   );
+  const mappings = mergeMappings(defaultMappings, existingMappings);
 
   return {
     ...structurallyValid,

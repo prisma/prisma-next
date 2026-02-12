@@ -48,10 +48,12 @@ describe('validateContract', () => {
   it('validates and computes mappings', () => {
     const result = validateContract<SqlContract<SqlStorage>>(baseContract);
 
-    expect(result.mappings.modelToTable.User).toBe('User');
-    expect(result.mappings.tableToModel.User).toBe('User');
-    expect(result.mappings.fieldToColumn.User?.id).toBe('id');
-    expect(result.mappings.columnToField.User?.email).toBe('email');
+    expect(result.mappings).toMatchObject({
+      modelToTable: { User: 'User' },
+      tableToModel: { User: 'User' },
+      fieldToColumn: { User: { id: 'id' } },
+      columnToField: { User: { email: 'email' } },
+    });
   });
 
   it('throws for invalid foreign key references', () => {
@@ -122,12 +124,62 @@ describe('validateContract', () => {
     };
 
     const result = validateContract<SqlContract<SqlStorage>>(contract);
-    expect(result.mappings.modelToTable.User).toBe('CustomUser');
-    expect(result.mappings.tableToModel.CustomUser).toBe('User');
-    expect(result.mappings.fieldToColumn.User?.id).toBe('identifier');
-    expect(result.mappings.columnToField.CustomUser?.identifier).toBe('id');
+    expect(result.mappings).toMatchObject({
+      modelToTable: { User: 'CustomUser' },
+      tableToModel: { CustomUser: 'User' },
+      fieldToColumn: { User: { id: 'identifier' } },
+      columnToField: { CustomUser: { identifier: 'id' } },
+    });
     expect(result.mappings.codecTypes.custom).toBeDefined();
     expect(result.mappings.operationTypes.customOp).toBeDefined();
+  });
+
+  it('throws when only one side of model/table override is provided', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      modelToTable: { User: 'CustomUser' },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /modelToTable and tableToModel must be provided together/,
+    );
+  });
+
+  it('throws when model/table overrides are not inverse', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      modelToTable: { User: 'CustomUser' },
+      tableToModel: { WrongTable: 'User' },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /Mappings override mismatch/,
+    );
+  });
+
+  it('throws when only one side of field/column override is provided', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      fieldToColumn: { User: { id: 'identifier' } },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /fieldToColumn and columnToField must be provided together/,
+    );
+  });
+
+  it('throws when field/column overrides are not inverse', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      modelToTable: { User: 'CustomUser' },
+      tableToModel: { CustomUser: 'User' },
+      fieldToColumn: { User: { id: 'identifier' } },
+      columnToField: { CustomUser: { wrong: 'id' } },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /Mappings override mismatch/,
+    );
   });
 
   it('throws when primary key references missing column', () => {

@@ -69,6 +69,11 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 const contract = validateContract<Contract>(contractJson);
 ```
 
+Mapping overrides in `contract.mappings` follow strict pair semantics:
+- `modelToTable` and `tableToModel` must either both be omitted (auto-computed) or both be provided as inverse maps.
+- `fieldToColumn` and `columnToField` must either both be omitted (auto-computed) or both be provided as inverse maps.
+- `codecTypes` and `operationTypes` are merged additively on top of defaults.
+
 ### Factories
 
 Use factory functions to construct contract IR structures in tests:
