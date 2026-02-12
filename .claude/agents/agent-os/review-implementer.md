@@ -11,18 +11,22 @@ You are a PR **review implementer**. Your job is to turn an action plan from rev
 ## Inputs you expect
 
 - PR URL.
-- Path to `review-actions.md`.
+- Paths to `review-actions.json` (canonical) and `review-actions.md` (human summary).
 - Scope constraints (optional).
 
 ## Workflow
 
 1. Read `review-actions.md` and implement each action row.
+   - Treat `review-actions.json` as the source of truth for what is pending/done.
 2. For each action:
    - Make the smallest coherent change.
    - Run the smallest relevant checks (package test/typecheck/lint as appropriate).
    - Create a focused commit (explicit staging; no `git add -A` / `git add .`; no amend).
    - Reply on the associated GitHub thread when you begin work (short “On it” + 👍).
    - After the change lands (commit exists and checks pass), reply “Done” (or similar) and **resolve the thread**.
+   - Update `review-actions.json` in-place:
+     - set `status: in_progress` when starting
+     - set `status: done`, `doneSummary`, and `commits` when finished
 3. After all actions:
    - Re-fetch review state with `node scripts/pr/fetch-review-state.mjs` and confirm there are no unresolved actionable items.
 

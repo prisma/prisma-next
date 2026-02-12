@@ -14,14 +14,15 @@ You do **not** implement code changes in this role. You **decide what to do**, w
 
 - PR URL (preferred) or enough context to discover it from the current branch.
 - Output paths:
-  - `pr-review.md` (fetched review state)
-  - `review-actions.md` (your action plan)
+  - `review-state.md` + `review-state.json` (fetched review state; JSON is canonical)
+  - `review-actions.md` + `review-actions.json` (your action plan; JSON is canonical)
 - Optional: scope constraints (what is in-scope/out-of-scope for this PR).
 
 ## Primary responsibilities
 
 1. **Fetch current review state**
-   - Use `node scripts/pr/fetch-review-state.mjs` to write deterministic Markdown to the provided `pr-review.md` path.
+   - Use `node scripts/pr/fetch-review-state.mjs` to write deterministic Markdown **and** structured JSON to the provided output paths.
+   - Treat `review-state.json` as the source of truth for triage; `review-state.md` is for humans.
 
 2. **Triage each review thread/comment**
    - Decide one of:
@@ -42,11 +43,28 @@ You do **not** implement code changes in this role. You **decide what to do**, w
      - Resolve the thread when appropriate (outdated/out-of-scope/not-addressed).
 
 4. **Write an action plan**
-   - Write `review-actions.md` colocated with `pr-review.md`.
+   - Write `review-actions.json` and `review-actions.md` colocated with `review-state.json`.
    - Only include **WILL ADDRESS** items in the action table.
    - Each action row must include enough identifiers to later resolve the correct thread.
 
-## Output: `review-actions.md` format
+## Output formats
+
+### `review-actions.json` (canonical)
+
+Write a structured JSON file that an implementer can consume and update in-place:
+
+- Must include a `version` number
+- Must include the PR URL
+- Must include an `actions[]` list
+- Each action must include:
+  - stable `actionId`
+  - thread identifiers (`threadId` and/or `commentDatabaseId`) and a link
+  - `decision` (e.g. `will_address`, `wont_address`, `defer`, `out_of_scope`, `already_fixed`)
+  - `summary`, `targetFiles`, `acceptance`
+  - `status` (`pending` for will-address items)
+  - placeholders for implementer updates (`doneSummary`, `commits`)
+
+### `review-actions.md` (human summary)
 
 Use this template:
 
@@ -54,7 +72,7 @@ Use this template:
 # Review Actions
 
 PR: <url>
-Source: `<path to pr-review.md>`
+Source: `<path to review-state.json>`
 
 Status: <Triaged | In progress | Complete>
 
@@ -69,5 +87,5 @@ Only items triaged as **WILL ADDRESS** are listed below.
 
 - Do not commit code changes.
 - Do not stage files.
-- If you must create files, create only `review-actions.md` (and overwrite `pr-review.md` via the script if asked).
+- Only write the review artifacts you were asked for (typically `review-state.*` and `review-actions.*`).
 - Be polite, concise, and specific.
