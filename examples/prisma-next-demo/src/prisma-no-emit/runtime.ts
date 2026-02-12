@@ -1,7 +1,7 @@
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { budgets, createRuntime, type Plugin, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
-import { context, executionStack } from './context';
+import { context, stack } from './context';
 
 export function getRuntime(
   databaseUrl: string,
@@ -17,8 +17,8 @@ export function getRuntime(
   const pool = new Pool({ connectionString: databaseUrl });
 
   // Avoid import-time instantiation: instantiate when runtime is requested.
-  const stackInstance = instantiateExecutionStack(executionStack);
-  const driverDescriptor = executionStack.driver;
+  const stackInstance = instantiateExecutionStack(stack);
+  const driverDescriptor = stack.driver;
   if (!driverDescriptor) {
     throw new Error('Driver descriptor missing from execution stack');
   }

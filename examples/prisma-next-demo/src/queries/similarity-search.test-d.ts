@@ -7,19 +7,30 @@ import type {
 import { expectTypeOf, test } from 'vitest';
 import { db } from '../prisma/db';
 
+type VectorDistanceExpression = AnyExpressionSource & {
+  asc(): AnyOrderBuilder;
+};
+
+type VectorOpsColumn = {
+  cosineDistance(arg: unknown): VectorDistanceExpression;
+};
+
+function hasVectorOpsColumn(value: unknown): value is VectorOpsColumn {
+  return typeof value === 'object' && value !== null && 'cosineDistance' in value;
+}
+
 /**
  * Type test to verify ResultType shape for similarity queries.
  */
 test('ResultType exposes projected keys for similarity query result', () => {
-  const postTable = db.schema.tables['post'];
+  const postTable = db.schema.tables.post;
   if (!postTable) throw new Error('post table not found');
   const postColumns = postTable.columns;
-  const cosineDistance = (
-    postColumns['embedding'] as unknown as { cosineDistance: (arg: unknown) => unknown }
-  ).cosineDistance;
-  const distanceExpr = cosineDistance(param('queryVector')) as AnyExpressionSource & {
-    asc(): AnyOrderBuilder;
-  };
+  const embeddingColumn = postColumns.embedding;
+  if (!hasVectorOpsColumn(embeddingColumn)) {
+    throw new Error('embedding column does not expose vector operations');
+  }
+  const distanceExpr = embeddingColumn.cosineDistance(param('queryVector'));
 
   const _plan = db.sql
     .from(postTable)
@@ -33,5 +44,9 @@ test('ResultType exposes projected keys for similarity query result', () => {
     .build({ params: { queryVector: [1, 2, 3] } });
 
   type Row = ResultType<typeof _plan>;
-  expectTypeOf({} as Row).toBeObject();
+  expectTypeOf<Row>().toExtend<{
+    id: unknown;
+    title: unknown;
+    distance: unknown;
+  }>();
 });

@@ -39,7 +39,6 @@ Key constraints:
 ### Related work / dependencies
 
 - [TML-1837](https://linear.app/prisma-company/issue/TML-1837/runtime-dx-decouple-runtime-driver-instantiation-from-connection) — decouple driver instantiation from connection binding (the helper must remain compatible with this direction)
-- TODO: Link any relevant existing spec(s)
 
 ### Requirements discussion
 

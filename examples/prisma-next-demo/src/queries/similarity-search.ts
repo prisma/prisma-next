@@ -4,22 +4,33 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 import { collect } from './utils';
 
+type VectorDistanceExpression = AnyExpressionSource & {
+  asc(): AnyOrderBuilder;
+};
+
+type VectorOpsColumn = {
+  cosineDistance(arg: unknown): VectorDistanceExpression;
+};
+
+function hasVectorOpsColumn(value: unknown): value is VectorOpsColumn {
+  return typeof value === 'object' && value !== null && 'cosineDistance' in value;
+}
+
 /**
  * Search for posts by cosine distance to a query vector.
  * Returns the top N posts ordered by similarity (closest first).
  */
 export async function similaritySearch(queryVector: number[], runtime: Runtime, limit = 10) {
-  const postTable = db.schema.tables['post'];
+  const postTable = db.schema.tables.post;
   if (!postTable) {
     throw new Error('post table not found');
   }
   const postColumns = postTable.columns;
-  const cosineDistance = (
-    postColumns['embedding'] as unknown as { cosineDistance: (arg: unknown) => unknown }
-  ).cosineDistance;
-  const distanceExpr = cosineDistance(param('queryVector')) as AnyExpressionSource & {
-    asc(): AnyOrderBuilder;
-  };
+  const embeddingColumn = postColumns.embedding;
+  if (!hasVectorOpsColumn(embeddingColumn)) {
+    throw new Error('embedding column does not expose vector operations');
+  }
+  const distanceExpr = embeddingColumn.cosineDistance(param('queryVector'));
 
   const plan = db.sql
     .from(postTable)

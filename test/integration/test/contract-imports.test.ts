@@ -161,7 +161,7 @@ describe('contract.d.ts imports resolution', () => {
       expect(contractDtsContent).not.toContain("from './contract-types'");
 
       // Create a test TypeScript file that imports the generated contract.d.ts
-      const testFileContent = `import type { Contract, CodecTypes } from './contract.d.ts';
+      const testFileContent = `import type { Contract, CodecTypes } from './contract';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 
 // Verify we can use the Contract type
@@ -188,8 +188,8 @@ type UserIdColumn = UserColumns['id'];
       const tsconfigContent = JSON.stringify({
         compilerOptions: {
           target: 'ES2022',
-          module: 'nodenext',
-          moduleResolution: 'nodenext',
+          module: 'esnext',
+          moduleResolution: 'bundler',
           strict: true,
           esModuleInterop: true,
           skipLibCheck: true,
@@ -287,7 +287,7 @@ type UserIdColumn = UserColumns['id'];
       expect(contractDtsContent).toContain("from '@prisma-next/adapter-postgres/codec-types'");
 
       // Create a comprehensive test file that uses all exported types
-      const testFileContent = `import type { Contract, CodecTypes, Tables, Models, Relations } from './contract.d.ts';
+      const testFileContent = `import type { Contract, CodecTypes, Tables, Models, Relations } from './contract';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import contractJson from './contract.json' with { type: 'json' };
 
@@ -321,8 +321,8 @@ type CodecIntType = CodecTypes['pg/int4@1'];
       const tsconfigContent = JSON.stringify({
         compilerOptions: {
           target: 'ES2022',
-          module: 'nodenext',
-          moduleResolution: 'nodenext',
+          module: 'esnext',
+          moduleResolution: 'bundler',
           strict: true,
           esModuleInterop: true,
           skipLibCheck: true,
