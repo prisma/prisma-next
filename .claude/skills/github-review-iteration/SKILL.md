@@ -24,13 +24,15 @@ This skill supports subcommands:
 - `iterate`: loop `triage` → `implement` until clear (default)
 
 ```
-/github-review-iteration iterate <PR_URL> <output-dir>
+/github-review-iteration iterate <PR_URL> [output-dir]
 ```
+
+When `output-dir` is omitted, use the standard layout: `agent-os/specs/review-framework/reviews/<owner>_<repo>_pr-<number>/` (derived from PR URL).
 
 Example:
 
 ```
-/github-review-iteration iterate https://github.com/OWNER/REPO/pull/123 agent-os/specs/2026-02-10-postgres-one-liner-lazy-client/reviews/
+/github-review-iteration iterate https://github.com/OWNER/REPO/pull/123
 ```
 
 ## Files written (deterministic layout)

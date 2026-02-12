@@ -1,12 +1,12 @@
 task_groups:
-  - name: "Canonical artifacts (v1) + normalization utilities"
+  - name: Canonical artifacts (v1) + normalization utilities
     claude_code_subagent: backend-specialist
     standards:
       - global/*
       - typescript/*
       - testing/test-writing.md
       - backend/queries.md
-  - name: "Deterministic renders + summaries (no network)"
+  - name: Deterministic renders + summaries (no network)
     claude_code_subagent: backend-specialist
     standards:
       - global/*
@@ -19,18 +19,18 @@ task_groups:
       - typescript/*
       - testing/test-writing.md
       - global/error-handling.md
-  - name: "Update Agent OS orchestration (triage/implement loop)"
+  - name: Update Agent OS orchestration (triage/implement loop)
     claude_code_subagent: workflow-orchestrator
     standards:
       - global/*
       - global/documentation.md
-  - name: "Documentation + rule alignment for the framework and Cursor sandbox constraints"
+  - name: Documentation + rule alignment for the framework and Cursor sandbox constraints
     claude_code_subagent: docs-specialist
     standards:
       - global/documentation.md
       - global/conventions.md
       - global/coding-style.md
-  - name: "Test coverage + integration checks for determinism and layering"
+  - name: Test coverage + integration checks for determinism and layering
     claude_code_subagent: qa-engineer
     standards:
       - testing/test-writing.md
