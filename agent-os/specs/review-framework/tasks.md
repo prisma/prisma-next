@@ -67,28 +67,28 @@ Key constraints (from spec):
 #### Task Group 2: Deterministic renders + summaries (no network)
 **Dependencies:** Task Group 1
 
-- [ ] 2.0 Implement pure, deterministic render/summarize tooling for review artifacts
-  - [ ] 2.1 Add `scripts/pr/render-review-state.mjs` (pure) to render `review-state.md` from `review-state.json`
+- [x] 2.0 Implement pure, deterministic render/summarize tooling for review artifacts
+  - [x] 2.1 Add `scripts/pr/render-review-state.mjs` (pure) to render `review-state.md` from `review-state.json`
     - Stable order derived from `review-state.json` (no re-sorting beyond trusting canonical JSON)
     - Ensure bodies are marker-free (already stripped in canonical JSON) and output is UTF-8 + trailing newline
-  - [ ] 2.2 Add `scripts/pr/summarize-review-state.mjs` (pure) with the spec CLI contract
+  - [x] 2.2 Add `scripts/pr/summarize-review-state.mjs` (pure) with the spec CLI contract
     - `--format text|json` (default `text`), stable ordering, trailing newline rules
-  - [ ] 2.3 Update/align `scripts/pr/render-review-actions.mjs` to match v1 `review-actions.json` guidance
+  - [x] 2.3 Update/align `scripts/pr/render-review-actions.mjs` to match v1 `review-actions.json` guidance
     - Do not depend on `wont_address`; prefer explicit reason codes (`defer`, `out_of_scope`, `already_fixed`, `not_actionable`)
     - Preserve `actions[]` order as written in JSON; may filter but **must not reorder**
     - Ensure table safety (escape `|`, collapse newlines/whitespace within cells)
-  - [ ] 2.4 Add deterministic fixtures + golden outputs for all pure scripts
+  - [x] 2.4 Add deterministic fixtures + golden outputs for all pure scripts
     - `review-state.json` → `review-state.md` golden file
     - `review-actions.json` → `review-actions.md` golden file
     - `review-state.json` → `summary.txt` (and/or `summary.json`) golden file
-  - [ ] 2.5 Add `node --test` unit tests asserting exact outputs (including trailing newline)
+  - [x] 2.5 Add `node --test` unit tests asserting exact outputs (including trailing newline)
     - Command: `node --test scripts/pr/**/*.test.mjs`
-  - [ ] 2.6 Verify each pure script’s CLI contract
+  - [x] 2.6 Verify each pure script’s CLI contract
     - Commands:
       - `node scripts/pr/render-review-state.mjs --help`
       - `node scripts/pr/render-review-actions.mjs --help`
       - `node scripts/pr/summarize-review-state.mjs --help`
-  - [ ] 2.7 Verify “same input → same bytes” behavior across runs
+  - [x] 2.7 Verify “same input → same bytes” behavior across runs
     - Run render/summarize twice and confirm files are identical (manual check acceptable)
 
 **Acceptance Criteria:**
