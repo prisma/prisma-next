@@ -1,9 +1,9 @@
-import type { CoreHashBase } from '@prisma-next/contract/types';
+import type { StorageHashBase } from '@prisma-next/contract/types';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
 import { createRef, createRoot, type SelectBuilder, type TableReference } from './src';
 
-type CoreHash = CoreHashBase<'core-hash-example'>;
-type AnotherCoreHash = CoreHashBase<'another-core-hash-example'>;
+type StorageHash = StorageHashBase<'storage-hash-example'>;
+type AnotherStorageHash = StorageHashBase<'another-storage-hash-example'>;
 
 declare const contract: SqlContract<
   {
@@ -53,18 +53,18 @@ declare const contract: SqlContract<
     };
     readonly operationTypes: Record<string, Record<string, unknown>>;
   },
-  CoreHash
+  StorageHash
 >;
 
-declare const wrongTable: TableReference<'comments', CoreHash>;
-declare const allTable: TableReference<string, CoreHash>;
+declare const wrongTable: TableReference<'comments', StorageHash>;
+declare const allTable: TableReference<string, StorageHash>;
 // biome-ignore lint/suspicious/noExplicitAny: playground tests type boundary with any table name
-declare const anyTable: TableReference<any, CoreHash>;
-declare const neverTable: TableReference<never, CoreHash>;
+declare const anyTable: TableReference<any, StorageHash>;
+declare const neverTable: TableReference<never, StorageHash>;
 declare const customTable: { '~name': 'users' };
 // @ts-expect-error
-declare const unknownTable: TableReference<unknown, CoreHash>;
-declare const differentHashTable: TableReference<'users', AnotherCoreHash>;
+declare const unknownTable: TableReference<unknown, StorageHash>;
+declare const differentHashTable: TableReference<'users', AnotherStorageHash>;
 
 const root = createRoot(contract);
 const ref = createRef(contract);

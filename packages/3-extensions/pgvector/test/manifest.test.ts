@@ -1,3 +1,4 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { pgvectorExtensionDescriptor } from '../src/exports/control';
 
@@ -47,17 +48,25 @@ describe('pgvector descriptor', () => {
     });
   });
 
-  it('codec types are importable', async () => {
-    // Verify the codec types module can be imported (type-only export)
-    // Type-only exports don't exist at runtime, so we just verify the import succeeds
-    await expect(import('../src/exports/codec-types')).resolves.toBeDefined();
-  });
+  it(
+    'codec types are importable',
+    async () => {
+      // Verify the codec types module can be imported (type-only export)
+      // Type-only exports don't exist at runtime, so we just verify the import succeeds
+      await expect(import('../src/exports/codec-types')).resolves.toBeDefined();
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('operation types are importable', async () => {
-    // Verify the operation types module can be imported (type-only export)
-    // Type-only exports don't exist at runtime, so we just verify the import succeeds
-    await expect(import('../src/exports/operation-types')).resolves.toBeDefined();
-  });
+  it(
+    'operation types are importable',
+    async () => {
+      // Verify the operation types module can be imported (type-only export)
+      // Type-only exports don't exist at runtime, so we just verify the import succeeds
+      await expect(import('../src/exports/operation-types')).resolves.toBeDefined();
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   describe('parameterized codec renderers', () => {
     it('has parameterized renderers in codecTypes', () => {

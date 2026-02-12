@@ -39,7 +39,7 @@ The **authoring layer** is free to carry richer state (deprecated vs deleted, hi
 
 ## What Does and Doesn’t End Up in the Contract (and Why)
 
-The **canonical contract IR** (what is emitted as `contract.json`, hashed into `coreHash`, and consumed by runtime/lanes/CLI) is intentionally **strict and pure**:
+The **canonical contract IR** (what is emitted as `contract.json`, hashed into `storageHash`/`executionHash`, and consumed by runtime/lanes/CLI) is intentionally **strict and pure**:
 
 - It describes **only the structures the application requires**:
   - Models, fields, relations.

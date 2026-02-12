@@ -1,4 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 
 /**
  * Column type descriptor containing both codec ID and native type.
@@ -54,7 +54,11 @@ export type ColumnBuilderState<
 > = ColumnBuilderStateBase<Name, Type> &
   (Nullable extends true
     ? { readonly nullable: true; readonly default?: NullableColumnCannotHaveDefault }
-    : { readonly nullable: false; readonly default?: ColumnDefault });
+    : {
+        readonly nullable: false;
+        readonly default?: ColumnDefault;
+        readonly executionDefault?: ExecutionMutationDefaultValue;
+      });
 
 /**
  * Unique constraint definition for table builder.
@@ -148,14 +152,14 @@ export interface ContractBuilderState<
     never,
     ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
   >,
-  CoreHash extends string | undefined = string | undefined,
+  StorageHash extends string | undefined = string | undefined,
   ExtensionPacks extends Record<string, unknown> | undefined = undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined = undefined,
 > {
   readonly target?: Target;
   readonly tables: Tables;
   readonly models: Models;
-  readonly coreHash?: CoreHash;
+  readonly storageHash?: StorageHash;
   readonly extensionPacks?: ExtensionPacks;
   readonly capabilities?: Capabilities;
   readonly storageTypes?: Record<string, StorageTypeInstanceState>;

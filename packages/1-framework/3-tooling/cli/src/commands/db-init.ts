@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
@@ -57,12 +58,12 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
   if (failure.code === 'MARKER_ORIGIN_MISMATCH') {
     const mismatchParts: string[] = [];
     if (
-      failure.marker?.coreHash !== failure.destination?.coreHash &&
-      failure.marker?.coreHash &&
-      failure.destination?.coreHash
+      failure.marker?.storageHash !== failure.destination?.storageHash &&
+      failure.marker?.storageHash &&
+      failure.destination?.storageHash
     ) {
       mismatchParts.push(
-        `coreHash (marker: ${failure.marker.coreHash}, destination: ${failure.destination.coreHash})`,
+        `storageHash (marker: ${failure.marker.storageHash}, destination: ${failure.destination.storageHash})`,
       );
     }
     if (
@@ -82,14 +83,10 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
         fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
         meta: {
           code: 'MARKER_ORIGIN_MISMATCH',
-          ...(failure.marker?.coreHash ? { markerCoreHash: failure.marker.coreHash } : {}),
-          ...(failure.destination?.coreHash
-            ? { destinationCoreHash: failure.destination.coreHash }
-            : {}),
-          ...(failure.marker?.profileHash ? { markerProfileHash: failure.marker.profileHash } : {}),
-          ...(failure.destination?.profileHash
-            ? { destinationProfileHash: failure.destination.profileHash }
-            : {}),
+          ...ifDefined('markerStorageHash', failure.marker?.storageHash),
+          ...ifDefined('destinationStorageHash', failure.destination?.storageHash),
+          ...ifDefined('markerProfileHash', failure.marker?.profileHash),
+          ...ifDefined('destinationProfileHash', failure.destination?.profileHash),
         },
       },
     );
@@ -242,8 +239,8 @@ async function executeDbInitCommand(
       plan: {
         targetId: config.target.targetId,
         destination: {
-          coreHash: result.value.marker?.coreHash ?? '',
-          ...(profileHash ? { profileHash } : {}),
+          storageHash: result.value.marker?.storageHash ?? '',
+          ...ifDefined('profileHash', profileHash),
         },
         operations: result.value.plan.operations.map((op) => ({
           id: op.id,
@@ -262,10 +259,8 @@ async function executeDbInitCommand(
       ...(result.value.marker
         ? {
             marker: {
-              coreHash: result.value.marker.coreHash,
-              ...(result.value.marker.profileHash
-                ? { profileHash: result.value.marker.profileHash }
-                : {}),
+              storageHash: result.value.marker.storageHash,
+              ...ifDefined('profileHash', result.value.marker.profileHash),
             },
           }
         : {}),

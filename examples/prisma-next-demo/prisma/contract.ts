@@ -2,13 +2,13 @@ import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import {
   enumColumn,
   enumType,
-  int4Column,
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
 import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
+import { uuidv4 } from '@prisma-next/ids';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
@@ -19,11 +19,7 @@ export const contract = defineContract<AllCodecTypes>()
   .storageType('user_type', enumType('user_type', ['admin', 'user']))
   .table('user', (t) =>
     t
-      .column('id', {
-        type: int4Column,
-        nullable: false,
-        default: { kind: 'function', expression: 'autoincrement()' },
-      })
+      .generated('id', uuidv4())
       .column('email', { type: textColumn, nullable: false })
       .column('createdAt', {
         type: timestamptzColumn,
@@ -38,13 +34,9 @@ export const contract = defineContract<AllCodecTypes>()
   )
   .table('post', (t) =>
     t
-      .column('id', {
-        type: int4Column,
-        nullable: false,
-        default: { kind: 'function', expression: 'autoincrement()' },
-      })
+      .generated('id', uuidv4())
       .column('title', { type: textColumn, nullable: false })
-      .column('userId', { type: int4Column, nullable: false })
+      .column('userId', { type: textColumn, nullable: false })
       .column('createdAt', {
         type: timestamptzColumn,
         nullable: false,
@@ -98,7 +90,6 @@ export const contract = defineContract<AllCodecTypes>()
       jsonAgg: true,
       returning: true,
       'pgvector/cosine': true,
-      'defaults.autoincrement': true,
       'defaults.now': true,
     },
   })

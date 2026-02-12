@@ -3,7 +3,7 @@
   "schemaVersion": "1",
   "target": "postgres",
   "targetFamily": "sql",
-  "coreHash": "sha256:test-core-relations",
+  "storageHash": "sha256:test-core-relations",
   "profileHash": "sha256:test-profile-relations",
   "models": {
     "User": {

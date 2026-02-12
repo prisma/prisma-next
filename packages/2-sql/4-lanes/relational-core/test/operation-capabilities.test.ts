@@ -11,7 +11,7 @@ describe('Operation capability gating', () => {
     const contract = validateContract<SqlContract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       capabilities: {
         pgvector: {
           'index.ivfflat': true,
@@ -70,7 +70,7 @@ describe('Operation capability gating', () => {
     const contract = validateContract<SqlContract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       capabilities: {},
       storage: {
         tables: {
@@ -125,7 +125,7 @@ describe('Operation capability gating', () => {
     const contract = validateContract<SqlContract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       capabilities: {},
       storage: {
         tables: {
@@ -179,7 +179,7 @@ describe('Operation capability gating', () => {
     const contract = validateContract<SqlContract<SqlStorage>>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       capabilities: {
         pgvector: {
           'index.ivfflat': true,

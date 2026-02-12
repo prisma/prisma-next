@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { ContractIR } from '@prisma-next/contract/ir';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { canonicalizeContract } from './canonicalization';
 
 type ContractInput = {
@@ -9,6 +10,7 @@ type ContractInput = {
   models: Record<string, unknown>;
   relations: Record<string, unknown>;
   storage: Record<string, unknown>;
+  execution?: Record<string, unknown>;
   extensionPacks: Record<string, unknown>;
   sources: Record<string, unknown>;
   capabilities: Record<string, Record<string, boolean>>;
@@ -22,20 +24,20 @@ function computeHash(content: string): string {
   return `sha256:${hash.digest('hex')}`;
 }
 
-export function computeCoreHash(contract: ContractInput): string {
-  const coreContract: ContractIR = {
+export function computeStorageHash(contract: ContractInput): string {
+  const storageContract: ContractIR = {
     schemaVersion: contract.schemaVersion,
     targetFamily: contract.targetFamily,
     target: contract.target,
-    models: contract.models,
-    relations: contract.relations,
     storage: contract.storage,
-    extensionPacks: contract.extensionPacks,
-    sources: contract.sources,
-    capabilities: contract.capabilities,
-    meta: contract.meta,
+    models: {},
+    relations: {},
+    extensionPacks: {},
+    sources: {},
+    capabilities: {},
+    meta: {},
   };
-  const canonical = canonicalizeContract(coreContract);
+  const canonical = canonicalizeContract(storageContract);
   return computeHash(canonical);
 }
 
@@ -53,5 +55,23 @@ export function computeProfileHash(contract: ContractInput): string {
     sources: {},
   };
   const canonical = canonicalizeContract(profileContract);
+  return computeHash(canonical);
+}
+
+export function computeExecutionHash(contract: ContractInput): string {
+  const executionContract: ContractIR = {
+    schemaVersion: contract.schemaVersion,
+    targetFamily: contract.targetFamily,
+    target: contract.target,
+    models: {},
+    relations: {},
+    storage: {},
+    extensionPacks: {},
+    sources: {},
+    capabilities: {},
+    meta: {},
+    ...ifDefined('execution', contract.execution),
+  };
+  const canonical = canonicalizeContract(executionContract);
   return computeHash(canonical);
 }

@@ -32,15 +32,15 @@ test('ResultType correctly infers number[] | null for nullable embedding column'
       createdAt: postTable.columns.createdAt,
       embedding: postTable.columns.embedding,
     })
-    .build({ params: { userId: 1 } });
+    .build({ params: { userId: 'user_001' } });
 
   type Row = ResultType<typeof _plan>;
 
   // Verify that embedding is correctly inferred as number[] | null (nullable vector column)
   expectTypeOf<Row['embedding']>().toEqualTypeOf<number[] | null>();
-  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['id']>().toEqualTypeOf<string>();
   expectTypeOf<Row['title']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['userId']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['userId']>().toEqualTypeOf<string>();
   // Note: createdAt type depends on codec definition - checking it's not never
   expectTypeOf<Row['createdAt']>().not.toEqualTypeOf<never>();
 });

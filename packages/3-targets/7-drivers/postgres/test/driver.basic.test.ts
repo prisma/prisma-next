@@ -14,7 +14,7 @@ describe('@prisma-next/driver-postgres', () => {
       await cleanup();
       cleanup = undefined;
     }
-  });
+  }, timeouts.spinUpPpgDev);
 
   it(
     'streams rows using buffered fallback when cursor disabled',

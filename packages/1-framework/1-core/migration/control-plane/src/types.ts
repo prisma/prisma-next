@@ -53,17 +53,17 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR = unk
    * Mappings are runtime-only and should not be part of ContractIR.
    *
    * Note: The returned ContractIR may include additional fields from the emitted contract
-   * (like coreHash, profileHash) that are not part of the ContractIR type but are preserved
+   * (like storageHash/executionHash, profileHash) that are not part of the ContractIR type but are preserved
    * for use by verify/sign operations.
    */
   validateContractIR(contractJson: unknown): ContractIR;
 
   /**
    * Verifies the database marker against the contract.
-   * Compares target, coreHash, and profileHash.
+   * Compares target, storageHash, and profileHash.
    *
    * @param options.contractIR - The validated contract (from validateContractIR). Must have
-   *   coreHash and target fields for verification. These fields are present in emitted
+   *   storageHash and target fields for verification. These fields are present in emitted
    *   contracts but not in the ContractIR type definition.
    */
   verify(options: {
@@ -363,11 +363,11 @@ export interface VerifyDatabaseResult {
   readonly code?: string;
   readonly summary: string;
   readonly contract: {
-    readonly coreHash: string;
+    readonly storageHash: string;
     readonly profileHash?: string;
   };
   readonly marker?: {
-    readonly coreHash?: string;
+    readonly storageHash?: string;
     readonly profileHash?: string;
   };
   readonly target: {
@@ -442,7 +442,7 @@ export interface VerifyDatabaseSchemaResult {
   readonly code?: string;
   readonly summary: string;
   readonly contract: {
-    readonly coreHash: string;
+    readonly storageHash: string;
     readonly profileHash?: string;
   };
   readonly target: {
@@ -475,7 +475,8 @@ export interface VerifyDatabaseSchemaResult {
 export interface EmitContractResult {
   readonly contractJson: string;
   readonly contractDts: string;
-  readonly coreHash: string;
+  readonly storageHash: string;
+  readonly executionHash?: string;
   readonly profileHash: string;
 }
 
@@ -510,7 +511,7 @@ export interface SignDatabaseResult {
   readonly ok: boolean;
   readonly summary: string;
   readonly contract: {
-    readonly coreHash: string;
+    readonly storageHash: string;
     readonly profileHash?: string;
   };
   readonly target: {
@@ -521,7 +522,7 @@ export interface SignDatabaseResult {
     readonly created: boolean;
     readonly updated: boolean;
     readonly previous?: {
-      readonly coreHash?: string;
+      readonly storageHash?: string;
       readonly profileHash?: string;
     };
   };

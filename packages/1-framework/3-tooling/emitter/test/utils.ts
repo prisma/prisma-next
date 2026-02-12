@@ -9,12 +9,12 @@ import { type ContractIR, irHeader, irMeta } from '@prisma-next/contract/ir';
  * from the result (useful for testing validation of missing fields).
  */
 export function createContractIR(
-  overrides: Partial<ContractIR> & { coreHash?: string; profileHash?: string } = {},
+  overrides: Partial<ContractIR> & { storageHash?: string; profileHash?: string } = {},
 ): ContractIR {
   // Check if fields are explicitly undefined (not just missing)
   const hasTarget = 'target' in overrides;
   const hasTargetFamily = 'targetFamily' in overrides;
-  const hasCoreHash = 'coreHash' in overrides;
+  const hasStorageHash = 'storageHash' in overrides;
   const hasSchemaVersion = 'schemaVersion' in overrides;
   const hasModels = 'models' in overrides;
   const hasRelations = 'relations' in overrides;
@@ -28,7 +28,7 @@ export function createContractIR(
   const headerOpts: {
     target?: string;
     targetFamily?: string;
-    coreHash?: string;
+    storageHash?: string;
     profileHash?: string;
   } = {};
 
@@ -44,10 +44,10 @@ export function createContractIR(
     headerOpts.targetFamily = 'sql';
   }
 
-  if (hasCoreHash && overrides.coreHash !== undefined) {
-    headerOpts.coreHash = overrides.coreHash;
-  } else if (!hasCoreHash) {
-    headerOpts.coreHash = 'sha256:test';
+  if (hasStorageHash && overrides.storageHash !== undefined) {
+    headerOpts.storageHash = overrides.storageHash;
+  } else if (!hasStorageHash) {
+    headerOpts.storageHash = 'sha256:test';
   }
 
   // profileHash is not part of ContractIR, but we can accept it for header creation
@@ -59,7 +59,7 @@ export function createContractIR(
     headerOpts as {
       target: string;
       targetFamily: string;
-      coreHash: string;
+      storageHash: string;
       profileHash?: string;
     },
   );
@@ -99,7 +99,7 @@ export function createContractIR(
 
   const meta = irMeta(Object.keys(metaOpts).length > 0 ? metaOpts : undefined);
 
-  // Build result by constructing the object directly (ContractIR doesn't include coreHash/profileHash)
+  // Build result by constructing the object directly (ContractIR doesn't include storageHash/profileHash)
   // When fields are explicitly undefined, include them as undefined (tests use type assertions to bypass TS)
   const result = {
     schemaVersion:

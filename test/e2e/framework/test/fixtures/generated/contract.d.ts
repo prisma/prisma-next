@@ -14,7 +14,11 @@ import type { Time } from '@prisma-next/adapter-postgres/codec-types';
 import type { Timetz } from '@prisma-next/adapter-postgres/codec-types';
 import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
 
-import type { CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
+import type {
+  ExecutionHashBase,
+  ProfileHashBase,
+  StorageHashBase,
+} from '@prisma-next/contract/types';
 import type {
   SqlContract,
   SqlStorage,
@@ -22,8 +26,10 @@ import type {
   ModelDefinition,
 } from '@prisma-next/sql-contract/types';
 
-export type CoreHash =
-  CoreHashBase<'sha256:4637c0c817e4595a7040e66431f762b23a729584ccc3f31bb95a7ad154463f67'>;
+export type StorageHash =
+  StorageHashBase<'sha256:b116d5f7750e0f2b6a6cf33e8ca02f076eabd5d8b746f80b2e68f263cebbd8d1'>;
+export type ExecutionHash =
+  ExecutionHashBase<'sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61'>;
 
@@ -201,6 +207,29 @@ export type Contract = SqlContract<
         indexes: readonly [];
         foreignKeys: readonly [];
       };
+      readonly event: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly name: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly created_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
+      };
     };
     readonly types: Record<string, never>;
   },
@@ -236,11 +265,29 @@ export type Contract = SqlContract<
         readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
       };
     };
+    readonly Event: {
+      storage: { readonly table: 'event' };
+      fields: {
+        readonly id: CodecTypes['pg/text@1']['output'];
+        readonly name: CodecTypes['pg/text@1']['output'];
+        readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      };
+    };
   },
   Record<string, never>,
   {
-    modelToTable: { readonly User: 'user'; readonly Post: 'post'; readonly Comment: 'comment' };
-    tableToModel: { readonly user: 'User'; readonly post: 'Post'; readonly comment: 'Comment' };
+    modelToTable: {
+      readonly User: 'user';
+      readonly Post: 'post';
+      readonly Comment: 'comment';
+      readonly Event: 'event';
+    };
+    tableToModel: {
+      readonly user: 'User';
+      readonly post: 'Post';
+      readonly comment: 'Comment';
+      readonly event: 'Event';
+    };
     fieldToColumn: {
       readonly User: {
         readonly id: 'id';
@@ -263,6 +310,11 @@ export type Contract = SqlContract<
         readonly content: 'content';
         readonly createdAt: 'created_at';
         readonly updatedAt: 'update_at';
+      };
+      readonly Event: {
+        readonly id: 'id';
+        readonly name: 'name';
+        readonly createdAt: 'created_at';
       };
     };
     columnToField: {
@@ -288,11 +340,17 @@ export type Contract = SqlContract<
         readonly created_at: 'createdAt';
         readonly update_at: 'updatedAt';
       };
+      readonly event: {
+        readonly id: 'id';
+        readonly name: 'name';
+        readonly created_at: 'createdAt';
+      };
     };
     codecTypes: PgTypes;
     operationTypes: Record<string, never>;
   },
-  CoreHash,
+  StorageHash,
+  ExecutionHash,
   ProfileHash
 >;
 

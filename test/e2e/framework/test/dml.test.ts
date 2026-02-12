@@ -12,6 +12,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
+const UUIDV7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 describe('DML E2E Tests', { timeout: 30000 }, () => {
   it('inserts, updates, and deletes a user', async () => {
     await withTestRuntime<Contract>(
@@ -104,6 +106,140 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
 
         // Verify deleted
         const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [userId]);
+        expect(selectResult.rows.length).toBe(0);
+      },
+    );
+  });
+});
+
+describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () => {
+  it('auto-generates a valid UUIDv7 id on insert', async () => {
+    await withTestRuntime<Contract>(contractJsonPath, async ({ tables, runtime, context }) => {
+      const eventTable = tables.event!;
+      const eventColumns = eventTable.columns;
+      const builder = sql({ context });
+
+      const insertPlan = builder
+        .insert(eventTable, {
+          name: param('name'),
+        })
+        .returning(eventColumns.id!, eventColumns.name!, eventColumns.created_at!)
+        .build({
+          params: {
+            name: 'uuidv7-test-event',
+          },
+        });
+
+      const insertRows = await executePlanAndCollect(runtime, insertPlan);
+      expect(insertRows.length).toBe(1);
+      expect(insertRows[0]).toMatchObject({
+        id: expect.stringMatching(UUIDV7_REGEX),
+        name: 'uuidv7-test-event',
+        created_at: expect.any(String),
+      });
+    });
+  });
+
+  it('allows overriding the auto-generated id', async () => {
+    await withTestRuntime<Contract>(contractJsonPath, async ({ tables, runtime, context }) => {
+      const eventTable = tables.event!;
+      const eventColumns = eventTable.columns;
+      const builder = sql({ context });
+
+      const overrideId = '019470ab-9a66-7000-8000-000000000001';
+
+      const insertPlan = builder
+        .insert(eventTable, {
+          id: param('id'),
+          name: param('name'),
+        })
+        .returning(eventColumns.id!, eventColumns.name!)
+        .build({
+          params: {
+            id: overrideId,
+            name: 'override-event',
+          },
+        });
+
+      const insertRows = await executePlanAndCollect(runtime, insertPlan);
+      expect(insertRows.length).toBe(1);
+      expect(insertRows[0]).toMatchObject({
+        id: overrideId,
+        name: 'override-event',
+      });
+    });
+  });
+
+  it('updates and deletes by UUIDv7 id', async () => {
+    await withTestRuntime<Contract>(
+      contractJsonPath,
+      async ({ tables, runtime, context, client }) => {
+        const eventTable = tables.event!;
+        const eventColumns = eventTable.columns;
+        const builder = sql({ context });
+
+        // Insert (auto-generated id)
+        const insertPlan = builder
+          .insert(eventTable, {
+            name: param('name'),
+          })
+          .returning(eventColumns.id!, eventColumns.name!)
+          .build({
+            params: {
+              name: 'to-be-updated',
+            },
+          });
+
+        const insertRows = await executePlanAndCollect(runtime, insertPlan);
+        type InsertRow = ResultType<typeof insertPlan>;
+        const firstRow = insertRows[0] as InsertRow | undefined;
+        const eventId = firstRow?.id;
+        if (eventId === undefined) {
+          throw new Error('Expected insert to return id');
+        }
+        expect(eventId).toMatch(UUIDV7_REGEX);
+
+        // Update
+        const updatePlan = builder
+          .update(eventTable, {
+            name: param('newName'),
+          })
+          .where(eventColumns.id!.eq(param('eventId')))
+          .returning(eventColumns.id!, eventColumns.name!)
+          .build({
+            params: {
+              newName: 'updated-event',
+              eventId,
+            },
+          });
+
+        const updateRows = await executePlanAndCollect(runtime, updatePlan);
+        expect(updateRows.length).toBe(1);
+        expect(updateRows[0]).toMatchObject({
+          id: eventId,
+          name: 'updated-event',
+        });
+
+        // Delete
+        const deletePlan = builder
+          .delete(eventTable)
+          .where(eventColumns.id!.eq(param('eventId')))
+          .returning(eventColumns.id!, eventColumns.name!)
+          .build({
+            params: {
+              eventId,
+            },
+          });
+
+        const deleteRows = await executePlanAndCollect(runtime, deletePlan);
+        expect(deleteRows.length).toBe(1);
+        expect(deleteRows[0]).toMatchObject({
+          id: eventId,
+          name: 'updated-event',
+        });
+
+        // Verify deleted
+        const selectResult = await client.query('SELECT * FROM "event" WHERE id = $1', [eventId]);
         expect(selectResult.rows.length).toBe(0);
       },
     );

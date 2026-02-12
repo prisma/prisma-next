@@ -132,7 +132,7 @@ The `docs/` directory contains the complete architectural design for Prisma Next
 
 This repository implements the initial production version; some details still differ from the full design:
 
-- Hashing: the current implementation uses a single `contractHash`. In the design, this corresponds to `coreHash`; `profileHash` (capability pinning) is not implemented here.
+- Hashing: the current implementation uses a single `contractHash`. In the design, this corresponds to `storageHash`; optional `executionHash` (execution defaults) and `profileHash` (capability pinning) are not implemented here.
 - CLI: use `pnpm exec prisma-next generate schema.psl -o .prisma`. Some design docs reference different CLI verbs.
 - Scope: migrations and ORM features are intentionally minimal in this release; the design includes richer planner/runner and extension packs.
 

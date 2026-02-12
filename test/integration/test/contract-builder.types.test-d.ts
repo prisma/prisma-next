@@ -30,7 +30,7 @@ test('builder contract types match fixture contract types', () => {
     .model('User', 'user', (m) =>
       m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
     )
-    .coreHash('sha256:test-core')
+    .storageHash('sha256:test-core')
     .build();
 
   const _validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
@@ -56,7 +56,7 @@ test('ResultType inference works identically to fixture contract', () => {
     .model('User', 'user', (m) =>
       m.field('id', 'id').field('email', 'email').field('createdAt', 'createdAt'),
     )
-    .coreHash('sha256:test-core')
+    .storageHash('sha256:test-core')
     .build();
 
   const validatedBuilderContract = validateContract<typeof builderContract>(builderContract);
@@ -162,7 +162,7 @@ test('contract structure type matches SqlContract', () => {
   expectTypeOf(contract).toHaveProperty('schemaVersion');
   expectTypeOf(contract).toHaveProperty('target');
   expectTypeOf(contract).toHaveProperty('targetFamily');
-  expectTypeOf(contract).toHaveProperty('coreHash');
+  expectTypeOf(contract).toHaveProperty('storageHash');
   expectTypeOf(contract).toHaveProperty('models');
   expectTypeOf(contract).toHaveProperty('storage');
   expectTypeOf(contract).toHaveProperty('mappings');

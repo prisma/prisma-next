@@ -177,7 +177,7 @@ type TestContractWithCapabilities = SqlContract<
 const testContractWithCapabilities = validateContract<TestContractWithCapabilities>({
   target: 'postgres',
   targetFamily: 'sql' as const,
-  coreHash: 'sha256:test-core',
+  storageHash: 'sha256:test-core',
   profileHash: 'sha256:test-profile',
   storage: {
     tables: {
@@ -493,7 +493,7 @@ test('includeMany with multiple includes preserves all types', () => {
   const contractWithComments = validateContract<ContractWithComments>({
     target: 'postgres',
     targetFamily: 'sql' as const,
-    coreHash: 'sha256:test-core',
+    storageHash: 'sha256:test-core',
     profileHash: 'sha256:test-profile',
     storage: {
       tables: {

@@ -93,7 +93,7 @@ describe('emit command functionality', () => {
   );
 
   it(
-    'emits contract with correct coreHash',
+    'emits contract with correct storageHash',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
       const contract = await loadContractFromTs(contractPath);
@@ -112,7 +112,7 @@ describe('emit command functionality', () => {
         sqlTargetFamilyHook,
       );
 
-      expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(result.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
     },
     timeouts.typeScriptCompilation,
   );

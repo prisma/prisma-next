@@ -67,8 +67,7 @@ async function main() {
         console.error('Usage: pnpm start -- user <userId>');
         process.exit(1);
       }
-      const userId = Number.parseInt(userIdStr, 10);
-      const user = await getUserById(userId, runtime);
+      const user = await getUserById(userIdStr, runtime);
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'posts') {
       const [userIdStr] = args;
@@ -76,8 +75,7 @@ async function main() {
         console.error('Usage: pnpm start -- posts <userId>');
         process.exit(1);
       }
-      const userId = Number.parseInt(userIdStr, 10);
-      const posts = await getUserPosts(userId, runtime);
+      const posts = await getUserPosts(userIdStr, runtime);
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'users-with-posts') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
@@ -109,7 +107,7 @@ async function main() {
       console.log(JSON.stringify(results, null, 2));
     } else if (cmd === 'users-paginate') {
       const [cursorStr, limitStr] = args;
-      const cursor = cursorStr ? Number.parseInt(cursorStr, 10) : null;
+      const cursor = cursorStr ?? null;
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const users = await ormGetUsersByIdCursor(cursor, limit, runtime);
       console.log(JSON.stringify(users, null, 2));
@@ -119,9 +117,8 @@ async function main() {
         console.error('Usage: pnpm start -- users-paginate-back <cursor> [limit]');
         process.exit(1);
       }
-      const cursor = Number.parseInt(cursorStr, 10);
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-      const users = await ormGetUsersBackward(cursor, limit, runtime);
+      const users = await ormGetUsersBackward(cursorStr, limit, runtime);
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'budget-violation') {
       console.log('Running unbounded query to demonstrate budget violation...');
@@ -150,28 +147,21 @@ async function main() {
         console.error('Usage: pnpm start -- user-kysely <userId>');
         process.exit(1);
       }
-      const userId = Number.parseInt(userIdStr, 10);
       // use a runtime without plugins to avoid false positive linting errors
       const kyselyRuntime = getRuntime(databaseUrl, []);
-      const user = await getUserByIdKysely(userId, kyselyRuntime);
+      const user = await getUserByIdKysely(userIdStr, kyselyRuntime);
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'user-transaction-kysely') {
-      const [userIdStr] = args;
-      if (!userIdStr) {
-        console.error('Usage: pnpm start -- user-transaction-kysely <userId>');
-        process.exit(1);
-      }
-      const userId = Number.parseInt(userIdStr, 10);
       // use a runtime without plugins to avoid false positive linting errors
       const kyselyRuntime = getRuntime(databaseUrl, []);
-      const newUser = await insertUserTransactionKysely(userId, kyselyRuntime);
+      const newUser = await insertUserTransactionKysely(kyselyRuntime);
       console.log('Inserted user:', JSON.stringify(newUser, null, 2));
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | ' +
           'users-with-posts [limit] | users-paginate [cursor] [limit] | ' +
           'users-paginate-back <cursor> [limit] | similarity-search <queryVector> [limit] | ' +
-          'budget-violation | user-kysely <userId> | user-transaction-kysely <userId>]',
+          'budget-violation | user-kysely <userId> | user-transaction-kysely]',
       );
       process.exit(1);
     }

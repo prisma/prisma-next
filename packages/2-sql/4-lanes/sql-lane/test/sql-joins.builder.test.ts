@@ -90,7 +90,7 @@ type ContractWithPosts = SqlContract<
 const contractWithPosts = validateContract<ContractWithPosts>({
   target: 'postgres',
   targetFamily: 'sql' as const,
-  coreHash: 'sha256:test-core',
+  storageHash: 'sha256:test-core',
   profileHash: 'sha256:test-profile',
   storage: {
     tables: {

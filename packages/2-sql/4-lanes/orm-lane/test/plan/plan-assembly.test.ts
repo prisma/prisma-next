@@ -24,7 +24,7 @@ describe('plan assembly', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: coreHash('sha256:test'),
+    storageHash: coreHash('sha256:test'),
     models: {},
     storage: {
       tables: {
@@ -823,7 +823,7 @@ describe('plan assembly', () => {
       const planMeta: PlanMeta = {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'dsl',
         refs: {
           tables: ['user'],
@@ -856,7 +856,7 @@ describe('plan assembly', () => {
       const planMeta: PlanMeta = {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'dsl',
         refs: {
           tables: ['user'],
@@ -887,7 +887,7 @@ describe('plan assembly', () => {
       const planMeta: PlanMeta = {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'dsl',
         refs: {
           tables: ['user'],
@@ -929,7 +929,7 @@ describe('plan assembly', () => {
       const planMeta: PlanMeta = {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'dsl',
         refs: {
           tables: ['user'],
@@ -961,7 +961,7 @@ describe('plan assembly', () => {
       const planMeta: PlanMeta = {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'dsl',
         refs: {
           tables: ['user'],

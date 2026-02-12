@@ -59,7 +59,7 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - JSON schema (single object): `{ code, domain, severity, summary, why, fix, where: { path, line }, meta, docsUrl }`.
 
 ## Plans & Preflights (Rendering)
-- Summary header: target, coreHash/profileHash, op count, affected tables, estimated rows.
+- Summary header: target, storageHash/profileHash, op count, affected tables, estimated rows.
 - Per‑op one‑liners: verb + table + key columns.
 - SQL visibility: hidden by default; show with `--show-sql` or at `-v`. Truncate to 10 lines/op; override via `--max-sql-lines <n>`.
 - Diffs: unified diff for DDL with `--show-diff` (auto at `-vv`).
@@ -95,7 +95,7 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 ## Database Commands
 - `db verify` (canonical):
   - Loads config + contract, connects via `--db` or `config.db.connection`.
-  - Checks marker presence, `coreHash`/`profileHash` equality, target match.
+  - Checks marker presence, `storageHash`/`profileHash` equality, target match.
   - Non‑interactive; single JSON with `--json`.
 - `db schema-verify` (canonical):
   - Loads config + contract, connects via `config.db.connection` (or `--db` when supported).

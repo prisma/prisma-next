@@ -107,7 +107,7 @@ type ContractWithoutCapabilities = SqlContract<
 const contractWithCapabilities = validateContract<ContractWithCapabilities>({
   target: 'postgres',
   targetFamily: 'sql' as const,
-  coreHash: 'sha256:test-core',
+  storageHash: 'sha256:test-core',
   profileHash: 'sha256:test-profile',
   storage: {
     tables: {
@@ -152,7 +152,7 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
 const contractWithoutCapabilities = validateContract<ContractWithoutCapabilities>({
   target: 'postgres',
   targetFamily: 'sql' as const,
-  coreHash: 'sha256:test-core',
+  storageHash: 'sha256:test-core',
   profileHash: 'sha256:test-profile',
   storage: {
     tables: {

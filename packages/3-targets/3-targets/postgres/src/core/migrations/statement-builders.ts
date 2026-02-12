@@ -38,7 +38,7 @@ export const ensureLedgerTableStatement: SqlStatement = {
 };
 
 export interface WriteMarkerInput {
-  readonly coreHash: string;
+  readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson?: unknown;
   readonly canonicalVersion?: number | null;
@@ -52,7 +52,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
 } {
   const params: readonly unknown[] = [
     1,
-    input.coreHash,
+    input.storageHash,
     input.profileHash,
     jsonParam(input.contractJson),
     input.canonicalVersion ?? null,
@@ -99,9 +99,9 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
 }
 
 export interface LedgerInsertInput {
-  readonly originCoreHash?: string | null;
+  readonly originStorageHash?: string | null;
   readonly originProfileHash?: string | null;
-  readonly destinationCoreHash: string;
+  readonly destinationStorageHash: string;
   readonly destinationProfileHash?: string | null;
   readonly contractJsonBefore?: unknown;
   readonly contractJsonAfter?: unknown;
@@ -128,9 +128,9 @@ export function buildLedgerInsertStatement(input: LedgerInsertInput): SqlStateme
       $7::jsonb
     )`,
     params: [
-      input.originCoreHash ?? null,
+      input.originStorageHash ?? null,
       input.originProfileHash ?? null,
-      input.destinationCoreHash,
+      input.destinationStorageHash,
       input.destinationProfileHash ?? null,
       jsonParam(input.contractJsonBefore),
       jsonParam(input.contractJsonAfter),

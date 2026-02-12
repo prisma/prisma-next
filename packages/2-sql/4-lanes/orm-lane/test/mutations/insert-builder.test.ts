@@ -12,7 +12,7 @@ describe('insert builder', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: coreHash('sha256:test'),
+    storageHash: coreHash('sha256:test'),
     models: {
       User: {
         storage: { table: 'user' },
@@ -57,6 +57,7 @@ describe('insert builder', () => {
     operations: createOperationRegistry(),
     codecs: createCodecRegistry(),
     types: {},
+    applyMutationDefaults: () => [],
   };
 
   describe('convertModelFieldsToColumns', () => {

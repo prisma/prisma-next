@@ -122,7 +122,7 @@ const contractWithTypes: ContractWithTypes = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  coreHash: coreHash('sha256:test'),
+  storageHash: coreHash('sha256:test'),
   storage: {
     tables: {
       test: {
@@ -278,7 +278,7 @@ test('schema.types is generic record when contract does not specify types', () =
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: coreHash('sha256:test'),
+    storageHash: coreHash('sha256:test'),
     storage: {
       tables: {
         test: {

@@ -83,6 +83,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 
 ## Architecture
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
+- `.cursor/rules/adr-writing.mdc` — ADR writing guidelines (clarity, flow, examples)
 - `.cursor/rules/contract-normalization-responsibilities.mdc` — Contract normalization responsibilities
 - `.cursor/rules/contract-default-values.mdc` — Validate emitted column defaults
 - `.cursor/rules/config-validation-and-normalization.mdc` — Config validation and normalization patterns using Arktype

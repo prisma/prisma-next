@@ -1,4 +1,5 @@
 import { relative } from 'node:path';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { bgGreen, blue, bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { Command } from 'commander';
 import stringWidth from 'string-width';
@@ -6,7 +7,8 @@ import stripAnsi from 'strip-ansi';
 import wrapAnsi from 'wrap-ansi';
 // EmitContractResult type for CLI output formatting (includes file paths)
 export interface EmitContractResult {
-  readonly coreHash: string;
+  readonly storageHash: string;
+  readonly executionHash?: string;
   readonly profileHash: string;
   readonly outDir: string;
   readonly files: {
@@ -94,7 +96,10 @@ export function formatEmitOutput(result: EmitContractResult, flags: GlobalFlags)
 
   lines.push(`${prefix}✔ Emitted contract.json → ${jsonPath}`);
   lines.push(`${prefix}✔ Emitted contract.d.ts → ${dtsPath}`);
-  lines.push(`${prefix}  coreHash: ${result.coreHash}`);
+  lines.push(`${prefix}  storageHash: ${result.storageHash}`);
+  if (result.executionHash) {
+    lines.push(`${prefix}  executionHash: ${result.executionHash}`);
+  }
   if (result.profileHash) {
     lines.push(`${prefix}  profileHash: ${result.profileHash}`);
   }
@@ -111,7 +116,8 @@ export function formatEmitOutput(result: EmitContractResult, flags: GlobalFlags)
 export function formatEmitJson(result: EmitContractResult): string {
   const output = {
     ok: true,
-    coreHash: result.coreHash,
+    storageHash: result.storageHash,
+    ...ifDefined('executionHash', result.executionHash),
     ...(result.profileHash ? { profileHash: result.profileHash } : {}),
     outDir: result.outDir,
     files: result.files,
@@ -223,7 +229,7 @@ export function formatVerifyOutput(result: VerifyDatabaseResult, flags: GlobalFl
 
   if (result.ok) {
     lines.push(`${prefix}${formatGreen('✔')} ${result.summary}`);
-    lines.push(`${prefix}${formatDimText(`  coreHash: ${result.contract.coreHash}`)}`);
+    lines.push(`${prefix}${formatDimText(`  storageHash: ${result.contract.storageHash}`)}`);
     if (result.contract.profileHash) {
       lines.push(`${prefix}${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
     }
@@ -772,8 +778,8 @@ export function formatSignOutput(result: SignDatabaseResult, flags: GlobalFlags)
     lines.push(`${prefix}${formatGreen('✔')} Database signed`);
 
     // Show from -> to hashes with clear labels
-    const previousHash = result.marker.previous?.coreHash ?? 'none';
-    const currentHash = result.contract.coreHash;
+    const previousHash = result.marker.previous?.storageHash ?? 'none';
+    const currentHash = result.contract.storageHash;
 
     lines.push(`${prefix}${formatDimText(`  from: ${previousHash}`)}`);
     lines.push(`${prefix}${formatDimText(`  to:   ${currentHash}`)}`);
@@ -814,7 +820,7 @@ export interface DbInitResult {
   readonly plan?: {
     readonly targetId: string;
     readonly destination: {
-      readonly coreHash: string;
+      readonly storageHash: string;
       readonly profileHash?: string;
     };
     readonly operations: readonly {
@@ -828,7 +834,7 @@ export interface DbInitResult {
     readonly operationsExecuted: number;
   };
   readonly marker?: {
-    readonly coreHash: string;
+    readonly storageHash: string;
     readonly profileHash?: string;
   };
   readonly summary: string;
@@ -872,7 +878,7 @@ export function formatDbInitPlanOutput(result: DbInitResult, flags: GlobalFlags)
   if (result.plan?.destination) {
     lines.push(`${prefix}`);
     lines.push(
-      `${prefix}${formatDimText(`Destination hash: ${result.plan.destination.coreHash}`)}`,
+      `${prefix}${formatDimText(`Destination hash: ${result.plan.destination.storageHash}`)}`,
     );
   }
 
@@ -910,7 +916,7 @@ export function formatDbInitApplyOutput(result: DbInitResult, flags: GlobalFlags
 
     // Marker info
     if (result.marker) {
-      lines.push(`${prefix}${formatDimText(`  Marker written: ${result.marker.coreHash}`)}`);
+      lines.push(`${prefix}${formatDimText(`  Marker written: ${result.marker.storageHash}`)}`);
       if (result.marker.profileHash) {
         lines.push(`${prefix}${formatDimText(`  Profile hash: ${result.marker.profileHash}`)}`);
       }

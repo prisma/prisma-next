@@ -1,15 +1,18 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 type NormalizedContract = {
   schemaVersion: string;
   targetFamily: string;
   target: string;
-  coreHash?: string;
+  storageHash?: string;
+  executionHash?: string;
   profileHash?: string;
   models: Record<string, unknown>;
   relations: Record<string, unknown>;
   storage: Record<string, unknown>;
+  execution?: Record<string, unknown>;
   extensionPacks: Record<string, unknown>;
   capabilities: Record<string, Record<string, boolean>>;
   meta: Record<string, unknown>;
@@ -21,10 +24,12 @@ const TOP_LEVEL_ORDER = [
   'canonicalVersion',
   'targetFamily',
   'target',
-  'coreHash',
+  'storageHash',
+  'executionHash',
   'profileHash',
   'models',
   'storage',
+  'execution',
   'capabilities',
   'extensionPacks',
   'meta',
@@ -82,6 +87,11 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
       const isRequiredMeta = isArrayEqual(currentPath, ['meta']);
       const isRequiredSources = isArrayEqual(currentPath, ['sources']);
+      const isRequiredExecutionDefaults = isArrayEqual(currentPath, [
+        'execution',
+        'mutations',
+        'defaults',
+      ]);
       const isExtensionNamespace = currentPath.length === 2 && currentPath[0] === 'extensionPacks';
       const isModelRelations =
         currentPath.length === 3 &&
@@ -113,6 +123,7 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isRequiredCapabilities &&
         !isRequiredMeta &&
         !isRequiredSources &&
+        !isRequiredExecutionDefaults &&
         !isExtensionNamespace &&
         !isModelRelations &&
         !isTableUniques &&
@@ -233,7 +244,7 @@ function orderTopLevel(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 export function canonicalizeContract(
-  ir: ContractIR & { coreHash?: string; profileHash?: string },
+  ir: ContractIR & { storageHash?: string; executionHash?: string; profileHash?: string },
 ): string {
   const normalized: NormalizedContract = {
     schemaVersion: ir.schemaVersion,
@@ -242,19 +253,18 @@ export function canonicalizeContract(
     models: ir.models,
     relations: ir.relations,
     storage: ir.storage,
+    ...ifDefined('execution', ir.execution),
     extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
     meta: ir.meta,
     sources: ir.sources,
   };
-
-  if (ir.coreHash !== undefined) {
-    normalized.coreHash = ir.coreHash;
-  }
-
-  if (ir.profileHash !== undefined) {
-    normalized.profileHash = ir.profileHash;
-  }
+  Object.assign(
+    normalized,
+    ifDefined('storageHash', ir.storageHash),
+    ifDefined('executionHash', ir.executionHash),
+    ifDefined('profileHash', ir.profileHash),
+  );
 
   const withDefaultsOmitted = omitDefaults(normalized, []) as NormalizedContract;
   const withSortedIndexes = sortIndexesAndUniques(withDefaultsOmitted.storage);

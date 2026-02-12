@@ -9,7 +9,7 @@ describe('capabilities', () => {
       const contract = validateContract<SqlContract<SqlStorage>>({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test',
+        storageHash: 'test',
         storage: { tables: {} },
         models: {},
         relations: {},
@@ -25,7 +25,7 @@ describe('capabilities', () => {
       const contract = validateContract<SqlContract<SqlStorage>>({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test',
+        storageHash: 'test',
         storage: { tables: {} },
         models: {},
         relations: {},
@@ -42,7 +42,7 @@ describe('capabilities', () => {
       const contract = validateContract<SqlContract<SqlStorage>>({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test',
+        storageHash: 'test',
         storage: { tables: {} },
         models: {},
         relations: {},
@@ -64,7 +64,7 @@ describe('capabilities', () => {
       const contract = validateContract<SqlContract<SqlStorage>>({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test',
+        storageHash: 'test',
         storage: { tables: {} },
         models: {},
         relations: {},
@@ -86,7 +86,7 @@ describe('capabilities', () => {
       const contract = validateContract<SqlContract<SqlStorage>>({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test',
+        storageHash: 'test',
         storage: { tables: {} },
         models: {},
         relations: {},
@@ -108,7 +108,7 @@ describe('capabilities', () => {
       const contract = validateContract<SqlContract<SqlStorage>>({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test',
+        storageHash: 'test',
         storage: { tables: {} },
         models: {},
         relations: {},
@@ -124,7 +124,7 @@ describe('capabilities', () => {
       const contract = validateContract<SqlContract<SqlStorage>>({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test',
+        storageHash: 'test',
         storage: { tables: {} },
         models: {},
         relations: {},
@@ -141,7 +141,7 @@ describe('capabilities', () => {
       const contract = validateContract<SqlContract<SqlStorage>>({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test',
+        storageHash: 'test',
         storage: { tables: {} },
         models: {},
         relations: {},
@@ -162,7 +162,7 @@ describe('capabilities', () => {
       const contract = validateContract<SqlContract<SqlStorage>>({
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test',
+        storageHash: 'test',
         storage: { tables: {} },
         models: {},
         relations: {},

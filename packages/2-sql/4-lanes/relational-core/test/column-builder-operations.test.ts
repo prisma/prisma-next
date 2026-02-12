@@ -15,7 +15,7 @@ describe('ColumnBuilder operations', () => {
   const contract = validateContract({
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'test-hash',
+    storageHash: 'test-hash',
     storage: {
       tables: {
         user: {

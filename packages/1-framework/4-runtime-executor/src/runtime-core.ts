@@ -165,12 +165,20 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
 
     const marker = parseContractMarkerRow(result.rows[0]);
 
-    const contract = this.contract as { coreHash: string; profileHash?: string | null };
-    if (marker.coreHash !== contract.coreHash) {
-      throw runtimeError('CONTRACT.MARKER_MISMATCH', 'Database core hash does not match contract', {
-        expected: contract.coreHash,
-        actual: marker.coreHash,
-      });
+    const contract = this.contract as {
+      storageHash: string;
+      executionHash?: string | null;
+      profileHash?: string | null;
+    };
+    if (marker.storageHash !== contract.storageHash) {
+      throw runtimeError(
+        'CONTRACT.MARKER_MISMATCH',
+        'Database storage hash does not match contract',
+        {
+          expected: contract.storageHash,
+          actual: marker.storageHash,
+        },
+      );
     }
 
     const expectedProfile = contract.profileHash ?? null;

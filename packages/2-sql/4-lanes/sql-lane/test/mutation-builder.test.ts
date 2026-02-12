@@ -10,6 +10,7 @@ import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/t
 import { describe, expect, it } from 'vitest';
 import { sql } from '../src/sql/builder';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
+import type { GeneratedContract } from './fixtures/contract-generated.d';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -18,6 +19,13 @@ function loadContract(name: string): Contract {
   const contents = readFileSync(filePath, 'utf8');
   const contractJson = JSON.parse(contents);
   return validateContract<Contract>(contractJson);
+}
+
+function loadGeneratedContract(name: string): GeneratedContract {
+  const filePath = join(fixtureDir, `${name}.json`);
+  const contents = readFileSync(filePath, 'utf8');
+  const contractJson = JSON.parse(contents);
+  return validateContract<GeneratedContract>(contractJson);
 }
 
 describe('mutation builder edge cases', () => {
@@ -301,6 +309,94 @@ describe('mutation builder edge cases', () => {
 
       expect(plan.meta.annotations?.codecs).toBeDefined();
       expect(plan.meta.annotations?.codecs?.['userId']).toBe('pg/int4@1');
+    });
+  });
+});
+
+describe('mutation builder generated defaults', () => {
+  const contract = loadGeneratedContract('contract-generated');
+  const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
+  const tables = schema<GeneratedContract>(context).tables;
+  const userTable = tables.user;
+
+  it('applies generated defaults for insert', () => {
+    const plan = sql<GeneratedContract, CodecTypes>({ context })
+      .insert(userTable, {
+        email: param('email'),
+      })
+      .build({ params: { email: 'test@example.com' } });
+
+    expect(plan.ast).toMatchObject({
+      kind: 'insert',
+      values: expect.objectContaining({
+        id: expect.any(Object),
+      }),
+    });
+    expect(plan.params).toHaveLength(2);
+  });
+
+  it('uses provided values over generated defaults', () => {
+    const plan = sql<GeneratedContract, CodecTypes>({ context })
+      .insert(userTable, {
+        id: param('id'),
+        email: param('email'),
+      })
+      .build({ params: { id: 'user_1', email: 'test@example.com' } });
+
+    expect(plan.params).toContain('user_1');
+  });
+
+  it('applies generated defaults for update when onUpdate is present', () => {
+    const contractWithUpdateDefault = {
+      ...contract,
+      execution: {
+        mutations: {
+          defaults: [
+            ...(contract.execution?.mutations.defaults ?? []),
+            {
+              ref: { table: 'user', column: 'id' },
+              onUpdate: { kind: 'generator', id: 'uuidv7' },
+            },
+          ],
+        },
+      },
+    } as GeneratedContract;
+    const updateContext = createTestContext(contractWithUpdateDefault, adapter);
+    const updateTables = schema<GeneratedContract>(updateContext).tables;
+    const updateUserTable = updateTables.user;
+    const updateUserColumns = updateUserTable.columns;
+
+    const plan = sql<GeneratedContract, CodecTypes>({ context: updateContext })
+      .update(updateUserTable, {
+        email: param('email'),
+      })
+      .where(updateUserColumns.id.eq(param('id')))
+      .build({ params: { id: 'user_1', email: 'updated@example.com' } });
+
+    expect(plan.ast).toMatchObject({
+      kind: 'update',
+      set: expect.objectContaining({
+        id: expect.any(Object),
+        email: expect.any(Object),
+      }),
+    });
+    expect(plan.params).toHaveLength(3);
+  });
+
+  it('supports calling returning before where for update', () => {
+    const updateUserColumns = tables.user.columns;
+    const plan = sql<GeneratedContract, CodecTypes>({ context })
+      .update(userTable, {
+        email: param('email'),
+      })
+      .returning(updateUserColumns.id)
+      .where(updateUserColumns.id.eq(param('id')))
+      .build({ params: { id: 'user_1', email: 'updated@example.com' } });
+
+    expect(plan.ast).toMatchObject({
+      kind: 'update',
+      returning: [createColumnRef('user', 'id')],
     });
   });
 });

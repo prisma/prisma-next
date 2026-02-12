@@ -82,7 +82,7 @@ describe('DML builders', () => {
       expect(plan.params).toEqual(['test@example.com', new Date('2024-01-01')]);
       expect(plan.meta).toMatchObject({
         target: 'postgres',
-        coreHash: contract.coreHash,
+        storageHash: contract.storageHash,
         lane: 'dsl',
         annotations: {
           intent: 'write',
@@ -159,7 +159,7 @@ describe('DML builders', () => {
       expect(plan.params).toEqual(['updated@example.com', 1]);
       expect(plan.meta).toMatchObject({
         target: 'postgres',
-        coreHash: contract.coreHash,
+        storageHash: contract.storageHash,
         lane: 'dsl',
         annotations: {
           intent: 'write',
@@ -237,7 +237,7 @@ describe('DML builders', () => {
       expect(plan.params).toEqual([1]);
       expect(plan.meta).toMatchObject({
         target: 'postgres',
-        coreHash: contract.coreHash,
+        storageHash: contract.storageHash,
         lane: 'dsl',
         annotations: {
           intent: 'write',

@@ -7,7 +7,7 @@ describe('validateContract structure validation', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test',
+    storageHash: 'sha256:test',
     models: {},
     storage: {
       tables: {
@@ -50,10 +50,10 @@ describe('validateContract structure validation', () => {
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/target/);
   });
 
-  it('throws on missing coreHash', () => {
+  it('throws on missing storageHash', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-    const invalid = { ...validContractInput, coreHash: undefined } as any;
-    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/coreHash/);
+    const invalid = { ...validContractInput, storageHash: undefined } as any;
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(/storageHash/);
   });
 
   it('throws on missing storage', () => {

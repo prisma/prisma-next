@@ -61,7 +61,7 @@ describe('emitContract API', () => {
       const result = await familyInstance.emitContract({ contractIR: contractRaw });
 
       expect(result).toBeDefined();
-      expect(result.coreHash).toBeDefined();
+      expect(result.storageHash).toBeDefined();
       expect(result.profileHash).toBeDefined();
       expect(result.contractJson).toBeDefined();
       expect(result.contractDts).toBeDefined();

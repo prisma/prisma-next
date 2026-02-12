@@ -15,7 +15,7 @@ Prisma Next also addresses the largest weakness in the legacy Prisma ORM: a mono
 ## Guiding Principles
 
 ### Contract-first
-The contract is the center of gravity. A single canonical `contract.json` defines what exists, what’s allowed, and what’s expected. Both planes ingest the same deterministic data and verify `coreHash` and `profileHash` against the database marker before acting. Contracts carry no executable logic; they are data that gates execution (ADR 006, ADR 010, ADR 021)
+The contract is the center of gravity. A single canonical `contract.json` defines what exists, what’s allowed, and what’s expected. Both planes ingest the same deterministic data and verify `storageHash` and `profileHash` against the database marker before acting. Contracts carry no executable logic; they are data that gates execution (ADR 006, ADR 010, ADR 021)
 
 ### Plans are the product
 We don’t execute intent directly; we compile it into immutable Plans. Every query plan lowers to one statement for predictability and guardrails, and every migration is a contract→contract edge with verifiable pre and post conditions. Plans are hashable, auditable, and portable across environments (ADR 002, ADR 003, ADR 001, ADR 011)
@@ -39,16 +39,16 @@ Fast, targeted feedback at authoring, planning, and execution time. Lints and bu
 
 Prisma Next is organized around two planes that share the contract and a pinned capability profile
 
-- **Migration Plane** (build time): authoring, planning, verifying, and applying contract changes
-- **Query Plane** (runtime): authoring, validating, and executing query plans against live data
+- **Control Plane** (build time): authoring, planning, verifying, and applying contract changes
+- **Execution Plane** (runtime): authoring, validating, and executing query plans against live data
 
 Both planes operate on the same shared artifacts (produced and consumed via a small Common "shared" plane):
 
-- **Data Contract:** Generated from PSL + TypeScript builders + extension manifests and distributed as JSON alongside TypeScript definitions
+- **Data Contract:** Generated from PSL + TypeScript builders + extension manifests and distributed as JSON alongside TypeScript definitions, including `storageHash` and optional `executionHash` for execution defaults
 - **Capability profile:** The contract declares required capabilities (and optional adapter pins) and emits a pinned `profileHash`. The runner verifies the database satisfies the contract and writes the same `profileHash` to the marker (ADR 117, ADR 021)
 - **Plan Factories:** Compile declarative inputs into deterministic plans with hash-stamped metadata
 - **Guardrail Plugins:** Applied during plan creation, preflight, and runtime execution
-- **Marker and ledger:** Database marker storing `coreHash` and `profileHash` plus an append-only ledger of applied edges for verification and audit (ADR 021, ADR 001)
+- **Marker and ledger:** Database marker storing `storageHash` and `profileHash` plus an append-only ledger of applied edges for verification and audit (ADR 021, ADR 001)
 
 ### Diagram — System map
 
@@ -61,7 +61,7 @@ flowchart LR
     Mk[(Marker + Ledger)]
   end
 
-  subgraph "Migration Plane"
+  subgraph "Control Plane"
     Auth[Authoring
     PSL/TS + Packs]
     Plan[Planner
@@ -72,7 +72,7 @@ flowchart LR
     idempotent ops + checks]
   end
 
-  subgraph "Query Plane"
+  subgraph "Execution Plane"
     QF["Plan Factories
     DSL | TypedSQL | Raw"]
     RT[Runtime
@@ -112,7 +112,7 @@ Quick links to detailed subsystem specifications:
 - [No-Emit Workflow](architecture%20docs/subsystems/9.%20No-Emit%20Workflow.md) — TS-first authoring, watch plugins, and CI trust model
 - [Error Handling](Error%20Handling.md) — Shared taxonomy (failures vs operational errors vs bugs) and boundary conversion patterns
 
-## Migration Plane — Self-Verifying Change
+## Control Plane — Self-Verifying Change
 
 **Authoring**
 
@@ -165,7 +165,7 @@ sequenceDiagram
   Runner->>DB: Acquire advisory lock
   Runner->>DB: Run ops with pre/post checks
   DB-->>Runner: Success
-  Runner->>Marker: Update coreHash/profileHash, write ledger
+  Runner->>Marker: Update storageHash/profileHash, write ledger
 ```
 
 ## Domains and Responsibilities
@@ -178,7 +178,7 @@ Notes
 - Family vs Target: “Target‑family” (SQL) applies to any SQL dialect; “target” is a concrete dialect (Postgres, MySQL). Family code lives in the SQL domain; dialect code lives in Extensions.
 - Repository layout: concrete targets (dialects), adapters, and drivers live under `packages/3-targets/**`. Adapters commonly expose multiple entrypoints from a single package — `./adapter` (shared core), `./control` (migration), `./runtime` (runtime) — mapped to planes via subpath globs in `architecture.config.json`.
 - Plane boundaries: Shared plane hosts type‑only code and validators safe for both planes. Migration and Runtime must not import code across planes; runtime consumes artifacts and shared‑plane types only.
-## Query Plane — Runtime Assertions
+## Execution Plane — Runtime Assertions
 
 **Authoring**
 
@@ -187,12 +187,12 @@ Notes
 
 **Planning**
 
-- Every query compiles to a plan `{ sql, params, meta: { coreHash, optional profileHash, lane, annotations, refs } }`
+- Every query compiles to a plan `{ sql, params, meta: { storageHash, optional profileHash, lane, annotations, refs } }`
 - Plans are immutable and executable across environments
 
 **Verification**
 
-- Runtime verifies marker `coreHash` and `profileHash` equality with the contract and applies lint rules and budgets configured by policy
+- Runtime verifies marker `storageHash` and `profileHash` equality with the contract and applies lint rules and budgets configured by policy
 - Extensible linting highlights potential issues before execution
  - Runtime validates declared codec `typeId` coverage: if the contract declares a per-column `typeId` (via extension decoration), a matching codec must be present in the composed registry or execution fails with a stable error
 
@@ -226,9 +226,9 @@ sequenceDiagram
   participant Codecs as Codecs
 
   App->>Factory: Build plan (DSL/TypedSQL/Raw)
-  Factory-->>App: Plan{sql,params,meta{coreHash,lane,annotations,refs}}
+  Factory-->>App: Plan{sql,params,meta{storageHash,lane,annotations,refs}}
   App->>Runtime: execute(plan)
-  Runtime->>Runtime: Verify marker coreHash/profileHash
+  Runtime->>Runtime: Verify marker storageHash/profileHash
   Runtime->>Plugins: Lints and budgets (policy)
   alt auto mode selection
     Runtime->>DB: EXPLAIN or probe fetch
@@ -241,7 +241,7 @@ sequenceDiagram
 ```
 ## Guardrails and Feedback Matrix
 
-| Stage            | Migration Plane                                                  | Query Plane                                                     |
+| Stage            | Control Plane                                                  | Execution Plane                                                     |
 |------------------|------------------------------------------------------------------|-----------------------------------------------------------------|
 | Authoring        | Contract builders validate schema intent and capability usage.   | DSL annotations and TypedSQL expose capabilities and policies. |
 | Planning         | Planner simulates edges; hash-stamps preconditions and outcomes. | Plan factories attach lint/budget annotations. |

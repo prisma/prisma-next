@@ -26,15 +26,15 @@ function createMockComponents() {
     verify: async (): Promise<VerifyDatabaseResult> => ({
       ok: true,
       summary: 'Verification passed',
-      contract: { coreHash: 'test-hash' },
-      marker: { coreHash: 'test-hash' },
+      contract: { storageHash: 'test-hash' },
+      marker: { storageHash: 'test-hash' },
       target: { expected: 'postgres' },
       timings: { total: 10 },
     }),
     schemaVerify: async (): Promise<VerifyDatabaseSchemaResult> => ({
       ok: true,
       summary: 'Schema verification passed',
-      contract: { coreHash: 'test-hash' },
+      contract: { storageHash: 'test-hash' },
       target: { expected: 'postgres' },
       schema: {
         issues: [],
@@ -56,13 +56,13 @@ function createMockComponents() {
     sign: async (): Promise<SignDatabaseResult> => ({
       ok: true,
       summary: 'Database signed successfully',
-      contract: { coreHash: 'test-hash' },
+      contract: { storageHash: 'test-hash' },
       target: { expected: 'postgres' },
       marker: { created: false, updated: true },
       timings: { total: 10 },
     }),
     emitContract: async () => ({
-      coreHash: 'test-core-hash',
+      storageHash: 'test-core-hash',
       profileHash: 'test-profile-hash',
       contractJson: '{"test": true}',
       contractDts: 'export interface Contract {}',
@@ -226,7 +226,7 @@ describe('ControlClient progress emission', () => {
       mockFamilyInstance.schemaVerify = async (): Promise<VerifyDatabaseSchemaResult> => ({
         ok: false,
         summary: 'Schema mismatch',
-        contract: { coreHash: 'test-hash' },
+        contract: { storageHash: 'test-hash' },
         target: { expected: 'postgres' },
         schema: {
           issues: [],

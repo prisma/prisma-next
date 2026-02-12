@@ -58,7 +58,7 @@ export interface MigrationPlan {
   readonly targetId: string;
   /** Destination contract identity that the plan intends to reach. */
   readonly destination: {
-    readonly coreHash: string;
+    readonly storageHash: string;
     readonly profileHash?: string;
   };
   /** Ordered list of operations to execute. */

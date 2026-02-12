@@ -48,7 +48,8 @@ describe('delete with vector operations', () => {
   const contractWithVector = validateContract<SqlContract<SqlStorage>>({
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'test-hash',
+    storageHash: 'sha256:test-storage-hash',
+    profileHash: 'sha256:test-profile-hash',
     storage: {
       tables: {
         user: {

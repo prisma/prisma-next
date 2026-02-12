@@ -25,6 +25,12 @@
       "plane": "migration"
     },
     {
+      "glob": "packages/1-framework/2-authoring/ids/**",
+      "domain": "framework",
+      "layer": "authoring",
+      "plane": "migration"
+    },
+    {
       "glob": "packages/1-framework/3-tooling/**",
       "domain": "framework",
       "layer": "tooling",

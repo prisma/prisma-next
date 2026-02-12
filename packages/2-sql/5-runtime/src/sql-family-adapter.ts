@@ -33,11 +33,15 @@ export class SqlFamilyAdapter<TContract extends SqlContract<SqlStorage>>
       });
     }
 
-    if (plan.meta.coreHash !== contract.coreHash) {
-      throw runtimeError('PLAN.HASH_MISMATCH', 'Plan core hash does not match runtime contract', {
-        planCoreHash: plan.meta.coreHash,
-        runtimeCoreHash: contract.coreHash,
-      });
+    if (plan.meta.storageHash !== contract.storageHash) {
+      throw runtimeError(
+        'PLAN.HASH_MISMATCH',
+        'Plan storage hash does not match runtime contract',
+        {
+          planStorageHash: plan.meta.storageHash,
+          runtimeStorageHash: contract.storageHash,
+        },
+      );
     }
   }
 }
