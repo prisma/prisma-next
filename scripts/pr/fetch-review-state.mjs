@@ -332,7 +332,6 @@ const COMMENTS_QUERY = `
             createdAt
             body
             reactionGroups { content users { totalCount } }
-            replyTo { id }
           }
         }
       }
