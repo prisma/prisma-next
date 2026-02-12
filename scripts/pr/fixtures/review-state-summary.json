@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "pr": {
+    "url": "https://github.com/owner/repo/pull/123",
+    "nodeId": "PR_kwDOEXAMPLE",
+    "number": 123,
+    "title": "Review framework canonical artifacts",
+    "state": "OPEN"
+  },
+  "fetchedAt": "2026-02-12T00:00:00.000Z",
+  "sourceBranch": "feature/review-framework",
+  "counts": {
+    "unresolvedThreads": 1,
+    "reviewsWithBody": 1,
+    "issueComments": 1
+  },
+  "unresolvedThreadNodeIds": ["PRRT_1"],
+  "reviewNodeIds": ["PRR_1"],
+  "issueCommentNodeIds": ["IC_1"]
+}
