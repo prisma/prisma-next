@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "pr": {
+    "url": "https://github.com/owner/repo/pull/123",
+    "nodeId": "PR_kwDOEXAMPLE"
+  },
+  "reviewState": {
+    "path": "review-state.json",
+    "fetchedAt": "2026-02-12T00:00:00.000Z"
+  },
+  "actions": [
+    {
+      "actionId": "A-001",
+      "target": {
+        "kind": "review_thread",
+        "nodeId": "PRRT_1",
+        "url": "https://github.com/owner/repo/pull/123#discussion_r1"
+      },
+      "decision": "will_address",
+      "summary": "Normalize reaction groups before rendering",
+      "rationale": null,
+      "targetFiles": ["scripts/pr/fetch-review-state.mjs"],
+      "acceptance": "Reaction groups are content-sorted and counts-only.",
+      "status": "pending",
+      "done": null
+    },
+    {
+      "actionId": "A-002",
+      "target": {
+        "kind": "issue_comment",
+        "nodeId": "IC_1"
+      },
+      "decision": "defer",
+      "summary": "Defer docs follow-ups to the next task group",
+      "rationale": "Task Group 1 is scoped to canonical artifacts and normalization utilities.",
+      "status": "pending"
+    }
+  ]
+}
