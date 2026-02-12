@@ -11,11 +11,7 @@ import type {
   RuntimeVerifyOptions,
   TelemetryOutcome,
 } from '@prisma-next/runtime-executor';
-import {
-  AsyncIterableResult,
-  createRuntimeCore,
-  runtimeError,
-} from '@prisma-next/runtime-executor';
+import { AsyncIterableResult, createRuntimeCore } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
@@ -36,7 +32,6 @@ import type {
   SqlRuntimeAdapterInstance,
   SqlRuntimeExtensionInstance,
 } from './sql-context';
-import { assertExecutionStackContractRequirements, createExecutionContext } from './sql-context';
 import { SqlFamilyAdapter } from './sql-family-adapter';
 
 export interface RuntimeOptions<
@@ -66,9 +61,8 @@ export interface CreateRuntimeOptions<
     RuntimeDriverInstance<'sql', TTargetId>,
     SqlRuntimeExtensionInstance<TTargetId>
   >;
-  readonly contract: TContract;
-  readonly context?: ExecutionContext<TContract>;
-  readonly driverOptions?: unknown;
+  readonly context: ExecutionContext<TContract>;
+  readonly driver: SqlDriver;
   readonly verify: RuntimeVerifyOptions;
   readonly plugins?: readonly Plugin<
     TContract,
@@ -79,13 +73,27 @@ export interface CreateRuntimeOptions<
   readonly log?: Log;
 }
 
-export interface Runtime {
-  execute<Row = Record<string, unknown>>(
-    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
-  ): AsyncIterableResult<Row>;
+export interface Runtime extends RuntimeQueryable {
+  connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
   operations(): OperationRegistry;
+}
+
+export interface RuntimeConnection extends RuntimeQueryable {
+  transaction(): Promise<RuntimeTransaction>;
+  release(): Promise<void>;
+}
+
+export interface RuntimeTransaction extends RuntimeQueryable {
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
+
+export interface RuntimeQueryable {
+  execute<Row = Record<string, unknown>>(
+    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+  ): AsyncIterableResult<Row>;
 }
 
 export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
@@ -182,6 +190,10 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     return new AsyncIterableResult(iterator(this));
   }
 
+  connection(): Promise<RuntimeConnection> {
+    return this.core.connection();
+  }
+
   telemetry(): RuntimeTelemetryEvent | null {
     return this.core.telemetry();
   }
@@ -195,90 +207,13 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
   }
 }
 
-function createOfflineDriver(): SqlDriver {
-  const missingDriver = () =>
-    runtimeError(
-      'RUNTIME.DRIVER_MISSING',
-      'Runtime created without driver options. Provide driver options to execute queries.',
-    );
-
-  return {
-    async connect() {
-      throw missingDriver();
-    },
-    async acquireConnection() {
-      throw missingDriver();
-    },
-    async *execute() {
-      yield* [];
-      throw missingDriver();
-    },
-    async query() {
-      throw missingDriver();
-    },
-    async close() {},
-  };
-}
-
-function isSqlDriver(driver: unknown): driver is SqlDriver {
-  if (!driver || typeof driver !== 'object') {
-    return false;
-  }
-  const candidate = driver as SqlDriver;
-  return (
-    typeof candidate.connect === 'function' &&
-    typeof candidate.execute === 'function' &&
-    typeof candidate.query === 'function' &&
-    typeof candidate.close === 'function'
-  );
-}
-
 export function createRuntime<TContract extends SqlContract<SqlStorage>, TTargetId extends string>(
   options: CreateRuntimeOptions<TContract, TTargetId>,
 ): Runtime {
-  const { stackInstance, contract, context, driverOptions, verify, plugins, mode, log } = options;
-
-  assertExecutionStackContractRequirements(contract, stackInstance.stack);
-
-  const resolvedContext =
-    context ??
-    createExecutionContext({
-      contract,
-      stackInstance,
-    });
-
-  // NOTE: Driver instantiation is handled here (instead of in instantiateExecutionStack) because
-  // runtime drivers currently receive connection information at construction time (need driverOptions).
-  //
-  // That makes it impossible to instantiate the stack in instantiateExecutionStack() which is a
-  // framework domain utility and unaware of the driver connection data structure.
-  //
-  // That forces this function to juggle offline mode + driverOptions/descriptor mismatches +
-  // runtime-shape validation. This will get simpler in TML-1837 once drivers can be instantiated
-  // unbound and connected later.
-  if (driverOptions !== undefined && !stackInstance.stack.driver) {
-    throw runtimeError(
-      'RUNTIME.DRIVER_OPTIONS_WITHOUT_DESCRIPTOR',
-      'Driver options provided, but the execution stack has no driver descriptor.',
-    );
-  }
-
-  let driver: SqlDriver;
-  if (stackInstance.stack.driver && driverOptions !== undefined) {
-    const driverInstance = stackInstance.stack.driver.create(driverOptions);
-    if (!isSqlDriver(driverInstance)) {
-      throw runtimeError(
-        'RUNTIME.INVALID_DRIVER_INSTANCE',
-        'Execution stack driver does not implement SqlDriver interface.',
-      );
-    }
-    driver = driverInstance;
-  } else {
-    driver = createOfflineDriver();
-  }
+  const { stackInstance, context, driver, verify, plugins, mode, log } = options;
 
   return new SqlRuntimeImpl({
-    context: resolvedContext,
+    context,
     adapter: stackInstance.adapter,
     driver,
     verify,

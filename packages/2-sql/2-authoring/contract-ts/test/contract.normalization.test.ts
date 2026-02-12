@@ -13,7 +13,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -38,7 +38,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -62,7 +62,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -86,7 +86,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -110,7 +110,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -135,7 +135,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -157,7 +157,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -181,7 +181,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -205,7 +205,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -238,7 +238,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -264,7 +264,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -290,7 +290,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {
         User: {
           storage: { table: 'User' },
@@ -337,7 +337,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {
         User: {
           storage: { table: 'User' },
@@ -369,7 +369,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -394,7 +394,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -419,7 +419,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -444,7 +444,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -469,7 +469,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
@@ -494,7 +494,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {
         User: {
           storage: { table: 'user' },
@@ -542,7 +542,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {
         User: {
           storage: { table: 'User' },
@@ -623,7 +623,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {
         User: {
           storage: { table: 'User' },
@@ -692,7 +692,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: null, // Storage is null - should hit else branch at line 390
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -707,7 +707,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         // No tables property - should hit else branch at line 394
@@ -725,7 +725,7 @@ describe('validateContract normalization', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: null, // Models is null - should hit else branch at line 436
       storage: {
         tables: {},

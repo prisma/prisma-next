@@ -6,6 +6,7 @@
  * - Unique indexes/constraints can satisfy non-unique index requirements
  * - Name differences do not cause operations to be emitted
  */
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -231,8 +232,8 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:contract' as never,
-    profileHash: 'sha256:profile' as never,
+    storageHash: coreHash('sha256:contract'),
+    profileHash: profileHash('sha256:profile'),
     storage: {
       tables: {},
     },

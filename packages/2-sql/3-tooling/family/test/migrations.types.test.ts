@@ -30,16 +30,16 @@ describe('createMigrationPlan', () => {
 
     const plan = createMigrationPlan<TestTargetDetails>({
       targetId: 'postgres',
-      origin: { coreHash: 'originCore', profileHash: 'originProfile' },
-      destination: { coreHash: 'core', profileHash: 'profile' },
+      origin: { storageHash: 'originCore', profileHash: 'originProfile' },
+      destination: { storageHash: 'core', profileHash: 'profile' },
       operations: sourceOperations as readonly SqlMigrationPlanOperation<TestTargetDetails>[],
       meta: { marker: 'none' },
     });
 
     expect(plan).toMatchObject({
       targetId: 'postgres',
-      origin: { coreHash: 'originCore', profileHash: 'originProfile' },
-      destination: { coreHash: 'core', profileHash: 'profile' },
+      origin: { storageHash: 'originCore', profileHash: 'originProfile' },
+      destination: { storageHash: 'core', profileHash: 'profile' },
       operations: [
         {
           id: 'operation.table.user',
@@ -62,7 +62,7 @@ describe('createMigrationPlan', () => {
     const mutableDetails = { schema: 'public', objectType: 'table' as const, name: 'user' };
     const plan = createMigrationPlan({
       targetId: 'postgres',
-      destination: { coreHash: 'abc' },
+      destination: { storageHash: 'abc' },
       operations: [
         {
           id: 'op1',
@@ -94,7 +94,7 @@ describe('createMigrationPlan', () => {
   it('preserves primitive details without cloning', () => {
     const plan = createMigrationPlan({
       targetId: 'postgres',
-      destination: { coreHash: 'abc' },
+      destination: { storageHash: 'abc' },
       operations: [
         {
           id: 'op1',
@@ -117,7 +117,7 @@ describe('createMigrationPlan', () => {
     const mutableArray = ['item1', 'item2'];
     const plan = createMigrationPlan({
       targetId: 'postgres',
-      destination: { coreHash: 'abc' },
+      destination: { storageHash: 'abc' },
       operations: [
         {
           id: 'op1',
@@ -145,7 +145,7 @@ describe('planner helpers', () => {
   it('produce immutable envelopes that clone conflict metadata', () => {
     const plan: SqlMigrationPlan<TestTargetDetails> = createMigrationPlan({
       targetId: 'postgres',
-      destination: { coreHash: 'abc', profileHash: 'def' },
+      destination: { storageHash: 'abc', profileHash: 'def' },
       operations: [],
     });
     const success = plannerSuccess(plan);

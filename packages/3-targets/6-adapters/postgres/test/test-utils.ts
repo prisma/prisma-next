@@ -5,6 +5,7 @@
  * schemas, and other common test fixtures.
  */
 
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
@@ -19,7 +20,7 @@ export function createTestContract(storage: Partial<SqlStorage> = {}): SqlContra
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test' as never,
+    storageHash: coreHash('sha256:test'),
     storage: {
       tables: {},
       types: {},

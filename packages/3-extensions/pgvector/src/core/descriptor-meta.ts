@@ -1,4 +1,3 @@
-import type { ExtensionPackRef } from '@prisma-next/contract/framework-components';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 
 const pgvectorTypeId = 'pg/vector@1' as const;
@@ -9,16 +8,17 @@ const cosineLowering = {
   template: '1 - ({{self}} <=> {{arg0}})',
 } as const;
 
-/**
- * Shared operation definition used by both pack metadata and runtime descriptor.
- * Frozen to prevent accidental mutation.
- */
 const cosineDistanceOperation = Object.freeze({
   method: 'cosineDistance',
   args: [{ kind: 'param' }],
   returns: { kind: 'builtin', type: 'number' },
   lowering: cosineLowering,
 } as const);
+
+export const pgvectorOperationSignature: SqlOperationSignature = {
+  forTypeId: pgvectorTypeId,
+  ...cosineDistanceOperation,
+};
 
 export const pgvectorPackMeta = {
   kind: 'extension',
@@ -45,9 +45,6 @@ export const pgvectorPackMeta = {
           alias: 'Vector',
         },
       ],
-      // Parameterized codec renderers for type emission.
-      // The renderer template produces precise TypeScript types like Vector<1536>
-      // when columns have typeParams with a `length` property.
       parameterized: {
         [pgvectorTypeId]: 'Vector<{{length}}>',
       },
@@ -63,15 +60,4 @@ export const pgvectorPackMeta = {
       { typeId: pgvectorTypeId, familyId: 'sql', targetId: 'postgres', nativeType: 'vector' },
     ],
   },
-  operations: [
-    {
-      for: pgvectorTypeId,
-      ...cosineDistanceOperation,
-    },
-  ],
-} as const satisfies ExtensionPackRef<'sql', 'postgres'>;
-
-export const pgvectorRuntimeOperation: SqlOperationSignature = {
-  forTypeId: pgvectorTypeId,
-  ...cosineDistanceOperation,
-};
+} as const;

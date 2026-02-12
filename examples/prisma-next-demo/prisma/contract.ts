@@ -1,12 +1,14 @@
 import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import {
-  int4Column,
+  enumColumn,
+  enumType,
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
 import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
+import { uuidv4 } from '@prisma-next/ids';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
@@ -14,30 +16,27 @@ type AllCodecTypes = CodecTypes & PgVectorCodecTypes;
 
 export const contract = defineContract<AllCodecTypes>()
   .target(postgresPack)
+  .storageType('user_type', enumType('user_type', ['admin', 'user']))
   .table('user', (t) =>
     t
-      .column('id', {
-        type: int4Column,
-        nullable: false,
-        default: { kind: 'function', expression: 'autoincrement()' },
-      })
+      .generated('id', uuidv4())
       .column('email', { type: textColumn, nullable: false })
       .column('createdAt', {
         type: timestamptzColumn,
         nullable: false,
         default: { kind: 'function', expression: 'now()' },
       })
+      .column('kind', {
+        type: enumColumn('user_type', 'user_type'),
+        nullable: false,
+      })
       .primaryKey(['id']),
   )
   .table('post', (t) =>
     t
-      .column('id', {
-        type: int4Column,
-        nullable: false,
-        default: { kind: 'function', expression: 'autoincrement()' },
-      })
+      .generated('id', uuidv4())
       .column('title', { type: textColumn, nullable: false })
-      .column('userId', { type: int4Column, nullable: false })
+      .column('userId', { type: textColumn, nullable: false })
       .column('createdAt', {
         type: timestamptzColumn,
         nullable: false,
@@ -52,6 +51,7 @@ export const contract = defineContract<AllCodecTypes>()
       .field('id', 'id')
       .field('email', 'email')
       .field('createdAt', 'createdAt')
+      .field('kind', 'kind')
       .relation('posts', {
         toModel: 'Post',
         toTable: 'post',
@@ -90,7 +90,6 @@ export const contract = defineContract<AllCodecTypes>()
       jsonAgg: true,
       returning: true,
       'pgvector/cosine': true,
-      'defaults.autoincrement': true,
       'defaults.now': true,
     },
   })

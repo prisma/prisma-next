@@ -2,7 +2,7 @@
  * CLI Application Entry Point (No-Emit Workflow)
  *
  * This is a command-line demo that showcases the "no-emit" workflow where the
- * contract is defined inline in TypeScript (prisma-no-emit/query-no-emit.ts)
+ * contract is defined inline in TypeScript (prisma-no-emit/context.ts)
  * rather than emitted to separate JSON/d.ts files.
  *
  * This workflow is useful for:
@@ -24,7 +24,7 @@
  */
 import 'dotenv/config';
 import { type as arktype } from 'arktype';
-import { getRuntime } from './prisma-no-emit/runtime-no-emit';
+import { getRuntime } from './prisma-no-emit/runtime';
 import { getUserById } from './queries/get-user-by-id-no-emit';
 import { getUserPosts } from './queries/get-user-posts-no-emit';
 import { getUsers } from './queries/get-users-no-emit';
@@ -63,8 +63,7 @@ async function main() {
         console.error('Usage: pnpm start:no-emit -- user <userId>');
         process.exit(1);
       }
-      const userId = Number.parseInt(userIdStr, 10);
-      const user = await getUserById(userId, runtime);
+      const user = await getUserById(userIdStr, runtime);
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'posts') {
       const [userIdStr] = args;
@@ -72,8 +71,7 @@ async function main() {
         console.error('Usage: pnpm start:no-emit -- posts <userId>');
         process.exit(1);
       }
-      const userId = Number.parseInt(userIdStr, 10);
-      const posts = await getUserPosts(userId, runtime);
+      const posts = await getUserPosts(userIdStr, runtime);
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'users-with-posts') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;

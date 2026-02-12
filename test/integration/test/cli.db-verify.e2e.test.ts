@@ -78,8 +78,8 @@ withTempDir(({ createTempDir }) => {
 
               // Write marker matching contract
               const write = writeContractMarker({
-                coreHash: contract.coreHash,
-                profileHash: contract.profileHash ?? contract.coreHash,
+                storageHash: contract.storageHash,
+                profileHash: contract.profileHash ?? contract.storageHash,
                 contractJson: contract,
                 canonicalVersion: 1,
               });
@@ -112,19 +112,23 @@ withTempDir(({ createTempDir }) => {
               ok: true,
               summary: expect.any(String),
               contract: {
-                coreHash: expect.any(String),
+                storageHash: expect.any(String),
               },
               marker: {
-                coreHash: expect.any(String),
+                storageHash: expect.any(String),
               },
               target: {
                 expected: expect.any(String),
               },
             });
 
-            // Verify coreHash matches
-            expect((parsed['contract'] as { coreHash: string }).coreHash).toBe(contract.coreHash);
-            expect((parsed['marker'] as { coreHash: string }).coreHash).toBe(contract.coreHash);
+            // Verify storageHash matches
+            expect((parsed['contract'] as { storageHash: string }).storageHash).toBe(
+              contract.storageHash,
+            );
+            expect((parsed['marker'] as { storageHash: string }).storageHash).toBe(
+              contract.storageHash,
+            );
             expect(consoleErrors.length).toBe(0);
           },
           // Use random ports to avoid conflicts in CI (no options = random ports)
@@ -235,8 +239,8 @@ withTempDir(({ createTempDir }) => {
 
             // Write marker matching contract
             const write = writeContractMarker({
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
+              storageHash: contract.storageHash,
+              profileHash: contract.profileHash ?? contract.storageHash,
               contractJson: contract,
               canonicalVersion: 1,
             });
@@ -269,10 +273,10 @@ withTempDir(({ createTempDir }) => {
             ok: true,
             summary: expect.any(String),
             contract: {
-              coreHash: expect.any(String),
+              storageHash: expect.any(String),
             },
             marker: {
-              coreHash: expect.any(String),
+              storageHash: expect.any(String),
             },
             target: {
               expected: expect.any(String),
@@ -324,7 +328,7 @@ withTempDir(({ createTempDir }) => {
           const contractJsonPath = join(testDir, 'output', 'contract.json');
           const contract = loadContractFromDisk<SqlContract<SqlStorage>>(contractJsonPath);
           expect(contract).toBeDefined();
-          expect(contract.coreHash).toBeDefined();
+          expect(contract.storageHash).toBeDefined();
 
           const command = createDbVerifyCommand();
           const verifyCwd4 = process.cwd();
@@ -412,8 +416,8 @@ withTempDir(({ createTempDir }) => {
 
             // Write marker matching contract
             const write = writeContractMarker({
-              coreHash: contract.coreHash,
-              profileHash: contract.profileHash ?? contract.coreHash,
+              storageHash: contract.storageHash,
+              profileHash: contract.profileHash ?? contract.storageHash,
               contractJson: contract,
               canonicalVersion: 1,
             });

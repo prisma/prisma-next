@@ -1,5 +1,6 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { ResultType } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -16,8 +17,8 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  coreHash: 'sha256:dml-test-core' as never,
-  profileHash: 'sha256:dml-test-profile' as never,
+  storageHash: coreHash('sha256:dml-test-core'),
+  profileHash: profileHash('sha256:dml-test-profile'),
   storage: {
     tables: {
       user: {
@@ -142,48 +143,52 @@ describe('DML Integration Tests', () => {
       });
     });
 
-    it('inserts a row without returning clause', async () => {
-      const runtime = createTestRuntime(
-        fixtureContract,
-        {
-          connect: { client },
-          cursor: { disabled: true },
-        },
-        {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        },
-      );
-
-      const context = createTestContext(fixtureContract, adapter);
-      const tables = schema(context).tables;
-      const builder = sql({ context });
-      const userTable = tables['user'];
-      if (!userTable) {
-        throw new Error('user table not found');
-      }
-
-      const insertPlan = builder
-        .insert(userTable, {
-          email: param('email'),
-          createdAt: param('createdAt'),
-        })
-        .build({
-          params: {
-            email: 'test2@example.com',
-            createdAt: new Date('2024-01-02T00:00:00Z'),
+    it(
+      'inserts a row without returning clause',
+      async () => {
+        const runtime = createTestRuntime(
+          fixtureContract,
+          {
+            connect: { client },
+            cursor: { disabled: true },
           },
-        });
+          {
+            verify: { mode: 'onFirstUse', requireMarker: true },
+          },
+        );
 
-      const rows = await executePlanAndCollect(runtime, insertPlan);
+        const context = createTestContext(fixtureContract, adapter);
+        const tables = schema(context).tables;
+        const builder = sql({ context });
+        const userTable = tables['user'];
+        if (!userTable) {
+          throw new Error('user table not found');
+        }
 
-      expect(rows.length).toBe(0);
+        const insertPlan = builder
+          .insert(userTable, {
+            email: param('email'),
+            createdAt: param('createdAt'),
+          })
+          .build({
+            params: {
+              email: 'test2@example.com',
+              createdAt: new Date('2024-01-02T00:00:00Z'),
+            },
+          });
 
-      const selectResult = await client.query('SELECT * FROM "user" WHERE email = $1', [
-        'test2@example.com',
-      ]);
-      expect(selectResult.rows.length).toBe(1);
-      expect(selectResult.rows[0].email).toBe('test2@example.com');
-    });
+        const rows = await executePlanAndCollect(runtime, insertPlan);
+
+        expect(rows.length).toBe(0);
+
+        const selectResult = await client.query('SELECT * FROM "user" WHERE email = $1', [
+          'test2@example.com',
+        ]);
+        expect(selectResult.rows.length).toBe(1);
+        expect(selectResult.rows[0].email).toBe('test2@example.com');
+      },
+      timeouts.databaseOperation,
+    );
   });
 
   describe('update', () => {

@@ -36,7 +36,6 @@
 
     { "path": "./packages/2-sql/5-runtime" },
 
-    { "path": "./packages/3-extensions/compat-prisma" },
     { "path": "./packages/3-extensions/pgvector" },
 
     { "path": "./packages/3-targets/3-targets/postgres" },

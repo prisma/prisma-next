@@ -117,9 +117,9 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         await executeStatement(driver!, ensureLedgerTableStatement);
 
         const mismatchedMarker = buildWriteMarkerStatements({
-          coreHash: 'sha256:other-contract',
+          storageHash: 'sha256:other-contract',
           profileHash: 'sha256:other-profile',
-          contractJson: { coreHash: 'sha256:other-contract' },
+          contractJson: { storageHash: 'sha256:other-contract' },
           canonicalVersion: null,
           meta: {},
         });
@@ -128,7 +128,10 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
-          origin: { coreHash: 'sha256:expected-origin', profileHash: 'sha256:expected-profile' },
+          origin: {
+            storageHash: 'sha256:expected-origin',
+            profileHash: 'sha256:expected-profile',
+          },
           destination: toPlanContractInfo(contract),
           operations: [],
         });

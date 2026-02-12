@@ -75,5 +75,6 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
     codecs: codecRegistry,
     operations: operationRegistry,
     types: {},
+    applyMutationDefaults: () => [],
   };
 }

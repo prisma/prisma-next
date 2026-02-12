@@ -183,7 +183,8 @@ async function executeContractEmitCommand(
 
     // Convert success result to CLI output format
     const emitResult: EmitContractResult = {
-      coreHash: result.value.coreHash,
+      storageHash: result.value.storageHash,
+      ...(result.value.executionHash ? { executionHash: result.value.executionHash } : {}),
       profileHash: result.value.profileHash,
       outDir: dirname(outputJsonPath),
       files: {

@@ -7,7 +7,6 @@ import type { EmitOptions } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
 import {
   assembleOperationRegistry,
-  convertOperationManifest,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
@@ -103,7 +102,7 @@ describe('emitter → lanes integration', () => {
         extensions: extensionDescriptors,
         descriptors,
       } = getSqlDescriptorBundle();
-      const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+      const operationRegistry = assembleOperationRegistry(descriptors);
       const codecTypeImports = extractCodecTypeImports(descriptors);
       const operationTypeImports = extractOperationTypeImports(descriptors);
       const extensionIds = extractExtensionIds(
@@ -156,7 +155,7 @@ describe('emitter → lanes integration', () => {
 
       // SqlQueryPlan doesn't have sql property - lowering happens in runtime
       expect(plan.ast).toBeDefined();
-      expect(plan.meta.coreHash).toBe(result.coreHash);
+      expect(plan.meta.storageHash).toBe(result.storageHash);
       expect(plan.meta.lane).toBe('dsl');
 
       type UserRow = ResultType<typeof plan>;
@@ -212,7 +211,7 @@ describe('emitter → lanes integration', () => {
       extensions: extensionDescriptors,
       descriptors,
     } = getSqlDescriptorBundle();
-    const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+    const operationRegistry = assembleOperationRegistry(descriptors);
     const codecTypeImports = extractCodecTypeImports(descriptors);
     const operationTypeImports = extractOperationTypeImports(descriptors);
     const extensionIds = extractExtensionIds(
@@ -300,7 +299,7 @@ describe('emitter → lanes integration', () => {
       extensions: extensionDescriptors,
       descriptors,
     } = getSqlDescriptorBundle();
-    const operationRegistry = assembleOperationRegistry(descriptors, convertOperationManifest);
+    const operationRegistry = assembleOperationRegistry(descriptors);
     const codecTypeImports = extractCodecTypeImports(descriptors);
     const operationTypeImports = extractOperationTypeImports(descriptors);
     const extensionIds = extractExtensionIds(
@@ -326,10 +325,7 @@ describe('emitter → lanes integration', () => {
     // Intentionally load extension packs independently a second time to ensure
     // the emit -> validate -> re-emit flow produces consistent results
     const descriptorsBundle2 = getSqlDescriptorBundle();
-    const operationRegistry2 = assembleOperationRegistry(
-      descriptorsBundle2.descriptors,
-      convertOperationManifest,
-    );
+    const operationRegistry2 = assembleOperationRegistry(descriptorsBundle2.descriptors);
     const codecTypeImports2 = extractCodecTypeImports(descriptorsBundle2.descriptors);
     const operationTypeImports2 = extractOperationTypeImports(descriptorsBundle2.descriptors);
     const extensionIds2 = extractExtensionIds(
@@ -350,7 +346,7 @@ describe('emitter → lanes integration', () => {
     const contract2 = validateContract<SqlContract<SqlStorage>>(contractJson2);
 
     expect(result1.contractJson).toBe(result2.contractJson);
-    expect(result1.coreHash).toBe(result2.coreHash);
+    expect(result1.storageHash).toBe(result2.storageHash);
 
     const adapter = createStubAdapter();
     const context1 = createTestContext(validatedContract, adapter);
@@ -382,7 +378,7 @@ describe('emitter → lanes integration', () => {
     // SqlQueryPlan doesn't have sql property - lowering happens in runtime
     expect(plan1.ast).toBeDefined();
     expect(plan2.ast).toBeDefined();
-    expect(plan1.meta.coreHash).toBe(plan2.meta.coreHash);
-    expect(plan1.meta.coreHash).toBe(result1.coreHash);
+    expect(plan1.meta.storageHash).toBe(plan2.meta.storageHash);
+    expect(plan1.meta.storageHash).toBe(result1.storageHash);
   });
 });

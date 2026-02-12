@@ -1,29 +1,39 @@
-import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { budgets, createRuntime, type Plugin, type Runtime } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
-import { executionContext, executionStackInstance } from './execution-context';
+import { executionContext, executionStack } from './context';
 
-export function getRuntime(databaseUrl: string): Runtime {
+export function getRuntime(
+  databaseUrl: string,
+  plugins: Plugin<typeof executionContext.contract>[] = [
+    budgets({
+      maxRows: 10_000,
+      defaultTableRows: 10_000,
+      tableRows: { user: 10_000, post: 10_000 },
+      maxLatencyMs: 1_000,
+    }),
+  ],
+): Runtime {
   const pool = new Pool({ connectionString: databaseUrl });
 
+  const stackInstance = instantiateExecutionStack(executionStack);
+  const driverDescriptor = executionStack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+  const driver = driverDescriptor.create({
+    connect: { pool },
+    cursor: { disabled: true },
+  });
+
   return createRuntime({
-    stackInstance: executionStackInstance,
-    contract: executionContext.contract,
+    stackInstance,
     context: executionContext,
-    driverOptions: {
-      connect: { pool },
-      cursor: { disabled: true },
-    },
+    driver,
     verify: {
       mode: 'onFirstUse',
       requireMarker: false,
     },
-    plugins: [
-      budgets({
-        maxRows: 10_000,
-        defaultTableRows: 10_000,
-        tableRows: { user: 10_000, post: 10_000 },
-        maxLatencyMs: 1_000,
-      }),
-    ],
+    plugins,
   });
 }

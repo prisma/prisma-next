@@ -176,7 +176,7 @@ export default defineConfig({
    - Reads the contract marker from the database
    - Compares marker presence: Returns `PN-RTM-3001` if marker is missing
    - Compares target compatibility: Returns `PN-RTM-3003` if contract target doesn't match config target
-   - Compares core hash: Returns `PN-RTM-3002` if `coreHash` doesn't match
+  - Compares storage hash: Returns `PN-RTM-3002` if `storageHash` doesn't match
    - Compares profile hash: Returns `PN-RTM-3002` if `profileHash` doesn't match (when present)
    - Checks codec coverage (optional): Compares contract column types against supported codec types and reports missing codecs
 
@@ -185,7 +185,7 @@ export default defineConfig({
 Success:
 ```
 ✔ Database matches contract
-  coreHash: sha256:abc123...
+  storageHash: sha256:abc123...
   profileHash: sha256:def456...
 ```
 
@@ -203,11 +203,11 @@ Failure:
   "ok": true,
   "summary": "Database matches contract",
   "contract": {
-    "coreHash": "sha256:abc123...",
+    "storageHash": "sha256:abc123...",
     "profileHash": "sha256:def456..."
   },
   "marker": {
-    "coreHash": "sha256:abc123...",
+    "storageHash": "sha256:abc123...",
     "profileHash": "sha256:def456..."
   },
   "target": {
@@ -499,7 +499,7 @@ export default defineConfig({
 Success (new marker):
 ```
 ✔ Database signed (marker created)
-  coreHash: sha256:abc123...
+  storageHash: sha256:abc123...
   profileHash: sha256:def456...
   Total time: 42ms
 ```
@@ -507,16 +507,16 @@ Success (new marker):
 Success (updated marker):
 ```
 ✔ Database signed (marker updated from sha256:old-hash)
-  coreHash: sha256:abc123...
+  storageHash: sha256:abc123...
   profileHash: sha256:def456...
-  previous coreHash: sha256:old-hash
+  previous storageHash: sha256:old-hash
   Total time: 42ms
 ```
 
 Success (already up-to-date):
 ```
 ✔ Database already signed with this contract
-  coreHash: sha256:abc123...
+  storageHash: sha256:abc123...
   profileHash: sha256:def456...
   Total time: 42ms
 ```
@@ -534,7 +534,7 @@ Failure (schema mismatch):
   "ok": true,
   "summary": "Database signed (marker created)",
   "contract": {
-    "coreHash": "sha256:abc123...",
+    "storageHash": "sha256:abc123...",
     "profileHash": "sha256:def456..."
   },
   "target": {
@@ -561,7 +561,7 @@ For updated markers:
   "ok": true,
   "summary": "Database signed (marker updated from sha256:old-hash)",
   "contract": {
-    "coreHash": "sha256:abc123...",
+    "storageHash": "sha256:abc123...",
     "profileHash": "sha256:def456..."
   },
   "target": {
@@ -572,7 +572,7 @@ For updated markers:
     "created": false,
     "updated": true,
     "previous": {
-      "coreHash": "sha256:old-hash",
+      "storageHash": "sha256:old-hash",
       "profileHash": "sha256:old-profile-hash"
     }
   },
@@ -754,7 +754,7 @@ Applying migration plan and verifying schema...
   "plan": {
     "targetId": "postgres",
     "destination": {
-      "coreHash": "sha256:abc123..."
+      "storageHash": "sha256:abc123..."
     },
     "operations": [
       {
@@ -769,7 +769,7 @@ Applying migration plan and verifying schema...
     "operationsExecuted": 4
   },
   "marker": {
-    "coreHash": "sha256:abc123..."
+    "storageHash": "sha256:abc123..."
   }
 }
 ```

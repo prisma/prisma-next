@@ -23,6 +23,8 @@
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/ids": "workspace:*",
+    "@prisma-next/integration-kysely": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
@@ -32,6 +34,7 @@
     "@prisma-next/target-postgres": "workspace:*",
     "arktype": "^2.1.29",
     "dotenv": "^16.4.5",
+    "kysely": "catalog:",
     "pg": "catalog:"
   },
   "devDependencies": {

@@ -1,8 +1,6 @@
 import type { ExecutionPlan, ResultType } from '@prisma-next/contract/types';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
@@ -14,15 +12,18 @@ import type { SqlStatement } from '../src/exports';
 import {
   createExecutionContext,
   type createRuntime,
+  createSqlExecutionStack,
   ensureSchemaStatement,
   ensureTableStatement,
   writeContractMarker,
 } from '../src/exports';
 import type {
   ExecutionContext,
+  SqlRuntimeAdapterDescriptor,
   SqlRuntimeAdapterInstance,
   SqlRuntimeDriverInstance,
   SqlRuntimeExtensionDescriptor,
+  SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 
 /**
@@ -77,8 +78,8 @@ export async function setupTestDatabase(
   await executeStatement(client, ensureSchemaStatement);
   await executeStatement(client, ensureTableStatement);
   const write = writeContractMarker({
-    coreHash: contract.coreHash,
-    profileHash: contract.profileHash ?? contract.coreHash,
+    storageHash: contract.storageHash,
+    profileHash: contract.profileHash ?? contract.storageHash,
     contractJson: contract,
     canonicalVersion: 1,
   });
@@ -94,8 +95,8 @@ export async function writeTestContractMarker(
   contract: SqlContract<SqlStorage>,
 ): Promise<void> {
   const write = writeContractMarker({
-    coreHash: contract.coreHash,
-    profileHash: contract.profileHash ?? contract.coreHash,
+    storageHash: contract.storageHash,
+    profileHash: contract.profileHash ?? contract.storageHash,
     contractJson: contract,
     canonicalVersion: 1,
   });
@@ -104,56 +105,41 @@ export async function writeTestContractMarker(
 
 /**
  * Creates a test adapter descriptor from a raw adapter.
- * This wraps the adapter in a descriptor for descriptor-first context creation in tests.
- * The adapter instance IS an Adapter (via intersection), with identity properties added.
+ * Wraps the adapter in an SqlRuntimeAdapterDescriptor with static contributions
+ * derived from the adapter's codec registry.
  */
-function createTestAdapterDescriptor(
+export function createTestAdapterDescriptor(
   adapter: Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
-): {
-  readonly kind: 'adapter';
-  readonly id: string;
-  readonly version: string;
-  readonly familyId: 'sql';
-  readonly targetId: 'postgres';
-  create(): SqlRuntimeAdapterInstance<'postgres'>;
-} {
+): SqlRuntimeAdapterDescriptor<'postgres'> {
+  const codecRegistry = adapter.profile.codecs();
   return {
     kind: 'adapter' as const,
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    codecs: () => codecRegistry,
+    operationSignatures: () => [],
+    parameterizedCodecs: () => [],
     create(): SqlRuntimeAdapterInstance<'postgres'> {
-      // Return an object that combines identity properties with the adapter's methods
-      return Object.assign(
-        {
-          familyId: 'sql' as const,
-          targetId: 'postgres' as const,
-        },
-        adapter,
-      );
+      return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
     },
   };
 }
 
 /**
- * Creates a test target descriptor.
- * This is a minimal descriptor for descriptor-first context creation in tests.
+ * Creates a test target descriptor with empty static contributions.
  */
-function createTestTargetDescriptor(): {
-  readonly kind: 'target';
-  readonly id: string;
-  readonly version: string;
-  readonly familyId: 'sql';
-  readonly targetId: 'postgres';
-  create(): { readonly familyId: 'sql'; readonly targetId: 'postgres' };
-} {
+export function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
   return {
     kind: 'target' as const,
     id: 'postgres',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    codecs: () => createCodecRegistry(),
+    operationSignatures: () => [],
+    parameterizedCodecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -174,20 +160,21 @@ export function createTestContext<TContract extends SqlContract<SqlStorage>>(
     extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   },
 ): ExecutionContext<TContract> {
-  const stack = createExecutionStack({
-    target: createTestTargetDescriptor(),
-    adapter: createTestAdapterDescriptor(adapter),
-    extensionPacks: options?.extensionPacks ?? [],
+  return createExecutionContext({
+    contract,
+    stack: {
+      target: createTestTargetDescriptor(),
+      adapter: createTestAdapterDescriptor(adapter),
+      extensionPacks: options?.extensionPacks ?? [],
+    },
   });
-  const stackInstance = instantiateExecutionStack(stack);
-  return createExecutionContext({ contract, stackInstance });
 }
 
 export function createTestStackInstance(options?: {
   extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   driver?: RuntimeDriverDescriptor<'sql', 'postgres', SqlRuntimeDriverInstance<'postgres'>>;
-}): ReturnType<typeof instantiateExecutionStack> {
-  const stack = createExecutionStack({
+}) {
+  const stack = createSqlExecutionStack({
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(createStubAdapter()),
     driver: options?.driver,
@@ -263,28 +250,31 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
  * and returns the contract with proper typing.
  * This helper allows tests to create contracts without depending on sql-query.
  */
-export function createTestContract<T extends SqlContract<SqlStorage>>(
-  contract: Partial<Omit<T, 'coreHash' | 'profileHash'>> & {
-    coreHash?: string | undefined;
-    profileHash?: string | undefined;
+export function createTestContract(
+  contract: Partial<Omit<SqlContract<SqlStorage>, 'storageHash' | 'profileHash'>> & {
+    storageHash?: string;
+    profileHash?: string;
   },
-): T {
+): SqlContract<SqlStorage> {
+  const { execution, ...rest } = contract;
+
   return {
-    ...contract,
-    schemaVersion: contract.schemaVersion ?? '1',
-    target: contract.target ?? 'postgres',
-    targetFamily: contract.targetFamily ?? 'sql',
-    storage: contract.storage ?? { tables: {} },
-    models: contract.models ?? {},
-    relations: contract.relations ?? {},
-    mappings: contract.mappings ?? { codecTypes: {}, operationTypes: {} },
-    capabilities: contract.capabilities ?? {},
-    extensionPacks: contract.extensionPacks ?? {},
-    meta: contract.meta ?? {},
-    sources: contract.sources ?? {},
-    coreHash: (contract.coreHash ?? 'sha256:testcore') satisfies string as never,
-    profileHash: (contract.profileHash ?? 'sha256:testprofile') satisfies string as never,
-  } satisfies SqlContract as never;
+    ...rest,
+    schemaVersion: rest.schemaVersion ?? '1',
+    target: rest.target ?? 'postgres',
+    targetFamily: rest.targetFamily ?? 'sql',
+    storage: rest.storage ?? { tables: {} },
+    models: rest.models ?? {},
+    relations: rest.relations ?? {},
+    mappings: rest.mappings ?? { codecTypes: {}, operationTypes: {} },
+    capabilities: rest.capabilities ?? {},
+    extensionPacks: rest.extensionPacks ?? {},
+    meta: rest.meta ?? {},
+    sources: rest.sources ?? {},
+    ...(execution ? { execution } : {}),
+    storageHash: coreHash(rest.storageHash ?? 'sha256:testcore'),
+    profileHash: profileHash(rest.profileHash ?? 'sha256:testprofile'),
+  } satisfies SqlContract<SqlStorage>;
 }
 
 // Re-export generic utilities from test-utils

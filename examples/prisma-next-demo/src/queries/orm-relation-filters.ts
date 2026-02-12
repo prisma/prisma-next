@@ -1,6 +1,6 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { orm } from '../prisma/query';
+import { orm } from '../prisma/context';
 import { collect } from './utils';
 
 export async function ormGetUsersWithPosts(runtime: Runtime) {
@@ -14,7 +14,7 @@ export async function ormGetUsersWithPosts(runtime: Runtime) {
     }))
     .take(100)
     .findMany({
-      params: { postId: 1 },
+      params: { postId: 'post_001' },
     });
 
   return collect(runtime.execute(plan));
@@ -31,7 +31,7 @@ export async function ormGetUsersWithoutPosts(runtime: Runtime) {
     }))
     .take(100)
     .findMany({
-      params: { postId: 1 },
+      params: { postId: 'post_001' },
     });
 
   return collect(runtime.execute(plan));
@@ -48,7 +48,7 @@ export async function ormGetUsersWhereAllPostsMatch(runtime: Runtime) {
     }))
     .take(100)
     .findMany({
-      params: { userId: 1 },
+      params: { userId: 'user_001' },
     });
 
   return collect(runtime.execute(plan));

@@ -94,19 +94,19 @@ export const contract = defineContract<AllCodecTypes>()
 Register the extension when creating your execution stack:
 
 ```typescript
-import { createExecutionStack, instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import { createExecutionContext } from '@prisma-next/sql-runtime';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 
-const stack = createExecutionStack({
+const stack = createSqlExecutionStack({
   target: postgresTarget,
   adapter: postgresAdapter,
   extensionPacks: [pgvector],
 });
+const context = createExecutionContext({ contract, stack });
 const stackInstance = instantiateExecutionStack(stack);
-const context = createExecutionContext({ contract, stackInstance });
 ```
 
 ### Query Usage

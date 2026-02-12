@@ -140,6 +140,41 @@ describe('TableBuilder', () => {
     expect(table.columns.active.default).toEqual({ kind: 'literal', expression: 'true' });
   });
 
+  it('stores execution defaults via generated()', () => {
+    const builder = createTable('user');
+    const table = builder
+      .generated('id', {
+        type: textColumn,
+        generated: {
+          kind: 'generator',
+          id: 'uuidv4',
+        },
+      })
+      .build();
+
+    expect(table.columns.id.executionDefault).toEqual({ kind: 'generator', id: 'uuidv4' });
+    expect(table.columns.id.nullable).toBe(false);
+  });
+
+  it('stores typeParams via generated()', () => {
+    const vectorIdColumn: ColumnTypeDescriptor = {
+      codecId: 'test/vector@1',
+      nativeType: 'vector',
+    };
+
+    const builder = createTable('document');
+    const table = builder
+      .generated('id', {
+        type: vectorIdColumn,
+        typeParams: { length: 256 },
+        generated: { kind: 'generator', id: 'uuidv4' },
+      })
+      .build();
+
+    expect(table.columns.id.typeParams).toEqual({ length: 256 });
+    expect(table.columns.id.nullable).toBe(false);
+  });
+
   it('stores typeParams from descriptor', () => {
     const builder = createTable('document');
     const table = builder

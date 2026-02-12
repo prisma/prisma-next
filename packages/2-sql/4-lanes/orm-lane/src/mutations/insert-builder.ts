@@ -83,6 +83,7 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
   }
 
   const insertValues: Record<string, ColumnRef | ParamRef> = {};
+  const usedColumns = new Set<string>();
   for (const [columnName, placeholder] of Object.entries(values)) {
     const columnMeta = contractTable.columns[columnName];
     assertColumnExists(columnMeta, columnName, tableName);
@@ -108,6 +109,37 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
     );
 
     insertValues[columnName] = createParamRef(index, paramName);
+    usedColumns.add(columnName);
+  }
+
+  const appliedDefaults = context.applyMutationDefaults({
+    op: 'create',
+    table: tableName,
+    values: insertValues,
+  });
+
+  for (const defaultValue of appliedDefaults) {
+    const columnMeta = contractTable.columns[defaultValue.column];
+    assertColumnExists(columnMeta, defaultValue.column, tableName);
+    if (usedColumns.has(defaultValue.column)) {
+      continue;
+    }
+
+    const index = paramValues.push(defaultValue.value);
+    paramCodecs[defaultValue.column] = columnMeta.codecId;
+    paramDescriptors.push(
+      createParamDescriptor({
+        name: defaultValue.column,
+        table: tableName,
+        column: defaultValue.column,
+        codecId: columnMeta.codecId,
+        nativeType: columnMeta.nativeType,
+        nullable: columnMeta.nullable,
+      }),
+    );
+
+    insertValues[defaultValue.column] = createParamRef(index, defaultValue.column);
+    usedColumns.add(defaultValue.column);
   }
 
   const ast = createInsertAst({
@@ -121,7 +153,7 @@ export function buildInsertPlan<TContract extends SqlContract<SqlStorage>>(
     meta: {
       target: context.contract.target,
       targetFamily: context.contract.targetFamily,
-      coreHash: context.contract.coreHash,
+      storageHash: context.contract.storageHash,
       lane: 'orm',
       refs: {
         tables: [tableName],

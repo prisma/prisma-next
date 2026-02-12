@@ -1,14 +1,16 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import {
-  createExecutionStack,
-  instantiateExecutionStack,
-} from '@prisma-next/core-execution-plane/stack';
-import type { RuntimeDriverDescriptor } from '@prisma-next/core-execution-plane/types';
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { describe, expect, it } from 'vitest';
 import type { Runtime } from '../src/exports';
-import { createExecutionContext, createRuntime } from '../src/exports';
-import { createStubAdapter, createTestContract } from './utils';
+import { createRuntime, createSqlExecutionStack } from '../src/exports';
+import {
+  createStubAdapter,
+  createTestAdapterDescriptor,
+  createTestContext,
+  createTestContract,
+  createTestTargetDescriptor,
+} from './utils';
 
 class MockDriver {
   private rows: ReadonlyArray<Record<string, unknown>> = [];
@@ -17,10 +19,10 @@ class MockDriver {
     this.rows = rows;
   }
 
-  async query(
+  async query<Row = Record<string, unknown>>(
     _sql: string,
-    _params: readonly unknown[],
-  ): Promise<{ rows: ReadonlyArray<unknown> }> {
+    _params?: readonly unknown[],
+  ): Promise<{ rows: ReadonlyArray<Row> }> {
     return { rows: [] };
   }
 
@@ -33,6 +35,10 @@ class MockDriver {
     }
   }
 
+  async acquireConnection(): Promise<never> {
+    throw new Error('Not implemented in mock');
+  }
+
   async connect(): Promise<void> {}
 
   async close(): Promise<void> {}
@@ -42,7 +48,7 @@ const fixtureContract = createTestContract({
   schemaVersion: '1',
   targetFamily: 'sql',
   target: 'postgres',
-  coreHash: 'test-hash',
+  storageHash: 'test-hash',
   profileHash: 'test-profile-hash',
   storage: {
     tables: {
@@ -62,52 +68,19 @@ const fixtureContract = createTestContract({
   mappings: { codecTypes: {}, operationTypes: {} },
 });
 
-function createTestRuntime(driver: MockDriver): Runtime {
+function createTestRuntime(mockDriver: MockDriver): Runtime {
   const adapter = createStubAdapter();
-  const driverDescriptor: RuntimeDriverDescriptor<'sql', 'postgres'> = {
-    kind: 'driver',
-    id: 'test-driver',
-    version: '0.0.1',
-    familyId: 'sql' as const,
-    targetId: 'postgres' as const,
-    create() {
-      return Object.assign(driver, {
-        familyId: 'sql' as const,
-        targetId: 'postgres' as const,
-      });
-    },
-  };
-  const stack = createExecutionStack({
-    target: {
-      kind: 'target',
-      id: 'postgres',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create() {
-        return { familyId: 'sql' as const, targetId: 'postgres' as const };
-      },
-    },
-    adapter: {
-      kind: 'adapter',
-      id: 'test-adapter',
-      version: '0.0.1',
-      familyId: 'sql' as const,
-      targetId: 'postgres' as const,
-      create() {
-        return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
-      },
-    },
-    driver: driverDescriptor,
+  const stack = createSqlExecutionStack({
+    target: createTestTargetDescriptor(),
+    adapter: createTestAdapterDescriptor(adapter),
     extensionPacks: [],
   });
   const stackInstance = instantiateExecutionStack(stack);
-  const context = createExecutionContext({ contract: fixtureContract, stackInstance });
+  const context = createTestContext(fixtureContract, adapter);
   return createRuntime({
-    stackInstance,
-    contract: fixtureContract,
+    stackInstance: stackInstance,
     context,
-    driverOptions: {},
+    driver: mockDriver,
     verify: { mode: 'onFirstUse', requireMarker: false },
   });
 }
@@ -127,7 +100,7 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
       meta: {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test-hash',
+        storageHash: 'test-hash',
         lane: 'sql',
         paramDescriptors: [],
       },
@@ -153,7 +126,7 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
       meta: {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'test-hash',
+        storageHash: 'test-hash',
         lane: 'sql',
         paramDescriptors: [],
       },
@@ -163,10 +136,8 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
     const rows = await result.toArray();
 
     expect(rows.length).toBe(1);
-    if (rows[0]) {
-      expect(typeof rows[0].id).toBe('number');
-      expect(typeof rows[0].email).toBe('string');
-    }
+    expect(typeof rows[0]!.id).toBe('number');
+    expect(typeof rows[0]!.email).toBe('string');
 
     await runtime.close();
   });

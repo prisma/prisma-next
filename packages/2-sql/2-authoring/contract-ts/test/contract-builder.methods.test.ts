@@ -50,15 +50,18 @@ describe('contract builder methods', () => {
     expect(contract.capabilities).toEqual(capabilities);
   });
 
-  it('sets coreHash correctly', () => {
+  it('sets storageHash correctly', () => {
     const hash = 'sha256:custom-hash';
-    const contract = defineContract<CodecTypes>().target(postgresTargetPack).coreHash(hash).build();
-    expect(contract.coreHash).toBe(hash);
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .storageHash(hash)
+      .build();
+    expect(contract.storageHash).toBe(hash);
   });
 
-  it('uses default coreHash when not provided', () => {
+  it('uses default storageHash when not provided', () => {
     const contract = defineContract<CodecTypes>().target(postgresTargetPack).build();
-    expect(contract.coreHash).toBe('sha256:ts-builder-placeholder');
+    expect(contract.storageHash).toBe('sha256:ts-builder-placeholder');
   });
 
   it('table callback can return undefined', () => {
@@ -191,12 +194,12 @@ describe('contract builder methods', () => {
   it('builds contract with all optional fields', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
-      .coreHash('sha256:custom')
+      .storageHash('sha256:custom')
       .capabilities({ feature: { enabled: true } })
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
       .model('User', 'user', (m) => m.field('id', 'id'))
       .build();
-    expect(contract.coreHash).toBe('sha256:custom');
+    expect(contract.storageHash).toBe('sha256:custom');
     expect(contract.capabilities).toEqual({ feature: { enabled: true } });
   });
 
@@ -225,6 +228,61 @@ describe('contract builder methods', () => {
       },
     });
     expect(contract.storage.tables.user.columns.role.typeRef).toBe('Role');
+  });
+
+  it('adds execution defaults for generated columns', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) =>
+        t
+          .generated('id', {
+            type: int4Column,
+            generated: { kind: 'generator', id: 'uuidv4' },
+          })
+          .column('email', { type: columnDescriptor('pg/text@1') })
+          .primaryKey(['id']),
+      )
+      .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
+      .build();
+
+    expect(contract.execution?.mutations.defaults).toEqual([
+      {
+        ref: { table: 'user', column: 'id' },
+        onCreate: { kind: 'generator', id: 'uuidv4' },
+      },
+    ]);
+  });
+
+  it('sorts execution defaults by table and column', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('zebra', (t) =>
+        t
+          .generated('zId', {
+            type: int4Column,
+            generated: { kind: 'generator', id: 'ulid' },
+          })
+          .primaryKey(['zId']),
+      )
+      .table('alpha', (t) =>
+        t
+          .generated('bId', {
+            type: int4Column,
+            generated: { kind: 'generator', id: 'uuidv7' },
+          })
+          .generated('aId', {
+            type: int4Column,
+            generated: { kind: 'generator', id: 'cuid2' },
+          })
+          .primaryKey(['aId']),
+      )
+      .build();
+
+    expect(contract.execution?.mutations.defaults.map((entry) => entry.ref)).toEqual([
+      { table: 'alpha', column: 'aId' },
+      { table: 'alpha', column: 'bId' },
+      { table: 'zebra', column: 'zId' },
+    ]);
   });
 });
 

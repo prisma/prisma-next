@@ -1,4 +1,5 @@
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -12,8 +13,8 @@ export const contract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   target: 'postgres',
   targetFamily: 'sql',
-  coreHash: 'sha256:contract' as never,
-  profileHash: 'sha256:profile' as never,
+  storageHash: coreHash('sha256:contract'),
+  profileHash: profileHash('sha256:profile'),
   storage: {
     tables: {
       user: {
@@ -101,7 +102,7 @@ export function createFailingPlan() {
 }
 
 export function toPlanContractInfo(c: SqlContract<SqlStorage>) {
-  return { coreHash: c.coreHash, profileHash: c.profileHash! };
+  return { storageHash: c.storageHash, profileHash: c.profileHash! };
 }
 
 export async function executeStatement(

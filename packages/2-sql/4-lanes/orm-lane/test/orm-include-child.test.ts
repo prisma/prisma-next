@@ -19,7 +19,7 @@ describe('orm-include-child', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test',
+    storageHash: 'sha256:test',
     models: {
       Post: {
         storage: { table: 'post' },

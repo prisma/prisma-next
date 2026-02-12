@@ -18,7 +18,7 @@ Provide a target-agnostic execution engine that family runtimes (e.g., `@prisma-
 
 ## Responsibilities
 
-- **Plan Validation**: Verify plans against contracts (coreHash/profileHash checks)
+- **Plan Validation**: Verify plans against contracts (storageHash/profileHash checks)
 - **Marker Verification**: Read and parse contract markers from databases
 - **Plugin Orchestration**: Manage plugin lifecycle (beforeExecute, onRow, afterExecute hooks)
 - **Telemetry Recording**: Track execution metrics (lane, target, fingerprint, outcome, duration)

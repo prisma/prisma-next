@@ -91,6 +91,27 @@ const ModelSchema = type.declare<ModelDefinition>().type({
   relations: type({ '[string]': 'unknown' }),
 });
 
+const ExecutionMutationDefaultValueSchema = type({
+  kind: "'generator'",
+  id: "'ulid' | 'nanoid' | 'uuidv7' | 'uuidv4' | 'cuid2' | 'ksuid'",
+  'params?': 'Record<string, unknown>',
+});
+
+const ExecutionMutationDefaultSchema = type({
+  ref: {
+    table: 'string',
+    column: 'string',
+  },
+  'onCreate?': ExecutionMutationDefaultValueSchema,
+  'onUpdate?': ExecutionMutationDefaultValueSchema,
+});
+
+const ExecutionSchema = type({
+  mutations: {
+    defaults: ExecutionMutationDefaultSchema.array().readonly(),
+  },
+});
+
 /**
  * Complete SqlContract schema for structural validation.
  * This validates the entire contract structure at once.
@@ -99,7 +120,8 @@ const SqlContractSchema = type({
   'schemaVersion?': "'1'",
   target: 'string',
   targetFamily: "'sql'",
-  coreHash: 'string',
+  storageHash: 'string',
+  'executionHash?': 'string',
   'profileHash?': 'string',
   'capabilities?': 'Record<string, Record<string, boolean>>',
   'extensionPacks?': 'Record<string, unknown>',
@@ -107,6 +129,7 @@ const SqlContractSchema = type({
   'sources?': 'Record<string, unknown>',
   models: type({ '[string]': ModelSchema }),
   storage: StorageSchema,
+  'execution?': ExecutionSchema,
 });
 
 /**

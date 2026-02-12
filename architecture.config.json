@@ -25,6 +25,12 @@
       "plane": "migration"
     },
     {
+      "glob": "packages/1-framework/2-authoring/ids/**",
+      "domain": "framework",
+      "layer": "authoring",
+      "plane": "migration"
+    },
+    {
       "glob": "packages/1-framework/3-tooling/**",
       "domain": "framework",
       "layer": "tooling",
@@ -139,12 +145,6 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/3-extensions/compat-prisma/**",
-      "domain": "extensions",
-      "layer": "compat",
-      "plane": "runtime"
-    },
-    {
       "glob": "packages/3-extensions/pgvector/src/core/**",
       "domain": "extensions",
       "layer": "adapters",
@@ -225,22 +225,10 @@
     "runtime": {
       "allow": ["shared", "runtime"],
       "forbid": ["migration"],
-      "exceptions": [
-        {
-          "from": "packages/3-extensions/compat-prisma/**",
-          "to": "packages/2-sql/**",
-          "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API"
-        }
-      ]
+      "exceptions": []
     }
   },
-  "crossDomainExceptions": [
-    {
-      "from": "packages/3-extensions/compat-prisma/**",
-      "to": "packages/2-sql/**",
-      "reason": "compat-prisma is a compatibility layer that needs to import from SQL packages to provide Prisma ORM-compatible API"
-    }
-  ],
+  "crossDomainExceptions": [],
   "layerOrder": {
     "framework": ["core", "authoring", "tooling", "runtime-executor"],
     "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"]

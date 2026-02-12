@@ -1,10 +1,9 @@
-import { timeouts } from '@prisma-next/test-utils';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    testTimeout: timeouts.default,
-    hookTimeout: timeouts.default,
+    globals: true,
+    environment: 'node',
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -15,13 +14,13 @@ export default defineConfig({
         '**/*.test.ts',
         '**/*.test-d.ts',
         '**/*.config.ts',
-        '**/exports/**',
+        '**/index.ts',
       ],
       thresholds: {
-        lines: 89,
-        branches: 79,
-        functions: 100,
-        statements: 89,
+        lines: 95,
+        branches: 95,
+        functions: 95,
+        statements: 95,
       },
     },
   },

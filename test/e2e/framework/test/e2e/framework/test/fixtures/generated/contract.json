@@ -2,7 +2,8 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "coreHash": "sha256:6bffbe54f87b253e12dd069d57a943d580662ed3da1aeb8bfd114fec3ea0e4d8",
+  "storageHash": "sha256:ef6a470e5086b66b812a56c7505fe2a14d08d0a585a5090e47e578c3aea60d79",
+  "executionHash": "sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589",
   "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
     "Comment": {
@@ -26,6 +27,23 @@
       "relations": {},
       "storage": {
         "table": "comment"
+      }
+    },
+    "Event": {
+      "fields": {
+        "createdAt": {
+          "column": "created_at"
+        },
+        "id": {
+          "column": "id"
+        },
+        "name": {
+          "column": "name"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "event"
       }
     },
     "Post": {
@@ -117,6 +135,129 @@
         },
         "uniques": []
       },
+      "event": {
+        "columns": {
+          "created_at": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "param_types": {
+        "columns": {
+          "bits": {
+            "codecId": "pg/varbit@1",
+            "nativeType": "bit varying",
+            "nullable": true,
+            "typeParams": {
+              "length": 12
+            }
+          },
+          "code": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": true,
+            "typeParams": {
+              "length": 16
+            }
+          },
+          "created_at": {
+            "codecId": "pg/timestamptz@1",
+            "nativeType": "timestamptz",
+            "nullable": true,
+            "typeParams": {
+              "precision": 3
+            }
+          },
+          "duration": {
+            "codecId": "pg/interval@1",
+            "nativeType": "interval",
+            "nullable": true,
+            "typeParams": {
+              "precision": 6
+            }
+          },
+          "flags": {
+            "codecId": "pg/bit@1",
+            "nativeType": "bit",
+            "nullable": true,
+            "typeParams": {
+              "length": 8
+            }
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "default": {
+              "expression": "autoincrement()",
+              "kind": "function"
+            },
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "name": {
+            "codecId": "sql/varchar@1",
+            "nativeType": "character varying",
+            "nullable": true,
+            "typeParams": {
+              "length": 255
+            }
+          },
+          "price": {
+            "codecId": "pg/numeric@1",
+            "nativeType": "numeric",
+            "nullable": true,
+            "typeParams": {
+              "precision": 10,
+              "scale": 2
+            }
+          },
+          "starts_at": {
+            "codecId": "pg/time@1",
+            "nativeType": "time",
+            "nullable": true,
+            "typeParams": {
+              "precision": 2
+            }
+          },
+          "starts_at_tz": {
+            "codecId": "pg/timetz@1",
+            "nativeType": "timetz",
+            "nullable": true,
+            "typeParams": {
+              "precision": 2
+            }
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
       "post": {
         "columns": {
           "created_at": {
@@ -176,8 +317,11 @@
             "nullable": false
           },
           "email": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
+            "codecId": "sql/varchar@1",
+            "nativeType": "character varying",
+            "typeParams": {
+              "length": 255
+            }
           },
           "id": {
             "codecId": "pg/int4@1",
@@ -203,6 +347,22 @@
         },
         "uniques": []
       }
+    }
+  },
+  "execution": {
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv7",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "event"
+          }
+        }
+      ]
     }
   },
   "capabilities": {

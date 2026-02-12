@@ -1,5 +1,5 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { sql, tables } from '../prisma/query';
+import { sql, tables } from '../prisma/context';
 import { collect } from './utils';
 
 export async function getUsers(runtime: Runtime, limit = 10) {
@@ -11,6 +11,7 @@ export async function getUsers(runtime: Runtime, limit = 10) {
       id: userTable.columns.id,
       email: userTable.columns.email,
       createdAt: userTable.columns.createdAt,
+      kind: userTable.columns.kind,
     })
     .limit(limit)
     .build();

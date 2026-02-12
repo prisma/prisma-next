@@ -1,12 +1,14 @@
+import type { TargetDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { TypeRenderEntry, TypeRenderer, TypesImportSpec } from '@prisma-next/contract/types';
-import type {
-  ControlAdapterDescriptor,
-  ControlExtensionDescriptor,
-  ControlTargetDescriptor,
-} from '@prisma-next/core-control-plane/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
+import type { SqlControlDescriptorWithContributions } from '../src/core/assembly';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
+import type {
+  SqlControlAdapterDescriptor,
+  SqlControlExtensionDescriptor,
+} from '../src/core/migrations/types';
 
 /**
  * Integration tests for parameterized codec emission plumbing.
@@ -20,24 +22,27 @@ import { createSqlFamilyInstance } from '../src/core/control-instance';
  * - Type imports for parameterized types are defined in `types.codecTypes.typeImports`
  */
 
-function createMockTarget(): ControlTargetDescriptor<'sql', 'postgres'> {
+function createMockTarget(): TargetDescriptor<'sql', 'postgres'> &
+  SqlControlDescriptorWithContributions {
   return {
     kind: 'target',
     id: 'postgres',
     version: '0.0.1',
     familyId: 'sql',
     targetId: 'postgres',
-    create: () => ({ familyId: 'sql' as const, targetId: 'postgres' as const }),
+    operationSignatures: () => [],
+    types: {},
   };
 }
 
-function createMockAdapter(): ControlAdapterDescriptor<'sql', 'postgres'> {
+function createMockAdapter(): SqlControlAdapterDescriptor<'postgres'> {
   return {
     kind: 'adapter',
     id: 'postgres',
     version: '0.0.1',
     familyId: 'sql',
     targetId: 'postgres',
+    operationSignatures: () => [],
     create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     types: {
       codecTypes: {
@@ -60,20 +65,21 @@ interface ParameterizedCodecConfig {
 function createMockExtensionWithParameterizedCodec(
   id: string,
   config: ParameterizedCodecConfig,
-): ControlExtensionDescriptor<'sql', 'postgres'> {
+): SqlControlExtensionDescriptor<'postgres'> {
   return {
     kind: 'extension',
     id,
     version: '0.0.1',
     familyId: 'sql',
     targetId: 'postgres',
+    operationSignatures: () => [],
     create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     types: {
       codecTypes: {
         parameterized: {
           [config.codecId]: config.renderer,
         },
-        ...(config.typesImport ? { typeImports: [config.typesImport] } : {}),
+        ...ifDefined('typeImports', config.typesImport ? [config.typesImport] : undefined),
       },
     },
   };
@@ -83,13 +89,14 @@ function createMockExtensionWithParameterizedRenderer(
   id: string,
   codecId: string,
   renderer: TypeRenderEntry['render'],
-): ControlExtensionDescriptor<'sql', 'postgres'> {
+): SqlControlExtensionDescriptor<'postgres'> {
   return {
     kind: 'extension',
     id,
     version: '0.0.1',
     familyId: 'sql',
     targetId: 'postgres',
+    operationSignatures: () => [],
     create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     types: {
       codecTypes: {
@@ -114,13 +121,13 @@ function createMockExtensionWithParameterizedRenderer(
 }
 
 function createTestContractIR(
-  overrides: Partial<ContractIR> & { coreHash?: string } = {},
-): ContractIR & { coreHash?: string } {
+  overrides: Partial<ContractIR> & { storageHash?: string } = {},
+): ContractIR & { storageHash?: string } {
   return {
     schemaVersion: '1',
     targetFamily: 'sql',
     target: 'postgres',
-    coreHash: 'sha256:placeholder',
+    storageHash: 'sha256:placeholder',
     models: {},
     relations: {},
     storage: { tables: {} },
@@ -383,7 +390,7 @@ describe('emit parameterized codecs integration', () => {
 
     // Create adapter with decimal codec
     const target = createMockTarget();
-    const adapter: ControlAdapterDescriptor<'sql', 'postgres'> = {
+    const adapter: SqlControlAdapterDescriptor<'postgres'> = {
       ...createMockAdapter(),
       types: {
         codecTypes: {
@@ -469,12 +476,13 @@ describe('emit parameterized codecs integration', () => {
     // Two different codecs with imports from the same package
     const target = createMockTarget();
     const adapter = createMockAdapter();
-    const extension: ControlExtensionDescriptor<'sql', 'postgres'> = {
+    const extension: SqlControlExtensionDescriptor<'postgres'> = {
       kind: 'extension',
       id: 'pgvector',
       version: '0.0.1',
       familyId: 'sql',
       targetId: 'postgres',
+      operationSignatures: () => [],
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
       types: {
         codecTypes: {

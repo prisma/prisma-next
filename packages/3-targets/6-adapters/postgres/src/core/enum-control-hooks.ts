@@ -52,6 +52,70 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 /**
+ * Parses a PostgreSQL array value into a JavaScript string array.
+ *
+ * PostgreSQL's `pg` library may return `array_agg` results either as:
+ * - A JavaScript array (when type parsers are configured)
+ * - A string in PostgreSQL array literal format: `{value1,value2,...}`
+ *
+ * Handles PostgreSQL's quoting rules for array elements:
+ * - Elements containing commas, double quotes, backslashes, or whitespace are double-quoted
+ * - Inside quoted elements, `\"` represents `"` and `\\` represents `\`
+ *
+ * @param value - The value to parse (array or PostgreSQL array string)
+ * @returns A string array, or null if the value cannot be parsed
+ */
+export function parsePostgresArray(value: unknown): string[] | null {
+  if (isStringArray(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.startsWith('{') && value.endsWith('}')) {
+    const inner = value.slice(1, -1);
+    if (inner === '') {
+      return [];
+    }
+    return parseArrayElements(inner);
+  }
+  return null;
+}
+
+function parseArrayElements(input: string): string[] {
+  const result: string[] = [];
+  let i = 0;
+  while (i < input.length) {
+    if (input[i] === ',') {
+      i++;
+      continue;
+    }
+    if (input[i] === '"') {
+      i++;
+      let element = '';
+      while (i < input.length && input[i] !== '"') {
+        if (input[i] === '\\' && i + 1 < input.length) {
+          i++;
+          element += input[i];
+        } else {
+          element += input[i];
+        }
+        i++;
+      }
+      i++;
+      result.push(element);
+    } else {
+      const nextComma = input.indexOf(',', i);
+      if (nextComma === -1) {
+        result.push(input.slice(i).trim());
+        i = input.length;
+      } else {
+        result.push(input.slice(i, nextComma).trim());
+        i = nextComma;
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Extracts enum values from a StorageTypeInstance.
  * Returns null if values are missing or invalid.
  */
@@ -653,13 +717,17 @@ export const pgEnumControlHooks: CodecControlHooks = {
     const result = await driver.query<EnumRow>(ENUM_INTROSPECT_QUERY, [namespace]);
     const types: Record<string, StorageTypeInstance> = {};
     for (const row of result.rows) {
-      if (!isStringArray(row.values)) {
-        continue;
+      const values = parsePostgresArray(row.values);
+      if (!values) {
+        throw new Error(
+          `Failed to parse enum values for type "${row.type_name}": ` +
+            `unexpected format: ${JSON.stringify(row.values)}`,
+        );
       }
       types[row.type_name] = {
         codecId: PG_ENUM_CODEC_ID,
         nativeType: row.type_name,
-        typeParams: { values: row.values },
+        typeParams: { values },
       };
     }
     return types;

@@ -18,6 +18,8 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Component Database Dependencies**: Consumes database dependencies declared by framework components (target/adapter/extension packs). Callers pass the active `frameworkComponents` list into planning/execution/verification; SQL layers structurally narrow to components that declare `databaseDependencies` and use their pure verification hooks (no fuzzy matching against `contract.extensionPacks`).
 - **Storage Type Control Hooks**: Extracts codec-owned control hooks for planning/verification/introspection of `storage.types` without adding enum-specific fields to shared IR
 - **Codec Ownership**: Enforces a single owner per `codecId` for parameterized renderers and control-plane hooks to prevent ambiguous conflicts during assembly
+- **Parameterized Type Verification**: Expands contract `typeParams` into expected native type strings during schema verification and flags missing parameters as type mismatches
+- **Schema Defaults Policy**: Ignores execution mutation defaults during schema verification since they are applied before DB writes
 
 ## Usage
 
@@ -84,7 +86,7 @@ The framework CLI uses this descriptor to:
 
 Family instances implement domain actions:
 - **`validateContractIR(contractJson)`**: Validates and normalizes contract, returns ContractIR without mappings
-- **`verify()`**: Verifies database marker against contract (compares target, coreHash, profileHash)
+- **`verify()`**: Verifies database marker against contract (compares target, storageHash, profileHash)
 - **`schemaVerify()`**: Verifies database schema against contract (compares contract requirements vs live schema)
 - **`introspect()`**: Introspects database schema and returns `SqlSchemaIR`
 - **`toSchemaView(schema)`**: Projects `SqlSchemaIR` into `CoreSchemaView` for human-readable display. Always displays native database types (e.g., `int4`, `text`) rather than mapped codec IDs (e.g., `pg/int4@1`) to reflect actual database state.

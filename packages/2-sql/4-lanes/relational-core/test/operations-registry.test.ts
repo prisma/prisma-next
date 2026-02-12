@@ -67,7 +67,7 @@ describe('operations-registry', () => {
   const contract = validateContract<TestContract>({
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'test-hash',
+    storageHash: 'test-hash',
     storage: {
       tables: {
         user: {
@@ -146,7 +146,7 @@ describe('operations-registry', () => {
     const contractWithoutCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -169,7 +169,7 @@ describe('operations-registry', () => {
     const contractWithCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -242,7 +242,7 @@ describe('operations-registry', () => {
     const contractWithFalseCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -301,7 +301,7 @@ describe('operations-registry', () => {
     const contractWithPartialCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -330,7 +330,7 @@ describe('operations-registry', () => {
     const contractWithAllCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -434,7 +434,7 @@ describe('operations-registry', () => {
     const contractWithoutCaps = validateContract<TestContract>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -590,7 +590,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -659,7 +659,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -734,7 +734,7 @@ describe('operations-registry', () => {
     const contractWithoutCaps = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -813,7 +813,7 @@ describe('operations-registry', () => {
     const contractWithFalseCaps = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -881,7 +881,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -938,7 +938,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -1007,7 +1007,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -1081,7 +1081,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -1128,7 +1128,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -1167,7 +1167,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -1239,7 +1239,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -1281,7 +1281,7 @@ describe('operations-registry', () => {
     const contractWithInt = validateContract<TestContractWithIdOnly>({
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'test-hash',
+      storageHash: 'test-hash',
       storage: {
         tables: {
           user: {
@@ -1328,5 +1328,353 @@ describe('operations-registry', () => {
     );
 
     expect(result['testOp']).toBeUndefined();
+  });
+
+  it('throws when argument spec entry is missing', () => {
+    const malformedSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'broken',
+      args: [undefined],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'broken(${self}, ${arg0})',
+      },
+    } as unknown as SqlOperationSignature;
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [
+        {
+          operations: () => [malformedSignature],
+        },
+      ],
+    });
+    const idColumn = schema(context).tables.user.columns.id as unknown as {
+      broken: (arg: unknown) => unknown;
+    };
+
+    expect(() => {
+      idColumn.broken(1);
+    }).toThrow('Missing argument spec for argument 0');
+  });
+
+  it.each([
+    {
+      name: 'missing contract capabilities',
+      contractInput: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        storageHash: 'test-hash',
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+                vector: { ...vectorColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        models: {},
+        relations: {},
+        mappings: {},
+      },
+      shouldAttach: false,
+    },
+    {
+      name: 'capability false',
+      contractInput: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        storageHash: 'test-hash',
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+                vector: { ...vectorColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        models: {},
+        relations: {},
+        mappings: {},
+        capabilities: {
+          postgres: {
+            lateral: false,
+          },
+        },
+      },
+      shouldAttach: false,
+    },
+    {
+      name: 'capability true',
+      contractInput: {
+        target: 'postgres',
+        targetFamily: 'sql',
+        storageHash: 'test-hash',
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { ...int4ColumnType, nullable: false },
+                vector: { ...vectorColumnType, nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        models: {},
+        relations: {},
+        mappings: {},
+        capabilities: {
+          postgres: {
+            lateral: true,
+          },
+        },
+      },
+      shouldAttach: true,
+    },
+  ])('applies capability-gated operation matrix: $name', ({ contractInput, shouldAttach }) => {
+    const signature: SqlOperationSignature = {
+      forTypeId: 'pg/vector@1',
+      method: 'cosineDistance',
+      args: [{ kind: 'typeId', type: 'pg/vector@1' }],
+      returns: { kind: 'builtin', type: 'number' },
+      capabilities: ['postgres.lateral'],
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} <=> ${arg0}',
+      },
+    };
+
+    const contractWithMatrixCaps = validateContract<TestContract>(
+      contractInput as unknown as TestContract,
+    );
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithMatrixCaps, adapter, {
+      extensions: [
+        {
+          operations: () => [signature],
+        },
+      ],
+    });
+    const vectorColumn = schema(context).tables.user.columns.vector as unknown as {
+      cosineDistance?: unknown;
+    };
+
+    if (shouldAttach) {
+      expect(typeof vectorColumn.cosineDistance).toBe('function');
+      return;
+    }
+    expect(vectorColumn.cosineDistance).toBeUndefined();
+  });
+
+  it('exposes undefined __jsType on operation result', () => {
+    const signature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [{ operations: () => [signature] }],
+    });
+    const idColumn = schema(context).tables.user.columns.id as unknown as {
+      add: (arg: unknown) => { readonly __jsType: unknown };
+    };
+
+    expect(idColumn.add(1).__jsType).toBeUndefined();
+  });
+
+  it('returns expression when return type has no registered operations', () => {
+    const signature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'toUnregisteredType',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'typeId', type: 'pg/unregistered@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'cast_unregistered(${self}, ${arg0})',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter, {
+      extensions: [{ operations: () => [signature] }],
+    });
+    const idColumn = schema(context).tables.user.columns.id as unknown as {
+      toUnregisteredType: (arg: unknown) => { kind: 'expression' };
+    };
+
+    const result = idColumn.toUnregisteredType(1);
+    expect(result.kind).toBe('expression');
+  });
+
+  it('skips capability-gated chained operations when contractCapabilities argument is undefined', () => {
+    const firstSignature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'add',
+      args: [{ kind: 'literal' }],
+      returns: { kind: 'typeId', type: 'pg/int4@1' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'infix',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: '${self} + ${arg0}',
+      },
+    };
+    const gatedSignature: SqlOperationSignature = {
+      forTypeId: 'pg/int4@1',
+      method: 'specialOp',
+      args: [{ kind: 'literal' }],
+      capabilities: ['postgres.lateral'],
+      returns: { kind: 'builtin', type: 'number' },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: SQL template with placeholders
+        template: 'special(${self}, ${arg0})',
+      },
+    };
+
+    const contractWithInt = validateContract<TestContractWithIdOnly>({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'test-hash',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { ...int4ColumnType, nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {},
+    });
+
+    const adapter = createStubAdapter();
+    const context = createTestContext(contractWithInt, adapter);
+    context.operations.register(firstSignature);
+    context.operations.register(gatedSignature);
+
+    const columnMeta = contractWithInt.storage.tables.user.columns.id;
+    const freshColumnBuilder = new ColumnBuilderImpl('user', 'id', columnMeta);
+    const withOps = attachOperationsToColumnBuilder(
+      freshColumnBuilder as unknown as ColumnBuilder<
+        string,
+        StorageColumn,
+        unknown,
+        Record<string, never>
+      >,
+      columnMeta,
+      context.operations,
+      undefined,
+    ) as unknown as {
+      add: (arg: unknown) => { specialOp?: (arg: unknown) => unknown };
+    };
+
+    const chained = withOps.add(1);
+    expect(chained.specialOp).toBeUndefined();
   });
 });

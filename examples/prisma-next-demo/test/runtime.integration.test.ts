@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: non-null assertions are fine for tests */
 
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { IncludeChildBuilder, JoinOnBuilder } from '@prisma-next/sql-lane';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
@@ -9,15 +10,27 @@ import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { executionContext, executionStackInstance } from '../src/prisma/execution-context';
+import { executionContext, executionStack } from '../src/prisma/context';
 import { getRuntime } from '../src/prisma/runtime';
+
+const executionStackInstance = instantiateExecutionStack(executionStack);
+
 import { initTestDatabase } from './utils/control-client';
+
+function createTestDriver(connectionString: string) {
+  const driverDescriptor = executionStack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+  const pool = new Pool({ connectionString });
+  return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+}
 
 const { contract } = executionContext;
 
 /**
  * Seeds test data using the runtime and query DSL.
- * Uses column defaults for id (autoincrement) and createdAt (now).
+ * Uses client-generated IDs and DB default for createdAt (now).
  */
 async function seedTestData(
   runtime: Runtime,
@@ -25,24 +38,28 @@ async function seedTestData(
     users?: string[];
     posts?: Array<{ title: string; userIndex: number }>;
   },
-): Promise<{ userIds: number[] }> {
+): Promise<{ userIds: string[] }> {
   const tables = schema(executionContext).tables;
   const userTable = tables['user']!;
   const postTable = tables['post']!;
 
-  const userIds: number[] = [];
+  const userIds: string[] = [];
 
-  // Insert users (omit id and createdAt - they have defaults)
+  // Insert users (provide id, omit createdAt since it has a default)
   if (data.users) {
     for (let i = 0; i < data.users.length; i++) {
       const email = data.users[i]!;
+      const id = `user_${String(i + 1).padStart(3, '0')}`;
+      const kind = i === 0 ? 'admin' : 'user';
 
       const plan = sql({ context: executionContext })
         .insert(userTable, {
+          id: param('id'),
           email: param('email'),
+          kind: param('kind'),
         })
         .returning(userTable.columns['id']!)
-        .build({ params: { email } });
+        .build({ params: { id, email, kind } });
 
       type InsertedRow = ResultType<typeof plan>;
       for await (const row of runtime.execute(plan)) {
@@ -51,19 +68,21 @@ async function seedTestData(
     }
   }
 
-  // Insert posts (omit id and createdAt - they have defaults)
+  // Insert posts (provide id, omit createdAt since it has a default)
   if (data.posts) {
     for (let i = 0; i < data.posts.length; i++) {
       const post = data.posts[i]!;
       const userId = userIds[post.userIndex];
       if (userId === undefined) continue;
+      const id = `post_${String(i + 1).padStart(3, '0')}`;
 
       const plan = sql({ context: executionContext })
         .insert(postTable, {
+          id: param('id'),
           title: param('title'),
           userId: param('userId'),
         })
-        .build({ params: { title: post.title, userId } });
+        .build({ params: { id, title: post.title, userId } });
 
       for await (const _row of runtime.execute(plan)) {
         // consume iterator
@@ -114,15 +133,10 @@ describe('runtime execute integration', () => {
         });
 
         const createRuntimeInstance = () => {
-          const pool = new Pool({ connectionString });
           return createRuntime({
             stackInstance: executionStackInstance,
-            contract,
             context,
-            driverOptions: {
-              connect: { pool },
-              cursor: { disabled: true },
-            },
+            driver: createTestDriver(connectionString),
             verify: { mode: 'always', requireMarker: true },
             plugins: [
               budgets({
@@ -224,7 +238,7 @@ describe('runtime execute integration', () => {
               createdAt: postTable.columns['createdAt']!,
             })
             .limit(1)
-            .build({ params: { userId: 1 } });
+            .build({ params: { userId: 'user_001' } });
 
           type PostRow = ResultType<typeof postPlan>;
 
@@ -242,7 +256,7 @@ describe('runtime execute integration', () => {
           expect(postRows).toHaveLength(1);
           expect(postRows[0]).toMatchObject({
             title: 'First Post',
-            userId: 1,
+            userId: 'user_001',
           });
         } finally {
           await runtime.close();
@@ -262,15 +276,10 @@ describe('runtime execute integration', () => {
         });
 
         const context = executionContext;
-        const pool = new Pool({ connectionString });
         const runtime = createRuntime({
           stackInstance: executionStackInstance,
-          contract,
           context,
-          driverOptions: {
-            connect: { pool },
-            cursor: { disabled: true },
-          },
+          driver: createTestDriver(connectionString),
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
@@ -344,15 +353,10 @@ describe('runtime execute integration', () => {
         });
 
         const context = executionContext;
-        const pool = new Pool({ connectionString });
         const runtime = createRuntime({
           stackInstance: executionStackInstance,
-          contract,
           context,
-          driverOptions: {
-            connect: { pool },
-            cursor: { disabled: true },
-          },
+          driver: createTestDriver(connectionString),
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
@@ -470,7 +474,7 @@ describe('runtime execute integration', () => {
           expect(alice!.posts[0]).toHaveProperty('id');
           expect(alice!.posts[0]).toHaveProperty('title');
           expect(alice!.posts[0]).toHaveProperty('createdAt');
-          expect(typeof alice!.posts[0]!.id).toBe('number');
+          expect(typeof alice!.posts[0]!.id).toBe('string');
           expect(typeof alice!.posts[0]!.title).toBe('string');
 
           const bob = rows.find((r) => r.email === 'bob@example.com');

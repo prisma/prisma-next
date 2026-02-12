@@ -66,17 +66,37 @@ export interface ExecutionStackInstance<
 export function createExecutionStack<
   TFamilyId extends string,
   TTargetId extends string,
+  TTargetInstance extends RuntimeTargetInstance<TFamilyId, TTargetId>,
+  TTargetDescriptor extends RuntimeTargetDescriptor<TFamilyId, TTargetId, TTargetInstance>,
   TAdapterInstance extends RuntimeAdapterInstance<TFamilyId, TTargetId>,
-  TDriverInstance extends RuntimeDriverInstance<TFamilyId, TTargetId>,
-  TExtensionInstance extends RuntimeExtensionInstance<TFamilyId, TTargetId>,
+  TAdapterDescriptor extends RuntimeAdapterDescriptor<TFamilyId, TTargetId, TAdapterInstance>,
+  TDriverInstance extends RuntimeDriverInstance<TFamilyId, TTargetId> = RuntimeDriverInstance<
+    TFamilyId,
+    TTargetId
+  >,
+  TDriverDescriptor extends
+    | RuntimeDriverDescriptor<TFamilyId, TTargetId, TDriverInstance>
+    | undefined = undefined,
+  TExtensionInstance extends RuntimeExtensionInstance<
+    TFamilyId,
+    TTargetId
+  > = RuntimeExtensionInstance<TFamilyId, TTargetId>,
+  TExtensionDescriptor extends RuntimeExtensionDescriptor<
+    TFamilyId,
+    TTargetId,
+    TExtensionInstance
+  > = never,
 >(input: {
-  readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
-  readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId, TAdapterInstance>;
-  readonly driver?: RuntimeDriverDescriptor<TFamilyId, TTargetId, TDriverInstance> | undefined;
-  readonly extensionPacks?:
-    | readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId, TExtensionInstance>[]
-    | undefined;
-}): ExecutionStack<TFamilyId, TTargetId, TAdapterInstance, TDriverInstance, TExtensionInstance> {
+  readonly target: TTargetDescriptor;
+  readonly adapter: TAdapterDescriptor;
+  readonly driver?: TDriverDescriptor | undefined;
+  readonly extensionPacks?: readonly TExtensionDescriptor[] | undefined;
+}): ExecutionStack<TFamilyId, TTargetId, TAdapterInstance, TDriverInstance, TExtensionInstance> & {
+  readonly target: TTargetDescriptor;
+  readonly adapter: TAdapterDescriptor;
+  readonly driver: TDriverDescriptor | undefined;
+  readonly extensionPacks: readonly TExtensionDescriptor[];
+} {
   return {
     target: input.target,
     adapter: input.adapter,

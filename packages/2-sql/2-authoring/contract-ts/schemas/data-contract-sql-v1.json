@@ -24,10 +24,15 @@
       "enum": ["sql"],
       "description": "Target family classification"
     },
-    "coreHash": {
+    "storageHash": {
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$",
-      "description": "SHA-256 hash of the core schema structure (models, fields, relations, storage layout)"
+      "description": "SHA-256 hash of the storage section (DB-satisfied expectations)"
+    },
+    "executionHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the execution section (client-side behavior)"
     },
     "profileHash": {
       "type": "string",
@@ -89,9 +94,28 @@
         }
       },
       "required": ["tables"]
+    },
+    "execution": {
+      "type": "object",
+      "description": "Execution-only behavior not satisfied by the database",
+      "additionalProperties": false,
+      "properties": {
+        "mutations": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "defaults": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/ExecutionMutationDefault" }
+            }
+          },
+          "required": ["defaults"]
+        }
+      },
+      "required": ["mutations"]
     }
   },
-  "required": ["schemaVersion", "target", "targetFamily", "coreHash", "models", "storage"],
+  "required": ["schemaVersion", "target", "targetFamily", "storageHash", "models", "storage"],
   "$defs": {
     "StorageTable": {
       "type": "object",
@@ -169,6 +193,44 @@
           "required": ["kind", "expression"]
         }
       ]
+    },
+    "ExecutionMutationDefaultValue": {
+      "type": "object",
+      "description": "Execution-time default value applied before a write",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["generator"]
+        },
+        "id": {
+          "type": "string",
+          "enum": ["ulid", "nanoid", "uuidv7", "uuidv4", "cuid2", "ksuid"]
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": ["kind", "id"]
+    },
+    "ExecutionMutationDefault": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "table": { "type": "string" },
+            "column": { "type": "string" }
+          },
+          "required": ["table", "column"]
+        },
+        "onCreate": { "$ref": "#/$defs/ExecutionMutationDefaultValue" },
+        "onUpdate": { "$ref": "#/$defs/ExecutionMutationDefaultValue" }
+      },
+      "required": ["ref"]
     },
     "StorageColumn": {
       "type": "object",

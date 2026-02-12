@@ -1,4 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { SqlFamilyAdapter } from '../src/sql-family-adapter';
@@ -8,7 +9,7 @@ const testContract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
   targetFamily: 'sql',
   target: 'postgres',
-  coreHash: 'sha256:test-hash' as never,
+  storageHash: coreHash('sha256:test-hash'),
   models: {},
   relations: {},
   storage: { tables: {} },
@@ -36,7 +37,7 @@ describe('SqlFamilyAdapter', () => {
     const plan: ExecutionPlan = {
       meta: {
         target: 'postgres',
-        coreHash: 'sha256:test-hash',
+        storageHash: 'sha256:test-hash',
         lane: 'sql',
         paramDescriptors: [],
       },
@@ -53,7 +54,7 @@ describe('SqlFamilyAdapter', () => {
     const plan: ExecutionPlan = {
       meta: {
         target: 'mysql', // Wrong target
-        coreHash: 'sha256:test-hash',
+        storageHash: 'sha256:test-hash',
         lane: 'sql',
         paramDescriptors: [],
       },
@@ -66,12 +67,12 @@ describe('SqlFamilyAdapter', () => {
     );
   });
 
-  it('throws on plan coreHash mismatch', () => {
+  it('throws on plan storageHash mismatch', () => {
     const adapter = new SqlFamilyAdapter(testContract);
     const plan: ExecutionPlan = {
       meta: {
         target: 'postgres',
-        coreHash: 'sha256:different-hash', // Wrong hash
+        storageHash: 'sha256:different-hash', // Wrong hash
         lane: 'sql',
         paramDescriptors: [],
       },
@@ -80,7 +81,7 @@ describe('SqlFamilyAdapter', () => {
     };
 
     expect(() => adapter.validatePlan(plan, testContract)).toThrow(
-      'Plan core hash does not match runtime contract',
+      'Plan storage hash does not match runtime contract',
     );
   });
 });

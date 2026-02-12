@@ -11,7 +11,7 @@ const UUID_OSSP_PATTERN = /^uuid_generate_v4\s*\(\s*\)$/i;
 const TRUE_PATTERN = /^true$/i;
 const FALSE_PATTERN = /^false$/i;
 const NUMERIC_PATTERN = /^-?\d+(\.\d+)?$/;
-const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::[\w\s]+(?:\(\d+\))?)?$/;
+const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/;
 
 /**
  * Parses a raw Postgres column default expression into a normalized ColumnDefault.
@@ -65,9 +65,10 @@ export function parsePostgresDefault(
 
   // String literals: 'value'::type or just 'value'
   // Match: 'some text'::text, 'hello'::character varying, 'value', etc.
+  // Strip the ::type cast so the normalized expression matches what contract authors write.
   const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);
   if (stringMatch?.[1] !== undefined) {
-    return { kind: 'literal', expression: trimmed };
+    return { kind: 'literal', expression: `'${stringMatch[1]}'` };
   }
 
   // Unrecognized expression - return as a function with the raw expression

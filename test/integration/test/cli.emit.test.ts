@@ -6,7 +6,6 @@ import { loadContractFromTs } from '@prisma-next/cli';
 import { emit } from '@prisma-next/emitter';
 import {
   assembleOperationRegistry,
-  convertOperationManifest,
   extractCodecTypeImports,
   extractExtensionIds,
   extractOperationTypeImports,
@@ -39,7 +38,7 @@ describe('emit command functionality', () => {
   const buildEmitterArtifacts = () => {
     const { adapter, target, extensions, descriptors } = getSqlDescriptorBundle();
     return {
-      operationRegistry: assembleOperationRegistry(descriptors, convertOperationManifest),
+      operationRegistry: assembleOperationRegistry(descriptors),
       codecTypeImports: extractCodecTypeImports(descriptors),
       operationTypeImports: extractOperationTypeImports(descriptors),
       extensionIds: extractExtensionIds(adapter, target, extensions),
@@ -94,7 +93,7 @@ describe('emit command functionality', () => {
   );
 
   it(
-    'emits contract with correct coreHash',
+    'emits contract with correct storageHash',
     async () => {
       const contractPath = join(fixturesDir, 'valid-contract.ts');
       const contract = await loadContractFromTs(contractPath);
@@ -113,7 +112,7 @@ describe('emit command functionality', () => {
         sqlTargetFamilyHook,
       );
 
-      expect(result.coreHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(result.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
     },
     timeouts.typeScriptCompilation,
   );

@@ -29,7 +29,7 @@ export class Root<TContract extends SqlContract> {
   from<TName extends string>(
     table: string extends TName
       ? TableReferenceTooWideError<'[error] `root.from()` call received a table reference without a specific table name'>
-      : TableReference<TName, TContract['coreHash']>,
+      : TableReference<TName, TContract['storageHash']>,
   ): TName extends string
     ? SelectBuilder<TContract, Pick<TContract['storage']['tables'], TName>>
     : PreviousFunctionReceivedBadInputError<'[error] invalid table reference in previous `root.from()` call will probably cause runtime errors'>;
@@ -39,7 +39,7 @@ export class Root<TContract extends SqlContract> {
   /**
    * @internal
    */
-  from(_table: any): any {
+  from(_table: unknown): unknown {
     // TODO: use runtime table reference value to do something "AST"-related.
     return new SelectBuilder(this.#contract);
   }
@@ -58,6 +58,6 @@ export function createRoot<TContract extends SqlContract>(contract: TContract): 
 /**
  * @internal
  */
-export function createRoot(contract: any): any {
-  return new Root(contract);
+export function createRoot(contract: unknown): unknown {
+  return new Root(contract as SqlContract);
 }

@@ -1,3 +1,4 @@
+import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   ComponentDatabaseDependency,
   SqlControlExtensionDescriptor,
@@ -64,6 +65,7 @@ function createFrameworkComponent(): SqlControlExtensionDescriptor<'postgres'> {
     familyId: 'sql',
     targetId: 'postgres',
     version: '0.0.0-test',
+    operationSignatures: () => [],
     databaseDependencies: { init: [pgvectorDependency] },
     create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
   };
@@ -74,8 +76,8 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:contract' as never,
-    profileHash: 'sha256:profile' as never,
+    storageHash: coreHash('sha256:contract'),
+    profileHash: profileHash('sha256:profile'),
     storage: {
       tables: {
         user: {
@@ -169,6 +171,103 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     });
   });
 
+  it('renders parameterized column types in DDL', () => {
+    const planner = createPostgresMigrationPlanner();
+    const contract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: coreHash('sha256:contract'),
+      profileHash: 'sha256:profile' as never,
+      storage: {
+        tables: {
+          params: {
+            columns: {
+              name: {
+                nativeType: 'character varying',
+                codecId: 'pg/varchar@1',
+                nullable: false,
+                typeParams: { length: 255 },
+              },
+              code: {
+                nativeType: 'character',
+                codecId: 'pg/char@1',
+                nullable: false,
+                typeParams: { length: 16 },
+              },
+              price: {
+                nativeType: 'numeric',
+                codecId: 'pg/numeric@1',
+                nullable: false,
+                typeParams: { precision: 10, scale: 2 },
+              },
+              flags: {
+                nativeType: 'bit',
+                codecId: 'pg/bit@1',
+                nullable: false,
+                typeParams: { length: 8 },
+              },
+              created_at: {
+                nativeType: 'timestamptz',
+                codecId: 'pg/timestamptz@1',
+                nullable: false,
+                typeParams: { precision: 3 },
+              },
+              start_time: {
+                nativeType: 'time',
+                codecId: 'pg/time@1',
+                nullable: false,
+                typeParams: { precision: 2 },
+              },
+              duration: {
+                nativeType: 'interval',
+                codecId: 'pg/interval@1',
+                nullable: false,
+                typeParams: { precision: 6 },
+              },
+            },
+            primaryKey: { columns: ['name'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: {
+        codecTypes: {},
+        operationTypes: {},
+      },
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      sources: {},
+    };
+
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [],
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+    const createTable = result.plan.operations.find((op) => op.id === 'table.params');
+    expect(createTable).toBeDefined();
+    const sql = createTable?.execute[0]?.sql ?? '';
+    expect(sql).toContain('"name" character varying(255)');
+    expect(sql).toContain('"code" character(16)');
+    expect(sql).toContain('"price" numeric(10,2)');
+    expect(sql).toContain('"flags" bit(8)');
+    expect(sql).toContain('"created_at" timestamptz(3)');
+    expect(sql).toContain('"start_time" time(2)');
+    expect(sql).toContain('"duration" interval(6)');
+  });
+
   it('skips dependency install when dependency already satisfied', () => {
     const planner = createPostgresMigrationPlanner();
     const frameworkComponents = [createFrameworkComponent()];
@@ -200,6 +299,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       familyId: 'sql',
       targetId: 'postgres',
       version: '0.0.0-test',
+      operationSignatures: () => [],
       // No databaseDependencies - planner should work without them
       databaseDependencies: {},
       create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
@@ -339,8 +439,8 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test-defaults' as never,
-      profileHash: 'sha256:test-defaults-profile' as never,
+      storageHash: coreHash('sha256:test-defaults'),
+      profileHash: profileHash('sha256:test-defaults-profile'),
       storage: {
         tables: {
           [tableName]: {

@@ -18,7 +18,7 @@ import 'dotenv/config';
 
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { schema, sql } from '../src/prisma/query';
+import { schema, sql } from '../src/prisma/context';
 import { getRuntime } from '../src/prisma/runtime';
 
 async function main() {
@@ -35,16 +35,16 @@ async function main() {
     // Insert users
     const alicePlan = sql
       .insert(userTable, {
-        id: param('id'),
         email: param('email'),
         createdAt: param('createdAt'),
+        kind: param('kind'),
       })
       .returning(userColumns.id, userColumns.email)
       .build({
         params: {
-          id: 1,
           email: 'alice@example.com',
           createdAt: new Date(),
+          kind: 'admin',
         },
       });
 
@@ -52,16 +52,16 @@ async function main() {
 
     const bobPlan = sql
       .insert(userTable, {
-        id: param('id'),
         email: param('email'),
         createdAt: param('createdAt'),
+        kind: param('kind'),
       })
       .returning(userColumns.id, userColumns.email)
       .build({
         params: {
-          id: 2,
           email: 'bob@example.com',
           createdAt: new Date(),
+          kind: 'user',
         },
       });
 
@@ -90,7 +90,6 @@ async function main() {
     // Insert posts with embeddings
     const post1Plan = sql
       .insert(postTable, {
-        id: param('id'),
         title: param('title'),
         userId: param('userId'),
         embedding: param('embedding'),
@@ -99,7 +98,6 @@ async function main() {
       .returning(postColumns.id, postColumns.title, postColumns.userId)
       .build({
         params: {
-          id: 1,
           title: 'First Post',
           userId: alice.id,
           embedding: generateEmbedding(1),
@@ -111,7 +109,6 @@ async function main() {
 
     const post2Plan = sql
       .insert(postTable, {
-        id: param('id'),
         title: param('title'),
         userId: param('userId'),
         embedding: param('embedding'),
@@ -120,7 +117,6 @@ async function main() {
       .returning(postColumns.id, postColumns.title, postColumns.userId)
       .build({
         params: {
-          id: 2,
           title: 'Second Post',
           userId: alice.id,
           embedding: generateEmbedding(2),
@@ -132,7 +128,6 @@ async function main() {
 
     const post3Plan = sql
       .insert(postTable, {
-        id: param('id'),
         title: param('title'),
         userId: param('userId'),
         embedding: param('embedding'),
@@ -141,7 +136,6 @@ async function main() {
       .returning(postColumns.id, postColumns.title, postColumns.userId)
       .build({
         params: {
-          id: 3,
           title: 'Third Post',
           userId: bob.id,
           embedding: generateEmbedding(3),

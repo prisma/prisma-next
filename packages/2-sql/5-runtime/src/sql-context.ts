@@ -1,17 +1,24 @@
 import { checkContractComponentRequirements } from '@prisma-next/contract/framework-components';
-import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
+import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import { createExecutionStack, type ExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
+  RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
+  RuntimeDriverDescriptor,
   RuntimeDriverInstance,
   RuntimeExtensionDescriptor,
   RuntimeExtensionInstance,
+  RuntimeTargetDescriptor,
+  RuntimeTargetInstance,
 } from '@prisma-next/core-execution-plane/types';
+import { generateId } from '@prisma-next/ids/runtime';
 import { createOperationRegistry } from '@prisma-next/operations';
 import { runtimeError } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import type {
   Adapter,
+  CodecParamsDescriptor,
   CodecRegistry,
   LoweredStatement,
   QueryAst,
@@ -19,116 +26,117 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
+  AppliedMutationDefault,
   ExecutionContext,
+  MutationDefaultsOptions,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
-import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
-
-// ============================================================================
-// Runtime Parameterized Codec Descriptor Types
-// ============================================================================
 
 /**
  * Runtime parameterized codec descriptor.
  * Provides validation schema and optional init hook for codecs that support type parameters.
  * Used at runtime to validate typeParams and create type helpers.
+ *
+ * This is a type alias for `CodecParamsDescriptor` from the AST layer,
+ * which is the shared definition used by both adapter and runtime.
  */
-export interface RuntimeParameterizedCodecDescriptor<
+export type RuntimeParameterizedCodecDescriptor<
   TParams = Record<string, unknown>,
   THelper = unknown,
-> {
-  /** The codec ID this descriptor applies to (e.g., 'pg/vector@1') */
-  readonly codecId: string;
+> = CodecParamsDescriptor<TParams, THelper>;
 
-  /**
-   * Arktype schema for validating typeParams.
-   * The schema is used to validate both storage.types entries and inline column typeParams.
-   */
-  readonly paramsSchema: Type<TParams>;
-
-  /**
-   * Optional init hook called during runtime context creation.
-   * Receives validated params and returns a helper object to be stored in context.types.
-   * If not provided, the validated params are stored directly.
-   */
-  readonly init?: (params: TParams) => THelper;
-}
-
-// ============================================================================
-// SQL Runtime Extension Types
-// ============================================================================
-
-/**
- * SQL runtime extension instance.
- * Extends the framework RuntimeExtensionInstance with SQL-specific hooks
- * for contributing codecs and operations to the runtime context.
- *
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- */
-export interface SqlRuntimeExtensionInstance<TTargetId extends string>
-  extends RuntimeExtensionInstance<'sql', TTargetId> {
-  /** Returns codecs to register in the runtime context. */
-  codecs?(): CodecRegistry;
-  /** Returns operations to register in the runtime context. */
-  operations?(): ReadonlyArray<SqlOperationSignature>;
-  /**
-   * Returns parameterized codec descriptors for type validation and helper creation.
-   * Uses unknown for type parameters to allow any concrete descriptor types.
-   */
+export interface SqlStaticContributions {
+  readonly codecs: () => CodecRegistry;
+  readonly operationSignatures: () => ReadonlyArray<SqlOperationSignature>;
   // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
-  parameterizedCodecs?(): ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
+  readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
 }
 
-/**
- * SQL runtime extension descriptor.
- * Extends the framework RuntimeExtensionDescriptor with SQL-specific instance type.
- *
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- */
-export interface SqlRuntimeExtensionDescriptor<TTargetId extends string>
-  extends RuntimeExtensionDescriptor<'sql', TTargetId, SqlRuntimeExtensionInstance<TTargetId>> {
+export interface SqlRuntimeTargetDescriptor<
+  TTargetId extends string = string,
+  TTargetInstance extends RuntimeTargetInstance<'sql', TTargetId> = RuntimeTargetInstance<
+    'sql',
+    TTargetId
+  >,
+> extends RuntimeTargetDescriptor<'sql', TTargetId, TTargetInstance>,
+    SqlStaticContributions {}
+
+export interface SqlRuntimeAdapterDescriptor<
+  TTargetId extends string = string,
+  TAdapterInstance extends RuntimeAdapterInstance<
+    'sql',
+    TTargetId
+  > = SqlRuntimeAdapterInstance<TTargetId>,
+> extends RuntimeAdapterDescriptor<'sql', TTargetId, TAdapterInstance>,
+    SqlStaticContributions {}
+
+export interface SqlRuntimeExtensionDescriptor<TTargetId extends string = string>
+  extends RuntimeExtensionDescriptor<'sql', TTargetId, SqlRuntimeExtensionInstance<TTargetId>>,
+    SqlStaticContributions {
   create(): SqlRuntimeExtensionInstance<TTargetId>;
 }
 
-// ============================================================================
-// SQL Runtime Adapter Instance
-// ============================================================================
+export interface SqlExecutionStack<TTargetId extends string = string> {
+  readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
+  readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId>;
+  readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
+}
 
-/**
- * SQL runtime adapter instance interface.
- * Combines RuntimeAdapterInstance identity with SQL Adapter behavior.
- * The instance IS an Adapter (via intersection), not HAS an adapter property.
- *
- * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
- */
+export type SqlExecutionStackWithDriver<TTargetId extends string = string> = Omit<
+  ExecutionStack<
+    'sql',
+    TTargetId,
+    SqlRuntimeAdapterInstance<TTargetId>,
+    SqlRuntimeDriverInstance<TTargetId>,
+    SqlRuntimeExtensionInstance<TTargetId>
+  >,
+  'target' | 'adapter' | 'driver' | 'extensionPacks'
+> & {
+  readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
+  readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId, SqlRuntimeAdapterInstance<TTargetId>>;
+  readonly driver:
+    | RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>
+    | undefined;
+  readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
+};
+
+export interface SqlRuntimeExtensionInstance<TTargetId extends string>
+  extends RuntimeExtensionInstance<'sql', TTargetId> {}
+
 export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = RuntimeAdapterInstance<
   'sql',
   TTargetId
 > &
   Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
 
-/**
- * SQL runtime driver instance type.
- * Combines identity properties with SQL driver behavior methods.
- */
 export type SqlRuntimeDriverInstance<TTargetId extends string = string> = RuntimeDriverInstance<
   'sql',
   TTargetId
 > &
   SqlDriver;
 
+export function createSqlExecutionStack<TTargetId extends string>(options: {
+  readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
+  readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId>;
+  readonly driver?:
+    | RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>
+    | undefined;
+  readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[] | undefined;
+}): SqlExecutionStackWithDriver<TTargetId> {
+  return createExecutionStack({
+    target: options.target,
+    adapter: options.adapter,
+    driver: options.driver,
+    extensionPacks: options.extensionPacks,
+  });
+}
+
 export type { ExecutionContext, TypeHelperRegistry };
 
 export function assertExecutionStackContractRequirements(
   contract: SqlContract<SqlStorage>,
-  stack: ExecutionStackInstance<
-    'sql',
-    string,
-    SqlRuntimeAdapterInstance<string>,
-    RuntimeDriverInstance<'sql', string>,
-    SqlRuntimeExtensionInstance<string>
-  >['stack'],
+  stack: SqlExecutionStack,
 ): void {
   const providedComponentIds = new Set<string>([
     stack.target.id,
@@ -176,14 +184,6 @@ export function assertExecutionStackContractRequirements(
   }
 }
 
-// ============================================================================
-// Parameterized Type Validation
-// ============================================================================
-
-/**
- * Validates typeParams against the codec's paramsSchema.
- * @throws RuntimeErrorEnvelope with code RUNTIME.TYPE_PARAMS_INVALID if validation fails
- */
 function validateTypeParams(
   typeParams: Record<string, unknown>,
   codecDescriptor: RuntimeParameterizedCodecDescriptor,
@@ -204,46 +204,27 @@ function validateTypeParams(
   return result as Record<string, unknown>;
 }
 
-/**
- * Collects parameterized codec descriptors from extension instances.
- * Returns a map of codecId → descriptor for quick lookup.
- * @throws RuntimeErrorEnvelope with code RUNTIME.DUPLICATE_PARAMETERIZED_CODEC if duplicate codecIds are found
- */
 function collectParameterizedCodecDescriptors(
-  extensionInstances: ReadonlyArray<SqlRuntimeExtensionInstance<string>>,
+  contributors: ReadonlyArray<SqlStaticContributions>,
 ): Map<string, RuntimeParameterizedCodecDescriptor> {
   const descriptors = new Map<string, RuntimeParameterizedCodecDescriptor>();
 
-  for (const extInstance of extensionInstances) {
-    const paramCodecs = extInstance.parameterizedCodecs?.();
-    if (paramCodecs) {
-      for (const descriptor of paramCodecs) {
-        if (descriptors.has(descriptor.codecId)) {
-          throw runtimeError(
-            'RUNTIME.DUPLICATE_PARAMETERIZED_CODEC',
-            `Duplicate parameterized codec descriptor for codecId '${descriptor.codecId}'.`,
-            { codecId: descriptor.codecId },
-          );
-        }
-        descriptors.set(descriptor.codecId, descriptor);
+  for (const contributor of contributors) {
+    for (const descriptor of contributor.parameterizedCodecs()) {
+      if (descriptors.has(descriptor.codecId)) {
+        throw runtimeError(
+          'RUNTIME.DUPLICATE_PARAMETERIZED_CODEC',
+          `Duplicate parameterized codec descriptor for codecId '${descriptor.codecId}'.`,
+          { codecId: descriptor.codecId },
+        );
       }
+      descriptors.set(descriptor.codecId, descriptor);
     }
   }
 
   return descriptors;
 }
 
-/**
- * Initializes type helpers from storage.types using codec descriptors.
- *
- * For each named type instance in `storage.types`:
- * - If a codec descriptor exists with an `init` hook: calls the hook and stores the result
- * - Otherwise: stores the full type instance metadata directly (codecId, nativeType, typeParams)
- *
- * This matches the typing in `ExtractSchemaTypes<Contract>` which extracts
- * `Contract['storage']['types']` directly, ensuring runtime values match static types
- * when no init hook transforms the value.
- */
 function initializeTypeHelpers(
   storageTypes: Record<string, StorageTypeInstance> | undefined,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
@@ -258,20 +239,16 @@ function initializeTypeHelpers(
     const descriptor = codecDescriptors.get(typeInstance.codecId);
 
     if (descriptor) {
-      // Validate typeParams against the codec's schema
       const validatedParams = validateTypeParams(typeInstance.typeParams, descriptor, {
         typeName,
       });
 
-      // Call init hook if provided, otherwise store full type instance
       if (descriptor.init) {
         helpers[typeName] = descriptor.init(validatedParams);
       } else {
-        // No init hook: expose full type instance metadata (matches contract typing)
         helpers[typeName] = typeInstance;
       }
     } else {
-      // No descriptor found: expose full type instance (no validation possible)
       helpers[typeName] = typeInstance;
     }
   }
@@ -279,10 +256,6 @@ function initializeTypeHelpers(
   return helpers;
 }
 
-/**
- * Validates inline column typeParams across all tables.
- * @throws RuntimeErrorEnvelope with code RUNTIME.TYPE_PARAMS_INVALID if validation fails
- */
 function validateColumnTypeParams(
   storage: SqlStorage,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
@@ -299,51 +272,81 @@ function validateColumnTypeParams(
   }
 }
 
+function computeExecutionDefaultValue(spec: ExecutionMutationDefaultValue): unknown {
+  switch (spec.kind) {
+    case 'generator':
+      return generateId(spec.params ? { id: spec.id, params: spec.params } : { id: spec.id });
+  }
+}
+
+function applyMutationDefaults(
+  contract: SqlContract<SqlStorage>,
+  options: MutationDefaultsOptions,
+): ReadonlyArray<AppliedMutationDefault> {
+  const defaults = contract.execution?.mutations.defaults ?? [];
+  if (defaults.length === 0) {
+    return [];
+  }
+
+  const applied: AppliedMutationDefault[] = [];
+  const appliedColumns = new Set<string>();
+
+  for (const mutationDefault of defaults) {
+    if (mutationDefault.ref.table !== options.table) {
+      continue;
+    }
+
+    const defaultSpec =
+      options.op === 'create' ? mutationDefault.onCreate : mutationDefault.onUpdate;
+    if (!defaultSpec) {
+      continue;
+    }
+
+    const columnName = mutationDefault.ref.column;
+    if (Object.hasOwn(options.values, columnName) || appliedColumns.has(columnName)) {
+      continue;
+    }
+
+    applied.push({
+      column: columnName,
+      value: computeExecutionDefaultValue(defaultSpec),
+    });
+    appliedColumns.add(columnName);
+  }
+
+  return applied;
+}
+
 export function createExecutionContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   TTargetId extends string = string,
 >(options: {
   readonly contract: TContract;
-  readonly stackInstance: ExecutionStackInstance<
-    'sql',
-    TTargetId,
-    SqlRuntimeAdapterInstance<TTargetId>,
-    RuntimeDriverInstance<'sql', TTargetId>,
-    SqlRuntimeExtensionInstance<TTargetId>
-  >;
+  readonly stack: SqlExecutionStack<TTargetId>;
 }): ExecutionContext<TContract> {
-  const { contract, stackInstance } = options;
-  const { adapter: adapterInstance, extensionPacks: extensionInstances } = stackInstance;
+  const { contract, stack } = options;
 
-  assertExecutionStackContractRequirements(contract, stackInstance.stack);
+  assertExecutionStackContractRequirements(contract, stack);
 
   const codecRegistry = createCodecRegistry();
   const operationRegistry = createOperationRegistry();
 
-  const adapterCodecs = adapterInstance.profile.codecs();
-  for (const codec of adapterCodecs.values()) {
-    codecRegistry.register(codec);
-  }
+  const contributors: SqlStaticContributions[] = [
+    stack.target,
+    stack.adapter,
+    ...stack.extensionPacks,
+  ];
 
-  for (const extInstance of extensionInstances) {
-    const extCodecs = extInstance.codecs?.();
-    if (extCodecs) {
-      for (const codec of extCodecs.values()) {
-        codecRegistry.register(codec);
-      }
+  for (const contributor of contributors) {
+    for (const c of contributor.codecs().values()) {
+      codecRegistry.register(c);
     }
-
-    const extOperations = extInstance.operations?.();
-    if (extOperations) {
-      for (const operation of extOperations) {
-        operationRegistry.register(operation);
-      }
+    for (const operation of contributor.operationSignatures()) {
+      operationRegistry.register(operation);
     }
   }
 
-  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(
-    extensionInstances as ReadonlyArray<SqlRuntimeExtensionInstance<string>>,
-  );
+  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(contributors);
 
   if (parameterizedCodecDescriptors.size > 0) {
     validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);
@@ -356,5 +359,6 @@ export function createExecutionContext<
     operations: operationRegistry,
     codecs: codecRegistry,
     types,
+    applyMutationDefaults: (options) => applyMutationDefaults(contract, options),
   };
 }

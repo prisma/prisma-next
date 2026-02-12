@@ -47,7 +47,7 @@ type MyContract = SqlContract<
 const contract = validateContract<MyContract>({
   target: 'postgres',
   targetFamily: 'sql' as const,
-  coreHash: 'sha256:test',
+  storageHash: 'sha256:test',
   storage: {
     tables: {
       user: {

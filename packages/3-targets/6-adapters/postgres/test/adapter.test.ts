@@ -15,7 +15,7 @@ const contract = Object.freeze(
   validateContract<PostgresContract>({
     target: 'postgres',
     targetFamily: 'sql' as const,
-    coreHash: 'sha256:test-core',
+    storageHash: 'sha256:test-core',
     profileHash: 'sha256:test-profile',
     storage: {
       tables: {
@@ -38,6 +38,13 @@ const contract = Object.freeze(
 );
 
 describe('createPostgresAdapter', () => {
+  it('exposes parameterized codecs', () => {
+    const adapter = createPostgresAdapter();
+    const codecs = adapter.parameterizedCodecs();
+
+    expect(codecs.some((codec) => codec.codecId === 'pg/numeric@1')).toBe(true);
+  });
+
   it('lowers select AST into canonical SQL with positional params', () => {
     const adapter = createPostgresAdapter();
 
@@ -837,7 +844,7 @@ describe('createPostgresAdapter', () => {
       validateContract<PostgresContract>({
         target: 'postgres',
         targetFamily: 'sql' as const,
-        coreHash: 'sha256:test-core',
+        storageHash: 'sha256:test-core',
         profileHash: 'sha256:test-profile',
         storage: {
           tables: {

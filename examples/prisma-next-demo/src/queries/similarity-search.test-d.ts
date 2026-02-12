@@ -1,7 +1,7 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { expectTypeOf, test } from 'vitest';
-import { sql, tables } from '../prisma/query';
+import { sql, tables } from '../prisma/context';
 
 /**
  * Type test to verify that ResultType correctly infers the distance column as number
@@ -27,6 +27,6 @@ test('ResultType correctly infers number for cosineDistance operation result', (
 
   // Verify that distance is correctly inferred as number
   expectTypeOf<Row['distance']>().toEqualTypeOf<number>();
-  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['id']>().toEqualTypeOf<string>();
   expectTypeOf<Row['title']>().toEqualTypeOf<string>();
 });

@@ -32,22 +32,51 @@ export interface RuntimeCoreOptions<TContract = unknown, TAdapter = unknown, TDr
   readonly operationRegistry: OperationRegistry;
 }
 
-export interface RuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = unknown> {
+export interface RuntimeCore<TContract = unknown, TAdapter = unknown, TDriver = unknown>
+  extends RuntimeQueryable {
   // Type parameters are used in the implementation for type safety
   readonly _typeContract?: TContract;
   readonly _typeAdapter?: TAdapter;
   readonly _typeDriver?: TDriver;
-  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row>;
+  connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
   operations(): OperationRegistry;
+}
+
+export interface RuntimeConnection extends RuntimeQueryable {
+  transaction(): Promise<RuntimeTransaction>;
+  release(): Promise<void>;
+}
+
+export interface RuntimeTransaction extends RuntimeQueryable {
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
+
+export interface RuntimeQueryable {
+  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row>;
 }
 
 interface DriverWithQuery<_TDriver> {
   query(sql: string, params: readonly unknown[]): Promise<{ rows: ReadonlyArray<unknown> }>;
 }
 
-interface DriverWithExecute<_TDriver> {
+interface DriverWithConnection<_TDriver> {
+  acquireConnection(): Promise<DriverConnection>;
+}
+
+export interface DriverConnection extends Queryable {
+  beginTransaction(): Promise<DriverTransaction>;
+  release(): Promise<void>;
+}
+
+export interface DriverTransaction extends Queryable {
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
+
+export interface Queryable {
   execute<Row = Record<string, unknown>>(options: {
     sql: string;
     params: readonly unknown[];
@@ -136,12 +165,20 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
 
     const marker = parseContractMarkerRow(result.rows[0]);
 
-    const contract = this.contract as { coreHash: string; profileHash?: string | null };
-    if (marker.coreHash !== contract.coreHash) {
-      throw runtimeError('CONTRACT.MARKER_MISMATCH', 'Database core hash does not match contract', {
-        expected: contract.coreHash,
-        actual: marker.coreHash,
-      });
+    const contract = this.contract as {
+      storageHash: string;
+      executionHash?: string | null;
+      profileHash?: string | null;
+    };
+    if (marker.storageHash !== contract.storageHash) {
+      throw runtimeError(
+        'CONTRACT.MARKER_MISMATCH',
+        'Database storage hash does not match contract',
+        {
+          expected: contract.storageHash,
+          actual: marker.storageHash,
+        },
+      );
     }
 
     const expectedProfile = contract.profileHash ?? null;
@@ -180,6 +217,63 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
   }
 
   execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row> {
+    return this.#executeWith(plan, this.driver as Queryable);
+  }
+
+  async connection(): Promise<RuntimeConnection> {
+    const driver = this.driver as unknown as DriverWithConnection<TDriver>;
+    const driverConn = await driver.acquireConnection();
+    const self = this;
+
+    const runtimeConnection: RuntimeConnection = {
+      async transaction(): Promise<RuntimeTransaction> {
+        const driverTx = await driverConn.beginTransaction();
+        const runtimeTx: RuntimeTransaction = {
+          async commit(): Promise<void> {
+            await driverTx.commit();
+          },
+          async rollback(): Promise<void> {
+            await driverTx.rollback();
+          },
+          execute<Row = Record<string, unknown>>(
+            plan: ExecutionPlan<Row>,
+          ): AsyncIterableResult<Row> {
+            return self.#executeWith(plan, driverTx);
+          },
+        };
+        return runtimeTx;
+      },
+      execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row> {
+        return self.#executeWith(plan, driverConn);
+      },
+      async release(): Promise<void> {
+        await driverConn.release();
+      },
+    };
+
+    return runtimeConnection;
+  }
+
+  telemetry(): RuntimeTelemetryEvent | null {
+    return this._telemetry;
+  }
+
+  operations(): OperationRegistry {
+    return this.operationRegistry;
+  }
+
+  close(): Promise<void> {
+    const driver = this.driver as unknown as DriverWithClose<TDriver>;
+    if (typeof driver.close === 'function') {
+      return driver.close();
+    }
+    return Promise.resolve();
+  }
+
+  #executeWith<Row = Record<string, unknown>>(
+    plan: ExecutionPlan<Row>,
+    queryable: Queryable,
+  ): AsyncIterableResult<Row> {
     this.validatePlan(plan);
     this._telemetry = null;
 
@@ -209,10 +303,9 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
           }
         }
 
-        const driver = self.driver as unknown as DriverWithExecute<TDriver>;
-        const encodedParams = plan.params as readonly unknown[];
+        const encodedParams = plan.params;
 
-        for await (const row of driver.execute<Record<string, unknown>>({
+        for await (const row of queryable.execute<Record<string, unknown>>({
           sql: plan.sql,
           params: encodedParams,
         })) {
@@ -259,22 +352,6 @@ class RuntimeCoreImpl<TContract = unknown, TAdapter = unknown, TDriver = unknown
     };
 
     return new AsyncIterableResult(iterator(this));
-  }
-
-  telemetry(): RuntimeTelemetryEvent | null {
-    return this._telemetry;
-  }
-
-  operations(): OperationRegistry {
-    return this.operationRegistry;
-  }
-
-  close(): Promise<void> {
-    const driver = this.driver as unknown as DriverWithClose<TDriver>;
-    if (typeof driver.close === 'function') {
-      return driver.close();
-    }
-    return Promise.resolve();
   }
 }
 

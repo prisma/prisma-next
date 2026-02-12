@@ -6,7 +6,11 @@ import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvecto
 import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
-import type { CoreHashBase, ProfileHashBase } from '@prisma-next/contract/types';
+import type {
+  ExecutionHashBase,
+  ProfileHashBase,
+  StorageHashBase,
+} from '@prisma-next/contract/types';
 import type {
   SqlContract,
   SqlStorage,
@@ -14,8 +18,10 @@ import type {
   ModelDefinition,
 } from '@prisma-next/sql-contract/types';
 
-export type CoreHash =
-  CoreHashBase<'sha256:8250c76f669e4f9d7aa8dbec3337ba408412024019297b8aa40339e80ff9d388'>;
+export type StorageHash =
+  StorageHashBase<'sha256:82a5eedba0cffd694a22952212ac3bc7b1a0a93c499656e1e46834b16ce70c7e'>;
+export type ExecutionHash =
+  ExecutionHashBase<'sha256:82a5eedba0cffd694a22952212ac3bc7b1a0a93c499656e1e46834b16ce70c7e'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:fc74c4c3a1401c2ffd528ee1bd61b0ac57af7bdd5e77d39d567389afcb1027bd'>;
 
@@ -29,8 +35,8 @@ export type Contract = SqlContract<
       readonly user: {
         columns: {
           readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
           readonly email: {
@@ -43,6 +49,11 @@ export type Contract = SqlContract<
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
           };
+          readonly kind: {
+            readonly nativeType: 'user_type';
+            readonly codecId: 'pg/enum@1';
+            readonly nullable: false;
+          };
         };
         primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
@@ -52,8 +63,8 @@ export type Contract = SqlContract<
       readonly post: {
         columns: {
           readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
           readonly title: {
@@ -62,8 +73,8 @@ export type Contract = SqlContract<
             readonly nullable: false;
           };
           readonly userId: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
           readonly createdAt: {
@@ -89,23 +100,30 @@ export type Contract = SqlContract<
         ];
       };
     };
-    readonly types: Record<string, never>;
+    readonly types: {
+      readonly user_type: {
+        readonly codecId: 'pg/enum@1';
+        readonly nativeType: 'user_type';
+        readonly typeParams: { readonly values: readonly ['admin', 'user'] };
+      };
+    };
   },
   {
     readonly User: {
       storage: { readonly table: 'user' };
       fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
+        readonly id: CodecTypes['pg/text@1']['output'];
         readonly email: CodecTypes['pg/text@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+        readonly kind: 'admin' | 'user';
       };
     };
     readonly Post: {
       storage: { readonly table: 'post' };
       fields: {
-        readonly id: CodecTypes['pg/int4@1']['output'];
+        readonly id: CodecTypes['pg/text@1']['output'];
         readonly title: CodecTypes['pg/text@1']['output'];
-        readonly userId: CodecTypes['pg/int4@1']['output'];
+        readonly userId: CodecTypes['pg/text@1']['output'];
         readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       };
@@ -141,6 +159,7 @@ export type Contract = SqlContract<
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
+        readonly kind: 'kind';
       };
       readonly Post: {
         readonly id: 'id';
@@ -155,6 +174,7 @@ export type Contract = SqlContract<
         readonly id: 'id';
         readonly email: 'email';
         readonly createdAt: 'createdAt';
+        readonly kind: 'kind';
       };
       readonly post: {
         readonly id: 'id';
@@ -167,7 +187,8 @@ export type Contract = SqlContract<
     codecTypes: PgTypes & PgVectorTypes;
     operationTypes: PgVectorOperationTypes;
   },
-  CoreHash,
+  StorageHash,
+  ExecutionHash,
   ProfileHash
 >;
 

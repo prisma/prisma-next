@@ -1,4 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   LoweredStatement,
@@ -23,7 +24,7 @@ describe('plan assembly', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test' as never,
+    storageHash: coreHash('sha256:test'),
     models: {},
     storage: {
       tables: {
@@ -822,7 +823,7 @@ describe('plan assembly', () => {
       const planMeta: PlanMeta = {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'dsl',
         refs: {
           tables: ['user'],
@@ -855,7 +856,7 @@ describe('plan assembly', () => {
       const planMeta: PlanMeta = {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'dsl',
         refs: {
           tables: ['user'],
@@ -886,7 +887,7 @@ describe('plan assembly', () => {
       const planMeta: PlanMeta = {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'dsl',
         refs: {
           tables: ['user'],
@@ -928,7 +929,7 @@ describe('plan assembly', () => {
       const planMeta: PlanMeta = {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'dsl',
         refs: {
           tables: ['user'],
@@ -960,7 +961,7 @@ describe('plan assembly', () => {
       const planMeta: PlanMeta = {
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         lane: 'dsl',
         refs: {
           tables: ['user'],

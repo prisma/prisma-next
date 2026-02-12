@@ -22,7 +22,8 @@ const createMockDriver = (
       return { rows: [{ table_name: 'user' }] as Row[] };
     }
     if (sql.includes('information_schema.columns')) {
-      return { rows: columns as Row[] };
+      // Add table_name to each column for batched query grouping
+      return { rows: columns.map((col) => ({ ...col, table_name: 'user' })) as Row[] };
     }
     if (sql.includes('PRIMARY KEY')) {
       return { rows: [] as Row[] };
@@ -279,14 +280,18 @@ describe('parsePostgresDefault normalizer', () => {
       expression: '-123.45',
     });
 
-    // String literals
+    // String literals (type casts are stripped)
     expect(parsePostgresDefault("'hello'::text")).toEqual({
       kind: 'literal',
-      expression: "'hello'::text",
+      expression: "'hello'",
+    });
+    expect(parsePostgresDefault('\'ok\'::"BillingState"')).toEqual({
+      kind: 'literal',
+      expression: "'ok'",
     });
     expect(parsePostgresDefault("'Hello''s'::text")).toEqual({
       kind: 'literal',
-      expression: "'Hello''s'::text",
+      expression: "'Hello''s'",
     });
     expect(parsePostgresDefault("'plain text'")).toEqual({
       kind: 'literal',
@@ -297,6 +302,78 @@ describe('parsePostgresDefault normalizer', () => {
     expect(parsePostgresDefault('uuid_generate_v4()')).toEqual({
       kind: 'function',
       expression: 'gen_random_uuid()',
+    });
+  });
+});
+
+describe('parsePostgresDefault strips type casts from string literals', () => {
+  it('strips ::text cast from simple string literal', () => {
+    expect(parsePostgresDefault("'ready'::text")).toEqual({
+      kind: 'literal',
+      expression: "'ready'",
+    });
+  });
+
+  it('strips ::character varying cast', () => {
+    expect(parsePostgresDefault("'hello'::character varying")).toEqual({
+      kind: 'literal',
+      expression: "'hello'",
+    });
+  });
+
+  it('strips ::character varying(255) cast with length', () => {
+    expect(parsePostgresDefault("'hello'::character varying(255)")).toEqual({
+      kind: 'literal',
+      expression: "'hello'",
+    });
+  });
+
+  it('strips quoted enum cast like ::"MyEnum"', () => {
+    expect(parsePostgresDefault('\'active\'::"StatusEnum"')).toEqual({
+      kind: 'literal',
+      expression: "'active'",
+    });
+  });
+
+  it('strips quoted camelCase enum cast like ::"EnvironmentModelKind"', () => {
+    expect(parsePostgresDefault('\'ready\'::"EnvironmentModelKind"')).toEqual({
+      kind: 'literal',
+      expression: "'ready'",
+    });
+  });
+
+  it('preserves plain string literal without cast', () => {
+    expect(parsePostgresDefault("'plain text'")).toEqual({
+      kind: 'literal',
+      expression: "'plain text'",
+    });
+  });
+
+  it('strips cast from string with escaped quotes', () => {
+    expect(parsePostgresDefault("'it''s ready'::text")).toEqual({
+      kind: 'literal',
+      expression: "'it''s ready'",
+    });
+  });
+
+  it('strips ::varchar cast', () => {
+    expect(parsePostgresDefault("'default_value'::varchar")).toEqual({
+      kind: 'literal',
+      expression: "'default_value'",
+    });
+  });
+
+  it('strips ::bpchar cast (blank-padded char)', () => {
+    expect(parsePostgresDefault("'Y'::bpchar")).toEqual({
+      kind: 'literal',
+      expression: "'Y'",
+    });
+  });
+
+  it('strips cast from empty string literal', () => {
+    expect(parsePostgresDefault("''::text")).toEqual({
+      kind: 'literal',
+      expression: "''",
     });
   });
 });

@@ -12,23 +12,21 @@ describe('pgvector operations', () => {
     expect(pgvectorDescriptor.version).toBe('0.0.1');
   });
 
-  it('provides codec registry with vector codec', () => {
-    const extension = pgvectorDescriptor.create();
-    const codecs = extension.codecs?.();
+  it('descriptor provides codec registry with vector codec', () => {
+    const codecs = pgvectorDescriptor.codecs();
     expect(codecs).toBeDefined();
 
-    const vectorCodec = codecs?.get('pg/vector@1');
+    const vectorCodec = codecs.get('pg/vector@1');
     expect(vectorCodec).toBeDefined();
     expect(vectorCodec?.id).toBe('pg/vector@1');
   });
 
-  it('provides operation signatures', () => {
-    const extension = pgvectorDescriptor.create();
-    const operations = extension.operations?.();
+  it('descriptor provides operation signatures', () => {
+    const operations = pgvectorDescriptor.operationSignatures();
     expect(operations).toBeDefined();
-    expect(operations?.length).toBe(1);
+    expect(operations.length).toBe(1);
 
-    const cosineDistanceOp = operations?.[0];
+    const cosineDistanceOp = operations[0];
     expect(cosineDistanceOp).toBeDefined();
     expect(cosineDistanceOp?.forTypeId).toBe('pg/vector@1');
     expect(cosineDistanceOp?.method).toBe('cosineDistance');
@@ -42,12 +40,11 @@ describe('pgvector operations', () => {
   });
 
   it('operations can be registered in operation registry', () => {
-    const extension = pgvectorDescriptor.create();
-    const operations = extension.operations?.();
+    const operations = pgvectorDescriptor.operationSignatures();
     expect(operations).toBeDefined();
 
     const registry = createOperationRegistry();
-    for (const op of operations ?? []) {
+    for (const op of operations) {
       registry.register(op);
     }
 
@@ -57,17 +54,22 @@ describe('pgvector operations', () => {
   });
 
   it('codecs can be registered in codec registry', () => {
-    const extension = pgvectorDescriptor.create();
-    const codecs = extension.codecs?.();
-    expect(codecs).toBeDefined();
+    const descriptorCodecs = pgvectorDescriptor.codecs();
+    expect(descriptorCodecs).toBeDefined();
 
     const registry = createCodecRegistry();
-    for (const codec of codecs?.values() ?? []) {
+    for (const codec of descriptorCodecs.values()) {
       registry.register(codec);
     }
 
     const vectorCodec = registry.get('pg/vector@1');
     expect(vectorCodec).toBeDefined();
     expect(vectorCodec?.id).toBe('pg/vector@1');
+  });
+
+  it('instance is minimal (identity only)', () => {
+    const instance = pgvectorDescriptor.create();
+    expect(instance.familyId).toBe('sql');
+    expect(instance.targetId).toBe('postgres');
   });
 });

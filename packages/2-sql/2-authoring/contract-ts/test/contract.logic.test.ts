@@ -7,7 +7,7 @@ describe('validateContract logic validation', () => {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    coreHash: 'sha256:test',
+    storageHash: 'sha256:test',
     models: {},
     storage: {
       tables: {
@@ -428,7 +428,7 @@ describe('validateContract logic validation', () => {
         schemaVersion: '1',
         target: 'postgres',
         targetFamily: 'sql',
-        coreHash: 'sha256:test',
+        storageHash: 'sha256:test',
         models: {
           User: {
             storage: { table: 'User' },
@@ -600,7 +600,7 @@ describe('validateContract logic validation', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: 'sha256:test',
+      storageHash: 'sha256:test',
       models: {},
       storage: {
         tables: {
