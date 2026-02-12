@@ -152,7 +152,7 @@ function planThreadOperations(action, viewerLogin, thread) {
   return operations;
 }
 
-function planStandaloneOperations(action, viewerLogin, standalone) {
+function planStandaloneOperations(action, viewerLogin, standalone, prNodeId) {
   const operations = [];
   const doneBody = buildDoneReplyBody(action.actionId);
   const hasDoneReply = hasDoneReplyFromViewer(standalone.replies, viewerLogin, action.actionId);
@@ -166,6 +166,7 @@ function planStandaloneOperations(action, viewerLogin, standalone) {
       kind: 'reply',
       body: doneBody,
       mutationTargetKind: action.target.kind,
+      subjectIdForComment: prNodeId ?? null,
     });
   }
 
@@ -218,7 +219,8 @@ function planReviewActionOperations({ reviewActions, viewerLogin, githubState })
       operations.push(createNoop(action, 'standalone_state_missing'));
       continue;
     }
-    operations.push(...planStandaloneOperations(action, viewerLogin, standalone));
+    const prNodeId = typeof reviewActions.pr?.nodeId === 'string' ? reviewActions.pr.nodeId : null;
+    operations.push(...planStandaloneOperations(action, viewerLogin, standalone, prNodeId));
   }
 
   return operations;

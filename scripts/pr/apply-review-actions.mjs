@@ -449,21 +449,42 @@ const MUTATION_RESOLVE_THREAD = `
   }
 `;
 
+const MUTATION_ADD_COMMENT = `
+  mutation($subjectId: ID!, $body: String!) {
+    addComment(input: { subjectId: $subjectId, body: $body }) {
+      comment { id }
+    }
+  }
+`;
+
 function executeOperation(operation) {
   if (operation.kind === 'noop') {
     return { state: 'noop', message: operation.reason ?? null };
   }
 
   if (operation.kind === 'reply') {
-    if (operation.mutationTargetKind !== 'review_thread') {
-      return { state: 'skipped', message: 'reply_not_supported_for_target_kind' };
+    if (operation.mutationTargetKind === 'review_thread') {
+      const response = runGhGraphql(MUTATION_REPLY_THREAD, {
+        threadId: operation.targetNodeId,
+        body: operation.body,
+      });
+      assertNoGraphqlErrors(response);
+      return { state: 'applied', message: null };
     }
-    const response = runGhGraphql(MUTATION_REPLY_THREAD, {
-      threadId: operation.targetNodeId,
-      body: operation.body,
-    });
-    assertNoGraphqlErrors(response);
-    return { state: 'applied', message: null };
+    if (
+      (operation.mutationTargetKind === 'issue_comment' ||
+        operation.mutationTargetKind === 'pull_request_review') &&
+      typeof operation.subjectIdForComment === 'string' &&
+      operation.subjectIdForComment.length > 0
+    ) {
+      const response = runGhGraphql(MUTATION_ADD_COMMENT, {
+        subjectId: operation.subjectIdForComment,
+        body: operation.body,
+      });
+      assertNoGraphqlErrors(response);
+      return { state: 'applied', message: null };
+    }
+    return { state: 'skipped', message: 'reply_missing_subject_or_unsupported_target' };
   }
 
   if (operation.kind === 'react') {
