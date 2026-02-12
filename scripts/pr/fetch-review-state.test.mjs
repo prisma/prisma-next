@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   buildCommentTrees,
   buildMarkdown,
+  buildReviewStateJson,
   computeLineRange,
   parseCliArgs,
   parsePrUrl,
@@ -54,10 +55,24 @@ test('CLI option parsing', () => {
     );
   });
 
+  test('when --out-json is passed without value', () => {
+    assert.throws(
+      () => parseCliArgs(['node', 'script', '--out-json']),
+      (e) => e.message?.includes('requires a value') && e.code === 2,
+    );
+  });
+
   test('when --out file path does not end with .md', () => {
     assert.throws(
       () => parseCliArgs(['node', 'script', '--out', 'foo.txt']),
       (e) => e.message?.includes('must end with .md') && e.code === 2,
+    );
+  });
+
+  test('when --out-json file path does not end with .json', () => {
+    assert.throws(
+      () => parseCliArgs(['node', 'script', '--out-json', 'foo.md']),
+      (e) => e.message?.includes('must end with .json') && e.code === 2,
     );
   });
 
@@ -74,9 +89,12 @@ test('CLI option parsing', () => {
       'https://github.com/owner/repo/pull/123',
       '--out',
       'out.md',
+      '--out-json',
+      'out.json',
     ]);
     assert.strictEqual(result.prUrl, 'https://github.com/owner/repo/pull/123');
     assert.strictEqual(result.outPath, 'out.md');
+    assert.strictEqual(result.outJsonPath, 'out.json');
   });
 
   test('when no args are passed', () => {
@@ -591,5 +609,21 @@ test('buildMarkdown document hierarchy', () => {
       assert.ok(idx > lastIndex, `${name} appears after previous block (chronological order)`);
       lastIndex = idx;
     }
+  });
+});
+
+test('buildReviewStateJson', () => {
+  test('includes pr metadata and empty arrays', () => {
+    const payload = makePayload();
+    const fetchedAt = '2026-02-12T00:00:00.000Z';
+    const json = buildReviewStateJson(payload, 'main', fetchedAt);
+
+    assert.strictEqual(json.version, 1);
+    assert.strictEqual(json.fetchedAt, fetchedAt);
+    assert.strictEqual(json.sourceBranch, 'main');
+    assert.strictEqual(json.pr.url, MINIMAL_PR.url);
+    assert.deepStrictEqual(json.threads, []);
+    assert.deepStrictEqual(json.reviews, []);
+    assert.deepStrictEqual(json.issueComments, []);
   });
 });

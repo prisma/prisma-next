@@ -41,7 +41,7 @@ The output is intended to be used locally to address review feedback without man
 - The script is invoked via Node:
 
 ```bash
-node scripts/pr/fetch-review-state.mjs [--pr <prUrl>] [--out <outputPath>]
+node scripts/pr/fetch-review-state.mjs [--pr <prUrl>] [--out <outputPath>] [--out-json <outputJsonPath>]
 ```
 
 ### Inputs
@@ -52,6 +52,10 @@ node scripts/pr/fetch-review-state.mjs [--pr <prUrl>] [--out <outputPath>]
   - If provided:
     - If `outputPath` is `-`, write to stdout
     - Otherwise, write to the specified file path
+  - If `outputPath` is a file path ending in `.md` and `--out-json` is not provided, the script also writes a sibling JSON file by replacing `.md` with `.json`.
+- `--out-json <outputJsonPath>` (optional)
+  - If provided, write a structured JSON representation of the fetched review state.
+  - If omitted, JSON is written automatically when `--out` is a `.md` file path.
   - If omitted, write to stdout
 
 ### Strict option parsing

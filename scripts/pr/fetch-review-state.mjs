@@ -11,8 +11,8 @@ const EXIT_CLI = 2;
 
 function parseCliArgs(argv) {
   const args = argv.slice(2);
-  const result = { prUrl: null, outPath: null };
-  const knownFlags = new Set(['--pr', '--out']);
+  const result = { prUrl: null, outPath: null, outJsonPath: null };
+  const knownFlags = new Set(['--pr', '--out', '--out-json']);
   let i = 0;
   while (i < args.length) {
     const arg = args[i];
@@ -36,6 +36,8 @@ function parseCliArgs(argv) {
       result.prUrl = value;
     } else if (flag === '--out') {
       result.outPath = value;
+    } else if (flag === '--out-json') {
+      result.outJsonPath = value;
     }
   }
   if (result.outPath !== null && result.outPath !== '-') {
@@ -43,6 +45,14 @@ function parseCliArgs(argv) {
       throw {
         code: EXIT_CLI,
         message: 'error: --out file path must end with .md',
+      };
+    }
+  }
+  if (result.outJsonPath !== null && result.outJsonPath !== '-') {
+    if (!result.outJsonPath.endsWith('.json')) {
+      throw {
+        code: EXIT_CLI,
+        message: 'error: --out-json file path must end with .json',
       };
     }
   }
@@ -557,7 +567,7 @@ function buildCommentBlock(c) {
   return lines;
 }
 
-function buildMarkdown(payload, sourceBranch) {
+function buildMarkdown(payload, sourceBranch, fetchedAt = new Date().toISOString()) {
   const { pr, threads, reviews, comments } = payload;
   const sortedThreads = sortThreads(threads);
   const sortedReviews = sortReviews(reviews).filter(
@@ -574,7 +584,6 @@ function buildMarkdown(payload, sourceBranch) {
   ];
   blocks.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
-  const fetchedAt = new Date().toISOString();
   const lines = [];
   lines.push('# Review');
   lines.push('');
@@ -596,6 +605,71 @@ function buildMarkdown(payload, sourceBranch) {
   }
 
   return `${lines.join('\n')}\n`;
+}
+
+function deriveOutJsonPath(outPath, outJsonPath) {
+  if (outJsonPath) return outJsonPath;
+  if (!outPath || outPath === '-') return null;
+  return outPath.replace(/\.md$/i, '.json');
+}
+
+function buildReviewStateJson(payload, sourceBranch, fetchedAt) {
+  const strip = (s) => stripInternalState(s ?? '');
+
+  const normalizeComment = (c) => ({
+    id: c.id ?? null,
+    databaseId: c.databaseId ?? null,
+    nodeId: c.nodeId ?? null,
+    url: c.url ?? null,
+    author: { login: c.author?.login ?? null },
+    createdAt: c.createdAt ?? null,
+    body: strip(c.body ?? ''),
+    reactionGroups: normalizeReactionGroups(c.reactionGroups),
+    replyTo: c.replyTo ? { id: c.replyTo.id ?? null } : null,
+  });
+
+  return {
+    version: 1,
+    fetchedAt,
+    sourceBranch: sourceBranch ?? null,
+    pr: {
+      url: payload.pr?.url ?? null,
+      number: payload.pr?.number ?? null,
+      title: payload.pr?.title ?? null,
+      state: payload.pr?.state ?? null,
+      headRefName: payload.pr?.headRefName ?? null,
+      baseRefName: payload.pr?.baseRefName ?? null,
+      updatedAt: payload.pr?.updatedAt ?? null,
+    },
+    threads: sortThreads(payload.threads ?? []).map((t) => ({
+      id: t.id ?? null,
+      path: t.path ?? null,
+      startLine: t.startLine ?? t.originalStartLine ?? null,
+      endLine: t.line ?? t.originalLine ?? null,
+      isResolved: t.isResolved ?? null,
+      isOutdated: t.isOutdated ?? null,
+      comments: sortThreadComments(t.comments?.nodes ?? []).map((c) => ({
+        ...normalizeComment(c),
+        state: c.state ?? null,
+      })),
+    })),
+    reviews: sortReviews(payload.reviews ?? []).map((r) => ({
+      id: r.id ?? null,
+      databaseId: r.databaseId ?? null,
+      url: r.url ?? null,
+      author: { login: r.author?.login ?? null },
+      state: r.state ?? null,
+      submittedAt: r.submittedAt ?? null,
+      body: strip(r.body ?? ''),
+      reactionGroups: normalizeReactionGroups(r.reactionGroups),
+    })),
+    issueComments: sortIssueComments(payload.comments ?? []).map((c) => ({
+      ...normalizeComment(c),
+      replies: sortIssueComments(c.replies ?? []).map((reply) => ({
+        ...normalizeComment(reply),
+      })),
+    })),
+  };
 }
 
 function normalizeReactionGroups(groups) {
@@ -690,13 +764,21 @@ async function main() {
     c.reactionGroups = normalizeReactionGroups(c.reactionGroups);
   }
 
-  const markdown = buildMarkdown(payload, sourceBranch);
+  const fetchedAt = new Date().toISOString();
+  const markdown = buildMarkdown(payload, sourceBranch, fetchedAt);
+  const outJsonPath = deriveOutJsonPath(opts.outPath, opts.outJsonPath);
+  const json = outJsonPath ? buildReviewStateJson(payload, sourceBranch, fetchedAt) : null;
 
   if (opts.outPath === null || opts.outPath === '-') {
     process.stdout.write(markdown);
   } else {
     await mkdir(dirname(opts.outPath), { recursive: true });
     await writeFile(opts.outPath, markdown, 'utf-8');
+  }
+
+  if (outJsonPath && outJsonPath !== '-') {
+    await mkdir(dirname(outJsonPath), { recursive: true });
+    await writeFile(outJsonPath, `${JSON.stringify(json, null, 2)}\n`, 'utf-8');
   }
 
   process.exit(EXIT_SUCCESS);
@@ -714,6 +796,7 @@ if (isMain) {
 
 export {
   buildCommentTrees,
+  buildReviewStateJson,
   buildMarkdown,
   computeLineRange,
   parseCliArgs,
