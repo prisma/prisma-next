@@ -1,0 +1,31 @@
+task_groups:
+  - name: cli-scaffolding-and-option-parsing
+    claude_code_subagent: primary
+    standards:
+      - global/conventions.md
+      - global/coding-style.md
+      - global/error-handling.md
+  - name: pr-resolution-logic
+    claude_code_subagent: primary
+    standards:
+      - global/conventions.md
+      - global/error-handling.md
+  - name: graphql-data-fetching
+    claude_code_subagent: primary
+    standards:
+      - global/conventions.md
+      - global/error-handling.md
+  - name: markdown-output-construction
+    claude_code_subagent: primary
+    standards:
+      - global/conventions.md
+      - global/coding-style.md
+  - name: unit-tests-pure-no-network
+    claude_code_subagent: primary
+    standards:
+      - global/conventions.md
+      - testing/test-writing.md
+  - name: acceptance-validation
+    claude_code_subagent: primary
+    standards:
+      - global/conventions.md
