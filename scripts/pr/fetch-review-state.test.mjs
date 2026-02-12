@@ -62,6 +62,14 @@ test('CLI option parsing', () => {
     );
   });
 
+  test('when --help is passed', () => {
+    const result = parseCliArgs(['node', 'script', '--help']);
+    assert.strictEqual(result.help, true);
+    assert.strictEqual(result.prUrl, null);
+    assert.strictEqual(result.outPath, null);
+    assert.strictEqual(result.outJsonPath, null);
+  });
+
   test('when --out file path does not end with .md', () => {
     assert.throws(
       () => parseCliArgs(['node', 'script', '--out', 'foo.txt']),

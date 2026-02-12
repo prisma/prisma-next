@@ -9,9 +9,32 @@ const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
 const EXIT_CLI = 2;
 
+function getHelpText() {
+  return [
+    'Usage:',
+    '  fetch-review-state.mjs [--pr <url>] [--out <path.md>|-] [--out-json <path.json>|-] [--help]',
+    '',
+    'Purpose:',
+    '  Fetch unresolved review threads, submitted review bodies, and PR comments for a GitHub pull request.',
+    '  Emit markdown review state to stdout or a file, and optionally emit normalized JSON review state.',
+    '',
+    'Flags:',
+    '  --pr <url>          GitHub pull request URL (for example: https://github.com/OWNER/REPO/pull/123).',
+    '                      If omitted, the script attempts to discover the PR for the current git branch.',
+    '  --out <path.md>|-   Markdown output path. Use "-" (or omit) to write markdown to stdout.',
+    '  --out-json <path.json>|-',
+    '                      JSON output path. If omitted and --out is a file path, defaults to same path with .json.',
+    '  --help              Show this help text and exit.',
+  ].join('\n');
+}
+
 function parseCliArgs(argv) {
   const args = argv.slice(2);
-  const result = { prUrl: null, outPath: null, outJsonPath: null };
+  const result = { prUrl: null, outPath: null, outJsonPath: null, help: false };
+  if (args.includes('--help')) {
+    result.help = true;
+    return result;
+  }
   const knownFlags = new Set(['--pr', '--out', '--out-json']);
   let i = 0;
   while (i < args.length) {
@@ -687,6 +710,11 @@ async function main() {
   } catch (e) {
     console.error(e.message);
     process.exit(e.code ?? EXIT_CLI);
+  }
+
+  if (opts.help) {
+    process.stdout.write(`${getHelpText()}\n`);
+    process.exit(EXIT_SUCCESS);
   }
 
   const pre = checkPreconditions();
