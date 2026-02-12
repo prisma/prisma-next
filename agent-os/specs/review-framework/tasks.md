@@ -195,18 +195,18 @@ Key constraints (from spec):
 #### Task Group 6: Test coverage + integration checks for determinism and layering
 **Dependencies:** Task Groups 1–5
 
-- [ ] 6.0 Confirm the framework is testable, deterministic, and repo-aligned
-  - [ ] 6.1 Run all script unit tests (pure + planner)
+- [x] 6.0 Confirm the framework is testable, deterministic, and repo-aligned
+  - [x] 6.1 Run all script unit tests (pure + planner)
     - Command: `node --test scripts/pr/**/*.test.mjs`
-  - [ ] 6.2 Run repo typecheck (where relevant)
+  - [x] 6.2 Run repo typecheck (where relevant)
     - Command: `pnpm typecheck`
-  - [ ] 6.3 Run repo lint (where relevant)
+  - [x] 6.3 Run repo lint (where relevant)
     - Command: `pnpm lint`
-  - [ ] 6.4 Validate architectural boundaries (where relevant)
+  - [x] 6.4 Validate architectural boundaries (where relevant)
     - Command: `pnpm lint:deps`
-  - [ ] 6.5 Run package tests (optional but recommended before landing changes)
+  - [x] 6.5 Run package tests (optional but recommended before landing changes)
     - Command: `pnpm test:packages`
-  - [ ] 6.6 Manual determinism check on artifacts
+  - [x] 6.6 Manual determinism check on artifacts
     - Re-run pure scripts twice and confirm byte-identical outputs
     - Confirm `apply-review-actions` dry-run output is stable (same planned operations for same inputs)
 
