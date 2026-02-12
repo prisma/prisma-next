@@ -62,6 +62,11 @@ function parsePrUrl(url) {
   };
 }
 
+function escapeMarkdownTableCell(value) {
+  const s = String(value ?? '');
+  return s.replace(/\r?\n/g, '<br />').replace(/\|/g, '\\|');
+}
+
 function renderReactions(groups) {
   if (!groups || groups.length === 0) return '--';
   const withCount = groups
@@ -90,11 +95,11 @@ function quoteBody(body) {
 function formatTimestamp(iso) {
   if (!iso) return '';
   const d = new Date(iso);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const h = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const h = String(d.getUTCHours()).padStart(2, '0');
+  const min = String(d.getUTCMinutes()).padStart(2, '0');
   return `${y}-${m}-${day} ${h}:${min}`;
 }
 
@@ -168,13 +173,21 @@ function runSync(cmd, args, input) {
 }
 
 function checkPreconditions() {
-  const git = runSync('which', ['git']);
+  const git = runSync('git', ['--version']);
   if (git.status !== 0) {
-    return { ok: false, message: 'error: git not found on PATH', code: EXIT_OPERATIONAL };
+    return {
+      ok: false,
+      message: 'error: git not found on PATH (expected to be able to run "git --version")',
+      code: EXIT_OPERATIONAL,
+    };
   }
-  const gh = runSync('which', ['gh']);
+  const gh = runSync('gh', ['--version']);
   if (gh.status !== 0) {
-    return { ok: false, message: 'error: gh not found on PATH', code: EXIT_OPERATIONAL };
+    return {
+      ok: false,
+      message: 'error: gh not found on PATH (expected to be able to run "gh --version")',
+      code: EXIT_OPERATIONAL,
+    };
   }
   const auth = runSync('gh', ['auth', 'status']);
   if (auth.status !== 0) {
@@ -218,30 +231,6 @@ function discoverPrUrl(branchName) {
     };
   }
   return { url: list[0].url };
-}
-
-function fetchPrMetadata(prUrl) {
-  const r = runSync('gh', [
-    'pr',
-    'view',
-    prUrl,
-    '--json',
-    'url,number,title,state,headRefName,baseRefName,updatedAt',
-  ]);
-  if (r.status !== 0) {
-    return {
-      error: `error: failed to fetch pull request metadata for ${prUrl}`,
-      code: EXIT_OPERATIONAL,
-    };
-  }
-  try {
-    return { data: JSON.parse(r.stdout) };
-  } catch {
-    return {
-      error: `error: failed to fetch pull request metadata for ${prUrl}`,
-      code: EXIT_OPERATIONAL,
-    };
-  }
 }
 
 const THREADS_QUERY = `
@@ -452,27 +441,6 @@ function threadEarliestDate(thread) {
   }, null);
 }
 
-function buildCommentTrees(comments) {
-  const byId = new Map();
-  for (const c of comments) {
-    byId.set(c.id, { ...c, replies: [] });
-  }
-  const roots = [];
-  for (const c of comments) {
-    const entry = byId.get(c.id);
-    const parentId = c.replyTo?.id;
-    if (parentId && byId.has(parentId)) {
-      byId.get(parentId).replies.push(entry);
-    } else {
-      roots.push(entry);
-    }
-  }
-  for (const r of roots) {
-    r.replies.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-  }
-  return roots;
-}
-
 function buildThreadBlock(thread) {
   const lines = [];
   const lineRange = computeLineRange(thread);
@@ -538,22 +506,6 @@ function buildCommentBlock(c) {
   lines.push('');
   if (reactions !== '--') lines.push(`- Reactions: ${reactions}`);
   lines.push('');
-  for (const reply of c.replies ?? []) {
-    const rLogin = reply.author?.login ?? 'unknown';
-    const rReactions = renderReactions(reply.reactionGroups);
-    const rUrl = reply.url ?? '';
-    lines.push(`## [${formatTimestamp(reply.createdAt)} @${rLogin}](${rUrl})`);
-    lines.push('');
-    lines.push('<!--');
-    lines.push(`- DatabaseId: ${reply.databaseId ?? 'unknown'}`);
-    lines.push(`- NodeId: ${reply.id ?? ''}`);
-    lines.push('-->');
-    lines.push('');
-    lines.push(quoteBody(reply.body));
-    lines.push('');
-    if (rReactions !== '--') lines.push(`- Reactions: ${rReactions}`);
-    lines.push('');
-  }
   return lines;
 }
 
@@ -563,14 +515,12 @@ function buildMarkdown(payload, sourceBranch) {
   const sortedReviews = sortReviews(reviews).filter(
     (r) => (r.body ?? '').trim().length > 0,
   );
-  const commentTrees = buildCommentTrees(comments).sort((a, b) =>
-    (a.createdAt || '').localeCompare(b.createdAt || ''),
-  );
+  const sortedComments = sortIssueComments(comments);
 
   const blocks = [
     ...sortedThreads.map((t) => ({ type: 'thread', date: threadEarliestDate(t), data: t })),
     ...sortedReviews.map((r) => ({ type: 'review', date: r.submittedAt ?? '', data: r })),
-    ...commentTrees.map((c) => ({ type: 'comment', date: c.createdAt ?? '', data: c })),
+    ...sortedComments.map((c) => ({ type: 'comment', date: c.createdAt ?? '', data: c })),
   ];
   blocks.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
@@ -581,7 +531,7 @@ function buildMarkdown(payload, sourceBranch) {
   lines.push('| PR | Title | State | Head | Base | FetchedAt | SourceBranch |');
   lines.push('| --- | --- | --- | --- | --- | --- | --- |');
   lines.push(
-    `| ${pr.url} | ${pr.title ?? ''} | ${pr.state ?? ''} | ${pr.headRefName ?? ''} | ${pr.baseRefName ?? ''} | ${fetchedAt} | ${sourceBranch ?? 'N/A'} |`,
+    `| ${escapeMarkdownTableCell(pr.url)} | ${escapeMarkdownTableCell(pr.title ?? '')} | ${escapeMarkdownTableCell(pr.state ?? '')} | ${escapeMarkdownTableCell(pr.headRefName ?? '')} | ${escapeMarkdownTableCell(pr.baseRefName ?? '')} | ${escapeMarkdownTableCell(fetchedAt)} | ${escapeMarkdownTableCell(sourceBranch ?? 'N/A')} |`,
   );
   lines.push('');
 
@@ -647,12 +597,6 @@ async function main() {
     }
   }
 
-  const metaResult = fetchPrMetadata(prUrl);
-  if (metaResult.error) {
-    console.error(metaResult.error);
-    process.exit(metaResult.code);
-  }
-
   if (!sourceBranch) {
     sourceBranch = getCurrentBranch();
     if (sourceBranch === 'HEAD') sourceBranch = 'N/A';
@@ -713,7 +657,6 @@ if (isMain) {
 }
 
 export {
-  buildCommentTrees,
   buildMarkdown,
   computeLineRange,
   parseCliArgs,

@@ -1,7 +1,6 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 import {
-  buildCommentTrees,
   buildMarkdown,
   computeLineRange,
   parseCliArgs,
@@ -234,42 +233,6 @@ test('Line range computation', () => {
   });
 });
 
-test('buildCommentTrees', () => {
-  test('when all comments have no replyTo', () => {
-    const comments = [
-      { id: 'c1', createdAt: '2024-01-01Z', replyTo: null },
-      { id: 'c2', createdAt: '2024-01-02Z', replyTo: null },
-    ];
-    const roots = buildCommentTrees(comments);
-    assert.strictEqual(roots.length, 2);
-    assert.strictEqual(roots[0].replies.length, 0);
-    assert.strictEqual(roots[1].replies.length, 0);
-  });
-
-  test('when comment has replyTo referencing another comment', () => {
-    const comments = [
-      { id: 'parent', createdAt: '2024-01-01Z', replyTo: null },
-      { id: 'child', createdAt: '2024-01-02Z', replyTo: { id: 'parent' } },
-    ];
-    const roots = buildCommentTrees(comments);
-    assert.strictEqual(roots.length, 1);
-    assert.strictEqual(roots[0].id, 'parent');
-    assert.strictEqual(roots[0].replies.length, 1);
-    assert.strictEqual(roots[0].replies[0].id, 'child');
-  });
-
-  test('when replies are out of order, sorts by createdAt', () => {
-    const comments = [
-      { id: 'parent', createdAt: '2024-01-01Z', replyTo: null },
-      { id: 'r2', createdAt: '2024-01-03Z', replyTo: { id: 'parent' } },
-      { id: 'r1', createdAt: '2024-01-02Z', replyTo: { id: 'parent' } },
-    ];
-    const roots = buildCommentTrees(comments);
-    assert.strictEqual(roots[0].replies[0].id, 'r1');
-    assert.strictEqual(roots[0].replies[1].id, 'r2');
-  });
-});
-
 test('buildMarkdown document hierarchy', () => {
   test('when payload is empty', () => {
     const payload = makePayload();
@@ -277,6 +240,18 @@ test('buildMarkdown document hierarchy', () => {
     assert.ok(md.startsWith('# Review\n'));
     assert.ok(md.includes('| PR | Title | State |'));
     assert.ok(md.includes(MINIMAL_PR.url));
+  });
+
+  test('escapes markdown table cells for PR metadata', () => {
+    const payload = makePayload({
+      pr: {
+        ...MINIMAL_PR,
+        title: 'Hello | world\nSecond line',
+      },
+    });
+    const md = buildMarkdown(payload, 'feat/pipe|branch');
+    assert.ok(md.includes('Hello \\| world<br />Second line'));
+    assert.ok(md.includes('feat/pipe\\|branch'));
   });
 
   test('when payload contains an inline review thread (PullRequestReviewThread)', () => {
@@ -304,9 +279,10 @@ test('buildMarkdown document hierarchy', () => {
 
     assert.ok(md.includes('# [src/foo.ts L16-L18](src/foo.ts:16)'));
     assert.ok(md.includes('<!-- ThreadId: PRRT_xxx -->'));
-    assert.match(
-      md,
-      /## \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @alice\]\(https:\/\/github\.com\/o\/r\/pull\/1#discussion_r1001\)/,
+    assert.ok(
+      md.includes(
+        '## [2024-01-15 10:00 @alice](https://github.com/o/r/pull/1#discussion_r1001)',
+      ),
     );
     assert.ok(md.includes('> Change this'));
   });
@@ -325,9 +301,10 @@ test('buildMarkdown document hierarchy', () => {
     const payload = makePayload({ reviews: [review] });
     const md = buildMarkdown(payload, 'main');
 
-    assert.match(
-      md,
-      /# \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @bob\]\(https:\/\/github\.com\/o\/r\/pull\/1#pullrequestreview-2001\)/,
+    assert.ok(
+      md.includes(
+        '# [2024-01-16 12:00 @bob](https://github.com/o/r/pull/1#pullrequestreview-2001)',
+      ),
     );
     assert.ok(md.includes('- State: APPROVED'));
     assert.ok(md.includes('> LGTM'));
@@ -364,19 +341,17 @@ test('buildMarkdown document hierarchy', () => {
       createdAt: '2024-01-17T14:00:00Z',
       body: 'Nice work',
       reactionGroups: [],
-      replyTo: null,
     };
     const payload = makePayload({ comments: [comment] });
     const md = buildMarkdown(payload, 'main');
 
-    assert.match(
-      md,
-      /# \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @charlie\]\(https:\/\/github\.com\/o\/r\/pull\/1#issuecomment-3001\)/,
+    assert.ok(
+      md.includes('# [2024-01-17 14:00 @charlie](https://github.com/o/r/pull/1#issuecomment-3001)'),
     );
     assert.ok(md.includes('> Nice work'));
   });
 
-  test('when payload contains a standalone PR comment with replies (IssueComment with replyTo)', () => {
+  test('when payload contains issue comments, renders them as a flat list', () => {
     const parent = {
       id: 'IC_parent',
       databaseId: 4001,
@@ -385,7 +360,6 @@ test('buildMarkdown document hierarchy', () => {
       createdAt: '2024-01-18T09:00:00Z',
       body: 'Initial thought',
       reactionGroups: [],
-      replyTo: null,
     };
     const reply = {
       id: 'IC_reply',
@@ -395,14 +369,13 @@ test('buildMarkdown document hierarchy', () => {
       createdAt: '2024-01-18T10:00:00Z',
       body: 'I agree',
       reactionGroups: [],
-      replyTo: { id: 'IC_parent' },
     };
     const payload = makePayload({ comments: [parent, reply] });
     const md = buildMarkdown(payload, 'main');
 
-    assert.match(md, /# \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @dave\]/);
+    assert.ok(md.includes('# [2024-01-18 09:00 @dave](https://github.com/o/r/pull/1#issuecomment-4001)'));
     assert.ok(md.includes('> Initial thought'));
-    assert.match(md, /## \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @eve\]/);
+    assert.ok(md.includes('# [2024-01-18 10:00 @eve](https://github.com/o/r/pull/1#issuecomment-4002)'));
     assert.ok(md.includes('> I agree'));
   });
 
@@ -443,7 +416,6 @@ test('buildMarkdown document hierarchy', () => {
       createdAt: '2024-01-18T00:00:00Z',
       body: 'c1',
       reactionGroups: [],
-      replyTo: null,
     };
     const payload = makePayload({
       threads: [thread],
@@ -520,7 +492,6 @@ test('buildMarkdown document hierarchy', () => {
       createdAt: '2024-01-18T06:00:00Z',
       body: 'Standalone comment',
       reactionGroups: [],
-      replyTo: null,
     };
     const parentWithReply = {
       id: 'IC_parent',
@@ -530,7 +501,6 @@ test('buildMarkdown document hierarchy', () => {
       createdAt: '2024-01-22T10:00:00Z',
       body: 'Parent with reply',
       reactionGroups: [],
-      replyTo: null,
     };
     const reply = {
       id: 'IC_reply',
@@ -540,7 +510,6 @@ test('buildMarkdown document hierarchy', () => {
       createdAt: '2024-01-22T11:00:00Z',
       body: 'Reply to parent',
       reactionGroups: [],
-      replyTo: { id: 'IC_parent' },
     };
 
     const payload = makePayload({
@@ -574,7 +543,7 @@ test('buildMarkdown document hierarchy', () => {
 
     assert.match(md, /# \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @dave\]/);
     assert.ok(md.includes('> Parent with reply'));
-    assert.match(md, /## \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @eve\]/);
+    assert.match(md, /# \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @eve\]/);
     assert.ok(md.includes('> Reply to parent'));
 
     const blockOrder = [
@@ -582,7 +551,8 @@ test('buildMarkdown document hierarchy', () => {
       { pattern: /# \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @alice\]/, name: 'review1 (Jan 19)' },
       { pattern: /# \[src\/bar\.ts L10-L12\]/, name: 'thread (Jan 20)' },
       { pattern: /# \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @bob\]/, name: 'review2 (Jan 21)' },
-      { pattern: /# \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @dave\]/, name: 'comment+reply (Jan 22)' },
+      { pattern: /# \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @dave\]/, name: 'comment (Jan 22 10:00)' },
+      { pattern: /# \[\d{4}-\d{2}-\d{2} \d{2}:\d{2} @eve\]/, name: 'comment (Jan 22 11:00)' },
     ];
     let lastIndex = -1;
     for (const { pattern, name } of blockOrder) {
