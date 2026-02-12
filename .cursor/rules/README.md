@@ -46,6 +46,14 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/cli-test-fixture-cleanup.mdc` — Avoid committing generated CLI test fixtures
 - `.cursor/rules/cli-package-exports.mdc` — CLI package export structure and import patterns
 
+## GitHub / PR automation
+- `.cursor/rules/github-cli-tls-in-sandbox.mdc` — Fix `gh api` TLS failures in sandboxed shells
+
+## Review Framework docs
+- `scripts/pr/README.md` — Deterministic review-framework workflow and script CLI contracts
+- `agent-os/specs/review-framework/spec.md` — Canonical artifact schemas, sorting/marker rules, and idempotent apply semantics
+- `agent-os/specs/review-framework/tasks.md` — Task-group checklist and acceptance criteria
+
 ## Imports & Layering
 - `.cursor/rules/import-validation.mdc` — Layering rules and exceptions
 - `.cursor/rules/shared-plane-packages.mdc` — Pattern for creating shared plane packages

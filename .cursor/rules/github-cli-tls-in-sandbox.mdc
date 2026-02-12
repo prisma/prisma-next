@@ -1,0 +1,20 @@
+---
+description: Avoid gh TLS/cert failures in sandboxed shells
+globs:
+  - scripts/pr/**
+alwaysApply: false
+---
+
+If `gh api` fails with TLS/certificate errors (for example `x509: OSStatus -26276`) while running inside a sandboxed shell, treat it as an **environment/cert-store mismatch**.
+
+Do:
+
+- Fail fast and return an operational error instead of retrying blindly in the same sandbox.
+- Exit with code `1` for this operational failure mode and print rerun guidance to stderr.
+- Re-run the `gh` call outside the sandbox (use a shell mode that uses the system cert store).
+- Keep GitHub mutations **idempotent** (reactions/replies/resolutions should be safe to retry).
+
+Don’t:
+
+- Don’t disable TLS verification (no `GH_NO_VERIFY_SSL`, no curl `-k`).
+
