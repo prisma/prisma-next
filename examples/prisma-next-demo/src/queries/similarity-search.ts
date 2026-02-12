@@ -13,7 +13,12 @@ type VectorOpsColumn = {
 };
 
 function hasVectorOpsColumn(value: unknown): value is VectorOpsColumn {
-  return typeof value === 'object' && value !== null && 'cosineDistance' in value;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'cosineDistance' in value &&
+    typeof (value as { cosineDistance?: unknown }).cosineDistance === 'function'
+  );
 }
 
 /**
