@@ -96,7 +96,6 @@ root
   // @ts-expect-error
   .build();
 root
-  // biome-ignore lint/suspicious/noExplicitAny: intentionally testing any cast for type-level behavior
   .from(allTable as unknown)
   // @ts-expect-error
   .build();
