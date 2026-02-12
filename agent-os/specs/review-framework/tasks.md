@@ -147,17 +147,17 @@ Key constraints (from spec):
 #### Task Group 4: Update Agent OS orchestration (triage/implement loop)
 **Dependencies:** Task Groups 1–3
 
-- [ ] 4.0 Align agents/skills with the deterministic artifacts + CLI contracts
-  - [ ] 4.1 Update `.claude/skills/github-review-iteration/SKILL.md` to use JSON-first canonical artifacts + derived Markdown views
+- [x] 4.0 Align agents/skills with the deterministic artifacts + CLI contracts
+  - [x] 4.1 Update `.claude/skills/github-review-iteration/SKILL.md` to use JSON-first canonical artifacts + derived Markdown views
     - Explicitly reference new/updated commands for fetch, render, summarize, apply (dry-run → apply)
-  - [ ] 4.2 Update `.claude/agents/agent-os/review-triager.md` to author `review-actions.json` v1 deterministically
+  - [x] 4.2 Update `.claude/agents/agent-os/review-triager.md` to author `review-actions.json` v1 deterministically
     - Ensure it uses node ids for all targets and preserves `actions[]` order intentionally
-  - [ ] 4.3 Update `.claude/agents/agent-os/review-implementer.md` to update action statuses (`pending|in_progress|done`) and completion records
-  - [ ] 4.4 Ensure the standard storage layout is used under `agent-os/specs/review-framework/reviews/<owner>_<repo>_pr-<number>/`
+  - [x] 4.3 Update `.claude/agents/agent-os/review-implementer.md` to update action statuses (`pending|in_progress|done`) and completion records
+  - [x] 4.4 Ensure the standard storage layout is used under `agent-os/specs/review-framework/reviews/<owner>_<repo>_pr-<number>/`
     - Ensure directory naming is deterministic from PR URL
-  - [ ] 4.5 Add a thin orchestration wrapper only if it reduces steps without adding nondeterminism
+  - [x] 4.5 Add a thin orchestration wrapper only if it reduces steps without adding nondeterminism
     - Optional script: `scripts/pr/review-iterate.mjs` (must be explicit about what it reads/writes)
-  - [ ] 4.6 Smoke-test the loop end-to-end on one real PR (manual)
+  - [x] 4.6 Smoke-test the loop end-to-end on one real PR (manual)
     - Fetch → render/summarize → triage → render actions → dry-run apply → apply → re-fetch
 
 **Acceptance Criteria:**
