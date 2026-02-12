@@ -69,7 +69,7 @@ Instruct the subagent to:
 - Perform a thorough code review focused on:
   - Architectural alignment with the existing codebase
   - Correctness, maintainability, and clarity
-  - Conventions of the Swift/macOS ecosystem and this repo
+  - Conventions of this repo’s documented tech stack
   - SRP/SOLID principles, pragmatic TDD/test hygiene, and CI readiness
   - Spec adherence (requirements traceability)
 - Create the report directory if needed: `agent-os/specs/[this-spec]/reviews/`
