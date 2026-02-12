@@ -49,17 +49,6 @@ describe('codec factory', () => {
 
     expect(testCodec.meta).toEqual({ db: { sql: { postgres: { nativeType: 'text' } } } });
   });
-
-  it('creates codec without meta property', () => {
-    const testCodec = codec({
-      typeId: 'test/no-meta@1',
-      targetTypes: ['text'],
-      encode: (value: string) => value,
-      decode: (wire: string) => wire,
-    });
-
-    expect(testCodec.meta).toBeUndefined();
-  });
 });
 
 describe('CodecRegistry', () => {

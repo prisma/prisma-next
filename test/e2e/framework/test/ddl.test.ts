@@ -30,6 +30,20 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           PRIMARY KEY ("id")
         );
 
+        CREATE TABLE "public"."param_types" (
+          "bits" bit varying(12),
+          "code" character(16),
+          "created_at" timestamptz(3),
+          "duration" interval(6),
+          "flags" bit(8),
+          "id" SERIAL NOT NULL,
+          "name" character varying(255),
+          "price" numeric(10,2),
+          "starts_at" time(2),
+          "starts_at_tz" timetz(2),
+          PRIMARY KEY ("id")
+        );
+
         CREATE TABLE "public"."post" (
           "created_at" timestamptz DEFAULT now() NOT NULL,
           "id" SERIAL NOT NULL,
@@ -42,7 +56,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
 
         CREATE TABLE "public"."user" (
           "created_at" timestamptz DEFAULT now() NOT NULL,
-          "email" text NOT NULL,
+          "email" character varying(255) NOT NULL,
           "id" SERIAL NOT NULL,
           "update_at" timestamptz,
           PRIMARY KEY ("id")

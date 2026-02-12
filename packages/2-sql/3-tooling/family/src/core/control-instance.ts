@@ -481,7 +481,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ...ifDefined('context', context),
         typeMetadataRegistry,
         frameworkComponents,
+        // Wire up target-specific normalizers if available
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
+        ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
       });
     },
     async sign(options: {

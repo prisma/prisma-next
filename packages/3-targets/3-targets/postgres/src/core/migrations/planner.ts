@@ -1,5 +1,7 @@
 import {
   escapeLiteral,
+  expandParameterizedNativeType,
+  normalizeSchemaNativeType,
   parsePostgresDefault,
   quoteIdentifier,
 } from '@prisma-next/adapter-postgres/control';
@@ -614,6 +616,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
+      normalizeNativeType: normalizeSchemaNativeType,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
 
@@ -755,7 +758,30 @@ function buildColumnTypeSql(column: StorageColumn): string {
     return quoteIdentifier(column.nativeType);
   }
 
-  return column.nativeType;
+  return renderParameterizedTypeSql(column) ?? column.nativeType;
+}
+
+/**
+ * Renders parameterized type SQL for a column, returning null if no expansion is needed.
+ *
+ * Uses the shared expandParameterizedNativeType utility from the postgres adapter.
+ * Returns null when the column has no typeParams, allowing the caller to fall back
+ * to the base nativeType.
+ */
+function renderParameterizedTypeSql(column: StorageColumn): string | null {
+  if (!column.typeParams) {
+    return null;
+  }
+
+  const expanded = expandParameterizedNativeType({
+    nativeType: column.nativeType,
+    codecId: column.codecId,
+    typeParams: column.typeParams,
+  });
+
+  // If no expansion happened (returned the same base type), return null
+  // so caller can decide whether to use nativeType directly
+  return expanded !== column.nativeType ? expanded : null;
 }
 
 /**

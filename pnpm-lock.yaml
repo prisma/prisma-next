@@ -15,6 +15,9 @@ catalogs:
     '@types/pg':
       specifier: 8.16.0
       version: 8.16.0
+    arktype:
+      specifier: ^2.1.29
+      version: 2.1.29
     gray-matter:
       specifier: ^4.0.3
       version: 4.0.3
@@ -1059,6 +1062,12 @@ importers:
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../1-core/operations
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/utils
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
       ts-toolbelt:
         specifier: ^9.6.0
         version: 9.6.0

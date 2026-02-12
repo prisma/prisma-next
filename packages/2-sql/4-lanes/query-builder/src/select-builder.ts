@@ -43,6 +43,7 @@ export class SelectBuilder<
   select(
     arg: never,
   ): PreviousFunctionReceivedBadInputError<'[error] invalid input in previous `select()` call'>;
+  // biome-ignore lint/suspicious/noExplicitAny: implementation signature must be compatible with all overloads
   select(..._args: unknown[]): unknown {
     // TODO: do runtime stuff.
     return this;

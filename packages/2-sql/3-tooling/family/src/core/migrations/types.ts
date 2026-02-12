@@ -48,6 +48,15 @@ export interface StorageTypePlanResult<TTargetDetails> {
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
 }
 
+/**
+ * Input for expanding parameterized native types.
+ */
+export interface ExpandNativeTypeInput {
+  readonly nativeType: string;
+  readonly codecId?: string;
+  readonly typeParams?: Record<string, unknown>;
+}
+
 export interface CodecControlHooks<TTargetDetails = unknown> {
   planTypeOperations?: (options: {
     readonly typeName: string;
@@ -67,6 +76,17 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
     readonly driver: ControlDriverInstance<'sql', string>;
     readonly schemaName?: string;
   }) => Promise<Record<string, StorageTypeInstance>>;
+  /**
+   * Expands a parameterized native type to its full SQL representation.
+   * Used by schema verification to compare contract types against database types.
+   *
+   * For example, expands:
+   * - { nativeType: 'character varying', typeParams: { length: 255 } } -> 'character varying(255)'
+   * - { nativeType: 'numeric', typeParams: { precision: 10, scale: 2 } } -> 'numeric(10,2)'
+   *
+   * Returns the expanded type string, or the original nativeType if no expansion is needed.
+   */
+  expandNativeType?: (input: ExpandNativeTypeInput) => string;
 }
 
 export interface SqlControlExtensionDescriptor<TTargetId extends string>

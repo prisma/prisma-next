@@ -51,7 +51,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { nativeType: 'int4', codecId: 'sql/int4@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -82,7 +82,7 @@ describe('sql-target-family-hook', () => {
         tables: {
           user: {
             columns: {
-              id: { nativeType: 'int4', codecId: 'sql/int4@1', nullable: false },
+              id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
