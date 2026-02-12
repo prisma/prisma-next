@@ -103,35 +103,35 @@ Key constraints (from spec):
 #### Task Group 3: `apply-review-actions` (network) with a pure planner + idempotent semantics
 **Dependencies:** Task Groups 1–2
 
-- [ ] 3.0 Implement idempotent GitHub mutation tooling for review administration
-  - [ ] 3.1 Implement a **pure planner** for `apply-review-actions`
+- [x] 3.0 Implement idempotent GitHub mutation tooling for review administration
+  - [x] 3.1 Implement a **pure planner** for `apply-review-actions`
     - Input: `review-actions.json` (+ optional `review-state.json`) + `viewer.login` + current GitHub state (as provided to planner)
     - Output: a deterministic operations list (resolve/reply/react/noop) suitable for dry-run printing and execution
-  - [ ] 3.2 Encode the spec’s simplified idempotency rule in the planner
+  - [x] 3.2 Encode the spec’s simplified idempotency rule in the planner
     - Review threads: remain in scope while `isResolved === false`
     - Standalone comments: considered resolved if there is a “Done” comment from **current user**
-  - [ ] 3.3 Implement marker-based “ensure reply” semantics
+  - [x] 3.3 Implement marker-based “ensure reply” semantics
     - Use a hidden marker like `<!-- review-framework:actionId=A-001 kind=done -->`
     - Apply checks marker (or exact body match rule) before posting to avoid duplicates
-  - [ ] 3.4 Implement “ensure reaction” semantics (node-id-only)
+  - [x] 3.4 Implement “ensure reaction” semantics (node-id-only)
     - Add reaction only if current user does not already have it
-  - [ ] 3.5 Implement “ensure thread resolved” semantics (node-id-only)
+  - [x] 3.5 Implement “ensure thread resolved” semantics (node-id-only)
     - Resolve only if currently unresolved
-  - [ ] 3.6 Implement `scripts/pr/apply-review-actions.mjs` (network executor wrapper)
+  - [x] 3.6 Implement `scripts/pr/apply-review-actions.mjs` (network executor wrapper)
     - Default is **`--dry-run`**; `--apply` must be explicit
     - Support `--format text|json` for printing planned/executed ops
     - Ensure exit codes: `0` success/no-op; `1` operational error; `2` usage error
-  - [ ] 3.7 Implement TLS/cert fail-fast handling aligned with `.cursor/rules/github-cli-tls-in-sandbox.mdc`
+  - [x] 3.7 Implement TLS/cert fail-fast handling aligned with `.cursor/rules/github-cli-tls-in-sandbox.mdc`
     - Detect common TLS/cert errors from `gh api` failures (e.g. `x509: OSStatus -26276`)
     - Print guidance to stderr: rerun outside sandbox; never disable TLS verification
-  - [ ] 3.8 Add `node --test` unit tests for the planner (no network)
+  - [x] 3.8 Add `node --test` unit tests for the planner (no network)
     - Covers: unresolved thread semantics; standalone “Done” detection; marker detection; ensure/noop behavior; stable operation ordering
     - Command: `node --test scripts/pr/**/*.test.mjs`
-  - [ ] 3.9 Add a minimal manual verification checklist for the executor (requires real PR)
+  - [x] 3.9 Add a minimal manual verification checklist for the executor (requires real PR)
     - Dry run: `node scripts/pr/apply-review-actions.mjs --in <review-actions.json> --dry-run`
     - Apply: `node scripts/pr/apply-review-actions.mjs --in <review-actions.json> --apply`
     - Re-run apply and confirm idempotent no-ops
-  - [ ] 3.10 Decide how to record apply results
+  - [x] 3.10 Decide how to record apply results
     - Either write back into `review-actions.json` `done.githubAdmin` or emit a derived `apply-log.json` (both acceptable per spec)
 
 **Acceptance Criteria:**
