@@ -1,4 +1,3 @@
-import type { Client, Pool } from 'pg';
 import { Client as PgClient, Pool as PgPool } from 'pg';
 import type { PostgresBinding, PostgresBindingInput } from './types';
 
@@ -22,7 +21,7 @@ function validatePostgresUrl(url: string): string {
   return trimmed;
 }
 
-type BindingInput = Partial<PostgresBindingInput>;
+type BindingInput = PostgresBindingInput;
 
 export function resolvePostgresBinding(options: BindingInput): PostgresBinding {
   const providedCount =
@@ -42,7 +41,10 @@ export function resolvePostgresBinding(options: BindingInput): PostgresBinding {
     return { kind: 'url', url: validatePostgresUrl(options.url) };
   }
 
-  const pgBinding = options.pg as Pool | Client;
+  const pgBinding = options.pg;
+  if (pgBinding === undefined) {
+    throw new Error('Provide one binding input: binding, url, or pg');
+  }
 
   if (pgBinding instanceof PgPool) {
     return { kind: 'pgPool', pool: pgBinding };
