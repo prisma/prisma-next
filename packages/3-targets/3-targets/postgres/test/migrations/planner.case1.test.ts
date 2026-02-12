@@ -454,7 +454,7 @@ describe('PostgresMigrationPlanner - composite unique constraint DDL', () => {
       schemaVersion: '1',
       target: 'postgres',
       targetFamily: 'sql',
-      coreHash: coreHash('sha256:composite-unique'),
+      storageHash: coreHash('sha256:composite-unique'),
       profileHash: profileHash('sha256:composite-unique-profile'),
       storage: {
         tables: {
