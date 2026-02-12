@@ -172,16 +172,16 @@ Key constraints (from spec):
 #### Task Group 5: Documentation + rule alignment for the framework and Cursor sandbox constraints
 **Dependencies:** Task Groups 1–4
 
-- [ ] 5.0 Ensure documentation and rules are consistent, discoverable, and non-contradictory
-  - [ ] 5.1 Update `scripts/pr/README.md` to document the framework workflow and script contracts
+- [x] 5.0 Ensure documentation and rules are consistent, discoverable, and non-contradictory
+  - [x] 5.1 Update `scripts/pr/README.md` to document the framework workflow and script contracts
     - Include JSON-first artifacts, derived Markdown, and example command lines
-  - [ ] 5.2 Ensure `.cursor/rules/github-cli-tls-in-sandbox.mdc` matches the spec guidance
+  - [x] 5.2 Ensure `.cursor/rules/github-cli-tls-in-sandbox.mdc` matches the spec guidance
     - Rerun outside sandbox; never disable TLS verification; fail fast
-  - [ ] 5.3 Update `.cursor/rules/README.md` to index the TLS rule and any new review-framework rules/docs
-  - [ ] 5.4 Update/extend spec docs if implementation requires clarifying decisions (schemas, markers, apply logging)
+  - [x] 5.3 Update `.cursor/rules/README.md` to index the TLS rule and any new review-framework rules/docs
+  - [x] 5.4 Update/extend spec docs if implementation requires clarifying decisions (schemas, markers, apply logging)
     - Keep contracts stable and versioned
-  - [ ] 5.5 Add a short “artifact contract quick reference” section (node ids, sorting, formatting, markers)
-  - [ ] 5.6 Verify docs reflect the actual CLI flags and defaults (help output stays accurate)
+  - [x] 5.5 Add a short “artifact contract quick reference” section (node ids, sorting, formatting, markers)
+  - [x] 5.6 Verify docs reflect the actual CLI flags and defaults (help output stays accurate)
 
 **Acceptance Criteria:**
 - Docs describe the same CLI contracts and semantics that the scripts implement.

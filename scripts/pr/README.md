@@ -1,94 +1,120 @@
-# PR utilities
+# PR Utilities
 
-Scripts for deterministic GitHub PR review artifacts and rendering workflows.
+Deterministic GitHub PR review tooling for the review-framework workflow. JSON artifacts are canonical; Markdown outputs are derived.
 
-## fetch-review-state
+Primary contract doc: `agent-os/specs/review-framework/spec.md`.
 
-Fetches PR review state (unresolved review threads, submitted reviews with bodies, PR issue comments), then emits canonical `review-state.json` v1 (node-id-only) plus derived Markdown output.
+## Workflow
+
+1. Fetch canonical state (`review-state.json`) from GitHub.
+2. Render derived state Markdown (`review-state.md`) and optional summary.
+3. Author/update canonical action plan (`review-actions.json`).
+4. Render derived actions Markdown (`review-actions.md`).
+5. Plan admin mutations (`--dry-run`, default), then apply explicitly with `--apply`.
+
+For a thin wrapper over this loop, use `scripts/pr/review-iterate.mjs`.
+
+## Artifact Contract Quick Reference
+
+- **Identifiers:** GraphQL `nodeId` only; no `databaseId` assumptions.
+- **Canonical artifacts:** `review-state.json` and `review-actions.json` (both `version: 1`).
+- **Derived artifacts:** `review-state.md`, `review-actions.md`, `summary.txt`/summary JSON, optional `apply-log.json`.
+- **Determinism:** stable sorting + `JSON.stringify(value, null, 2) + "\n"` for canonical JSON outputs.
+- **Markers:** automation uses hidden markers like `<!-- review-framework:actionId=A-001 kind=done -->`; marker text is stripped from fetched state JSON bodies.
+
+## CLI Contracts
+
+All scripts support `--help` (stdout, exit `0`). Usage errors exit `2`. Operational errors exit `1`.
+
+### fetch-review-state (network)
 
 ```bash
-# Discover PR from current branch
-node scripts/pr/fetch-review-state.mjs
+node scripts/pr/fetch-review-state.mjs [--pr <url>] [--out <path.md>|-] [--out-json <path.json>|-] [--help]
+```
 
-# Explicit PR URL
-node scripts/pr/fetch-review-state.mjs --pr https://github.com/OWNER/REPO/pull/123
+- Fetches unresolved review threads, submitted review bodies, and PR issue comments.
+- Emits canonical `review-state.json` (v1, node-id-only).
+- Markdown output is derived.
+- If `--out` is omitted, markdown is written to stdout.
+- If `--out-json` is omitted and `--out` is a file path, JSON defaults to the same path with `.json`.
+- Requires `git` and authenticated `gh`.
 
-# Write to file (Markdown + inferred JSON path)
-node scripts/pr/fetch-review-state.mjs --pr <url> --out review-state.md
+Examples:
 
-# Also write JSON explicitly
+```bash
+node scripts/pr/fetch-review-state.mjs --pr https://github.com/OWNER/REPO/pull/123 --out-json review-state.json
 node scripts/pr/fetch-review-state.mjs --pr <url> --out review-state.md --out-json review-state.json
-
-# Stdout (both derived Markdown + canonical JSON)
 node scripts/pr/fetch-review-state.mjs --pr <url> --out - --out-json -
 ```
 
-Requires `git` and authenticated `gh`.
+### render-review-state (pure)
 
-## review-artifacts utilities
+```bash
+node scripts/pr/render-review-state.mjs --in <review-state.json> [--out <review-state.md>|-] [--help]
+```
 
-`scripts/pr/review-artifacts.mjs` contains TG1 canonical artifact logic:
+### summarize-review-state (pure)
 
-- v1 runtime validators (`assertReviewStateV1`, `assertReviewActionsV1`)
+```bash
+node scripts/pr/summarize-review-state.mjs --in <review-state.json> [--format text|json] [--out <path>|-] [--help]
+```
+
+- `--format` defaults to `text`.
+- `--out` defaults to stdout.
+
+### render-review-actions (pure)
+
+```bash
+node scripts/pr/render-review-actions.mjs --in <review-actions.json> [--out <review-actions.md>|-] [--help]
+```
+
+### apply-review-actions (network, idempotent)
+
+```bash
+node scripts/pr/apply-review-actions.mjs --in <review-actions.json> [--review-state <review-state.json>] [--apply] [--dry-run] [--format text|json] [--log-out <apply-log.json>] [--help]
+```
+
+- `--dry-run` is the default mode.
+- `--apply` enables mutations explicitly.
+- `--format` defaults to `text`.
+- Planner/executor operate on node ids and ensure no duplicate done replies/reactions.
+- TLS/certificate failures fail fast with rerun guidance for non-sandbox shells; TLS verification must stay enabled.
+
+Examples:
+
+```bash
+node scripts/pr/apply-review-actions.mjs --in <review-actions.json> --review-state <review-state.json> --format text
+node scripts/pr/apply-review-actions.mjs --in <review-actions.json> --review-state <review-state.json> --apply --format json --log-out <apply-log.json>
+```
+
+### review-iterate (network wrapper)
+
+```bash
+node scripts/pr/review-iterate.mjs --pr <url> [--reviews-root <dir>] [--apply] [--help]
+```
+
+- Runs fetch, render, summarize, optional actions render, and apply planning in one deterministic wrapper.
+- Writes artifacts under `<reviews-root>/<owner>_<repo>_pr-<number>/`.
+- Uses dry-run apply by default; `--apply` executes mutations.
+
+## review-artifacts Utilities
+
+`scripts/pr/review-artifacts.mjs` provides canonical TG1 artifact logic:
+
+- runtime validators (`assertReviewStateV1`, `assertReviewActionsV1`)
 - marker stripping (`stripReviewFrameworkMarkers`)
 - deterministic normalization/sorting helpers for review-state v1
-- deterministic artifact formatting (`formatCanonicalJson`)
+- deterministic JSON formatting (`formatCanonicalJson`)
 
-## Fixtures
+## Fixtures and Tests
 
-Small stable v1 fixtures live in `scripts/pr/fixtures/`:
+Fixtures in `scripts/pr/fixtures/`:
 
 - `review-state.v1.json`
 - `review-actions.v1.json`
 
-## Tests
-
-Run all PR script tests:
+Run tests:
 
 ```bash
 node --test scripts/pr/**/*.test.mjs
 ```
-
-## render-review-actions
-
-Renders deterministic `review-actions.md` from `review-actions.json` (a pure transformation).
-
-```bash
-node scripts/pr/render-review-actions.mjs --in agent-os/specs/.../reviews/review-actions.json --out agent-os/specs/.../reviews/review-actions.md
-```
-
-## apply-review-actions
-
-Plans idempotent review admin operations and optionally applies GitHub mutations. Default mode is `--dry-run`.
-
-```bash
-# Dry-run plan (default)
-node scripts/pr/apply-review-actions.mjs --in agent-os/specs/.../reviews/review-actions.json --review-state agent-os/specs/.../reviews/review-state.json --format text
-
-# Execute mutations explicitly
-node scripts/pr/apply-review-actions.mjs --in agent-os/specs/.../reviews/review-actions.json --review-state agent-os/specs/.../reviews/review-state.json --apply --format json --log-out agent-os/specs/.../reviews/apply-log.json
-```
-
-Behavior:
-
-- Uses a pure planner (`apply-review-actions-planner.mjs`) to compute deterministic operations.
-- Uses ensure semantics for reply/reaction/resolve operations with node IDs only.
-- Fails fast on TLS/certificate failures and instructs rerun outside sandbox (never disable TLS verification).
-- Records execution output as a derived apply log (`--log-out`).
-
-### Manual verification checklist (real PR required)
-
-Run these checks against a real pull request and keep the output in your implementation notes:
-
-```bash
-# 1) Dry-run plan
-node scripts/pr/apply-review-actions.mjs --in <review-actions.json> --review-state <review-state.json> --dry-run --format json
-
-# 2) Apply
-node scripts/pr/apply-review-actions.mjs --in <review-actions.json> --review-state <review-state.json> --apply --format json --log-out <apply-log.json>
-
-# 3) Re-run apply to confirm idempotent no-op behavior
-node scripts/pr/apply-review-actions.mjs --in <review-actions.json> --review-state <review-state.json> --apply --format json --log-out <apply-log.json>
-```
-
-See `agent-os/specs/review-framework/spec.md` for framework contracts.
