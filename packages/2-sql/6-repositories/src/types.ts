@@ -1,0 +1,302 @@
+import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import type {
+  ExtractCodecTypes,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+} from '@prisma-next/sql-contract/types';
+import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
+
+// ---------------------------------------------------------------------------
+// Comparison / Filter / Order / Include
+// ---------------------------------------------------------------------------
+
+export type ComparisonOp = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte';
+
+export interface FilterExpr {
+  readonly column: string;
+  readonly op: ComparisonOp;
+  readonly value: unknown;
+}
+
+export interface OrderExpr {
+  readonly column: string;
+  readonly direction: 'asc' | 'desc';
+}
+
+export interface IncludeExpr {
+  readonly relationName: string;
+  readonly relatedModelName: string;
+  readonly relatedTableName: string;
+  readonly fkColumn: string;
+  readonly parentPkColumn: string;
+  readonly nested: CollectionState;
+}
+
+// ---------------------------------------------------------------------------
+// CollectionState — plain data, no query builder types
+// ---------------------------------------------------------------------------
+
+export interface CollectionState {
+  readonly filters: readonly FilterExpr[];
+  readonly includes: readonly IncludeExpr[];
+  readonly orderBy: readonly OrderExpr[] | undefined;
+  readonly limit: number | undefined;
+  readonly offset: number | undefined;
+}
+
+export function emptyState(): CollectionState {
+  return {
+    filters: [],
+    includes: [],
+    orderBy: undefined,
+    limit: undefined,
+    offset: undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// RepositoryContext — bundles lane context + runtime
+// ---------------------------------------------------------------------------
+
+export interface RuntimeScope {
+  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row>;
+}
+
+export interface RuntimeConnection extends RuntimeScope {
+  release?(): Promise<void>;
+  transaction?(): Promise<RuntimeTransaction>;
+}
+
+export interface RuntimeTransaction extends RuntimeScope {
+  commit?(): Promise<void>;
+  rollback?(): Promise<void>;
+}
+
+export interface RuntimeQueryable extends RuntimeScope {
+  connection?(): Promise<RuntimeConnection>;
+  transaction?(): Promise<RuntimeTransaction>;
+}
+
+export interface RepositoryContext<TContract extends SqlContract<SqlStorage>> {
+  readonly contract: TContract;
+  readonly runtime: RuntimeQueryable;
+}
+
+// ---------------------------------------------------------------------------
+// ColumnAccessor — type-safe proxy for where() callbacks
+// ---------------------------------------------------------------------------
+
+export type ComparisonMethods<T> = {
+  eq(value: T): FilterExpr;
+  neq(value: T): FilterExpr;
+  gt(value: T): FilterExpr;
+  lt(value: T): FilterExpr;
+  gte(value: T): FilterExpr;
+  lte(value: T): FilterExpr;
+};
+
+export type ColumnAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {
+  [K in keyof FieldsOf<TContract, ModelName> & string]: ComparisonMethods<
+    FieldJsType<TContract, ModelName, K>
+  >;
+};
+
+// ---------------------------------------------------------------------------
+// DefaultModelRow — all scalar fields with JS types
+// ---------------------------------------------------------------------------
+
+export type DefaultModelRow<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {
+  [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
+};
+
+// ---------------------------------------------------------------------------
+// Helpers for extracting fields / types from the contract
+// ---------------------------------------------------------------------------
+
+type ModelsOf<TContract extends SqlContract<SqlStorage>> =
+  TContract['models'] extends Record<string, unknown> ? TContract['models'] : Record<string, never>;
+
+type ModelDef<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelName extends keyof ModelsOf<TContract> ? ModelsOf<TContract>[ModelName] : never;
+
+type FieldsOf<TContract extends SqlContract<SqlStorage>, ModelName extends string> = ModelDef<
+  TContract,
+  ModelName
+> extends { readonly fields: infer F }
+  ? F extends Record<string, unknown>
+    ? F
+    : Record<string, never>
+  : Record<string, never>;
+
+type FieldValueType<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = FieldName extends keyof FieldsOf<TContract, ModelName>
+  ? FieldsOf<TContract, ModelName>[FieldName]
+  : unknown;
+
+type ModelFieldToColumnMap<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = TContract['mappings']['fieldToColumn'] extends Record<string, Record<string, string>>
+  ? ModelName extends keyof TContract['mappings']['fieldToColumn']
+    ? TContract['mappings']['fieldToColumn'][ModelName]
+    : never
+  : never;
+
+type FieldToColumnMapSafe<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelFieldToColumnMap<TContract, ModelName> extends Record<string, string>
+  ? ModelFieldToColumnMap<TContract, ModelName>
+  : never;
+
+type ModelTableFromMappings<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = TContract['mappings']['modelToTable'] extends Record<string, string>
+  ? ModelName extends keyof TContract['mappings']['modelToTable']
+    ? TContract['mappings']['modelToTable'][ModelName]
+    : never
+  : never;
+
+type ModelTableFromModel<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelDef<TContract, ModelName> extends {
+  readonly storage: { readonly table: infer T extends string };
+}
+  ? T
+  : never;
+
+type ModelTableName<TContract extends SqlContract<SqlStorage>, ModelName extends string> = [
+  ModelTableFromMappings<TContract, ModelName>,
+] extends [never]
+  ? ModelTableFromModel<TContract, ModelName>
+  : ModelTableFromMappings<TContract, ModelName>;
+
+type FieldColumnName<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = (FieldToColumnMapSafe<TContract, ModelName> extends never
+  ? FieldValueType<TContract, ModelName, FieldName> extends {
+      readonly column: infer ColName extends string;
+    }
+    ? ColName
+    : FieldName
+  : FieldName extends keyof FieldToColumnMapSafe<TContract, ModelName>
+    ? FieldToColumnMapSafe<TContract, ModelName>[FieldName]
+    : FieldValueType<TContract, ModelName, FieldName> extends {
+          readonly column: infer ColName extends string;
+        }
+      ? ColName
+      : FieldName) &
+  string;
+
+type FieldStorageJsType<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = ModelTableName<TContract, ModelName> extends infer TableName extends string
+  ? FieldColumnName<TContract, ModelName, FieldName> extends infer ColName extends string
+    ? TContract['storage']['tables'] extends Record<
+        string,
+        { readonly columns: Record<string, unknown> }
+      >
+      ? TableName extends keyof TContract['storage']['tables']
+        ? ColName extends keyof TContract['storage']['tables'][TableName]['columns']
+          ? TContract['storage']['tables'][TableName]['columns'][ColName] extends StorageColumn
+            ? ComputeColumnJsType<
+                TContract,
+                TableName,
+                ColName,
+                TContract['storage']['tables'][TableName]['columns'][ColName],
+                ExtractCodecTypes<TContract>
+              >
+            : never
+          : never
+        : never
+      : never
+    : never
+  : never;
+
+type FieldJsType<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = [FieldStorageJsType<TContract, ModelName, FieldName>] extends [never]
+  ? FieldValueType<TContract, ModelName, FieldName> extends { readonly column: string }
+    ? unknown
+    : FieldValueType<TContract, ModelName, FieldName>
+  : FieldStorageJsType<TContract, ModelName, FieldName>;
+
+// ---------------------------------------------------------------------------
+// Relation helpers
+// ---------------------------------------------------------------------------
+
+type ContractRelations<TContract extends SqlContract<SqlStorage>> =
+  TContract['relations'] extends Record<string, unknown>
+    ? TContract['relations']
+    : Record<string, never>;
+
+type TableRelations<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelTableName<TContract, ModelName> extends infer TableName extends string
+  ? TableName extends keyof ContractRelations<TContract>
+    ? ContractRelations<TContract>[TableName]
+    : Record<string, never>
+  : Record<string, never>;
+
+type LegacyModelRelations<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelDef<TContract, ModelName> extends { readonly relations: infer R }
+  ? R
+  : Record<string, never>;
+
+type ExactRecord<T> =
+  T extends Record<string, unknown>
+    ? string extends keyof T
+      ? Record<string, never>
+      : T
+    : Record<string, never>;
+
+export type RelationsOf<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = keyof ExactRecord<TableRelations<TContract, ModelName>> extends never
+  ? ExactRecord<LegacyModelRelations<TContract, ModelName>>
+  : ExactRecord<TableRelations<TContract, ModelName>>;
+
+export type RelationNames<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = keyof RelationsOf<TContract, ModelName> & string;
+
+type RelationModelName<Relation> = Relation extends { readonly to: infer To extends string }
+  ? To
+  : Relation extends { readonly model: infer Model extends string }
+    ? Model
+    : never;
+
+export type RelatedModelName<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+> = RelationsOf<TContract, ModelName> extends infer Rels
+  ? Rels extends Record<string, unknown>
+    ? RelName extends keyof Rels
+      ? RelationModelName<Rels[RelName]>
+      : never
+    : never
+  : never;
+
+export type RepositoryModelName<TContract extends SqlContract<SqlStorage>> =
+  keyof ModelsOf<TContract> & string;

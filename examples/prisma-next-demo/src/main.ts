@@ -13,6 +13,9 @@
  * - user <id>                  Get user by ID
  * - posts <userId>             Get posts for a user
  * - users-with-posts [limit]   Users with nested posts (includeMany)
+ * - repo-users [limit]         Users via repository API
+ * - repo-admins [limit]        Admin users via custom repository scope
+ * - repo-posts <userId> [limit] Posts for a user via repository API
  * - users-paginate [cursor]    Cursor-based pagination
  * - similarity-search <vec>    Vector similarity search (pgvector)
  * - budget-violation           Demo budget enforcement error
@@ -32,6 +35,9 @@ import { getUserPosts } from './queries/get-user-posts';
 import { getUsers } from './queries/get-users';
 import { getUsersWithPosts } from './queries/get-users-with-posts';
 import { ormGetUsersBackward, ormGetUsersByIdCursor } from './queries/orm-pagination';
+import { repositoryGetAdminUsers } from './repositories/get-admin-users';
+import { repositoryGetUserPosts } from './repositories/get-user-posts';
+import { repositoryGetUsers } from './repositories/get-users';
 import { similaritySearch } from './queries/similarity-search';
 
 const appConfigSchema = arktype({
@@ -82,6 +88,23 @@ async function main() {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await getUsersWithPosts(runtime, limit);
       console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'repo-users') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const users = await repositoryGetUsers(limit, runtime);
+      console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'repo-admins') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const users = await repositoryGetAdminUsers(limit, runtime);
+      console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'repo-posts') {
+      const [userIdStr, limitStr] = args;
+      if (!userIdStr) {
+        console.error('Usage: pnpm start -- repo-posts <userId> [limit]');
+        process.exit(1);
+      }
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const posts = await repositoryGetUserPosts(userIdStr, limit, runtime);
+      console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'similarity-search') {
       const [queryVectorStr, limitStr] = args;
       if (!queryVectorStr) {
@@ -156,7 +179,8 @@ async function main() {
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | ' +
-          'users-with-posts [limit] | users-paginate [cursor] [limit] | ' +
+          'users-with-posts [limit] | repo-users [limit] | repo-admins [limit] | ' +
+          'repo-posts <userId> [limit] | users-paginate [cursor] [limit] | ' +
           'users-paginate-back <cursor> [limit] | similarity-search <queryVector> [limit] | ' +
           'budget-violation | user-kysely <userId> | user-transaction-kysely]',
       );

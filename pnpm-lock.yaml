@@ -125,6 +125,9 @@ importers:
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../packages/2-sql/4-lanes/relational-core
+      '@prisma-next/sql-repositories':
+        specifier: workspace:*
+        version: link:../../packages/2-sql/6-repositories
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../packages/2-sql/5-runtime
@@ -1221,6 +1224,46 @@ importers:
       pg:
         specifier: 'catalog:'
         version: 8.16.3
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
+
+  packages/2-sql/6-repositories:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/shared/contract
+      '@prisma-next/runtime-executor':
+        specifier: workspace:*
+        version: link:../../1-framework/4-runtime-executor
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../1-core/contract
+      '@prisma-next/sql-relational-core':
+        specifier: workspace:*
+        version: link:../4-lanes/relational-core
+      '@prisma-next/sql-runtime':
+        specifier: workspace:*
+        version: link:../5-runtime
+      kysely:
+        specifier: 'catalog:'
+        version: 0.28.10
+    devDependencies:
+      '@prisma-next/test-utils':
+        specifier: workspace:*
+        version: link:../../../test/utils
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
