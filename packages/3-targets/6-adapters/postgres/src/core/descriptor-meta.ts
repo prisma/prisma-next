@@ -77,7 +77,11 @@ function renderJsonTypeExpression(params: Record<string, unknown>): string {
   }
   const schema = params['schema'];
   if (schema && typeof schema === 'object') {
-    return renderTypeScriptTypeFromJsonSchema(schema);
+    const rendered = renderTypeScriptTypeFromJsonSchema(schema);
+    if (!isSafeTypeExpression(rendered)) {
+      return 'JsonValue';
+    }
+    return rendered;
   }
   return 'JsonValue';
 }

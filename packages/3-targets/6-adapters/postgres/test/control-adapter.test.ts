@@ -433,6 +433,7 @@ describe('PostgresControlAdapter', () => {
             return {
               rows: [
                 {
+                  table_name: 'event',
                   column_name: 'payload',
                   data_type: 'jsonb',
                   udt_name: 'jsonb',
@@ -442,6 +443,7 @@ describe('PostgresControlAdapter', () => {
                   numeric_scale: null,
                 },
                 {
+                  table_name: 'event',
                   column_name: 'raw',
                   data_type: 'json',
                   udt_name: 'json',

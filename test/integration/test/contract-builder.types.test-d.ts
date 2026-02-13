@@ -1,3 +1,7 @@
+import type {
+  JsonValue,
+  CodecTypes as PgCodecTypes,
+} from '@prisma-next/adapter-postgres/codec-types';
 import {
   int4Column,
   jsonb,
@@ -205,4 +209,42 @@ test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
 
   expectTypeOf<Row['payload']>().toEqualTypeOf<unknown>();
   expectTypeOf<Row['meta']>().toEqualTypeOf<unknown>();
+});
+
+// Helper: extracts the return type of parameterizedOutput when called with params P.
+// Uses conditional type inference to avoid Biome parser issues with generic call syntax.
+type ResolveParameterizedOutput<
+  CodecKey extends keyof PgCodecTypes,
+  P,
+> = PgCodecTypes[CodecKey] extends { readonly parameterizedOutput: (params: P) => infer R }
+  ? R
+  : never;
+
+test('ResolveStandardSchemaOutput resolves Arktype schema via .infer', () => {
+  const profileSchema = arktype({ displayName: 'string', active: 'boolean' });
+  type ArktypeSchema = typeof profileSchema;
+
+  type Resolved = ResolveParameterizedOutput<'pg/jsonb@1', { readonly schema: ArktypeSchema }>;
+
+  expectTypeOf<Resolved>().toEqualTypeOf<{ displayName: string; active: boolean }>();
+});
+
+test('ResolveStandardSchemaOutput resolves Standard Schema via ~standard.types.output', () => {
+  type BareStandardSchema = {
+    readonly '~standard': {
+      readonly types: {
+        readonly output: { rank: number; verified: boolean };
+      };
+    };
+  };
+
+  type Resolved = ResolveParameterizedOutput<'pg/jsonb@1', { readonly schema: BareStandardSchema }>;
+
+  expectTypeOf<Resolved>().toEqualTypeOf<{ rank: number; verified: boolean }>();
+});
+
+test('ResolveStandardSchemaOutput falls back to JsonValue without schema', () => {
+  type Resolved = ResolveParameterizedOutput<'pg/json@1', {}>;
+
+  expectTypeOf<Resolved>().toEqualTypeOf<JsonValue>();
 });

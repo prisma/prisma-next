@@ -231,31 +231,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       ),
     ]);
 
-    // Group results by table name for efficient lookup.
-    // Some unit-test mocks omit table_name/tablename; when introspecting exactly one table,
-    // treat those rows as belonging to that table.
+    // Group results by table name for efficient lookup
     const columnsByTable = groupBy(columnsResult.rows, 'table_name');
     const pksByTable = groupBy(pkResult.rows, 'table_name');
     const fksByTable = groupBy(fkResult.rows, 'table_name');
     const uniquesByTable = groupBy(uniqueResult.rows, 'table_name');
     const indexesByTable = groupBy(indexResult.rows, 'tablename');
-    const fallbackTableName =
-      tablesResult.rows.length === 1 ? (tablesResult.rows[0]?.table_name ?? null) : null;
-
-    // When exactly one table is being introspected, rows missing the grouping
-    // key (e.g., test mocks that omit table_name) are treated as belonging to
-    // that table via the UNGROUPED_KEY sentinel in groupBy.
-    const rowsForTable = <TRow>(
-      grouped: Map<string, TRow[]>,
-      tableName: string,
-    ): readonly TRow[] => {
-      const directRows = grouped.get(tableName) ?? [];
-      if (fallbackTableName !== tableName) {
-        return directRows;
-      }
-      const ungroupedRows = grouped.get(UNGROUPED_KEY) ?? [];
-      return ungroupedRows.length > 0 ? [...directRows, ...ungroupedRows] : directRows;
-    };
 
     // Get set of PK constraint names per table (to exclude from uniques)
     const pkConstraintsByTable = new Map<string, Set<string>>();
@@ -275,7 +256,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
       // Process columns for this table
       const columns: Record<string, SqlColumnIR> = {};
-      for (const colRow of rowsForTable(columnsByTable, tableName)) {
+      for (const colRow of columnsByTable.get(tableName) ?? []) {
         let nativeType = colRow.udt_name;
         const formattedType = colRow.formatted_type
           ? normalizeFormattedType(colRow.formatted_type, colRow.data_type, colRow.udt_name)
@@ -309,7 +290,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }
 
       // Process primary key
-      const pkRows = [...rowsForTable(pksByTable, tableName)];
+      const pkRows = [...(pksByTable.get(tableName) ?? [])];
       const primaryKeyColumns = pkRows
         .sort((a, b) => a.ordinal_position - b.ordinal_position)
         .map((row) => row.column_name);
@@ -326,7 +307,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         string,
         { columns: string[]; referencedTable: string; referencedColumns: string[]; name: string }
       >();
-      for (const fkRow of rowsForTable(fksByTable, tableName)) {
+      for (const fkRow of fksByTable.get(tableName) ?? []) {
         const existing = foreignKeysMap.get(fkRow.constraint_name);
         if (existing) {
           existing.columns.push(fkRow.column_name);
@@ -352,7 +333,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       // Process unique constraints (excluding those that are also PKs)
       const pkConstraints = pkConstraintsByTable.get(tableName) ?? new Set();
       const uniquesMap = new Map<string, { columns: string[]; name: string }>();
-      for (const uniqueRow of rowsForTable(uniquesByTable, tableName)) {
+      for (const uniqueRow of uniquesByTable.get(tableName) ?? []) {
         // Skip if this constraint is also a primary key
         if (pkConstraints.has(uniqueRow.constraint_name)) {
           continue;
@@ -374,7 +355,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
       // Process indexes
       const indexesMap = new Map<string, { columns: string[]; name: string; unique: boolean }>();
-      for (const idxRow of rowsForTable(indexesByTable, tableName)) {
+      for (const idxRow of indexesByTable.get(tableName) ?? []) {
         if (!idxRow.attname) {
           continue;
         }
@@ -535,18 +516,10 @@ function normalizeFormattedType(formattedType: string, dataType: string, udtName
  * Groups an array of objects by a specified key.
  * Returns a Map for O(1) lookup by group key.
  */
-const UNGROUPED_KEY = '__ungrouped__';
-
-/**
- * Groups an array of objects by a specified key.
- * Returns a Map for O(1) lookup by group key.
- * Items with undefined/null keys are grouped under UNGROUPED_KEY.
- */
-function groupBy<T, K extends keyof T>(items: readonly T[], key: K): Map<string, T[]> {
-  const map = new Map<string, T[]>();
+function groupBy<T, K extends keyof T>(items: readonly T[], key: K): Map<T[K], T[]> {
+  const map = new Map<T[K], T[]>();
   for (const item of items) {
-    const rawKey = item[key];
-    const groupKey = (rawKey == null ? UNGROUPED_KEY : String(rawKey)) as string;
+    const groupKey = item[key];
     let group = map.get(groupKey);
     if (!group) {
       group = [];

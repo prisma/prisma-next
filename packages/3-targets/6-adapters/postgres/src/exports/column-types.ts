@@ -214,6 +214,10 @@ function createJsonColumnFactory(
     return {
       codecId,
       nativeType,
+      // Phantom type: at runtime, typeParams.schema holds a plain JSON Schema record
+      // (the result of extractStandardSchemaOutputJsonSchema), but we cast it as TSchema
+      // so that the type-level `ResolveStandardSchemaOutput<P>` in codec-types.ts can
+      // resolve the schema's output type via `~standard.types.output` or `.infer`.
       typeParams: createJsonTypeParams(schema) as JsonSchemaTypeParams & {
         readonly schema: TSchema;
       },

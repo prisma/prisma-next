@@ -1,5 +1,7 @@
 type JsonSchemaRecord = Record<string, unknown>;
 
+const MAX_DEPTH = 32;
+
 function isRecord(value: unknown): value is JsonSchemaRecord {
   return typeof value === 'object' && value !== null;
 }
@@ -29,12 +31,12 @@ function renderLiteral(value: unknown): string {
   return 'unknown';
 }
 
-function renderUnion(items: readonly unknown[]): string {
-  const rendered = items.map((item) => renderTypeScriptTypeFromJsonSchema(item));
+function renderUnion(items: readonly unknown[], depth: number): string {
+  const rendered = items.map((item) => render(item, depth));
   return rendered.join(' | ');
 }
 
-function renderObjectType(schema: JsonSchemaRecord): string {
+function renderObjectType(schema: JsonSchemaRecord, depth: number): string {
   const properties = isRecord(schema['properties']) ? schema['properties'] : {};
   const required = Array.isArray(schema['required'])
     ? new Set(schema['required'].filter((key): key is string => typeof key === 'string'))
@@ -46,25 +48,25 @@ function renderObjectType(schema: JsonSchemaRecord): string {
     if (additionalProperties === true || additionalProperties === undefined) {
       return 'Record<string, unknown>';
     }
-    return `Record<string, ${renderTypeScriptTypeFromJsonSchema(additionalProperties)}>`;
+    return `Record<string, ${render(additionalProperties, depth)}>`;
   }
 
   const renderedProperties = keys.map((key) => {
     const valueSchema = (properties as JsonSchemaRecord)[key];
     const optionalMarker = required.has(key) ? '' : '?';
-    return `${quotePropertyKey(key)}${optionalMarker}: ${renderTypeScriptTypeFromJsonSchema(valueSchema)}`;
+    return `${quotePropertyKey(key)}${optionalMarker}: ${render(valueSchema, depth)}`;
   });
 
   return `{ ${renderedProperties.join('; ')} }`;
 }
 
-function renderArrayType(schema: JsonSchemaRecord): string {
+function renderArrayType(schema: JsonSchemaRecord, depth: number): string {
   if (Array.isArray(schema['items'])) {
-    return `readonly [${schema['items'].map((item) => renderTypeScriptTypeFromJsonSchema(item)).join(', ')}]`;
+    return `readonly [${schema['items'].map((item) => render(item, depth)).join(', ')}]`;
   }
 
   if (schema['items'] !== undefined) {
-    const itemType = renderTypeScriptTypeFromJsonSchema(schema['items']);
+    const itemType = render(schema['items'], depth);
     const needsParens = itemType.includes(' | ') || itemType.includes(' & ');
     return needsParens ? `(${itemType})[]` : `${itemType}[]`;
   }
@@ -72,10 +74,12 @@ function renderArrayType(schema: JsonSchemaRecord): string {
   return 'unknown[]';
 }
 
-export function renderTypeScriptTypeFromJsonSchema(schema: unknown): string {
-  if (!isRecord(schema)) {
+function render(schema: unknown, depth: number): string {
+  if (depth > MAX_DEPTH || !isRecord(schema)) {
     return 'JsonValue';
   }
+
+  const nextDepth = depth + 1;
 
   if ('const' in schema) {
     return renderLiteral(schema['const']);
@@ -86,21 +90,19 @@ export function renderTypeScriptTypeFromJsonSchema(schema: unknown): string {
   }
 
   if (Array.isArray(schema['oneOf'])) {
-    return renderUnion(schema['oneOf']);
+    return renderUnion(schema['oneOf'], nextDepth);
   }
 
   if (Array.isArray(schema['anyOf'])) {
-    return renderUnion(schema['anyOf']);
+    return renderUnion(schema['anyOf'], nextDepth);
   }
 
   if (Array.isArray(schema['allOf'])) {
-    return schema['allOf'].map((item) => renderTypeScriptTypeFromJsonSchema(item)).join(' & ');
+    return schema['allOf'].map((item) => render(item, nextDepth)).join(' & ');
   }
 
   if (Array.isArray(schema['type'])) {
-    return schema['type']
-      .map((item) => renderTypeScriptTypeFromJsonSchema({ ...schema, type: item }))
-      .join(' | ');
+    return schema['type'].map((item) => render({ ...schema, type: item }, nextDepth)).join(' | ');
   }
 
   switch (schema['type']) {
@@ -114,12 +116,16 @@ export function renderTypeScriptTypeFromJsonSchema(schema: unknown): string {
     case 'null':
       return 'null';
     case 'array':
-      return renderArrayType(schema);
+      return renderArrayType(schema, nextDepth);
     case 'object':
-      return renderObjectType(schema);
+      return renderObjectType(schema, nextDepth);
     default:
       break;
   }
 
   return 'JsonValue';
+}
+
+export function renderTypeScriptTypeFromJsonSchema(schema: unknown): string {
+  return render(schema, 0);
 }

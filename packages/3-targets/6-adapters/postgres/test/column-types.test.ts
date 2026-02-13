@@ -68,4 +68,23 @@ describe('adapter-postgres column-types', () => {
       });
     });
   });
+
+  describe('error paths', () => {
+    it('throws when schema lacks ~standard.jsonSchema.output', () => {
+      const badSchema = { '~standard': {} } as never;
+      expect(() => jsonb(badSchema)).toThrow(
+        'JSON schema must expose ~standard.jsonSchema.output()',
+      );
+    });
+
+    it('throws when schema is not a Standard Schema value', () => {
+      const notASchema = { foo: 'bar' } as never;
+      expect(() => jsonb(notASchema)).toThrow('jsonb(schema) expects a Standard Schema value');
+    });
+
+    it('throws for json() with invalid schema', () => {
+      const notASchema = { foo: 'bar' } as never;
+      expect(() => json(notASchema)).toThrow('json(schema) expects a Standard Schema value');
+    });
+  });
 });
