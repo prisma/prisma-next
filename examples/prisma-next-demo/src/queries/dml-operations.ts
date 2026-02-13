@@ -17,15 +17,15 @@ export async function insertUser(email: string, runtime: Runtime) {
       },
     });
 
-  const rows: Array<{ id: number; email: string }> = [];
+  const rows: Array<{ id: string; email: string }> = [];
   for await (const row of runtime.execute(plan)) {
-    rows.push(row as { id: number; email: string });
+    rows.push(row as { id: string; email: string });
   }
 
   return rows[0];
 }
 
-export async function updateUser(userId: number, newEmail: string, runtime: Runtime) {
+export async function updateUser(userId: string, newEmail: string, runtime: Runtime) {
   const userTable = db.schema.tables.user;
   const userColumns = userTable.columns;
 
@@ -42,15 +42,15 @@ export async function updateUser(userId: number, newEmail: string, runtime: Runt
       },
     });
 
-  const rows: Array<{ id: number; email: string }> = [];
+  const rows: Array<{ id: string; email: string }> = [];
   for await (const row of runtime.execute(plan)) {
-    rows.push(row as { id: number; email: string });
+    rows.push(row as { id: string; email: string });
   }
 
   return rows[0];
 }
 
-export async function deleteUser(userId: number, runtime: Runtime) {
+export async function deleteUser(userId: string, runtime: Runtime) {
   const userTable = db.schema.tables.user;
   const userColumns = userTable.columns;
 
@@ -64,9 +64,9 @@ export async function deleteUser(userId: number, runtime: Runtime) {
       },
     });
 
-  const rows: Array<{ id: number; email: string }> = [];
+  const rows: Array<{ id: string; email: string }> = [];
   for await (const row of runtime.execute(plan)) {
-    rows.push(row as { id: number; email: string });
+    rows.push(row as { id: string; email: string });
   }
 
   return rows[0];

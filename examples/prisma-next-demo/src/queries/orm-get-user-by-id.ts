@@ -3,7 +3,7 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 import { collect } from './utils';
 
-export async function ormGetUserById(userId: number, runtime: Runtime) {
+export async function ormGetUserById(userId: string, runtime: Runtime) {
   const plan = db.orm
     .user()
     .where((u) => u.id.eq(param('userId')))

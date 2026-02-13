@@ -3,7 +3,7 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { Kysely } from 'kysely';
 import { db } from '../prisma/db';
 
-export async function getUserById(userId: number, runtime: Runtime) {
+export async function getUserById(userId: string, runtime: Runtime) {
   const contract = db.context.contract;
   const kysely = new Kysely<KyselifyContract<typeof contract>>({
     dialect: new KyselyPrismaDialect({ runtime, contract }),

@@ -4,7 +4,7 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 import { collect } from './utils';
 
-export async function getUserPosts(userId: number, runtime: Runtime) {
+export async function getUserPosts(userId: string, runtime: Runtime) {
   const postTable = db.schema.tables.post;
 
   const plan = db.sql

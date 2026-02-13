@@ -7,6 +7,7 @@ const baseContract = {
   target: 'postgres',
   targetFamily: 'sql',
   coreHash: 'sha256:test',
+  storageHash: 'sha256:test-storage',
   models: {
     User: {
       storage: { table: 'User' },

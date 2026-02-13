@@ -1,14 +1,16 @@
+import { generateId } from '@prisma-next/ids/runtime';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 
 export async function ormCreateUser(
-  data: { id: number; email: string; createdAt: Date; kind: 'admin' | 'user' },
+  data: { email: string; createdAt: Date; kind: 'admin' | 'user' },
   runtime: Runtime,
 ) {
+  const id = generateId({ id: 'uuidv4' });
   const plan = db.orm
     .user()
-    .create({ id: data.id, email: data.email, createdAt: data.createdAt, kind: data.kind });
+    .create({ id, email: data.email, createdAt: data.createdAt, kind: data.kind });
 
   // Drain the result stream (DML operations don't return rows without RETURNING)
   for await (const _row of runtime.execute(plan)) {
@@ -20,7 +22,7 @@ export async function ormCreateUser(
   return 1;
 }
 
-export async function ormUpdateUser(userId: number, newEmail: string, runtime: Runtime) {
+export async function ormUpdateUser(userId: string, newEmail: string, runtime: Runtime) {
   const plan = db.orm
     .user()
     .update((u) => u.id.eq(param('userId')), { email: newEmail }, { params: { userId } });
@@ -35,7 +37,7 @@ export async function ormUpdateUser(userId: number, newEmail: string, runtime: R
   return 1;
 }
 
-export async function ormDeleteUser(userId: number, runtime: Runtime) {
+export async function ormDeleteUser(userId: string, runtime: Runtime) {
   const plan = db.orm.user().delete((u) => u.id.eq(param('userId')), { params: { userId } });
 
   // Drain the result stream (DML operations don't return rows without RETURNING)
