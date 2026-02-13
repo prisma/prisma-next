@@ -1463,6 +1463,81 @@ describe('PostgresControlAdapter', () => {
     });
   });
 
+  describe('introspect - USER-DEFINED enum types', () => {
+    it('strips surrounding double quotes from mixed-case enum formatted_type', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'Organization' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'Organization',
+              column_name: 'billingState',
+              data_type: 'USER-DEFINED',
+              udt_name: 'BillingState',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: '"BillingState"',
+            },
+          ],
+        },
+        { match: includes('PRIMARY KEY'), rows: [] },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('pg_enum'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      // format_type() returns '"BillingState"' for mixed-case enums;
+      // introspection must strip the quotes so it matches the contract's unquoted name
+      expect(result.tables['Organization']?.columns['billingState']?.nativeType).toBe(
+        'BillingState',
+      );
+    });
+
+    it('preserves lowercase enum formatted_type (no quotes from format_type)', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'user' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'user',
+              column_name: 'role',
+              data_type: 'USER-DEFINED',
+              udt_name: 'role',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'role',
+            },
+          ],
+        },
+        { match: includes('PRIMARY KEY'), rows: [] },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('pg_enum'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      // Lowercase enum names are not quoted by format_type(), should pass through unchanged
+      expect(result.tables['user']?.columns['role']?.nativeType).toBe('role');
+    });
+  });
+
   describe('normalizeSchemaNativeType', () => {
     it.each([
       { input: 'varchar(255)', expected: 'character varying(255)' },
