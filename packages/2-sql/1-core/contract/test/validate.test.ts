@@ -183,6 +183,90 @@ describe('validateContract', () => {
     );
   });
 
+  it('throws when tableToModel contains an unmapped reverse entry', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      modelToTable: { User: 'CustomUser' },
+      tableToModel: { CustomUser: 'User', User: 'User' },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /tableToModel\..*is not mirrored in modelToTable/,
+    );
+  });
+
+  it('throws when fieldToColumn references unknown model', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      fieldToColumn: { MissingModel: { id: 'id' } },
+      columnToField: { User: { id: 'id' } },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /fieldToColumn references unknown model "MissingModel"/,
+    );
+  });
+
+  it('throws when columnToField missing table for mapped model', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      fieldToColumn: { User: { id: 'id' } },
+      columnToField: {},
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /columnToField is missing table "User" for model "User"/,
+    );
+  });
+
+  it('throws when columnToField references unknown table', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      fieldToColumn: { User: { id: 'id' } },
+      columnToField: {
+        User: { id: 'id' },
+        Ghost: { id: 'id' },
+      },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /columnToField references unknown table "Ghost"/,
+    );
+  });
+
+  it('throws when fieldToColumn missing model for known table', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      modelToTable: { User: 'CustomUser' },
+      tableToModel: { CustomUser: 'User' },
+      fieldToColumn: {},
+      columnToField: {
+        CustomUser: { id: 'id' },
+      },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /fieldToColumn is missing model "User" for table "CustomUser"/,
+    );
+  });
+
+  it('throws when columnToField has entry not mirrored in fieldToColumn', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      fieldToColumn: { User: { id: 'id' } },
+      columnToField: {
+        User: {
+          id: 'id',
+          email: 'missingField',
+        },
+      },
+    };
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /columnToField\..*is not mirrored in fieldToColumn/,
+    );
+  });
+
   it('throws when primary key references missing column', () => {
     const invalid = makeContract();
     invalid.storage.tables.User.primaryKey = { columns: ['missing'] };
@@ -289,6 +373,31 @@ describe('validateContract', () => {
     expect(result.storage.tables.User.indexes).toHaveLength(1);
   });
 
+  it('accepts valid unique/index columns without triggering validation errors', () => {
+    const valid = makeContract();
+    valid.storage.tables.User.uniques = [{ columns: ['email'] }];
+    valid.storage.tables.User.indexes = [{ columns: ['id'] }];
+
+    const result = validateContract<SqlContract<SqlStorage>>(valid);
+    expect(result.storage.tables.User.primaryKey).toEqual({ columns: ['id'] });
+    expect(result.storage.tables.User.uniques).toHaveLength(1);
+    expect(result.storage.tables.User.indexes).toHaveLength(1);
+  });
+
+  it('accepts null mapping buckets by treating them as empty overrides', () => {
+    const contract = makeContract();
+    contract.mappings = {
+      modelToTable: { User: 'User' },
+      tableToModel: { User: 'User' },
+      fieldToColumn: null as unknown as Record<string, Record<string, string>>,
+      columnToField: null as unknown as Record<string, Record<string, string>>,
+    };
+
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    expect(result.mappings.fieldToColumn).toEqual({});
+    expect(result.mappings.columnToField).toEqual({});
+  });
+
   it('throws structural error for non-object values', () => {
     expect(() => validateContract<SqlContract<SqlStorage>>(null)).toThrow(
       /Contract structural validation failed/,
@@ -325,6 +434,17 @@ describe('validateContract', () => {
       indexes: [],
       foreignKeys: [],
     } as unknown as Mutable<SqlContract<SqlStorage>['storage']['tables']['User']>;
+
+    expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
+      /Contract structural validation failed/,
+    );
+  });
+
+  it('throws structural error when storage exists without tables', () => {
+    const invalid = {
+      ...makeContract(),
+      storage: {},
+    } as unknown as SqlContract<SqlStorage>;
 
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /Contract structural validation failed/,
