@@ -107,8 +107,8 @@ flowchart LR
 - `src/prisma/contract.json` - Emitted contract (emit workflow only)
 - `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
 - `src/prisma/db.ts` - One-liner Postgres client + query roots (emit workflow)
-- `src/prisma-no-emit/context.ts` - Env-free execution stack/context + query roots (no-emit workflow)
-- `src/prisma-no-emit/runtime.ts` - Runtime factory (no-emit workflow)
+- `src/prisma-no-emit/context-no-emit.ts` - Env-free execution stack/context + query roots (no-emit workflow)
+- `src/prisma-no-emit/runtime-no-emit.ts` - Runtime factory (no-emit workflow)
 - `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
 - `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
 - `scripts/stamp-marker.ts` - Contract marker management
