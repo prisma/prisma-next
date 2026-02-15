@@ -1,7 +1,9 @@
 import type { ContractBase } from '@prisma-next/contract/types';
 import type { RuntimeConnection, RuntimeTransaction } from '@prisma-next/runtime-executor';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CompiledQuery, DatabaseConnection, QueryResult, TransactionSettings } from 'kysely';
 import { createExecutionPlanFromCompiledQuery } from './execution-plan';
+import { runGuardrails } from './transform/index.js';
 
 export class KyselyPrismaConnection implements DatabaseConnection {
   #contract: ContractBase;
@@ -33,6 +35,10 @@ export class KyselyPrismaConnection implements DatabaseConnection {
     if (!this.#connection) {
       throw new Error('Invoked executeQuery on released connection');
     }
+    const query = (compiledQuery as { query?: unknown }).query;
+    if (query) {
+      runGuardrails(this.#contract as SqlContract<SqlStorage>, query);
+    }
     const plan = createExecutionPlanFromCompiledQuery<R>(
       this.#contract,
       compiledQuery as CompiledQuery<R>,
@@ -62,6 +68,10 @@ export class KyselyPrismaConnection implements DatabaseConnection {
   ): AsyncIterableIterator<QueryResult<R>> {
     if (!this.#connection) {
       throw new Error('Invoked streamQuery on released connection');
+    }
+    const query = (compiledQuery as { query?: unknown }).query;
+    if (query) {
+      runGuardrails(this.#contract as SqlContract<SqlStorage>, query);
     }
     const plan = createExecutionPlanFromCompiledQuery<R>(
       this.#contract,
