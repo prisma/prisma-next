@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ExtractCodecTypes } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { OperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnRef, createTableRef } from '@prisma-next/sql-relational-core/ast';
@@ -25,7 +26,7 @@ describe('IncludeChildBuilderImpl', () => {
   const contract = loadContract('contract');
   const adapter = createStubAdapter();
   const context = createTestContext(contract, adapter);
-  const codecTypes = contract.mappings.codecTypes;
+  const codecTypes = {} as ExtractCodecTypes<Contract>;
   const tableRef = createTableRef('user');
   const tables = schema<Contract>(context).tables;
   const userColumns = tables.user.columns;
