@@ -44,6 +44,11 @@ type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyo
     : Encoded
   : Encoded;
 
+export type TypeMaps = {
+  readonly codecTypes: CodecTypes;
+  readonly operationTypes: OperationTypes;
+};
+
 export type Contract = SqlContract<
   {
     readonly tables: {
@@ -485,8 +490,6 @@ export type Contract = SqlContract<
         readonly tags: 'tags';
       };
     };
-    codecTypes: PgTypes;
-    operationTypes: Record<string, never>;
   },
   StorageHash,
   ExecutionHash,
