@@ -1,0 +1,8 @@
+# Specs live in `agent-os/specs/`
+
+This repository’s spec workflow stores specs under:
+
+- `agent-os/specs/YYYY-MM-DD-kebab-case-spec-name/`
+
+If you see links to `docs/specs/**` (e.g. in Linear issues), treat them as **potentially stale** for this repo/worktree and prefer creating/updating specs in `agent-os/specs/`.
+
