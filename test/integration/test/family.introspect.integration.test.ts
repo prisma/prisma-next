@@ -359,35 +359,39 @@ describe('family instance introspect', () => {
   });
 
   describe('for an invalid database connection', () => {
-    it('handles connection errors gracefully', async () => {
-      let invalidDriver: Awaited<ReturnType<typeof postgresDriver.create>> | undefined;
-      try {
-        invalidDriver = await postgresDriver.create('postgresql://invalid:5432/invalid');
-      } catch {
-        // Driver creation might fail immediately, which is fine
-        // We'll skip this test if driver creation fails
-        return;
-      }
+    it(
+      'handles connection errors gracefully',
+      async () => {
+        let invalidDriver: Awaited<ReturnType<typeof postgresDriver.create>> | undefined;
+        try {
+          invalidDriver = await postgresDriver.create('postgresql://invalid:5432/invalid');
+        } catch {
+          // Driver creation might fail immediately, which is fine
+          // We'll skip this test if driver creation fails
+          return;
+        }
 
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensionPacks: [],
-        });
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensionPacks: [],
+          });
 
-        await expect(
-          familyInstance.introspect({
-            driver: invalidDriver,
-          }),
-        ).rejects.toThrow();
-      } finally {
-        await invalidDriver.close().catch(() => {
-          // Ignore cleanup errors
-        });
-      }
-    });
+          await expect(
+            familyInstance.introspect({
+              driver: invalidDriver,
+            }),
+          ).rejects.toThrow();
+        } finally {
+          await invalidDriver.close().catch(() => {
+            // Ignore cleanup errors
+          });
+        }
+      },
+      timeouts.databaseOperation,
+    );
   });
 
   describe('for a schema with extensions', () => {
