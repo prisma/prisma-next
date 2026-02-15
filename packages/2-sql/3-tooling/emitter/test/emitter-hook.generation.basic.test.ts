@@ -67,6 +67,106 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain('CodecTypes');
   });
 
+  describe('Contract and TypeMaps shape (Task 1.1)', () => {
+    it('emits TypeMaps as separate export', () => {
+      const ir = createContractIR({
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      });
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      expect(types).toContain('export type TypeMaps');
+      expect(types).toContain('codecTypes');
+      expect(types).toContain('operationTypes');
+    });
+
+    it('TypeMaps has locked shape { codecTypes, operationTypes }', () => {
+      const ir = createContractIR({
+        models: {},
+        storage: { tables: {} },
+      });
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      expect(types).toContain('readonly codecTypes: CodecTypes');
+      expect(types).toContain('readonly operationTypes: OperationTypes');
+    });
+
+    it('Contract does not include phantom codecTypes or operationTypes keys', () => {
+      const ir = createContractIR({
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' } },
+            relations: {},
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      });
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      expect(types).not.toContain("'__@prisma-next/sql-contract/codecTypes@__'");
+      expect(types).not.toContain("'__@prisma-next/sql-contract/operationTypes@__'");
+    });
+
+    it('Contract mappings type includes only runtime-real keys', () => {
+      const ir = createContractIR({
+        models: {
+          User: {
+            storage: { table: 'user' },
+            fields: { id: { column: 'id' }, email: { column: 'email' } },
+            relations: {},
+          },
+        },
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      });
+      const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+      expect(types).toContain('modelToTable');
+      expect(types).toContain('tableToModel');
+      expect(types).toContain('fieldToColumn');
+      expect(types).toContain('columnToField');
+    });
+  });
+
   it('generates contract types with correct import path', () => {
     const ir = createContractIR({
       models: {
