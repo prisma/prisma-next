@@ -33,20 +33,20 @@ Source:
 
 ### 2.1 Tests first: define/validate parity with split types
 
-- [ ] Add/adjust 2-8 focused tests asserting `defineContract()` and `validateContract<Contract>()` produce compatible runtime `Contract` values under the new split model.
-- [ ] Add tests that `_generated` is stripped/absent from returned runtime contract values.
-- [ ] Add regression tests for visualization/traversal use-cases against returned runtime contracts.
+- [x] Add/adjust 2-8 focused tests asserting `defineContract()` and `validateContract<Contract>()` produce compatible runtime `Contract` values under the new split model.
+- [x] Add tests that `_generated` is stripped/absent from returned runtime contract values.
+- [x] Add regression tests for visualization/traversal use-cases against returned runtime contracts.
 
 ### 2.2 Keep construction model intact
 
-- [ ] Preserve internal class + public factory construction model (`constructContract(...)` or equivalent entrypoint).
-- [ ] Ensure construction computes runtime-real mappings only.
-- [ ] Ensure consumers bind to `Contract` interface instead of class type.
+- [x] Preserve internal class + public factory construction model (`constructContract(...)` or equivalent entrypoint).
+- [x] Ensure construction computes runtime-real mappings only.
+- [x] Ensure consumers bind to `Contract` interface instead of class type.
 
 ### 2.3 Keep contract definition-only
 
-- [ ] Confirm contract loading/validation does not require execution stack or runtime descriptor instantiation.
-- [ ] Ensure validator does not fabricate `TypeMaps` as runtime properties.
+- [x] Confirm contract loading/validation does not require execution stack or runtime descriptor instantiation.
+- [x] Ensure validator does not fabricate `TypeMaps` as runtime properties.
 
 ## 3) Lane/context typing model: thread `(Contract, TypeMaps)` explicitly
 
