@@ -23,7 +23,7 @@ function createMockDriverWithVoidBinding(): SqlDriver {
 
   return {
     ...queryable,
-    connect: async (_binding?: void) => {},
+    connect: async (_binding?: undefined) => {},
     acquireConnection: async () => connection,
     close: async () => {},
   } as SqlDriver;

@@ -73,7 +73,10 @@ class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
     if (this.#delegate === null) {
       throw new Error(USE_BEFORE_CONNECT_MESSAGE);
     }
-    return this.#delegate.explain!(request);
+    if (!this.#delegate.explain) {
+      throw new Error('Postgres driver does not support explain()');
+    }
+    return this.#delegate.explain(request);
   }
 
   async query<Row = Record<string, unknown>>(

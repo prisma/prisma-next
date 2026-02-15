@@ -114,7 +114,7 @@ export type SqlRuntimeDriverInstance<TTargetId extends string = string> = Runtim
   'sql',
   TTargetId
 > &
-  SqlDriver;
+  SqlDriver<unknown>;
 
 export function createSqlExecutionStack<TTargetId extends string>(options: {
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
