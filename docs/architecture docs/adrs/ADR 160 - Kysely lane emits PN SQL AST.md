@@ -6,7 +6,7 @@ sequenceDiagram
   participant App as App (Kysely)
   participant Kysely as Kysely compiler
   participant Lane as Kysely lane (Prisma Next)
-  participant Xform as Kysely→PN transformer
+  participant Xform as Kysely-to-PN transformer
   participant RT as SQL Runtime
   participant Plug as Runtime plugins
   participant Adp as Adapter lowering
