@@ -37,6 +37,11 @@ export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = Record<string, never>;
 
+export type TypeMaps = {
+  readonly codecTypes: CodecTypes;
+  readonly operationTypes: OperationTypes;
+};
+
 export type Contract = SqlContract<
   {
     readonly tables: {
@@ -346,8 +351,6 @@ export type Contract = SqlContract<
         readonly created_at: 'createdAt';
       };
     };
-    codecTypes: PgTypes;
-    operationTypes: Record<string, never>;
   },
   StorageHash,
   ExecutionHash,
