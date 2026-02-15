@@ -54,11 +54,11 @@ type ContractWithPosts = SqlContract<
   },
   Record<string, never>,
   Record<string, never>,
-  {
-    readonly codecTypes: Record<string, never>;
-    readonly operationTypes: Record<string, Record<string, unknown>>;
-  }
->;
+  Record<string, never>
+> & {
+  readonly '__@prisma-next/sql-contract/codecTypes@__': Record<string, never>;
+  readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, never>;
+};
 
 const contractWithPosts = validateContract<ContractWithPosts>({
   target: 'postgres',
@@ -92,10 +92,7 @@ const contractWithPosts = validateContract<ContractWithPosts>({
   },
   models: {},
   relations: {},
-  mappings: {
-    codecTypes: {},
-    operationTypes: {},
-  },
+  mappings: {},
 });
 
 describe('JoinOnBuilder', () => {
