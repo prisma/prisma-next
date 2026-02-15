@@ -431,6 +431,135 @@ describe('transformKyselyToPnAst', () => {
     });
   });
 
+  describe('defensive throws on ambiguous/invalid shapes', () => {
+    it('throws on unqualified column ref in multi-table scope', () => {
+      const query = {
+        kind: 'SelectQueryNode',
+        from: {
+          kind: 'FromNode',
+          froms: [
+            {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
+          ],
+        },
+        selections: [
+          {
+            kind: 'SelectionNode',
+            selection: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'id' },
+              },
+            },
+          },
+        ],
+        joins: [
+          {
+            kind: 'JoinNode',
+            joinType: 'LeftJoinNode',
+            table: {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'post' },
+            },
+            on: {
+              kind: 'OnNode',
+              node: {
+                kind: 'BinaryOperationNode',
+                left: {
+                  kind: 'ReferenceNode',
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'id' },
+                    table: { kind: 'IdentifierNode', name: 'user' },
+                  },
+                },
+                operator: { kind: 'OperatorNode', operator: '=' },
+                right: {
+                  kind: 'ReferenceNode',
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'userId' },
+                    table: { kind: 'IdentifierNode', name: 'post' },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      };
+
+      expect(() => transformKyselyToPnAst(contract, query, [])).toThrow(KyselyTransformError);
+      try {
+        transformKyselyToPnAst(contract, query, []);
+      } catch (e) {
+        expect((e as KyselyTransformError).code).toBe(
+          KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+        );
+      }
+    });
+
+    it('throws on ambiguous selectAll in multi-table scope', () => {
+      const query = {
+        kind: 'SelectQueryNode',
+        from: {
+          kind: 'FromNode',
+          froms: [
+            {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
+          ],
+        },
+        selections: [{ kind: 'SelectAllNode' }],
+        joins: [
+          {
+            kind: 'JoinNode',
+            joinType: 'LeftJoinNode',
+            table: {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'post' },
+            },
+            on: {
+              kind: 'OnNode',
+              node: {
+                kind: 'BinaryOperationNode',
+                left: {
+                  kind: 'ReferenceNode',
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'id' },
+                    table: { kind: 'IdentifierNode', name: 'user' },
+                  },
+                },
+                operator: { kind: 'OperatorNode', operator: '=' },
+                right: {
+                  kind: 'ReferenceNode',
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'userId' },
+                    table: { kind: 'IdentifierNode', name: 'post' },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      };
+
+      expect(() => transformKyselyToPnAst(contract, query, [])).toThrow(KyselyTransformError);
+      try {
+        transformKyselyToPnAst(contract, query, []);
+      } catch (e) {
+        expect((e as KyselyTransformError).code).toBe(
+          KYSELY_TRANSFORM_ERROR_CODES.AMBIGUOUS_SELECT_ALL,
+        );
+      }
+    });
+  });
+
   describe('param indexing', () => {
     it('aligns param indices with compiledQuery.parameters order', () => {
       const query = selectQueryFixture({
