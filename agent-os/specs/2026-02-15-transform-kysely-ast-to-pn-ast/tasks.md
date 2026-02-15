@@ -200,7 +200,7 @@ Wire the transformer into the Kysely integration so plans carry PN AST and meta.
 - [x] Extend `test/integration/test/` Kysely tests to assert `plan.ast` presence
 - [x] Assert `plan.meta.refs` populated for Kysely queries
 - [x] Assert `plan.meta.paramDescriptors` populated
-- [ ] Run Kysely integration with AST-first lints enabled
+- [x] Run Kysely integration with AST-first lints enabled
 
 **Phase 5 acceptance criteria**:
 
