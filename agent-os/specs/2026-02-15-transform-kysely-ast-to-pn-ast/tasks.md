@@ -59,13 +59,13 @@ Update shared contract types used by all lanes.
 
 ### 2.1 ParamDescriptor.source extension
 
-- [ ] Extend `ParamDescriptor.source` from `'dsl' | 'raw'` to `'dsl' | 'raw' | 'lane'` in `packages/1-framework/1-core/shared/contract/src/types.ts`
-- [ ] Update any existing `ParamDescriptor` creation sites for `source` typing
-- [ ] Add unit test for new source value
+- [x] Extend `ParamDescriptor.source` from `'dsl' | 'raw'` to `'dsl' | 'raw' | 'lane'` in `packages/1-framework/1-core/shared/contract/src/types.ts`
+- [x] Update any existing `ParamDescriptor` creation sites for `source` typing
+- [x] Add unit test for new source value
 
 ### 2.2 Documentation
 
-- [ ] Update contract README or type docs to document `source: 'lane'`
+- [x] Update contract README or type docs to document `source: 'lane'`
 
 **Phase 2 acceptance criteria**:
 
