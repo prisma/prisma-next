@@ -62,6 +62,12 @@ class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
             async next() {
               throw new Error(USE_BEFORE_CONNECT_MESSAGE);
             },
+            async return() {
+              return { done: true, value: undefined };
+            },
+            async throw(error?: unknown) {
+              throw error ?? new Error(USE_BEFORE_CONNECT_MESSAGE);
+            },
           };
         },
       };

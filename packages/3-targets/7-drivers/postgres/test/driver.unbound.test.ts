@@ -27,11 +27,13 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
     it('returns an unbound driver with stable identity fields', () => {
       const driver = createDriver();
 
-      expect(driver.familyId).toBe('sql');
-      expect(driver.targetId).toBe('postgres');
-      expect(driver.acquireConnection).toBeDefined();
-      expect(driver.connect).toBeDefined();
-      expect(driver.close).toBeDefined();
+      expect(driver).toMatchObject({
+        familyId: 'sql',
+        targetId: 'postgres',
+        acquireConnection: expect.any(Function),
+        connect: expect.any(Function),
+        close: expect.any(Function),
+      });
     });
 
     it('accepts cursor options without requiring connection binding', () => {
