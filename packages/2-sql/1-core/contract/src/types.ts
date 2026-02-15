@@ -138,17 +138,11 @@ export type SqlMappings = {
   readonly tableToModel?: Record<string, string>;
   readonly fieldToColumn?: Record<string, Record<string, string>>;
   readonly columnToField?: Record<string, Record<string, string>>;
-  readonly codecTypes: Record<string, { readonly output: unknown }>;
-  readonly operationTypes: Record<string, Record<string, unknown>>;
 };
 
 export const DEFAULT_FK_CONSTRAINT = true;
 export const DEFAULT_FK_INDEX = true;
 
-/**
- * Resolves foreign key `constraint` and `index` fields to their effective boolean values,
- * falling back through optional override defaults, then to the global defaults.
- */
 export function applyFkDefaults(
   fk: { constraint?: boolean | undefined; index?: boolean | undefined },
   overrideDefaults?: { constraint?: boolean | undefined; index?: boolean | undefined },
@@ -158,6 +152,9 @@ export function applyFkDefaults(
     index: fk.index ?? overrideDefaults?.index ?? DEFAULT_FK_INDEX,
   };
 }
+
+export type SqlCodecTypesKey = '__@prisma-next/sql-contract/codecTypes@__';
+export type SqlOperationTypesKey = '__@prisma-next/sql-contract/operationTypes@__';
 
 export type SqlContract<
   S extends SqlStorage = SqlStorage,
@@ -176,8 +173,14 @@ export type SqlContract<
   readonly execution?: ExecutionSection;
 };
 
-export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> =
-  TContract['mappings']['codecTypes'];
+export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> = TContract extends {
+  readonly [K in SqlCodecTypesKey]: infer C;
+}
+  ? C
+  : Record<string, never>;
 
-export type ExtractOperationTypes<TContract extends SqlContract<SqlStorage>> =
-  TContract['mappings']['operationTypes'];
+export type ExtractOperationTypes<TContract extends SqlContract<SqlStorage>> = TContract extends {
+  readonly [K in SqlOperationTypesKey]: infer O;
+}
+  ? O
+  : Record<string, never>;

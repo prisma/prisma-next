@@ -884,13 +884,12 @@ describe('computeMappings', () => {
     };
     const existingMappings: Partial<SqlMappings> = {
       modelToTable: { User: 'custom_table' },
-      codecTypes: { 'pg/int4@1': { output: 0 } },
-      operationTypes: { custom: {} },
+      tableToModel: { custom_table: 'User' },
     };
     const mappings = computeMappings(models, storage, existingMappings);
     expect(mappings.modelToTable?.['User']).toBe('custom_table');
-    expect(mappings.codecTypes).toEqual(existingMappings.codecTypes);
-    expect(mappings.operationTypes).toEqual(existingMappings.operationTypes);
+    expect(mappings).not.toHaveProperty('codecTypes');
+    expect(mappings).not.toHaveProperty('operationTypes');
   });
 
   it('computes mappings for multiple models', () => {

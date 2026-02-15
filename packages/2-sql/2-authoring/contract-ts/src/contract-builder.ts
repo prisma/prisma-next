@@ -36,6 +36,7 @@ import {
   type ModelField,
   type ReferentialAction,
   type SqlContract,
+  type SqlMappings,
   type SqlStorage,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -134,33 +135,7 @@ type InvertRecord<T extends Record<string, string>> = {
   readonly [K in keyof T & string as T[K]]: K;
 };
 
-/**
- * Type-level mappings structure for contracts built via `defineContract()`.
- *
- * Derives literal types for `modelToTable`, `tableToModel`, `fieldToColumn`, and `columnToField`
- * from the builder's `Models` generic parameter, preserving the specific string literal types
- * needed for type-safe query building.
- */
-type ContractBuilderMappings<
-  Models extends Record<
-    string,
-    ModelBuilderState<string, string, Record<string, string>, Record<string, RelationDefinition>>
-  >,
-  C extends Record<string, { output: unknown }>,
-> = {
-  readonly modelToTable: { readonly [K in keyof Models & string]: Models[K]['table'] };
-  readonly tableToModel: { readonly [K in keyof Models & string as Models[K]['table']]: K };
-  readonly fieldToColumn: {
-    readonly [K in keyof Models & string]: ExtractModelFields<Models[K]>;
-  };
-  readonly columnToField: {
-    readonly [K in keyof Models & string as Models[K]['table']]: InvertRecord<
-      ExtractModelFields<Models[K]>
-    >;
-  };
-  readonly codecTypes: C;
-  readonly operationTypes: Record<string, never>;
-};
+type ContractBuilderMappings = SqlMappings;
 
 type BuildStorageTable<
   _TableName extends string,
@@ -334,8 +309,10 @@ class SqlContractBuilder<
         BuildStorage<Tables, Types>,
         BuildModels<Models>,
         BuildRelations<Models>,
-        ContractBuilderMappings<Models, CodecTypes>
+        ContractBuilderMappings
       > & {
+        readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
+        readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, never>;
         readonly schemaVersion: '1';
         readonly target: Target;
         readonly targetFamily: 'sql';
@@ -347,14 +324,15 @@ class SqlContractBuilder<
           ? { readonly capabilities: Capabilities }
           : unknown)
     : never {
-    // Type helper to ensure literal types are preserved in return type
     type BuiltContract = Target extends string
       ? SqlContract<
           BuildStorage<Tables, Types>,
           BuildModels<Models>,
           BuildRelations<Models>,
-          ContractBuilderMappings<Models, CodecTypes>
+          ContractBuilderMappings
         > & {
+          readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
+          readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, never>;
           readonly schemaVersion: '1';
           readonly target: Target;
           readonly targetFamily: 'sql';
@@ -572,11 +550,7 @@ class SqlContractBuilder<
       storage as SqlStorage,
     );
 
-    const mappings = {
-      ...baseMappings,
-      codecTypes: {} as CodecTypes,
-      operationTypes: {} as Record<string, never>,
-    } as ContractBuilderMappings<Models, CodecTypes>;
+    const mappings = baseMappings as ContractBuilderMappings;
 
     const extensionNamespaces = this.state.extensionNamespaces ?? [];
     const extensionPacks: Record<string, unknown> = { ...(this.state.extensionPacks || {}) };

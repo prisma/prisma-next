@@ -16,8 +16,6 @@ type ResolvedMappings = {
   tableToModel: Record<string, string>;
   fieldToColumn: Record<string, Record<string, string>>;
   columnToField: Record<string, Record<string, string>>;
-  codecTypes: Record<string, { readonly output: unknown }>;
-  operationTypes: Record<string, Record<string, unknown>>;
 };
 
 function computeDefaultMappings(models: Record<string, ModelDefinition>): ResolvedMappings {
@@ -49,8 +47,6 @@ function computeDefaultMappings(models: Record<string, ModelDefinition>): Resolv
     tableToModel,
     fieldToColumn,
     columnToField,
-    codecTypes: {},
-    operationTypes: {},
   };
 }
 
@@ -166,8 +162,6 @@ function mergeMappings(
     tableToModel,
     fieldToColumn,
     columnToField,
-    codecTypes: { ...defaults.codecTypes, ...(existingMappings?.codecTypes ?? {}) },
-    operationTypes: { ...defaults.operationTypes, ...(existingMappings?.operationTypes ?? {}) },
   };
 }
 
