@@ -517,6 +517,53 @@ function buildSummary({ mode, viewerLogin, operations, results }) {
   };
 }
 
+function updateReviewActionsWithGithubAdmin(reviewActions, summary, appliedAt) {
+  const actionResultsById = new Map();
+  for (const result of summary.results) {
+    if (!actionResultsById.has(result.actionId)) {
+      actionResultsById.set(result.actionId, []);
+    }
+    actionResultsById.get(result.actionId).push(result);
+  }
+
+  const nextActions = reviewActions.actions.map((action) => {
+    if (action.decision !== 'will_address' || action.status !== 'done') {
+      return action;
+    }
+
+    const existingDone = action.done && typeof action.done === 'object' ? action.done : {};
+    if (existingDone.githubAdmin && typeof existingDone.githubAdmin === 'object') {
+      return action;
+    }
+
+    const operationResults = actionResultsById.get(action.actionId) ?? [];
+    const githubAdminOps = operationResults
+      .filter((entry) => entry.kind !== 'noop')
+      .map((entry) => ({
+        kind: entry.kind,
+        targetNodeId: entry.targetNodeId,
+        state: entry.state,
+        message: entry.message ?? null,
+      }));
+
+    return {
+      ...action,
+      done: {
+        ...existingDone,
+        githubAdmin: {
+          appliedAt,
+          operations: githubAdminOps,
+        },
+      },
+    };
+  });
+
+  return {
+    ...reviewActions,
+    actions: nextActions,
+  };
+}
+
 async function main() {
   const args = parseCliArgs(process.argv);
   if (args.help) {
@@ -572,6 +619,12 @@ async function main() {
     args.format === 'json' ? formatCanonicalJson(summary) : formatTextOutput(summary);
   process.stdout.write(output);
 
+  if (args.apply && args.inPath !== '-') {
+    const appliedAt = new Date().toISOString();
+    const nextReviewActions = updateReviewActionsWithGithubAdmin(reviewActions, summary, appliedAt);
+    await writeOutput(args.inPath, formatCanonicalJson(nextReviewActions));
+  }
+
   if (args.logOutPath) {
     await writeOutput(args.logOutPath, formatCanonicalJson(summary));
   }
@@ -592,4 +645,9 @@ if (isMain) {
   });
 }
 
-export { getTlsGuidanceMessage, isTlsCertError, parseCliArgs };
+export {
+  getTlsGuidanceMessage,
+  isTlsCertError,
+  parseCliArgs,
+  updateReviewActionsWithGithubAdmin,
+};

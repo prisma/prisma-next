@@ -61,6 +61,13 @@ node scripts/pr/review-iterate.mjs --pr <PR_URL>
 
 Use `--apply` only when ready to execute GitHub mutations.
 
+For phase-specific execution without full orchestration, use:
+
+- `/agent-os/review-fetch-phase <PR_URL> [output-dir]`
+- `/agent-os/review-triage-phase <PR_URL> [output-dir]`
+- `/agent-os/review-implement-phase <PR_URL> [output-dir]`
+- `/agent-os/review-apply-phase <PR_URL> [output-dir]`
+
 ## Behavioral rules
 
 - **WILL ADDRESS** items:
@@ -175,7 +182,7 @@ Invoke the review triager agent at `.claude/agents/agent-os/review-triager.md` a
 The triager must:
 
 - fetch review state (via `scripts/pr/fetch-review-state.mjs`)
-- triage review threads and administer thread replies/reactions/resolution
+- triage review threads into `review-actions.json` decisions/status
 - write/update `review-actions.md` and `review-actions.json`
 
 3. **Validate handoff contract**
@@ -203,6 +210,10 @@ The implementer must:
 - reply "On it" when starting, then "Done" and resolve the thread when complete
 - update `review-actions.json` in-place (`status`, `done`)
 - re-fetch review state at the end to verify remaining actionable items
+
+Responsibility note:
+- Posting "Done" and resolving completed threads belongs to the implementer phase.
+- `apply-review-actions` is an idempotent admin safety net and dry-run/apply tool for actions already marked done.
 
 ### `iterate`
 

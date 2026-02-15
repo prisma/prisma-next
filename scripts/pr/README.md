@@ -9,8 +9,9 @@ Primary contract doc: `agent-os/specs/review-framework/spec.md`.
 1. Fetch canonical state (`review-state.json`) from GitHub.
 2. Render derived state Markdown (`review-state.md`) and optional summary.
 3. Author/update canonical action plan (`review-actions.json`).
-4. Render derived actions Markdown (`review-actions.md`).
-5. Plan admin mutations (`--dry-run`, default), then apply explicitly with `--apply`.
+4. Implement `will_address` actions, commit fixes, and post "Done" updates on completed threads.
+5. Render derived actions Markdown (`review-actions.md`).
+6. Plan admin mutations (`--dry-run`, default), then apply explicitly with `--apply`.
 
 For a thin wrapper over this loop, use `scripts/pr/review-iterate.mjs`.
 
@@ -78,7 +79,13 @@ node scripts/pr/apply-review-actions.mjs --in <review-actions.json> [--review-st
 - `--apply` enables mutations explicitly.
 - `--format` defaults to `text`.
 - Planner/executor operate on node ids and ensure no duplicate done replies/reactions.
+- On `--apply`, completed `will_address` actions are stamped with `done.githubAdmin` in `review-actions.json`; reruns treat stamped actions as already administered.
 - TLS/certificate failures fail fast with rerun guidance for non-sandbox shells; TLS verification must stay enabled.
+
+Responsibility:
+
+- Posting "Done" on completed code-review threads belongs to the implementation phase.
+- `apply-review-actions` is the idempotent admin phase for dry-run/apply over actions already marked done.
 
 Examples:
 

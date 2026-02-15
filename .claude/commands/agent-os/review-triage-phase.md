@@ -56,4 +56,4 @@ Return the concrete artifact paths written:
 
 Suggest next phase command when appropriate:
 
-- `/agent-os/review-apply-phase <PR_URL> [output-dir]`
+- `/agent-os/review-implement-phase <PR_URL> [output-dir]`

@@ -27,6 +27,7 @@ If missing, instruct user to run:
 
 - `/agent-os/review-fetch-phase <PR_URL> [output-dir]`
 - then triage to produce/update `review-actions.json`
+- then implement to complete code changes and mark actions done
 
 ## Behavior
 
@@ -57,9 +58,14 @@ node scripts/pr/apply-review-actions.mjs --in <output-dir>/review-actions.json -
 
 If `review-state.json` is absent, omit `--review-state`.
 
+5. After apply, re-run fetch + triage before any subsequent apply run.
+   - This prevents acting on stale historical `done` actions.
+   - `apply-review-actions` now records `done.githubAdmin` metadata in `review-actions.json`, and planner treats those actions as already administered.
+
 ## Error handling / reliability
 
 - Keep behavior idempotent and retry-safe.
+- Completed actions with `done.githubAdmin` are treated as already applied (noop).
 - Treat API errors as operational failures.
 - If `gh api` fails with TLS/cert errors in sandbox (`x509` / `OSStatus -26276` patterns), fail fast and instruct rerun outside sandbox.
 - Never disable TLS verification.

@@ -1,0 +1,15 @@
+---
+description: Keep review-framework apply runs idempotent for completed actions
+globs:
+  - scripts/pr/**
+  - .claude/commands/agent-os/review-*.md
+alwaysApply: false
+---
+
+When running or updating the review-framework apply flow:
+
+- Treat actions with `done.githubAdmin` as already administered.
+- Do not post additional "Done" replies/reactions for already-administered actions.
+- Default to dry-run and require explicit apply.
+- After apply, persist apply metadata back to canonical actions JSON when possible.
+- Before repeated applies, refresh state and retriage to avoid operating on stale historical actions.

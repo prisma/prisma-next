@@ -107,6 +107,11 @@ function createNoop(action, reason) {
   };
 }
 
+function hasGithubAdminCompletion(action) {
+  const githubAdmin = action?.done?.githubAdmin;
+  return typeof githubAdmin === 'object' && githubAdmin !== null;
+}
+
 function planThreadOperations(action, viewerLogin, thread) {
   const operations = [];
   const doneBody = buildDoneReplyBody(action.actionId);
@@ -201,6 +206,10 @@ function planReviewActionOperations({ reviewActions, viewerLogin, githubState })
     }
     if (action.status !== 'done') {
       operations.push(createNoop(action, 'status_not_done'));
+      continue;
+    }
+    if (hasGithubAdminCompletion(action)) {
+      operations.push(createNoop(action, 'github_admin_already_applied'));
       continue;
     }
 

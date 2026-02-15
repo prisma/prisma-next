@@ -518,6 +518,51 @@ function assertReviewActionsV1(reviewActions) {
           }
         }
       }
+      if (action.done.githubAdmin !== undefined && action.done.githubAdmin !== null) {
+        if (typeof action.done.githubAdmin !== 'object') {
+          throw new TypeError(`${pointer}.done.githubAdmin must be object or null`);
+        }
+        if (!isNonEmptyString(action.done.githubAdmin.appliedAt)) {
+          throw new TypeError(`${pointer}.done.githubAdmin.appliedAt must be a non-empty string`);
+        }
+        if (!Array.isArray(action.done.githubAdmin.operations)) {
+          throw new TypeError(`${pointer}.done.githubAdmin.operations must be an array`);
+        }
+        for (let operationIndex = 0; operationIndex < action.done.githubAdmin.operations.length; operationIndex += 1) {
+          const operation = action.done.githubAdmin.operations[operationIndex];
+          if (typeof operation !== 'object' || operation === null) {
+            throw new TypeError(`${pointer}.done.githubAdmin.operations[${operationIndex}] must be an object`);
+          }
+          if (!isNonEmptyString(operation.kind)) {
+            throw new TypeError(
+              `${pointer}.done.githubAdmin.operations[${operationIndex}].kind must be a non-empty string`,
+            );
+          }
+          if (!isNonEmptyString(operation.targetNodeId)) {
+            throw new TypeError(
+              `${pointer}.done.githubAdmin.operations[${operationIndex}].targetNodeId must be a non-empty string`,
+            );
+          }
+          if (
+            operation.state !== undefined &&
+            operation.state !== null &&
+            !isNonEmptyString(operation.state)
+          ) {
+            throw new TypeError(
+              `${pointer}.done.githubAdmin.operations[${operationIndex}].state must be a non-empty string when provided`,
+            );
+          }
+          if (
+            operation.message !== undefined &&
+            operation.message !== null &&
+            typeof operation.message !== 'string'
+          ) {
+            throw new TypeError(
+              `${pointer}.done.githubAdmin.operations[${operationIndex}].message must be string or null when provided`,
+            );
+          }
+        }
+      }
     }
   }
 

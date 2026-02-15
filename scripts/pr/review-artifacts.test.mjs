@@ -251,6 +251,42 @@ test('assertReviewActionsV1 validates v1 schema and decision constraints', () =>
       }),
     /rationale must be a non-empty string/,
   );
+
+  const withGithubAdmin = {
+    ...validActions,
+    actions: [
+      {
+        ...validActions.actions[0],
+        status: 'done',
+        done: {
+          doneAt: '2026-02-12T01:00:00.000Z',
+          githubAdmin: {
+            appliedAt: '2026-02-12T02:00:00.000Z',
+            operations: [{ kind: 'resolve_thread', targetNodeId: 'PRRT_1', state: 'applied' }],
+          },
+        },
+      },
+      validActions.actions[1],
+    ],
+  };
+  assert.doesNotThrow(() => assertReviewActionsV1(withGithubAdmin));
+  assert.throws(
+    () =>
+      assertReviewActionsV1({
+        ...withGithubAdmin,
+        actions: [
+          {
+            ...withGithubAdmin.actions[0],
+            done: {
+              ...withGithubAdmin.actions[0].done,
+              githubAdmin: { appliedAt: '', operations: [] },
+            },
+          },
+          withGithubAdmin.actions[1],
+        ],
+      }),
+    /done\.githubAdmin\.appliedAt must be a non-empty string/,
+  );
 });
 
 test('formatCanonicalJson uses deterministic formatting', () => {

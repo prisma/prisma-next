@@ -308,3 +308,42 @@ test('returns noop for non-done and non-will_address actions', () => {
     ['decision_not_will_address', 'status_not_done'],
   );
 });
+
+test('returns noop when github admin already recorded for action', () => {
+  const reviewActions = createReviewActions([
+    {
+      actionId: 'A-030',
+      target: { kind: 'review_thread', nodeId: 'PRRT_C' },
+      decision: 'will_address',
+      summary: 'already administered',
+      rationale: null,
+      status: 'done',
+      done: {
+        doneAt: '2026-02-12T00:00:00.000Z',
+        githubAdmin: {
+          appliedAt: '2026-02-12T01:00:00.000Z',
+          operations: [{ kind: 'resolve_thread', targetNodeId: 'PRRT_C' }],
+        },
+      },
+    },
+  ]);
+
+  const operations = planReviewActionOperations({
+    reviewActions,
+    viewerLogin: 'wmadden',
+    githubState: {
+      reviewThreads: [
+        {
+          nodeId: 'PRRT_C',
+          isResolved: false,
+          comments: [{ nodeId: 'PRRC_C', authorLogin: 'reviewer', body: 'c', reactionGroups: [] }],
+        },
+      ],
+      standaloneTargets: [],
+    },
+  });
+
+  assert.deepStrictEqual(operations.map((operation) => operation.reason), [
+    'github_admin_already_applied',
+  ]);
+});

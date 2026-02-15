@@ -48,6 +48,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 
 ## GitHub / PR automation
 - `.cursor/rules/github-cli-tls-in-sandbox.mdc` — Fix `gh api` TLS failures in sandboxed shells
+- `.cursor/rules/review-framework-apply-idempotency.mdc` — Keep review-framework apply reruns idempotent for completed actions
 
 ## Review Framework docs
 - `scripts/pr/README.md` — Deterministic review-framework workflow and script CLI contracts
