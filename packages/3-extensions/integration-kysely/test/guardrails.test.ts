@@ -1,11 +1,8 @@
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { describe, expect, it } from 'vitest';
-import {
-  KYSELY_TRANSFORM_ERROR_CODES,
-  KyselyTransformError,
-  runGuardrails,
-} from '../src/transform/index.js';
-import type { Contract } from './fixtures/generated/contract.js';
+import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from '../src/transform/errors';
+import { runGuardrails } from '../src/transform/guardrails';
+import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
@@ -198,6 +195,40 @@ describe('runGuardrails', () => {
       };
 
       expect(() => runGuardrails(contract, query)).not.toThrow();
+    });
+
+    it('rejects unqualified ref in multi-FROM scope (froms.length > 1)', () => {
+      const query = {
+        kind: 'SelectQueryNode',
+        from: {
+          kind: 'FromNode',
+          froms: [
+            { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+            { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'post' } },
+          ],
+        },
+        selections: [
+          {
+            kind: 'SelectionNode',
+            selection: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'id' },
+              },
+            },
+          },
+        ],
+      };
+
+      expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
+      try {
+        runGuardrails(contract, query);
+      } catch (e) {
+        expect((e as KyselyTransformError).code).toBe(
+          KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+        );
+      }
     });
   });
 
