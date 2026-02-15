@@ -108,21 +108,21 @@ Source:
 
 ### 6.1 Tests first: demo DX with split type exports
 
-- [ ] Add/adjust 2-8 focused demo integration checks for:
+- [x] Add/adjust 2-8 focused demo integration checks for:
   - visualization rendering directly from runtime `Contract` value
   - emitted workflow typing with `Contract` + `TypeMaps`
   - no HMR/type mismatch from runtime/type shape divergence
 
 ### 6.2 Update demo/runtime usage
 
-- [ ] Update no-emit and emitted demo wiring to the final split model (`Contract` and `TypeMaps` where applicable).
-- [ ] Ensure convenience runtime flow remains aligned (validate contract first, context from descriptors, runtime lazy instantiation as applicable).
+- [x] Update no-emit and emitted demo wiring to the final split model (`Contract` and `TypeMaps` where applicable).
+- [x] Ensure convenience runtime flow remains aligned (validate contract first, context from descriptors, runtime lazy instantiation as applicable).
 
 ### 6.3 Documentation updates
 
-- [ ] Keep ADR 159 synchronized with final implementation details.
-- [ ] Update package READMEs/docs that reference extraction-from-contract or legacy runtime mapping assumptions.
-- [ ] Ensure references use `agent-os/specs/` for in-repo spec workflow.
+- [x] Keep ADR 159 synchronized with final implementation details.
+- [x] Update package READMEs/docs that reference extraction-from-contract or legacy runtime mapping assumptions.
+- [x] Ensure references use `agent-os/specs/` for in-repo spec workflow.
 
 ## 7) Final verification
 

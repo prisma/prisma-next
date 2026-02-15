@@ -23,7 +23,7 @@ This demo includes two runtime implementations demonstrating different approache
 
 ### 1. Emit Workflow (Default)
 
-Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-liner client:
+Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-liner client. The emitted workflow uses `Contract` and `TypeMaps` explicitly: `postgres<Contract, TypeMaps>({ contractJson, url })`.
 
 - **Files**: `src/prisma/db.ts`, `src/main.ts`
 - **Contract source**: `src/prisma/contract.json` (emitted from `prisma/contract.ts`)

@@ -80,10 +80,10 @@ See `architecture.config.json` for the complete mapping and `pnpm lint:deps` to 
 
 ```typescript
 import postgres from '@prisma-next/postgres/runtime';
-import type { Contract } from './contract.d';
+import type { Contract, TypeMaps } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-const db = postgres<Contract>({
+const db = postgres<Contract, TypeMaps>({
   contractJson,
   url: process.env['DATABASE_URL']!,
 });
