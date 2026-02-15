@@ -28,8 +28,9 @@ import type {
   UpdateAst,
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors.js';
-import { getColumnName, getTableName, hasKind } from './kysely-ast-types.js';
+import { ifDefined } from '@prisma-next/utils/defined';
+import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
+import { getColumnName, getTableName, hasKind } from './kysely-ast-types';
 
 export interface TransformResult {
   readonly ast: QueryAst;
@@ -462,9 +463,13 @@ function transformSelections(
 }
 
 function transformSelect(node: Record<string, unknown>, ctx: TransformContext): SelectAst {
-  ctx.multiTableScope = Array.isArray(node['joins']) && (node['joins'] as unknown[]).length > 0;
-
+  const joinsRaw = node['joins'] as unknown[] | undefined;
   const fromNode = node['from'];
+  const fromNodeRec = fromNode as Record<string, unknown> | undefined;
+  const froms = fromNodeRec?.['froms'] as unknown[] | undefined;
+  const multiFrom = Array.isArray(froms) && froms.length > 1;
+  ctx.multiTableScope = (Array.isArray(joinsRaw) && joinsRaw.length > 0) || multiFrom;
+
   if (!fromNode) {
     throw new KyselyTransformError(
       'SELECT query requires FROM clause',
@@ -472,9 +477,8 @@ function transformSelect(node: Record<string, unknown>, ctx: TransformContext): 
     );
   }
 
-  const fromNodeRec = fromNode as Record<string, unknown>;
-  const froms = fromNodeRec['froms'] as unknown[] | undefined;
-  const firstFrom = Array.isArray(froms) ? froms[0] : undefined;
+  const fromsArr = fromNodeRec!['froms'] as unknown[] | undefined;
+  const firstFrom = Array.isArray(fromsArr) ? fromsArr[0] : undefined;
   if (!firstFrom) {
     throw new KyselyTransformError(
       'FROM clause has no tables',
@@ -489,6 +493,18 @@ function transformSelect(node: Record<string, unknown>, ctx: TransformContext): 
   const aliasNode = tableNode['alias'];
   if (aliasNode && typeof aliasNode === 'object' && 'name' in aliasNode) {
     ctx.tableAliases.set(String((aliasNode as { name: string }).name), fromTable);
+  }
+
+  const joinNodes = (joinsRaw ?? []) as unknown[];
+  for (const j of joinNodes) {
+    if (typeof j !== 'object' || j === null) continue;
+    const jn = j as Record<string, unknown>;
+    const joinTable = transformTableRef(jn['table'] ?? jn, ctx);
+    const joinTableNode = (jn['table'] ?? jn) as Record<string, unknown>;
+    const joinAliasNode = joinTableNode['alias'];
+    if (joinAliasNode && typeof joinAliasNode === 'object' && 'name' in joinAliasNode) {
+      ctx.tableAliases.set(String((joinAliasNode as { name: string }).name), joinTable.name);
+    }
   }
 
   const project = transformSelections(node['selections'], ctx, fromTable);
@@ -529,7 +545,6 @@ function transformSelect(node: Record<string, unknown>, ctx: TransformContext): 
   }
 
   const joins: JoinAst[] = [];
-  const joinNodes = (node['joins'] ?? []) as unknown[];
   for (const j of joinNodes) {
     if (typeof j !== 'object' || j === null) continue;
     const jn = j as Record<string, unknown>;
@@ -549,20 +564,31 @@ function transformSelect(node: Record<string, unknown>, ctx: TransformContext): 
     joins.push({ kind: 'join', joinType, table, on });
   }
 
-  const hasSelectAll = (node['selections'] as unknown[] | undefined)?.some?.((s) =>
-    hasKind(s, 'SelectAllNode'),
-  );
-  const selectAllIntent = hasSelectAll ? { table: fromTable } : undefined;
+  const selectionNodes = (node['selections'] as unknown[] | undefined) ?? [];
+  const hasExplicitSelectAll =
+    Array.isArray(selectionNodes) && selectionNodes.some((s) => hasKind(s, 'SelectAllNode'));
+  let selectAllTable: string | undefined;
+  if (selectionNodes.length === 0) {
+    selectAllTable = fromTable;
+  } else if (hasExplicitSelectAll) {
+    const firstSelectAll = selectionNodes.find((s) => hasKind(s, 'SelectAllNode'));
+    if (firstSelectAll) {
+      const s = firstSelectAll as Record<string, unknown>;
+      const tableRef = (s['reference'] ?? s['table']) as unknown;
+      selectAllTable = tableRef ? resolveTable(tableRef, ctx, fromTable) : fromTable;
+    }
+  }
+  const selectAllIntent = selectAllTable !== undefined ? { table: selectAllTable } : undefined;
 
   return {
     kind: 'select',
     from: fromRef,
-    ...(joins.length > 0 && { joins }),
+    ...ifDefined('joins', joins.length > 0 ? joins : undefined),
     project,
-    ...(where && { where }),
-    ...(orderBy && orderBy.length > 0 && { orderBy }),
-    ...(limit !== undefined && { limit }),
-    ...(selectAllIntent && { selectAllIntent }),
+    ...ifDefined('where', where ?? undefined),
+    ...ifDefined('orderBy', orderBy && orderBy.length > 0 ? orderBy : undefined),
+    ...ifDefined('limit', limit),
+    ...ifDefined('selectAllIntent', selectAllIntent ?? undefined),
   } as SelectAst;
 }
 
@@ -583,6 +609,20 @@ function transformInsert(node: Record<string, unknown>, ctx: TransformContext): 
   const valueEntries = valuesRec['values'] as unknown[] | undefined;
 
   const columns = node['columns'] as unknown[] | undefined;
+  const firstEntry = Array.isArray(valueEntries) ? valueEntries[0] : undefined;
+  const isRowFormat =
+    Array.isArray(columns) &&
+    columns.length > 0 &&
+    firstEntry !== undefined &&
+    (hasKind(firstEntry, 'PrimitiveValueListNode') ||
+      (Array.isArray(firstEntry) && firstEntry.length > 0));
+  if (isRowFormat && Array.isArray(valueEntries) && valueEntries.length > 1) {
+    throw new KyselyTransformError(
+      'Multi-row INSERT values are not supported; use single-row INSERT or batch via separate plans',
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+      { rowCount: valueEntries.length },
+    );
+  }
   if (
     Array.isArray(columns) &&
     columns.length > 0 &&
@@ -670,7 +710,10 @@ function transformInsert(node: Record<string, unknown>, ctx: TransformContext): 
     kind: 'insert',
     table: tableRef,
     values: valuesRecord,
-    ...(insertReturning && insertReturning.length > 0 && { returning: insertReturning }),
+    ...ifDefined(
+      'returning',
+      insertReturning && insertReturning.length > 0 ? insertReturning : undefined,
+    ),
   } as InsertAst;
 }
 
@@ -740,8 +783,11 @@ function transformUpdate(node: Record<string, unknown>, ctx: TransformContext): 
     kind: 'update',
     table: tableRef,
     set: setRecord,
-    ...(where && { where }),
-    ...(updateReturning && updateReturning.length > 0 && { returning: updateReturning }),
+    ...ifDefined('where', where ?? undefined),
+    ...ifDefined(
+      'returning',
+      updateReturning && updateReturning.length > 0 ? updateReturning : undefined,
+    ),
   } as UpdateAst;
 }
 
@@ -798,8 +844,11 @@ function transformDelete(node: Record<string, unknown>, ctx: TransformContext): 
   return {
     kind: 'delete',
     table: tableRef,
-    ...(where && { where }),
-    ...(deleteReturning && deleteReturning.length > 0 && { returning: deleteReturning }),
+    ...ifDefined('where', where ?? undefined),
+    ...ifDefined(
+      'returning',
+      deleteReturning && deleteReturning.length > 0 ? deleteReturning : undefined,
+    ),
   } as DeleteAst;
 }
 
@@ -901,9 +950,12 @@ export function transformKyselyToPnAst(
   const metaAdditions = {
     refs,
     paramDescriptors,
-    ...(projection && { projection }),
-    ...(projectionTypes && Object.keys(projectionTypes).length > 0 && { projectionTypes }),
-    ...(ast.kind === 'select' && ast.selectAllIntent && { selectAllIntent: ast.selectAllIntent }),
+    ...ifDefined('projection', projection),
+    ...ifDefined(
+      'projectionTypes',
+      projectionTypes && Object.keys(projectionTypes).length > 0 ? projectionTypes : undefined,
+    ),
+    ...ifDefined('selectAllIntent', ast.kind === 'select' ? ast.selectAllIntent : undefined),
   };
   return { ast, metaAdditions };
 }
