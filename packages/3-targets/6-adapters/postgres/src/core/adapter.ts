@@ -8,7 +8,9 @@ import type {
   IncludeRef,
   InsertAst,
   JoinAst,
+  JoinOnExpr,
   LiteralExpr,
+  ListLiteralExpr,
   LowererContext,
   NullCheckExpr,
   OperationExpr,
@@ -188,6 +190,12 @@ function renderWhere(expr: WhereExpr, contract?: PostgresContract): string {
   if (expr.kind === 'nullCheck') {
     return renderNullCheck(expr, contract);
   }
+  if (expr.kind === 'and') {
+    return expr.exprs.map((e) => `(${renderWhere(e, contract)})`).join(' AND ');
+  }
+  if (expr.kind === 'or') {
+    return expr.exprs.map((e) => `(${renderWhere(e, contract)})`).join(' OR ');
+  }
   return renderBinary(expr, contract);
 }
 
@@ -201,17 +209,24 @@ function renderNullCheck(expr: NullCheckExpr, contract?: PostgresContract): stri
 function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   const leftExpr = expr.left as ColumnRef | OperationExpr;
   const left = renderExpr(leftExpr, contract);
-  // Handle both ParamRef and ColumnRef on the right side
-  // (ColumnRef can appear in EXISTS subqueries for correlation)
-  const rightExpr = expr.right as ParamRef | ColumnRef;
-  const right =
-    rightExpr.kind === 'col'
-      ? renderColumn(rightExpr)
-      : renderParam(rightExpr as ParamRef, contract);
-  // Only wrap in parentheses if it's an operation expression
   const leftRendered = isOperationExpr(leftExpr) ? `(${left})` : left;
 
-  // Map operators to SQL symbols
+  const rightExpr = expr.right;
+  let right: string;
+  if (rightExpr.kind === 'listLiteral') {
+    right = renderListLiteral(rightExpr as ListLiteralExpr, contract);
+  } else if (rightExpr.kind === 'literal') {
+    right = renderLiteral(rightExpr);
+  } else if (rightExpr.kind === 'col') {
+    right = renderColumn(rightExpr);
+  } else if (rightExpr.kind === 'param') {
+    right = renderParam(rightExpr, contract);
+  } else if (rightExpr.kind === 'operation') {
+    right = renderOperation(rightExpr, contract);
+  } else {
+    right = renderColumn(rightExpr as ColumnRef);
+  }
+
   const operatorMap: Record<BinaryExpr['op'], string> = {
     eq: '=',
     neq: '!=',
@@ -219,9 +234,20 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
     lt: '<',
     gte: '>=',
     lte: '<=',
+    like: 'LIKE',
+    ilike: 'ILIKE',
+    in: 'IN',
+    notIn: 'NOT IN',
   };
 
   return `${leftRendered} ${operatorMap[expr.op]} ${right}`;
+}
+
+function renderListLiteral(expr: ListLiteralExpr, contract?: PostgresContract): string {
+  const values = expr.values
+    .map((v) => (v.kind === 'param' ? renderParam(v, contract) : renderLiteral(v)))
+    .join(', ');
+  return `(${values})`;
 }
 
 function renderColumn(ref: ColumnRef): string {
@@ -300,20 +326,20 @@ function renderOperation(expr: OperationExpr, contract?: PostgresContract): stri
   return result;
 }
 
-function renderJoin(join: JoinAst, _contract?: PostgresContract): string {
+function renderJoin(join: JoinAst, contract?: PostgresContract): string {
   const joinType = join.joinType.toUpperCase();
   const table = quoteIdentifier(join.table.name);
-  const onClause = renderJoinOn(join.on);
+  const onClause = renderJoinOn(join.on, contract);
   return `${joinType} JOIN ${table} ON ${onClause}`;
 }
 
-function renderJoinOn(on: JoinAst['on']): string {
+function renderJoinOn(on: JoinOnExpr, contract?: PostgresContract): string {
   if (on.kind === 'eqCol') {
     const left = renderColumn(on.left);
     const right = renderColumn(on.right);
     return `${left} = ${right}`;
   }
-  throw new Error(`Unsupported join ON expression kind: ${on.kind}`);
+  return renderWhere(on, contract);
 }
 
 function renderInclude(
@@ -333,7 +359,7 @@ function renderInclude(
   const jsonBuildObject = `json_build_object(${childProjection})`;
 
   // Build the ON condition from the include's ON clause - this goes in the WHERE clause
-  const onCondition = renderJoinOn(include.child.on);
+  const onCondition = renderJoinOn(include.child.on, contract);
 
   // Build WHERE clause: combine ON condition with any additional WHERE clauses
   let whereClause = ` WHERE ${onCondition}`;
@@ -456,7 +482,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
     return `${column} = ${value}`;
   });
 
-  const whereClause = ` WHERE ${renderWhere(ast.where, contract)}`;
+  const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where, contract)}` : '';
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';
@@ -466,7 +492,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
 
 function renderDelete(ast: DeleteAst, contract?: PostgresContract): string {
   const table = quoteIdentifier(ast.table.name);
-  const whereClause = ` WHERE ${renderWhere(ast.where, contract)}`;
+  const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where, contract)}` : '';
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';

@@ -22,6 +22,7 @@ export interface CreateSelectAstOptions {
   readonly where?: WhereExpr;
   readonly orderBy?: ReadonlyArray<{ expr: ColumnRef | OperationExpr; dir: Direction }>;
   readonly limit?: number;
+  readonly selectAllIntent?: { table?: string };
 }
 
 export function createSelectAst(options: CreateSelectAstOptions): SelectAst {
@@ -34,5 +35,6 @@ export function createSelectAst(options: CreateSelectAstOptions): SelectAst {
     where: options.where,
     orderBy: options.orderBy,
     limit: options.limit,
+    selectAllIntent: options.selectAllIntent,
   }) as SelectAst;
 }
