@@ -13,17 +13,20 @@ Kysely integration for Prisma Next: connects Kysely query builder output to the 
 ```mermaid
 flowchart LR
   subgraph Kysely
+    direction TB
     QB[Query Builder]
     QB --> CQ[compiledQuery]
   end
 
   subgraph Transform
+    direction TB
     CQ --> T[transformKyselyToPnAst]
     T --> AST[QueryAst]
     T --> Meta[metaAdditions]
   end
 
   subgraph Runtime
+    direction TB
     Plan[ExecutionPlan]
     Plan --> Lower[lowerSqlPlan]
     Lower --> Driver[Driver]
