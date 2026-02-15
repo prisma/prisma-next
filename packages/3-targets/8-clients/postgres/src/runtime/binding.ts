@@ -1,10 +1,6 @@
+import type { PostgresBinding } from '@prisma-next/driver-postgres/runtime';
 import type { Client, Pool } from 'pg';
 import { Client as PgClient, Pool as PgPool } from 'pg';
-
-export type PostgresBinding =
-  | { readonly kind: 'url'; readonly url: string }
-  | { readonly kind: 'pgPool'; readonly pool: Pool }
-  | { readonly kind: 'pgClient'; readonly client: Client };
 
 export type PostgresBindingInput =
   | {

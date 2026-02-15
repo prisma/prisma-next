@@ -1,4 +1,4 @@
-export type { PostgresBinding } from '../runtime/binding';
+export type { PostgresBinding } from '@prisma-next/driver-postgres/runtime';
 export type {
   PostgresClient,
   PostgresOptions,

@@ -110,6 +110,8 @@ const driverWithCursor = {
 
 This preserves the invariant that stack instantiation is env-free while still allowing driver-specific configuration at create time.
 
+**DX note:** This descriptor-wrapping pattern is intentionally treated as a **temporary compromise**. It solves the immediate goal of TML-1837 (decoupling instantiation from binding), but it is not ideal ergonomics for callers. We intend to introduce a more explicit, first-class way to provide driver create options (while keeping stack instantiation deterministic and env-free) in a follow-up effort, and are deferring that improvement for now.
+
 ## Consequences
 
 - ✅ Stack instantiation is deterministic and env-free (descriptors → instances, including driver).

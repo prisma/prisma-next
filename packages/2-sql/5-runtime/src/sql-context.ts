@@ -110,6 +110,12 @@ export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = Runti
 > &
   Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
 
+/**
+ * NOTE: Binding type is intentionally erased to unknown at this shared runtime layer.
+ * Target clients (for example `postgres()`) validate and construct the concrete binding
+ * before calling `driver.connect(binding)`, which keeps runtime behavior safe today.
+ * A future follow-up can preserve TBinding through stack/context generics end-to-end.
+ */
 export type SqlRuntimeDriverInstance<TTargetId extends string = string> = RuntimeDriverInstance<
   'sql',
   TTargetId

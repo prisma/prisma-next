@@ -8,7 +8,7 @@
 
 ## Summary Verdict
 
-**Ship with nits.** The implementation meets spec acceptance criteria and aligns with the architecture. Remaining items are minor: end-to-end `connect(binding)` type-safety is weaker than the spec implies (type erasure + duplicate binding types), `PostgresDriverOptions` is still exported from the runtime surface, and the known `@prisma-next/integration-kysely` CI failure (pre-existing, unrelated to this PR).
+**Needs follow-ups (design + clarity).** Functional acceptance criteria are largely met, but multiple issues materially undermine the design’s goals (DX, type-safety, and learnability): create-options require descriptor wrapping without being documented as a first-class pattern, `connect(binding)` type-safety is not preserved end-to-end, binding types are duplicated, the legacy `PostgresDriverOptions` remains exported from the runtime surface, and key lifecycle tests are hard to read without consulting implementation. The known `@prisma-next/integration-kysely` CI failure is pre-existing and unrelated.
 
 ---
 
@@ -38,29 +38,63 @@
 
 ## Major Findings (Must-Fix)
 
-None. Implementation meets acceptance criteria.
+### 1. Driver lifecycle documentation was not accessible (ADR 159)
+
+The original ADR 159 was too compressed to serve its purpose: it did not define the driver lifecycle in a way that a new team member (or even the spec author) could reliably apply without reading implementation. This is a correctness risk over time: the design will be reinterpreted inconsistently.
+
+**Update:** ADR 159 has been rewritten to explicitly define vocabulary, responsibilities/boundaries, a state model, and concrete sequencing.
+
+### 2. Legacy `PostgresDriverOptions` export conflicts with “descriptor + connect is the path”
+
+Keeping a legacy `{ connect: { pool | client } }` options type exported from the runtime surface is a strong affordance for the old mental model and invites accidental usage in app code. If the design goal is a clean lifecycle, this should be removed and tests/utilities updated.
 
 ---
 
-## Minor Findings / Nits
+## Design / API Findings
 
-### 1. Cursor options passthrough is implemented, but shape/typing warrants a quick check
+### 1. Driver `create(options?)`: options exist, but stack instantiation can’t pass them directly
 
-The spec allows driver-specific options (e.g. `cursor`) at `create()` time. This branch does wire `cursor` through `postgres()` by wrapping the driver descriptor's `create()` and passing `{ cursor: options.cursor }` into `postgresDriver.create(...)`.
+`RuntimeDriverDescriptor.create(options?: TCreateOptions)` supports driver-specific, non-connection options at create time. But `instantiateExecutionStack()` always calls `stack.driver.create()` with no args, so callers cannot pass create options “through” stack instantiation.
 
-**Nit:** The cursor option shape is defined in `PostgresDriverCreateOptions` (driver package). There is a unit test that appears to pass an example cursor object with keys that don’t match the current driver option shape; if that’s intentional “opaque passthrough”, the types may need loosening, otherwise the test data should match the supported fields.
+This branch’s workaround pattern is to **curry options into the descriptor** before it enters the stack. `postgres()` does this by creating an inline descriptor wrapper whose `create()` calls `postgresDriver.create({ cursor: options.cursor })`.
 
-### 2. Type narrowing test for `driver` when stack has driver descriptor
+**Nit:** The pattern is correct but not obvious without reading `postgres()`; documenting it (or providing an alternative instantiation API) would reduce confusion.
 
-`stack.types.test-d.ts` asserts `instanceWithDriver.driver` is `MockDriverInstance | undefined` but does not assert that when `stack.driver` is defined, `instance.driver` is narrowed to non-undefined in a way that avoids `!` at call sites. The spec expects "type narrows when stack has driver descriptor." The `postgres()` runtime getter uses `const driver = stackInstance.driver; if (driver === undefined) throw ...` — narrowing works at runtime but a type-level test would strengthen confidence.
+### 2. Cursor options passthrough works, but the test data doesn’t reflect the actual option shape
 
-### 3. `PostgresDriverOptions` still exported and used in test utils
+Cursor options are forwarded from `postgres()` to the driver descriptor `create(...)`.
 
-`PostgresDriverOptions` (with `connect: { pool | client }`) remains exported from driver-postgres runtime. Integration test utils use it as a convenience shape and convert via `bindingFromDriverOptions`. This is acceptable — it’s a test helper, not the production path — but `PostgresDriverOptions` is documented as legacy in spec. Consider renaming to `LegacyPostgresDriverOptions` or moving it to a test-only export if you want to signal it’s not for app code.
+**Nit:** The cursor option shape is defined in `PostgresDriverCreateOptions` (driver package). The forwarding unit test passes an example cursor object with keys that don’t match that shape; if cursor options are meant to be strictly typed, the test data should use supported keys (e.g. `batchSize` / `disabled`). If they’re meant to be opaque passthrough, the typing should be loosened intentionally.
 
-### 4. `TBinding = void` and `connect(undefined)`
+### 3. Type narrowing test for `driver` when stack has driver descriptor (addressed)
 
-`SqlDriver<TBinding>` with `TBinding = void` requires `connect(binding: void)`. Callers use `connect(undefined)`. The relational-core test covers this; the type is correct but slightly unusual. No change needed.
+**Update:** The follow-up `stack.types.test-d.ts` now includes an explicit narrowing assertion after `if (driver === undefined) throw`, verifying the narrowed type is `MockDriverInstance`.
+
+### 4. `connect(binding)` call-site type-safety is weaker than the spec implies
+
+The shared interface supports driver-determined binding via `SqlDriver<TBinding>`, but `TBinding` is not preserved through the SQL runtime stack types, so `postgres().runtime()` doesn’t get strong compile-time coupling between the binding returned by `resolvePostgresBinding(...)` and the driver’s `connect(...)` parameter type.
+
+This currently works via structural typing, but it’s a notable gap versus the spec’s “compile-time type safety at driver call sites” intent.
+
+### 5. Duplicate `PostgresBinding` type definitions (client vs driver package)
+
+`PostgresBinding` is defined in both the Postgres client (`packages/3-targets/8-clients/postgres/src/runtime/binding.ts`) and the Postgres driver package (`packages/3-targets/7-drivers/postgres/src/postgres-driver.ts`). They are structurally identical today, but duplication invites drift and contributes to weaker type-safety at the `connect(binding)` call site.
+
+### 6. `PostgresDriverOptions` legacy export remains on the runtime surface
+
+Even if primarily used by tests/utilities, exporting legacy `{ connect: { pool | client } }` options from the runtime surface invites accidental use and contradicts the “descriptor + connect is the supported path” story.
+
+**Recommendation:** delete the legacy runtime export and update tests/utilities to use `PostgresBinding` directly.
+
+### 7. “Unbound vs bound” driver semantics + test readability
+
+The unbound Postgres driver instance is **not replaced** after connect; it keeps identity and stores a private delegate created on first `connect(binding)`. The term “bound driver” here refers to the internal delegate implementation that has been bound to a specific pool/client/url.
+
+The `driver.unbound.test.ts` suite validates the lifecycle, but it reads as a set of independent assertions; it could be restructured with more narrative grouping (“given an unbound driver… when connected… then…”) for readability.
+
+### 8. `TBinding = void` and `connect(undefined)`
+
+`SqlDriver<TBinding>` with `TBinding = void` requires `connect(binding: void)`, so callers use `connect(undefined)`. The relational-core test covers this; the type is correct but slightly unusual. No change needed.
 
 ---
 
@@ -83,10 +117,12 @@ The spec allows driver-specific options (e.g. `cursor`) at `create()` time. This
 
 ### 3. `PostgresDriverOptions` still exported and used in test utils
 
-**Status:** ⚠️ Intentionally unchanged
+**Status:** ✅ Addressed
 
-- **Reason to ignore for this spec:** this export is currently used by test utilities for migration/compatibility glue and is not part of the production runtime path introduced by TML-1837.
-- Renaming/removing it now would broaden scope and force follow-up churn in unrelated test helpers. We can handle this as a dedicated cleanup task if we want stricter signaling (e.g. rename to `LegacyPostgresDriverOptions`).
+- Removed `PostgresDriverOptions` from runtime exports in `packages/3-targets/7-drivers/postgres/src/exports/runtime.ts`.
+- Updated integration test utilities to stop importing the legacy runtime type:
+  - `test/integration/test/utils.ts` now uses a local `IntegrationDriverOptions` helper type and still converts to `PostgresBinding` for `driver.connect(binding)`.
+- Updated `packages/3-targets/7-drivers/postgres/README.md` runtime exports list to remove `PostgresDriverOptions`.
 
 ### 4. `TBinding = void` and `connect(undefined)`
 
@@ -94,6 +130,19 @@ The spec allows driver-specific options (e.g. `cursor`) at `create()` time. This
 
 - **Reason to ignore for this spec:** current typing is deliberate and validated by tests in relational-core; changing this would require a broader interface design pass across all drivers.
 - No functional or safety issue was identified.
+
+### 5. Duplicate `PostgresBinding` type definitions (client vs driver package)
+
+**Status:** ✅ Addressed
+
+- Removed the client-local `PostgresBinding` declaration from `packages/3-targets/8-clients/postgres/src/runtime/binding.ts`.
+- The client now imports `PostgresBinding` from `@prisma-next/driver-postgres/runtime`, so there is a single canonical binding type source for runtime connect calls.
+
+### 6. Duplicate type import in postgres runtime entrypoint
+
+**Status:** ✅ Addressed
+
+- Removed duplicate `PostgresDriverCreateOptions` import in `packages/3-targets/8-clients/postgres/src/runtime/postgres.ts`.
 
 ---
 
@@ -110,6 +159,7 @@ The spec allows driver-specific options (e.g. `cursor`) at `create()` time. This
 
 - **ADR 159:** Clear terminology, lifecycle (instantiate → connect → create runtime), interface changes.
 - **ADR 152:** Updated to reference ADR 159.
+- **ADR 159 sequencing note:** The numbered lifecycle steps (instantiate stack → connect at boundary → create runtime) are consistent with the later prose (“binding happens at the boundary… use-before-connect fails fast”). The prose is a restatement/elaboration, not a competing sequence.
 - **Runtime subsystem doc:** Example shows `instantiateExecutionStack` → `driver.connect` → `createRuntime`; "Phase 2" description matches new flow.
 - **driver-postgres README:** Descriptor + connect usage, binding variants, ADR 159 link.
 - **core-execution-plane README:** Execution stack example with unbound driver and connect-at-boundary.
@@ -121,7 +171,7 @@ The spec allows driver-specific options (e.g. `cursor`) at `create()` time. This
 ## Suggested Follow-ups
 
 1. **Integration-kysely CI:** `pnpm -F @prisma-next/integration-kysely test` fails with `Command "prisma-next" not found` in `emit:check` (pre-test step). This predates TML-1837. Fix CLI/bin discovery so `prisma-next` is available when integration-kysely runs (e.g. via `pnpm build` order or workspace bin linking).
-2. **Cursor options in postgres():** Add `cursor?: PostgresDriverCreateOptions['cursor']` to `PostgresOptionsBase` and pass it into descriptor `create()` when instantiating the stack, or document the current limitation.
+2. **Preserve `TBinding` through runtime stack types:** Parameterize `SqlRuntimeDriverInstance` / `SqlExecutionStackWithDriver` to retain the driver’s binding type so `connect(binding)` is strongly type-checked at call sites.
 3. **Connect-twice-with-different-binding:** Add a test or document that calling `connect(b)` twice with different bindings leaves the first binding active (current behavior).
 4. **Visual assets:** Spec suggested `current-lifecycle.svg`, `proposed-lifecycle.svg`; these were not added. Consider adding for onboarding.
 

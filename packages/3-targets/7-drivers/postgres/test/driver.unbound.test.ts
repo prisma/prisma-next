@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import postgresRuntimeDriverDescriptor from '../src/exports/runtime';
 
-describe('@prisma-next/driver-postgres descriptor create + connect', () => {
+describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
   let cleanup: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -15,175 +15,188 @@ describe('@prisma-next/driver-postgres descriptor create + connect', () => {
     }
   }, timeouts.spinUpPpgDev);
 
-  it('returns unbound driver when create() called with no args', () => {
-    const driver = postgresRuntimeDriverDescriptor.create();
-    expect(driver).toBeDefined();
-    expect(driver.familyId).toBe('sql');
-    expect(driver.targetId).toBe('postgres');
-    expect(driver.acquireConnection).toBeDefined();
-    expect(driver.connect).toBeDefined();
-    expect(driver.close).toBeDefined();
-  });
+  function createDriver(options?: Parameters<typeof postgresRuntimeDriverDescriptor.create>[0]) {
+    const driver = postgresRuntimeDriverDescriptor.create(options);
+    cleanup = async () => {
+      await driver.close();
+    };
+    return driver;
+  }
 
-  it('returns unbound driver when create() called with cursor options only', () => {
-    const driver = postgresRuntimeDriverDescriptor.create({
-      cursor: { batchSize: 10, disabled: false },
+  describe('descriptor.create', () => {
+    it('returns an unbound driver with stable identity fields', () => {
+      const driver = createDriver();
+
+      expect(driver.familyId).toBe('sql');
+      expect(driver.targetId).toBe('postgres');
+      expect(driver.acquireConnection).toBeDefined();
+      expect(driver.connect).toBeDefined();
+      expect(driver.close).toBeDefined();
     });
-    expect(driver).toBeDefined();
+
+    it('accepts cursor options without requiring connection binding', () => {
+      const driver = createDriver({ cursor: { batchSize: 10, disabled: false } });
+      expect(driver).toBeDefined();
+    });
   });
 
-  it('throws clear error when acquireConnection called before connect', async () => {
-    const driver = postgresRuntimeDriverDescriptor.create();
-    await expect(driver.acquireConnection()).rejects.toThrow(
-      'Postgres driver not connected. Call connect(binding) before acquireConnection or execute.',
-    );
-  });
+  describe('given an unbound driver', () => {
+    const useBeforeConnectMessage =
+      'Postgres driver not connected. Call connect(binding) before acquireConnection or execute.';
 
-  it('throws clear error when query called before connect', async () => {
-    const driver = postgresRuntimeDriverDescriptor.create();
-    await expect(driver.query('select 1')).rejects.toThrow(
-      'Postgres driver not connected. Call connect(binding) before acquireConnection or execute.',
-    );
-  });
+    it('throws when acquireConnection is called', async () => {
+      const driver = createDriver();
+      await expect(driver.acquireConnection()).rejects.toThrow(useBeforeConnectMessage);
+    });
 
-  it('throws clear error when execute called before connect', async () => {
-    const driver = postgresRuntimeDriverDescriptor.create();
-    const iter = driver.execute({ sql: 'select 1' });
-    const iterator = iter[Symbol.asyncIterator]();
-    await expect(iterator.next()).rejects.toThrow(
-      'Postgres driver not connected. Call connect(binding) before acquireConnection or execute.',
-    );
-  });
+    it('throws when query is called', async () => {
+      const driver = createDriver();
+      await expect(driver.query('select 1')).rejects.toThrow(useBeforeConnectMessage);
+    });
 
-  it(
-    'enables acquireConnection and execution after connect with pool binding',
-    async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
+    it('throws when execute is iterated', async () => {
+      const driver = createDriver();
+      const iter = driver.execute({ sql: 'select 1' });
+      const iterator = iter[Symbol.asyncIterator]();
+      await expect(iterator.next()).rejects.toThrow(useBeforeConnectMessage);
+    });
 
-      const driver = postgresRuntimeDriverDescriptor.create();
+    it('throws when explain is called', async () => {
+      const driver = createDriver();
+      expect(driver.explain).toBeDefined();
+      await expect(driver.explain!({ sql: 'select 1' })).rejects.toThrow(useBeforeConnectMessage);
+    });
 
-      cleanup = async () => {
-        await driver.close();
-      };
+    describe('when connected with pgPool binding', () => {
+      it(
+        'queries successfully',
+        async () => {
+          const db = newDb();
+          const { Pool: MemPool } = db.adapters.createPg();
+          const memPool = new MemPool();
 
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
-      await driver.query('create table items(id serial primary key, name text)');
-      await driver.query('insert into items(name) values ($1)', ['test']);
+          const driver = createDriver();
+          await driver.connect({ kind: 'pgPool', pool: memPool as unknown as Pool });
 
-      const result = await driver.query<{ id: number; name: string }>('select id, name from items');
-      expect(result.rows).toHaveLength(1);
-      expect(result.rows[0]?.name).toBe('test');
-    },
-    timeouts.spinUpPpgDev,
-  );
+          await driver.query('create table items(id serial primary key, name text)');
+          await driver.query('insert into items(name) values ($1)', ['test']);
 
-  it(
-    'enables acquireConnection and execution after connect with client binding',
-    async () => {
-      const db = newDb();
-      const { Client } = db.adapters.createPg();
-      const client = new Client();
-
-      const driver = postgresRuntimeDriverDescriptor.create();
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
-      await driver.query('create table items(id serial primary key, name text)');
-      await driver.query('insert into items(name) values ($1)', ['test']);
-
-      const result = await driver.query<{ id: number; name: string }>('select id, name from items');
-      expect(result.rows).toHaveLength(1);
-      expect(result.rows[0]?.name).toBe('test');
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
-    'connects from url binding and executes',
-    async () => {
-      const database = await createDevDatabase();
-      const driver = postgresRuntimeDriverDescriptor.create();
-
-      cleanup = async () => {
-        await driver.close();
-        await database.close();
-      };
-
-      await driver.connect({ kind: 'url', url: database.connectionString });
-      await driver.query('create table url_items(id serial primary key, name text)');
-      await driver.query('insert into url_items(name) values ($1)', ['url-test']);
-
-      const result = await driver.query<{ id: number; name: string }>(
-        'select id, name from url_items where name = $1',
-        ['url-test'],
+          const result = await driver.query<{ id: number; name: string }>(
+            'select id, name from items',
+          );
+          expect(result.rows).toHaveLength(1);
+          expect(result.rows[0]?.name).toBe('test');
+        },
+        timeouts.spinUpPpgDev,
       );
-      expect(result.rows).toHaveLength(1);
-      expect(result.rows[0]?.name).toBe('url-test');
-    },
-    timeouts.spinUpPpgDev,
-  );
 
-  it(
-    'is idempotent when connect called twice with same pool binding',
-    async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
+      it(
+        'is idempotent when connect is called twice with the same binding',
+        async () => {
+          const db = newDb();
+          const { Pool: MemPool } = db.adapters.createPg();
+          const memPool = new MemPool();
 
-      const driver = postgresRuntimeDriverDescriptor.create();
-      const binding = { kind: 'pgPool' as const, pool: pool as unknown as Pool };
+          const driver = createDriver();
+          const binding = { kind: 'pgPool' as const, pool: memPool as unknown as Pool };
 
-      cleanup = async () => {
-        await driver.close();
-      };
+          await driver.connect(binding);
+          await driver.connect(binding);
 
-      await driver.connect(binding);
-      await driver.connect(binding);
+          await driver.query('create table items(id serial primary key, name text)');
+          const result = await driver.query<{ id: number; name: string }>(
+            'select id, name from items',
+          );
+          expect(result.rows).toBeDefined();
+        },
+        timeouts.spinUpPpgDev,
+      );
 
-      await driver.query('create table items(id serial primary key, name text)');
-      const result = await driver.query<{ id: number; name: string }>('select id, name from items');
-      expect(result.rows).toBeDefined();
-    },
-    timeouts.spinUpPpgDev,
-  );
+      it(
+        'allows close to be called multiple times',
+        async () => {
+          const db = newDb();
+          const { Pool: MemPool } = db.adapters.createPg();
+          const memPool = new MemPool();
 
-  it(
-    'close works after connect with pool binding',
-    async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
+          const driver = createDriver();
+          await driver.connect({ kind: 'pgPool', pool: memPool as unknown as Pool });
 
-      const driver = postgresRuntimeDriverDescriptor.create();
+          cleanup = undefined;
 
-      cleanup = undefined;
+          await driver.close();
+          await driver.close();
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
 
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
-      await driver.close();
-      await driver.close();
-    },
-    timeouts.spinUpPpgDev,
-  );
+    describe('when connected with pgClient binding', () => {
+      it(
+        'queries successfully',
+        async () => {
+          const db = newDb();
+          const { Client: MemClient } = db.adapters.createPg();
+          const memClient = new MemClient();
 
-  it(
-    'close works after connect with client binding',
-    async () => {
-      const db = newDb();
-      const { Client } = db.adapters.createPg();
-      const client = new Client();
+          const driver = createDriver();
+          await driver.connect({ kind: 'pgClient', client: memClient as unknown as Client });
 
-      const driver = postgresRuntimeDriverDescriptor.create();
+          await driver.query('create table items(id serial primary key, name text)');
+          await driver.query('insert into items(name) values ($1)', ['test']);
 
-      cleanup = undefined;
+          const result = await driver.query<{ id: number; name: string }>(
+            'select id, name from items',
+          );
+          expect(result.rows).toHaveLength(1);
+          expect(result.rows[0]?.name).toBe('test');
+        },
+        timeouts.spinUpPpgDev,
+      );
 
-      await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
-      await driver.close();
-    },
-    timeouts.spinUpPpgDev,
-  );
+      it(
+        'close works after connect',
+        async () => {
+          const db = newDb();
+          const { Client: MemClient } = db.adapters.createPg();
+          const memClient = new MemClient();
+
+          const driver = createDriver();
+          await driver.connect({ kind: 'pgClient', client: memClient as unknown as Client });
+
+          cleanup = undefined;
+
+          await driver.close();
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
+
+    describe('when connected with url binding', () => {
+      it(
+        'queries successfully',
+        async () => {
+          const database = await createDevDatabase();
+
+          const driver = createDriver();
+          cleanup = async () => {
+            await driver.close();
+            await database.close();
+          };
+
+          await driver.connect({ kind: 'url', url: database.connectionString });
+          await driver.query('create table url_items(id serial primary key, name text)');
+          await driver.query('insert into url_items(name) values ($1)', ['url-test']);
+
+          const result = await driver.query<{ id: number; name: string }>(
+            'select id, name from url_items where name = $1',
+            ['url-test'],
+          );
+          expect(result.rows).toHaveLength(1);
+          expect(result.rows[0]?.name).toBe('url-test');
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
+  });
 });

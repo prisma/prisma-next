@@ -2,7 +2,6 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type { PostgresDriverCreateOptions } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import type { PostgresDriverCreateOptions } from '@prisma-next/driver-postgres/runtime';
 import type {
   ExtractCodecTypes,
   ExtractOperationTypes,
@@ -162,6 +161,8 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
         throw new Error('Relational runtime requires a driver descriptor on the execution stack');
       }
 
+      // `binding` is normalized by resolvePostgresBinding(), so this call site remains
+      // type-safe in practice while SqlRuntimeDriverInstance currently uses SqlDriver<unknown>.
       await driver.connect(binding);
 
       runtimeInstance = createRuntime({
