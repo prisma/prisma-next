@@ -92,7 +92,7 @@ This is especially true for **parameterized codecs**, where output types vary ba
 
 We preserve excellent lane inference (row types, operation IO types) by carrying codec/operation type maps as **type-only attachments**, sourced from:
 
-- TS authoring (no-emit): `defineContract<CodecTypes>()` and extension pack type exports
+- TS authoring (no-emit): target/extension pack type exports (inferred from `.target()` and `.extensionPacks()`)
 - JSON + `contract.d.ts`: emitted `CodecTypes` / `OperationTypes` types
 
 But we **do not** represent these as runtime properties on `contract.mappings`.
@@ -105,7 +105,26 @@ Implementation sketch (conceptual):
 - Update lanes to stop reading `contract.mappings.codecTypes` / `contract.mappings.operationTypes` as runtime values.
 - Runtime execution continues to use `ExecutionContext.codecs` and `ExecutionContext.operations` (registries assembled from descriptors).
 
-### 4) Workflow unification
+#### TS authoring ergonomics: infer codec types from packs
+
+In the TS authoring surface, avoid forcing authors to manually compose codec types like:
+
+```ts
+import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types'
+import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types'
+type AllCodecTypes = CodecTypes & PgVectorCodecTypes
+
+defineContract<AllCodecTypes>().target(postgresPack).extensionPacks({ pgvector })
+```
+
+Instead, the builder should infer and accumulate the necessary type maps from:
+
+- `.target(postgresPack)`
+- `.extensionPacks({ pgvector })`
+
+This keeps a single point of configuration while still providing deterministic typing (including parameterized codecs).
+
+### 5) Workflow unification
 
 #### TS authoring (no-emit)
 
@@ -126,13 +145,13 @@ Critical invariant:
 - The returned runtime object must structurally match `TContract` for all **runtime-real** keys (including runtime-real `mappings`).
 - Codec/operation type maps are provided by the TypeScript type parameter (from `contract.d.ts`) via the type-only channel, not via runtime properties.
 
-### 5) Demo visualization
+### 6) Demo visualization
 
 - Demo renders the constructed `Contract` directly.
 - Remove any `ContractIR` aliases used only to make rendering possible.
 - The visualization scope is “all application-relevant components” of the contract, not only storage schema.
 
-### 6) Call site updates (breaking)
+### 7) Call site updates (breaking)
 
 - Update internal consumers (lanes, demo, tooling) to rely on the constructed `Contract` surface.
 - Remove any defensive branching based on “JSON vs TS contract shape” where possible.
@@ -155,6 +174,7 @@ Critical invariant:
   - Lanes do not rely on runtime presence of codec/operation type maps for inference (type-only channel is sufficient)
 - **Demo/integration**
   - Demo contract visualization can render from `Contract` directly during Vite HMR without runtime/type mismatches
+  - Convenience runtime wiring (e.g. lazy clients that validate contract before building context/stack) remains compatible with the separation of definition-only contract vs context registries
 
 ## Migration / Rollout Notes
 
