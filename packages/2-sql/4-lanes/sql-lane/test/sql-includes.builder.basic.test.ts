@@ -63,11 +63,10 @@ type ContractWithCapabilities = SqlContract<
   },
   Record<string, never>,
   Record<string, never>,
-  {
-    readonly codecTypes: CodecTypes;
-    readonly operationTypes: Record<string, Record<string, unknown>>;
-  }
+  Record<string, never>
 > & {
+  readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
+  readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, Record<string, unknown>>;
   readonly capabilities: {
     readonly postgres: {
       readonly lateral: true;
@@ -109,10 +108,7 @@ const contractWithCapabilities = validateContract<ContractWithCapabilities>({
   },
   models: {},
   relations: {},
-  mappings: {
-    codecTypes: {} as CodecTypes,
-    operationTypes: {},
-  },
+  mappings: {},
   capabilities: {
     postgres: {
       lateral: true,
