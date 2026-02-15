@@ -1,5 +1,27 @@
+import type { Client, Pool } from 'pg';
 import { Client as PgClient, Pool as PgPool } from 'pg';
-import type { PostgresBinding, PostgresBindingInput } from './types';
+
+export type PostgresBinding =
+  | { readonly kind: 'url'; readonly url: string }
+  | { readonly kind: 'pgPool'; readonly pool: Pool }
+  | { readonly kind: 'pgClient'; readonly client: Client };
+
+export type PostgresBindingInput =
+  | {
+      readonly binding: PostgresBinding;
+      readonly url?: never;
+      readonly pg?: never;
+    }
+  | {
+      readonly url: string;
+      readonly binding?: never;
+      readonly pg?: never;
+    }
+  | {
+      readonly pg: Pool | Client;
+      readonly binding?: never;
+      readonly url?: never;
+    };
 
 function validatePostgresUrl(url: string): string {
   const trimmed = url.trim();
