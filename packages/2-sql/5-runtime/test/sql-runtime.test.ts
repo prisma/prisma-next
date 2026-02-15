@@ -85,7 +85,7 @@ function createMockDriver(): SqlDriver {
 
   return {
     ...queryable,
-    connect: vi.fn().mockResolvedValue(undefined),
+    connect: vi.fn().mockImplementation(async (_binding?: void) => undefined),
     acquireConnection: vi.fn().mockResolvedValue({
       ...queryable,
       release: vi.fn().mockResolvedValue(undefined),

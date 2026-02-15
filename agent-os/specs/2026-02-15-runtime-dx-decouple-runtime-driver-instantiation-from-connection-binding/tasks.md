@@ -76,17 +76,17 @@ Groups 1–4 can be partially parallelized (1 before 2 and 3; 2 before 4). Group
 
 ### 2.1 Tests (test-first)
 
-- [ ] **Unit:** `SqlDriver` interface supports `connect(binding: TBinding)` (type-level).
-- [ ] **Unit:** Mock driver implementing `SqlDriver<PostgresBinding>` compiles and accepts binding at connect.
-- [ ] **Unit:** Driver with `TBinding = void` has no-arg or no-op connect (if needed for backward compat during migration—spec says no shims, so may be N/A).
+- [x] **Unit:** `SqlDriver` interface supports `connect(binding: TBinding)` (type-level).
+- [x] **Unit:** Mock driver implementing `SqlDriver<PostgresBinding>` compiles and accepts binding at connect.
+- [x] **Unit:** Driver with `TBinding = void` has no-arg or no-op connect (if needed for backward compat during migration—spec says no shims, so may be N/A).
 
 ### 2.2 Implementation
 
-- [ ] Update `SqlDriver` in `packages/2-sql/4-lanes/relational-core/src/ast/driver-types.ts`:
+- [x] Update `SqlDriver` in `packages/2-sql/4-lanes/relational-core/src/ast/driver-types.ts`:
   - Add `TBinding = void` type parameter.
   - Change `connect(binding: TBinding): Promise<void>`.
-- [ ] Update all implementers of `SqlDriver` to satisfy the new signature (Postgres driver comes in Group 4).
-- [ ] Run `pnpm -F @prisma-next/sql-relational-core test` and `pnpm lint:deps`.
+- [x] Update all implementers of `SqlDriver` to satisfy the new signature (Postgres driver comes in Group 4).
+- [x] Run `pnpm -F @prisma-next/sql-relational-core test` and `pnpm lint:deps`.
 
 **Acceptance criteria:** `SqlDriver<TBinding>` interface has `connect(binding)`; no Postgres-specific types in shared interface; layering preserved.
 
@@ -98,16 +98,16 @@ Groups 1–4 can be partially parallelized (1 before 2 and 3; 2 before 4). Group
 
 ### 3.1 Tests (test-first)
 
-- [ ] **Unit:** `instantiateExecutionStack(stack)` with driver descriptor calls `stack.driver.create()` with no connection args.
-- [ ] **Unit:** Returned `ExecutionStackInstance.driver` is the unbound driver from descriptor.
-- [ ] **Unit:** Stack without driver descriptor produces instance with `driver === undefined`.
-- [ ] **Unit:** `driver.create()` with no args or optional non-connection options returns unbound driver.
+- [x] **Unit:** `instantiateExecutionStack(stack)` with driver descriptor calls `stack.driver.create()` with no connection args.
+- [x] **Unit:** Returned `ExecutionStackInstance.driver` is the unbound driver from descriptor.
+- [x] **Unit:** Stack without driver descriptor produces instance with `driver === undefined`.
+- [x] **Unit:** `driver.create()` with no args or optional non-connection options returns unbound driver.
 
 ### 3.2 Implementation
 
-- [ ] Ensure `instantiateExecutionStack()` passes no connection to `stack.driver.create()` (options may include driver-specific non-connection opts like `cursor`).
-- [ ] Verify `ExecutionStackInstance` type includes `driver` and that `instantiateExecutionStack` populates it.
-- [ ] Run `pnpm -F @prisma-next/core-execution-plane test` and `pnpm lint:deps`.
+- [x] Ensure `instantiateExecutionStack()` passes no connection to `stack.driver.create()` (options may include driver-specific non-connection opts like `cursor`).
+- [x] Verify `ExecutionStackInstance` type includes `driver` and that `instantiateExecutionStack` populates it.
+- [x] Run `pnpm -F @prisma-next/core-execution-plane test` and `pnpm lint:deps`.
 
 **Acceptance criteria:** Stack instantiation is complete and env-free; driver is included when stack has driver descriptor; no connection passed to `create()`.
 

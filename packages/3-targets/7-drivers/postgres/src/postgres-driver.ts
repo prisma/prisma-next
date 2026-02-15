@@ -214,7 +214,7 @@ class PostgresPoolDriverImpl extends PostgresQueryable<PoolClient> implements Sq
     this.pool = options.connect.pool;
   }
 
-  async connect(): Promise<void> {
+  async connect(_binding?: void): Promise<void> {
     // No-op: caller controls connecting the underlying client or pool
   }
 
@@ -251,7 +251,7 @@ class PostgresDirectDriverImpl extends PostgresQueryable<Client> implements SqlD
     this.directClient = options.connect.client;
   }
 
-  async connect(): Promise<void> {
+  async connect(_binding?: void): Promise<void> {
     // No-op: caller controls connecting the underlying client or pool
   }
 
