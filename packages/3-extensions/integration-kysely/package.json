@@ -29,7 +29,8 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
-    "@prisma-next/sql-relational-core": "workspace:*"
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
@@ -41,8 +42,8 @@
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/runtime-executor": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
-    "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
