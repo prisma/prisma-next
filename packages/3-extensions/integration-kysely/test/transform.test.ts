@@ -1,6 +1,6 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import type {
   DeleteAst,
   InsertAst,
@@ -9,12 +9,9 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { Kysely, PostgresDialect } from 'kysely';
 import { describe, expect, it } from 'vitest';
-import {
-  KYSELY_TRANSFORM_ERROR_CODES,
-  KyselyTransformError,
-  transformKyselyToPnAst,
-} from '../src/transform/index.js';
-import type { Contract } from './fixtures/generated/contract.js';
+import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from '../src/transform/errors';
+import { transformKyselyToPnAst } from '../src/transform/transform';
+import type { Contract } from './fixtures/generated/contract';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
@@ -370,6 +367,32 @@ describe('transformKyselyToPnAst', () => {
       expect(insertAst.kind).toBe('insert');
       expect(insertAst.table).toEqual({ kind: 'table', name: 'user' });
       expect(Object.keys(insertAst.values)).toEqual(['id', 'email', 'createdAt']);
+    });
+
+    it('throws on multi-row INSERT values', () => {
+      const query = {
+        kind: 'InsertQueryNode',
+        into: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+        columns: [
+          { kind: 'ColumnNode', column: { kind: 'IdentifierNode', name: 'id' } },
+          { kind: 'ColumnNode', column: { kind: 'IdentifierNode', name: 'email' } },
+        ],
+        values: {
+          kind: 'ValuesNode',
+          values: [
+            { kind: 'PrimitiveValueListNode', values: ['id1', 'a@x.com'] },
+            { kind: 'PrimitiveValueListNode', values: ['id2', 'b@x.com'] },
+          ],
+        },
+      };
+      expect(() => transformKyselyToPnAst(contract, query, [])).toThrow(KyselyTransformError);
+      try {
+        transformKyselyToPnAst(contract, query, []);
+      } catch (e) {
+        expect((e as KyselyTransformError).code).toBe(
+          KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+        );
+      }
     });
 
     it('transforms insert with returning columns', () => {

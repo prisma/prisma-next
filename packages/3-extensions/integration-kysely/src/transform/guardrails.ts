@@ -1,10 +1,16 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors.js';
-import { getColumnName, getTableName, hasKind } from './kysely-ast-types.js';
+import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
+import { getColumnName, getTableName, hasKind } from './kysely-ast-types';
 
 function isMultiTableSelect(node: Record<string, unknown>): boolean {
   const joins = node['joins'];
-  return Array.isArray(joins) && joins.length > 0;
+  if (Array.isArray(joins) && joins.length > 0) return true;
+  const fromNode = node['from'];
+  if (typeof fromNode === 'object' && fromNode !== null) {
+    const froms = (fromNode as Record<string, unknown>)['froms'];
+    return Array.isArray(froms) && froms.length > 1;
+  }
+  return false;
 }
 
 function hasExplicitTableRef(node: unknown): boolean {
