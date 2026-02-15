@@ -91,20 +91,30 @@ This is especially true for **parameterized codecs**, where output types vary ba
 
 ### 4) Codec/operation type maps are type-only (do not exist at runtime)
 
-We preserve excellent lane inference (row types, operation IO types) by carrying codec/operation type maps as **type-only attachments**, sourced from:
+We preserve excellent lane inference (row types, operation IO types) by carrying codec/operation type maps as a **separate type export** (not part of `Contract`), sourced from:
 
 - TS authoring (no-emit): target/extension pack type exports (inferred from `.target()` and `.extensionPacks()`)
 - JSON + `contract.d.ts`: emitted `CodecTypes` / `OperationTypes` types
 
-But we **do not** represent these as runtime properties on `contract.mappings`.
+But we **do not** represent these as runtime properties on `contract.mappings`, and we do **not** attach them to `Contract` as an “extract-from-contract” typing trick.
 
 Implementation sketch (conceptual):
 
-- Update the SQL contract type surface to carry codec/op type maps via a **phantom** channel (e.g. `unique symbol` keyed), so generic code can still do:
-  - `ExtractCodecTypes<TContract>`
-  - `ExtractOperationTypes<TContract>`
+- `contract.d.ts` exports:
+  - `Contract`: the contract structure (definition-only runtime shape)
+  - `TypeMaps`: a separate type containing the maps needed for lane typing
+- Lanes and schema builders are parameterized by `(Contract, TypeMaps)` rather than extracting codec/op types from `Contract`.
 - Update lanes to stop reading `contract.mappings.codecTypes` / `contract.mappings.operationTypes` as runtime values.
 - Runtime execution continues to use `ExecutionContext.codecs` and `ExecutionContext.operations` (registries assembled from descriptors).
+
+`TypeMaps` shape (locked):
+
+```ts
+export type TypeMaps = {
+  readonly codecTypes: CodecTypes
+  readonly operationTypes: OperationTypes
+}
+```
 
 #### TS authoring ergonomics: infer codec types from packs
 
@@ -125,6 +135,18 @@ Instead, the builder should infer and accumulate the necessary type maps from:
 
 This keeps a single point of configuration while still providing deterministic typing (including parameterized codecs).
 
+##### No-emit convenience inference: `ContractWithTypeMaps`
+
+For no-emit ergonomics (so convenience helpers like `postgres()` don’t require explicit type parameters), TS authoring can return a composite type:
+
+```ts
+export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
+  readonly [TYPE_MAPS]?: TTypeMaps
+}
+```
+
+This is a phantom type parameter used for inference only. It must not introduce runtime “pretend keys”, and it does not make `TypeMaps` part of the `Contract` structure.
+
 ### 5) Workflow unification
 
 #### TS authoring (no-emit)
@@ -144,7 +166,7 @@ This keeps a single point of configuration while still providing deterministic t
 Critical invariant:
 
 - The returned runtime object must structurally match `TContract` for all **runtime-real** keys (including runtime-real `mappings`).
-- Codec/operation type maps are provided by the TypeScript type parameter (from `contract.d.ts`) via the type-only channel, not via runtime properties.
+- Codec/operation type maps are provided separately via `TypeMaps` (from `contract.d.ts`), not via runtime properties and not via extraction from `Contract`.
 
 ### 6) Demo visualization
 
