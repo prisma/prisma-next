@@ -38,6 +38,21 @@ The acceptance-scope for supported SQL features is defined by the demo app: we w
    - Add Kysely equivalents for the demo queries in `examples/prisma-next-demo/src/kysely`.
    - The Kysely versions should be executable with the demo runtime and validate that plugins can inspect AST/refs.
 
+8. **AST-based lint plugin (prove plugin inspection concept)**
+   - Reimplement the lint plugin to use `plan.ast` and `plan.meta` for structural analysis (not SQL string parsing).
+   - Use this to prove that:
+     - Kysely-authored plans are fully compatible with Prisma Next runtime plugin analysis, and
+     - Kysely-authored plans lower through PN SQL lowering the same way as DSL/ORM plans.
+   - Minimum lint rules to validate the concept:
+     - detect **DELETE without WHERE**
+     - detect **UPDATE without WHERE**
+     - detect **unbounded SELECT** (missing LIMIT) where detectable via `SelectAst.limit`
+     - preserve **SELECT \*** signal when query was authored as “select all columns” (even if normalized/expanded)
+
+9. **Migrate lint plugin into SQL domain**
+   - Move the lint plugin implementation out of `packages/1-framework/4-runtime-executor` into a SQL-owned package/location.
+   - Export it from the SQL runtime surface so consumers don’t need to import SQL-aware plugins from the framework domain.
+
 ### Non-functional requirements
 
 - **Deterministic**: transformation output should be stable for identical inputs.
@@ -46,6 +61,5 @@ The acceptance-scope for supported SQL features is defined by the demo app: we w
 
 ### Out of scope (for this spec)
 
-- Moving `packages/1-framework/4-runtime-executor/src/plugins/lints.ts` into the SQL domain (noted as existing layering violation).
-- Implementing a full production-grade lint ruleset (the current lint plugin is a POC).
+- Implementing a full production-grade lint ruleset beyond the minimum rules required to prove AST-based inspection.
 

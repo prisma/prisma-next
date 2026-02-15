@@ -62,6 +62,13 @@ Today’s POC plugins show intended consumption patterns:
 
 > Note: you mentioned `lints.ts` living in framework is a known early mistake; it should move into the SQL domain. This doc is describing the current as-is state for reference.
 
+### 3.1 Proof-of-concept target (this spec)
+
+As part of this spec, we will replace the current behavior with an **AST-first lint plugin** that lints `plan.ast` for SQL plans (including Kysely-authored plans once they attach PN AST). This is the “proof” that:
+
+- runtime plugins can be lane-agnostic and operate on PN AST
+- Kysely lane output is compatible with Prisma Next runtime plugin analysis and PN SQL lowering
+
 ## 4) PN SQL AST (current) and robustness gaps
 
 The current PN SQL AST lives under `packages/2-sql/4-lanes/relational-core/src/ast/types.ts` and is intentionally minimal.
@@ -91,6 +98,8 @@ Given the demo scope and Kysely compilation output (see below), the PN AST must 
 - `like` and `in` (and likely `notIn`, `ilike`, etc. depending on demo queries)
 - richer join `on` expressions (or reuse `WhereExpr`/`Expression` patterns)
 - representing lists (`IN (...)`) without leaking authoring-library node shapes
+
+Additionally, to support meaningful lints (e.g. “DELETE without WHERE”), the SQL AST must be able to represent the **absence** of a WHERE clause for mutations (today `DeleteAst.where` / `UpdateAst.where` are required).
 
 ## 5) Kysely AST nodes encountered (local compilation)
 

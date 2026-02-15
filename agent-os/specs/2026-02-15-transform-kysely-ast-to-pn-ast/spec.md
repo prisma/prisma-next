@@ -11,6 +11,8 @@ This spec adds a **Kysely → PN SQL AST transformer** that converts Kysely’s 
 
 Acceptance scope is defined by the demo app: recreate all query examples under `examples/prisma-next-demo/src/queries` as Kysely equivalents under `examples/prisma-next-demo/src/kysely`.
 
+To prove the end-to-end concept, this spec also reimplements the lint plugin to actually lint based on `plan.ast` and migrates that plugin into a SQL-owned location (so SQL-aware plugins aren’t sourced from the framework domain).
+
 ## Background
 
 ### Current plan model and plugin surfaces
@@ -45,12 +47,13 @@ We explicitly do not want plugins to depend on Kysely node shapes or semantics. 
   - `paramDescriptors` sufficient for runtime encoding and plugin inspection
 - Expand PN SQL AST (lane-neutral) to represent constructs required by demo scope.
 - Enforce robustness: unsupported constructs throw (forcing function).
+- Reimplement linting as an AST-first plugin and use it to prove Kysely lane compatibility with Prisma Next plugin analysis and PN SQL lowering.
+- Migrate the lint plugin into a SQL-owned location and export it from a SQL surface.
 
 ## Non-goals
 
 - Encoding Kysely-specific node kinds into PN SQL AST.
-- Implementing or finalizing a production lint ruleset.
-- Moving the POC lint plugin out of framework (known layering violation, separate work).
+- Implementing or finalizing a production lint ruleset beyond what’s needed to prove AST-based inspection.
 
 ## Design
 
@@ -173,6 +176,22 @@ These expansions require updating:
 - SQL lowering in adapters (e.g. Postgres adapter) to handle new node kinds/operators
 - existing lane builders/tests if they share types (they will)
 
+### 4.1 AST needs to represent “missing WHERE” for mutations
+
+To support a meaningful lint like “DELETE without WHERE” or “UPDATE without WHERE”, the PN SQL AST must be able to represent that absence.
+
+Today:
+
+- `DeleteAst.where` is required
+- `UpdateAst.where` is required
+
+Change (lane-neutral, enables linting + Kysely parity):
+
+- make `DeleteAst.where?: WhereExpr`
+- make `UpdateAst.where?: WhereExpr`
+
+DSL/ORM builders can continue to enforce “WHERE required” at the builder layer, but the AST must allow representing “no where clause” when authoring surfaces (or raw queries) permit it.
+
 ### 5) Compatibility surface (observed Kysely node kinds)
 
 From local compilation of representative Kysely queries, the following Kysely node kinds appear:
@@ -210,6 +229,37 @@ Add Kysely equivalents for demo queries under `examples/prisma-next-demo/src/kys
 - plans built via Kysely carry `plan.ast` and `plan.meta.refs/paramDescriptors/projectionTypes`
 - plugins (budgets, future lints) can operate based on AST/refs rather than raw SQL parsing
 
+Additionally, include one or more “guardrail proving” queries in the Kysely demo set that intentionally violate lints (e.g. DELETE without WHERE) to verify AST-based plugin enforcement blocks execution.
+
+## Lint plugin: AST-first inspection + migration
+
+### Why
+
+The current POC lint plugin (`packages/1-framework/4-runtime-executor/src/plugins/lints.ts`) only lints when `plan.ast` is missing (it returns early when AST exists) and relies on raw SQL heuristics. That does not validate the intended architecture.
+
+### Desired behavior
+
+Implement an AST-first lints plugin that:
+
+- if `plan.ast` is a SQL `QueryAst`, performs structural linting on the AST
+- if `plan.ast` is missing, may optionally fall back to raw guardrails (heuristic), but AST-bearing plans are the primary target
+
+Minimum lint rules (to prove the concept):
+
+- **DELETE without WHERE**: block execution when `ast.kind === 'delete'` and `ast.where` is missing
+- **UPDATE without WHERE**: block execution when `ast.kind === 'update'` and `ast.where` is missing
+- **Unbounded SELECT**: warn/error when `ast.kind === 'select'` and `ast.limit` is missing (severity configurable)
+- **SELECT \***: warn/error when query intent was “select all columns”
+  - if we normalize `.selectAll()` by expanding to explicit columns, preserve a signal for “selectAll intent” via AST or `meta.annotations`
+
+### Migration target
+
+Move the lint plugin into a SQL-owned location, proposed:
+
+- `packages/2-sql/5-runtime/src/plugins/lints.ts` (and export from `packages/2-sql/5-runtime/src/exports/index.ts`)
+
+This keeps SQL-aware plugin logic in the SQL domain while still using the family-agnostic plugin interface from `@prisma-next/runtime-executor`.
+
 ## Testing plan
 
 - **Unit tests (SQL domain)**:
@@ -218,8 +268,13 @@ Add Kysely equivalents for demo queries under `examples/prisma-next-demo/src/kys
   - `meta.refs` is resolved and validated against a fixture contract
   - `meta.projectionTypes` and `annotations.codecs` are present and correct for selectAll/returningAll
   - unsupported node kinds throw with stable error shape
+  - AST-first lint plugin:
+    - blocks delete/update without where
+    - flags missing select limit
+    - flags selectAll intent
 - **Integration**:
   - extend `test/integration/test/kysely.test.ts` to assert `plan.ast` presence (by instrumenting the Kysely dialect/connection) and ensure plugins can observe AST-bearing plans
+  - run Kysely integration tests with AST-first lints plugin enabled and assert expected failures for unsafe queries
 - **Demo**:
   - add/execute Kysely equivalents under `examples/prisma-next-demo/src/kysely`
 
