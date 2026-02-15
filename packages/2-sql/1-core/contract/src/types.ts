@@ -170,6 +170,23 @@ export type SqlContract<
   readonly execution?: ExecutionSection;
 };
 
+/**
+ * Extracts TypeMaps from a contract for lane typing.
+ * Handles: phantom typeMaps (no-emit), legacy phantom keys (codecTypes/operationTypes), or never (emitted requires explicit TypeMaps).
+ */
+export type ExtractTypeMapsFromContract<T> = T extends {
+  readonly '__@prisma-next/sql-contract/typeMaps@__'?: infer TM;
+}
+  ? TM
+  : T extends { readonly [K in SqlCodecTypesKey]: infer C }
+    ? T extends { readonly [K in SqlOperationTypesKey]: infer O }
+      ? TypeMaps<
+          C extends Record<string, { output: unknown }> ? C : Record<string, never>,
+          O extends Record<string, unknown> ? O : Record<string, never>
+        >
+      : never
+    : never;
+
 export type ExtractCodecTypes<T> = T extends {
   readonly '__@prisma-next/sql-contract/typeMaps@__'?: infer TM;
 }

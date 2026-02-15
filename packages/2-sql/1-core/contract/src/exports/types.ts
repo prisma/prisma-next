@@ -3,6 +3,7 @@ export type {
   ContractWithTypeMaps,
   ExtractCodecTypes,
   ExtractOperationTypes,
+  ExtractTypeMapsFromContract,
   ForeignKey,
   ForeignKeyReferences,
   Index,
