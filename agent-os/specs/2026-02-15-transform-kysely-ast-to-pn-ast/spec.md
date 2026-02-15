@@ -265,3 +265,12 @@ Add Kysely equivalents for demo queries under `examples/prisma-next-demo/src/kys
 - Update architecture docs and package READMEs when shared types change (`ParamDescriptor.source`, optional `DeleteAst.where` / `UpdateAst.where`).
 - Document the lint plugin migration in SQL runtime README and any “plugins” or “guardrails” documentation.
 - Update Query Lanes and Runtime & Plugin Framework subsystem docs to mention Kysely lane and AST-first lints.
+
+## Consolidated scope notes
+
+This section consolidates the previous local `README.md` notes for this spec folder:
+
+- Problem framing: Kysely lane plans originally lacked PN-native `plan.ast`, preventing lane-agnostic plugin inspection.
+- Guardrail: PN AST remains Prisma Next-native (no Kysely-shaped nodes in PN AST).
+- Scope forcing function: unsupported Kysely node kinds throw instead of silently degrading behavior.
+- Acceptance focus: demo parity under `examples/prisma-next-demo/src/kysely` with AST-first lint enforcement.
