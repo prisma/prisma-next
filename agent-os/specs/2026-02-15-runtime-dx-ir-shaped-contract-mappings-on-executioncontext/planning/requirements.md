@@ -1,11 +1,11 @@
-# Spec Requirements: Runtime DX: IR-shaped Contract + mappings on ExecutionContext
+# Spec Requirements: Runtime DX: definition-only Contract + separate TypeMaps
 
 ## Initial Description
 ## Summary
 
-Make `Contract` match the validated `contract.json` IR shape so it is traversable/inspectable (demo visualization), and move derived mappings to `ExecutionContext`.
+Make `Contract` a definition-only, traversable runtime shape with runtime-real mappings, and carry codec/operation typing through a separate `TypeMaps` type.
 
-This removes "pretend" runtime keys/types and keeps derived data on the context.
+This removes "pretend" runtime keys/types while preserving deterministic lane typing.
 
 ## Links
 
@@ -15,8 +15,8 @@ This removes "pretend" runtime keys/types and keeps derived data on the context.
 
 * `Contract` matches runtime object returned by `validateContract()` (exclude `_generated`).
 * Demo visualization consumes validated `Contract` directly (no ad-hoc `ContractIR` aliases).
-* Lanes read mappings from `context.mappings` (not `contract.mappings`).
-* No-emit flow computes mappings during context construction.
+* Lanes and clients use runtime registries from `ExecutionContext` and type-level `TypeMaps` for inference.
+* Emitted workflow uses explicit `Contract` + `TypeMaps`; no-emit can infer `TypeMaps` via `ContractWithTypeMaps`.
 
 ## Requirements Discussion
 

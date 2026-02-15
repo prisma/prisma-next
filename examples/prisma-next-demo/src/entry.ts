@@ -13,49 +13,19 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { Contract } from './prisma/contract.d';
 import contractJson from './prisma/contract.json' with { type: 'json' };
 
-type ContractRenderShape = {
-  readonly models: Record<
-    string,
-    {
-      readonly storage: { readonly table: string };
-      readonly fields: Record<string, { readonly column?: string }>;
-    }
-  >;
-  readonly storage: {
-    readonly tables: Record<
-      string,
-      {
-        readonly columns: Record<
-          string,
-          { readonly nativeType: string; readonly nullable?: boolean }
-        >;
-        readonly primaryKey?: { readonly columns: readonly string[] };
-        readonly foreignKeys?: ReadonlyArray<{
-          readonly columns: readonly string[];
-          readonly references: { readonly table: string; readonly columns: readonly string[] };
-        }>;
-      }
-    >;
-  };
-  readonly relations: Record<
-    string,
-    Record<string, { readonly cardinality: string; readonly to: string; readonly on: object }>
-  >;
-  readonly capabilities: Record<string, Record<string, boolean>>;
-  readonly extensionPacks: Record<string, unknown>;
-  readonly target: string;
-  readonly storageHash: string;
-};
+type RelationView = { readonly cardinality: string; readonly to: string };
 
-function renderContract(c: ContractRenderShape): string {
+function renderContract(c: Contract): string {
+  const relationsByTable = c.relations as Record<string, Record<string, RelationView>>;
   const models = Object.entries(c.models)
     .map(([name, model]) => {
       const tableName = model.storage.table;
-      const tableRelations = c.relations[tableName] ?? {};
+      const tableRelations = relationsByTable[tableName] ?? {};
+      const fieldToColumn = c.mappings.fieldToColumn?.[tableName] ?? {};
 
-      const fields = Object.entries(model.fields)
-        .map(([fieldName, field]) => {
-          const col = (field as { column?: string }).column ?? fieldName;
+      const fields = Object.keys(model.fields)
+        .map((fieldName) => {
+          const col = fieldToColumn[fieldName] ?? fieldName;
           return `
             <div class="column">
               <span class="col-name">${fieldName}</span>
@@ -168,7 +138,7 @@ function renderContract(c: ContractRenderShape): string {
 }
 
 function renderFromContractJson(json: unknown): void {
-  const c = validateContract<Contract>(json) as unknown as ContractRenderShape;
+  const c = validateContract<Contract>(json);
   if (app) app.innerHTML = renderContract(c);
 }
 

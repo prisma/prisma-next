@@ -140,14 +140,15 @@ export type OperationTypesOf<T> = T extends { readonly operationTypes: infer O }
     : Record<string, never>
   : Record<string, never>;
 
-export type TypeMapsPhantomKey = '__@prisma-next/sql-contract/typeMaps@__';
+declare const TYPE_MAPS: unique symbol;
+export type TypeMapsPhantomKey = typeof TYPE_MAPS;
 
 /**
  * Phantom type for no-emit: carries TypeMaps for inference without runtime keys.
  * Must not introduce runtime properties.
  */
 export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
-  readonly '__@prisma-next/sql-contract/typeMaps@__'?: TTypeMaps;
+  readonly [TYPE_MAPS]?: TTypeMaps;
 };
 
 export type SqlCodecTypesKey = '__@prisma-next/sql-contract/codecTypes@__';
@@ -175,7 +176,7 @@ export type SqlContract<
  * Handles: phantom typeMaps (no-emit), legacy phantom keys (codecTypes/operationTypes), or never (emitted requires explicit TypeMaps).
  */
 export type ExtractTypeMapsFromContract<T> = T extends {
-  readonly '__@prisma-next/sql-contract/typeMaps@__'?: infer TM;
+  readonly [K in TypeMapsPhantomKey]?: infer TM;
 }
   ? TM
   : T extends { readonly [K in SqlCodecTypesKey]: infer C }
@@ -187,18 +188,21 @@ export type ExtractTypeMapsFromContract<T> = T extends {
       : never
     : never;
 
-export type ExtractCodecTypes<T> = T extends {
-  readonly '__@prisma-next/sql-contract/typeMaps@__'?: infer TM;
-}
-  ? CodecTypesOf<TM>
-  : T extends { readonly [K in SqlCodecTypesKey]: infer C }
-    ? C
-    : Record<string, never>;
+export type ResolvedTypeMaps<TContract, TTypeMaps = ExtractTypeMapsFromContract<TContract>> = [
+  TTypeMaps,
+] extends [never]
+  ? ExtractTypeMapsFromContract<TContract>
+  : TTypeMaps;
 
-export type ExtractOperationTypes<T> = T extends {
-  readonly '__@prisma-next/sql-contract/typeMaps@__'?: infer TM;
-}
-  ? OperationTypesOf<TM>
-  : T extends { readonly [K in SqlOperationTypesKey]: infer O }
-    ? O
-    : Record<string, never>;
+export type ResolvedCodecTypes<
+  TContract,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
+> = CodecTypesOf<ResolvedTypeMaps<TContract, TTypeMaps>>;
+
+export type ResolvedOperationTypes<
+  TContract,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
+> = OperationTypesOf<ResolvedTypeMaps<TContract, TTypeMaps>>;
+
+export type ExtractCodecTypes<T> = ResolvedCodecTypes<T, never>;
+export type ExtractOperationTypes<T> = ResolvedOperationTypes<T, never>;
