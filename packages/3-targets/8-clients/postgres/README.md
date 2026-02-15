@@ -20,6 +20,11 @@ One-liner lazy Postgres client for Prisma Next runtime composition.
 
 Runtime and connection resources are deferred until `db.runtime()` is called.
 
+When URL binding is used, pool timeouts are configurable via `poolOptions`:
+
+- `poolOptions.connectionTimeoutMillis` (default `20_000`)
+- `poolOptions.idleTimeoutMillis` (default `30_000`)
+
 ## Responsibilities
 
 - Build a static Postgres execution stack from target, adapter, and driver descriptors

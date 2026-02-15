@@ -64,11 +64,13 @@ pnpm start:no-emit -- users
 
 ```mermaid
 flowchart LR
-  Contract[contract.json + contract.d.ts] --> Db[postgres(...)]
-  Db --> Static[sql schema orm context stack]
+  Contract[Contract artifacts] --> Db[postgres(...)]
+  Db --> Static[Static roots]
   Db --> Lazy[runtime()]
   Lazy --> Runtime[Runtime]
 ```
+
+Contract artifacts are `contract.json` and `contract.d.ts`. Static roots are `sql`, `schema`, `orm`, `context`, and `stack`.
 
 ## Related Docs
 

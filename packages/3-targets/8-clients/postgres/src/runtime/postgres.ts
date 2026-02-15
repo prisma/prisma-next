@@ -69,6 +69,10 @@ export interface PostgresOptionsBase<TContract extends SqlContract<SqlStorage>> 
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
   readonly plugins?: readonly Plugin<TContract>[];
   readonly verify?: RuntimeVerifyOptions;
+  readonly poolOptions?: {
+    readonly connectionTimeoutMillis?: number;
+    readonly idleTimeoutMillis?: number;
+  };
 }
 
 export type PostgresOptionsWithContract<TContract extends SqlContract<SqlStorage>> =
@@ -157,8 +161,8 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
           ? {
               pool: new Pool({
                 connectionString: binding.url,
-                connectionTimeoutMillis: 20_000,
-                idleTimeoutMillis: 30_000,
+                connectionTimeoutMillis: options.poolOptions?.connectionTimeoutMillis ?? 20_000,
+                idleTimeoutMillis: options.poolOptions?.idleTimeoutMillis ?? 30_000,
               }),
             }
           : binding.kind === 'pgPool'

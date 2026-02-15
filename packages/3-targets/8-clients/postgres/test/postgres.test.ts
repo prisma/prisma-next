@@ -205,6 +205,26 @@ describe('postgres', () => {
     });
   });
 
+  it('allows overriding url pool timeout options', () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+      poolOptions: {
+        connectionTimeoutMillis: 5_000,
+        idleTimeoutMillis: 45_000,
+      },
+    });
+
+    db.runtime();
+
+    expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
+    expect(mocks.poolCtor).toHaveBeenCalledWith({
+      connectionString: 'postgres://localhost:5432/db',
+      connectionTimeoutMillis: 5_000,
+      idleTimeoutMillis: 45_000,
+    });
+  });
+
   it('accepts postgresql url scheme', () => {
     postgres({
       contract,
