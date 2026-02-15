@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsdown",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output",
-    "emit": "pnpm exec prisma-next contract emit --config test/fixtures/prisma-next.config.ts",
+    "preemit": "pnpm --filter @prisma-next/cli build",
+    "emit": "node ../../1-framework/3-tooling/cli/dist/cli.js contract emit --config test/fixtures/prisma-next.config.ts",
     "emit:check": "pnpm emit && git diff --exit-code test/fixtures/generated/",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
