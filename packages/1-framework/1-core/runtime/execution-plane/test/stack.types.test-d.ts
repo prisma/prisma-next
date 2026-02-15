@@ -40,13 +40,13 @@ test('ExecutionStackInstance.driver type includes driver instance when stack has
   const instanceWithDriver = instantiateExecutionStack(stackWithDriver);
 
   expectTypeOf(instanceWithDriver).toHaveProperty('driver');
-  expectTypeOf(instanceWithDriver.driver).toMatchTypeOf<MockDriverInstance | undefined>();
+  expectTypeOf(instanceWithDriver.driver).toExtend<MockDriverInstance | undefined>();
 
   const instanceDriver = instanceWithDriver.driver;
   if (instanceDriver === undefined) {
     throw new Error('driver should exist when stack has driver descriptor');
   }
-  expectTypeOf(instanceDriver).toMatchTypeOf<MockDriverInstance>();
+  expectTypeOf(instanceDriver).toExtend<MockDriverInstance>();
 });
 
 test('ExecutionStackInstance has driver property when stack has no driver descriptor', () => {

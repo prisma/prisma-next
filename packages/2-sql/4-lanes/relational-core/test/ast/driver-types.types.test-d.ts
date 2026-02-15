@@ -14,7 +14,7 @@ test('SqlDriver interface supports connect(binding: TBinding)', () => {
 
 test('SqlDriver default TBinding is void', () => {
   expectTypeOf<SqlDriver>().toHaveProperty('connect');
-  expectTypeOf<SqlDriver>().toMatchTypeOf<SqlDriver<void>>();
+  expectTypeOf<SqlDriver>().toExtend<SqlDriver<void>>();
 });
 
 test('mock driver implementing SqlDriver<TestBinding> compiles and accepts binding at connect', () => {

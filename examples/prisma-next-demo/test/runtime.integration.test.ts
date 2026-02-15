@@ -25,8 +25,13 @@ async function createTestDriver(connectionString: string) {
   }
   const pool = new Pool({ connectionString });
   const driver = driverDescriptor.create({ cursor: { disabled: true } });
-  await driver.connect({ kind: 'pgPool', pool });
-  return driver;
+  try {
+    await driver.connect({ kind: 'pgPool', pool });
+    return driver;
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
 }
 
 async function getRuntime(

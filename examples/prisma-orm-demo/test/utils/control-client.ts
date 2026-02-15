@@ -90,7 +90,12 @@ export async function createTestRuntime<TContract extends SqlContract<SqlStorage
   }
   const pool = new Pool({ connectionString });
   const driver = driverDescriptor.create({ cursor: { disabled: true } });
-  await driver.connect({ kind: 'pgPool', pool });
+  try {
+    await driver.connect({ kind: 'pgPool', pool });
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
   const runtime = createRuntime({
     stackInstance,
     context,
