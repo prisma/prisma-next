@@ -56,6 +56,19 @@ The transformer (`src/transform/`) converts Kysely AST nodes to PN SQL AST:
 
 All refs are validated against the contract. Unsupported node kinds throw `KyselyTransformError` with stable codes.
 
+The transformer also throws defensively if ambiguous or invalid shapes slip through (e.g. when invoked without guardrails): unqualified column refs in multi-table scope, ambiguous `selectAll` in multi-table scope, and unsupported node kinds.
+
+## Guardrails
+
+Pre-transform guardrails (`runGuardrails`) run before the transformer in the Kysely lane execution path:
+
+| Rule | Condition | Error |
+|------|-----------|-------|
+| Qualified refs | Multi-table scope (joins) with unqualified column ref | `UNQUALIFIED_REF_IN_MULTI_TABLE` |
+| Ambiguous selectAll | Multi-table scope with `selectAll()` / `select *` without table qualification | `AMBIGUOUS_SELECT_ALL` |
+
+Only `SelectQueryNode` with joins is validated; INSERT/UPDATE/DELETE are single-table.
+
 ## Dependencies
 
 - `@prisma-next/contract` — Plan types, ParamDescriptor, PlanRefs

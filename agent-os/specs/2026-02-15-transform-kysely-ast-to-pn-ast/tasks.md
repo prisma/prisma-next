@@ -163,15 +163,15 @@ Ensure Kysely lane rejects ambiguous queries before transformation.
 
 ### 4.1 Pre-transform guardrails
 
-- [ ] Implement qualified-ref check: in multi-table scope, reject unqualified column references
-- [ ] Implement ambiguous selectAll check: reject `selectAll()` / `select *` in multi-table scope unless unambiguously scoped
-- [ ] Integrate guardrails into Kysely lane execution path (before calling transformer)
-- [ ] Add unit tests for each guardrail (reject expected queries)
+- [x] Implement qualified-ref check: in multi-table scope, reject unqualified column references
+- [x] Implement ambiguous selectAll check: reject `selectAll()` / `select *` in multi-table scope unless unambiguously scoped
+- [x] Integrate guardrails into Kysely lane execution path (before calling transformer)
+- [x] Add unit tests for each guardrail (reject expected queries)
 
 ### 4.2 Transformer fallback
 
-- [ ] Document that transformer throws if ambiguity slips through (defensive)
-- [ ] Add test: transformer throws on ambiguous/invalid node shapes
+- [x] Document that transformer throws if ambiguity slips through (defensive)
+- [x] Add test: transformer throws on ambiguous/invalid node shapes
 
 **Phase 4 acceptance criteria**:
 
