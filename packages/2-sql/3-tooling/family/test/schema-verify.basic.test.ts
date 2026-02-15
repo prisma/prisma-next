@@ -66,10 +66,7 @@ describe('verifySqlSchema - basic', () => {
         },
         models: {},
         relations: {},
-        mappings: {
-          codecTypes: {},
-          operationTypes: {},
-        },
+        mappings: {},
         capabilities: {},
         extensionPacks: {},
         meta: {},
@@ -127,10 +124,7 @@ describe('verifySqlSchema - basic', () => {
         },
         models: {},
         relations: {},
-        mappings: {
-          codecTypes: {},
-          operationTypes: {},
-        },
+        mappings: {},
         capabilities: {},
         extensionPacks: {},
         meta: {},

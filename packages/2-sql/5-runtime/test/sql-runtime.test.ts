@@ -34,10 +34,7 @@ const testContract: SqlContract<SqlStorage> = {
   capabilities: {},
   meta: {},
   sources: {},
-  mappings: {
-    codecTypes: {},
-    operationTypes: {},
-  },
+  mappings: {},
 };
 
 interface DriverExecuteSpies {
