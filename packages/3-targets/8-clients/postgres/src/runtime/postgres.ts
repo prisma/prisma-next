@@ -1,6 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import type { PostgresDriverCreateOptions } from '@prisma-next/driver-postgres/runtime';
 import type {
   ExtractCodecTypes,
   ExtractOperationTypes,
@@ -32,7 +33,6 @@ import {
   createSqlExecutionStack,
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import { Pool } from 'pg';
 import { type PostgresBindingInput, resolvePostgresBinding } from './binding';
 
 type NormalizeOperationTypes<T> = {
@@ -62,17 +62,14 @@ export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
   readonly orm: OrmRegistry<TContract, ExtractCodecTypes<TContract>>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
-  runtime(): Runtime;
+  runtime(): Promise<Runtime>;
 }
 
 export interface PostgresOptionsBase<TContract extends SqlContract<SqlStorage>> {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
   readonly plugins?: readonly Plugin<TContract>[];
   readonly verify?: RuntimeVerifyOptions;
-  readonly poolOptions?: {
-    readonly connectionTimeoutMillis?: number;
-    readonly idleTimeoutMillis?: number;
-  };
+  readonly cursor?: PostgresDriverCreateOptions['cursor'];
 }
 
 export type PostgresOptionsWithContract<TContract extends SqlContract<SqlStorage>> =
@@ -124,7 +121,15 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    driver: postgresDriver,
+    driver:
+      options.cursor === undefined
+        ? postgresDriver
+        : {
+            ...postgresDriver,
+            create() {
+              return postgresDriver.create({ cursor: options.cursor });
+            },
+          },
     extensionPacks: options.extensions ?? [],
   });
 
@@ -145,34 +150,18 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     orm,
     context,
     stack,
-    runtime() {
+    async runtime() {
       if (runtimeInstance) {
         return runtimeInstance;
       }
 
       const stackInstance = instantiateExecutionStack(stack);
-      const driverDescriptor = stack.driver;
-      if (!driverDescriptor) {
-        throw new Error('Driver descriptor missing from execution stack');
+      const driver = stackInstance.driver;
+      if (driver === undefined) {
+        throw new Error('Relational runtime requires a driver descriptor on the execution stack');
       }
 
-      const connect =
-        binding.kind === 'url'
-          ? {
-              pool: new Pool({
-                connectionString: binding.url,
-                connectionTimeoutMillis: options.poolOptions?.connectionTimeoutMillis ?? 20_000,
-                idleTimeoutMillis: options.poolOptions?.idleTimeoutMillis ?? 30_000,
-              }),
-            }
-          : binding.kind === 'pgPool'
-            ? { pool: binding.pool }
-            : { client: binding.client };
-
-      const driver = driverDescriptor.create({
-        connect,
-        cursor: { disabled: true },
-      });
+      await driver.connect(binding);
 
       runtimeInstance = createRuntime({
         stackInstance,

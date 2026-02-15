@@ -21,7 +21,7 @@ import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { db } from '../src/prisma/db';
 
 async function main() {
-  const runtime = db.runtime();
+  const runtime = await db.runtime();
 
   try {
     const tables = db.schema.tables;

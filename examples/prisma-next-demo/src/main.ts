@@ -55,7 +55,7 @@ const [cmd, ...args] = argv;
 
 async function main() {
   loadAppConfig();
-  const runtime = db.runtime();
+  const runtime = await db.runtime();
   try {
     if (cmd === 'users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;

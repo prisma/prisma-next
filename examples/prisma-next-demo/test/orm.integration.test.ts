@@ -14,20 +14,23 @@ const { contract } = context;
 const executionStack = db.stack;
 const executionStackInstance = instantiateExecutionStack(executionStack);
 
-function createTestDriver(connectionString: string) {
+async function createTestDriver(connectionString: string) {
   const driverDescriptor = executionStack.driver;
   if (!driverDescriptor) {
     throw new Error('Driver descriptor missing from execution stack');
   }
   const pool = new Pool({ connectionString });
-  return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+  const driver = driverDescriptor.create({ cursor: { disabled: true } });
+  await driver.connect({ kind: 'pgPool', pool });
+  return driver;
 }
 
-function getRuntime(connectionString: string): Runtime {
+async function getRuntime(connectionString: string): Promise<Runtime> {
+  const driver = await createTestDriver(connectionString);
   return createRuntime({
     stackInstance: executionStackInstance,
     context,
-    driver: createTestDriver(connectionString),
+    driver,
     verify: { mode: 'onFirstUse', requireMarker: false },
     plugins: [
       budgets({
@@ -113,7 +116,7 @@ describe('ORM integration tests', () => {
         // Initialize schema using control client
         await initTestDatabase({ connection: connectionString, contractIR: contract });
 
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
         try {
           // Seed data using runtime
           await seedTestData(runtime, {
@@ -143,7 +146,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await seedTestData(runtime, { users: ['alice@example.com'] });
@@ -170,7 +173,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await seedTestData(runtime, {
@@ -199,7 +202,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await seedTestData(runtime, {
@@ -233,7 +236,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           const { ormCreateUser } = await import('../src/queries/orm-writes');
@@ -256,7 +259,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await seedTestData(runtime, { users: ['alice@example.com'] });
@@ -282,7 +285,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await seedTestData(runtime, { users: ['alice@example.com'] });
@@ -304,7 +307,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);
@@ -343,7 +346,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           const emails = Array.from({ length: 10 }, (_, i) => `user${i + 1}@example.com`);

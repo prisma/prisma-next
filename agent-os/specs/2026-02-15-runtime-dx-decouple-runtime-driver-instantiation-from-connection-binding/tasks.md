@@ -147,20 +147,20 @@ Groups 1–4 can be partially parallelized (1 before 2 and 3; 2 before 4). Group
 
 ### 5.1 Tests (test-first)
 
-- [ ] **Unit:** `postgres()` `runtime()` getter calls `stackInstance.driver.connect(binding)` before `createRuntime`.
-- [ ] **Unit:** `postgres()` throws clear configuration error when stack has no driver descriptor but relational runtime is expected.
-- [ ] **Unit:** `createRuntime` receives `driver` from `stackInstance.driver` after connect.
+- [x] **Unit:** `postgres()` `runtime()` getter calls `stackInstance.driver.connect(binding)` before `createRuntime`.
+- [x] **Unit:** `postgres()` throws clear configuration error when stack has no driver descriptor but relational runtime is expected.
+- [x] **Unit:** `createRuntime` receives `driver` from `stackInstance.driver` after connect.
 
 ### 5.2 Implementation
 
-- [ ] Update `postgres()` in `packages/3-targets/8-clients/postgres/src/runtime/postgres.ts`:
+- [x] Update `postgres()` in `packages/3-targets/8-clients/postgres/src/runtime/postgres.ts`:
   - Instantiate stack via `instantiateExecutionStack(stack)` (stack instance now includes `driver`).
   - Assert `stackInstance.driver` exists; throw configuration error if missing.
   - Resolve binding from options (reuse `resolvePostgresBinding`).
   - Call `stackInstance.driver.connect(binding)` to bind.
   - Pass `driver: stackInstance.driver` to `createRuntime`.
-- [ ] Ensure `createRuntime` signature unchanged (still receives `driver: SqlDriver`).
-- [ ] Run `pnpm -F @prisma-next/postgres test` and `pnpm lint:deps`.
+- [x] Ensure `createRuntime` signature unchanged (still receives `driver: SqlDriver`).
+- [x] Run `pnpm -F @prisma-next/postgres test` and `pnpm lint:deps`.
 
 **Acceptance criteria:** New flow: instantiate stack → connect driver → create runtime; `postgres().runtime()` executes plans successfully; configuration error when driver descriptor missing.
 
