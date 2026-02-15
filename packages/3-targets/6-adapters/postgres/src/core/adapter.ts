@@ -210,17 +210,23 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   const leftExpr = expr.left as ColumnRef | OperationExpr;
   const left = renderExpr(leftExpr, contract);
   const leftRendered = isOperationExpr(leftExpr) ? `(${left})` : left;
+  const leftCol = leftExpr.kind === 'col' ? leftExpr : undefined;
 
   const rightExpr = expr.right;
   let right: string;
   if (rightExpr.kind === 'listLiteral') {
-    right = renderListLiteral(rightExpr as ListLiteralExpr, contract);
+    right = renderListLiteral(
+      rightExpr as ListLiteralExpr,
+      contract,
+      leftCol?.table,
+      leftCol?.column,
+    );
   } else if (rightExpr.kind === 'literal') {
     right = renderLiteral(rightExpr);
   } else if (rightExpr.kind === 'col') {
     right = renderColumn(rightExpr);
   } else if (rightExpr.kind === 'param') {
-    right = renderParam(rightExpr, contract);
+    right = renderParam(rightExpr, contract, leftCol?.table, leftCol?.column);
   } else if (rightExpr.kind === 'operation') {
     right = renderOperation(rightExpr, contract);
   } else {
@@ -243,9 +249,16 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   return `${leftRendered} ${operatorMap[expr.op]} ${right}`;
 }
 
-function renderListLiteral(expr: ListLiteralExpr, contract?: PostgresContract): string {
+function renderListLiteral(
+  expr: ListLiteralExpr,
+  contract?: PostgresContract,
+  tableName?: string,
+  columnName?: string,
+): string {
   const values = expr.values
-    .map((v) => (v.kind === 'param' ? renderParam(v, contract) : renderLiteral(v)))
+    .map((v) =>
+      v.kind === 'param' ? renderParam(v, contract, tableName, columnName) : renderLiteral(v),
+    )
     .join(', ');
   return `(${values})`;
 }
