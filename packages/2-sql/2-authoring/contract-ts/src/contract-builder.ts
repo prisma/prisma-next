@@ -36,6 +36,24 @@ import { computeMappings } from './contract';
  */
 type ContractBuilderMappings = SqlMappings;
 
+type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
+  ? C extends Record<string, { output: unknown }>
+    ? C
+    : Record<string, never>
+  : Record<string, never>;
+
+type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (
+  k: infer I,
+) => void
+  ? I
+  : never;
+
+type MergeExtensionCodecTypes<Packs extends Record<string, unknown>> = UnionToIntersection<
+  {
+    [K in keyof Packs]: ExtractCodecTypesFromPack<Packs[K]>;
+  }[keyof Packs]
+>;
+
 type BuildStorageTable<
   _TableName extends string,
   Columns extends Record<string, ColumnBuilderState<string, boolean, string>>,
@@ -432,10 +450,12 @@ class SqlContractBuilder<
     >;
   }
 
-  override target<T extends string>(
-    packRef: TargetPackRef<'sql', T>,
+  override target<T extends string, TPack extends TargetPackRef<string, T>>(
+    packRef: TPack,
   ): SqlContractBuilder<
-    CodecTypes,
+    ExtractCodecTypesFromPack<TPack> extends Record<string, never>
+      ? CodecTypes
+      : ExtractCodecTypesFromPack<TPack>,
     T,
     Tables,
     Models,
@@ -445,7 +465,9 @@ class SqlContractBuilder<
     Capabilities
   > {
     return new SqlContractBuilder<
-      CodecTypes,
+      ExtractCodecTypesFromPack<TPack> extends Record<string, never>
+        ? CodecTypes
+        : ExtractCodecTypesFromPack<TPack>,
       T,
       Tables,
       Models,
@@ -456,13 +478,24 @@ class SqlContractBuilder<
     >({
       ...this.state,
       target: packRef.targetId,
-    });
+    }) as SqlContractBuilder<
+      ExtractCodecTypesFromPack<TPack> extends Record<string, never>
+        ? CodecTypes
+        : ExtractCodecTypesFromPack<TPack>,
+      T,
+      Tables,
+      Models,
+      Types,
+      StorageHash,
+      ExtensionPacks,
+      Capabilities
+    >;
   }
 
-  extensionPacks(
-    packs: Record<string, ExtensionPackRef<'sql', string>>,
+  extensionPacks<const Packs extends Record<string, ExtensionPackRef<'sql', string>>>(
+    packs: Packs,
   ): SqlContractBuilder<
-    CodecTypes,
+    CodecTypes & MergeExtensionCodecTypes<Packs>,
     Target,
     Tables,
     Models,
@@ -477,7 +510,7 @@ class SqlContractBuilder<
 
     const namespaces = new Set(this.state.extensionNamespaces ?? []);
 
-    for (const packRef of Object.values(packs)) {
+    for (const packRef of Object.values(packs) as ExtensionPackRef<'sql', string>[]) {
       if (!packRef) continue;
 
       if (packRef.kind !== 'extension') {
@@ -502,7 +535,7 @@ class SqlContractBuilder<
     }
 
     return new SqlContractBuilder<
-      CodecTypes,
+      CodecTypes & MergeExtensionCodecTypes<Packs>,
       Target,
       Tables,
       Models,
