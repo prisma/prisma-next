@@ -30,22 +30,22 @@ Source:
 
 ### 2.1 Tests first: validateContract + defineContract parity
 
-- [ ] Add tests asserting `defineContract()` and `validateContract<Contract>()` produce compatible runtime-real contract shapes.
-- [ ] Add tests that `_generated` is stripped/absent from returned runtime contract values where applicable.
-- [ ] Add regression tests for visualization/traversal use-cases against returned contract values.
+- [x] Add tests asserting `defineContract()` and `validateContract<Contract>()` produce compatible runtime-real contract shapes.
+- [x] Add tests that `_generated` is stripped/absent from returned runtime contract values where applicable.
+- [x] Add regression tests for visualization/traversal use-cases against returned contract values.
 
 ### 2.2 Implement construction model (internal class + public factory)
 
-- [ ] Introduce/refactor to an internal class implementation that encapsulates:
+- [x] Introduce/refactor to an internal class implementation that encapsulates:
   - construction invariants
   - mapping computation
-- [ ] Keep public construction API factory-first (`constructContract(...)` or equivalent entrypoint).
-- [ ] Ensure consumers bind to `Contract` interface rather than class type.
+- [x] Keep public construction API factory-first (`constructContract(...)` or equivalent entrypoint).
+- [x] Ensure consumers bind to `Contract` interface rather than class type.
 
 ### 2.3 Keep contract definition-only
 
-- [ ] Confirm contract loading/validation does not require execution stack or runtime descriptor instantiation.
-- [ ] Ensure validator does not fabricate type-only maps as runtime properties.
+- [x] Confirm contract loading/validation does not require execution stack or runtime descriptor instantiation.
+- [x] Ensure validator does not fabricate type-only maps as runtime properties.
 
 ## 3) Query lanes and context integration
 
