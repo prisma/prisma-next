@@ -5,7 +5,7 @@ alwaysApply: true
 ---
 
 - Use pnpm not npm!
-- The source of truth for Node.js version is the root `package.json` `engines.node` field. Your shell should be configured to respect that (e.g. Volta, or nvm/fnm with a matching `.nvmrc`). If it is not—e.g. you see a wrong `node -v` or Node/pnpm commands fail due to version—report to the user: "Your shell is misconfigured for this repo. Use the Node version in the root package.json engines field. Configure a version manager (Volta, nvm, fnm) to respect it, or run `nvm use` / `fnm use` / equivalent in this directory before running commands." Otherwise, before running Node.js or pnpm commands you may run `nvm use` or the user's local equivalent to ensure the correct version is active.
+- Use the shell's Node.js. Do not run `nvm use`, `fnm use`, or any other version-switching command. The source of truth for the required version is the root `package.json` `engines.node` field. If the shell's `node -v` does not satisfy that or Node/pnpm commands fail due to version, report to the user: "Your shell is misconfigured for this repo. Configure your environment so that `node` resolves to a version that satisfies the root package.json engines.node (e.g. set your default Node in your version manager, or use Volta)."
 - We use turborepo to build, generally. `pnpm build` scripts are available in each package which delegate to turborepo
 - When you want to typecheck, use the local `pnpm typecheck` scripts instead of writing `tsc` commands from scratch
 - When you want to test, use the local `pnpm test` scripts. For coverage, use `pnpm test:coverage` (all packages) or `pnpm coverage:packages` (packages only, excludes examples)

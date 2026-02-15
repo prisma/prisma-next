@@ -29,7 +29,7 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 
 ## Golden Rules
 
-- **Node.js version**: Source of truth is root `package.json` `engines.node`. Your shell should respect it; if not, report misconfiguration and how to fix (version manager or `nvm use` / equivalent). Otherwise you may run `nvm use` or the user's local utility to set the version before commands.
+- **Node.js version**: Use the shell's Node. Do not run nvm/fnm or any version switcher. Source of truth is root `package.json` `engines.node`. If the shell's version is wrong or commands fail, report that the shell is misconfigured and the user should configure their environment to satisfy `engines.node`.
 - Use pnpm and local scripts (not ad‑hoc `tsc`, `jest`): `.cursor/rules/use-correct-tools.mdc`
 - Don't branch on target; use adapters: `.cursor/rules/no-target-branches.mdc`
 - Keep tests concise; omit "should": `.cursor/rules/omit-should-in-tests.mdc`
