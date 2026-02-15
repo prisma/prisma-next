@@ -69,8 +69,12 @@ withTempDir(({ createTempDir }) => {
           },
         });
 
-        // Wait for initial emit
-        const initialEmitSuccess = await waitForFileChange(contractJsonPath, null, 5000);
+        // Wait for initial emit (Vite plugin startup can be slow)
+        const initialEmitSuccess = await waitForFileChange(
+          contractJsonPath,
+          null,
+          timeouts.typeScriptCompilation,
+        );
         expect(initialEmitSuccess).toBe(true);
 
         // Read initial contract to verify it was emitted correctly
@@ -114,7 +118,11 @@ withTempDir(({ createTempDir }) => {
         server.watcher.emit('change', contractPath);
 
         // Wait for re-emit (contract.json should be updated)
-        const reEmitSuccess = await waitForFileChange(contractJsonPath, initialMtime, 5000);
+        const reEmitSuccess = await waitForFileChange(
+          contractJsonPath,
+          initialMtime,
+          timeouts.typeScriptCompilation,
+        );
         expect(reEmitSuccess).toBe(true);
 
         // Verify the new contract has the additional column
