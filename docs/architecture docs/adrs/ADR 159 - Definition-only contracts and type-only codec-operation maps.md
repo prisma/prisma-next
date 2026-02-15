@@ -28,10 +28,11 @@ sequenceDiagram
   Note over App: Runtime behavior reads registries from ExecutionContext\nCompile-time inference uses Contract type-only maps (incl parameterized codecs)
 ```
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2026-02-15  
 **Authors:** Prisma Next Team  
-**Domain:** SQL family, contract types, lanes, runtime DX
+**Domain:** SQL family, contract types, lanes, runtime DX  
+**Spec:** [agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md](../../../agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md)
 
 ## Context
 
@@ -198,4 +199,9 @@ Rationale: we want an explicit signal that these maps are for TypeScript inferen
   - use `ExecutionContext` registries for runtime execution behavior
 - Ensure `validateContract()` does not attempt to fabricate type-only maps as runtime values.
 - Ensure convenience clients and façades remain compatible with this model (validate contract first, then derive context/registries; keep typing extractable from `TContract`).
+
+## Implementation complete (2026-02-15)
+
+- Demo visualization (`examples/prisma-next-demo/src/entry.ts`) renders directly from `validateContract<Contract>(contractJson)` output. No `ContractIR` alias; the constructed Contract is used for rendering and HMR.
+- Control-client test utilities use the constructed Contract from `validateContract` for dbInit/verify operations.
 
