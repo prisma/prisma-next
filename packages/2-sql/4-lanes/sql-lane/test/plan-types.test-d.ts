@@ -37,9 +37,8 @@ test('builder without select() has unknown Row type', () => {
   if (!userTable) throw new Error('user table not found');
   const builderAfterFrom = builder.from(userTable);
 
-  // Before select(), Row type should be unknown
-  const _plan = builderAfterFrom.build();
-  expectTypeOf<ResultType<typeof _plan>>().toEqualTypeOf<unknown>();
+  type PlanType = ReturnType<typeof builderAfterFrom.build>;
+  expectTypeOf<ResultType<PlanType>>().toEqualTypeOf<unknown>();
 });
 
 test('select() with object projection infers Row type', () => {
@@ -264,14 +263,13 @@ test('builder chain preserves Row type through methods', () => {
   const _plan = builderWithSelect.build();
   type Row = ResultType<typeof _plan>;
 
-  // Methods that don't change projection should preserve Row type
-  const _planFromWhere = builderWithWhere.build();
-  const _planFromOrder = builderWithOrder.build();
-  const _planFromLimit = builderWithLimit.build();
+  type PlanFromWhere = ReturnType<typeof builderWithWhere.build>;
+  type PlanFromOrder = ReturnType<typeof builderWithOrder.build>;
+  type PlanFromLimit = ReturnType<typeof builderWithLimit.build>;
 
-  expectTypeOf<ResultType<typeof _planFromWhere>>().toEqualTypeOf<Row>();
-  expectTypeOf<ResultType<typeof _planFromOrder>>().toEqualTypeOf<Row>();
-  expectTypeOf<ResultType<typeof _planFromLimit>>().toEqualTypeOf<Row>();
+  expectTypeOf<ResultType<PlanFromWhere>>().toEqualTypeOf<Row>();
+  expectTypeOf<ResultType<PlanFromOrder>>().toEqualTypeOf<Row>();
+  expectTypeOf<ResultType<PlanFromLimit>>().toEqualTypeOf<Row>();
 });
 
 test('wrong Row type assignments fail type check', () => {
