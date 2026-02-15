@@ -1,3 +1,5 @@
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
 import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import type {
   DeleteAst,
@@ -5,6 +7,7 @@ import type {
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { Kysely, PostgresDialect } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import {
   KYSELY_TRANSFORM_ERROR_CODES,
@@ -15,6 +18,16 @@ import type { Contract } from './fixtures/generated/contract.js';
 import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
 
 const contract = validateContract<Contract>(contractJson);
+const adapter = createPostgresAdapter();
+const postgresContract = contract as unknown as PostgresContract;
+
+interface TestDb {
+  user: {
+    id: string;
+    email: string;
+    createdAt: string;
+  };
+}
 
 function selectQueryFixture(overrides: Record<string, unknown> = {}) {
   return {
@@ -55,6 +68,10 @@ function binaryWhere(_id: string, value: unknown) {
       right: { kind: 'ValueNode', value },
     },
   };
+}
+
+function normalizeSql(sql: string): string {
+  return sql.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 describe('transformKyselyToPnAst', () => {
@@ -593,6 +610,35 @@ describe('transformKyselyToPnAst', () => {
         );
       }
     });
+
+    it('throws on non-string operator payload', () => {
+      const query = selectQueryFixture({
+        where: {
+          kind: 'WhereNode',
+          node: {
+            kind: 'BinaryOperationNode',
+            left: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'id' },
+                table: { kind: 'IdentifierNode', name: 'user' },
+              },
+            },
+            operator: { kind: 'OperatorNode', operator: { value: '=' } },
+            right: { kind: 'ValueNode', value: 'x' },
+          },
+        },
+      });
+      expect(() => transformKyselyToPnAst(contract, query, ['x'])).toThrow(KyselyTransformError);
+      try {
+        transformKyselyToPnAst(contract, query, ['x']);
+      } catch (e) {
+        expect((e as KyselyTransformError).code).toBe(
+          KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+        );
+      }
+    });
   });
 
   describe('defensive throws on ambiguous/invalid shapes', () => {
@@ -759,6 +805,139 @@ describe('transformKyselyToPnAst', () => {
         index: 2,
         source: 'lane',
       });
+    });
+
+    it('keeps descriptor order aligned with multiple where values', () => {
+      const query = selectQueryFixture({
+        where: {
+          kind: 'WhereNode',
+          node: {
+            kind: 'AndNode',
+            exprs: [
+              {
+                kind: 'BinaryOperationNode',
+                left: {
+                  kind: 'ReferenceNode',
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'id' },
+                    table: { kind: 'IdentifierNode', name: 'user' },
+                  },
+                },
+                operator: { kind: 'OperatorNode', operator: '=' },
+                right: { kind: 'ValueNode', value: 'first' },
+              },
+              {
+                kind: 'BinaryOperationNode',
+                left: {
+                  kind: 'ReferenceNode',
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'email' },
+                    table: { kind: 'IdentifierNode', name: 'user' },
+                  },
+                },
+                operator: { kind: 'OperatorNode', operator: 'like' },
+                right: { kind: 'ValueNode', value: 'second' },
+              },
+              {
+                kind: 'BinaryOperationNode',
+                left: {
+                  kind: 'ReferenceNode',
+                  column: {
+                    kind: 'ColumnNode',
+                    column: { kind: 'IdentifierNode', name: 'id' },
+                    table: { kind: 'IdentifierNode', name: 'user' },
+                  },
+                },
+                operator: { kind: 'OperatorNode', operator: 'in' },
+                right: {
+                  kind: 'PrimitiveValueListNode',
+                  values: [
+                    { kind: 'ValueNode', value: 'third' },
+                    { kind: 'ValueNode', value: 'fourth' },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+
+      const params = ['first', 'second', 'third', 'fourth'];
+      const result = transformKyselyToPnAst(contract, query, params);
+      expect(result.metaAdditions.paramDescriptors).toHaveLength(4);
+      expect(result.metaAdditions.paramDescriptors.map((p) => p.index)).toEqual([1, 2, 3, 4]);
+      expect(result.metaAdditions.paramDescriptors.map((p) => p.source)).toEqual([
+        'lane',
+        'lane',
+        'lane',
+        'lane',
+      ]);
+      expect(result.metaAdditions.paramDescriptors.map((p) => p.refs)).toEqual([
+        { table: 'user', column: 'id' },
+        { table: 'user', column: 'email' },
+        { table: 'user', column: 'id' },
+        { table: 'user', column: 'id' },
+      ]);
+    });
+  });
+
+  describe('lowering parity', () => {
+    it('matches Kysely compiled SQL for simple insert', async () => {
+      const db = new Kysely<TestDb>({
+        dialect: new PostgresDialect({ pool: {} as never }),
+      });
+
+      try {
+        const compiled = db
+          .insertInto('user')
+          .values({ id: 'u_1', email: 'u_1@example.com', createdAt: '2024-01-01' })
+          .compile();
+        const transformed = transformKyselyToPnAst(contract, compiled.query, compiled.parameters);
+        const lowered = adapter.lower(transformed.ast, {
+          contract: postgresContract,
+          params: compiled.parameters,
+        });
+
+        expect(normalizeSql(lowered.body.sql)).toBe(normalizeSql(compiled.sql));
+        expect(lowered.body.params).toEqual(compiled.parameters);
+      } finally {
+        await db.destroy();
+      }
+    });
+
+    it('keeps select semantics aligned with Kysely compiled output', async () => {
+      const db = new Kysely<TestDb>({
+        dialect: new PostgresDialect({ pool: {} as never }),
+      });
+
+      try {
+        const compiled = db
+          .selectFrom('user')
+          .select(['id', 'email'])
+          .where('id', '=', 'u_1')
+          .orderBy('email', 'asc')
+          .compile();
+        const transformed = transformKyselyToPnAst(contract, compiled.query, compiled.parameters);
+        const lowered = adapter.lower(transformed.ast, {
+          contract: postgresContract,
+          params: compiled.parameters,
+        });
+
+        const loweredSql = normalizeSql(lowered.body.sql);
+        const compiledSql = normalizeSql(compiled.sql);
+
+        expect(loweredSql).toContain('from "user"');
+        expect(compiledSql).toContain('from "user"');
+        expect(loweredSql).toContain('where "user"."id" = $1');
+        expect(compiledSql).toContain('where "id" = $1');
+        expect(loweredSql).toContain('order by');
+        expect(compiledSql).toContain('order by');
+        expect(lowered.body.params).toEqual(compiled.parameters);
+      } finally {
+        await db.destroy();
+      }
     });
   });
 
