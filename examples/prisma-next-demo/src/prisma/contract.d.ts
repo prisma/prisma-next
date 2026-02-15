@@ -29,7 +29,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:c36c9d26c78f8bc59694a743717b94efbeacd71b5e038e9d8f63fb627a4693bb'>;
+  StorageHashBase<'sha256:19e2d195038bf3a01527aae0f092246619b08c38a5a45d9a6f8bfd2f1c4a8976'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:8564aae6b2d73c1c37b71bce79fc4222405383e180e042b7596cae01d925804b'>;
 export type ProfileHash =
@@ -39,14 +39,19 @@ export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = PgVectorOperationTypes;
 
+export type TypeMaps = {
+  readonly codecTypes: CodecTypes;
+  readonly operationTypes: OperationTypes;
+};
+
 export type Contract = SqlContract<
   {
     readonly tables: {
       readonly user: {
         columns: {
           readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
           readonly email: {
@@ -73,8 +78,8 @@ export type Contract = SqlContract<
       readonly post: {
         columns: {
           readonly id: {
-            readonly nativeType: 'character';
-            readonly codecId: 'sql/char@1';
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
           readonly title: {
@@ -122,7 +127,7 @@ export type Contract = SqlContract<
     readonly User: {
       storage: { readonly table: 'user' };
       fields: {
-        readonly id: Char<36>;
+        readonly id: CodecTypes['pg/text@1']['output'];
         readonly email: CodecTypes['pg/text@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
         readonly kind: 'admin' | 'user';
@@ -131,7 +136,7 @@ export type Contract = SqlContract<
     readonly Post: {
       storage: { readonly table: 'post' };
       fields: {
-        readonly id: Char<36>;
+        readonly id: CodecTypes['pg/text@1']['output'];
         readonly title: CodecTypes['pg/text@1']['output'];
         readonly userId: CodecTypes['pg/text@1']['output'];
         readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
@@ -194,8 +199,6 @@ export type Contract = SqlContract<
         readonly createdAt: 'createdAt';
       };
     };
-    codecTypes: PgTypes & PgVectorTypes;
-    operationTypes: PgVectorOperationTypes;
   },
   StorageHash,
   ExecutionHash,
