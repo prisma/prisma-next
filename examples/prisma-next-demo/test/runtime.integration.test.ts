@@ -129,7 +129,7 @@ describe('runtime execute integration', () => {
         // Initialize schema and marker using control client
         await initTestDatabase({
           connection: connectionString,
-          contractIR: contract,
+          contract,
         });
 
         const tables = schema(context).tables;
@@ -228,7 +228,7 @@ describe('runtime execute integration', () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         await initTestDatabase({
           connection: connectionString,
-          contractIR: contract,
+          contract,
         });
         const runtime = await getRuntime(connectionString);
 
@@ -299,7 +299,7 @@ describe('runtime execute integration', () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         await initTestDatabase({
           connection: connectionString,
-          contractIR: contract,
+          contract,
         });
 
         const { stackInstance, driver } = await createTestDriver(connectionString);
@@ -376,7 +376,7 @@ describe('runtime execute integration', () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         await initTestDatabase({
           connection: connectionString,
-          contractIR: contract,
+          contract,
         });
 
         const { stackInstance, driver } = await createTestDriver(connectionString);
@@ -438,7 +438,7 @@ describe('runtime execute integration', () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({
           connection: connectionString,
-          contractIR: contract,
+          contract,
         });
         const runtime = await getRuntime(connectionString);
 
