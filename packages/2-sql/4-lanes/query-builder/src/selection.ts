@@ -1,8 +1,13 @@
-import type { SqlContract, StorageColumn } from '@prisma-next/sql-contract/types';
+import type {
+  ExtractCodecTypes,
+  SqlContract,
+  StorageColumn,
+} from '@prisma-next/sql-contract/types';
 import type { DrainOuterGeneric } from './type-atoms';
 
 /**
  * A utility type to extract the output type of a referenced column from a contract.
+ * Uses the type-only codec channel (ExtractCodecTypes), not runtime mappings.
  *
  * @template TContract The contract that describes the database.
  * @template TTableName The name of the table containing the column.
@@ -16,7 +21,7 @@ export type ExtractOutputType<
 > = _TColumn extends StorageColumn
   ?
       | (_TColumn['nullable'] extends true ? null : never)
-      | TContract['mappings']['codecTypes'][_TColumn['codecId']]['output']
+      | ExtractCodecTypes<TContract>[_TColumn['codecId']]['output']
   : never;
 
 /**
