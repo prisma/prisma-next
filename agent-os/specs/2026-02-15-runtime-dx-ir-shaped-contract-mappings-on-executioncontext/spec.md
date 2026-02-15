@@ -50,21 +50,22 @@ Treat `Contract` as the **constructed, application-facing contract object**.
 - `defineContract()` (TS authoring) and `validateContract()` (JSON ingestion) both produce the same constructed `Contract`.
 - The constructed `Contract` is shaped for **application needs**, not for JSON serialization limitations.
 
-### 2) Constructed Contract as a class (or factory)
+### 2) Contract construction model: internal class + public factory
 
-Introduce a constructed `Contract` representation implemented as either:
+Use a **class as an internal implementation detail** while keeping the public API as a factory that returns the `Contract` interface:
 
-- **A class** (preferred if we want encapsulated construction + invariants):
-  - `new Contract(irLikeValue)` constructs, validates invariants, and computes mappings once
-  - mappings stored as concrete properties (`contract.mappings`)
-  - optional future: getters for computed/derived views
+- Internal implementation:
+  - a concrete class encapsulates construction invariants and mapping computation
+  - class internals can evolve (additional helpers/methods) without exposing implementation details
+- Public surface:
+  - `constructContract(input): Contract` (or equivalent existing factory entrypoint)
+  - consumers bind to the `Contract` interface, not the class type
 
-or
+This gives us:
 
-- **A factory function** (preferred if we want POJO-only runtime values):
-  - `constructContract(irLikeValue): Contract`
-
-Either way, the output must be a **plain traversable object** suitable for rendering/inspection and stable across workflows.
+- stable construction ergonomics (factory-first API)
+- room to add future contract behavior behind the interface
+- a runtime value that remains traversable/inspectable and consistent across workflows
 
 ### 3) Mappings are real and extensible
 
