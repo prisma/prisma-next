@@ -354,6 +354,71 @@ describe('transformKyselyToPnAst', () => {
       expect(insertAst.table).toEqual({ kind: 'table', name: 'user' });
       expect(Object.keys(insertAst.values)).toEqual(['id', 'email', 'createdAt']);
     });
+
+    it('transforms insert with returning columns', () => {
+      const query = {
+        kind: 'InsertQueryNode',
+        into: {
+          kind: 'TableNode',
+          table: { kind: 'IdentifierNode', name: 'user' },
+        },
+        values: {
+          kind: 'ValuesNode',
+          values: [
+            {
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'id' },
+                table: { kind: 'IdentifierNode', name: 'user' },
+              },
+              value: { kind: 'ValueNode', value: 'id-val' },
+            },
+            {
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'email' },
+                table: { kind: 'IdentifierNode', name: 'user' },
+              },
+              value: { kind: 'ValueNode', value: 'e@example.com' },
+            },
+          ],
+        },
+        returning: {
+          kind: 'ReturningNode',
+          selections: [
+            {
+              kind: 'SelectionNode',
+              selection: {
+                kind: 'ReferenceNode',
+                column: {
+                  kind: 'ColumnNode',
+                  column: { kind: 'IdentifierNode', name: 'id' },
+                  table: { kind: 'IdentifierNode', name: 'user' },
+                },
+              },
+            },
+            {
+              kind: 'SelectionNode',
+              selection: {
+                kind: 'ReferenceNode',
+                column: {
+                  kind: 'ColumnNode',
+                  column: { kind: 'IdentifierNode', name: 'email' },
+                  table: { kind: 'IdentifierNode', name: 'user' },
+                },
+              },
+            },
+          ],
+        },
+      };
+      const result = transformKyselyToPnAst(contract, query, ['id-val', 'e@example.com']);
+      const insertAst = result.ast as InsertAst;
+      expect(insertAst.kind).toBe('insert');
+      expect(insertAst.returning).toBeDefined();
+      expect(insertAst.returning).toHaveLength(2);
+      expect(insertAst.returning).toContainEqual({ kind: 'col', table: 'user', column: 'id' });
+      expect(insertAst.returning).toContainEqual({ kind: 'col', table: 'user', column: 'email' });
+    });
   });
 
   describe('UpdateQueryNode', () => {
@@ -381,6 +446,49 @@ describe('transformKyselyToPnAst', () => {
       expect(updateAst.kind).toBe('update');
       expect(updateAst.where).toBeDefined();
       expect(updateAst.set['email']).toBeDefined();
+    });
+
+    it('transforms update with returning columns', () => {
+      const query = {
+        kind: 'UpdateQueryNode',
+        table: {
+          kind: 'TableNode',
+          table: { kind: 'IdentifierNode', name: 'user' },
+        },
+        updates: [
+          {
+            column: {
+              kind: 'ColumnNode',
+              column: { kind: 'IdentifierNode', name: 'email' },
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
+            value: { kind: 'ValueNode', value: 'updated@example.com' },
+          },
+        ],
+        where: binaryWhere('id', 'uid'),
+        returning: {
+          kind: 'ReturningNode',
+          selections: [
+            {
+              kind: 'SelectionNode',
+              selection: {
+                kind: 'ReferenceNode',
+                column: {
+                  kind: 'ColumnNode',
+                  column: { kind: 'IdentifierNode', name: 'id' },
+                  table: { kind: 'IdentifierNode', name: 'user' },
+                },
+              },
+            },
+          ],
+        },
+      };
+      const result = transformKyselyToPnAst(contract, query, ['updated@example.com', 'uid']);
+      const updateAst = result.ast as UpdateAst;
+      expect(updateAst.kind).toBe('update');
+      expect(updateAst.returning).toBeDefined();
+      expect(updateAst.returning).toHaveLength(1);
+      expect(updateAst.returning?.[0]).toEqual({ kind: 'col', table: 'user', column: 'id' });
     });
   });
 
@@ -413,6 +521,49 @@ describe('transformKyselyToPnAst', () => {
       expect(deleteNoWhere.kind).toBe('delete');
       expect(deleteNoWhere.where).toBeUndefined();
     });
+
+    it('transforms delete with returning columns', () => {
+      const query = {
+        kind: 'DeleteQueryNode',
+        from: {
+          kind: 'TableNode',
+          table: { kind: 'IdentifierNode', name: 'user' },
+        },
+        where: binaryWhere('id', 'uid'),
+        returning: {
+          kind: 'ReturningNode',
+          selections: [
+            {
+              kind: 'SelectionNode',
+              selection: {
+                kind: 'ReferenceNode',
+                column: {
+                  kind: 'ColumnNode',
+                  column: { kind: 'IdentifierNode', name: 'id' },
+                  table: { kind: 'IdentifierNode', name: 'user' },
+                },
+              },
+            },
+            {
+              kind: 'SelectionNode',
+              selection: {
+                kind: 'ReferenceNode',
+                column: {
+                  kind: 'ColumnNode',
+                  column: { kind: 'IdentifierNode', name: 'email' },
+                  table: { kind: 'IdentifierNode', name: 'user' },
+                },
+              },
+            },
+          ],
+        },
+      };
+      const result = transformKyselyToPnAst(contract, query, ['uid']);
+      const deleteAst = result.ast as DeleteAst;
+      expect(deleteAst.kind).toBe('delete');
+      expect(deleteAst.returning).toBeDefined();
+      expect(deleteAst.returning).toHaveLength(2);
+    });
   });
 
   describe('unsupported nodes', () => {
@@ -424,6 +575,19 @@ describe('transformKyselyToPnAst', () => {
         transformKyselyToPnAst(contract, { kind: 'UnknownNode' }, []);
       } catch (e) {
         expect(KyselyTransformError.is(e)).toBe(true);
+        expect((e as KyselyTransformError).code).toBe(
+          KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+        );
+      }
+    });
+
+    it('throws on SubQueryNode as root', () => {
+      expect(() =>
+        transformKyselyToPnAst(contract, { kind: 'SubQueryNode', query: {} }, []),
+      ).toThrow(KyselyTransformError);
+      try {
+        transformKyselyToPnAst(contract, { kind: 'SubQueryNode', query: {} }, []);
+      } catch (e) {
         expect((e as KyselyTransformError).code).toBe(
           KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
         );
@@ -560,13 +724,27 @@ describe('transformKyselyToPnAst', () => {
     });
   });
 
+  describe('paramDescriptors', () => {
+    it('includes codecId and nativeType when contract has column metadata', () => {
+      const query = selectQueryFixture({
+        where: binaryWhere('id', 'uid'),
+      });
+      const result = transformKyselyToPnAst(contract, query, ['uid']);
+      const desc = result.metaAdditions.paramDescriptors[0];
+      expect(desc).toBeDefined();
+      expect(desc?.refs).toEqual({ table: 'user', column: 'id' });
+      expect(desc?.codecId).toBeDefined();
+      expect(desc?.nativeType).toBeDefined();
+    });
+  });
+
   describe('param indexing', () => {
     it('aligns param indices with compiledQuery.parameters order', () => {
       const query = selectQueryFixture({
-        where: binaryWhere('id', 'p1'),
+        where: binaryWhere('id', 'placeholder'),
         limit: {
           kind: 'LimitNode',
-          limit: { kind: 'ValueNode', value: 5 },
+          limit: { kind: 'ValueNode', value: 'limit_placeholder' },
         },
       });
       const params = ['user_1', 5];
@@ -596,6 +774,58 @@ describe('transformKyselyToPnAst', () => {
         table: 'user',
         column: 'id',
       });
+    });
+  });
+
+  describe('contract validation', () => {
+    it('throws on unknown table', () => {
+      const query = selectQueryFixture();
+      const badQuery = {
+        ...query,
+        from: {
+          kind: 'FromNode',
+          froms: [
+            {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'nonexistent_table' },
+            },
+          ],
+        },
+      };
+      expect(() => transformKyselyToPnAst(contract, badQuery, [])).toThrow(KyselyTransformError);
+      try {
+        transformKyselyToPnAst(contract, badQuery, []);
+      } catch (e) {
+        expect((e as KyselyTransformError).code).toBe(KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF);
+        expect((e as KyselyTransformError).details?.table).toBe('nonexistent_table');
+      }
+    });
+
+    it('throws on unknown column in where', () => {
+      const query = selectQueryFixture({
+        where: {
+          kind: 'WhereNode',
+          node: {
+            kind: 'BinaryOperationNode',
+            left: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'nonexistent_col' },
+                table: { kind: 'IdentifierNode', name: 'user' },
+              },
+            },
+            operator: { kind: 'OperatorNode', operator: '=' },
+            right: { kind: 'ValueNode', value: 'x' },
+          },
+        },
+      });
+      expect(() => transformKyselyToPnAst(contract, query, ['x'])).toThrow(KyselyTransformError);
+      try {
+        transformKyselyToPnAst(contract, query, ['x']);
+      } catch (e) {
+        expect((e as KyselyTransformError).code).toBe(KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF);
+      }
     });
   });
 });
