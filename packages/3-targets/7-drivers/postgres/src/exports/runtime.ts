@@ -106,6 +106,5 @@ export default postgresRuntimeDriverDescriptor;
 export type {
   PostgresBinding,
   PostgresDriverCreateOptions,
-  PostgresDriverOptions,
   QueryResult,
 } from '../postgres-driver';

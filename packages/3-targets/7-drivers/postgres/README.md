@@ -107,7 +107,7 @@ Binding variants:
 
 - `./runtime`: Runtime entry point for driver implementation
   - Default: `postgresRuntimeDriverDescriptor` — use `create()` for unbound driver, then `connect(binding)`
-  - Types: `PostgresBinding`, `PostgresDriverOptions`, `PostgresDriverCreateOptions`, `QueryResult`
+  - Types: `PostgresBinding`, `PostgresDriverCreateOptions`, `QueryResult`
 - `./control`: Control plane entry point for driver descriptors
   - Default export: `DriverDescriptor` for use in `prisma-next.config.ts`
 
