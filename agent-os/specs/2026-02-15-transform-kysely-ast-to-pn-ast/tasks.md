@@ -343,27 +343,27 @@ Keep architecture docs and package READMEs aligned with the implementation.
 
 ### 10.1 Supporting reference
 
-- [ ] Update `supporting-reference.md` as compatibility/implementation evolves during work
+- [x] Update `supporting-reference.md` as compatibility/implementation evolves during work
 
 ### 10.2 ADR
 
-- [ ] Ensure [ADR 159](../../../docs/architecture%20docs/adrs/ADR%20159%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md) reflects final decisions (update if needed)
-- [ ] Add ADR to ADR-INDEX if not already listed
+- [x] Ensure [ADR 160](../../../docs/architecture%20docs/adrs/ADR%20160%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md) reflects final decisions (update if needed)
+- [x] Add ADR to ADR-INDEX if not already listed
 
 ### 10.3 Subsystem docs
 
-- [ ] Update Query Lanes subsystem doc: mention Kysely lane, AST attachment, transformer
-- [ ] Update Runtime & Plugin Framework subsystem doc: AST-first lints, lint plugin in SQL domain
+- [x] Update Query Lanes subsystem doc: mention Kysely lane, AST attachment, transformer
+- [x] Update Runtime & Plugin Framework subsystem doc: AST-first lints, lint plugin in SQL domain
 
 ### 10.4 Package READMEs
 
-- [ ] `integration-kysely`: describe transformer, plan structure, guardrails
-- [ ] `sql-runtime`: describe lints plugin, export surface
-- [ ] `relational-core` (or AST package): document new AST node kinds if significant
+- [x] `integration-kysely`: describe transformer, plan structure, guardrails
+- [x] `sql-runtime`: describe lints plugin, export surface
+- [x] `relational-core` (or AST package): document new AST node kinds if significant
 
 ### 10.5 Architecture overview
 
-- [ ] Update `docs/Architecture Overview.md` if Kysely lane / AST-first lints affect high-level picture
+- [x] Update `docs/Architecture Overview.md` if Kysely lane / AST-first lints affect high-level picture
 
 **Phase 10 acceptance criteria**:
 
@@ -399,9 +399,9 @@ Phase 1–9 ──────────────────────�
 | PN AST types | `packages/2-sql/4-lanes/relational-core/src/ast/types.ts` |
 | ParamDescriptor | `packages/1-framework/1-core/shared/contract/src/types.ts` |
 | Kysely integration | `packages/3-extensions/integration-kysely/src/connection.ts` |
-| Current lints | `packages/1-framework/4-runtime-executor/src/plugins/lints.ts` |
+| Lints (SQL domain) | `packages/2-sql/5-runtime/src/plugins/lints.ts` |
 | Raw guardrails | `packages/1-framework/4-runtime-executor/src/guardrails/raw.ts` |
 | SQL runtime exports | `packages/2-sql/5-runtime/src/exports/index.ts` |
 | Demo queries | `examples/prisma-next-demo/src/queries/` |
 | Demo Kysely | `examples/prisma-next-demo/src/kysely/` |
-| ADR 159 | `docs/architecture docs/adrs/ADR 159 - Kysely lane emits PN SQL AST.md` |
+| ADR 160 | `docs/architecture docs/adrs/ADR 160 - Kysely lane emits PN SQL AST.md` |

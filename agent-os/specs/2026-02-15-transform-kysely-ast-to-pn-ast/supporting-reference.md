@@ -34,15 +34,16 @@ Source: `packages/2-sql/4-lanes/relational-core/src/plan.ts` (`SqlQueryPlan`) an
 - DSL/ORM builders construct a `QueryAst` value and return it as `SqlQueryPlan.ast`.
 - Runtime lowering (`lowerSqlPlan`) returns `ExecutionPlan` that includes `ast: queryPlan.ast` unchanged.
 
-### 2.2 Kysely integration currently does **not** attach PN AST
+### 2.2 Kysely integration attaches PN AST (as of transform spec implementation)
 
-`packages/3-extensions/integration-kysely/src/connection.ts` currently constructs:
+`packages/3-extensions/integration-kysely/src/connection.ts` now:
 
-- `ast: undefined`
-- `meta.lane: 'raw'`
-- `meta.paramDescriptors: []`
-
-even though Kysely provides `compiledQuery.query` (Kysely AST) and `compiledQuery.parameters`.
+- Calls `transformKyselyToPnAst(contract, compiledQuery.query, compiledQuery.parameters)` to produce PN `QueryAst` and meta
+- Sets `ast` to the transformed `QueryAst` for `SelectQueryNode`, `InsertQueryNode`, `UpdateQueryNode`, `DeleteQueryNode`
+- Sets `meta.lane = 'kysely'` for transformed plans
+- Populates `meta.paramDescriptors`, `meta.refs`, `meta.projection`, `meta.projectionTypes` from transformer output
+- Runs `runGuardrails()` before transformation to reject unqualified refs and ambiguous `selectAll` in multi-table scope
+- Falls back to `ast: undefined`, `meta.lane: 'raw'`, `meta.paramDescriptors: []` for non-transformable query kinds
 
 ## 3) What runtime plugins normally receive
 
@@ -52,54 +53,49 @@ Plugins are called with the full `ExecutionPlan`:
 - `onRow(row, plan, ctx)`
 - `afterExecute(plan, result, ctx)`
 
-Today’s POC plugins show intended consumption patterns:
+Plugins consume plans as follows:
 
 - **Budgets plugin** uses:
   - `plan.ast.kind === 'select'` and `plan.ast.limit` for boundedness checks
-  - `plan.meta.refs?.tables?.[0]` as a quick “primary table” heuristic
+  - `plan.meta.refs?.tables?.[0]` as a quick "primary table" heuristic
   - fallback to `EXPLAIN` if `plan.ast` is missing
-- **Lints plugin (POC)** currently returns early when `plan.ast` exists and only lints “raw” SQL via heuristic parsing. This is why attaching PN AST is necessary but not sufficient: the plugin must later be updated to actually *use* AST.
+- **Lints plugin** (canonical in SQL domain: `packages/2-sql/5-runtime/src/plugins/lints.ts`) inspects `plan.ast` when present:
+  - DELETE without WHERE — blocks execution
+  - UPDATE without WHERE — blocks execution
+  - Unbounded SELECT — warns/errors when `limit` is missing
+  - SELECT * intent — warns/errors when `selectAllIntent` is present
+  - When `plan.ast` is missing, falls back to raw heuristic guardrails or skips linting (configurable via `fallbackWhenAstMissing`)
 
-> Note: you mentioned `lints.ts` living in framework is a known early mistake; it should move into the SQL domain. This doc is describing the current as-is state for reference.
+The lints plugin is exported from `@prisma-next/sql-runtime`; framework `runtime-executor` no longer provides it.
 
-### 3.1 Proof-of-concept target (this spec)
+## 4) PN SQL AST (current state after transform spec implementation)
 
-As part of this spec, we will replace the current behavior with an **AST-first lint plugin** that lints `plan.ast` for SQL plans (including Kysely-authored plans once they attach PN AST). This is the “proof” that:
+The PN SQL AST lives under `packages/2-sql/4-lanes/relational-core/src/ast/types.ts`.
 
-- runtime plugins can be lane-agnostic and operate on PN AST
-- Kysely lane output is compatible with Prisma Next runtime plugin analysis and PN SQL lowering
-
-## 4) PN SQL AST (current) and robustness gaps
-
-The current PN SQL AST lives under `packages/2-sql/4-lanes/relational-core/src/ast/types.ts` and is intentionally minimal.
-
-Key points for transformation work:
+Key types for transformation:
 
 - Query roots: `SelectAst | InsertAst | UpdateAst | DeleteAst`
-- PN node kinds (non-exhaustive but current):
+- PN node kinds:
   - `TableRef`, `ColumnRef`, `ParamRef`, `LiteralExpr`
   - `OperationExpr`
   - `BinaryExpr`, `ExistsExpr`, `NullCheckExpr`
+  - `AndExpr`, `OrExpr` — boolean composition for WHERE/ON
+  - `ListLiteralExpr` — for `IN (...)` operands
   - `JoinAst`, `IncludeAst`, `IncludeRef`
   - `SelectAst`, `InsertAst`, `UpdateAst`, `DeleteAst`
 - Expressions:
   - `ColumnRef`, `ParamRef`, `LiteralExpr`
   - `OperationExpr` (method + forTypeId + lowering spec) for extension operations (e.g., pgvector)
-- WHERE is currently limited:
-  - `BinaryExpr` with ops only `eq/neq/gt/lt/gte/lte`
-  - `ExistsExpr`
-  - `NullCheckExpr`
+- WHERE and predicate operators:
+  - `BinaryExpr` with `BinaryOp`: `eq`, `neq`, `gt`, `lt`, `gte`, `lte`, `like`, `ilike`, `in`, `notIn`
+  - `ExistsExpr`, `NullCheckExpr`
+  - `AndExpr`, `OrExpr` for compound predicates
 - Joins:
-  - Join ON is currently only `eqCol` (column = column)
-
-Given the demo scope and Kysely compilation output (see below), the PN AST must expand to include at least:
-
-- `and/or` boolean composition
-- `like` and `in` (and likely `notIn`, `ilike`, etc. depending on demo queries)
-- richer join `on` expressions (or reuse `WhereExpr`/`Expression` patterns)
-- representing lists (`IN (...)`) without leaking authoring-library node shapes
-
-Additionally, to support meaningful lints (e.g. “DELETE without WHERE”), the SQL AST must be able to represent the **absence** of a WHERE clause for mutations (today `DeleteAst.where` / `UpdateAst.where` are required).
+  - `JoinOnExpr` is `eqCol` (column = column) or any `WhereExpr` (richer ON predicates)
+- Select all intent:
+  - `SelectAst.selectAllIntent?: { table?: string }` preserved when normalizing `selectAll()` to explicit columns
+- Mutations:
+  - `DeleteAst.where` and `UpdateAst.where` are optional (`WhereExpr | undefined`) to support lints that block mutation without WHERE
 
 ## 5) Kysely AST nodes encountered (local compilation)
 
@@ -175,7 +171,7 @@ Legend:
 | Kysely node kind | Meaning | PN node(s) | Status |
 |---|---|---|---|
 | `SelectionNode` | one projection item | `project[]` entry | ✅ |
-| `SelectAllNode` | `select *` | (no equivalent) | 🟡 |
+| `SelectAllNode` | `select *` | Expanded columns + `selectAllIntent` | ✅ |
 
 Notes:
 
@@ -187,26 +183,25 @@ Notes:
 | Kysely node kind | Meaning | PN node(s) | Status |
 |---|---|---|---|
 | `WhereNode` | WHERE wrapper | `SelectAst.where` | ✅ |
-| `BinaryOperationNode` | binary predicate | `BinaryExpr` | 🟡 |
-| `OperatorNode` (`=`, `like`, `in`, …) | operator | `BinaryOp` union | 🟡 |
-| `ValueNode` | literal value | `ParamRef` or `LiteralExpr` | 🟡 |
-| `PrimitiveValueListNode` | list literal (e.g. `IN (...)`) | (no equivalent) | 🟡 |
+| `BinaryOperationNode` | binary predicate | `BinaryExpr` | ✅ |
+| `OperatorNode` (`=`, `like`, `in`, …) | operator | `BinaryOp` union | ✅ |
+| `ValueNode` | literal value | `ParamRef` or `LiteralExpr` | ✅ |
+| `PrimitiveValueListNode` | list literal (e.g. `IN (...)`) | `ListLiteralExpr` | ✅ |
 
 Notes:
 
-- PN `BinaryOp` currently does **not** include `like` or `in`.
-- PN WHERE lacks `and/or` composition (demo scope almost certainly needs this).
+- PN `BinaryOp` includes `like`, `ilike`, `in`, `notIn`. `AndExpr`/`OrExpr` provide boolean composition.
 
 ### 6.5 JOINs
 
 | Kysely node kind | Meaning | PN node(s) | Status |
 |---|---|---|---|
 | `JoinNode` | JOIN | `JoinAst` | ✅ |
-| `OnNode` | ON wrapper | `JoinAst.on` | 🟡 |
+| `OnNode` | ON wrapper | `JoinAst.on` (WhereExpr) | ✅ |
 
 Notes:
 
-- PN join-on expression is currently only `eqCol`. Kysely can express richer ON predicates; demo scope likely only needs simple column equality at first, but we should evolve PN join-on to accept general boolean expressions.
+- PN `JoinOnExpr` accepts `eqCol` or any `WhereExpr` for richer ON predicates.
 
 ### 6.6 ORDER BY / LIMIT
 
@@ -256,20 +251,15 @@ In DSL, param descriptors are created during WHERE building when a `param('name'
 
 Source: `packages/2-sql/4-lanes/sql-lane/src/sql/predicate-builder.ts` and `packages/1-framework/1-core/shared/contract/src/types.ts` (`ParamDescriptor`).
 
-## 8) What’s missing to utilize refs/params for Kysely queries
+## 8) Kysely plan parity (implemented)
 
-To make Kysely plans equivalent (from a plugin’s perspective), we need:
+Kysely plans are now equivalent to DSL/ORM plans from a plugin's perspective:
 
-1. **Attach PN AST**: produce `QueryAst` and set `plan.ast`.
-2. **Set lane**: `meta.lane = 'kysely'` (observability only).
-3. **Resolved refs**: build `meta.refs.tables/columns` from the PN AST (or during transformation) and validate against the contract.
-4. **Param descriptors**:
-   - Kysely provides `compiledQuery.parameters` but not names.
-   - We must map each `ValueNode`/list element to a `ParamRef(index)` in PN AST and emit a corresponding `ParamDescriptor`:
-     - `source`: likely needs to evolve beyond `'dsl' | 'raw'` (Kysely is neither).
-     - `refs`: attach `{ table, column }` when the param is used in a predicate against a column.
-     - `codecId/nativeType/nullable`: derive from contract column metadata once refs are resolved.
-5. **PN AST expansion**: support operators and boolean composition required by demo queries (`like`, `in`, `and/or`, richer joins, etc.).
+1. **Attach PN AST** — transformer produces `QueryAst` and sets `plan.ast`.
+2. **Set lane** — `meta.lane = 'kysely'` for transformed plans.
+3. **Resolved refs** — transformer builds `meta.refs.tables/columns` and validates against the contract.
+4. **Param descriptors** — transformer maps `ValueNode`/list elements to `ParamRef(index)` and emits `ParamDescriptor` with `source: 'lane'`, `refs` when resolvable, and `codecId`/`nativeType`/`nullable` from contract.
+5. **PN AST expansion** — implemented: `AndExpr`/`OrExpr`, `like`/`ilike`/`in`/`notIn`, `ListLiteralExpr`, richer `JoinOnExpr`, `selectAllIntent`, optional `DeleteAst.where`/`UpdateAst.where`.
 
 ## 9) Explaining “normalization” (what you asked in Q7)
 
