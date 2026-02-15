@@ -29,7 +29,7 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 
 ## Golden Rules
 
-- **Always use the Node.js version in `.nvmrc`** (currently v24) — run `nvm use` before any commands
+- **Node.js version**: Source of truth is root `package.json` `engines.node`. Your shell should respect it; if not, report misconfiguration and how to fix (version manager or `nvm use` / equivalent). Otherwise you may run `nvm use` or the user's local utility to set the version before commands.
 - Use pnpm and local scripts (not ad‑hoc `tsc`, `jest`): `.cursor/rules/use-correct-tools.mdc`
 - Don't branch on target; use adapters: `.cursor/rules/no-target-branches.mdc`
 - Keep tests concise; omit "should": `.cursor/rules/omit-should-in-tests.mdc`
