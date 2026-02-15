@@ -3,7 +3,7 @@ import type { Client, Pool } from 'pg';
 import { newDb } from 'pg-mem';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createPostgresDriverFromOptions } from '../src/postgres-driver';
+import postgresRuntimeDriverDescriptor from '../src/exports/runtime';
 
 describe('@prisma-next/driver-postgres', () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -22,9 +22,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
-      });
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       cleanup = async () => {
         await driver.close();
@@ -37,15 +35,6 @@ describe('@prisma-next/driver-postgres', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it('throws error when neither pool nor client provided', () => {
-    expect(() => {
-      createPostgresDriverFromOptions({
-        // @ts-expect-error - Testing invalid input
-        connect: {},
-      });
-    }).toThrow('PostgresDriver requires a pool or client');
-  });
-
   it(
     'falls back to buffered mode when cursor execution fails',
     async () => {
@@ -53,8 +42,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
+      const driver = postgresRuntimeDriverDescriptor.create({
         cursor: { batchSize: 1 },
       });
 
@@ -88,8 +76,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
+      const driver = postgresRuntimeDriverDescriptor.create({
         cursor: { batchSize: 1 },
       });
 
@@ -119,9 +106,7 @@ describe('@prisma-next/driver-postgres', () => {
     const { Client } = db.adapters.createPg();
     const client = new Client();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { client: client as unknown as Client },
-    });
+    const driver = postgresRuntimeDriverDescriptor.create();
 
     cleanup = async () => {
       await driver.close();
@@ -147,9 +132,7 @@ describe('@prisma-next/driver-postgres', () => {
     const { Client } = db.adapters.createPg();
     const client = new Client();
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { client: client as unknown as Client },
-    });
+    const driver = postgresRuntimeDriverDescriptor.create();
 
     cleanup = async () => {
       await driver.close();
@@ -176,8 +159,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
+      const driver = postgresRuntimeDriverDescriptor.create({
         cursor: { batchSize: 1 },
       });
 
@@ -211,8 +193,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
+      const driver = postgresRuntimeDriverDescriptor.create({
         cursor: { batchSize: 1 },
       });
 
@@ -250,9 +231,7 @@ describe('@prisma-next/driver-postgres', () => {
       end: vi.fn(async () => {}),
     } as unknown as Client;
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { client },
-    });
+    const driver = postgresRuntimeDriverDescriptor.create();
 
     await driver.connect({ kind: 'pgClient', client });
     await driver.query('select 1');
@@ -273,9 +252,7 @@ describe('@prisma-next/driver-postgres', () => {
     };
     const client = mockClient as unknown as Client;
 
-    const driver = createPostgresDriverFromOptions({
-      connect: { client },
-    });
+    const driver = postgresRuntimeDriverDescriptor.create();
 
     await driver.connect({ kind: 'pgClient', client });
     await driver.close();

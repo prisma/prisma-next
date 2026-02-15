@@ -4,7 +4,7 @@ import { Pool as PgPool } from 'pg';
 import { newDb } from 'pg-mem';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createPostgresDriver, createPostgresDriverFromOptions } from '../src/postgres-driver';
+import postgresRuntimeDriverDescriptor from '../src/exports/runtime';
 
 describe('@prisma-next/driver-postgres', () => {
   let cleanup: (() => Promise<void>) | undefined;
@@ -23,8 +23,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
+      const driver = postgresRuntimeDriverDescriptor.create({
         cursor: { disabled: true },
       });
 
@@ -58,8 +57,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
+      const driver = postgresRuntimeDriverDescriptor.create({
         cursor: { batchSize: 1 },
       });
 
@@ -94,8 +92,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
+      const driver = postgresRuntimeDriverDescriptor.create({
         cursor: { batchSize: 2 },
       });
 
@@ -133,9 +130,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
-      });
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       cleanup = async () => {
         await driver.close();
@@ -170,9 +165,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
-      });
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       cleanup = async () => {
         await driver.close();
@@ -200,9 +193,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Client } = db.adapters.createPg();
       const client = new Client();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { client: client as unknown as Client },
-      });
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       cleanup = async () => {
         await driver.close();
@@ -227,9 +218,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Client } = db.adapters.createPg();
       const client = new Client();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { client: client as unknown as Client },
-      });
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       cleanup = async () => {
         await driver.close();
@@ -253,12 +242,9 @@ describe('@prisma-next/driver-postgres', () => {
       const { Client } = db.adapters.createPg();
       const client = new Client();
 
-      // Connect the client first
       await client.connect();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { client: client as unknown as Client },
-      });
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       cleanup = async () => {
         await driver.close();
@@ -281,9 +267,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
-      });
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.close();
@@ -301,9 +285,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
-      });
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.close();
@@ -321,9 +303,7 @@ describe('@prisma-next/driver-postgres', () => {
       const { Pool } = db.adapters.createPg();
       const pool = new Pool();
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
-      });
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       cleanup = async () => {
         await driver.close();
@@ -350,8 +330,7 @@ describe('@prisma-next/driver-postgres', () => {
       const database = await createDevDatabase();
       const pool = new PgPool({ connectionString: database.connectionString });
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
+      const driver = postgresRuntimeDriverDescriptor.create({
         cursor: { batchSize: 1 },
       });
 
@@ -386,9 +365,7 @@ describe('@prisma-next/driver-postgres', () => {
       const database = await createDevDatabase();
       const pool = new PgPool({ connectionString: database.connectionString });
 
-      const driver = createPostgresDriverFromOptions({
-        connect: { pool: pool as unknown as Pool },
-      });
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       cleanup = async () => {
         await driver.close();
@@ -413,69 +390,23 @@ describe('@prisma-next/driver-postgres', () => {
   );
 
   it(
-    'creates driver from connection string',
+    'connects with url binding',
     async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      // Mock the Pool constructor to use our pg-mem pool
-      const MockPool = class extends Pool {
-        constructor() {
-          super();
-          // Use the pg-mem pool instance
-          Object.assign(this, pool);
-        }
-      };
-
-      const driver = createPostgresDriver('postgresql://test', {
-        poolFactory: MockPool as typeof import('pg').Pool,
-      });
+      const database = await createDevDatabase();
+      const driver = postgresRuntimeDriverDescriptor.create();
 
       cleanup = async () => {
         await driver.close();
+        await database.close();
       };
 
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+      await driver.connect({ kind: 'url', url: database.connectionString });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1)', ['test']);
 
       const result = await driver.query<{ id: number; name: string }>('select id, name from items');
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0]?.name).toBe('test');
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
-    'creates driver with custom poolFactory',
-    async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      let customPoolFactoryCalled = false;
-      const CustomPool = class extends Pool {
-        constructor() {
-          super();
-          customPoolFactoryCalled = true;
-          Object.assign(this, pool);
-        }
-      };
-
-      const driver = createPostgresDriver('postgresql://test', {
-        poolFactory: CustomPool as typeof import('pg').Pool,
-      });
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      expect(customPoolFactoryCalled).toBe(true);
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
-      await driver.query('create table items(id serial primary key, name text)');
-      const result = await driver.query<{ id: number; name: string }>('select id, name from items');
-      expect(result.rows).toBeDefined();
     },
     timeouts.spinUpPpgDev,
   );
@@ -488,9 +419,7 @@ describe('@prisma-next/driver-postgres', () => {
         const { Pool } = db.adapters.createPg();
         const pool = new Pool();
 
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool: pool as unknown as Pool },
-        });
+        const driver = postgresRuntimeDriverDescriptor.create();
 
         cleanup = async () => {
           await driver.close();
@@ -525,9 +454,7 @@ describe('@prisma-next/driver-postgres', () => {
         const { Client } = db.adapters.createPg();
         const client = new Client();
 
-        const driver = createPostgresDriverFromOptions({
-          connect: { client: client as unknown as Client },
-        });
+        const driver = postgresRuntimeDriverDescriptor.create();
 
         cleanup = async () => {
           await driver.close();
@@ -562,8 +489,7 @@ describe('@prisma-next/driver-postgres', () => {
         const { Pool } = db.adapters.createPg();
         const pool = new Pool();
 
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool: pool as unknown as Pool },
+        const driver = postgresRuntimeDriverDescriptor.create({
           cursor: { disabled: true },
         });
 
@@ -603,9 +529,7 @@ describe('@prisma-next/driver-postgres', () => {
 
         const pool = new PgPool({ connectionString: database.connectionString });
 
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool: pool as unknown as Pool },
-        });
+        const driver = postgresRuntimeDriverDescriptor.create();
 
         cleanup = async () => {
           await driver.close();
@@ -647,9 +571,7 @@ describe('@prisma-next/driver-postgres', () => {
 
         const pool = new PgPool({ connectionString: database.connectionString });
 
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool: pool as unknown as Pool },
-        });
+        const driver = postgresRuntimeDriverDescriptor.create();
 
         cleanup = async () => {
           await driver.close();
@@ -690,8 +612,7 @@ describe('@prisma-next/driver-postgres', () => {
 
         const pool = new PgPool({ connectionString: database.connectionString });
 
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool: pool as unknown as Pool },
+        const driver = postgresRuntimeDriverDescriptor.create({
           cursor: { disabled: true },
         });
 
@@ -733,9 +654,7 @@ describe('@prisma-next/driver-postgres', () => {
 
         const pool = new PgPool({ connectionString: database.connectionString });
 
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool: pool as unknown as Pool },
-        });
+        const driver = postgresRuntimeDriverDescriptor.create();
 
         cleanup = async () => {
           await driver.close();
@@ -769,9 +688,7 @@ describe('@prisma-next/driver-postgres', () => {
 
         const pool = new PgPool({ connectionString: database.connectionString });
 
-        const driver = createPostgresDriverFromOptions({
-          connect: { pool: pool as unknown as Pool },
-        });
+        const driver = postgresRuntimeDriverDescriptor.create();
 
         cleanup = async () => {
           await driver.close();
