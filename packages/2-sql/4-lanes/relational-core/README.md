@@ -88,6 +88,14 @@ flowchart TD
 - Defines `SqlQueryPlan<Row>` interface for SQL query plans produced by lanes before lowering
 - Provides `augmentDescriptorWithColumnMeta(descriptors, columnMeta)` helper to update ParamDescriptor with `codecId` and `nativeType` from column metadata
 
+### AST Types (`ast/types.ts`)
+- Query roots: `SelectAst`, `InsertAst`, `UpdateAst`, `DeleteAst`
+- Expressions: `ColumnRef`, `ParamRef`, `LiteralExpr`, `OperationExpr`, `ListLiteralExpr`
+- Predicates: `BinaryExpr` (ops: `eq`, `neq`, `gt`, `lt`, `gte`, `lte`, `like`, `ilike`, `in`, `notIn`), `AndExpr`, `OrExpr`, `ExistsExpr`, `NullCheckExpr`
+- Joins: `JoinAst`, `JoinOnExpr` (eqCol or WhereExpr)
+- `SelectAst.selectAllIntent` — preserves select-all intent when normalized to explicit columns
+- `DeleteAst.where` and `UpdateAst.where` optional for mutation-without-WHERE lint support
+
 ### Type Definitions (`types.ts`)
 - Defines TypeScript types for column builders, operations, projections
 - Provides type inference utilities for extracting JavaScript types from codec types (e.g., `ExtractJsTypeFromColumnBuilder`)
