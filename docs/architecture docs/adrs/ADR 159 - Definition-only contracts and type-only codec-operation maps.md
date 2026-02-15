@@ -1,4 +1,4 @@
-# ADR 159 - Definition-only contracts and type-only codec/operation maps
+# ADR 159 - Definition-only contracts and separate TypeMaps for lane typing
 
 ```mermaid
 sequenceDiagram
@@ -13,19 +13,19 @@ sequenceDiagram
 
   alt No-emit (TS authoring)
     App->>TS: defineContract().target(pack).extensionPacks(packs).…build()
-    TS-->>App: Contract value (definition-only)\n+ type-only codec/op type maps inferred from packs
+    TS-->>App: Contract value (definition-only)\n+ ContractWithTypeMaps phantom for inference
   else Emit (JSON + .d.ts)
     App->>JSON: import contract.json
-    App->>Dts: import type Contract (plus emitted type maps)
+    App->>Dts: import type Contract, TypeMaps
     App->>V: validateContract<Contract>(contract.json)
     V-->>App: Contract value (definition-only)\n(runtime-real mappings only)
   end
 
-  App->>Ctx: createExecutionContext({ contract, stack: descriptors-only })
+  App->>Ctx: createExecutionContext<Contract, TypeMaps>({ contract, stack: descriptors-only })
   Ctx->>Stack: read descriptor contributions
   Ctx-->>App: ExecutionContext\n(codecs registry, operations registry, type helpers)
 
-  Note over App: Runtime behavior reads registries from ExecutionContext\nCompile-time inference uses Contract type-only maps (incl parameterized codecs)
+  Note over App: Runtime behavior reads registries from ExecutionContext\nCompile-time inference uses TypeMaps + contract metadata (incl parameterized codecs)
 ```
 
 **Status:** Accepted  
@@ -48,7 +48,7 @@ Query lanes and the demo visualization want a **single predictable “contract�
 
 Over time we developed multiple “contract representations” that look similar but aren’t:
 
-- The **TypeScript `Contract` type** (from `contract.d.ts`, or from TS authoring generics) includes helpful “mapping dictionaries” such as codec/operation type maps.
+- The **TypeScript `Contract` type** (from `contract.d.ts`, or from TS authoring) implied the presence of codec/operation type maps as if they were part of the contract structure.
 - The **runtime contract value** (from `validateContract(contract.json)`) does not and cannot meaningfully contain those type maps as real data.
 
 This mismatch became obvious in the demo app (e.g. Vite hot reload): the object you can iterate/render is **different** from what the TypeScript type claims it is.
@@ -101,14 +101,24 @@ The runtime contract object may include **runtime-real structural mappings** der
 
 These are real data and should be safe to traverse, render, and serialize.
 
-#### 2.2 Type-only codec/operation maps (do not exist as runtime keys)
+#### 2.2 TypeMaps are a separate type (not part of Contract)
 
-Codec/operation type maps are treated as **type-only** and must not be modeled as ordinary runtime keys on the contract value.
+Codec/operation typing is treated as **type-only** and must not be modeled as ordinary runtime keys on the contract value.
 
-Instead, they are carried via a **phantom type channel** on the `Contract` type so that:
+Instead, `contract.d.ts` exports a separate `TypeMaps` type alongside `Contract`:
 
-- lanes can infer types deterministically from `TContract` (no registry-dependent typing)
-- runtime contract values remain honest/traversable (no “pretend” keys)
+```ts
+export type TypeMaps = {
+  readonly codecTypes: CodecTypes
+  readonly operationTypes: OperationTypes
+}
+```
+
+Key properties:
+
+- `Contract` stays focused on **contract structure** (definition-only runtime value).
+- `TypeMaps` carries the compile-time maps needed for deterministic inference (including parameterized codecs).
+- Consumers that need lane typing thread `TypeMaps` explicitly (e.g. `ExecutionContext<Contract, TypeMaps>`).
 
 ### 2.3 Ergonomics: infer type maps from packs in TS authoring
 
@@ -123,7 +133,17 @@ The codec/operation **type maps** used for inference are therefore derivable fro
 
 This ADR keeps the underlying type map concept (it is still required for inference, including parameterized codecs), but expects the authoring DSL to infer and accumulate it from the selected packs.
 
-### 3) Query lanes get runtime behavior from ExecutionContext, compile-time typing from Contract types
+In the no-emit workflow, we additionally allow convenience helpers (e.g. `postgres()`) to infer `TypeMaps` without a second generic by using a composite type:
+
+```ts
+export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
+  readonly [TYPE_MAPS]?: TTypeMaps
+}
+```
+
+This is a **phantom type parameter**: it does not add runtime keys to the contract object, and it does not turn `TypeMaps` into part of `Contract`’s structural model. It exists purely so helpers can infer the associated `TypeMaps` from the authored contract type.
+
+### 3) Query lanes get runtime behavior from ExecutionContext, compile-time typing from TypeMaps
 
 Lanes already operate with an `ExecutionContext`:
 
@@ -132,19 +152,19 @@ Lanes already operate with an `ExecutionContext`:
   - `context.operations` (operation signatures + lowering, assembled from descriptors)
   - `context.types` (parameterized type helpers)
 
-But compile-time inference for columns and operation expressions continues to flow from the **contract type surface** (from `contract.d.ts` or TS authoring generics), because:
+But compile-time inference for columns and operation expressions continues to flow from **TypeMaps** (from `contract.d.ts` or TS authoring inference), because:
 
 - parameterized codec output types vary per column/type instance, and
 - that information is encoded in the contract type graph, not in runtime registry values.
 
-### 4) Stop reading codec/operation type maps from `contract.mappings.*`
+### 4) Stop reading codec/operation typing from the runtime Contract shape
 
 Any lane code that currently does something like:
 
 - `contract.mappings.codecTypes`
 - `contract.mappings.operationTypes`
 
-must be updated to use type-level extraction helpers (backed by the phantom channel) and/or to rely on runtime registries on `ExecutionContext` only for execution behavior.
+must be updated to use `TypeMaps` (type-level) and to rely on runtime registries on `ExecutionContext` for execution behavior.
 
 ## Naming and API shape
 
@@ -157,12 +177,12 @@ Rationale: “mappings” is already widely used, and these indexes are genuinel
 
 ### Type-only maps naming
 
-We introduce a **type-only** concept for codec/operation type maps:
+We introduce a **type-only** `TypeMaps` export for codec/operation type maps:
 
-- **`SqlTypeMaps`** (or similar) for the type-level attachment
-- a `unique symbol` key (e.g. `SQL_TYPE_MAPS`) used to store the phantom attachment so it cannot collide with user schema keys and is not something consumers will render/serialize accidentally.
+- **`TypeMaps`**: exported from `contract.d.ts` and used as the explicit typing input for lane-context construction.
+- `ContractWithTypeMaps`: a no-emit-only composite type that carries `TypeMaps` as a phantom parameter for inference in convenience helpers.
 
-Rationale: we want an explicit signal that these maps are for TypeScript inference only, not runtime inspection.
+Rationale: we want an explicit signal that these maps are for TypeScript inference only, not runtime inspection, and we want to avoid implying that they are part of the contract structure.
 
 ## Consequences
 
@@ -173,7 +193,9 @@ Rationale: we want an explicit signal that these maps are for TypeScript inferen
 - No-emit workflows keep a **single configuration surface** (import codec column constructors once; types flow).
 - Lane typing remains deterministic and precise, including parameterized codecs.
 - Runtime composition remains where it belongs: `ExecutionContext` derived from descriptors.
-- Higher-level runtime clients (e.g. `@prisma-next/postgres/runtime`) can stay ergonomic by being generic only over `TContract` while still extracting lane typing (`ExtractCodecTypes<TContract>`, `ExtractOperationTypes<TContract>`) without relying on runtime “pretend keys”.
+- Higher-level runtime clients (e.g. `@prisma-next/postgres/runtime`) can stay ergonomic:
+  - emitted workflow: `postgres<Contract, TypeMaps>({ contractJson, ... })`
+  - no-emit workflow: `postgres({ contract })` where `contract` is `ContractWithTypeMaps<Contract, TypeMaps>`
 
 ### Trade-offs
 
@@ -193,15 +215,17 @@ Rationale: we want an explicit signal that these maps are for TypeScript inferen
 ## Implementation notes (high level)
 
 - Update SQL contract type surfaces so runtime `mappings` contains only runtime-real keys.
-- Provide a type-only phantom channel for codec/operation type maps and extraction helpers (e.g. `ExtractCodecTypes<TContract>`).
+- Emit and export `TypeMaps` from `contract.d.ts`.
+- Thread `TypeMaps` through lane/context typing (e.g. `ExecutionContext<TContract, TypeMaps>`), removing assumptions that codec/op typing is available on the runtime contract value.
 - Update lane code to:
-  - use type-level extraction (not runtime reads) for row typing
+  - use `TypeMaps` (type-level) for row typing
   - use `ExecutionContext` registries for runtime execution behavior
 - Ensure `validateContract()` does not attempt to fabricate type-only maps as runtime values.
-- Ensure convenience clients and façades remain compatible with this model (validate contract first, then derive context/registries; keep typing extractable from `TContract`).
+- Ensure convenience clients and façades remain compatible with this model (validate contract first, then derive context/registries).
 
 ## Implementation complete (2026-02-15)
 
 - Demo visualization (`examples/prisma-next-demo/src/entry.ts`) renders directly from `validateContract<Contract>(contractJson)` output. No `ContractIR` alias; the constructed Contract is used for rendering and HMR.
+- Demo emitted workflow (`examples/prisma-next-demo/src/prisma/db.ts`) uses `postgres<Contract, TypeMaps>({ contractJson, ... })` with explicit `TypeMaps` from `contract.d.ts`.
 - Control-client test utilities use the constructed Contract from `validateContract` for dbInit/verify operations.
 
