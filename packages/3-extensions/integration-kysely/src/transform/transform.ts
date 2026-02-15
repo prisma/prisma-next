@@ -491,12 +491,17 @@ function transformSelect(node: Record<string, unknown>, ctx: TransformContext): 
   const limitNode = node['limit'];
   let limit: number | undefined;
   if (limitNode && hasKind(limitNode, 'LimitNode')) {
-    const limitVal = (limitNode as Record<string, unknown>)['limit'] as unknown;
+    const limitVal = (limitNode as Record<string, unknown>)['limit'] as Record<string, unknown>;
     if (hasKind(limitVal, 'ValueNode')) {
-      nextParamIndex(ctx);
-      addParamDescriptor(ctx, {});
-      const val = ctx.parameters[ctx.paramIndex - 1];
-      limit = typeof val === 'number' ? val : undefined;
+      const directVal = limitVal['value'];
+      if (typeof directVal === 'number') {
+        limit = directVal;
+      } else {
+        nextParamIndex(ctx);
+        addParamDescriptor(ctx, {});
+        const val = ctx.parameters[ctx.paramIndex - 1];
+        limit = typeof val === 'number' ? val : undefined;
+      }
     }
   }
 
