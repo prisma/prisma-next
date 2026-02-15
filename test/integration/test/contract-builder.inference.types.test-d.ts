@@ -1,6 +1,7 @@
 /**
  * Type tests for defineContract() inference from .target() and .extensionPacks().
  * Verifies that codec/op type maps are inferred from packs without manual type composition.
+ * Task 4.1: pack-driven TypeMaps inference and ContractWithTypeMaps no-emit inference.
  */
 
 import type { CodecTypes as PgCodecTypes } from '@prisma-next/adapter-postgres/codec-types';
@@ -12,8 +13,16 @@ import {
 import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
 import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
-import type { ExtractCodecTypes } from '@prisma-next/sql-contract/types';
+import type {
+  ExtractCodecTypes,
+  ExtractTypeMapsFromContract,
+  TypeMaps,
+} from '@prisma-next/sql-contract/types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { sql } from '@prisma-next/sql-lane/sql';
+import { schema } from '@prisma-next/sql-relational-core/schema';
+import type { ResultType } from '@prisma-next/sql-relational-core/types';
+import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { expectTypeOf, test } from 'vitest';
 
@@ -72,4 +81,74 @@ test('defineContract<CodecTypes>() still works when explicit type param provided
 
   type InferredCodecTypes = ExtractCodecTypes<typeof contract>;
   expectTypeOf<InferredCodecTypes>().toMatchTypeOf<PgCodecTypes>();
+});
+
+test('ExtractTypeMapsFromContract extracts TypeMaps from defineContract build result', () => {
+  const contract = defineContract()
+    .target(postgresPack)
+    .table('user', (t) =>
+      t
+        .column('id', { type: int4Column, nullable: false })
+        .column('email', { type: textColumn, nullable: false })
+        .primaryKey(['id']),
+    )
+    .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
+    .build();
+
+  type Extracted = ExtractTypeMapsFromContract<typeof contract>;
+  expectTypeOf<Extracted>().toMatchTypeOf<TypeMaps<PgCodecTypes, Record<string, never>>>();
+  expectTypeOf<Extracted['codecTypes']>().toHaveProperty('pg/int4@1');
+});
+
+test('schema and sql infer types from ContractWithTypeMaps without explicit TypeMaps param', () => {
+  const contract = defineContract()
+    .target(postgresPack)
+    .table('user', (t) =>
+      t
+        .column('id', { type: int4Column, nullable: false })
+        .column('email', { type: textColumn, nullable: false })
+        .primaryKey(['id']),
+    )
+    .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
+    .build();
+
+  const adapter = createStubAdapter();
+  const context = createTestContext(contract, adapter);
+  const schemaHandle = schema(context);
+  const userTable = schemaHandle.tables.user;
+  if (!userTable) throw new Error('user table not found');
+
+  const plan = sql({ context })
+    .from(userTable)
+    .select({
+      id: userTable.columns.id,
+      email: userTable.columns.email,
+    })
+    .build();
+
+  type Row = ResultType<typeof plan>;
+  expectTypeOf<Row['id']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['email']>().toEqualTypeOf<string>();
+});
+
+test('mixed target and extension pack composition accumulates codec types', () => {
+  const contract = defineContract()
+    .target(postgresPack)
+    .table('doc', (t) =>
+      t
+        .column('id', { type: int4Column, nullable: false })
+        .column('content', { type: textColumn, nullable: false })
+        .column('embedding', { type: vectorColumn, nullable: true })
+        .primaryKey(['id']),
+    )
+    .model('Doc', 'doc', (m) =>
+      m.field('id', 'id').field('content', 'content').field('embedding', 'embedding'),
+    )
+    .extensionPacks({ pgvector })
+    .build();
+
+  type InferredCodecTypes = ExtractCodecTypes<typeof contract>;
+  expectTypeOf<InferredCodecTypes>().toHaveProperty('pg/int4@1');
+  expectTypeOf<InferredCodecTypes>().toHaveProperty('pg/text@1');
+  expectTypeOf<InferredCodecTypes>().toHaveProperty('pg/vector@1');
 });

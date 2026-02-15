@@ -1,9 +1,8 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 import { textColumn, timestamptzColumn } from '@prisma-next/adapter-postgres/column-types';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-export const contract = defineContract<CodecTypes>()
+export const contract = defineContract()
   .target(postgresPack)
   .table('User', (t) =>
     t
