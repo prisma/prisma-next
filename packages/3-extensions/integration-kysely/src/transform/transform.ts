@@ -133,7 +133,14 @@ function resolveColumnRef(node: unknown, ctx: TransformContext, tableOverride?: 
     );
   }
   const table = tableOverride ?? resolveTable(node, ctx);
-  const column = getColumnName(node);
+  let column = getColumnName(node);
+  if (!column && typeof node === 'object' && node !== null) {
+    const n = node as Record<string, unknown>;
+    const col = n['column'];
+    if (col && typeof col === 'object') {
+      column = getColumnName(col);
+    }
+  }
   if (!column) {
     throw new KyselyTransformError(
       'Could not resolve column reference',
@@ -402,6 +409,17 @@ function transformSelections(
 
     if (hasKind(sel, 'SelectionNode')) {
       const exprNode = s['selection'] ?? s['column'] ?? s;
+      if (hasKind(exprNode, 'SelectAllNode')) {
+        const tableRef =
+          (exprNode as Record<string, unknown>)['reference'] ??
+          (exprNode as Record<string, unknown>)['table'];
+        const table = tableRef ? resolveTable(tableRef, ctx, fromTable) : fromTable;
+        const expanded = expandSelectAll(table, ctx.contract);
+        for (const { alias: a, expr } of expanded) {
+          project.push({ alias: a, expr });
+        }
+        continue;
+      }
       const aliasNode = s['alias'];
       const alias =
         typeof aliasNode === 'object' && aliasNode !== null && 'name' in aliasNode
@@ -534,12 +552,48 @@ function transformInsert(node: Record<string, unknown>, ctx: TransformContext): 
 
   const valuesRecord: Record<string, ColumnRef | ParamRef> = {};
   const valuesRec = valuesNode as Record<string, unknown>;
-  const valueEntries = valuesRec['values'] as Array<{
-    column: unknown;
-    value: unknown;
-  }>;
-  if (Array.isArray(valueEntries)) {
+  const valueEntries = valuesRec['values'] as unknown[] | undefined;
+
+  const columns = node['columns'] as unknown[] | undefined;
+  if (
+    Array.isArray(columns) &&
+    columns.length > 0 &&
+    Array.isArray(valueEntries) &&
+    valueEntries.length > 0
+  ) {
+    const firstRow = valueEntries[0];
+    const rowValues =
+      hasKind(firstRow, 'PrimitiveValueListNode') &&
+      Array.isArray((firstRow as Record<string, unknown>)['values'])
+        ? ((firstRow as Record<string, unknown>)['values'] as unknown[])
+        : [firstRow];
+    const tableDef = ctx.contract.storage.tables[tableRef.name];
+    const tableCols = tableDef?.columns ? Object.keys(tableDef.columns).sort() : [];
+    for (let i = 0; i < rowValues.length; i++) {
+      const colName =
+        i < columns.length
+          ? (getColumnName(columns[i]) ?? (i < tableCols.length ? tableCols[i] : undefined))
+          : i < tableCols.length
+            ? tableCols[i]
+            : undefined;
+      if (!colName) continue;
+      validateColumn(ctx.contract, tableRef.name, colName);
+      ctx.refsTables.add(tableRef.name);
+      ctx.refsColumns.set(`${tableRef.name}.${colName}`, { table: tableRef.name, column: colName });
+      const val = transformValue(rowValues[i], ctx, {
+        table: tableRef.name,
+        column: colName,
+      });
+      valuesRecord[colName] = val as ParamRef;
+    }
+  } else if (Array.isArray(valueEntries)) {
     for (const entry of valueEntries) {
+      if (
+        hasKind(entry, 'PrimitiveValueListNode') ||
+        (typeof entry === 'object' && entry !== null && !('column' in entry) && !('value' in entry))
+      ) {
+        continue;
+      }
       const colNode = (entry as { column?: unknown; value?: unknown }).column ?? entry;
       const colRef = resolveColumnRef(colNode, ctx, tableRef.name);
       const valueNode = (entry as { column?: unknown; value?: unknown }).value ?? entry;
@@ -554,13 +608,33 @@ function transformInsert(node: Record<string, unknown>, ctx: TransformContext): 
     const returningRec = insertReturningNode as Record<string, unknown>;
     const items = returningRec['selections'] as unknown[] | undefined;
     if (Array.isArray(items)) {
-      insertReturning = items
-        .map((item) => {
-          const itemRec = item as Record<string, unknown>;
-          const colNode = itemRec['column'] ?? item;
-          return resolveColumnRef(colNode, ctx, tableRef.name);
-        })
-        .filter((c): c is ColumnRef => c !== undefined && c !== null);
+      const refs: ColumnRef[] = [];
+      for (const item of items) {
+        const exprNode =
+          (item as Record<string, unknown>)?.['selection'] ??
+          (item as Record<string, unknown>)?.['column'] ??
+          item;
+        if (hasKind(exprNode, 'SelectAllNode') || hasKind(item, 'SelectAllNode')) {
+          const expanded = expandSelectAll(tableRef.name, ctx.contract);
+          for (const { expr } of expanded) {
+            if (expr.kind === 'col') refs.push(expr);
+          }
+        } else {
+          const colNode = (item as Record<string, unknown>)?.['column'] ?? exprNode;
+          const exprCol = (exprNode as Record<string, unknown>)?.['column'];
+          const toResolve = colNode ?? exprCol ?? item;
+          const colName = getColumnName(toResolve);
+          if (colName) {
+            refs.push(resolveColumnRef(toResolve, ctx, tableRef.name));
+          } else {
+            const expanded = expandSelectAll(tableRef.name, ctx.contract);
+            for (const { expr } of expanded) {
+              if (expr.kind === 'col') refs.push(expr);
+            }
+          }
+        }
+      }
+      insertReturning = refs.length > 0 ? refs : undefined;
     }
   }
 
@@ -601,13 +675,34 @@ function transformUpdate(node: Record<string, unknown>, ctx: TransformContext): 
     const updateReturningRec = updateReturningNode as Record<string, unknown>;
     const items = updateReturningRec['selections'] as unknown[] | undefined;
     if (Array.isArray(items)) {
-      updateReturning = items
-        .map((item) => {
-          const itemRec = item as Record<string, unknown>;
-          const colNode = itemRec['column'] ?? item;
-          return resolveColumnRef(colNode, ctx, tableRef.name);
-        })
-        .filter((c): c is ColumnRef => c !== undefined && c !== null);
+      const refs: ColumnRef[] = [];
+      for (const item of items) {
+        const exprNode =
+          (item as Record<string, unknown>)?.['selection'] ??
+          (item as Record<string, unknown>)?.['column'] ??
+          item;
+        if (hasKind(exprNode, 'SelectAllNode') || hasKind(item, 'SelectAllNode')) {
+          const expanded = expandSelectAll(tableRef.name, ctx.contract);
+          for (const { expr } of expanded) {
+            if (expr.kind === 'col') refs.push(expr);
+          }
+        } else {
+          const toResolve =
+            (item as Record<string, unknown>)?.['column'] ??
+            (exprNode as Record<string, unknown>)?.['column'] ??
+            item;
+          const colName = getColumnName(toResolve);
+          if (colName) {
+            refs.push(resolveColumnRef(toResolve, ctx, tableRef.name));
+          } else {
+            const expanded = expandSelectAll(tableRef.name, ctx.contract);
+            for (const { expr } of expanded) {
+              if (expr.kind === 'col') refs.push(expr);
+            }
+          }
+        }
+      }
+      updateReturning = refs.length > 0 ? refs : undefined;
     }
   }
 
@@ -637,13 +732,34 @@ function transformDelete(node: Record<string, unknown>, ctx: TransformContext): 
     const deleteReturningRec = deleteReturningNode as Record<string, unknown>;
     const items = deleteReturningRec['selections'] as unknown[] | undefined;
     if (Array.isArray(items)) {
-      deleteReturning = items
-        .map((item) => {
-          const itemRec = item as Record<string, unknown>;
-          const colNode = itemRec['column'] ?? item;
-          return resolveColumnRef(colNode, ctx, tableRef.name);
-        })
-        .filter((c): c is ColumnRef => c !== undefined && c !== null);
+      const refs: ColumnRef[] = [];
+      for (const item of items) {
+        const exprNode =
+          (item as Record<string, unknown>)?.['selection'] ??
+          (item as Record<string, unknown>)?.['column'] ??
+          item;
+        if (hasKind(exprNode, 'SelectAllNode') || hasKind(item, 'SelectAllNode')) {
+          const expanded = expandSelectAll(tableRef.name, ctx.contract);
+          for (const { expr } of expanded) {
+            if (expr.kind === 'col') refs.push(expr);
+          }
+        } else {
+          const toResolve =
+            (item as Record<string, unknown>)?.['column'] ??
+            (exprNode as Record<string, unknown>)?.['column'] ??
+            item;
+          const colName = getColumnName(toResolve);
+          if (colName) {
+            refs.push(resolveColumnRef(toResolve, ctx, tableRef.name));
+          } else {
+            const expanded = expandSelectAll(tableRef.name, ctx.contract);
+            for (const { expr } of expanded) {
+              if (expr.kind === 'col') refs.push(expr);
+            }
+          }
+        }
+      }
+      deleteReturning = refs.length > 0 ? refs : undefined;
     }
   }
 
