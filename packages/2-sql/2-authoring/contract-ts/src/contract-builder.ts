@@ -20,12 +20,14 @@ import {
   TableBuilder,
 } from '@prisma-next/contract-authoring';
 import type {
+  ContractWithTypeMaps,
   ModelDefinition,
   ModelField,
   SqlContract,
   SqlMappings,
   SqlStorage,
   StorageTypeInstance,
+  TypeMaps,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { computeMappings } from './contract';
@@ -172,34 +174,13 @@ class SqlContractBuilder<
    * @returns A normalized SqlContract with all required fields present
    */
   build(): Target extends string
-    ? SqlContract<
-        BuildStorage<Tables, Types>,
-        BuildModels<Models>,
-        BuildRelations<Models>,
-        ContractBuilderMappings
-      > & {
-        readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
-        readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, never>;
-        readonly schemaVersion: '1';
-        readonly target: Target;
-        readonly targetFamily: 'sql';
-        readonly storageHash: StorageHash extends string ? StorageHash : string;
-      } & (ExtensionPacks extends Record<string, unknown>
-          ? { readonly extensionPacks: ExtensionPacks }
-          : Record<string, never>) &
-        (Capabilities extends Record<string, Record<string, boolean>>
-          ? { readonly capabilities: Capabilities }
-          : Record<string, never>)
-    : never {
-    type BuiltContract = Target extends string
-      ? SqlContract<
+    ? ContractWithTypeMaps<
+        SqlContract<
           BuildStorage<Tables, Types>,
           BuildModels<Models>,
           BuildRelations<Models>,
           ContractBuilderMappings
         > & {
-          readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
-          readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, never>;
           readonly schemaVersion: '1';
           readonly target: Target;
           readonly targetFamily: 'sql';
@@ -209,7 +190,30 @@ class SqlContractBuilder<
             : Record<string, never>) &
           (Capabilities extends Record<string, Record<string, boolean>>
             ? { readonly capabilities: Capabilities }
-            : Record<string, never>)
+            : Record<string, never>),
+        TypeMaps<CodecTypes, Record<string, never>>
+      >
+    : never {
+    type BuiltContract = Target extends string
+      ? ContractWithTypeMaps<
+          SqlContract<
+            BuildStorage<Tables, Types>,
+            BuildModels<Models>,
+            BuildRelations<Models>,
+            ContractBuilderMappings
+          > & {
+            readonly schemaVersion: '1';
+            readonly target: Target;
+            readonly targetFamily: 'sql';
+            readonly storageHash: StorageHash extends string ? StorageHash : string;
+          } & (ExtensionPacks extends Record<string, unknown>
+              ? { readonly extensionPacks: ExtensionPacks }
+              : Record<string, never>) &
+            (Capabilities extends Record<string, Record<string, boolean>>
+              ? { readonly capabilities: Capabilities }
+              : Record<string, never>),
+          TypeMaps<CodecTypes, Record<string, never>>
+        >
       : never;
     if (!this.state.target) {
       throw new Error('target is required. Call .target() before .build()');
