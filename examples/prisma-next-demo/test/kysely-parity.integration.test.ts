@@ -25,8 +25,8 @@ async function seedTestData(
   },
 ): Promise<{ userIds: string[] }> {
   const tables = schema(executionContext).tables;
-  const userTable = tables['user']!;
-  const postTable = tables['post']!;
+  const userTable = tables.user!;
+  const postTable = tables.post!;
   const userIds: string[] = [];
 
   if (data.users) {
@@ -84,8 +84,7 @@ describe('Kysely parity integration', () => {
         try {
           await seedTestData(runtime, { users: ['alice@example.com'] });
           const user = await getUserById('user_001', runtime);
-          expect(user).toBeDefined();
-          expect(user?.email).toBe('alice@example.com');
+          expect(user).toMatchObject({ email: 'alice@example.com' });
         } finally {
           await runtime.close();
         }
@@ -156,10 +155,12 @@ describe('Kysely parity integration', () => {
           });
           const users = await getUsersWithPosts(runtime, 10);
           expect(users).toHaveLength(2);
-          const alice = users.find((u) => u.email === 'alice@example.com');
-          expect(alice?.posts).toHaveLength(2);
-          const bob = users.find((u) => u.email === 'bob@example.com');
-          expect(bob?.posts).toHaveLength(1);
+          const alice = users.find((u) => u.email === 'alice@example.com')!;
+          const bob = users.find((u) => u.email === 'bob@example.com')!;
+          expect(alice).toMatchObject({ email: 'alice@example.com', posts: expect.any(Array) });
+          expect(alice.posts).toHaveLength(2);
+          expect(bob).toMatchObject({ email: 'bob@example.com', posts: expect.any(Array) });
+          expect(bob.posts).toHaveLength(1);
         } finally {
           await runtime.close();
         }
