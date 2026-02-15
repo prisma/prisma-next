@@ -1,3 +1,12 @@
+/**
+ * Transforms Kysely compiled query AST into Prisma Next SQL QueryAst.
+ *
+ * Defensive behavior: If ambiguity slips through (e.g. guardrails bypassed or invoked directly),
+ * the transformer throws rather than emitting best-effort refs. Specifically:
+ * - Unqualified column refs in multi-table scope → UNQUALIFIED_REF_IN_MULTI_TABLE
+ * - Ambiguous selectAll in multi-table scope → AMBIGUOUS_SELECT_ALL
+ * - Unsupported node kinds → UNSUPPORTED_NODE
+ */
 import type { ParamDescriptor, PlanRefs } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
@@ -41,6 +50,7 @@ interface TransformContext {
   refsTables: Set<string>;
   refsColumns: Map<string, { table: string; column: string }>;
   tableAliases: Map<string, string>;
+  multiTableScope?: boolean;
 }
 
 function createContext(
@@ -96,7 +106,14 @@ function validateColumn(contract: SqlContract<SqlStorage>, table: string, column
 }
 
 function resolveTable(node: unknown, ctx: TransformContext, defaultTable?: string): string {
-  const table = getTableName(node) ?? defaultTable;
+  const explicitTable = getTableName(node);
+  if (ctx.multiTableScope && explicitTable === undefined && defaultTable !== undefined) {
+    throw new KyselyTransformError(
+      'Unqualified column reference in multi-table scope; use table.column (e.g. user.id)',
+      KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+    );
+  }
+  const table = explicitTable ?? defaultTable;
   if (!table) {
     throw new KyselyTransformError(
       'Could not resolve table for column reference',
@@ -109,6 +126,12 @@ function resolveTable(node: unknown, ctx: TransformContext, defaultTable?: strin
 }
 
 function resolveColumnRef(node: unknown, ctx: TransformContext, tableOverride?: string): ColumnRef {
+  if (ctx.multiTableScope && tableOverride !== undefined && getTableName(node) === undefined) {
+    throw new KyselyTransformError(
+      'Unqualified column reference in multi-table scope; use table.column (e.g. user.id)',
+      KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+    );
+  }
   const table = tableOverride ?? resolveTable(node, ctx);
   const column = getColumnName(node);
   if (!column) {
@@ -363,6 +386,12 @@ function transformSelections(
 
     if (hasKind(sel, 'SelectAllNode')) {
       const tableRef = (s['reference'] ?? s['table']) as unknown;
+      if (ctx.multiTableScope && !tableRef) {
+        throw new KyselyTransformError(
+          'Ambiguous selectAll in multi-table scope; qualify with table (e.g. db.selectFrom(u).innerJoin(p).selectAll("user"))',
+          KYSELY_TRANSFORM_ERROR_CODES.AMBIGUOUS_SELECT_ALL,
+        );
+      }
       const table = tableRef ? resolveTable(tableRef, ctx, fromTable) : fromTable;
       const expanded = expandSelectAll(table, ctx.contract);
       for (const { alias, expr } of expanded) {
@@ -394,6 +423,8 @@ function transformSelections(
 }
 
 function transformSelect(node: Record<string, unknown>, ctx: TransformContext): SelectAst {
+  ctx.multiTableScope = Array.isArray(node['joins']) && (node['joins'] as unknown[]).length > 0;
+
   const fromNode = node['from'];
   if (!fromNode) {
     throw new KyselyTransformError(

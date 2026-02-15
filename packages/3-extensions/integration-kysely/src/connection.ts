@@ -1,6 +1,8 @@
 import type { ContractBase, ExecutionPlan } from '@prisma-next/contract/types';
 import type { RuntimeConnection, RuntimeTransaction } from '@prisma-next/runtime-executor';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CompiledQuery, DatabaseConnection, QueryResult, TransactionSettings } from 'kysely';
+import { runGuardrails } from './transform/index.js';
 
 export class KyselyPrismaConnection implements DatabaseConnection {
   #contract: ContractBase;
@@ -77,6 +79,10 @@ export class KyselyPrismaConnection implements DatabaseConnection {
   }
 
   #createExecutionPlan<R>(compiledQuery: CompiledQuery<R>): ExecutionPlan<R, unknown> {
+    const query = (compiledQuery as { query?: unknown }).query;
+    if (query) {
+      runGuardrails(this.#contract as SqlContract<SqlStorage>, query);
+    }
     return {
       // TODO: convert the Kysely AST into Prisma AST
       ast: undefined,
