@@ -1,4 +1,6 @@
 export type {
+  CodecTypesOf,
+  ContractWithTypeMaps,
   ExtractCodecTypes,
   ExtractOperationTypes,
   ForeignKey,
@@ -7,6 +9,7 @@ export type {
   ModelDefinition,
   ModelField,
   ModelStorage,
+  OperationTypesOf,
   PrimaryKey,
   SqlCodecTypesKey,
   SqlContract,
@@ -16,5 +19,7 @@ export type {
   StorageColumn,
   StorageTable,
   StorageTypeInstance,
+  TypeMaps,
+  TypeMapsPhantomKey,
   UniqueConstraint,
 } from '../types';

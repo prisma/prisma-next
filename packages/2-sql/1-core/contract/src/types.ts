@@ -116,6 +116,40 @@ export type SqlMappings = {
   readonly columnToField?: Record<string, Record<string, string>>;
 };
 
+/**
+ * Type-only maps for lane inference. Not runtime properties on Contract.
+ * Emitted from contract.d.ts; carried via phantom for no-emit.
+ */
+export type TypeMaps<
+  TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  TOperationTypes extends Record<string, unknown> = Record<string, never>,
+> = {
+  readonly codecTypes: TCodecTypes;
+  readonly operationTypes: TOperationTypes;
+};
+
+export type CodecTypesOf<T> = T extends { readonly codecTypes: infer C }
+  ? C extends Record<string, { output: unknown }>
+    ? C
+    : Record<string, never>
+  : Record<string, never>;
+
+export type OperationTypesOf<T> = T extends { readonly operationTypes: infer O }
+  ? O extends Record<string, unknown>
+    ? O
+    : Record<string, never>
+  : Record<string, never>;
+
+export type TypeMapsPhantomKey = '__@prisma-next/sql-contract/typeMaps@__';
+
+/**
+ * Phantom type for no-emit: carries TypeMaps for inference without runtime keys.
+ * Must not introduce runtime properties.
+ */
+export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
+  readonly '__@prisma-next/sql-contract/typeMaps@__'?: TTypeMaps;
+};
+
 export type SqlCodecTypesKey = '__@prisma-next/sql-contract/codecTypes@__';
 export type SqlOperationTypesKey = '__@prisma-next/sql-contract/operationTypes@__';
 
@@ -136,14 +170,18 @@ export type SqlContract<
   readonly execution?: ExecutionSection;
 };
 
-export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> = TContract extends {
-  readonly [K in SqlCodecTypesKey]: infer C;
+export type ExtractCodecTypes<T> = T extends {
+  readonly '__@prisma-next/sql-contract/typeMaps@__'?: infer TM;
 }
-  ? C
-  : Record<string, never>;
+  ? CodecTypesOf<TM>
+  : T extends { readonly [K in SqlCodecTypesKey]: infer C }
+    ? C
+    : Record<string, never>;
 
-export type ExtractOperationTypes<TContract extends SqlContract<SqlStorage>> = TContract extends {
-  readonly [K in SqlOperationTypesKey]: infer O;
+export type ExtractOperationTypes<T> = T extends {
+  readonly '__@prisma-next/sql-contract/typeMaps@__'?: infer TM;
 }
-  ? O
-  : Record<string, never>;
+  ? OperationTypesOf<TM>
+  : T extends { readonly [K in SqlOperationTypesKey]: infer O }
+    ? O
+    : Record<string, never>;
