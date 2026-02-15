@@ -263,7 +263,7 @@ describe('Postgres adapter join rendering', () => {
     );
   });
 
-  it('throws error for unsupported join ON expression kind', () => {
+  it('renders join ON with WhereExpr (AndExpr)', () => {
     const adapter = createPostgresAdapter();
 
     const ast: SelectAst = {
@@ -275,18 +275,32 @@ describe('Postgres adapter join rendering', () => {
           joinType: 'inner',
           table: { kind: 'table', name: 'post' },
           on: {
-            // @ts-expect-error - Testing unsupported join ON expression kind
-            kind: 'unsupported',
-            left: { kind: 'col', table: 'user', column: 'id' },
-            right: { kind: 'col', table: 'post', column: 'userId' },
+            kind: 'and',
+            exprs: [
+              {
+                kind: 'bin',
+                op: 'eq',
+                left: { kind: 'col', table: 'user', column: 'id' },
+                right: { kind: 'col', table: 'post', column: 'userId' },
+              },
+              {
+                kind: 'bin',
+                op: 'neq',
+                left: { kind: 'col', table: 'post', column: 'title' },
+                right: { kind: 'literal', value: '' },
+              },
+            ],
           },
         },
       ],
       project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
     };
 
-    expect(() => adapter.lower(ast, { contract, params: [] })).toThrow(
-      'Unsupported join ON expression kind: unsupported',
-    );
+    const lowered = adapter.lower(ast, { contract, params: [] });
+
+    expect(lowered.body.sql).toContain('ON');
+    expect(lowered.body.sql).toContain('AND');
+    expect(lowered.body.sql).toContain('"user"."id" = "post"."userId"');
+    expect(lowered.body.sql).toContain('"post"."title"');
   });
 });

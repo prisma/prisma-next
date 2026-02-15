@@ -8,7 +8,9 @@ import type {
   IncludeRef,
   InsertAst,
   JoinAst,
+  JoinOnExpr,
   LiteralExpr,
+  ListLiteralExpr,
   LowererContext,
   NullCheckExpr,
   OperationExpr,
@@ -214,7 +216,6 @@ function renderNullCheck(expr: NullCheckExpr, contract?: PostgresContract): stri
 function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   const leftExpr = expr.left as ColumnRef | OperationExpr;
   const left = renderExpr(leftExpr, contract);
-  // Only wrap in parentheses if it's an operation expression
   const leftRendered = isOperationExpr(leftExpr) ? `(${left})` : left;
   const right = renderBinaryRight(expr.right, contract);
   const operatorMap: Record<BinaryExpr['op'], string> = {
@@ -335,20 +336,20 @@ function renderOperation(expr: OperationExpr, contract?: PostgresContract): stri
   return result;
 }
 
-function renderJoin(join: JoinAst, _contract?: PostgresContract): string {
+function renderJoin(join: JoinAst, contract?: PostgresContract): string {
   const joinType = join.joinType.toUpperCase();
   const table = quoteIdentifier(join.table.name);
-  const onClause = renderJoinOn(join.on);
+  const onClause = renderJoinOn(join.on, contract);
   return `${joinType} JOIN ${table} ON ${onClause}`;
 }
 
-function renderJoinOn(on: JoinAst['on']): string {
+function renderJoinOn(on: JoinOnExpr, contract?: PostgresContract): string {
   if (on.kind === 'eqCol') {
     const left = renderColumn(on.left);
     const right = renderColumn(on.right);
     return `${left} = ${right}`;
   }
-  throw new Error(`Unsupported join ON expression kind: ${on.kind}`);
+  return renderWhere(on, contract);
 }
 
 function renderInclude(
@@ -368,7 +369,7 @@ function renderInclude(
   const jsonBuildObject = `json_build_object(${childProjection})`;
 
   // Build the ON condition from the include's ON clause - this goes in the WHERE clause
-  const onCondition = renderJoinOn(include.child.on);
+  const onCondition = renderJoinOn(include.child.on, contract);
 
   // Build WHERE clause: combine ON condition with any additional WHERE clauses
   let whereClause = ` WHERE ${onCondition}`;
@@ -494,7 +495,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
     return `${column} = ${value}`;
   });
 
-  const whereClause = ` WHERE ${renderWhere(ast.where, contract)}`;
+  const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where, contract)}` : '';
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';
@@ -504,7 +505,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
 
 function renderDelete(ast: DeleteAst, contract?: PostgresContract): string {
   const table = quoteIdentifier(ast.table.name);
-  const whereClause = ` WHERE ${renderWhere(ast.where, contract)}`;
+  const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where, contract)}` : '';
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';
