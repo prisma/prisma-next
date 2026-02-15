@@ -86,8 +86,8 @@ Source:
 
 ### 5.1 Tests/checks first: lock generated artifact expectations
 
-- [ ] Add/adjust 2-8 focused emit checks ensuring generated `contract.d.ts` files include separate `TypeMaps` export and do not declare legacy `mappings.codecTypes` / `mappings.operationTypes`.
-- [ ] Cover generated artifacts in:
+- [x] Add/adjust 2-8 focused emit checks ensuring generated `contract.d.ts` files include separate `TypeMaps` export and do not declare legacy `mappings.codecTypes` / `mappings.operationTypes`.
+- [x] Cover generated artifacts in:
   - `examples/prisma-next-demo/src/prisma/`
   - `examples/prisma-orm-demo/src/prisma-next/`
   - `packages/3-extensions/integration-kysely/test/fixtures/generated/`
@@ -95,14 +95,14 @@ Source:
 
 ### 5.2 Re-emit all generated contracts
 
-- [ ] Re-run contract emission for all generated contract fixtures/examples.
-- [ ] Update generation inputs where necessary so emitted artifacts converge on the new type model.
-- [ ] Ensure generated `contract.json`/`contract.d.ts` pairs are consistent and deterministic.
+- [x] Re-run contract emission for all generated contract fixtures/examples.
+- [x] Update generation inputs where necessary so emitted artifacts converge on the new type model.
+- [x] Ensure generated `contract.json`/`contract.d.ts` pairs are consistent and deterministic.
 
 ### 5.3 Remove legacy generated shape
 
-- [ ] Confirm no remaining generated `contract.d.ts` includes `mappings.codecTypes` / `mappings.operationTypes`.
-- [ ] Resolve any holdout fixture/config path still emitting legacy shape.
+- [x] Confirm no remaining generated `contract.d.ts` includes `mappings.codecTypes` / `mappings.operationTypes`.
+- [x] Resolve any holdout fixture/config path still emitting legacy shape.
 
 ## 6) Demo and docs alignment
 
