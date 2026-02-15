@@ -126,11 +126,11 @@ Source:
 
 ## 7) Final verification
 
-- [ ] Run targeted package tests/typechecks covering:
+- [x] Run targeted package tests/typechecks covering:
   - SQL contract types/validation
   - emitter generated type shape (`Contract` + `TypeMaps`)
   - relational core / sql-lane / orm-lane typing with explicit type maps
   - postgres convenience client typing (emitted + no-emit paths)
-- [ ] Run integration/e2e tests that exercise emitted and no-emit workflows.
-- [ ] Confirm no remaining runtime reads of type-only mapping properties.
-- [ ] Confirm no remaining generated `contract.d.ts` uses legacy `mappings.codecTypes` / `mappings.operationTypes`.
+- [x] Run integration/e2e tests that exercise emitted and no-emit workflows.
+- [x] Confirm no remaining runtime reads of type-only mapping properties.
+- [x] Confirm no remaining generated `contract.d.ts` uses legacy `mappings.codecTypes` / `mappings.operationTypes`.
