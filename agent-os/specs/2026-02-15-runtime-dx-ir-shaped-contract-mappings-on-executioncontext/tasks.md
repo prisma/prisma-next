@@ -76,20 +76,20 @@ Source:
 
 ### 5.1 Tests first: demo DX checks
 
-- [ ] Add/adjust demo integration checks for:
+- [x] Add/adjust demo integration checks for:
   - contract visualization rendering directly from runtime contract value
   - no HMR/type mismatch caused by runtime/type shape divergence
 
 ### 5.2 Update demo usage
 
-- [ ] Update no-emit and emitted demo contract wiring to match final type model.
-- [ ] Ensure convenience runtime configuration flow remains aligned (validate contract first, context from descriptors, runtime lazy instantiation as applicable).
+- [x] Update no-emit and emitted demo contract wiring to match final type model.
+- [x] Ensure convenience runtime configuration flow remains aligned (validate contract first, context from descriptors, runtime lazy instantiation as applicable).
 
 ### 5.3 Documentation updates
 
-- [ ] Keep ADR 159 synchronized with final implementation details.
-- [ ] Update package READMEs/docs that reference old runtime mapping assumptions.
-- [ ] Ensure references use `agent-os/specs/` for in-repo spec workflow.
+- [x] Keep ADR 159 synchronized with final implementation details.
+- [x] Update package READMEs/docs that reference old runtime mapping assumptions.
+- [x] Ensure references use `agent-os/specs/` for in-repo spec workflow.
 
 ## 6) Final verification
 
