@@ -87,6 +87,12 @@ For inspection and codec resolution, we store **canonical identifiers** aligned 
 
 This keeps refs stable across lanes and across SQL formatting differences.
 
+### Preventing ambiguous queries (refs must be PN-native)
+
+We expect the Kysely lane to provide **PN-native refs** (`plan.meta.refs` as canonical `{ table, column }` pairs), not best-effort strings.
+
+To make that possible, the lane must **prevent** users from constructing ambiguous queries (for example, unqualified column refs when multiple tables are in scope). Guardrails should fail early with actionable errors. If ambiguity still reaches the transformer, we throw (forcing function).
+
 ## Detailed design
 
 ### 1) Kysely → PN SQL AST transformation
@@ -132,6 +138,11 @@ This is required for:
 
 - plugin heuristics (budget estimation, future lints)
 - “resolved refs” requirement (no best-effort strings)
+
+**Ambiguity policy**:
+
+- Prefer preventing ambiguity in the Kysely lane (guardrails) over “resolving” heuristically.
+- If a ref cannot be deterministically resolved to a single contract `{ table, column }`, throw.
 
 #### 3.2 `meta.projection`, `meta.projectionTypes`, `meta.annotations.codecs`
 
@@ -283,6 +294,7 @@ This keeps SQL-aware plugin logic in the SQL domain while still using the family
 - **Parameter ordering mismatch**: mitigate by implementing explicit node visitors matching Kysely compiler structure; cover with tests.
 - **AST expansions require lowering changes**: treat as part of the spec; add tests around adapter lowering for new node kinds.
 - **`selectAll` expansion needs contract access**: transformer receives contract; expansion uses contract table columns deterministically (sorted keys).
+- **Ambiguous refs in multi-table scope**: mitigate by Kysely-lane guardrails that reject unqualified refs / ambiguous `selectAll` before execution; transformer still throws if ambiguity slips through.
 
 ## Documentation updates
 

@@ -53,6 +53,13 @@ The acceptance-scope for supported SQL features is defined by the demo app: we w
    - Move the lint plugin implementation out of `packages/1-framework/4-runtime-executor` into a SQL-owned package/location.
    - Export it from the SQL runtime surface so consumers don’t need to import SQL-aware plugins from the framework domain.
 
+10. **Prevent ambiguous refs in the Kysely lane**
+   - The Kysely lane must prevent users from constructing **ambiguous** query plans where refs cannot be deterministically resolved to PN-native `{ table, column }` pairs.
+   - Minimum guardrails:
+     - If more than one table is in scope (e.g. joins), reject unqualified column references (require table/alias qualification).
+     - Reject ambiguous `selectAll()`/`select *` in multi-table scope unless it can be unambiguously scoped to a single table.
+   - If ambiguity still reaches the transformer (unexpected node shapes, raw fragments, future Kysely features), the transformer must **throw** rather than emitting best-effort refs.
+
 ### Non-functional requirements
 
 - **Deterministic**: transformation output should be stable for identical inputs.
