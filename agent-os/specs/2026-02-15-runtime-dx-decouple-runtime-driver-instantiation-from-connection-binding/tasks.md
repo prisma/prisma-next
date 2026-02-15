@@ -53,18 +53,18 @@ Groups 1–4 can be partially parallelized (1 before 2 and 3; 2 before 4). Group
 
 ### 1.1 Tests (test-first)
 
-- [ ] **Unit:** `instantiateExecutionStack()` with driver descriptor returns instance with `driver` defined.
-- [ ] **Unit:** `instantiateExecutionStack()` with no driver descriptor returns instance with `driver` undefined.
-- [ ] **Type:** `ExecutionStackInstance.driver` type narrows when stack has driver descriptor.
+- [x] **Unit:** `instantiateExecutionStack()` with driver descriptor returns instance with `driver` defined.
+- [x] **Unit:** `instantiateExecutionStack()` with no driver descriptor returns instance with `driver` undefined.
+- [x] **Type:** `ExecutionStackInstance.driver` type narrows when stack has driver descriptor.
 
 ### 1.2 Implementation
 
-- [ ] Update `RuntimeDriverDescriptor` in `packages/1-framework/1-core/runtime/execution-plane/src/types.ts`:
+- [x] Update `RuntimeDriverDescriptor` in `packages/1-framework/1-core/runtime/execution-plane/src/types.ts`:
   - Add `TCreateOptions` type parameter (default `void`).
   - Change `create(options?: TCreateOptions): TDriverInstance` (optional; no connection required).
-- [ ] Add `readonly driver: TDriverInstance | undefined` to `ExecutionStackInstance` in `packages/1-framework/1-core/runtime/execution-plane/src/stack.ts`.
-- [ ] Update `instantiateExecutionStack()` to call `stack.driver.create()` when `stack.driver` is present and include driver in returned instance.
-- [ ] Run `pnpm -F @prisma-next/core-execution-plane test` and `pnpm lint:deps`.
+- [x] Add `readonly driver: TDriverInstance | undefined` to `ExecutionStackInstance` in `packages/1-framework/1-core/runtime/execution-plane/src/stack.ts`.
+- [x] Update `instantiateExecutionStack()` to call `stack.driver.create()` when `stack.driver` is present and include driver in returned instance.
+- [x] Run `pnpm -F @prisma-next/core-execution-plane test` and `pnpm lint:deps`.
 
 **Acceptance criteria:** Descriptor `create()` accepts optional options; stack instance includes `driver` when stack has driver descriptor; types compile and tests pass.
 

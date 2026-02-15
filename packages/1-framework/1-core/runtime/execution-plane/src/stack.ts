@@ -27,7 +27,9 @@ export interface ExecutionStack<
 > {
   readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId, TAdapterInstance>;
-  readonly driver: RuntimeDriverDescriptor<TFamilyId, TTargetId, TDriverInstance> | undefined;
+  readonly driver:
+    | RuntimeDriverDescriptor<TFamilyId, TTargetId, unknown, TDriverInstance>
+    | undefined;
   readonly extensionPacks: readonly RuntimeExtensionDescriptor<
     TFamilyId,
     TTargetId,
@@ -60,6 +62,7 @@ export interface ExecutionStackInstance<
   >;
   readonly target: RuntimeTargetInstance<TFamilyId, TTargetId>;
   readonly adapter: TAdapterInstance;
+  readonly driver: TDriverInstance | undefined;
   readonly extensionPacks: readonly TExtensionInstance[];
 }
 
@@ -75,7 +78,7 @@ export function createExecutionStack<
     TTargetId
   >,
   TDriverDescriptor extends
-    | RuntimeDriverDescriptor<TFamilyId, TTargetId, TDriverInstance>
+    | RuntimeDriverDescriptor<TFamilyId, TTargetId, unknown, TDriverInstance>
     | undefined = undefined,
   TExtensionInstance extends RuntimeExtensionInstance<
     TFamilyId,
@@ -126,10 +129,13 @@ export function instantiateExecutionStack<
   TDriverInstance,
   TExtensionInstance
 > {
+  const driver = stack.driver ? stack.driver.create() : undefined;
+
   return {
     stack,
     target: stack.target.create(),
     adapter: stack.adapter.create(),
+    driver,
     extensionPacks: stack.extensionPacks.map((descriptor) => descriptor.create()),
   };
 }

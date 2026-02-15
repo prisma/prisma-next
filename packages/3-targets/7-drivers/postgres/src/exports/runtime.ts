@@ -18,14 +18,52 @@ export type PostgresRuntimeDriver = RuntimeDriverInstance<'sql', 'postgres'> & S
 /**
  * Postgres driver descriptor for runtime plane.
  */
+const USE_BEFORE_CONNECT_MESSAGE =
+  'Postgres driver not connected. Call connect(binding) before acquireConnection or execute.';
+
+class PostgresUnboundDriver implements PostgresRuntimeDriver {
+  readonly familyId = 'sql' as const;
+  readonly targetId = 'postgres' as const;
+
+  async connect(): Promise<void> {
+    throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+  }
+
+  async acquireConnection(): Promise<never> {
+    throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+  }
+
+  async close(): Promise<void> {}
+
+  execute(): AsyncIterable<never> {
+    return {
+      [Symbol.asyncIterator]() {
+        return {
+          async next() {
+            throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+          },
+        };
+      },
+    };
+  }
+
+  async query(): Promise<never> {
+    throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+  }
+}
+
 const postgresRuntimeDriverDescriptor: RuntimeDriverDescriptor<
   'sql',
   'postgres',
+  PostgresDriverOptions,
   PostgresRuntimeDriver
 > = {
   ...postgresDriverDescriptorMeta,
-  create(options: PostgresDriverOptions): PostgresRuntimeDriver {
-    return createPostgresDriverFromOptions(options) as PostgresRuntimeDriver;
+  create(options?: PostgresDriverOptions): PostgresRuntimeDriver {
+    if (options?.connect) {
+      return createPostgresDriverFromOptions(options) as PostgresRuntimeDriver;
+    }
+    return new PostgresUnboundDriver();
   },
 };
 

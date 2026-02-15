@@ -96,7 +96,7 @@ export type SqlExecutionStackWithDriver<TTargetId extends string = string> = Omi
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId, SqlRuntimeAdapterInstance<TTargetId>>;
   readonly driver:
-    | RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>
+    | RuntimeDriverDescriptor<'sql', TTargetId, unknown, SqlRuntimeDriverInstance<TTargetId>>
     | undefined;
   readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
 };
@@ -120,7 +120,7 @@ export function createSqlExecutionStack<TTargetId extends string>(options: {
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId>;
   readonly driver?:
-    | RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>
+    | RuntimeDriverDescriptor<'sql', TTargetId, unknown, SqlRuntimeDriverInstance<TTargetId>>
     | undefined;
   readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[] | undefined;
 }): SqlExecutionStackWithDriver<TTargetId> {
