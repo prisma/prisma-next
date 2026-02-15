@@ -1,18 +1,14 @@
-import type { CodecTypes as PgTypes } from '@prisma-next/adapter-postgres/codec-types';
 import {
   int4Column,
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import type { CodecTypes as PgVectorCodecTypes } from '@prisma-next/extension-pgvector/codec-types';
 import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
-type CodecTypes = PgTypes & PgVectorCodecTypes;
-
-export const contract = defineContract<CodecTypes>()
+export const contract = defineContract()
   .target(postgresPack)
   .table('user', (t) =>
     t
