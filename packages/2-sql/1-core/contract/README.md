@@ -122,6 +122,11 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 const contract = validateContract<Contract>(contractJson);
 ```
 
+`validateContract` returns a constructed contract that:
+- Computes runtime-real `mappings` (modelToTable, tableToModel, fieldToColumn, columnToField) from models/storage
+- Strips `_generated` if present on input (emitter metadata is excluded from the returned value)
+- Does not require execution stack or runtime descriptors
+
 Mapping overrides in `contract.mappings` follow strict pair semantics:
 - `modelToTable` and `tableToModel` must either both be omitted (auto-computed) or both be provided as inverse maps.
 - `fieldToColumn` and `columnToField` must either both be omitted (auto-computed) or both be provided as inverse maps.
