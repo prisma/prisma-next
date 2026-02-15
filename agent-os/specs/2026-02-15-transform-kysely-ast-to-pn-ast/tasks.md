@@ -306,28 +306,28 @@ Ensure adequate unit, integration, and demo coverage.
 
 ### 9.1 Unit tests (SQL domain)
 
-- [ ] Transformer: select, where, like, in, join, limit, insert, update, delete, returning
-- [ ] Param indexing and paramDescriptors
-- [ ] Ref resolution and contract validation
-- [ ] Unsupported node throws
+- [x] Transformer: select, where, like, in, join, limit, insert, update, delete, returning
+- [x] Param indexing and paramDescriptors
+- [x] Ref resolution and contract validation
+- [x] Unsupported node throws
 
 ### 9.2 Unit tests (lints)
 
-- [ ] AST-first lint blocks delete without where
-- [ ] AST-first lint blocks update without where
-- [ ] AST-first lint flags missing select limit
-- [ ] AST-first lint flags selectAll intent
+- [x] AST-first lint blocks delete without where
+- [x] AST-first lint blocks update without where
+- [x] AST-first lint flags missing select limit
+- [x] AST-first lint flags selectAll intent
 
 ### 9.3 Integration tests
 
-- [ ] Kysely integration: assert `plan.ast` presence
-- [ ] Kysely integration with AST-first lints: assert expected failures for unsafe queries
-- [ ] Run full integration suite
+- [x] Kysely integration: assert `plan.ast` presence
+- [x] Kysely integration with AST-first lints: assert expected failures for unsafe queries
+- [x] Run full integration suite
 
 ### 9.4 Demo tests
 
-- [ ] Add/run Kysely demo execution tests
-- [ ] Validate plugin observation (e.g. budgets, lints) for Kysely plans
+- [x] Add/run Kysely demo execution tests
+- [x] Validate plugin observation (e.g. budgets, lints) for Kysely plans
 
 **Phase 9 acceptance criteria**:
 
