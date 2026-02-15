@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import type { Plugin } from '@prisma-next/sql-runtime';
+import { lints, type Plugin } from '@prisma-next/sql-runtime';
 import { teardownTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Kysely, sql } from 'kysely';
@@ -346,6 +346,48 @@ describe('Kysely integration', () => {
         expect(plan.meta.projection).toBeDefined();
         expect(plan.meta.projectionTypes).toBeDefined();
         expect(plan.meta.annotations?.codecs).toBeDefined();
+      },
+      testTimeout,
+    );
+
+    it(
+      'AST-first lints block Kysely DELETE without WHERE',
+      async () => {
+        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+          plugins: [lints()],
+        });
+
+        const kysely = new Kysely<KyselifyContract<Contract>>({
+          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
+        });
+
+        await expect(kysely.deleteFrom('user').execute()).rejects.toMatchObject({
+          code: 'LINT.DELETE_WITHOUT_WHERE',
+          category: 'LINT',
+        });
+      },
+      testTimeout,
+    );
+
+    it(
+      'AST-first lints block Kysely UPDATE without WHERE',
+      async () => {
+        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+          plugins: [lints()],
+        });
+
+        const kysely = new Kysely<KyselifyContract<Contract>>({
+          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
+        });
+
+        await expect(
+          kysely.updateTable('user').set({ email: 'unsafe@example.com' }).execute(),
+        ).rejects.toMatchObject({
+          code: 'LINT.UPDATE_WITHOUT_WHERE',
+          category: 'LINT',
+        });
       },
       testTimeout,
     );
