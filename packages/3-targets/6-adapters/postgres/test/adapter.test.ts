@@ -6,6 +6,11 @@ import type {
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import {
+  createParamRef,
+  createTableRef,
+  createUpdateAst,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 
 import { createPostgresAdapter } from '../src/core/adapter';
@@ -635,18 +640,19 @@ describe('createPostgresAdapter', () => {
       it('lowers update AST without where clause', () => {
         const adapter = createPostgresAdapter();
 
-        const ast: UpdateAst = {
-          kind: 'update',
-          table: { kind: 'table', name: 'user' },
+        const ast = createUpdateAst({
+          table: createTableRef('user'),
           set: {
-            email: { kind: 'param', index: 1, name: 'newEmail' },
+            email: createParamRef(1, 'newEmail'),
           },
-        };
+        });
 
         const lowered = adapter.lower(ast, { contract, params: ['updated@example.com'] });
 
-        expect(lowered.body.sql).toBe('UPDATE "user" SET "email" = $1');
-        expect(lowered.body.params).toEqual(['updated@example.com']);
+        expect(lowered.body).toMatchObject({
+          sql: 'UPDATE "user" SET "email" = $1',
+          params: ['updated@example.com'],
+        });
       });
     });
 

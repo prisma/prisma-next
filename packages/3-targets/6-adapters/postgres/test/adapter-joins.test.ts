@@ -1,5 +1,12 @@
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import {
+  createBinaryExpr,
+  createColumnRef,
+  createJoin,
+  createSelectAst,
+  createTableRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
@@ -266,35 +273,26 @@ describe('Postgres adapter join rendering', () => {
   it('renders join ON with WhereExpr (AndExpr)', () => {
     const adapter = createPostgresAdapter();
 
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
+    const ast = createSelectAst({
+      from: createTableRef('user'),
       joins: [
-        {
-          kind: 'join',
-          joinType: 'inner',
-          table: { kind: 'table', name: 'post' },
-          on: {
-            kind: 'and',
-            exprs: [
-              {
-                kind: 'bin',
-                op: 'eq',
-                left: { kind: 'col', table: 'user', column: 'id' },
-                right: { kind: 'col', table: 'post', column: 'userId' },
-              },
-              {
-                kind: 'bin',
-                op: 'neq',
-                left: { kind: 'col', table: 'post', column: 'title' },
-                right: { kind: 'literal', value: '' },
-              },
-            ],
-          },
-        },
+        createJoin('inner', createTableRef('post'), {
+          kind: 'and',
+          exprs: [
+            createBinaryExpr(
+              'eq',
+              createColumnRef('user', 'id'),
+              createColumnRef('post', 'userId'),
+            ),
+            createBinaryExpr('neq', createColumnRef('post', 'title'), {
+              kind: 'literal',
+              value: '',
+            }),
+          ],
+        }),
       ],
-      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
-    };
+      project: [{ alias: 'id', expr: createColumnRef('user', 'id') }],
+    });
 
     const lowered = adapter.lower(ast, { contract, params: [] });
 

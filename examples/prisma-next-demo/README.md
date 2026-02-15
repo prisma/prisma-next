@@ -162,4 +162,22 @@ pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example
 
 - **Vector Similarity Search**: The demo includes a `similarity-search.ts` query that demonstrates cosine distance operations using the pgvector extension pack.
 - **Extension Packs**: Shows how to configure and use extension packs (pgvector) in `prisma-next.config.ts`.
-- **Kysely Lane Parity**: `src/kysely/` contains Kysely equivalents for demo queries (get-user-by-id, get-user-posts, get-users, get-users-with-posts, dml-operations, insert-user-transaction). Run with `pnpm start -- user-kysely <id>`, `posts-kysely <userId>`, etc. Use `guardrail-delete-kysely` to demonstrate AST-based lint blocking DELETE without WHERE.
+- **Kysely Lane Parity**: `src/kysely/` contains Kysely equivalents for demo queries:
+  - `get-user-by-id.ts`
+  - `get-user-posts.ts`
+  - `get-users.ts`
+  - `get-users-with-posts.ts`
+  - `dml-operations.ts`
+  - `insert-user-transaction.ts`
+  - `delete-without-where.ts`
+  - `get-all-posts-unbounded.ts`
+  - `update-without-where.ts`
+  - Run commands:
+    - `pnpm start -- user-kysely <id>`
+    - `pnpm start -- posts-kysely <userId>`
+    - `pnpm start -- users-kysely`
+    - `pnpm start -- users-with-posts-kysely`
+    - `pnpm start -- dml-kysely`
+    - `pnpm start -- user-transaction-kysely`
+    - `pnpm start -- guardrail-delete-kysely`
+  - Additional guardrail examples (`update-without-where.ts`, `get-all-posts-unbounded.ts`) are available in `src/kysely/` for direct invocation from tests or scripts.
