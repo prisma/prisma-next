@@ -1,1 +1,69 @@
 # @prisma-next/integration-kysely
+
+Kysely integration for Prisma Next: connects Kysely query builder output to the Prisma Next runtime.
+
+## Responsibilities
+
+- Provide a Kysely-compatible database interface that routes queries through the Prisma Next execution stack
+- Transform Kysely `compiledQuery` AST into Prisma Next SQL AST (`QueryAst`) for lane-agnostic plugin inspection
+- Populate `plan.meta.refs`, `plan.meta.paramDescriptors`, and related metadata for Kysely-authored queries
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Kysely
+    QB[Query Builder]
+    QB --> CQ[compiledQuery]
+  end
+
+  subgraph Transform
+    CQ --> T[transformKyselyToPnAst]
+    T --> AST[QueryAst]
+    T --> Meta[metaAdditions]
+  end
+
+  subgraph Runtime
+    Plan[ExecutionPlan]
+    Plan --> Lower[lowerSqlPlan]
+    Lower --> Driver[Driver]
+  end
+
+  AST --> Plan
+  Meta --> Plan
+```
+
+## Transformer
+
+The transformer (`src/transform/`) converts Kysely AST nodes to PN SQL AST:
+
+| Kysely Node | PN AST |
+|-------------|--------|
+| `SelectQueryNode` | `SelectAst` |
+| `InsertQueryNode` | `InsertAst` |
+| `UpdateQueryNode` | `UpdateAst` |
+| `DeleteQueryNode` | `DeleteAst` |
+| `FromNode` / `TableNode` | `TableRef` |
+| `ReferenceNode` + `ColumnNode` | `ColumnRef` |
+| `SelectAllNode` | Expanded columns + `selectAllIntent` |
+| `BinaryOperationNode` | `BinaryExpr` (=, <>, >, <, >=, <=, like, in) |
+| `PrimitiveValueListNode` | `ListLiteralExpr` |
+| `AndNode` / `OrNode` | `AndExpr` / `OrExpr` |
+| `JoinNode` + `OnNode` | `JoinAst` |
+| `ValuesNode` | `InsertAst.values` |
+| `ColumnUpdateNode` | `UpdateAst.set` |
+| `ReturningNode` | `returning` column refs |
+
+All refs are validated against the contract. Unsupported node kinds throw `KyselyTransformError` with stable codes.
+
+## Dependencies
+
+- `@prisma-next/contract` — Plan types, ParamDescriptor, PlanRefs
+- `@prisma-next/sql-contract` — SqlContract, SqlStorage
+- `@prisma-next/sql-relational-core` — AST types (SelectAst, InsertAst, etc.)
+- `kysely` (peer)
+
+## See also
+
+- [ADR 159](../../docs/architecture%20docs/adrs/ADR%20159%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md)
+- [Transform spec](../../agent-os/specs/2026-02-15-transform-kysely-ast-to-pn-ast/spec.md)

@@ -80,73 +80,73 @@ Implement the core transformer as a pure function in the SQL domain.
 
 ### 3.1 Transformer module setup
 
-- [ ] Create transformer module location (e.g. `packages/3-extensions/integration-kysely/src/transform/` or SQL domain equivalent per architecture)
-- [ ] Define transformer function signature: `(contract, compiledQuery.query, compiledQuery.parameters) => { ast, metaAdditions }`
-- [ ] Add fixture contract for unit tests
+- [x] Create transformer module location (e.g. `packages/3-extensions/integration-kysely/src/transform/` or SQL domain equivalent per architecture)
+- [x] Define transformer function signature: `(contract, compiledQuery.query, compiledQuery.parameters) => { ast, metaAdditions }`
+- [x] Add fixture contract for unit tests
 
 ### 3.2 Query roots
 
-- [ ] Implement transformation for `SelectQueryNode` → `SelectAst`
-- [ ] Implement transformation for `InsertQueryNode` → `InsertAst`
-- [ ] Implement transformation for `UpdateQueryNode` → `UpdateAst`
-- [ ] Implement transformation for `DeleteQueryNode` → `DeleteAst`
-- [ ] Add unit tests for each query root
+- [x] Implement transformation for `SelectQueryNode` → `SelectAst`
+- [x] Implement transformation for `InsertQueryNode` → `InsertAst`
+- [x] Implement transformation for `UpdateQueryNode` → `UpdateAst`
+- [x] Implement transformation for `DeleteQueryNode` → `DeleteAst`
+- [x] Add unit tests for each query root
 
 ### 3.3 FROM, tables, columns, aliases
 
-- [ ] Transform `FromNode` / `TableNode` → `TableRef`
-- [ ] Transform `ReferenceNode` + `ColumnNode` → `ColumnRef` (with contract validation)
-- [ ] Handle `AliasNode` for selections
-- [ ] Add unit tests for ref resolution
+- [x] Transform `FromNode` / `TableNode` → `TableRef`
+- [x] Transform `ReferenceNode` + `ColumnNode` → `ColumnRef` (with contract validation)
+- [x] Handle `AliasNode` for selections
+- [x] Add unit tests for ref resolution
 
 ### 3.4 Selections and projection
 
-- [ ] Transform `SelectionNode` → `SelectAst.project` entries
-- [ ] Transform `SelectAllNode` → expanded explicit columns via contract (with selectAll intent annotation)
-- [ ] Add unit tests for projection, including selectAll expansion
+- [x] Transform `SelectionNode` → `SelectAst.project` entries
+- [x] Transform `SelectAllNode` → expanded explicit columns via contract (with selectAll intent annotation)
+- [x] Add unit tests for projection, including selectAll expansion
 
 ### 3.5 WHERE predicates
 
-- [ ] Transform `WhereNode` → `WhereExpr`
-- [ ] Transform `BinaryOperationNode` with operators: `=`, `<>`, `>`, `<`, `>=`, `<=`, `like`, `in`
-- [ ] Transform `ValueNode` → `ParamRef` or `LiteralExpr`
-- [ ] Transform `PrimitiveValueListNode` → `ListLiteralExpr`
-- [ ] Implement AND/OR composition for compound WHERE
-- [ ] Add unit tests for each predicate type
+- [x] Transform `WhereNode` → `WhereExpr`
+- [x] Transform `BinaryOperationNode` with operators: `=`, `<>`, `>`, `<`, `>=`, `<=`, `like`, `in`
+- [x] Transform `ValueNode` → `ParamRef` or `LiteralExpr`
+- [x] Transform `PrimitiveValueListNode` → `ListLiteralExpr`
+- [x] Implement AND/OR composition for compound WHERE
+- [x] Add unit tests for each predicate type
 
 ### 3.6 JOINs, ORDER BY, LIMIT
 
-- [ ] Transform `JoinNode` + `OnNode` → `JoinAst`
-- [ ] Transform `OrderByNode` / `OrderByItemNode` → `SelectAst.orderBy`
-- [ ] Transform `LimitNode` → `SelectAst.limit`
-- [ ] Add unit tests for joins, orderBy, limit
+- [x] Transform `JoinNode` + `OnNode` → `JoinAst`
+- [x] Transform `OrderByNode` / `OrderByItemNode` → `SelectAst.orderBy`
+- [x] Transform `LimitNode` → `SelectAst.limit`
+- [x] Add unit tests for joins, orderBy, limit
 
 ### 3.7 INSERT/UPDATE/DELETE specifics
 
-- [ ] Transform `ValuesNode` → `InsertAst.values`
-- [ ] Transform `ColumnUpdateNode` → `UpdateAst.set`
-- [ ] Transform `ReturningNode` → `returning` column refs
-- [ ] Add unit tests for DML details
+- [x] Transform `ValuesNode` → `InsertAst.values`
+- [x] Transform `ColumnUpdateNode` → `UpdateAst.set`
+- [x] Transform `ReturningNode` → `returning` column refs
+- [x] Add unit tests for DML details
 
 ### 3.8 Parameter indexing and paramDescriptors
 
-- [ ] Implement deterministic parameter traversal matching Kysely compiler order
-- [ ] Map each parameterized value to `ParamRef.index` (1-based into `plan.params`)
-- [ ] Build `meta.paramDescriptors` with `refs`, `codecId`, `nativeType`, `nullable` when contract metadata available
-- [ ] Use `ParamDescriptor.source = 'lane'` for Kysely params
-- [ ] Add unit tests verifying param index alignment with `compiledQuery.parameters`
+- [x] Implement deterministic parameter traversal matching Kysely compiler order
+- [x] Map each parameterized value to `ParamRef.index` (1-based into `plan.params`)
+- [x] Build `meta.paramDescriptors` with `refs`, `codecId`, `nativeType`, `nullable` when contract metadata available
+- [x] Use `ParamDescriptor.source = 'lane'` for Kysely params
+- [x] Add unit tests verifying param index alignment with `compiledQuery.parameters`
 
 ### 3.9 Ref extraction and validation
 
-- [ ] Extract `meta.refs.tables` and `meta.refs.columns` from transformed AST
-- [ ] Validate all refs against `contract.storage.tables`
-- [ ] Add unit tests for ref resolution
+- [x] Extract `meta.refs.tables` and `meta.refs.columns` from transformed AST
+- [x] Validate all refs against `contract.storage.tables`
+- [x] Add unit tests for ref resolution
 
 ### 3.10 Unsupported node handling
 
-- [ ] Throw on unsupported Kysely node kinds (no silent fallback)
-- [ ] Use stable error shape (code, message, details)
-- [ ] Add unit tests for unsupported-node throws
+- [x] Throw on unsupported Kysely node kinds (no silent fallback)
+- [x] Use stable error shape (code, message, details)
+- [x] Add unit tests for unsupported-node throws
 
 **Phase 3 acceptance criteria**:
 
