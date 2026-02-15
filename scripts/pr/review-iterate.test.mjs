@@ -22,10 +22,9 @@ test('derives deterministic review directory name', () => {
   );
 });
 
-test('parses CLI defaults to dry-run mode', () => {
+test('parses CLI defaults', () => {
   const parsed = parseCliArgs(['node', 'review-iterate.mjs', '--pr', 'https://github.com/o/r/pull/1']);
   assert.strictEqual(parsed.prUrl, 'https://github.com/o/r/pull/1');
-  assert.strictEqual(parsed.apply, false);
   assert.strictEqual(parsed.reviewsRoot, 'agent-os/specs/review-framework/reviews');
 });
 

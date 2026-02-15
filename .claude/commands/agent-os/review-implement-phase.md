@@ -43,7 +43,8 @@ If missing, instruct user to run:
    - create focused commits
    - post "On it" when starting each action
    - post "Done" and resolve thread when finished
-   - update `review-actions.json` (`status`, `done.doneAt`, `done.summary`, `done.commits`)
+   - only set action `status: done` after GitHub "Done" + thread resolution succeeds
+   - update `review-actions.json` (`status`, `done.doneAt`, `done.summary`, `done.commits`) in the same completion step
 4. Render latest actions markdown for visibility:
 
 ```bash
@@ -53,7 +54,7 @@ node scripts/pr/render-review-actions.mjs --in <output-dir>/review-actions.json 
 ## Ownership (important)
 
 - The **implement phase** is responsible for actual fixes and posting "Done" updates tied to completed code changes.
-- The **apply phase** is for idempotent GitHub admin actions over already triaged/completed actions, and acts as a safety net for missing admin updates.
+- The **apply phase** is optional fallback tooling for exceptional cleanup/recovery, not part of the default loop.
 
 ## Output to user
 
@@ -65,5 +66,5 @@ Return:
 
 Suggest next step:
 
-- `/agent-os/review-apply-phase <PR_URL> [output-dir]`
-- then `/agent-os/review-fetch-phase <PR_URL> [output-dir]` to refresh state
+- `/agent-os/review-fetch-phase <PR_URL> [output-dir]` to refresh state
+- then `/agent-os/review-triage-phase <PR_URL> [output-dir]` to decide if another implementation pass is needed

@@ -58,4 +58,4 @@ Return the concrete artifact paths written:
 
 If the user wants, suggest next phase command:
 
-- `/agent-os/review-apply-phase <PR_URL> [output-dir]`
+- `/agent-os/review-triage-phase <PR_URL> [output-dir]`

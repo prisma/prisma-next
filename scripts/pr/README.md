@@ -11,7 +11,7 @@ Primary contract doc: `agent-os/specs/review-framework/spec.md`.
 3. Author/update canonical action plan (`review-actions.json`).
 4. Implement `will_address` actions, commit fixes, and post "Done" updates on completed threads.
 5. Render derived actions Markdown (`review-actions.md`).
-6. Plan admin mutations (`--dry-run`, default), then apply explicitly with `--apply`.
+6. Re-fetch + re-triage and repeat until no actionable items remain.
 
 For a thin wrapper over this loop, use `scripts/pr/review-iterate.mjs`.
 
@@ -84,8 +84,8 @@ node scripts/pr/apply-review-actions.mjs --in <review-actions.json> [--review-st
 
 Responsibility:
 
-- Posting "Done" on completed code-review threads belongs to the implementation phase.
-- `apply-review-actions` is the idempotent admin phase for dry-run/apply over actions already marked done.
+- Posting "Done" on completed code-review threads belongs to the implementation phase and should happen before setting an action to done.
+- `apply-review-actions` is optional idempotent recovery tooling when administrative cleanup is needed.
 
 Examples:
 
@@ -97,12 +97,12 @@ node scripts/pr/apply-review-actions.mjs --in <review-actions.json> --review-sta
 ### review-iterate (network wrapper)
 
 ```bash
-node scripts/pr/review-iterate.mjs --pr <url> [--reviews-root <dir>] [--apply] [--help]
+node scripts/pr/review-iterate.mjs --pr <url> [--reviews-root <dir>] [--help]
 ```
 
-- Runs fetch, render, summarize, optional actions render, and apply planning in one deterministic wrapper.
+- Runs fetch, render, summarize, and optional actions render in one deterministic wrapper.
 - Writes artifacts under `<reviews-root>/<owner>_<repo>_pr-<number>/`.
-- Uses dry-run apply by default; `--apply` executes mutations.
+- Does not run admin apply as part of the default loop.
 
 ## review-artifacts Utilities
 

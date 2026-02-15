@@ -14,7 +14,7 @@ const DEFAULT_REVIEWS_ROOT = 'agent-os/specs/review-framework/reviews';
 function getHelpText() {
   return [
     'Usage:',
-    '  review-iterate.mjs --pr <url> [--reviews-root <dir>] [--apply] [--help]',
+    '  review-iterate.mjs --pr <url> [--reviews-root <dir>] [--help]',
     '',
     'Purpose:',
     '  Run a thin deterministic review loop wrapper for one PR.',
@@ -25,12 +25,11 @@ function getHelpText() {
     '  - Renders review-state.md (derived)',
     '  - Summarizes review-state to summary.txt (derived)',
     '  - Renders review-actions.md if review-actions.json exists',
-    '  - Runs apply-review-actions in dry-run mode by default (or --apply)',
+    '  - Does not run apply-review-actions (use implement phase + re-fetch/re-triage loop)',
     '',
     'Flags:',
     '  --pr <url>             GitHub pull request URL.',
     '  --reviews-root <dir>   Root directory for review artifacts.',
-    '  --apply                Execute GitHub mutations (default is dry-run).',
     '  --help                 Show this help text and exit.',
   ].join('\n');
 }
@@ -40,7 +39,6 @@ function parseCliArgs(argv) {
   const result = {
     prUrl: null,
     reviewsRoot: DEFAULT_REVIEWS_ROOT,
-    apply: false,
     help: false,
   };
 
@@ -52,11 +50,6 @@ function parseCliArgs(argv) {
   let index = 0;
   while (index < args.length) {
     const arg = args[index];
-    if (arg === '--apply') {
-      result.apply = true;
-      index += 1;
-      continue;
-    }
     if (arg !== '--pr' && arg !== '--reviews-root') {
       throw { code: EXIT_CLI, message: `error: unknown flag "${arg}"` };
     }
@@ -145,7 +138,6 @@ async function main() {
   const reviewSummaryPath = resolve(reviewDir, 'summary.txt');
   const reviewActionsJsonPath = resolve(reviewDir, 'review-actions.json');
   const reviewActionsMdPath = resolve(reviewDir, 'review-actions.md');
-  const applyLogPath = resolve(reviewDir, 'apply-log.json');
 
   await mkdir(dirname(reviewStateJsonPath), { recursive: true });
 
@@ -177,20 +169,9 @@ async function main() {
       '--out',
       reviewActionsMdPath,
     ]);
-    runNodeScript('scripts/pr/apply-review-actions.mjs', [
-      '--in',
-      reviewActionsJsonPath,
-      '--review-state',
-      reviewStateJsonPath,
-      '--format',
-      'json',
-      '--log-out',
-      applyLogPath,
-      ...(options.apply ? ['--apply'] : ['--dry-run']),
-    ]);
   } else {
     process.stdout.write(
-      `info: review-actions.json not found at ${reviewActionsJsonPath}; skipping render/apply\n`,
+      `info: review-actions.json not found at ${reviewActionsJsonPath}; skipping actions render\n`,
     );
   }
 

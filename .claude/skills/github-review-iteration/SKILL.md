@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # GitHub Review Iteration
 
-Run an iterative PR review loop: **fetch state → render/summarize → triage actions → implement → dry-run apply → apply → re-fetch** until the PR has no remaining actionable items.
+Run an iterative PR review loop: **fetch state → render/summarize → triage actions → implement (code + Done + resolve) → re-fetch** until the PR has no remaining actionable items.
 
 This skill is an **orchestrator**. It delegates:
 
@@ -66,7 +66,7 @@ For phase-specific execution without full orchestration, use:
 - `/agent-os/review-fetch-phase <PR_URL> [output-dir]`
 - `/agent-os/review-triage-phase <PR_URL> [output-dir]`
 - `/agent-os/review-implement-phase <PR_URL> [output-dir]`
-- `/agent-os/review-apply-phase <PR_URL> [output-dir]`
+- `/agent-os/review-apply-phase <PR_URL> [output-dir]` (optional recovery only)
 
 ## Behavioral rules
 
@@ -118,7 +118,7 @@ node scripts/pr/summarize-review-state.mjs --in <review-dir>/review-state.json -
 node scripts/pr/render-review-actions.mjs --in <review-dir>/review-actions.json --out <review-dir>/review-actions.md
 ```
 
-4. Apply GitHub admin actions with dry-run first:
+4. Optional recovery-only admin actions:
 
 ```bash
 # default behavior is dry-run
@@ -212,8 +212,8 @@ The implementer must:
 - re-fetch review state at the end to verify remaining actionable items
 
 Responsibility note:
-- Posting "Done" and resolving completed threads belongs to the implementer phase.
-- `apply-review-actions` is an idempotent admin safety net and dry-run/apply tool for actions already marked done.
+- Posting "Done" and resolving completed threads belongs to the implementer phase and is part of marking actions done.
+- `apply-review-actions` is an optional idempotent safety net for exceptional recovery, not the default loop.
 
 ### `iterate`
 

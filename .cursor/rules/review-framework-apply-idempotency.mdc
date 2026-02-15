@@ -13,3 +13,8 @@ When running or updating the review-framework apply flow:
 - Default to dry-run and require explicit apply.
 - After apply, persist apply metadata back to canonical actions JSON when possible.
 - Before repeated applies, refresh state and retriage to avoid operating on stale historical actions.
+
+Default loop guidance:
+
+- Prefer `fetch -> triage -> implement -> fetch/retriage` as the primary workflow.
+- Treat apply as optional recovery tooling, not a required step of each iteration.
