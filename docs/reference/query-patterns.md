@@ -11,10 +11,10 @@ This document covers standard patterns for working with Prisma Next queries, inc
 ```typescript
 // src/prisma/db.ts
 import postgres from '@prisma-next/postgres/runtime';
-import type { Contract } from './contract.d';
+import type { Contract, TypeMaps } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-export const db = postgres<Contract>({
+export const db = postgres<Contract, TypeMaps>({
   contractJson,
   url: process.env['DATABASE_URL']!,
 });
@@ -193,10 +193,10 @@ type UserWithPosts = ResultType<typeof plan>;
 
 ```typescript
 import postgres from '@prisma-next/postgres/runtime';
-import type { Contract } from './contract.d';
+import type { Contract, TypeMaps } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-const db = postgres<Contract>({
+const db = postgres<Contract, TypeMaps>({
   contractJson,
   url: process.env['DATABASE_URL']!,
 });
