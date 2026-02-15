@@ -42,13 +42,18 @@ export async function getPrismaNextRuntime(): Promise<Runtime> {
       stack,
     });
 
-    const driverDescriptor = stack.driver;
-    if (!driverDescriptor) {
+    const driver = stackInstance.driver;
+    if (!driver) {
       throw new Error('Driver descriptor missing from execution stack');
     }
 
-    const driver = driverDescriptor.create({ cursor: { disabled: true } });
-    await driver.connect({ kind: 'pgClient', client });
+    try {
+      await driver.connect({ kind: 'pgClient', client });
+    } catch (error) {
+      await client.end();
+      client = undefined;
+      throw error;
+    }
 
     runtime = createRuntime({
       stackInstance,

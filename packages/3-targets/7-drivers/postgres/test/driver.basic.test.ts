@@ -212,7 +212,7 @@ describe('@prisma-next/driver-postgres', () => {
   );
 
   it(
-    'handles already connected client',
+    'fails fast when connect is called twice on runtime driver',
     async () => {
       const db = newDb();
       const { Client } = db.adapters.createPg();
@@ -225,7 +225,11 @@ describe('@prisma-next/driver-postgres', () => {
       };
 
       await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
-      await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
+      await expect(
+        driver.connect({ kind: 'pgClient', client: client as unknown as Client }),
+      ).rejects.toThrow(
+        'Postgres driver already connected. Call close() before reconnecting with a new binding.',
+      );
 
       await driver.query('create table items(id serial primary key, name text)');
       const result = await driver.query<{ id: number; name: string }>('select id, name from items');

@@ -21,6 +21,8 @@ export type PostgresRuntimeDriver = RuntimeDriverInstance<'sql', 'postgres'> &
 
 const USE_BEFORE_CONNECT_MESSAGE =
   'Postgres driver not connected. Call connect(binding) before acquireConnection or execute.';
+const ALREADY_CONNECTED_MESSAGE =
+  'Postgres driver already connected. Call close() before reconnecting with a new binding.';
 
 class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
   readonly familyId = 'sql' as const;
@@ -35,7 +37,7 @@ class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
 
   async connect(binding: PostgresBinding): Promise<void> {
     if (this.#delegate !== null) {
-      return;
+      throw new Error(ALREADY_CONNECTED_MESSAGE);
     }
     this.#delegate = createBoundDriverFromBinding(binding, this.#cursorOpts);
   }

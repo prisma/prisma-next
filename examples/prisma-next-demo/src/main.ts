@@ -55,8 +55,9 @@ const [cmd, ...args] = argv;
 
 async function main() {
   loadAppConfig();
-  const runtime = await db.runtime();
+  let runtime: Awaited<ReturnType<typeof db.runtime>> | undefined;
   try {
+    runtime = await db.runtime();
     if (cmd === 'users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await getUsers(runtime, limit);
@@ -165,7 +166,9 @@ async function main() {
     console.error('Error:', error);
     process.exit(1);
   } finally {
-    await runtime.close();
+    if (runtime) {
+      await runtime.close();
+    }
   }
 }
 

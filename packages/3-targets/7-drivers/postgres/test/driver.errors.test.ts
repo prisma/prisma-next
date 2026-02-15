@@ -286,10 +286,12 @@ describe('@prisma-next/driver-postgres', () => {
       { batchSize: 1, disabled: false },
     );
 
-    await expect(async () => {
-      for await (const _row of driver.execute({ sql: 'select 1' })) {
-      }
-    }).rejects.toThrow('cursor read failed');
+    await expect(
+      (async () => {
+        for await (const _row of driver.execute({ sql: 'select 1' })) {
+        }
+      })(),
+    ).rejects.toThrow('cursor read failed');
   });
 
   it('normalizes postgres cursor failures as SqlQueryError', async () => {
@@ -322,10 +324,12 @@ describe('@prisma-next/driver-postgres', () => {
       { batchSize: 1, disabled: false },
     );
 
-    await expect(async () => {
-      for await (const _row of driver.execute({ sql: 'select 1' })) {
-      }
-    }).rejects.toBeInstanceOf(SqlQueryError);
+    await expect(
+      (async () => {
+        for await (const _row of driver.execute({ sql: 'select 1' })) {
+        }
+      })(),
+    ).rejects.toBeInstanceOf(SqlQueryError);
   });
 
   it('supports no-op connect on pool and direct bound drivers', async () => {

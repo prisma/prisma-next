@@ -318,27 +318,29 @@ export function createBoundDriverFromBinding(
   binding: PostgresBinding,
   cursorOpts: PostgresDriverCreateOptions['cursor'],
 ): SqlDriver<PostgresBinding> {
-  if (binding.kind === 'url') {
-    const pool = new Pool({
-      connectionString: binding.url,
-      connectionTimeoutMillis: 20_000,
-      idleTimeoutMillis: 30_000,
-    });
-    return new PostgresPoolDriverImpl({
-      connect: { pool },
-      cursor: cursorOpts,
-    });
+  switch (binding.kind) {
+    case 'url': {
+      const pool = new Pool({
+        connectionString: binding.url,
+        connectionTimeoutMillis: 20_000,
+        idleTimeoutMillis: 30_000,
+      });
+      return new PostgresPoolDriverImpl({
+        connect: { pool },
+        cursor: cursorOpts,
+      });
+    }
+    case 'pgPool':
+      return new PostgresPoolDriverImpl({
+        connect: { pool: binding.pool },
+        cursor: cursorOpts,
+      });
+    case 'pgClient':
+      return new PostgresDirectDriverImpl({
+        connect: { client: binding.client },
+        cursor: cursorOpts,
+      });
   }
-  if (binding.kind === 'pgPool') {
-    return new PostgresPoolDriverImpl({
-      connect: { pool: binding.pool },
-      cursor: cursorOpts,
-    });
-  }
-  return new PostgresDirectDriverImpl({
-    connect: { client: binding.client },
-    cursor: cursorOpts,
-  });
 }
 
 function readCursor<Row>(cursor: Cursor<Row>, size: number): Promise<Row[]> {

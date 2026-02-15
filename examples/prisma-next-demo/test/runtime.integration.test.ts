@@ -13,21 +13,20 @@ import { describe, expect, it } from 'vitest';
 import { db } from '../src/prisma/db';
 
 const executionStack = db.stack;
-const executionStackInstance = instantiateExecutionStack(executionStack);
 const context = db.context;
 
 import { initTestDatabase } from './utils/control-client';
 
 async function createTestDriver(connectionString: string) {
-  const driverDescriptor = executionStack.driver;
-  if (!driverDescriptor) {
+  const stackInstance = instantiateExecutionStack(executionStack);
+  const driver = stackInstance.driver;
+  if (!driver) {
     throw new Error('Driver descriptor missing from execution stack');
   }
   const pool = new Pool({ connectionString });
-  const driver = driverDescriptor.create({ cursor: { disabled: true } });
   try {
     await driver.connect({ kind: 'pgPool', pool });
-    return driver;
+    return { stackInstance, driver };
   } catch (error) {
     await pool.end();
     throw error;
@@ -45,9 +44,9 @@ async function getRuntime(
     }),
   ],
 ): Promise<Runtime> {
-  const driver = await createTestDriver(connectionString);
+  const { stackInstance, driver } = await createTestDriver(connectionString);
   return createRuntime({
-    stackInstance: executionStackInstance,
+    stackInstance,
     context,
     driver,
     verify: { mode: 'onFirstUse', requireMarker: false },
@@ -161,9 +160,9 @@ describe('runtime execute integration', () => {
         });
 
         const createRuntimeInstance = async () => {
-          const driver = await createTestDriver(connectionString);
+          const { stackInstance, driver } = await createTestDriver(connectionString);
           return createRuntime({
-            stackInstance: executionStackInstance,
+            stackInstance,
             context,
             driver,
             verify: { mode: 'always', requireMarker: true },
@@ -303,9 +302,9 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const driver = await createTestDriver(connectionString);
+        const { stackInstance, driver } = await createTestDriver(connectionString);
         const runtime = createRuntime({
-          stackInstance: executionStackInstance,
+          stackInstance,
           context,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
@@ -380,9 +379,9 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const driver = await createTestDriver(connectionString);
+        const { stackInstance, driver } = await createTestDriver(connectionString);
         const runtime = createRuntime({
-          stackInstance: executionStackInstance,
+          stackInstance,
           context,
           driver,
           verify: { mode: 'onFirstUse', requireMarker: false },

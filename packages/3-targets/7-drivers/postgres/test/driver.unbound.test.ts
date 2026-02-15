@@ -93,7 +93,7 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
       );
 
       it(
-        'is idempotent when connect is called twice with the same binding',
+        'fails fast when connect is called twice',
         async () => {
           const db = newDb();
           const { Pool: MemPool } = db.adapters.createPg();
@@ -103,7 +103,9 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
           const binding = { kind: 'pgPool' as const, pool: memPool as unknown as Pool };
 
           await driver.connect(binding);
-          await driver.connect(binding);
+          await expect(driver.connect(binding)).rejects.toThrow(
+            'Postgres driver already connected. Call close() before reconnecting with a new binding.',
+          );
 
           await driver.query('create table items(id serial primary key, name text)');
           const result = await driver.query<{ id: number; name: string }>(

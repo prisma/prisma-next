@@ -580,5 +580,6 @@ const db = postgres<Contract>({
   url: process.env.DATABASE_URL!,
 });
 
-const results = await db.runtime().execute(query);
+const runtime = await db.runtime();
+const results = runtime.execute(query);
 ```

@@ -39,9 +39,9 @@ test('mock driver implementing SqlDriver<TestBinding> compiles and accepts bindi
           commit: async () => {},
           rollback: async () => {},
         }),
-      }) as Awaited<ReturnType<SqlDriver<TestBinding>['acquireConnection']>>,
+      }) as unknown as Awaited<ReturnType<SqlDriver<TestBinding>['acquireConnection']>>,
     close: async () => {},
-  } as SqlDriver<TestBinding>;
+  } as unknown as SqlDriver<TestBinding>;
 
   expectTypeOf(driver.connect).toBeFunction();
   expectTypeOf(driver.connect).parameter(0).toEqualTypeOf<TestBinding>();

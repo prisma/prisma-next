@@ -93,11 +93,14 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       await initTestDatabase({ connection: connectionString, contractIR: contract });
 
       // Seed 100 test users using a runtime without strict budgets
-      const { runtime: seedRuntime } = await createTestRuntime(connectionString, contract);
+      const { runtime: seedRuntime, pool: seedPool } = await createTestRuntime(
+        connectionString,
+        contract,
+      );
       try {
         await seedTestUsers(seedRuntime, 100);
       } finally {
-        await seedRuntime.close();
+        await closeTestRuntime({ runtime: seedRuntime, pool: seedPool });
       }
 
       // Now create a runtime with strict budget for testing
@@ -142,11 +145,14 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       await initTestDatabase({ connection: connectionString, contractIR: contract });
 
       // Seed users using a runtime without strict budgets
-      const { runtime: seedRuntime } = await createTestRuntime(connectionString, contract);
+      const { runtime: seedRuntime, pool: seedPool } = await createTestRuntime(
+        connectionString,
+        contract,
+      );
       try {
         await seedTestUsers(seedRuntime, 100);
       } finally {
-        await seedRuntime.close();
+        await closeTestRuntime({ runtime: seedRuntime, pool: seedPool });
       }
 
       const { runtime, pool } = await createTestRuntime(connectionString, contract, {
@@ -188,11 +194,14 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       await initTestDatabase({ connection: connectionString, contractIR: contract });
 
       // Seed users using a runtime without strict budgets
-      const { runtime: seedRuntime } = await createTestRuntime(connectionString, contract);
+      const { runtime: seedRuntime, pool: seedPool } = await createTestRuntime(
+        connectionString,
+        contract,
+      );
       try {
         await seedTestUsers(seedRuntime, 100);
       } finally {
-        await seedRuntime.close();
+        await closeTestRuntime({ runtime: seedRuntime, pool: seedPool });
       }
 
       const { runtime, pool } = await createTestRuntime(connectionString, contract, {

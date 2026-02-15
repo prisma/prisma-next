@@ -13,20 +13,20 @@ function createMockDriverWithVoidBinding(): SqlDriver {
     ...queryable,
     commit: async () => {},
     rollback: async () => {},
-  } as Awaited<ReturnType<SqlConnection['beginTransaction']>>;
+  } as unknown as Awaited<ReturnType<SqlConnection['beginTransaction']>>;
 
   const connection = {
     ...queryable,
     release: async () => {},
     beginTransaction: async () => transaction,
-  } as SqlConnection;
+  } as unknown as SqlConnection;
 
   return {
     ...queryable,
     connect: async (_binding?: undefined) => {},
     acquireConnection: async () => connection,
     close: async () => {},
-  } as SqlDriver;
+  } as unknown as SqlDriver;
 }
 
 describe('SqlDriver', () => {
