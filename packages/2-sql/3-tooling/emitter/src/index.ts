@@ -309,6 +309,11 @@ export const sqlTargetFamilyHook = {
   export type LaneCodecTypes = CodecTypes;
   export type OperationTypes = ${operationTypes || 'Record<string, never>'};
 
+  export type TypeMaps = {
+    readonly codecTypes: CodecTypes;
+    readonly operationTypes: OperationTypes;
+  };
+
   export type Contract = SqlContract<
   ${storageType},
   ${modelsType},
@@ -317,7 +322,7 @@ export const sqlTargetFamilyHook = {
   StorageHash,
   ExecutionHash,
   ProfileHash
-  > & { readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes; readonly '__@prisma-next/sql-contract/operationTypes@__': OperationTypes };
+  >;
 
   export type Tables = Contract['storage']['tables'];
   export type Models = Contract['models'];
