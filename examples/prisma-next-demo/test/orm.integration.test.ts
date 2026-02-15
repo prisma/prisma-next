@@ -126,7 +126,7 @@ describe('ORM integration tests', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         // Initialize schema using control client
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
 
         const runtime = await getRuntime(connectionString);
         try {
@@ -157,7 +157,7 @@ describe('ORM integration tests', () => {
     'orm.getUserById returns single user by ID',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -184,7 +184,7 @@ describe('ORM integration tests', () => {
     'orm relation filters: where.related.posts.some() returns users with at least one post',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -213,7 +213,7 @@ describe('ORM integration tests', () => {
     'orm includes: include.posts() returns users with nested posts arrays',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -247,7 +247,7 @@ describe('ORM integration tests', () => {
     'orm writes: create() inserts a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -270,7 +270,7 @@ describe('ORM integration tests', () => {
     'orm writes: update() updates a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -296,7 +296,7 @@ describe('ORM integration tests', () => {
     'orm writes: delete() deletes a user',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -318,7 +318,7 @@ describe('ORM integration tests', () => {
     'orm pagination: ormGetUsersByIdCursor returns paginated users with gt cursor',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
         const runtime = await getRuntime(connectionString);
 
         try {
@@ -357,7 +357,7 @@ describe('ORM integration tests', () => {
     'orm pagination: ormGetUsersBackward returns users before cursor with lt operator',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
-        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        await initTestDatabase({ connection: connectionString, contract: contract });
         const runtime = await getRuntime(connectionString);
 
         try {
