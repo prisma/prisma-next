@@ -1,5 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
+import type { PostgresDriverCreateOptions } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import type { PostgresDriverCreateOptions } from '@prisma-next/driver-postgres/runtime';
 import type {

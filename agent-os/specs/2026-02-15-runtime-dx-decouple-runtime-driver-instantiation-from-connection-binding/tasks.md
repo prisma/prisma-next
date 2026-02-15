@@ -209,13 +209,13 @@ Groups 1–4 can be partially parallelized (1 before 2 and 3; 2 before 4). Group
 
 ### 8.1 Implementation
 
-- [ ] Add ADR or extend spec section documenting:
+- [x] Add ADR or extend spec section documenting:
   - "Driver" = Prisma Next interface (not underlying library like `pg`).
   - All drivers adhere to common interface; instantiation ≠ connection.
   - Connection binding is driver-determined; each driver defines its own binding type.
-- [ ] Update `docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md` with new connection lifecycle (instantiate stack with driver → connect at boundary → create runtime).
-- [ ] Update `packages/1-framework/1-core/runtime/execution-plane/README.md` and `packages/3-targets/7-drivers/postgres/README.md` to reflect new flow.
-- [ ] Ensure ADR 152 or follow-on ADR captures `RuntimeDriverDescriptor.create(options?)` and `SqlDriver.connect(binding)` changes.
+- [x] Update `docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md` with new connection lifecycle (instantiate stack with driver → connect at boundary → create runtime).
+- [x] Update `packages/1-framework/1-core/runtime/execution-plane/README.md` and `packages/3-targets/7-drivers/postgres/README.md` to reflect new flow.
+- [x] Ensure ADR 152 or follow-on ADR captures `RuntimeDriverDescriptor.create(options?)` and `SqlDriver.connect(binding)` changes.
 
 **Acceptance criteria:** Driver terminology and lifecycle documented; architecture docs and package READMEs updated; ADR or spec section records the decision.
 
@@ -225,9 +225,9 @@ Groups 1–4 can be partially parallelized (1 before 2 and 3; 2 before 4). Group
 
 Before marking complete:
 
-- [ ] `pnpm build` succeeds.
-- [ ] `pnpm test:packages` passes.
-- [ ] `pnpm test:integration` passes.
-- [ ] `pnpm lint:deps` passes (no layering violations).
-- [ ] Examples (`prisma-next-demo`, `prisma-orm-demo`, `prisma-no-emit`) run successfully.
-- [ ] Use-before-connect produces clear, actionable error.
+- [x] `pnpm build` succeeds.
+- [⚠️] `pnpm test:packages` passes. (fails in `@prisma-next/integration-kysely`: `Command "prisma-next" not found`)
+- [x] `pnpm test:integration` passes.
+- [x] `pnpm lint:deps` passes (no layering violations).
+- [x] Examples (`prisma-next-demo`, `prisma-orm-demo`, `prisma-no-emit`) run successfully.
+- [x] Use-before-connect produces clear, actionable error.

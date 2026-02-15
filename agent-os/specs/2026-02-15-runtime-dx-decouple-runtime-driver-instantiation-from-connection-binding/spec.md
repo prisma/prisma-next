@@ -12,6 +12,8 @@ This aligns execution-plane drivers with target/adapter/extension behavior: `ins
 
 ## Terminology (Recorded for Spec and ADR)
 
+See [ADR 159 — Driver Terminology and Lifecycle](../../../docs/architecture%20docs/adrs/ADR%20159%20-%20Driver%20Terminology%20and%20Lifecycle.md).
+
 - **Driver**: In Prisma Next, "driver" refers to the Prisma Next interface implementing execution behavior—*not* the underlying library (e.g. `pg`). All drivers adhere to a common interface. Instantiation ≠ connection.
 - **Connection binding**: Driver-determined configuration that wires the driver to a transport (e.g. Postgres: pool/client; future: HTTP, in-memory).
 
@@ -226,6 +228,7 @@ No visual assets were provided. The planning `visuals/` directory is empty. Sugg
 
 ## References
 
-- [ADR 152 — Execution Plane Descriptors and Instances](../../../docs/architecture docs/adrs/ADR 152 - Execution Plane Descriptors and Instances.md)
-- [Runtime & Plugin Framework subsystem](../../../docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md)
+- [ADR 152 — Execution Plane Descriptors and Instances](../../../docs/architecture%20docs/adrs/ADR%20152%20-%20Execution%20Plane%20Descriptors%20and%20Instances.md)
+- [ADR 159 — Driver Terminology and Lifecycle](../../../docs/architecture%20docs/adrs/ADR%20159%20-%20Driver%20Terminology%20and%20Lifecycle.md)
+- [Runtime & Plugin Framework subsystem](../../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)
 - [Postgres one-liner lazy client spec](../2026-02-10-postgres-one-liner-lazy-client/spec.md) (TML-1891, related)

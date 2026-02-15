@@ -1,0 +1,107 @@
+# Verification Report: Runtime DX: Decouple Runtime Driver Instantiation from Connection Binding
+
+**Spec:** `2026-02-15-runtime-dx-decouple-runtime-driver-instantiation-from-connection-binding`
+**Date:** 2026-02-15
+**Verifier:** implementation-verifier
+**Status:** ❌ Failed
+
+---
+
+## Executive Summary
+
+Implementation for task groups 1-8 is present and documented in `tasks.md`, with only one verification checklist item marked ⚠️ due to a known package-suite failure. Roadmap did not require checkbox updates. Full-suite verification surfaced regressions in e2e runtime tests and one package test-command failure, so verification status is failed.
+
+---
+
+## 1. Tasks Verification
+
+**Status:** ⚠️ Issues Found
+
+### Completed Tasks
+- [x] Task Group 1: Core interfaces (RuntimeDriverDescriptor, ExecutionStackInstance)
+  - [x] Subtask 1.1
+  - [x] Subtask 1.2
+- [x] Task Group 2: SqlDriver interface (connect with binding)
+  - [x] Subtask 2.1
+  - [x] Subtask 2.2
+- [x] Task Group 3: Execution stack
+  - [x] Subtask 3.1
+  - [x] Subtask 3.2
+- [x] Task Group 4: Postgres driver (unbound create, connect with binding)
+  - [x] Subtask 4.1
+  - [x] Subtask 4.2
+- [x] Task Group 5: Runtime wiring (postgres client, createRuntime)
+  - [x] Subtask 5.1
+  - [x] Subtask 5.2
+- [x] Task Group 6: Examples and integration
+  - [x] Subtask 6.1
+- [x] Task Group 7: Legacy helper cleanup
+  - [x] Subtask 7.1
+  - [x] Subtask 7.2
+- [x] Task Group 8: Docs and ADR
+  - [x] Subtask 8.1
+
+### Incomplete or Issues
+- ⚠️ Verification checklist item: `pnpm test:packages` remains non-passing due to `@prisma-next/integration-kysely` failing with `Command "prisma-next" not found`.
+
+---
+
+## 2. Documentation Verification
+
+**Status:** ⚠️ Issues Found
+
+### Implementation Documentation
+- [x] Spec and tasks updated:
+  - `agent-os/specs/2026-02-15-runtime-dx-decouple-runtime-driver-instantiation-from-connection-binding/spec.md`
+  - `agent-os/specs/2026-02-15-runtime-dx-decouple-runtime-driver-instantiation-from-connection-binding/tasks.md`
+- [x] ADR and subsystem updates:
+  - `docs/architecture docs/adrs/ADR 159 - Driver Terminology and Lifecycle.md`
+  - `docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md`
+
+### Verification Documentation
+- [x] Final verification report: `agent-os/specs/2026-02-15-runtime-dx-decouple-runtime-driver-instantiation-from-connection-binding/verifications/final-verification.html`
+
+### Missing Documentation
+- `agent-os/specs/2026-02-15-runtime-dx-decouple-runtime-driver-instantiation-from-connection-binding/implementation/` reports are not present.
+
+---
+
+## 3. Roadmap Updates
+
+**Status:** ⚠️ No Updates Needed
+
+### Updated Roadmap Items
+- None
+
+### Notes
+`agent-os/product/roadmap.md` currently contains no task checkboxes tied directly to this spec slice, so no roadmap edits were applied.
+
+---
+
+## 4. Test Suite Results
+
+**Status:** ❌ Critical Failures
+
+### Test Summary
+- **Total Tests:** 269 (from suites with explicit totals: integration + examples + e2e)
+- **Passing:** 248
+- **Failing:** 19
+- **Errors:** 1 package-suite task failure (`@prisma-next/integration-kysely#test`)
+
+### Failed Tests
+- `pnpm test:packages`:
+  - `@prisma-next/integration-kysely#test` failed: `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`, `Command "prisma-next" not found`
+- `pnpm test:e2e` (`@prisma-next/e2e-tests`):
+  - 19 tests failed across:
+    - `test/runtime.joins.test.ts`
+    - `test/runtime.projections.test.ts`
+    - `test/runtime.includes.test.ts`
+    - `test/dml.test.ts`
+    - `test/ddl.test.ts`
+    - `test/runtime.basic.test.ts`
+  - Common failure signature: `TypeError: runtime.close is not a function` in `test/e2e/framework/test/utils.ts`
+
+### Notes
+- `pnpm test:integration` passed: 34 files, 220 passed, 2 skipped.
+- `pnpm test:examples` passed: 32 Turbo tasks successful; example Vitest totals 25 passed (22 in `prisma-next-demo`, 3 in `prisma-orm-demo`).
+- `pnpm test:all` failed early because `pnpm test:packages` failed, so remaining chained suites were run manually as part of verification.

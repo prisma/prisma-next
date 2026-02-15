@@ -27,7 +27,7 @@ test('ExecutionStackInstance.driver type includes driver instance when stack has
     create: () => ({ familyId: 'sql', targetId: 'postgres' }),
   };
 
-  const driver: RuntimeDriverDescriptor<'sql', 'postgres', void, MockDriverInstance> = {
+  const driverDescriptor: RuntimeDriverDescriptor<'sql', 'postgres', void, MockDriverInstance> = {
     kind: 'driver',
     id: 'pg-driver',
     familyId: 'sql',
@@ -36,11 +36,17 @@ test('ExecutionStackInstance.driver type includes driver instance when stack has
     create: () => ({ familyId: 'sql', targetId: 'postgres' }),
   };
 
-  const stackWithDriver = createExecutionStack({ target, adapter, driver });
+  const stackWithDriver = createExecutionStack({ target, adapter, driver: driverDescriptor });
   const instanceWithDriver = instantiateExecutionStack(stackWithDriver);
 
   expectTypeOf(instanceWithDriver).toHaveProperty('driver');
   expectTypeOf(instanceWithDriver.driver).toMatchTypeOf<MockDriverInstance | undefined>();
+
+  const instanceDriver = instanceWithDriver.driver;
+  if (instanceDriver === undefined) {
+    throw new Error('driver should exist when stack has driver descriptor');
+  }
+  expectTypeOf(instanceDriver).toMatchTypeOf<MockDriverInstance>();
 });
 
 test('ExecutionStackInstance has driver property when stack has no driver descriptor', () => {
