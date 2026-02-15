@@ -14,36 +14,36 @@ Expand the PN SQL AST in a lane-neutral way to support the demo scope. These cha
 
 ### 1.1 Boolean composition (AND/OR)
 
-- [ ] Add `AndExpr` and `OrExpr` node kinds to `WhereExpr` in `packages/2-sql/4-lanes/relational-core/src/ast/types.ts`
-- [ ] Extend `WhereExpr` union to include `AndExpr | OrExpr`
-- [ ] Update adapter lowering to handle `AndExpr` / `OrExpr` (Postgres adapter)
-- [ ] Add unit tests for lowering new node kinds
+- [x] Add `AndExpr` and `OrExpr` node kinds to `WhereExpr` in `packages/2-sql/4-lanes/relational-core/src/ast/types.ts`
+- [x] Extend `WhereExpr` union to include `AndExpr | OrExpr`
+- [x] Update adapter lowering to handle `AndExpr` / `OrExpr` (Postgres adapter)
+- [x] Add unit tests for lowering new node kinds
 
 ### 1.2 Predicate operators
 
-- [ ] Add `like` and `ilike` (if needed) to `BinaryOp` union in AST types
-- [ ] Add `in` and `notIn` to `BinaryOp` union
-- [ ] Add `ListLiteralExpr` (or equivalent) for `IN (...)` operands
-- [ ] Update adapter lowering for new operators
-- [ ] Add unit tests for `like`, `in` lowering
+- [x] Add `like` and `ilike` (if needed) to `BinaryOp` union in AST types
+- [x] Add `in` and `notIn` to `BinaryOp` union
+- [x] Add `ListLiteralExpr` (or equivalent) for `IN (...)` operands
+- [x] Update adapter lowering for new operators
+- [x] Add unit tests for `like`, `in` lowering
 
 ### 1.3 Join ON expressiveness
 
-- [ ] Evolve `JoinAst.on` from `eqCol`-only to accept `WhereExpr` (or a compatible expression structure)
-- [ ] Update join lowering in adapter
-- [ ] Add tests for join conditions
+- [x] Evolve `JoinAst.on` from `eqCol`-only to accept `WhereExpr` (or a compatible expression structure)
+- [x] Update join lowering in adapter
+- [x] Add tests for join conditions
 
 ### 1.4 selectAll intent
 
-- [ ] Add `selectAll` intent representation—either an explicit AST node or `meta.annotations.selectAllIntent` when normalized to explicit columns
-- [ ] Ensure `SelectAst.project` can represent select-all when expanded via contract table columns
-- [ ] Add tests for selectAll expansion and intent preservation
+- [x] Add `selectAll` intent representation—either an explicit AST node or `meta.annotations.selectAllIntent` when normalized to explicit columns
+- [x] Ensure `SelectAst.project` can represent select-all when expanded via contract table columns
+- [x] Add tests for selectAll expansion and intent preservation
 
 ### 1.5 Optional mutation WHERE
 
-- [ ] Make `DeleteAst.where` optional (`WhereExpr | undefined`)
-- [ ] Make `UpdateAst.where` optional (`WhereExpr | undefined`)
-- [ ] Add tests ensuring undefined where is representable
+- [x] Make `DeleteAst.where` optional (`WhereExpr | undefined`)
+- [x] Make `UpdateAst.where` optional (`WhereExpr | undefined`)
+- [x] Add tests ensuring undefined where is representable
 
 **Phase 1 acceptance criteria**:
 
