@@ -78,5 +78,5 @@ Only `SelectQueryNode` with joins is validated; INSERT/UPDATE/DELETE are single-
 
 ## See also
 
-- [ADR 159](../../docs/architecture%20docs/adrs/ADR%20159%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md)
+- [ADR 160](../../docs/architecture%20docs/adrs/ADR%20160%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md)
 - [Transform spec](../../agent-os/specs/2026-02-15-transform-kysely-ast-to-pn-ast/spec.md)
