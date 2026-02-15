@@ -1,4 +1,5 @@
 import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
+import type { PluginContext } from '@prisma-next/runtime-executor';
 import type {
   BinaryExpr,
   DeleteAst,
@@ -15,7 +16,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 import { lints } from '../src/plugins/lints';
 
-function createPluginContext() {
+function createPluginContext(): PluginContext<unknown, unknown, unknown> {
   return {
     contract: {},
     adapter: {},
@@ -63,7 +64,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await expect(plugin.beforeExecute?.(plan, ctx as never)).rejects.toMatchObject({
+      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'LINT.DELETE_WITHOUT_WHERE',
         message: expect.stringContaining('DELETE without WHERE'),
         details: { table: 'user' },
@@ -82,7 +83,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).not.toHaveBeenCalled();
     });
   });
@@ -98,7 +99,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await expect(plugin.beforeExecute?.(plan, ctx as never)).rejects.toMatchObject({
+      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'LINT.UPDATE_WITHOUT_WHERE',
         message: expect.stringContaining('UPDATE without WHERE'),
         details: { table: 'user' },
@@ -121,7 +122,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).not.toHaveBeenCalled();
     });
   });
@@ -136,7 +137,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'LINT.NO_LIMIT',
@@ -155,7 +156,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).not.toHaveBeenCalled();
     });
 
@@ -168,7 +169,7 @@ describe('lints plugin', () => {
       const plugin = lints({ severities: { noLimit: 'error' } });
       const ctx = createPluginContext();
 
-      await expect(plugin.beforeExecute?.(plan, ctx as never)).rejects.toMatchObject({
+      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'LINT.NO_LIMIT',
         message: expect.stringContaining('Unbounded SELECT'),
       });
@@ -187,7 +188,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'LINT.SELECT_STAR',
@@ -210,7 +211,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'LINT.SELECT_STAR',
@@ -229,7 +230,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).not.toHaveBeenCalled();
     });
 
@@ -244,7 +245,7 @@ describe('lints plugin', () => {
       const plugin = lints({ severities: { selectStar: 'error' } });
       const ctx = createPluginContext();
 
-      await expect(plugin.beforeExecute?.(plan, ctx as never)).rejects.toMatchObject({
+      await expect(plugin.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
         code: 'LINT.SELECT_STAR',
         message: expect.stringContaining('selectAll intent'),
       });
@@ -262,7 +263,7 @@ describe('lints plugin', () => {
       const plugin = lints({ fallbackWhenAstMissing: 'raw' });
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'LINT.NO_LIMIT',
@@ -281,7 +282,7 @@ describe('lints plugin', () => {
       const plugin = lints({ fallbackWhenAstMissing: 'skip' });
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).not.toHaveBeenCalled();
     });
 
@@ -295,7 +296,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'LINT.NO_LIMIT',
@@ -317,7 +318,7 @@ describe('lints plugin', () => {
       const plugin = lints();
       const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx as never);
+      await plugin.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).not.toHaveBeenCalled();
     });
   });

@@ -25,9 +25,9 @@ describe('ParamDescriptor', () => {
         lane: 'kysely',
         paramDescriptors: [{ index: 1, source: 'lane', refs: { table: 'user', column: 'id' } }],
       };
-      expect(meta.paramDescriptors).toHaveLength(1);
-      expect(meta.paramDescriptors[0]?.source).toBe('lane');
-      expect(meta.paramDescriptors[0]?.refs).toEqual({ table: 'user', column: 'id' });
+      expect(meta.paramDescriptors).toEqual([
+        { index: 1, source: 'lane', refs: { table: 'user', column: 'id' } },
+      ]);
     });
   });
 });
