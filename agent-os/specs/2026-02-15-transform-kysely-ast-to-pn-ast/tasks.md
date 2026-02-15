@@ -244,16 +244,16 @@ Move lint plugin from framework to SQL runtime and update exports.
 
 ### 7.1 Migration
 
-- [ ] Ensure `packages/2-sql/5-runtime/src/plugins/lints.ts` is the canonical implementation (from Phase 6)
-- [ ] Export lints from `packages/2-sql/5-runtime/src/exports/index.ts`
-- [ ] Update framework `packages/1-framework/4-runtime-executor`: remove or deprecate `plugins/lints.ts`, add re-export from SQL runtime if backward compat desired
-- [ ] Update any imports that reference framework lints to use SQL runtime
-- [ ] Run `pnpm lint:deps` to validate imports
+- [x] Ensure `packages/2-sql/5-runtime/src/plugins/lints.ts` is the canonical implementation (from Phase 6)
+- [x] Export lints from `packages/2-sql/5-runtime/src/exports/index.ts`
+- [x] Update framework `packages/1-framework/4-runtime-executor`: remove or deprecate `plugins/lints.ts`, add re-export from SQL runtime if backward compat desired
+- [x] Update any imports that reference framework lints to use SQL runtime
+- [x] Run `pnpm lint:deps` to validate imports
 
 ### 7.2 Package README
 
-- [ ] Update SQL runtime README: document lints plugin, export surface, usage
-- [ ] Update framework README if lints were removed or deprecated
+- [x] Update SQL runtime README: document lints plugin, export surface, usage
+- [x] Update framework README if lints were removed or deprecated
 
 **Phase 7 acceptance criteria**:
 
