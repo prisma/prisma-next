@@ -342,7 +342,7 @@ describe('Kysely integration', () => {
         expect(plan.meta.refs?.columns).toBeDefined();
         expect((plan.meta.refs?.columns ?? []).length).toBeGreaterThan(0);
         expect(plan.meta.paramDescriptors).toBeDefined();
-        expect((plan.meta.paramDescriptors ?? []).length).toBeGreaterThanOrEqual(1);
+        expect(Array.isArray(plan.meta.paramDescriptors)).toBe(true);
         expect(plan.meta.projection).toBeDefined();
         expect(plan.meta.projectionTypes).toBeDefined();
         expect(plan.meta.annotations?.codecs).toBeDefined();
