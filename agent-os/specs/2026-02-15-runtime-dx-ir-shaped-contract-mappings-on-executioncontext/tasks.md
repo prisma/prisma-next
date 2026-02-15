@@ -93,9 +93,9 @@ Source:
 
 ## 6) Final verification
 
-- [ ] Run targeted package tests covering:
+- [x] Run targeted package tests covering:
   - SQL contract types/validation
   - relational core / sql-lane / orm-lane typing
   - postgres convenience client typing where relevant
-- [ ] Run integration/e2e tests that exercise emitted and no-emit workflows.
-- [ ] Confirm no remaining runtime reads of type-only mapping properties.
+- [x] Run integration/e2e tests that exercise emitted and no-emit workflows.
+- [x] Confirm no remaining runtime reads of type-only mapping properties.

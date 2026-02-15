@@ -65,7 +65,7 @@ const fixtureContract = createTestContract({
   },
   models: {},
   relations: {},
-  mappings: { codecTypes: {}, operationTypes: {} },
+  mappings: {},
 });
 
 function createTestRuntime(mockDriver: MockDriver): Runtime {
