@@ -66,7 +66,6 @@ For phase-specific execution without full orchestration, use:
 - `/agent-os/review-fetch-phase <PR_URL> [output-dir]`
 - `/agent-os/review-triage-phase <PR_URL> [output-dir]`
 - `/agent-os/review-implement-phase <PR_URL> [output-dir]`
-- `/agent-os/review-apply-phase <PR_URL> [output-dir]` (optional recovery only)
 
 ## Behavioral rules
 
