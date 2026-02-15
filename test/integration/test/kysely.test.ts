@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import type { Plugin } from '@prisma-next/sql-runtime';
 import { teardownTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Kysely, sql } from 'kysely';
@@ -10,6 +12,15 @@ import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/contract.js';
 import { createTestRuntimeFromClient, setupE2EDatabase } from './utils.js';
+
+function createPlanCapturePlugin(captured: ExecutionPlan[]): Plugin {
+  return {
+    name: 'plan-capture',
+    async beforeExecute(plan) {
+      captured.push(plan);
+    },
+  };
+}
 
 // Load contract fixture from the integration test fixtures
 const fixtureContract = loadContractFixture();
@@ -295,6 +306,72 @@ describe('Kysely integration', () => {
           .execute();
 
         expect(users).toHaveLength(0);
+      },
+      testTimeout,
+    );
+  });
+
+  describe('plan structure (Phase 5)', () => {
+    it(
+      'attaches plan.ast, meta.lane, meta.refs, paramDescriptors for Kysely select',
+      async () => {
+        const captured: ExecutionPlan[] = [];
+        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+          plugins: [createPlanCapturePlugin(captured)],
+        });
+
+        const kysely = new Kysely<KyselifyContract<Contract>>({
+          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
+        });
+
+        await kysely
+          .selectFrom('user')
+          .select(['id', 'email'])
+          .where('email', 'like', '%@example.com')
+          .limit(5)
+          .execute();
+
+        expect(captured).toHaveLength(1);
+        const plan = captured[0];
+        expect(plan.ast).toBeDefined();
+        expect(plan.ast?.kind).toBe('select');
+        expect(plan.meta.lane).toBe('kysely');
+        expect(plan.meta.refs).toBeDefined();
+        expect(plan.meta.refs?.tables).toContain('user');
+        expect(plan.meta.refs?.columns).toBeDefined();
+        expect((plan.meta.refs?.columns ?? []).length).toBeGreaterThan(0);
+        expect(plan.meta.paramDescriptors).toBeDefined();
+        expect((plan.meta.paramDescriptors ?? []).length).toBeGreaterThanOrEqual(1);
+        expect(plan.meta.projection).toBeDefined();
+        expect(plan.meta.projectionTypes).toBeDefined();
+        expect(plan.meta.annotations?.codecs).toBeDefined();
+      },
+      testTimeout,
+    );
+
+    it(
+      'uses lane raw and no ast for raw sql queries',
+      async () => {
+        const captured: ExecutionPlan[] = [];
+        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+          plugins: [createPlanCapturePlugin(captured)],
+        });
+
+        const kysely = new Kysely<KyselifyContract<Contract>>({
+          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
+        });
+
+        await sql<{ id: number; email: string }>`
+          SELECT id, email FROM "user" WHERE email = ${'ada@example.com'}
+        `.execute(kysely);
+
+        expect(captured).toHaveLength(1);
+        const plan = captured[0];
+        expect(plan.ast).toBeUndefined();
+        expect(plan.meta.lane).toBe('raw');
+        expect(plan.meta.paramDescriptors).toEqual([]);
       },
       testTimeout,
     );
