@@ -2,8 +2,11 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import type {
+  CodecTypesOf,
   ExtractCodecTypes,
   ExtractOperationTypes,
+  ExtractTypeMapsFromContract,
+  OperationTypesOf,
   SqlContract,
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
@@ -55,18 +58,23 @@ type OrmClient<TContract extends SqlContract<SqlStorage>> = ReturnType<
   typeof ormBuilder<TContract>
 >;
 
-export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
+export interface PostgresClient<
+  TContract extends SqlContract<SqlStorage>,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
+> {
   readonly sql: SelectBuilder<
     TContract,
     unknown,
-    ExtractCodecTypes<TContract>,
-    ExtractOperationTypes<TContract>
+    [TTypeMaps] extends [never] ? ExtractCodecTypes<TContract> : CodecTypesOf<TTypeMaps>,
+    [TTypeMaps] extends [never] ? ExtractOperationTypes<TContract> : OperationTypesOf<TTypeMaps>
   >;
   readonly kysely: KyselyQueryLane<TContract>;
   readonly schema: SchemaHandle<
     TContract,
-    ExtractCodecTypes<TContract>,
-    ToSchemaOperationTypes<ExtractOperationTypes<TContract>>
+    [TTypeMaps] extends [never] ? ExtractCodecTypes<TContract> : CodecTypesOf<TTypeMaps>,
+    ToSchemaOperationTypes<
+      [TTypeMaps] extends [never] ? ExtractOperationTypes<TContract> : OperationTypesOf<TTypeMaps>
+    >
   >;
   readonly orm: OrmClient<TContract>;
   readonly context: ExecutionContext<TContract>;
@@ -143,16 +151,22 @@ function toRuntimeBinding<TContract extends SqlContract<SqlStorage>>(
 /**
  * Creates a lazy Postgres client from either `contractJson` or a TypeScript-authored `contract`.
  * Static query surfaces are available immediately, while `runtime()` instantiates the driver/pool on first call.
+ *
+ * - No-emit: infers TypeMaps from ContractWithTypeMaps. Example: postgres({ contract })
+ * - Emitted: pass TypeMaps explicitly. Example: postgres<Contract, TypeMaps>({ contractJson, url })
  */
-export default function postgres<TContract extends SqlContract<SqlStorage>>(
-  options: PostgresOptionsWithContract<TContract>,
-): PostgresClient<TContract>;
-export default function postgres<TContract extends SqlContract<SqlStorage>>(
-  options: PostgresOptionsWithContractJson<TContract>,
-): PostgresClient<TContract>;
-export default function postgres<TContract extends SqlContract<SqlStorage>>(
-  options: PostgresOptions<TContract>,
-): PostgresClient<TContract> {
+export default function postgres<
+  TContract extends SqlContract<SqlStorage>,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
+>(options: PostgresOptionsWithContract<TContract>): PostgresClient<TContract, TTypeMaps>;
+export default function postgres<
+  TContract extends SqlContract<SqlStorage>,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
+>(options: PostgresOptionsWithContractJson<TContract>): PostgresClient<TContract, TTypeMaps>;
+export default function postgres<
+  TContract extends SqlContract<SqlStorage>,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
+>(options: PostgresOptions<TContract>): PostgresClient<TContract, TTypeMaps> {
   const contract = resolveContract(options);
   let binding = resolveOptionalPostgresBinding(options);
   const stack = createSqlExecutionStack({
@@ -167,8 +181,8 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     stack,
   });
 
-  const schema: PostgresClient<TContract>['schema'] = schemaBuilder(context);
-  const sql = sqlBuilder({ context });
+  const schema = schemaBuilder<TContract, TTypeMaps>(context);
+  const sql = sqlBuilder<TContract, TTypeMaps>({ context });
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
@@ -242,7 +256,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
   return {
     sql,
     kysely: createKyselyLane(contract),
-    schema,
+    schema: schema as PostgresClient<TContract, TTypeMaps>['schema'],
     orm,
     context,
     stack,
