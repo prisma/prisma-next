@@ -30,7 +30,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
 
       await expect(driver.query('select * from nonexistent_table')).rejects.toThrow();
     },
@@ -62,7 +62,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
 
@@ -97,7 +97,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1)', ['test']);
 
@@ -127,6 +127,7 @@ describe('@prisma-next/driver-postgres', () => {
       await driver.close();
     };
 
+    await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
     // Mock client.connect to throw a non-"already connected" error
     // connect() is a no-op, so we test acquireClient indirectly through query()
     const originalConnect = client.connect.bind(client);
@@ -154,6 +155,7 @@ describe('@prisma-next/driver-postgres', () => {
       await driver.close();
     };
 
+    await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
     // Mock client.connect to throw a non-Error exception
     // connect() is a no-op, so we test acquireClient indirectly through query()
     const originalConnect = client.connect.bind(client);
@@ -183,7 +185,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
 
@@ -218,7 +220,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1)', ['test']);
 
@@ -252,6 +254,7 @@ describe('@prisma-next/driver-postgres', () => {
       connect: { client },
     });
 
+    await driver.connect({ kind: 'pgClient', client });
     await driver.query('select 1');
 
     expect(client.connect).not.toHaveBeenCalled();
@@ -274,6 +277,7 @@ describe('@prisma-next/driver-postgres', () => {
       connect: { client },
     });
 
+    await driver.connect({ kind: 'pgClient', client });
     await driver.close();
 
     expect(mockClient.end).toHaveBeenCalled();

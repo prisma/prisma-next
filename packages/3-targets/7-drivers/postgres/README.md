@@ -87,27 +87,32 @@ flowchart TD
 
 ## Usage
 
+**Descriptor + connect (recommended):**
+
 ```typescript
-import { createPostgresDriver } from '@prisma-next/driver-postgres/runtime';
-import { createRuntime } from '@prisma-next/sql-runtime';
+import postgresDriver from '@prisma-next/driver-postgres/runtime';
 
-const driver = createPostgresDriver({
-  connectionString: process.env.DATABASE_URL,
-});
+const driver = postgresDriver.create({ cursor: { batchSize: 100 } });
+await driver.connect({ kind: 'url', url: process.env.DATABASE_URL });
+// driver is now bound; use acquireConnection, query, execute, etc.
+```
 
-const runtime = createRuntime({
-  contract,
-  adapter: postgresAdapter,
-  driver,
-});
+**Legacy helpers (bound at construction; connect is a no-op):**
+
+```typescript
+import { createPostgresDriver, createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
+
+const driver = createPostgresDriver(process.env.DATABASE_URL);
+// Bound drivers from createPostgresDriver/createPostgresDriverFromOptions are ready immediately
 ```
 
 ## Exports
 
 - `./runtime`: Runtime entry point for driver implementation
-  - `createPostgresDriver(connectionString, options?)`: Create driver from connection string
-  - `createPostgresDriverFromOptions(options)`: Create driver from options object
-  - Types: `PostgresDriverOptions`, `QueryResult`
+  - Default: `postgresRuntimeDriverDescriptor` — use `create()` for unbound driver, then `connect(binding)`
+  - `createPostgresDriver(connectionString, options?)`: Create bound driver from connection string
+  - `createPostgresDriverFromOptions(options)`: Create bound driver from options object
+  - Types: `PostgresBinding`, `PostgresDriverOptions`, `PostgresDriverCreateOptions`, `QueryResult`
 - `./control`: Control plane entry point for driver descriptors
   - Default export: `DriverDescriptor` for use in `prisma-next.config.ts`
 

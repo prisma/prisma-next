@@ -2,74 +2,107 @@ import type {
   RuntimeDriverDescriptor,
   RuntimeDriverInstance,
 } from '@prisma-next/core-execution-plane/types';
-import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
+import type {
+  SqlConnection,
+  SqlDriver,
+  SqlExecuteRequest,
+  SqlExplainResult,
+  SqlQueryResult,
+} from '@prisma-next/sql-relational-core/ast';
 import { postgresDriverDescriptorMeta } from '../core/descriptor-meta';
-import type { PostgresDriverOptions } from '../postgres-driver';
-import { createPostgresDriverFromOptions } from '../postgres-driver';
+import {
+  createBoundDriverFromBinding,
+  type PostgresBinding,
+  type PostgresDriverCreateOptions,
+} from '../postgres-driver';
 
-/**
- * Postgres runtime driver instance interface.
- * SqlDriver provides SQL-specific methods (execute, explain, close).
- * RuntimeDriverInstance provides target identification (familyId, targetId).
- * We use intersection type to combine both interfaces.
- */
-export type PostgresRuntimeDriver = RuntimeDriverInstance<'sql', 'postgres'> & SqlDriver;
+export type PostgresRuntimeDriver = RuntimeDriverInstance<'sql', 'postgres'> &
+  SqlDriver<PostgresBinding>;
 
-/**
- * Postgres driver descriptor for runtime plane.
- */
 const USE_BEFORE_CONNECT_MESSAGE =
   'Postgres driver not connected. Call connect(binding) before acquireConnection or execute.';
 
-class PostgresUnboundDriver implements PostgresRuntimeDriver {
+class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
   readonly familyId = 'sql' as const;
   readonly targetId = 'postgres' as const;
 
-  async connect(): Promise<void> {
-    throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+  #delegate: SqlDriver<PostgresBinding> | null = null;
+  #cursorOpts: PostgresDriverCreateOptions['cursor'];
+
+  constructor(cursorOpts?: PostgresDriverCreateOptions['cursor']) {
+    this.#cursorOpts = cursorOpts;
   }
 
-  async acquireConnection(): Promise<never> {
-    throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+  async connect(binding: PostgresBinding): Promise<void> {
+    if (this.#delegate !== null) {
+      return;
+    }
+    this.#delegate = createBoundDriverFromBinding(binding, this.#cursorOpts);
   }
 
-  async close(): Promise<void> {}
-
-  execute(): AsyncIterable<never> {
-    return {
-      [Symbol.asyncIterator]() {
-        return {
-          async next() {
-            throw new Error(USE_BEFORE_CONNECT_MESSAGE);
-          },
-        };
-      },
-    };
+  async acquireConnection(): Promise<SqlConnection> {
+    if (this.#delegate === null) {
+      throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+    }
+    return this.#delegate.acquireConnection();
   }
 
-  async query(): Promise<never> {
-    throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+  async close(): Promise<void> {
+    if (this.#delegate !== null) {
+      await this.#delegate.close();
+      this.#delegate = null;
+    }
+  }
+
+  execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
+    if (this.#delegate === null) {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next() {
+              throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+            },
+          };
+        },
+      };
+    }
+    return this.#delegate.execute<Row>(request);
+  }
+
+  async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
+    if (this.#delegate === null) {
+      throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+    }
+    return this.#delegate.explain!(request);
+  }
+
+  async query<Row = Record<string, unknown>>(
+    sql: string,
+    params?: readonly unknown[],
+  ): Promise<SqlQueryResult<Row>> {
+    if (this.#delegate === null) {
+      throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+    }
+    return this.#delegate.query<Row>(sql, params);
   }
 }
 
 const postgresRuntimeDriverDescriptor: RuntimeDriverDescriptor<
   'sql',
   'postgres',
-  PostgresDriverOptions,
+  PostgresDriverCreateOptions,
   PostgresRuntimeDriver
 > = {
   ...postgresDriverDescriptorMeta,
-  create(options?: PostgresDriverOptions): PostgresRuntimeDriver {
-    if (options?.connect) {
-      return createPostgresDriverFromOptions(options) as PostgresRuntimeDriver;
-    }
-    return new PostgresUnboundDriver();
+  create(options?: PostgresDriverCreateOptions): PostgresRuntimeDriver {
+    return new PostgresUnboundDriverImpl(options?.cursor);
   },
 };
 
 export default postgresRuntimeDriverDescriptor;
 export type {
   CreatePostgresDriverOptions,
+  PostgresBinding,
   PostgresDriverOptions,
   QueryResult,
 } from '../postgres-driver';

@@ -32,7 +32,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
 
@@ -67,7 +67,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1), ($2), ($3)', ['a', 'b', 'c']);
 
@@ -103,7 +103,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1), ($2), ($3), ($4)', [
         'a',
@@ -141,7 +141,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
 
       // pg-mem doesn't support EXPLAIN (FORMAT JSON), so we test that explain() is callable
@@ -178,7 +178,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1)', ['test']);
 
@@ -208,7 +208,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1)', ['test']);
 
@@ -235,8 +235,8 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
-      await driver.connect();
+      await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
+      await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
 
       await driver.query('create table items(id serial primary key, name text)');
       const result = await driver.query<{ id: number; name: string }>('select id, name from items');
@@ -264,6 +264,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
+      await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
       // acquireClient should detect client is already connected and skip connect()
       await driver.query('create table items(id serial primary key, name text)');
       const result = await driver.query<{ id: number; name: string }>('select id, name from items');
@@ -284,7 +285,7 @@ describe('@prisma-next/driver-postgres', () => {
         connect: { pool: pool as unknown as Pool },
       });
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.close();
 
       // Closing again should not throw (pool.ended check)
@@ -304,7 +305,7 @@ describe('@prisma-next/driver-postgres', () => {
         connect: { pool: pool as unknown as Pool },
       });
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.close();
 
       // pg-mem Pool doesn't have an 'ended' property, so we just verify close() doesn't throw
@@ -328,7 +329,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
 
       const rows: Array<{ id: number; name: string }> = [];
@@ -359,7 +360,7 @@ describe('@prisma-next/driver-postgres', () => {
         await database.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table cursor_items(id serial primary key, name text)');
       await driver.query('insert into cursor_items(name) values ($1), ($2), ($3)', ['a', 'b', 'c']);
 
@@ -394,7 +395,7 @@ describe('@prisma-next/driver-postgres', () => {
         await database.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table explain_items(id serial primary key, name text)');
       await driver.query('insert into explain_items(name) values ($1)', ['test']);
 
@@ -435,7 +436,7 @@ describe('@prisma-next/driver-postgres', () => {
         await driver.close();
       };
 
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1)', ['test']);
 
@@ -471,7 +472,7 @@ describe('@prisma-next/driver-postgres', () => {
       };
 
       expect(customPoolFactoryCalled).toBe(true);
-      await driver.connect();
+      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
       await driver.query('create table items(id serial primary key, name text)');
       const result = await driver.query<{ id: number; name: string }>('select id, name from items');
       expect(result.rows).toBeDefined();
@@ -495,7 +496,7 @@ describe('@prisma-next/driver-postgres', () => {
           await driver.close();
         };
 
-        await driver.connect();
+        await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
         await driver.query('create table items(id serial primary key, name text)');
 
         const connection = await driver.acquireConnection();
@@ -532,7 +533,7 @@ describe('@prisma-next/driver-postgres', () => {
           await driver.close();
         };
 
-        await driver.connect();
+        await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
         await driver.query('create table items(id serial primary key, name text)');
 
         const connection = await driver.acquireConnection();
@@ -570,7 +571,7 @@ describe('@prisma-next/driver-postgres', () => {
           await driver.close();
         };
 
-        await driver.connect();
+        await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
         await driver.query('create table items(id serial primary key, name text)');
         await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
 
@@ -611,7 +612,7 @@ describe('@prisma-next/driver-postgres', () => {
           await database.close();
         };
 
-        await driver.connect();
+        await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
         await driver.query('create table tx_items(id serial primary key, name text)');
 
         const connection = await driver.acquireConnection();
@@ -655,7 +656,7 @@ describe('@prisma-next/driver-postgres', () => {
           await database.close();
         };
 
-        await driver.connect();
+        await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
         await driver.query('create table tx_rollback_items(id serial primary key, name text)');
 
         const connection = await driver.acquireConnection();
@@ -699,7 +700,7 @@ describe('@prisma-next/driver-postgres', () => {
           await database.close();
         };
 
-        await driver.connect();
+        await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
         await driver.query('create table tx_stream_items(id serial primary key, name text)');
         await driver.query('insert into tx_stream_items(name) values ($1), ($2)', ['tx-a', 'tx-b']);
 
@@ -741,7 +742,7 @@ describe('@prisma-next/driver-postgres', () => {
           await database.close();
         };
 
-        await driver.connect();
+        await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
         await driver.query('create table tx_explain_items(id serial primary key, name text)');
 
         const connection = await driver.acquireConnection();
@@ -777,7 +778,7 @@ describe('@prisma-next/driver-postgres', () => {
           await database.close();
         };
 
-        await driver.connect();
+        await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
         await driver.query('create table tx_multi_items(id serial primary key, name text)');
 
         const connection = await driver.acquireConnection();

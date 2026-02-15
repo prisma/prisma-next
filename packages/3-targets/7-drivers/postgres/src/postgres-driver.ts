@@ -21,8 +21,22 @@ import { isAlreadyConnectedError, isPostgresError, normalizePgError } from './no
 
 export type QueryResult<T extends QueryResultRow = QueryResultRow> = PgQueryResult<T>;
 
+export type PostgresBinding =
+  | { readonly kind: 'url'; readonly url: string }
+  | { readonly kind: 'pgPool'; readonly pool: PoolType }
+  | { readonly kind: 'pgClient'; readonly client: Client };
+
 export interface PostgresDriverOptions {
   readonly connect: { client: Client } | { pool: PoolType };
+  readonly cursor?:
+    | {
+        readonly batchSize?: number;
+        readonly disabled?: boolean;
+      }
+    | undefined;
+}
+
+export interface PostgresDriverCreateOptions {
   readonly cursor?:
     | {
         readonly batchSize?: number;
@@ -203,7 +217,10 @@ class PostgresTransactionImpl extends PostgresQueryable implements SqlTransactio
   }
 }
 
-class PostgresPoolDriverImpl extends PostgresQueryable<PoolClient> implements SqlDriver {
+class PostgresPoolDriverImpl
+  extends PostgresQueryable<PoolClient>
+  implements SqlDriver<PostgresBinding>
+{
   private readonly pool: PoolType;
 
   constructor(options: PostgresDriverOptions & { connect: { pool: PoolType } }) {
@@ -214,9 +231,7 @@ class PostgresPoolDriverImpl extends PostgresQueryable<PoolClient> implements Sq
     this.pool = options.connect.pool;
   }
 
-  async connect(_binding?: void): Promise<void> {
-    // No-op: caller controls connecting the underlying client or pool
-  }
+  async connect(_binding: PostgresBinding): Promise<void> {}
 
   async acquireConnection(): Promise<SqlConnection> {
     const client = await this.acquireClient();
@@ -240,7 +255,10 @@ class PostgresPoolDriverImpl extends PostgresQueryable<PoolClient> implements Sq
   }
 }
 
-class PostgresDirectDriverImpl extends PostgresQueryable<Client> implements SqlDriver {
+class PostgresDirectDriverImpl
+  extends PostgresQueryable<Client>
+  implements SqlDriver<PostgresBinding>
+{
   private readonly directClient: Client;
 
   constructor(options: PostgresDriverOptions & { connect: { client: Client } }) {
@@ -251,9 +269,7 @@ class PostgresDirectDriverImpl extends PostgresQueryable<Client> implements SqlD
     this.directClient = options.connect.client;
   }
 
-  async connect(_binding?: void): Promise<void> {
-    // No-op: caller controls connecting the underlying client or pool
-  }
+  async connect(_binding: PostgresBinding): Promise<void> {}
 
   async acquireConnection(): Promise<SqlConnection> {
     // TODO: This might need to be protected with a mutex.
@@ -306,7 +322,7 @@ export interface CreatePostgresDriverOptions {
 export function createPostgresDriver(
   connectionString: string,
   options?: CreatePostgresDriverOptions,
-): SqlDriver {
+): SqlDriver<PostgresBinding> {
   const PoolImpl: typeof Pool = options?.poolFactory ?? Pool;
   const pool = new PoolImpl({ connectionString });
   return new PostgresPoolDriverImpl({
@@ -315,7 +331,9 @@ export function createPostgresDriver(
   });
 }
 
-export function createPostgresDriverFromOptions(options: PostgresDriverOptions): SqlDriver {
+export function createPostgresDriverFromOptions(
+  options: PostgresDriverOptions,
+): SqlDriver<PostgresBinding> {
   if ('pool' in options.connect) {
     return new PostgresPoolDriverImpl(
       options as PostgresDriverOptions & { connect: { pool: PoolType } },
@@ -327,6 +345,33 @@ export function createPostgresDriverFromOptions(options: PostgresDriverOptions):
     );
   }
   throw new Error('PostgresDriver requires a pool or client');
+}
+
+export function createBoundDriverFromBinding(
+  binding: PostgresBinding,
+  cursorOpts: PostgresDriverCreateOptions['cursor'],
+): SqlDriver<PostgresBinding> {
+  if (binding.kind === 'url') {
+    const pool = new Pool({
+      connectionString: binding.url,
+      connectionTimeoutMillis: 20_000,
+      idleTimeoutMillis: 30_000,
+    });
+    return new PostgresPoolDriverImpl({
+      connect: { pool },
+      cursor: cursorOpts,
+    });
+  }
+  if (binding.kind === 'pgPool') {
+    return new PostgresPoolDriverImpl({
+      connect: { pool: binding.pool },
+      cursor: cursorOpts,
+    });
+  }
+  return new PostgresDirectDriverImpl({
+    connect: { client: binding.client },
+    cursor: cursorOpts,
+  });
 }
 
 function readCursor<Row>(cursor: Cursor<Row>, size: number): Promise<Row[]> {

@@ -119,23 +119,23 @@ Groups 1–4 can be partially parallelized (1 before 2 and 3; 2 before 4). Group
 
 ### 4.1 Tests (test-first)
 
-- [ ] **Unit:** `postgresRuntimeDriverDescriptor.create()` with no args returns unbound driver.
-- [ ] **Unit:** `driver.connect(binding)` with pool binding enables `acquireConnection()` and execution.
-- [ ] **Unit:** `driver.connect(binding)` with client binding enables `acquireConnection()` and execution.
-- [ ] **Unit:** Use-before-connect: execution fails with clear error when `connect()` not called.
-- [ ] **Unit:** `connect()` called twice with same binding is idempotent or fails gracefully (specify expected behavior).
-- [ ] **Unit:** Postgres driver `close()` works for both pool and direct client bindings.
+- [x] **Unit:** `postgresRuntimeDriverDescriptor.create()` with no args returns unbound driver.
+- [x] **Unit:** `driver.connect(binding)` with pool binding enables `acquireConnection()` and execution.
+- [x] **Unit:** `driver.connect(binding)` with client binding enables `acquireConnection()` and execution.
+- [x] **Unit:** Use-before-connect: execution fails with clear error when `connect()` not called.
+- [x] **Unit:** `connect()` called twice with same binding is idempotent or fails gracefully (specify expected behavior).
+- [x] **Unit:** Postgres driver `close()` works for both pool and direct client bindings.
 
 ### 4.2 Implementation
 
-- [ ] Define `PostgresBinding` type (pool | client | url-resolved) in Postgres driver package.
-- [ ] Refactor `PostgresPoolDriverImpl` and `PostgresDirectDriverImpl` to support unbound creation:
+- [x] Define `PostgresBinding` type (pool | client | url-resolved) in Postgres driver package.
+- [x] Refactor `PostgresPoolDriverImpl` and `PostgresDirectDriverImpl` to support unbound creation:
   - Constructor accepts only non-connection options (e.g. `cursor`).
   - Introduce lazy binding stored after `connect(binding)`.
-- [ ] Implement `connect(binding: PostgresBinding): Promise<void>` that stores binding and enables `acquireConnection()` and execution.
-- [ ] Update `postgresRuntimeDriverDescriptor.create()` to take no connection args; return unbound driver.
-- [ ] Add fail-fast error for use-before-connect (execution before `connect()`).
-- [ ] Run `pnpm -F @prisma-next/driver-postgres test` and `pnpm lint:deps`.
+- [x] Implement `connect(binding: PostgresBinding): Promise<void>` that stores binding and enables `acquireConnection()` and execution.
+- [x] Update `postgresRuntimeDriverDescriptor.create()` to take no connection args; return unbound driver.
+- [x] Add fail-fast error for use-before-connect (execution before `connect()`).
+- [x] Run `pnpm -F @prisma-next/driver-postgres test` and `pnpm lint:deps`.
 
 **Acceptance criteria:** Driver is instantiable without connection; `connect(binding)` binds and enables execution; use-before-connect fails with clear error; existing driver tests pass or are updated.
 
