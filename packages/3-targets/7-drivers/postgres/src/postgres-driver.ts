@@ -314,39 +314,6 @@ class PostgresDirectDriverImpl
   async releaseClient(_client: Client): Promise<void> {}
 }
 
-export interface CreatePostgresDriverOptions {
-  readonly cursor?: PostgresDriverOptions['cursor'];
-  readonly poolFactory?: typeof Pool;
-}
-
-export function createPostgresDriver(
-  connectionString: string,
-  options?: CreatePostgresDriverOptions,
-): SqlDriver<PostgresBinding> {
-  const PoolImpl: typeof Pool = options?.poolFactory ?? Pool;
-  const pool = new PoolImpl({ connectionString });
-  return new PostgresPoolDriverImpl({
-    connect: { pool },
-    cursor: options?.cursor,
-  });
-}
-
-export function createPostgresDriverFromOptions(
-  options: PostgresDriverOptions,
-): SqlDriver<PostgresBinding> {
-  if ('pool' in options.connect) {
-    return new PostgresPoolDriverImpl(
-      options as PostgresDriverOptions & { connect: { pool: PoolType } },
-    );
-  }
-  if ('client' in options.connect) {
-    return new PostgresDirectDriverImpl(
-      options as PostgresDriverOptions & { connect: { client: Client } },
-    );
-  }
-  throw new Error('PostgresDriver requires a pool or client');
-}
-
 export function createBoundDriverFromBinding(
   binding: PostgresBinding,
   cursorOpts: PostgresDriverCreateOptions['cursor'],

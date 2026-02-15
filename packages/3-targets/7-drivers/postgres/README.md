@@ -87,7 +87,7 @@ flowchart TD
 
 ## Usage
 
-**Descriptor + connect (recommended):**
+Use the descriptor + connect lifecycle:
 
 ```typescript
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
@@ -97,21 +97,15 @@ await driver.connect({ kind: 'url', url: process.env.DATABASE_URL });
 // driver is now bound; use acquireConnection, query, execute, etc.
 ```
 
-**Legacy helpers (bound at construction; connect is a no-op):**
-
-```typescript
-import { createPostgresDriver, createPostgresDriverFromOptions } from '@prisma-next/driver-postgres/runtime';
-
-const driver = createPostgresDriver(process.env.DATABASE_URL);
-// Bound drivers from createPostgresDriver/createPostgresDriverFromOptions are ready immediately
-```
+Binding variants:
+- `{ kind: 'url', url }`: Driver creates a Pool from the connection string
+- `{ kind: 'pgPool', pool }`: Use an existing pg Pool
+- `{ kind: 'pgClient', client }`: Use an existing pg Client (direct connection)
 
 ## Exports
 
 - `./runtime`: Runtime entry point for driver implementation
   - Default: `postgresRuntimeDriverDescriptor` — use `create()` for unbound driver, then `connect(binding)`
-  - `createPostgresDriver(connectionString, options?)`: Create bound driver from connection string
-  - `createPostgresDriverFromOptions(options)`: Create bound driver from options object
   - Types: `PostgresBinding`, `PostgresDriverOptions`, `PostgresDriverCreateOptions`, `QueryResult`
 - `./control`: Control plane entry point for driver descriptors
   - Default export: `DriverDescriptor` for use in `prisma-next.config.ts`

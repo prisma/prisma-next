@@ -568,25 +568,17 @@ t.user.id.in([1, 2, 3])
 
 ### Runtime Connection
 
-```typescript
-import { createRuntime } from '@prisma/runtime';
-import { createPostgresDriver } from '@prisma/runtime/drivers';
+Use `postgres()` from `@prisma-next/postgres/runtime` for the one-liner client, or compose manually:
 
-const runtime = createRuntime({
-  ir: contractIR,
-  driver: createPostgresDriver({
-    host: 'localhost',
-    port: 5432,
-    database: 'postgres',
-    user: 'postgres',
-    password: 'postgres',
-  }),
-  verify: 'onFirstUse',
-  plugins: [
-    // Optional: add linting, telemetry, budgets, etc.
-  ]
+```typescript
+import postgres from '@prisma-next/postgres/runtime';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
+
+const db = postgres<Contract>({
+  contractJson,
+  url: process.env.DATABASE_URL!,
 });
 
-const results = await runtime.execute(query);
-await runtime.end();
+const results = await db.runtime().execute(query);
 ```

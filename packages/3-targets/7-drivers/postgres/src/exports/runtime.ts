@@ -101,9 +101,8 @@ const postgresRuntimeDriverDescriptor: RuntimeDriverDescriptor<
 
 export default postgresRuntimeDriverDescriptor;
 export type {
-  CreatePostgresDriverOptions,
   PostgresBinding,
+  PostgresDriverCreateOptions,
   PostgresDriverOptions,
   QueryResult,
 } from '../postgres-driver';
-export { createPostgresDriver, createPostgresDriverFromOptions } from '../postgres-driver';

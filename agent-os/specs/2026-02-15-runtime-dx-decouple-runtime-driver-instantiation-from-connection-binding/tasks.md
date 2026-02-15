@@ -187,17 +187,17 @@ Groups 1–4 can be partially parallelized (1 before 2 and 3; 2 before 4). Group
 
 ### 7.1 Tests (test-first)
 
-- [ ] **Unit:** Postgres driver tests use descriptor `create()` + `connect()` path instead of `createPostgresDriverFromOptions`.
+- [x] **Unit:** Postgres driver tests use descriptor `create()` + `connect()` path instead of `createPostgresDriverFromOptions`.
 
 ### 7.2 Implementation
 
-- [ ] Update `packages/3-targets/7-drivers/postgres/test/driver.basic.test.ts` to use descriptor + `connect()`.
-- [ ] Update `packages/3-targets/7-drivers/postgres/test/driver.errors.test.ts` to use descriptor + `connect()`.
-- [ ] Remove or deprecate `createPostgresDriver` and `createPostgresDriverFromOptions` from runtime entrypoint `@prisma-next/driver-postgres/runtime` (spec: remove by end of PR).
-- [ ] Update `packages/3-targets/7-drivers/postgres/README.md` to describe descriptor + `connect()` lifecycle.
-- [ ] Update `docs/reference/typescript-patterns.md` if it references legacy helpers.
-- [ ] Update root `README.md` if it references `createPostgresDriver`.
-- [ ] Run `pnpm test:packages` and `pnpm lint:deps`.
+- [x] Update `packages/3-targets/7-drivers/postgres/test/driver.basic.test.ts` to use descriptor + `connect()`.
+- [x] Update `packages/3-targets/7-drivers/postgres/test/driver.errors.test.ts` to use descriptor + `connect()`.
+- [x] Remove or deprecate `createPostgresDriver` and `createPostgresDriverFromOptions` from runtime entrypoint `@prisma-next/driver-postgres/runtime` (spec: remove by end of PR).
+- [x] Update `packages/3-targets/7-drivers/postgres/README.md` to describe descriptor + `connect()` lifecycle.
+- [x] Update `docs/reference/typescript-patterns.md` if it references legacy helpers.
+- [x] Update root `README.md` if it references `createPostgresDriver`.
+- [x] Run `pnpm test:packages` and `pnpm lint:deps`.
 
 **Acceptance criteria:** Legacy helper runtime-driver construction paths removed; tests use descriptor + `connect()`; README and docs updated.
 
