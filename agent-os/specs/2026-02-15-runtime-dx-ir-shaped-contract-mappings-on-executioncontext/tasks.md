@@ -1,4 +1,4 @@
-# Tasks — Runtime DX: definition-only contract + runtime-real mappings (TML-1831)
+# Tasks — Runtime DX: Constructed Contract + runtime-real mappings (TML-1831)
 
 Source:
 - Spec: `agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md`
@@ -9,7 +9,7 @@ Source:
 
 ### 1.1 Tests first: lock expected runtime/type split
 
-- [x] Add/adjust unit + type tests to assert:
+- [x] Add/adjust 2-8 focused unit + type tests to assert:
   - runtime contract values include only runtime-real mapping keys
   - lanes do not require runtime `contract.mappings.codecTypes` / `operationTypes`
   - `ExtractCodecTypes<TContract>` / `ExtractOperationTypes<TContract>` still work for lane inference
@@ -30,7 +30,7 @@ Source:
 
 ### 2.1 Tests first: validateContract + defineContract parity
 
-- [x] Add tests asserting `defineContract()` and `validateContract<Contract>()` produce compatible runtime-real contract shapes.
+- [x] Add 2-8 focused tests asserting `defineContract()` and `validateContract<Contract>()` produce compatible runtime-real contract shapes.
 - [x] Add tests that `_generated` is stripped/absent from returned runtime contract values where applicable.
 - [x] Add regression tests for visualization/traversal use-cases against returned contract values.
 
@@ -51,7 +51,7 @@ Source:
 
 ### 3.1 Tests first: lane behavior with new type channel
 
-- [x] Add/adjust lane tests to cover type inference without runtime codec/op maps on contract values.
+- [x] Add/adjust 2-8 focused lane tests to cover type inference without runtime codec/op maps on contract values.
 - [x] Add/adjust parameterized codec tests (column-level `typeParams` / `typeRef`) to verify no regressions.
 
 ### 3.2 Update lane/runtime call sites
@@ -64,7 +64,7 @@ Source:
 
 ### 4.1 Tests first: inference behavior
 
-- [x] Add type tests demonstrating `.target(...)` + `.extensionPacks(...)` infers codec/op type maps.
+- [x] Add 2-8 focused type tests demonstrating `.target(...)` + `.extensionPacks(...)` infers codec/op type maps.
 - [x] Add regression tests for mixed target/extension pack composition and parameterized codecs.
 
 ### 4.2 Implement builder inference improvements
@@ -76,7 +76,7 @@ Source:
 
 ### 5.1 Tests first: demo DX checks
 
-- [x] Add/adjust demo integration checks for:
+- [x] Add/adjust 2-8 focused demo integration checks for:
   - contract visualization rendering directly from runtime contract value
   - no HMR/type mismatch caused by runtime/type shape divergence
 
