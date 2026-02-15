@@ -217,7 +217,29 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   const leftExpr = expr.left as ColumnRef | OperationExpr;
   const left = renderExpr(leftExpr, contract);
   const leftRendered = isOperationExpr(leftExpr) ? `(${left})` : left;
-  const right = renderBinaryRight(expr.right, contract);
+  const leftCol = leftExpr.kind === 'col' ? leftExpr : undefined;
+
+  const rightExpr = expr.right;
+  let right: string;
+  if (rightExpr.kind === 'listLiteral') {
+    right = renderListLiteral(
+      rightExpr as ListLiteralExpr,
+      contract,
+      leftCol?.table,
+      leftCol?.column,
+    );
+  } else if (rightExpr.kind === 'literal') {
+    right = renderLiteral(rightExpr);
+  } else if (rightExpr.kind === 'col') {
+    right = renderColumn(rightExpr);
+  } else if (rightExpr.kind === 'param') {
+    right = renderParam(rightExpr, contract, leftCol?.table, leftCol?.column);
+  } else if (rightExpr.kind === 'operation') {
+    right = renderOperation(rightExpr, contract);
+  } else {
+    right = renderColumn(rightExpr as ColumnRef);
+  }
+
   const operatorMap: Record<BinaryExpr['op'], string> = {
     eq: '=',
     neq: '!=',
@@ -234,30 +256,21 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   return `${leftRendered} ${operatorMap[expr.op]} ${right}`;
 }
 
-function renderBinaryRight(right: BinaryExpr['right'], contract?: PostgresContract): string {
-  if (right.kind === 'col') {
-    return renderColumn(right);
+function renderListLiteral(
+  expr: ListLiteralExpr,
+  contract?: PostgresContract,
+  tableName?: string,
+  columnName?: string,
+): string {
+  if (expr.values.length === 0) {
+    return '(NULL)';
   }
-  if (right.kind === 'param') {
-    return renderParam(right, contract);
-  }
-  if (right.kind === 'literal') {
-    return renderLiteral(right);
-  }
-  if (right.kind === 'operation') {
-    return renderExpr(right, contract);
-  }
-  if (right.kind === 'listLiteral') {
-    if (right.values.length === 0) {
-      return '(NULL)';
-    }
-    const values = right.values.map((value) =>
-      value.kind === 'param' ? renderParam(value, contract) : renderLiteral(value),
-    );
-    return `(${values.join(', ')})`;
-  }
-
-  throw new Error(`Unsupported binary right expression kind: ${(right as { kind: string }).kind}`);
+  const values = expr.values
+    .map((v) =>
+      v.kind === 'param' ? renderParam(v, contract, tableName, columnName) : renderLiteral(v),
+    )
+    .join(', ');
+  return `(${values})`;
 }
 
 function renderColumn(ref: ColumnRef): string {
