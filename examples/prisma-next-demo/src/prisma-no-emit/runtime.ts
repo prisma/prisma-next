@@ -21,7 +21,12 @@ export async function getRuntime(
   if (!driver) {
     throw new Error('Driver descriptor missing from execution stack');
   }
-  await driver.connect({ kind: 'pgPool', pool });
+  try {
+    await driver.connect({ kind: 'pgPool', pool });
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
 
   return createRuntime({
     stackInstance,

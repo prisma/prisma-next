@@ -12,23 +12,27 @@ import { initTestDatabase } from './utils/control-client';
 const context = db.context;
 const { contract } = context;
 const executionStack = db.stack;
-const executionStackInstance = instantiateExecutionStack(executionStack);
 
 async function createTestDriver(connectionString: string) {
-  const driverDescriptor = executionStack.driver;
-  if (!driverDescriptor) {
+  const stackInstance = instantiateExecutionStack(executionStack);
+  const driver = stackInstance.driver;
+  if (!driver) {
     throw new Error('Driver descriptor missing from execution stack');
   }
   const pool = new Pool({ connectionString });
-  const driver = driverDescriptor.create({ cursor: { disabled: true } });
-  await driver.connect({ kind: 'pgPool', pool });
-  return driver;
+  try {
+    await driver.connect({ kind: 'pgPool', pool });
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
+  return { stackInstance, driver };
 }
 
 async function getRuntime(connectionString: string): Promise<Runtime> {
-  const driver = await createTestDriver(connectionString);
+  const { stackInstance, driver } = await createTestDriver(connectionString);
   return createRuntime({
-    stackInstance: executionStackInstance,
+    stackInstance,
     context,
     driver,
     verify: { mode: 'onFirstUse', requireMarker: false },
