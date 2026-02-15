@@ -64,13 +64,13 @@ Source:
 
 ### 4.1 Tests first: inference behavior
 
-- [ ] Add type tests demonstrating `.target(...)` + `.extensionPacks(...)` infers codec/op type maps.
-- [ ] Add regression tests for mixed target/extension pack composition and parameterized codecs.
+- [x] Add type tests demonstrating `.target(...)` + `.extensionPacks(...)` infers codec/op type maps.
+- [x] Add regression tests for mixed target/extension pack composition and parameterized codecs.
 
 ### 4.2 Implement builder inference improvements
 
-- [ ] Refactor `defineContract()` builder typing to infer/accumulate type maps from selected packs.
-- [ ] Remove need for manual `type AllCodecTypes = ...` in demo/examples where inference can replace it.
+- [x] Refactor `defineContract()` builder typing to infer/accumulate type maps from selected packs.
+- [x] Remove need for manual `type AllCodecTypes = ...` in demo/examples where inference can replace it.
 
 ## 5) Demo + docs alignment
 
