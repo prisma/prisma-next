@@ -10,6 +10,7 @@ import { getUserById } from '../src/kysely/get-user-by-id';
 import { getUserPosts } from '../src/kysely/get-user-posts';
 import { getUsers } from '../src/kysely/get-users';
 import { getUsersWithPosts } from '../src/kysely/get-users-with-posts';
+import { updateWithoutWhere } from '../src/kysely/update-without-where';
 import { executionContext } from '../src/prisma/context';
 import { getRuntime } from '../src/prisma/runtime';
 import { initTestDatabase } from './utils/control-client';
@@ -177,6 +178,26 @@ describe('Kysely parity integration', () => {
         try {
           await expect(deleteWithoutWhere(runtime)).rejects.toMatchObject({
             code: 'LINT.DELETE_WITHOUT_WHERE',
+            category: 'LINT',
+          });
+        } finally {
+          await runtime.close();
+        }
+      }, {});
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'guardrail blocks UPDATE without WHERE',
+    async () => {
+      await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = getRuntime(connectionString);
+
+        try {
+          await expect(updateWithoutWhere(runtime)).rejects.toMatchObject({
+            code: 'LINT.UPDATE_WITHOUT_WHERE',
             category: 'LINT',
           });
         } finally {
