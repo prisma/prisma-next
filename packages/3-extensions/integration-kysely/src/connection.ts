@@ -2,7 +2,14 @@ import type { ContractBase, ExecutionPlan } from '@prisma-next/contract/types';
 import type { RuntimeConnection, RuntimeTransaction } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CompiledQuery, DatabaseConnection, QueryResult, TransactionSettings } from 'kysely';
-import { runGuardrails } from './transform/index.js';
+import { runGuardrails, transformKyselyToPnAst } from './transform/index.js';
+
+const TRANSFORMABLE_KINDS = new Set([
+  'SelectQueryNode',
+  'InsertQueryNode',
+  'UpdateQueryNode',
+  'DeleteQueryNode',
+]);
 
 export class KyselyPrismaConnection implements DatabaseConnection {
   #contract: ContractBase;
@@ -80,11 +87,51 @@ export class KyselyPrismaConnection implements DatabaseConnection {
 
   #createExecutionPlan<R>(compiledQuery: CompiledQuery<R>): ExecutionPlan<R, unknown> {
     const query = (compiledQuery as { query?: unknown }).query;
-    if (query) {
-      runGuardrails(this.#contract as SqlContract<SqlStorage>, query);
+    const sqlContract = this.#contract as SqlContract<SqlStorage>;
+
+    const kind = (query as { kind?: string })?.kind;
+    if (query && typeof query === 'object' && kind !== undefined && TRANSFORMABLE_KINDS.has(kind)) {
+      runGuardrails(sqlContract, query);
+      const { ast, metaAdditions } = transformKyselyToPnAst(
+        sqlContract,
+        query,
+        compiledQuery.parameters,
+      );
+
+      const baseMeta = {
+        target: this.#contract.target,
+        targetFamily: this.#contract.targetFamily,
+        storageHash: this.#contract.storageHash,
+        ...(this.#contract.profileHash !== undefined
+          ? { profileHash: this.#contract.profileHash }
+          : {}),
+        lane: 'kysely' as const,
+        paramDescriptors: metaAdditions.paramDescriptors,
+        refs: metaAdditions.refs,
+        ...(metaAdditions.projection !== undefined && { projection: metaAdditions.projection }),
+        ...(metaAdditions.projectionTypes !== undefined &&
+          Object.keys(metaAdditions.projectionTypes).length > 0 && {
+            projectionTypes: metaAdditions.projectionTypes,
+          }),
+      };
+
+      const annotations: { codecs?: Record<string, string> } = {};
+      if (metaAdditions.projectionTypes && Object.keys(metaAdditions.projectionTypes).length > 0) {
+        annotations.codecs = { ...metaAdditions.projectionTypes };
+      }
+
+      return {
+        ast,
+        sql: compiledQuery.sql,
+        params: compiledQuery.parameters,
+        meta: {
+          ...baseMeta,
+          ...(Object.keys(annotations).length > 0 && { annotations }),
+        },
+      };
     }
+
     return {
-      // TODO: convert the Kysely AST into Prisma AST
       ast: undefined,
       sql: compiledQuery.sql,
       params: compiledQuery.parameters,
@@ -96,7 +143,6 @@ export class KyselyPrismaConnection implements DatabaseConnection {
           ? { profileHash: this.#contract.profileHash }
           : {}),
         lane: 'raw',
-        // TODO: fill in the parameter descriptors
         paramDescriptors: [],
       },
     };
