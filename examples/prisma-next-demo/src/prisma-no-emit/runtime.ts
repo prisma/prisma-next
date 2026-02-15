@@ -17,11 +17,10 @@ export async function getRuntime(
   const pool = new Pool({ connectionString: databaseUrl });
 
   const stackInstance = instantiateExecutionStack(stack);
-  const driverDescriptor = stack.driver;
-  if (!driverDescriptor) {
+  const driver = stackInstance.driver;
+  if (!driver) {
     throw new Error('Driver descriptor missing from execution stack');
   }
-  const driver = driverDescriptor.create({ cursor: { disabled: true } });
   await driver.connect({ kind: 'pgPool', pool });
 
   return createRuntime({
