@@ -209,7 +209,7 @@ From local compilation of representative Kysely queries, the following Kysely no
 
 `SelectQueryNode`, `WhereNode`, `BinaryOperationNode`, `OperatorNode`, `ValueNode`, `PrimitiveValueListNode`, `JoinNode`, `OnNode`, `OrderByNode`, `LimitNode`, `InsertQueryNode`, `ValuesNode`, `UpdateQueryNode`, `ColumnUpdateNode`, `DeleteQueryNode`, `ReturningNode`, plus identifier/selection wrapper nodes.
 
-See `docs/specs/2026-02-15-transform-kysely-ast-to-pn-ast/supporting-reference.md` for the full union list and a representative `compiledQuery.query` dump.
+See `agent-os/specs/2026-02-15-transform-kysely-ast-to-pn-ast/supporting-reference.md` for the full union list and a representative `compiledQuery.query` dump.
 
 ## AST & meta model changes
 
@@ -298,6 +298,6 @@ This keeps SQL-aware plugin logic in the SQL domain while still using the family
 
 ## Documentation updates
 
-- Keep `docs/specs/2026-02-15-transform-kysely-ast-to-pn-ast/supporting-reference.md` as the evolving compatibility/implementation reference.
+- Keep `agent-os/specs/2026-02-15-transform-kysely-ast-to-pn-ast/supporting-reference.md` as the evolving compatibility/implementation reference.
 - If/when we change shared types (`ParamDescriptor.source`), update any relevant architecture docs and package READMEs that describe plan metadata expectations.
 
