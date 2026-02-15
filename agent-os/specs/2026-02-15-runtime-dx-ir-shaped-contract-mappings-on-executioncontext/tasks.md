@@ -72,15 +72,15 @@ Source:
 
 ### 4.1 Tests first: pack-driven `TypeMaps` inference
 
-- [ ] Add 2-8 focused type tests demonstrating `.target(...)` + `.extensionPacks(...)` infer `TypeMaps` correctly.
-- [ ] Add regression tests for mixed target/extension pack composition and parameterized codecs.
-- [ ] Add tests for `ContractWithTypeMaps` no-emit inference in convenience helpers.
+- [x] Add 2-8 focused type tests demonstrating `.target(...)` + `.extensionPacks(...)` infer `TypeMaps` correctly.
+- [x] Add regression tests for mixed target/extension pack composition and parameterized codecs.
+- [x] Add tests for `ContractWithTypeMaps` no-emit inference in convenience helpers.
 
 ### 4.2 Implement builder inference model
 
-- [ ] Refactor `defineContract()` builder typing so no-emit authoring infers/accumulates type maps from selected packs.
-- [ ] Ensure no-emit workflow can carry `ContractWithTypeMaps<Contract, TypeMaps>` for helper inference without adding runtime keys.
-- [ ] Remove remaining manual `AllCodecTypes`/manual map composition where inference can replace it.
+- [x] Refactor `defineContract()` builder typing so no-emit authoring infers/accumulates type maps from selected packs.
+- [x] Ensure no-emit workflow can carry `ContractWithTypeMaps<Contract, TypeMaps>` for helper inference without adding runtime keys.
+- [x] Remove remaining manual `AllCodecTypes`/manual map composition where inference can replace it.
 
 ## 5) Re-emit generated contracts and fixture alignment
 

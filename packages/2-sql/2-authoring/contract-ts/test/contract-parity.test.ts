@@ -3,7 +3,6 @@ import type { SqlContract, SqlMappings, SqlStorage } from '@prisma-next/sql-cont
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
-import type { CodecTypes } from './fixtures/contract.d';
 import { columnDescriptor } from './helpers/column-descriptor';
 
 const int4Column = columnDescriptor('pg/int4@1');
@@ -35,7 +34,7 @@ function assertCompatibleRuntimeShape(contract: SqlContract<SqlStorage>, label: 
 
 describe('validateContract and defineContract parity', () => {
   it('defineContract().build() produces compatible runtime-real contract shape', () => {
-    const built = defineContract<CodecTypes>()
+    const built = defineContract()
       .target(postgresTargetPack)
       .table('user', (t) =>
         t
@@ -89,7 +88,7 @@ describe('validateContract and defineContract parity', () => {
   });
 
   it('both paths produce traversable mappings with same structural keys', () => {
-    const built = defineContract<CodecTypes>()
+    const built = defineContract()
       .target(postgresTargetPack)
       .table('user', (t) =>
         t
