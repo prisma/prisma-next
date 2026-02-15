@@ -1,15 +1,29 @@
 import { planInvalid } from '@prisma-next/plan';
-import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  CodecTypesOf,
+  ExtractCodecTypes,
+  ExtractTypeMapsFromContract,
+  SqlContract,
+  SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import { OrmModelBuilderImpl } from './orm/builder';
 import type { OrmBuilderOptions, OrmRegistry } from './orm-types';
 
 type ModelName<TContract extends SqlContract<SqlStorage>> = keyof TContract['models'] & string;
 
-export function orm<TContract extends SqlContract<SqlStorage>>(
+export function orm<
+  TContract extends SqlContract<SqlStorage>,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
+>(
   options: OrmBuilderOptions<TContract>,
-): OrmRegistry<TContract, ExtractCodecTypes<TContract>> {
+): OrmRegistry<
+  TContract,
+  [TTypeMaps] extends [never] ? ExtractCodecTypes<TContract> : CodecTypesOf<TTypeMaps>
+> {
   const contract = options.context.contract;
-  type CodecTypes = ExtractCodecTypes<TContract>;
+  type CodecTypes = [TTypeMaps] extends [never]
+    ? ExtractCodecTypes<TContract>
+    : CodecTypesOf<TTypeMaps>;
 
   return new Proxy({} as OrmRegistry<TContract, CodecTypes>, {
     get(_target, prop) {
