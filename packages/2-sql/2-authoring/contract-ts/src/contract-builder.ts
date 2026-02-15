@@ -31,24 +31,10 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { computeMappings } from './contract';
 
 /**
- * Type-level mappings structure for contracts built via `defineContract()`.
- *
- * Compile-time type helper (not a runtime object) that ensures mappings match what the builder
- * produces. `codecTypes` uses the generic `CodecTypes` parameter; `operationTypes` is always
- * empty since operations are added via extensions at runtime.
- *
- * **Difference from ExecutionContext**: This is a compile-time type for contract construction.
- * `ExecutionContext` is a runtime object with populated registries for query execution.
- *
- * @template C - The `CodecTypes` generic parameter passed to `defineContract<CodecTypes>()`
+ * Type-level mappings for contracts built via `defineContract()`.
+ * Runtime mappings contain only structural keys; codec/operation types are type-only (phantom).
  */
-type ContractBuilderMappings<C extends Record<string, { output: unknown }>> = Omit<
-  SqlMappings,
-  'codecTypes' | 'operationTypes'
-> & {
-  readonly codecTypes: C;
-  readonly operationTypes: Record<string, never>;
-};
+type ContractBuilderMappings = SqlMappings;
 
 type BuildStorageTable<
   _TableName extends string,
@@ -172,8 +158,10 @@ class SqlContractBuilder<
         BuildStorage<Tables, Types>,
         BuildModels<Models>,
         BuildRelations<Models>,
-        ContractBuilderMappings<CodecTypes>
+        ContractBuilderMappings
       > & {
+        readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
+        readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, never>;
         readonly schemaVersion: '1';
         readonly target: Target;
         readonly targetFamily: 'sql';
@@ -185,14 +173,15 @@ class SqlContractBuilder<
           ? { readonly capabilities: Capabilities }
           : Record<string, never>)
     : never {
-    // Type helper to ensure literal types are preserved in return type
     type BuiltContract = Target extends string
       ? SqlContract<
           BuildStorage<Tables, Types>,
           BuildModels<Models>,
           BuildRelations<Models>,
-          ContractBuilderMappings<CodecTypes>
+          ContractBuilderMappings
         > & {
+          readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
+          readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, never>;
           readonly schemaVersion: '1';
           readonly target: Target;
           readonly targetFamily: 'sql';
@@ -400,11 +389,7 @@ class SqlContractBuilder<
       storage as SqlStorage,
     );
 
-    const mappings = {
-      ...baseMappings,
-      codecTypes: {} as CodecTypes,
-      operationTypes: {} as Record<string, never>,
-    } as ContractBuilderMappings<CodecTypes>;
+    const mappings = baseMappings as ContractBuilderMappings;
 
     const extensionNamespaces = this.state.extensionNamespaces ?? [];
     const extensionPacks: Record<string, unknown> = { ...(this.state.extensionPacks || {}) };

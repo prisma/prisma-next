@@ -208,14 +208,11 @@ export function computeMappings(
     fieldToColumn[modelName] = modelFieldToColumn;
   }
 
-  // Preserve existing mappings if provided, otherwise use computed ones
   return {
     modelToTable: existingMappings?.modelToTable ?? modelToTable,
     tableToModel: existingMappings?.tableToModel ?? tableToModel,
     fieldToColumn: existingMappings?.fieldToColumn ?? fieldToColumn,
     columnToField: existingMappings?.columnToField ?? columnToField,
-    codecTypes: existingMappings?.codecTypes ?? {},
-    operationTypes: existingMappings?.operationTypes ?? {},
   };
 }
 

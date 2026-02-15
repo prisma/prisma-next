@@ -421,10 +421,6 @@ describe('SQL contract factories', () => {
       const mappings = {
         modelToTable: { User: 'user' },
         tableToModel: { user: 'User' },
-        codecTypes: {
-          'pg/int4@1': { output: 'number' },
-        },
-        operationTypes: {},
       };
       const c = contract({
         target: 'postgres',

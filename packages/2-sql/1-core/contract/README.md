@@ -72,7 +72,7 @@ const contract = validateContract<Contract>(contractJson);
 Mapping overrides in `contract.mappings` follow strict pair semantics:
 - `modelToTable` and `tableToModel` must either both be omitted (auto-computed) or both be provided as inverse maps.
 - `fieldToColumn` and `columnToField` must either both be omitted (auto-computed) or both be provided as inverse maps.
-- `codecTypes` and `operationTypes` are merged additively on top of defaults.
+- Codec and operation type maps are type-only (phantom channel) and are not present at runtime.
 
 ### Factories
 
