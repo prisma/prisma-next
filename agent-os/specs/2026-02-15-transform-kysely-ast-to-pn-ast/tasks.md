@@ -186,20 +186,20 @@ Wire the transformer into the Kysely integration so plans carry PN AST and meta.
 
 ### 5.1 Plan construction
 
-- [ ] In `packages/3-extensions/integration-kysely/src/connection.ts`, call transformer with `compiledQuery`, `contract`
-- [ ] Set `plan.ast = transformed QueryAst`
-- [ ] Set `plan.meta.lane = 'kysely'`
-- [ ] Set `plan.meta.refs` from transformer output
-- [ ] Set `plan.meta.paramDescriptors` from transformer output
-- [ ] Set `plan.meta.projection` and `plan.meta.projectionTypes` where applicable
-- [ ] Set `plan.params = compiledQuery.parameters`
-- [ ] Ensure `plan.meta.annotations.codecs` populated when projection types known
+- [x] In `packages/3-extensions/integration-kysely/src/connection.ts`, call transformer with `compiledQuery`, `contract`
+- [x] Set `plan.ast = transformed QueryAst`
+- [x] Set `plan.meta.lane = 'kysely'`
+- [x] Set `plan.meta.refs` from transformer output
+- [x] Set `plan.meta.paramDescriptors` from transformer output
+- [x] Set `plan.meta.projection` and `plan.meta.projectionTypes` where applicable
+- [x] Set `plan.params = compiledQuery.parameters`
+- [x] Ensure `plan.meta.annotations.codecs` populated when projection types known
 
 ### 5.2 Integration tests
 
-- [ ] Extend `test/integration/test/` Kysely tests to assert `plan.ast` presence
-- [ ] Assert `plan.meta.refs` populated for Kysely queries
-- [ ] Assert `plan.meta.paramDescriptors` populated
+- [x] Extend `test/integration/test/` Kysely tests to assert `plan.ast` presence
+- [x] Assert `plan.meta.refs` populated for Kysely queries
+- [x] Assert `plan.meta.paramDescriptors` populated
 - [ ] Run Kysely integration with AST-first lints enabled
 
 **Phase 5 acceptance criteria**:
