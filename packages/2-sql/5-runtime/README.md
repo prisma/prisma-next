@@ -113,13 +113,34 @@ for await (const row of runtime.execute(plan)) {
 
 - `lowerSqlPlan` - SQL plan lowering via adapter
 
-### Plugins (re-exported from `@prisma-next/runtime-executor`)
+### Plugins
 
-- `budgets`, `lints` - SQL-compatible plugins
+- `budgets` - Re-exported from `@prisma-next/runtime-executor` (target-neutral)
+- `lints` - **AST-first lint plugin** (canonical in SQL domain), inspects `plan.ast` when present
 - `BudgetsOptions`, `LintsOptions` - Plugin option types
-- `Plugin`, `PluginContext` - Plugin interface types
+- `Plugin`, `PluginContext` - Plugin interface types (from runtime-executor)
 - `AfterExecuteResult` - Plugin hook result type
 - `Log` - Log entry type
+
+#### Lints plugin (SQL domain)
+
+The `lints` plugin operates on `plan.ast` when it is a SQL `QueryAst`:
+
+- **DELETE without WHERE** — blocks execution (configurable severity)
+- **UPDATE without WHERE** — blocks execution (configurable severity)
+- **Unbounded SELECT** — warns/errors when `limit` is missing
+- **SELECT \* intent** — warns/errors when `selectAllIntent` is present
+
+When `plan.ast` is missing, the plugin falls back to raw heuristic guardrails (`fallbackWhenAstMissing: 'raw'`) or skips linting (`fallbackWhenAstMissing: 'skip'`). Default is `'raw'`.
+
+```typescript
+import { createRuntime, lints } from '@prisma-next/sql-runtime';
+
+const runtime = createRuntime({
+  // ...
+  plugins: [lints({ severities: { noLimit: 'error' } })],
+});
+```
 
 ## Architecture
 
