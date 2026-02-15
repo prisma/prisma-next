@@ -215,20 +215,20 @@ Reimplement the lint plugin to inspect `plan.ast` instead of raw SQL.
 
 ### 6.1 New lint implementation (SQL domain)
 
-- [ ] Create `packages/2-sql/5-runtime/src/plugins/lints.ts`
-- [ ] Implement `beforeExecute` that inspects `plan.ast` when present (SQL `QueryAst`)
-- [ ] Rule: **DELETE without WHERE** — `ast.kind === 'delete'` and `ast.where` missing → block execution
-- [ ] Rule: **UPDATE without WHERE** — `ast.kind === 'update'` and `ast.where` missing → block execution
-- [ ] Rule: **Unbounded SELECT** — `ast.kind === 'select'` and `ast.limit` missing → warn/error (severity configurable)
-- [ ] Rule: **SELECT * intent** — detect selectAll intent (AST or meta) → warn/error
-- [ ] Preserve `LintsOptions` and severity configuration
-- [ ] Add unit tests for each lint rule (AST-based)
+- [x] Create `packages/2-sql/5-runtime/src/plugins/lints.ts`
+- [x] Implement `beforeExecute` that inspects `plan.ast` when present (SQL `QueryAst`)
+- [x] Rule: **DELETE without WHERE** — `ast.kind === 'delete'` and `ast.where` missing → block execution
+- [x] Rule: **UPDATE without WHERE** — `ast.kind === 'update'` and `ast.where` missing → block execution
+- [x] Rule: **Unbounded SELECT** — `ast.kind === 'select'` and `ast.limit` missing → warn/error (severity configurable)
+- [x] Rule: **SELECT * intent** — detect selectAll intent (AST or meta) → warn/error
+- [x] Preserve `LintsOptions` and severity configuration
+- [x] Add unit tests for each lint rule (AST-based)
 
 ### 6.2 Fallback behavior
 
-- [ ] When `plan.ast` is missing, optionally fall back to raw guardrails (heuristic) or skip lints
-- [ ] Document fallback behavior
-- [ ] Add unit test for fallback path
+- [x] When `plan.ast` is missing, optionally fall back to raw guardrails (heuristic) or skip lints
+- [x] Document fallback behavior
+- [x] Add unit test for fallback path
 
 **Phase 6 acceptance criteria**:
 
