@@ -270,26 +270,26 @@ Add Kysely equivalents for all demo queries.
 
 ### 8.1 Map demo queries to Kysely
 
-- [ ] Audit `examples/prisma-next-demo/src/queries`: list all query patterns (select, insert, update, delete, joins, like, in, limit, returning, etc.)
-- [ ] Create `examples/prisma-next-demo/src/kysely/` structure mirroring queries where applicable
+- [x] Audit `examples/prisma-next-demo/src/queries`: list all query patterns (select, insert, update, delete, joins, like, in, limit, returning, etc.)
+- [x] Create `examples/prisma-next-demo/src/kysely/` structure mirroring queries where applicable
 
 ### 8.2 Implement Kysely equivalents
 
-- [ ] `get-user-by-id` (already exists; verify and enhance if needed)
-- [ ] `get-user-posts` (filter by userId)
-- [ ] `get-users` (with limit)
-- [ ] `get-users-with-posts` (or closest Kysely join equivalent)
-- [ ] `get-all-posts-unbounded` (for unbounded SELECT lint test)
-- [ ] `dml-operations`: insert, update, delete (with returning)
-- [ ] `insert-user-transaction` (already exists; verify)
-- [ ] Add like/in queries if present in demo
-- [ ] Add at least one **guardrail-proving** query: DELETE without WHERE (intentionally failing to verify AST-based plugin blocks execution)
+- [x] `get-user-by-id` (already exists; verify and enhance if needed)
+- [x] `get-user-posts` (filter by userId)
+- [x] `get-users` (with limit)
+- [x] `get-users-with-posts` (or closest Kysely join equivalent)
+- [x] `get-all-posts-unbounded` (for unbounded SELECT lint test)
+- [x] `dml-operations`: insert, update, delete (with returning)
+- [x] `insert-user-transaction` (already exists; verify)
+- [x] Add like/in queries if present in demo
+- [x] Add at least one **guardrail-proving** query: DELETE without WHERE (intentionally failing to verify AST-based plugin blocks execution)
 
 ### 8.3 Wire into demo
 
-- [ ] Ensure demo `main.ts` (or equivalent) can run Kysely parity commands
-- [ ] Validate execution succeeds for safe queries
-- [ ] Validate guardrail-proving query is blocked
+- [x] Ensure demo `main.ts` (or equivalent) can run Kysely parity commands
+- [x] Validate execution succeeds for safe queries
+- [x] Validate guardrail-proving query is blocked
 
 **Phase 8 acceptance criteria**:
 

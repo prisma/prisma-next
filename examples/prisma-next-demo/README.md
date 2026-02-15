@@ -162,3 +162,4 @@ pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example
 
 - **Vector Similarity Search**: The demo includes a `similarity-search.ts` query that demonstrates cosine distance operations using the pgvector extension pack.
 - **Extension Packs**: Shows how to configure and use extension packs (pgvector) in `prisma-next.config.ts`.
+- **Kysely Lane Parity**: `src/kysely/` contains Kysely equivalents for demo queries (get-user-by-id, get-user-posts, get-users, get-users-with-posts, dml-operations, insert-user-transaction). Run with `pnpm start -- user-kysely <id>`, `posts-kysely <userId>`, etc. Use `guardrail-delete-kysely` to demonstrate AST-based lint blocking DELETE without WHERE.
