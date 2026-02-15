@@ -1232,6 +1232,19 @@ importers:
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
 
   packages/3-extensions/integration-kysely:
+    dependencies:
+      '@prisma-next/contract':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/shared/contract
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../2-sql/1-core/contract
+      '@prisma-next/sql-relational-core':
+        specifier: workspace:*
+        version: link:../../2-sql/4-lanes/relational-core
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/shared/utils
     devDependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
@@ -1239,9 +1252,6 @@ importers:
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/cli
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../1-framework/1-core/shared/contract
       '@prisma-next/core-execution-plane':
         specifier: workspace:*
         version: link:../../1-framework/1-core/runtime/execution-plane
@@ -1257,15 +1267,9 @@ importers:
       '@prisma-next/runtime-executor':
         specifier: workspace:*
         version: link:../../1-framework/4-runtime-executor
-      '@prisma-next/sql-contract':
-        specifier: workspace:*
-        version: link:../../2-sql/1-core/contract
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../2-sql/2-authoring/contract-ts
-      '@prisma-next/sql-relational-core':
-        specifier: workspace:*
-        version: link:../../2-sql/4-lanes/relational-core
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../2-sql/5-runtime
