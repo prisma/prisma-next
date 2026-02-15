@@ -1,4 +1,4 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
 import type {
   BinaryExpr,
   DeleteAst,
@@ -30,12 +30,22 @@ function createPluginContext() {
   };
 }
 
-function createPlan(overrides: Partial<ExecutionPlan>): ExecutionPlan {
+const baseMeta: PlanMeta = {
+  target: 'postgres',
+  storageHash: 'sha256:test',
+  lane: 'dsl',
+  paramDescriptors: [],
+};
+
+type PlanOverrides = Partial<Omit<ExecutionPlan, 'meta'>> & { meta?: Partial<PlanMeta> };
+
+function createPlan(overrides: PlanOverrides): ExecutionPlan {
+  const { meta: metaOverrides, ...rest } = overrides;
   return {
     sql: 'SELECT 1',
     params: [],
-    meta: {},
-    ...overrides,
+    meta: { ...baseMeta, ...(metaOverrides ?? {}) } as PlanMeta,
+    ...rest,
   } as ExecutionPlan;
 }
 
@@ -48,7 +58,6 @@ describe('lints plugin', () => {
       const deleteAst: DeleteAst = {
         kind: 'delete',
         table: userTable,
-        where: undefined,
       };
       const plan = createPlan({ ast: deleteAst });
       const plugin = lints();
@@ -84,7 +93,6 @@ describe('lints plugin', () => {
         kind: 'update',
         table: userTable,
         set: { email: { kind: 'param', index: 1 } },
-        where: undefined,
       };
       const plan = createPlan({ ast: updateAst });
       const plugin = lints();
