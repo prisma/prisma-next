@@ -1,6 +1,6 @@
 task_groups:
-  - name: contract-type-model-cleanup-runtime-real-mappings-vs-type-only-maps
-    claude_code_subagent: contract-types-specialist
+  - name: contract-and-type-surface-split-contract-vs-typemaps
+    claude_code_subagent: contract-type-systems-specialist
     standards:
       - global/coding-style.md
       - global/conventions.md
@@ -10,7 +10,7 @@ task_groups:
       - typescript/testing.md
       - testing/test-writing.md
   - name: contract-construction-and-validation-flow
-    claude_code_subagent: runtime-validation-specialist
+    claude_code_subagent: contract-runtime-validation-specialist
     standards:
       - global/coding-style.md
       - global/conventions.md
@@ -20,18 +20,18 @@ task_groups:
       - typescript/error-handling.md
       - typescript/testing.md
       - testing/test-writing.md
-  - name: query-lanes-and-context-integration
-    claude_code_subagent: sql-lanes-specialist
+  - name: lane-context-typing-model-thread-contract-typemaps-explicitly
+    claude_code_subagent: lanes-context-typing-specialist
     standards:
       - global/coding-style.md
       - global/conventions.md
       - global/tech-stack.md
+      - backend/queries.md
       - typescript/typescript-best-practices.md
       - typescript/testing.md
-      - backend/queries.md
       - testing/test-writing.md
-  - name: ts-authoring-ergonomics-infer-type-maps-from-packs
-    claude_code_subagent: ts-authoring-specialist
+  - name: ts-authoring-ergonomics-and-no-emit-inference
+    claude_code_subagent: ts-authoring-inference-specialist
     standards:
       - global/coding-style.md
       - global/conventions.md
@@ -39,6 +39,14 @@ task_groups:
       - typescript/typescript-best-practices.md
       - typescript/naming-conventions.md
       - typescript/testing.md
+      - testing/test-writing.md
+  - name: re-emit-generated-contracts-and-fixture-alignment
+    claude_code_subagent: emit-fixture-alignment-specialist
+    standards:
+      - global/coding-style.md
+      - global/conventions.md
+      - global/validation.md
+      - typescript/typescript-best-practices.md
       - testing/test-writing.md
   - name: demo-and-docs-alignment
     claude_code_subagent: demo-docs-specialist
