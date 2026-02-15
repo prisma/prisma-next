@@ -1,6 +1,10 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import type { PostgresDriverOptions } from '@prisma-next/driver-postgres/runtime';
+import type {
+  PostgresBinding,
+  PostgresDriverCreateOptions,
+  PostgresDriverOptions,
+} from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Log, Plugin, Runtime, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
@@ -24,15 +28,23 @@ export interface CreateTestRuntimeOptions {
   readonly log?: Log;
 }
 
+function bindingFromDriverOptions(opts: PostgresDriverOptions): PostgresBinding {
+  const { connect } = opts;
+  if ('client' in connect) {
+    return { kind: 'pgClient', client: connect.client };
+  }
+  return { kind: 'pgPool', pool: connect.pool };
+}
+
 /**
  * Creates a runtime with standard test configuration using runtime descriptors.
  * This helper DRYs up the common pattern of runtime creation in tests.
  */
-export function createTestRuntime(
+export async function createTestRuntime(
   contract: SqlContract<SqlStorage>,
   driverOptions: PostgresDriverOptions,
   options?: CreateTestRuntimeOptions,
-): Runtime {
+): Promise<Runtime> {
   const verify: {
     mode: 'onFirstUse' | 'startup' | 'always';
     requireMarker: boolean;
@@ -62,10 +74,16 @@ export function createTestRuntime(
     throw new Error('Driver descriptor missing from execution stack');
   }
 
+  const createOpts: PostgresDriverCreateOptions = {
+    cursor: driverOptions.cursor ?? { disabled: true },
+  };
+  const driver = driverDescriptor.create(createOpts);
+  await driver.connect(bindingFromDriverOptions(driverOptions));
+
   return createRuntime({
     stackInstance,
     context,
-    driver: driverDescriptor.create(driverOptions),
+    driver,
     verify,
     ...(options?.plugins ? { plugins: options.plugins } : {}),
     ...(options?.mode ? { mode: options.mode } : {}),
@@ -77,11 +95,11 @@ export function createTestRuntime(
  * Creates a runtime with the given contract and database client using runtime descriptors.
  * This helper DRYs up the common pattern of runtime creation in e2e tests.
  */
-export function createTestRuntimeFromClient(
+export async function createTestRuntimeFromClient(
   contract: SqlContract<SqlStorage>,
   client: Client,
   options?: CreateTestRuntimeOptions,
-): Runtime {
+): Promise<Runtime> {
   return createTestRuntime(
     contract,
     {

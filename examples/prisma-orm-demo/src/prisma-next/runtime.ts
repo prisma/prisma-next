@@ -17,7 +17,7 @@ import contractJson from './contract.json' with { type: 'json' };
 let runtime: Runtime | undefined;
 let client: Client | undefined;
 
-export function getPrismaNextRuntime(): Runtime {
+export async function getPrismaNextRuntime(): Promise<Runtime> {
   if (!runtime) {
     const connectionString = process.env['DATABASE_URL'];
     if (!connectionString) {
@@ -47,13 +47,13 @@ export function getPrismaNextRuntime(): Runtime {
       throw new Error('Driver descriptor missing from execution stack');
     }
 
+    const driver = driverDescriptor.create({ cursor: { disabled: true } });
+    await driver.connect({ kind: 'pgClient', client });
+
     runtime = createRuntime({
       stackInstance,
       context,
-      driver: driverDescriptor.create({
-        connect: { client },
-        cursor: { disabled: true },
-      }),
+      driver,
       verify: {
         mode: 'onFirstUse',
         requireMarker: false,

@@ -172,10 +172,10 @@ Groups 1–4 can be partially parallelized (1 before 2 and 3; 2 before 4). Group
 
 ### 6.1 Implementation
 
-- [ ] Update `examples/prisma-next-demo` to use new wiring (if it composes manually; `postgres()` one-liner may already encapsulate).
-- [ ] Update `examples/prisma-orm-demo` if it uses manual driver/stack wiring.
-- [ ] Update `examples/prisma-no-emit` if it uses manual driver/stack wiring.
-- [ ] Run `pnpm test:packages` and `pnpm test:integration`; fix any regressions.
+- [x] Update `examples/prisma-next-demo` to use new wiring (if it composes manually; `postgres()` one-liner may already encapsulate).
+- [x] Update `examples/prisma-orm-demo` if it uses manual driver/stack wiring.
+- [x] Update `examples/prisma-no-emit` if it uses manual driver/stack wiring.
+- [x] Run `pnpm test:packages` and `pnpm test:integration`; fix any regressions.
 
 **Acceptance criteria:** All examples run; integration tests pass; demos execute queries successfully.
 

@@ -59,7 +59,7 @@ describe('runtime execute integration', () => {
   }, timeouts.spinUpPpgDev);
 
   it('executes a plan after onFirstUse verification', async () => {
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
         connect: { client },
@@ -92,7 +92,7 @@ describe('runtime execute integration', () => {
       storageHash: coreHash('sha256:mismatch'),
     };
 
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       mismatchedContract,
       {
         connect: { client },
@@ -119,7 +119,7 @@ describe('runtime execute integration', () => {
   });
 
   it('blocks raw select star with lint error', async () => {
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
         connect: { client },
@@ -150,7 +150,7 @@ describe('runtime execute integration', () => {
   });
 
   it('warns on missing limit and blocks via budget heuristic', async () => {
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
         connect: { client },
@@ -176,7 +176,7 @@ describe('runtime execute integration', () => {
   });
 
   it('records unindexed predicate warning when refs lack indexes', async () => {
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
         connect: { client },
@@ -207,7 +207,7 @@ describe('runtime execute integration', () => {
   });
 
   it('prevents read-only mutation when annotations intent is report', async () => {
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
         connect: { client },
@@ -236,7 +236,7 @@ describe('runtime execute integration', () => {
   it(
     'respects unbounded select severity override',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -269,7 +269,7 @@ describe('runtime execute integration', () => {
   it(
     'attaches explain estimates when enabled',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -302,7 +302,7 @@ describe('runtime execute integration', () => {
   );
 
   it('emits stable fingerprint for literal-only differences', async () => {
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
         connect: { client },

@@ -63,7 +63,7 @@ describe('comparison operators integration', () => {
   it(
     'gt operator returns rows where id > cursor',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -91,7 +91,7 @@ describe('comparison operators integration', () => {
   it(
     'lt operator returns rows where id < cursor',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -119,7 +119,7 @@ describe('comparison operators integration', () => {
   it(
     'gte operator returns rows where id >= cursor',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -147,7 +147,7 @@ describe('comparison operators integration', () => {
   it(
     'lte operator returns rows where id <= cursor',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -175,7 +175,7 @@ describe('comparison operators integration', () => {
   it(
     'cursor pagination returns correct pages (forward)',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -230,7 +230,7 @@ describe('comparison operators integration', () => {
   it(
     'cursor pagination returns correct pages (backward)',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -262,7 +262,7 @@ describe('comparison operators integration', () => {
   it(
     'gt returns empty result when cursor exceeds all values',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -290,7 +290,7 @@ describe('comparison operators integration', () => {
   it(
     'lt returns empty result when cursor is below all values',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },

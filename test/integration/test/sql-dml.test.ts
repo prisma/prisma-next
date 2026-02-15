@@ -93,7 +93,7 @@ describe('DML Integration Tests', () => {
 
   describe('insert', () => {
     it('inserts a row and returns it with returning clause', async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -146,7 +146,7 @@ describe('DML Integration Tests', () => {
     it(
       'inserts a row without returning clause',
       async () => {
-        const runtime = createTestRuntime(
+        const runtime = await createTestRuntime(
           fixtureContract,
           {
             connect: { client },
@@ -202,7 +202,7 @@ describe('DML Integration Tests', () => {
     it(
       'updates a row and returns it with returning clause',
       async () => {
-        const runtime = createTestRuntime(
+        const runtime = await createTestRuntime(
           fixtureContract,
           {
             connect: { client },
@@ -256,7 +256,7 @@ describe('DML Integration Tests', () => {
     );
 
     it('updates a row without returning clause', async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -312,7 +312,7 @@ describe('DML Integration Tests', () => {
     }, timeouts.spinUpPpgDev);
 
     it('deletes a row and returns it with returning clause', async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
           connect: { client },
@@ -364,7 +364,7 @@ describe('DML Integration Tests', () => {
     it(
       'deletes a row without returning clause',
       async () => {
-        const runtime = createTestRuntime(
+        const runtime = await createTestRuntime(
           fixtureContract,
           {
             connect: { client },
