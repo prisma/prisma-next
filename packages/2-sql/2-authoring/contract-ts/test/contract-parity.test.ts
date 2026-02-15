@@ -139,6 +139,51 @@ describe('validateContract and defineContract parity', () => {
     expect(builtMappingKeys).toEqual(
       expect.arrayContaining(['modelToTable', 'tableToModel', 'fieldToColumn', 'columnToField']),
     );
+
+    expect(validated.mappings.modelToTable).toEqual(built.mappings.modelToTable);
+    expect(validated.mappings.tableToModel).toEqual(built.mappings.tableToModel);
+    expect(validated.mappings.fieldToColumn).toEqual(built.mappings.fieldToColumn);
+    expect(validated.mappings.columnToField).toEqual(built.mappings.columnToField);
+  });
+
+  it('validator never adds codecTypes or operationTypes to mappings', () => {
+    const contractJson = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      models: {
+        User: {
+          storage: { table: 'user' },
+          fields: { id: { column: 'id' }, email: { column: 'email' } },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    };
+
+    const validated = validateContract<SqlContract<SqlStorage>>(contractJson);
+
+    expect(validated.mappings).not.toHaveProperty('codecTypes');
+    expect(validated.mappings).not.toHaveProperty('operationTypes');
+    const keys = Object.keys(validated.mappings) as (keyof SqlMappings)[];
+    expect(keys.length).toBe(4);
+    for (const key of keys) {
+      expect(RUNTIME_MAPPING_KEYS).toContain(key);
+    }
   });
 
   it('validateContract strips _generated from input', () => {
