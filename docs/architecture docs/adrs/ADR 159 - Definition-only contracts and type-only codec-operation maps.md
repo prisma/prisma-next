@@ -1,4 +1,4 @@
-# ADR 155 - Definition-only contracts and type-only codec/operation maps
+# ADR 159 - Definition-only contracts and type-only codec/operation maps
 
 ```mermaid
 sequenceDiagram
@@ -12,11 +12,11 @@ sequenceDiagram
   participant Ctx as createExecutionContext
 
   alt No-emit (TS authoring)
-    App->>TS: defineContract<CodecTypes>().…build()
-    TS-->>App: Contract value (definition-only)\n+ type-only CodecTypes/OperationTypes
+    App->>TS: defineContract().target(pack).extensionPacks(packs).…build()
+    TS-->>App: Contract value (definition-only)\n+ type-only codec/op type maps inferred from packs
   else Emit (JSON + .d.ts)
     App->>JSON: import contract.json
-    App->>Dts: import type Contract, CodecTypes, OperationTypes
+    App->>Dts: import type Contract (plus emitted type maps)
     App->>V: validateContract<Contract>(contract.json)
     V-->>App: Contract value (definition-only)\n(runtime-real mappings only)
   end
@@ -109,6 +109,19 @@ Instead, they are carried via a **phantom type channel** on the `Contract` type 
 - lanes can infer types deterministically from `TContract` (no registry-dependent typing)
 - runtime contract values remain honest/traversable (no “pretend” keys)
 
+### 2.3 Ergonomics: infer type maps from packs in TS authoring
+
+In TS authoring (no-emit), developers already provide a single point of configuration by selecting:
+
+- a target pack (`.target(postgresPack)`)
+- extension packs (`.extensionPacks({ pgvector })`)
+
+The codec/operation **type maps** used for inference are therefore derivable from those pack refs at compile time. We should not require users to manually write unions/intersections like:
+
+- `type AllCodecTypes = PostgresCodecTypes & PgVectorCodecTypes`
+
+This ADR keeps the underlying type map concept (it is still required for inference, including parameterized codecs), but expects the authoring DSL to infer and accumulate it from the selected packs.
+
 ### 3) Query lanes get runtime behavior from ExecutionContext, compile-time typing from Contract types
 
 Lanes already operate with an `ExecutionContext`:
@@ -159,6 +172,7 @@ Rationale: we want an explicit signal that these maps are for TypeScript inferen
 - No-emit workflows keep a **single configuration surface** (import codec column constructors once; types flow).
 - Lane typing remains deterministic and precise, including parameterized codecs.
 - Runtime composition remains where it belongs: `ExecutionContext` derived from descriptors.
+- Higher-level runtime clients (e.g. `@prisma-next/postgres/runtime`) can stay ergonomic by being generic only over `TContract` while still extracting lane typing (`ExtractCodecTypes<TContract>`, `ExtractOperationTypes<TContract>`) without relying on runtime “pretend keys”.
 
 ### Trade-offs
 
@@ -183,8 +197,5 @@ Rationale: we want an explicit signal that these maps are for TypeScript inferen
   - use type-level extraction (not runtime reads) for row typing
   - use `ExecutionContext` registries for runtime execution behavior
 - Ensure `validateContract()` does not attempt to fabricate type-only maps as runtime values.
-
-## Follow-ups
-
-- Update the Linear issue text for TML-1831 to reflect the clarified design (contract definition-only; type-only maps via phantom channel; runtime mappings remain runtime-real).
+- Ensure convenience clients and façades remain compatible with this model (validate contract first, then derive context/registries; keep typing extractable from `TContract`).
 
