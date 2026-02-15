@@ -14,5 +14,5 @@ export async function getUserById(userId: string, runtime: Runtime) {
     .select(['id', 'email', 'createdAt'])
     .where('id', '=', userId)
     .limit(1)
-    .executeTakeFirst();
+    .executeTakeFirstOrThrow();
 }
