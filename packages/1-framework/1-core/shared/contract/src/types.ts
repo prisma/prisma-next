@@ -204,7 +204,7 @@ export interface ParamDescriptor {
   readonly codecId?: string;
   readonly nativeType?: string;
   readonly nullable?: boolean;
-  readonly source: 'dsl' | 'raw';
+  readonly source: 'dsl' | 'raw' | 'lane';
   readonly refs?: { table: string; column: string };
 }
 
