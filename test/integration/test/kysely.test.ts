@@ -334,18 +334,21 @@ describe('Kysely integration', () => {
 
         expect(captured).toHaveLength(1);
         const plan = captured[0];
-        expect(plan.ast).toBeDefined();
-        expect(plan.ast?.kind).toBe('select');
-        expect(plan.meta.lane).toBe('kysely');
-        expect(plan.meta.refs).toBeDefined();
-        expect(plan.meta.refs?.tables).toContain('user');
-        expect(plan.meta.refs?.columns).toBeDefined();
-        expect((plan.meta.refs?.columns ?? []).length).toBeGreaterThan(0);
-        expect(plan.meta.paramDescriptors).toBeDefined();
-        expect(Array.isArray(plan.meta.paramDescriptors)).toBe(true);
-        expect(plan.meta.projection).toBeDefined();
-        expect(plan.meta.projectionTypes).toBeDefined();
-        expect(plan.meta.annotations?.codecs).toBeDefined();
+        expect(plan).toMatchObject({
+          ast: { kind: 'select' },
+          meta: {
+            lane: 'kysely',
+            refs: {
+              tables: expect.arrayContaining(['user']),
+              columns: expect.any(Array),
+            },
+            paramDescriptors: expect.any(Array),
+            projection: expect.any(Object),
+            projectionTypes: expect.any(Object),
+            annotations: { codecs: expect.any(Object) },
+          },
+        });
+        expect(plan.meta.refs?.columns?.length ?? 0).toBeGreaterThan(0);
       },
       testTimeout,
     );
