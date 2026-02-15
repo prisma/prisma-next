@@ -172,12 +172,7 @@ function transformValue(
   ctx: TransformContext,
   refs?: { table: string; column: string },
 ): ParamRef | LiteralExpr {
-  if (typeof node !== 'object' || node === null) {
-    return { kind: 'literal', value: node };
-  }
-  const n = node as Record<string, unknown>;
-  if (hasKind(node, 'ValueNode')) {
-    const idx = nextParamIndex(ctx);
+  const addDescriptorForCurrentParam = (): void => {
     const colDef = refs ? ctx.contract.storage.tables[refs.table]?.columns[refs.column] : undefined;
     const descriptor: Omit<ParamDescriptor, 'index' | 'source'> = {
       ...(refs && { refs }),
@@ -187,6 +182,23 @@ function transformValue(
       ...(refs && colDef !== undefined && { nullable: colDef.nullable ?? false }),
     };
     addParamDescriptor(ctx, descriptor);
+  };
+
+  if (typeof node !== 'object' || node === null) {
+    // Kysely can place primitive values directly in PrimitiveValueListNode entries for INSERT/IN.
+    // If they correspond to the next compiled parameter, preserve placeholder semantics.
+    const nextCompiledParam = ctx.parameters[ctx.paramIndex];
+    if (ctx.paramIndex < ctx.parameters.length && Object.is(nextCompiledParam, node)) {
+      const idx = nextParamIndex(ctx);
+      addDescriptorForCurrentParam();
+      return { kind: 'param', index: idx };
+    }
+    return { kind: 'literal', value: node };
+  }
+  const n = node as Record<string, unknown>;
+  if (hasKind(node, 'ValueNode')) {
+    const idx = nextParamIndex(ctx);
+    addDescriptorForCurrentParam();
     return { kind: 'param', index: idx };
   }
   const nodeKind = String((n as { kind?: string })['kind'] ?? 'unknown');
@@ -218,7 +230,13 @@ function mapOperator(op: string): BinaryOp | undefined {
 function getOperatorFromNode(node: unknown): string | undefined {
   if (typeof node !== 'object' || node === null) return undefined;
   const n = node as Record<string, unknown>;
-  if (hasKind(node, 'OperatorNode')) return String(n['operator'] ?? n);
+  if (hasKind(node, 'OperatorNode')) {
+    const op = n['operator'];
+    if (typeof op === 'string') {
+      return op;
+    }
+    return undefined;
+  }
   return undefined;
 }
 
@@ -256,10 +274,13 @@ function transformWhereExpr(
 
   if (
     hasKind(node, 'BinaryOperationNode') ||
-    (n['kind'] === 'BinaryOperationNode' && n['left'] && n['operator'] && n['right'])
+    ((n['kind'] === 'BinaryOperationNode' || hasKind(node, 'BinaryOperationNode')) &&
+      n['operator'] &&
+      (n['left'] || n['leftOperand']) &&
+      (n['right'] || n['rightOperand']))
   ) {
-    const leftNode = n['left'] as unknown;
-    const rightNode = n['right'] as unknown;
+    const leftNode = (n['left'] ?? n['leftOperand']) as unknown;
+    const rightNode = (n['right'] ?? n['rightOperand']) as unknown;
     const opNode = n['operator'] as unknown;
     const opStr = getOperatorFromNode(opNode);
     const op = opStr ? mapOperator(opStr) : undefined;
@@ -474,7 +495,9 @@ function transformSelect(node: Record<string, unknown>, ctx: TransformContext): 
 
   const whereNode = node['where'];
   const where = transformWhereExpr(
-    (whereNode as Record<string, unknown> | null)?.['node'] ?? whereNode,
+    (whereNode as Record<string, unknown> | null)?.['node'] ??
+      (whereNode as Record<string, unknown> | null)?.['where'] ??
+      whereNode,
     ctx,
     fromTable,
   );
@@ -497,9 +520,9 @@ function transformSelect(node: Record<string, unknown>, ctx: TransformContext): 
       if (typeof directVal === 'number') {
         limit = directVal;
       } else {
-        nextParamIndex(ctx);
+        const limitParamIndex = nextParamIndex(ctx);
         addParamDescriptor(ctx, {});
-        const val = ctx.parameters[ctx.paramIndex - 1];
+        const val = ctx.parameters[limitParamIndex - 1];
         limit = typeof val === 'number' ? val : undefined;
       }
     }
@@ -669,7 +692,9 @@ function transformUpdate(node: Record<string, unknown>, ctx: TransformContext): 
 
   const updateWhereNode = node['where'];
   const where = transformWhereExpr(
-    (updateWhereNode as Record<string, unknown> | null)?.['node'] ?? updateWhereNode,
+    (updateWhereNode as Record<string, unknown> | null)?.['node'] ??
+      (updateWhereNode as Record<string, unknown> | null)?.['where'] ??
+      updateWhereNode,
     ctx,
     tableRef.name,
   );
@@ -726,7 +751,9 @@ function transformDelete(node: Record<string, unknown>, ctx: TransformContext): 
 
   const deleteWhereNode = node['where'];
   const where = transformWhereExpr(
-    (deleteWhereNode as Record<string, unknown> | null)?.['node'] ?? deleteWhereNode,
+    (deleteWhereNode as Record<string, unknown> | null)?.['node'] ??
+      (deleteWhereNode as Record<string, unknown> | null)?.['where'] ??
+      deleteWhereNode,
     ctx,
     tableRef.name,
   );

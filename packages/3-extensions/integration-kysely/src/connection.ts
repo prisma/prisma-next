@@ -115,9 +115,13 @@ export class KyselyPrismaConnection implements DatabaseConnection {
           }),
       };
 
-      const annotations: { codecs?: Record<string, string> } = {};
+      const annotations: { codecs?: Record<string, string>; selectAllIntent?: { table?: string } } =
+        {};
       if (metaAdditions.projectionTypes && Object.keys(metaAdditions.projectionTypes).length > 0) {
         annotations.codecs = { ...metaAdditions.projectionTypes };
+      }
+      if (metaAdditions.selectAllIntent) {
+        annotations.selectAllIntent = metaAdditions.selectAllIntent;
       }
 
       return {
