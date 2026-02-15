@@ -52,21 +52,21 @@ Source:
 
 ### 3.1 Tests first: lane inference with explicit `TypeMaps`
 
-- [ ] Add/adjust 2-8 focused lane/type tests to cover inference using `(TContract, TTypeMaps)` instead of extracting maps from `TContract`.
-- [ ] Add/adjust parameterized codec tests (`typeParams` / `typeRef`) to verify precision remains intact.
-- [ ] Add tests that lane runtime behavior still reads registries from `ExecutionContext` only.
+- [x] Add/adjust 2-8 focused lane/type tests to cover inference using `(TContract, TTypeMaps)` instead of extracting maps from `TContract`.
+- [x] Add/adjust parameterized codec tests (`typeParams` / `typeRef`) to verify precision remains intact.
+- [x] Add tests that lane runtime behavior still reads registries from `ExecutionContext` only.
 
 ### 3.2 Refactor lane/core generics and helpers
 
-- [ ] Update lane, relational-core, orm-lane, query-builder, and integration helpers to accept explicit `TypeMaps` generics where needed.
-- [ ] Remove runtime/type assumptions that codec/op maps are available on contract mappings.
-- [ ] Keep typing surfaces readable and minimize generic churn at call sites.
+- [x] Update lane, relational-core, orm-lane, query-builder, and integration helpers to accept explicit `TypeMaps` generics where needed.
+- [x] Remove runtime/type assumptions that codec/op maps are available on contract mappings.
+- [x] Keep typing surfaces readable and minimize generic churn at call sites.
 
 ### 3.3 Update convenience clients and context APIs
 
-- [ ] Update convenience clients (for example `@prisma-next/postgres/runtime`) to support emitted usage with explicit generics (`<Contract, TypeMaps>`).
-- [ ] Ensure runtime execution behavior still depends on `ExecutionContext.codecs`, `ExecutionContext.operations`, and `ExecutionContext.types`.
-- [ ] Keep no-emit ergonomics via inferred typing paths (see task group 4).
+- [x] Update convenience clients (for example `@prisma-next/postgres/runtime`) to support emitted usage with explicit generics (`<Contract, TypeMaps>`).
+- [x] Ensure runtime execution behavior still depends on `ExecutionContext.codecs`, `ExecutionContext.operations`, and `ExecutionContext.types`.
+- [x] Keep no-emit ergonomics via inferred typing paths (see task group 4).
 
 ## 4) TS authoring ergonomics and no-emit inference
 
