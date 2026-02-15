@@ -48,8 +48,6 @@ describe('predicates', () => {
       tableToModel: {},
       fieldToColumn: {},
       columnToField: {},
-      codecTypes: {},
-      operationTypes: {},
     },
     capabilities: {},
     extensionPacks: {},

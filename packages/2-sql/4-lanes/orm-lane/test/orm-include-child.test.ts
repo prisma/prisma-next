@@ -54,8 +54,6 @@ describe('orm-include-child', () => {
       tableToModel: { post: 'Post' },
       fieldToColumn: { Post: { id: 'id', title: 'title' } },
       columnToField: { post: { id: 'id', title: 'title' } },
-      codecTypes: {},
-      operationTypes: {},
     },
     meta: {},
     sources: {},

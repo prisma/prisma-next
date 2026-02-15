@@ -75,13 +75,14 @@ export type Contract = SqlContract<
         readonly createdAt: 'createdAt';
       };
     };
-    readonly codecTypes: CodecTypes;
-    readonly operationTypes: OperationTypes;
   },
   StorageHash,
   ExecutionHash,
   ProfileHash
->;
+> & {
+  readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
+  readonly '__@prisma-next/sql-contract/operationTypes@__': OperationTypes;
+};
 
 // Codec type map and scalar mapping imported from adapter - used for type inference in lanes
 export type { CodecTypes };

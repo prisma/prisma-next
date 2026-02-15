@@ -43,8 +43,6 @@ describe('insert builder', () => {
       tableToModel: { user: 'User' },
       fieldToColumn: { User: { id: 'id', email: 'email' } },
       columnToField: { user: { id: 'id', email: 'email' } },
-      codecTypes: {},
-      operationTypes: {},
     },
     capabilities: {},
     extensionPacks: {},

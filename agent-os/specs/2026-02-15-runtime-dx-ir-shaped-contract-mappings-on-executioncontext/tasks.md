@@ -51,14 +51,14 @@ Source:
 
 ### 3.1 Tests first: lane behavior with new type channel
 
-- [ ] Add/adjust lane tests to cover type inference without runtime codec/op maps on contract values.
-- [ ] Add/adjust parameterized codec tests (column-level `typeParams` / `typeRef`) to verify no regressions.
+- [x] Add/adjust lane tests to cover type inference without runtime codec/op maps on contract values.
+- [x] Add/adjust parameterized codec tests (column-level `typeParams` / `typeRef`) to verify no regressions.
 
 ### 3.2 Update lane/runtime call sites
 
-- [ ] Remove runtime reads of `contract.mappings.codecTypes` / `contract.mappings.operationTypes` from lane code.
-- [ ] Ensure runtime behavior uses `ExecutionContext` registries (`codecs`, `operations`, `types`) only.
-- [ ] Keep generic extraction-based typing intact in convenience clients (e.g. `@prisma-next/postgres/runtime`).
+- [x] Remove runtime reads of `contract.mappings.codecTypes` / `contract.mappings.operationTypes` from lane code.
+- [x] Ensure runtime behavior uses `ExecutionContext` registries (`codecs`, `operations`, `types`) only.
+- [x] Keep generic extraction-based typing intact in convenience clients (e.g. `@prisma-next/postgres/runtime`).
 
 ## 4) TS authoring ergonomics: infer type maps from packs
 

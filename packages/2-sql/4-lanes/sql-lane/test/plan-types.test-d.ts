@@ -1,5 +1,5 @@
 import type { ResultType as CoreResultType, ExecutionPlan } from '@prisma-next/contract/types';
-import type { SqlContract } from '@prisma-next/sql-contract/types';
+import type { ExtractCodecTypes, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { schema } from '@prisma-next/sql-relational-core/schema';
@@ -476,7 +476,7 @@ test('codec mapping resolves scalar types correctly', () => {
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
   expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
 
-  type ContractCodecTypes = Contract['mappings'] extends { codecTypes: infer C } ? C : never;
+  type ContractCodecTypes = ExtractCodecTypes<Contract>;
   expectTypeOf<ContractCodecTypes>().toExtend<CodecTypes>();
 });
 
@@ -523,63 +523,67 @@ test('representative contract resolves types correctly end-to-end', () => {
 });
 
 test('result typing is derived solely from projection, unaffected by joins', () => {
-  // Define a fully-typed contract type for this test
+  type ContractWithPostsStorage = SqlStorage & {
+    readonly tables: {
+      readonly user: {
+        readonly columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly email: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            nullable: false;
+          };
+        };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly never[];
+        readonly indexes: readonly never[];
+        readonly foreignKeys: readonly never[];
+      };
+      readonly post: {
+        readonly columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly userId: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly title: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            nullable: false;
+          };
+        };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly never[];
+        readonly indexes: readonly never[];
+        readonly foreignKeys: readonly never[];
+      };
+    };
+  };
+
   type ContractWithPosts = SqlContract<
-    {
-      readonly tables: {
-        readonly user: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly email: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
-          };
-          readonly primaryKey: { readonly columns: readonly ['id'] };
-          readonly uniques: readonly never[];
-          readonly indexes: readonly never[];
-          readonly foreignKeys: readonly never[];
-        };
-        readonly post: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly userId: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly title: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
-          };
-          readonly primaryKey: { readonly columns: readonly ['id'] };
-          readonly uniques: readonly never[];
-          readonly indexes: readonly never[];
-          readonly foreignKeys: readonly never[];
-        };
-      };
-    },
+    ContractWithPostsStorage,
     Record<string, never>,
     Record<string, never>,
-    {
-      readonly codecTypes: {
-        readonly 'pg/int4@1': { readonly output: number };
-        readonly 'pg/text@1': { readonly output: string };
-      };
-      readonly operationTypes: Record<string, Record<string, unknown>>;
-    }
-  >;
+    Record<string, never>
+  > & {
+    readonly '__@prisma-next/sql-contract/codecTypes@__': {
+      readonly 'pg/int4@1': { readonly output: number };
+      readonly 'pg/text@1': { readonly output: string };
+    };
+    readonly '__@prisma-next/sql-contract/operationTypes@__': Record<
+      string,
+      Record<string, unknown>
+    >;
+  };
 
   const contractWithPosts = validateContract<ContractWithPosts>({
     target: 'postgres',
@@ -611,10 +615,7 @@ test('result typing is derived solely from projection, unaffected by joins', () 
     },
     models: {},
     relations: {},
-    mappings: {
-      codecTypes: {},
-      operationTypes: {},
-    } as unknown as ContractWithPosts['mappings'],
+    mappings: {},
   });
 
   const adapter = createStubAdapter();
@@ -772,65 +773,69 @@ test('mixed leaves and nested objects in projection', () => {
 });
 
 test('nested projection with joins infers nested Row type', () => {
-  // Define a fully-typed contract type for this test
-  type ContractWithPosts = SqlContract<
-    {
-      readonly tables: {
-        readonly user: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly email: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
+  type NestedContractStorage = SqlStorage & {
+    readonly tables: {
+      readonly user: {
+        readonly columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
           };
-          readonly primaryKey: { readonly columns: readonly ['id'] };
-          readonly uniques: readonly never[];
-          readonly indexes: readonly never[];
-          readonly foreignKeys: readonly never[];
-        };
-        readonly post: {
-          readonly columns: {
-            readonly id: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly userId: {
-              readonly nativeType: 'int4';
-              readonly codecId: 'pg/int4@1';
-              nullable: false;
-            };
-            readonly title: {
-              readonly nativeType: 'text';
-              readonly codecId: 'pg/text@1';
-              nullable: false;
-            };
+          readonly email: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            nullable: false;
           };
-          readonly primaryKey: { readonly columns: readonly ['id'] };
-          readonly uniques: readonly never[];
-          readonly indexes: readonly never[];
-          readonly foreignKeys: readonly never[];
         };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly never[];
+        readonly indexes: readonly never[];
+        readonly foreignKeys: readonly never[];
       };
-    },
-    Record<string, never>,
-    Record<string, never>,
-    {
-      readonly codecTypes: {
-        readonly 'pg/int4@1': { readonly output: number };
-        readonly 'pg/text@1': { readonly output: string };
+      readonly post: {
+        readonly columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly userId: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            nullable: false;
+          };
+          readonly title: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            nullable: false;
+          };
+        };
+        readonly primaryKey: { readonly columns: readonly ['id'] };
+        readonly uniques: readonly never[];
+        readonly indexes: readonly never[];
+        readonly foreignKeys: readonly never[];
       };
-      readonly operationTypes: Record<string, Record<string, unknown>>;
-    }
-  >;
+    };
+  };
 
-  const contractWithPosts = validateContract<ContractWithPosts>({
+  type NestedContractWithPosts = SqlContract<
+    NestedContractStorage,
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
+  > & {
+    readonly '__@prisma-next/sql-contract/codecTypes@__': {
+      readonly 'pg/int4@1': { readonly output: number };
+      readonly 'pg/text@1': { readonly output: string };
+    };
+    readonly '__@prisma-next/sql-contract/operationTypes@__': Record<
+      string,
+      Record<string, unknown>
+    >;
+  };
+
+  const contractWithPosts = validateContract<NestedContractWithPosts>({
     target: 'postgres',
     targetFamily: 'sql' as const,
     storageHash: 'sha256:test-core',
@@ -860,10 +865,7 @@ test('nested projection with joins infers nested Row type', () => {
     },
     models: {},
     relations: {},
-    mappings: {
-      codecTypes: {},
-      operationTypes: {},
-    } as unknown as ContractWithPosts['mappings'],
+    mappings: {},
   });
 
   const adapter = createStubAdapter();

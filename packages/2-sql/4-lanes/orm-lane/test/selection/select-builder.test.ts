@@ -58,8 +58,6 @@ function createTestContract(): SqlContract<SqlStorage> {
       tableToModel: {},
       fieldToColumn: {},
       columnToField: {},
-      codecTypes: {},
-      operationTypes: {},
     },
     capabilities: {},
     extensionPacks: {},
