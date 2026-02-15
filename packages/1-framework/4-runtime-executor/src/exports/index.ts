@@ -8,8 +8,6 @@ export type { ContractMarkerRecord } from '../marker';
 export { parseContractMarkerRow } from '../marker';
 export type { BudgetsOptions } from '../plugins/budgets';
 export { budgets } from '../plugins/budgets';
-export type { LintsOptions } from '../plugins/lints';
-export { lints } from '../plugins/lints';
 export type {
   AfterExecuteResult,
   Log,
