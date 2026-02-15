@@ -11,8 +11,8 @@ export async function getUserById(userId: string, runtime: Runtime) {
 
   return kysely
     .selectFrom('user')
-    .selectAll()
+    .select(['id', 'email', 'createdAt'])
     .where('id', '=', userId)
     .limit(1)
-    .executeTakeFirstOrThrow();
+    .executeTakeFirst();
 }
