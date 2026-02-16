@@ -50,7 +50,7 @@ Note: each `plan` executed by the ORM Client carries the same `meta.groupingKey`
 
 Prisma Next’s query plane is built around immutable Plans and the **one query → one statement** rule (see [ADR 003 — One Query One Statement](ADR 003 - One Query One Statement.md)). This makes verification, guardrails, and debugging predictable: runtime plugins can lint, budget, and observe each statement deterministically.
 
-We also want to build a higher-abstraction, model-centric client (working title: **ORM Client**) in the vein of PrismaClient / ActiveRecord. One of its key specializations is ergonomic relationship traversal and nested writes. In practice, many ORM operations will require orchestrating **multiple database statements** (for example: nested creates across multiple tables, read-then-write sequences with capability-gated strategies, retries, or explicit transaction workflows).
+We also want to build a higher-abstraction, model-centric client (working title: **ORM Client**) in the vein of PrismaClient / ActiveRecord. One of its key specializations is ergonomic relationship traversal and nested writes. In practice, many ORM operations will require orchestrating **multiple database statements** (for example: nested creates across multiple tables, read-then-write sequences with strategies gated on adapter-reported capabilities negotiated at connect time, retries, or explicit transaction workflows).
 
 At that layer, it is not always possible—or desirable—to preserve “one call → one statement”. Even when each individual statement remains analyzable, plugins currently have no stable way to recognize that a set of statements belong to the same higher-level user operation.
 
