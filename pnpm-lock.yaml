@@ -1607,6 +1607,9 @@ importers:
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../utils
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
@@ -1689,6 +1692,9 @@ importers:
       '@prisma-next/vite-plugin-contract-emit':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/vite-plugin-contract-emit
+      arktype:
+        specifier: 'catalog:'
+        version: 2.1.29
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*

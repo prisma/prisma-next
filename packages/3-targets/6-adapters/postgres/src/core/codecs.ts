@@ -28,6 +28,8 @@ import {
   PG_INT4_CODEC_ID,
   PG_INT8_CODEC_ID,
   PG_INTERVAL_CODEC_ID,
+  PG_JSON_CODEC_ID,
+  PG_JSONB_CODEC_ID,
   PG_NUMERIC_CODEC_ID,
   PG_TEXT_CODEC_ID,
   PG_TIME_CODEC_ID,
@@ -80,6 +82,14 @@ const sqlCharCodec = sqlCodecDefinitions.char.codec;
 const sqlVarcharCodec = sqlCodecDefinitions.varchar.codec;
 const sqlIntCodec = sqlCodecDefinitions.int.codec;
 const sqlFloatCodec = sqlCodecDefinitions.float.codec;
+
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { readonly [key: string]: JsonValue }
+  | readonly JsonValue[];
 
 // Create individual codec instances
 const pgTextCodec = codec({
@@ -412,6 +422,38 @@ const pgIntervalCodec = codec<typeof PG_INTERVAL_CODEC_ID, string, string>({
   },
 });
 
+const pgJsonCodec = codec<typeof PG_JSON_CODEC_ID, string | JsonValue, JsonValue>({
+  typeId: PG_JSON_CODEC_ID,
+  targetTypes: ['json'],
+  encode: (value) => JSON.stringify(value),
+  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'json',
+        },
+      },
+    },
+  },
+});
+
+const pgJsonbCodec = codec<typeof PG_JSONB_CODEC_ID, string | JsonValue, JsonValue>({
+  typeId: PG_JSONB_CODEC_ID,
+  targetTypes: ['jsonb'],
+  encode: (value) => JSON.stringify(value),
+  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'jsonb',
+        },
+      },
+    },
+  },
+});
+
 // Build codec definitions using the builder DSL
 const codecs = defineCodecs()
   .add('char', sqlCharCodec)
@@ -437,7 +479,9 @@ const codecs = defineCodecs()
   .add('bit', pgBitCodec)
   .add('bit varying', pgVarbitCodec)
   .add('interval', pgIntervalCodec)
-  .add('enum', pgEnumCodec);
+  .add('enum', pgEnumCodec)
+  .add('json', pgJsonCodec)
+  .add('jsonb', pgJsonbCodec);
 
 // Export derived structures directly from codecs builder
 export const codecDefinitions = codecs.codecDefinitions;

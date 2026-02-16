@@ -661,4 +661,15 @@ describe('PostgresMigrationPlanner - column defaults', () => {
     });
     expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid(INTERVAL \'5500 years\') NOT NULL');
   });
+
+  it('preserves json and jsonb native types in CREATE TABLE', () => {
+    const sql = planTableSql('event_payloads', {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      payload: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: false },
+      raw: { nativeType: 'json', codecId: 'pg/json@1', nullable: true },
+    });
+
+    expect(sql).toContain('"payload" jsonb NOT NULL');
+    expect(sql).toContain('"raw" json');
+  });
 });

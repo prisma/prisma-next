@@ -290,7 +290,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }
 
       // Process primary key
-      const pkRows = pksByTable.get(tableName) ?? [];
+      const pkRows = [...(pksByTable.get(tableName) ?? [])];
       const primaryKeyColumns = pkRows
         .sort((a, b) => a.ordinal_position - b.ordinal_position)
         .map((row) => row.column_name);

@@ -101,6 +101,7 @@ flowchart TD
 - SQL base codecs: `sql/char`, `sql/varchar`, `sql/int`, `sql/float`
 - PostgreSQL aliases for base codecs: `pg/char`, `pg/varchar`, `pg/int`, `pg/float`
 - Supports PostgreSQL types: `int2`, `int4`, `int8`, `float4`, `float8`, `text`, `bool`, `enum`
+- Supports PostgreSQL types: `int2`, `int4`, `int8`, `float4`, `float8`, `text`, `timestamp`, `timestamptz`, `bool`, `enum`, `json`, `jsonb`
 - Parameterized types: `character(n)`, `character varying(n)`, `numeric(p,s)`, `bit(n)`, `bit varying(n)`, `timestamp(p)`, `timestamptz(p)`, `time(p)`, `timetz(p)`, `interval(p)`
 
 **Types (`types.ts`)**
@@ -130,6 +131,11 @@ flowchart TD
 - Exports column descriptors for built-in types and enum helpers (`enumType`, `enumColumn(typeRef, nativeType)`)
 - Parameterized helpers: `charColumn(length)`, `varcharColumn(length)`, `numericColumn(precision, scale?)`, `bitColumn(length)`, `varbitColumn(length)`, `timeColumn(precision?)`, `timetzColumn(precision?)`, `intervalColumn(precision?)`
 
+- Exports JSON helpers:
+  - `jsonColumn`, `jsonbColumn`
+  - `json(schema?)`, `jsonb(schema?)` where `schema` is a Standard Schema value (e.g., Arktype)
+  - When a schema is provided, `typeParams` metadata is derived from the schema's `~standard` interface
+
 ## Dependencies
 
 - **`@prisma-next/sql-contract`**: SQL contract types
@@ -150,6 +156,7 @@ flowchart TD
 - [ADR 068 - Error mapping to RuntimeError](../../../../docs/architecture%20docs/adrs/ADR%20068%20-%20Error%20mapping%20to%20RuntimeError.md)
 - [ADR 112 - Target Extension Packs](../../../../docs/architecture%20docs/adrs/ADR%20112%20-%20Target%20Extension%20Packs.md)
 - [ADR 114 - Extension codecs & branded types](../../../../docs/architecture%20docs/adrs/ADR%20114%20-%20Extension%20codecs%20&%20branded%20types.md)
+- [ADR 159 - Postgres JSON and JSONB typed columns](../../../../docs/architecture%20docs/adrs/ADR%20159%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md)
 
 ## Usage
 
@@ -250,10 +257,56 @@ DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id", "user"."email"
 
 **Note:** MySQL does not support RETURNING clauses. A future MySQL adapter would declare `returning: false` and either reject plans with RETURNING or provide an alternative implementation.
 
+## JSON and JSONB support
+
+The adapter supports PostgreSQL-native `json` and `jsonb` columns.
+
+### Value semantics
+
+Both `json` and `jsonb` accept any valid JSON value:
+
+- object
+- array
+- string
+- number
+- boolean
+- JSON `null` (distinct from SQL `NULL`)
+
+`jsonb` uses normalized binary storage, so whitespace and object key order are not preserved.
+
+### Authoring helpers
+
+```typescript
+import { json, jsonb } from '@prisma-next/adapter-postgres/column-types';
+import { type as arktype } from 'arktype';
+
+const auditPayloadSchema = arktype({
+  action: 'string',
+  actorId: 'number',
+});
+
+table('event', (t) =>
+  t
+    .column('payload', { type: jsonb(auditPayloadSchema), nullable: false })
+    .column('raw', { type: json(), nullable: true }),
+);
+```
+
+### Typed fallback behavior
+
+- If a schema value is provided, emitted `contract.d.ts` derives a concrete type from that schema.
+- If no schema is provided, emitted type falls back to `JsonValue`.
+- Runtime values still encode/decode as JSON-compatible values.
+
+### Standard Schema integration
+
+`json(schema)` and `jsonb(schema)` accept Standard Schema values. Arktype schemas work out of the box via their Standard Schema adapter (`schema['~standard']`).
+
 ## Exports
 
 - `./adapter`: Adapter implementation (`createPostgresAdapter`)
-- `./codec-types`: PostgreSQL codec types (`CodecTypes`, `dataTypes`)
+- `./codec-types`: PostgreSQL codec types (`CodecTypes`, `JsonValue`, `dataTypes`)
+- `./column-types`: Column type descriptors and authoring helpers (`json`, `jsonb`, `jsonColumn`, `jsonbColumn`, `enumType`, `enumColumn`, `textColumn`, `int4Column`, etc.)
 - `./types`: PostgreSQL-specific types
 - `./control`: Control-plane entry point (adapter descriptor)
 - `./runtime`: Runtime-plane entry point (runtime adapter descriptor)

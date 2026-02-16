@@ -47,6 +47,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
         CREATE TABLE "public"."post" (
           "created_at" timestamptz DEFAULT now() NOT NULL,
           "id" SERIAL NOT NULL,
+          "meta" json,
           "published" bool NOT NULL,
           "title" text NOT NULL,
           "update_at" timestamptz,
@@ -58,6 +59,7 @@ describe('DDL E2E Tests', { timeout: 30000 }, () => {
           "created_at" timestamptz DEFAULT now() NOT NULL,
           "email" character varying(255) NOT NULL,
           "id" SERIAL NOT NULL,
+          "profile" jsonb,
           "update_at" timestamptz,
           PRIMARY KEY ("id")
         );

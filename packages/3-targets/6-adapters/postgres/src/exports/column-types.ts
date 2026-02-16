@@ -17,6 +17,8 @@ import {
   PG_INT4_CODEC_ID,
   PG_INT8_CODEC_ID,
   PG_INTERVAL_CODEC_ID,
+  PG_JSON_CODEC_ID,
+  PG_JSONB_CODEC_ID,
   PG_NUMERIC_CODEC_ID,
   PG_TEXT_CODEC_ID,
   PG_TIME_CODEC_ID,
@@ -27,6 +29,12 @@ import {
   SQL_CHAR_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
 } from '../core/codec-ids';
+import {
+  extractStandardSchemaOutputJsonSchema,
+  extractStandardSchemaTypeExpression,
+  isStandardSchemaLike,
+  type StandardSchemaLike,
+} from '../core/standard-schema';
 
 export const textColumn: ColumnTypeDescriptor = {
   codecId: PG_TEXT_CODEC_ID,
@@ -154,6 +162,86 @@ export function intervalColumn(precision?: number): ColumnTypeDescriptor & {
     nativeType: 'interval',
     ...(precision === undefined ? {} : { typeParams: { precision } }),
   } as const;
+}
+
+export const jsonColumn: ColumnTypeDescriptor = {
+  codecId: PG_JSON_CODEC_ID,
+  nativeType: 'json',
+} as const;
+
+export const jsonbColumn: ColumnTypeDescriptor = {
+  codecId: PG_JSONB_CODEC_ID,
+  nativeType: 'jsonb',
+} as const;
+
+type JsonSchemaTypeParams = {
+  readonly schema: Record<string, unknown>;
+  readonly type?: string;
+};
+
+function createJsonTypeParams(schema: StandardSchemaLike): JsonSchemaTypeParams {
+  const outputSchema = extractStandardSchemaOutputJsonSchema(schema);
+  if (!outputSchema) {
+    throw new Error('JSON schema must expose ~standard.jsonSchema.output()');
+  }
+
+  const expression = extractStandardSchemaTypeExpression(schema);
+  if (expression) {
+    return { schema: outputSchema, type: expression };
+  }
+
+  return { schema: outputSchema };
+}
+
+type TypedColumnDescriptor<TSchema extends StandardSchemaLike> = ColumnTypeDescriptor & {
+  readonly typeParams: JsonSchemaTypeParams & { readonly schema: TSchema };
+};
+
+function createJsonColumnFactory(
+  codecId: string,
+  nativeType: string,
+  staticDescriptor: ColumnTypeDescriptor,
+) {
+  return <TSchema extends StandardSchemaLike>(schema?: TSchema): ColumnTypeDescriptor => {
+    if (!schema) {
+      return staticDescriptor;
+    }
+
+    if (!isStandardSchemaLike(schema)) {
+      throw new Error(`${nativeType}(schema) expects a Standard Schema value`);
+    }
+
+    return {
+      codecId,
+      nativeType,
+      // Phantom type: at runtime, typeParams.schema holds a plain JSON Schema record
+      // (the result of extractStandardSchemaOutputJsonSchema), but we cast it as TSchema
+      // so that the type-level `ResolveStandardSchemaOutput<P>` in codec-types.ts can
+      // resolve the schema's output type via `~standard.types.output` or `.infer`.
+      typeParams: createJsonTypeParams(schema) as JsonSchemaTypeParams & {
+        readonly schema: TSchema;
+      },
+    };
+  };
+}
+
+const _json = createJsonColumnFactory(PG_JSON_CODEC_ID, 'json', jsonColumn);
+const _jsonb = createJsonColumnFactory(PG_JSONB_CODEC_ID, 'jsonb', jsonbColumn);
+
+export function json(): ColumnTypeDescriptor;
+export function json<TSchema extends StandardSchemaLike>(
+  schema: TSchema,
+): TypedColumnDescriptor<TSchema>;
+export function json<TSchema extends StandardSchemaLike>(schema?: TSchema): ColumnTypeDescriptor {
+  return _json(schema);
+}
+
+export function jsonb(): ColumnTypeDescriptor;
+export function jsonb<TSchema extends StandardSchemaLike>(
+  schema: TSchema,
+): TypedColumnDescriptor<TSchema>;
+export function jsonb<TSchema extends StandardSchemaLike>(schema?: TSchema): ColumnTypeDescriptor {
+  return _jsonb(schema);
 }
 
 export function enumType<const Values extends readonly string[]>(
