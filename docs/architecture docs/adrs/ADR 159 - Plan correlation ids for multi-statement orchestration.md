@@ -1,26 +1,20 @@
-# ADR 159 — Plan correlation IDs for multi-statement orchestration
+# ADR 159 — Plan grouping keys for multi-statement orchestration
 
 ```ts
 // ORM Client (conceptual)
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 
-type Correlation = {
-  readonly traceId: string; // stable for one ORM operation invocation
-  readonly spanId: string; // unique per statement execution attempt
-  readonly parentSpanId?: string; // optional: enables nesting later
-};
-
-function attachCorrelation<Row>(
+function attachGroupingKey<Row>(
   plan: ExecutionPlan<Row>,
-  correlation: Correlation,
+  groupingKey: string,
 ): ExecutionPlan<Row> {
   // Plans are immutable and may be reused/re-executed; attach attempt-scoped
-  // correlation by returning a new Plan value for this execution attempt.
+  // metadata by returning a new Plan value for this execution attempt.
   return Object.freeze({
     ...plan,
     meta: Object.freeze({
       ...plan.meta,
-      correlation,
+      groupingKey,
     }),
   });
 }
@@ -36,12 +30,10 @@ sequenceDiagram
   participant DB as Database
 
   App->>ORM: user.create({ ... nested writes ... })
-  ORM->>ORM: traceId = newTraceId()
-  ORM->>ORM: parentSpanId = newSpanId() (optional)
+  ORM->>ORM: groupingKey = newGroupingKey()
 
   loop for each statement needed by orchestration
-    ORM->>ORM: spanId = newSpanId()  (attempt scoped)
-    ORM->>RT: execute(Plan{ meta.correlation{traceId, spanId, parentSpanId?} })
+    ORM->>RT: execute(Plan{ meta.groupingKey })
     RT->>Plugins: beforeExecute(plan)
     RT->>DB: execute(sql, params)
     DB-->>RT: rows / result
@@ -65,19 +57,16 @@ We want a grouping mechanism that:
 - Preserves statement-level analysis (lints/budgets/telemetry run per Plan)
 - Enables correlation across multiple Plans that serve one user-visible operation
 - Generalizes beyond the initial ORM use case (other orchestrators may also group work)
-- Mirrors a well-understood model (OpenTelemetry trace/span semantics)
+- Avoids overloading future distributed tracing identifiers (Prisma Next may adopt OpenTelemetry for tracing later)
 
 ## Decision
 
-Introduce **core, first-class correlation identifiers** on the Plan metadata, inspired by OpenTelemetry:
+Introduce a **core, first-class Plan grouping key**:
 
-- Add optional `meta.correlation` to the unified Plan metadata type (`PlanMeta`) in `@prisma-next/contract/types`.
-- Define the correlation model as:
-  - **`traceId`**: groups multiple statement executions that serve the same higher-level operation
-  - **`spanId`**: identifies a single statement execution attempt (one `execute(plan)` call, including per-attempt retries)
-  - **`parentSpanId?`**: optional field enabling a future tree model (nested spans) without redesign
+- Add optional `meta.groupingKey` to the unified Plan metadata type (`PlanMeta`) in `@prisma-next/contract/types`.
+- `groupingKey` groups multiple statement executions that serve the same higher-level operation.
 
-These identifiers are **informational only**:
+The grouping key is **informational only**:
 
 - They do not affect execution semantics, correctness, lowering, or verification
 - They are excluded from any hashing, identity, caching, or de-duplication keys
@@ -87,48 +76,46 @@ These identifiers are **informational only**:
 
 Correlation is a cross-cutting concern in the runtime/plugin ecosystem. If it is hidden in `annotations.ext` or ad-hoc metadata bags, plugins become inconsistent and we lose the ability to standardize tooling and patterns.
 
-Making correlation a **core Plan abstraction** aligns with “Plans are the product” and “Explicit over implicit” (Architecture Overview). It also keeps the runtime core wafer-thin: the runtime does not invent meaning; it executes the Plan it is given and provides consistent surfaces to plugins (ADR 014).
+Making grouping a **core Plan abstraction** aligns with “Plans are the product” and “Explicit over implicit” (Architecture Overview). It also keeps the runtime core wafer-thin: the runtime does not invent meaning; it executes the Plan it is given and provides consistent surfaces to plugins (ADR 014).
 
 ## Semantics and naming
 
-We intentionally choose OTel-adjacent naming because the semantics are widely understood:
+We intentionally avoid OpenTelemetry terms like `traceId` and `spanId`. Prisma Next may adopt OTel for real tracing later, and reusing those names in the Plan model would be overloaded and confusing.
 
-- **`traceId`** is the closest match for “this ORM operation invocation”
-- **`spanId`** is the closest match for “this statement execution attempt”
+We also avoid domain-specific names like `intentId`. Today, “grouping by ORM user intent” is the motivating use case, but future orchestrators may group work for different reasons (pipelines, retries, backfills, preflight/probing, multi-target fanout).
 
-To avoid overloading generic identifiers at the top level, these fields live under a scoped container: `meta.correlation`.
+We choose **`groupingKey`** because it:
 
-We explicitly avoid domain-specific names like `intentId`. Today, “grouping by ORM user intent” is the motivating use case, but future orchestrators may group work for different reasons (pipelines, retries, backfills, preflight/probing, multi-target fanout). “Correlation” captures the general purpose without implying a single domain meaning.
+- Signals the field is for **grouping and correlation** (not identity)
+- Avoids implying global uniqueness or stability
+- Remains broadly applicable to future orchestrators beyond the ORM Client
 
 ## How it is applied
 
 ### Source of truth: the orchestrator
 
-Correlation is assigned by the component that orchestrates multiple Plans (initially the ORM Client):
+The grouping key is assigned by the component that orchestrates multiple Plans (initially the ORM Client):
 
-- `traceId` is created **once**, at the start of an ORM operation invocation
-- Each statement execution attempt gets a fresh `spanId`
-- `parentSpanId` is optional; when used, it typically points at the ORM operation’s “root span”
+- `groupingKey` is created **once**, at the start of an ORM operation invocation
+- All statement executions that belong to that invocation attach the same `groupingKey`
 
-### Attempt-scoped `spanId` requires immutability-friendly attachment
+### Immutability-friendly attachment
 
-Plans are immutable and may be reused or re-executed. A `spanId` cannot be a stable property of a reusable Plan template if it must be unique per execution attempt.
+Plans are immutable and may be reused or re-executed.
 
-Therefore, the orchestrator attaches correlation **at execution time**, by constructing a new Plan value for that attempt (copying meta and adding `meta.correlation`). This keeps Plan templates reusable and keeps correlation attempt-scoped.
+Therefore, the orchestrator attaches `groupingKey` **at execution time**, by constructing a new Plan value for the attempt (copying meta and adding `meta.groupingKey`). This keeps Plan templates reusable and keeps grouping explicit.
 
 ### Plugin visibility
 
-Plugins already receive the full `ExecutionPlan` on every hook. By storing correlation on `PlanMeta`, the correlation identifiers become available everywhere plugins operate (beforeExecute, onRow, afterExecute), without introducing additional hook parameters or global context.
+Plugins already receive the full `ExecutionPlan` on every hook. By storing grouping on `PlanMeta`, `groupingKey` is available everywhere plugins operate (beforeExecute, onRow, afterExecute), without introducing additional hook parameters or global context.
 
 ## Reapplying the concept beyond the ORM Client
 
-The correlation model is intentionally generic:
+The grouping mechanism is intentionally generic:
 
-- Any future “orchestrator” that executes multiple Plans (pipelines, batch APIs, queue workers, explicit multi-step flows) can create a `traceId` and attach attempt-scoped `spanId`s.
-- Higher-level tooling can aggregate by `traceId` to present “one user action” timelines.
-- Runtime telemetry can include correlation IDs where appropriate, without parsing SQL text or inferring relationships.
-
-If we later need relationships that are not strictly a tree, we can extend `meta.correlation` with OTel-like *links* (DAG edges) without changing the basic trace/span model.
+- Any future “orchestrator” that executes multiple Plans (pipelines, batch APIs, queue workers, explicit multi-step flows) can create a `groupingKey` and attach it to each Plan execution.
+- Higher-level tooling can aggregate by `groupingKey` to present “one user action” timelines.
+- Runtime telemetry can include `groupingKey` where appropriate, without parsing SQL text or inferring relationships.
 
 ## Consequences
 
@@ -141,8 +128,7 @@ If we later need relationships that are not strictly a tree, we can extend `meta
 
 ### Trade-offs
 
-- Requires discipline: correlation IDs must be treated as non-semantic metadata and excluded from any plan identity/hashing
-- Names overlap with OTel concepts; scoping under `meta.correlation` mitigates ambiguity but does not eliminate it
+- Requires discipline: `groupingKey` must be treated as non-semantic metadata and excluded from any plan identity/hashing
 
 ## Alternatives considered
 
@@ -153,11 +139,11 @@ If we later need relationships that are not strictly a tree, we can extend `meta
 
 ## Notes on hashing, caching, and fingerprints
 
-The runtime’s current telemetry fingerprint is computed from SQL text only, so adding `meta.correlation` does not affect it.
+The runtime’s current telemetry fingerprint is computed from SQL text only, so adding `meta.groupingKey` does not affect it.
 
-If/when we implement plan identity/hashing as described in ADR 013, `meta.correlation` must be explicitly excluded from identity inputs. Correlation is observational metadata, not part of the Plan’s executable meaning.
+If/when we implement plan identity/hashing as described in ADR 013, `meta.groupingKey` must be explicitly excluded from identity inputs. Grouping is observational metadata, not part of the Plan’s executable meaning.
 
 ## Decision record
 
-Add optional, OTel-inspired correlation identifiers to Plan metadata as `meta.correlation{traceId, spanId, parentSpanId?}`. Generate and attach them in orchestrators (starting with the ORM Client) such that `traceId` is stable per higher-level operation invocation and `spanId` is unique per statement execution attempt. Keep these fields informational only and exclude them from hashing and caching semantics.
+Add optional `meta.groupingKey: string` to Plan metadata. Generate it in orchestrators (starting with the ORM Client) such that it is stable per higher-level operation invocation and attached to all statement executions that serve that invocation. Keep it informational only and exclude it from hashing and caching semantics.
 
