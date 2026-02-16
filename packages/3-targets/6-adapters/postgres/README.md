@@ -103,6 +103,7 @@ flowchart TD
 - Supports PostgreSQL types: `int2`, `int4`, `int8`, `float4`, `float8`, `text`, `bool`, `enum`
 - Supports PostgreSQL types: `int2`, `int4`, `int8`, `float4`, `float8`, `text`, `timestamp`, `timestamptz`, `bool`, `enum`, `json`, `jsonb`
 - Parameterized types: `character(n)`, `character varying(n)`, `numeric(p,s)`, `bit(n)`, `bit varying(n)`, `timestamp(p)`, `timestamptz(p)`, `time(p)`, `timetz(p)`, `interval(p)`
+- Array types: generic `pg/array@1` codec wrapping any scalar element type (e.g., `int4[]`, `text[]`)
 
 **Types (`types.ts`)**
 - PostgreSQL-specific types and utilities
@@ -130,6 +131,7 @@ flowchart TD
 **Column Types Export (`column-types.ts`)**
 - Exports column descriptors for built-in types and enum helpers (`enumType`, `enumColumn(typeRef, nativeType)`)
 - Parameterized helpers: `charColumn(length)`, `varcharColumn(length)`, `numericColumn(precision, scale?)`, `bitColumn(length)`, `varbitColumn(length)`, `timeColumn(precision?)`, `timetzColumn(precision?)`, `intervalColumn(precision?)`
+- List helper: `listOf(elementDescriptor, options?)` — wraps any scalar column type as a PostgreSQL array (e.g., `listOf(int4Column)` → `int4[]`). Supports `{ nullableItems: true }` for nullable elements.
 
 - Exports JSON helpers:
   - `jsonColumn`, `jsonbColumn`
@@ -301,6 +303,52 @@ table('event', (t) =>
 ### Standard Schema integration
 
 `json(schema)` and `jsonb(schema)` accept Standard Schema values. Arktype schemas work out of the box via their Standard Schema adapter (`schema['~standard']`).
+
+## List (Array) Types
+
+The adapter supports PostgreSQL array columns via a generic `pg/array@1` codec. Arrays map from the contract-agnostic "list" concept to PostgreSQL's native array types.
+
+### Authoring
+
+```typescript
+import { int4Column, textColumn, listOf } from '@prisma-next/adapter-postgres/column-types';
+
+// int4[] column
+const scores = listOf(int4Column);
+
+// text[] column with nullable items: (string | null)[]
+const tags = listOf(textColumn, { nullableItems: true });
+```
+
+### Contract IR
+
+Array columns use `codecId: 'pg/array@1'` with `typeParams`:
+
+```json
+{
+  "codecId": "pg/array@1",
+  "nativeType": "int4[]",
+  "typeParams": {
+    "element": "pg/int4@1",
+    "elementNativeType": "int4"
+  }
+}
+```
+
+### Supported Features
+
+- All existing scalar column types as element types
+- Nullable lists (`nullable: true` on the column)
+- Nullable items within lists (`typeParams.nullableItems: true`)
+- SQL lowering with proper type casts (e.g., `$1::int4[]`)
+- Schema introspection and verification
+- Type generation producing `Array<T>` or `Array<T | null>`
+
+### Out of Scope
+
+- Multi-dimensional arrays (e.g., `integer[][]`)
+- Array query operators (`@>`, `<@`, `&&`, `ANY()`)
+- Nested lists / composite element types
 
 ## Exports
 
