@@ -52,8 +52,8 @@ const user = await prisma.user.findFirst({
 **Prisma Next:**
 ```typescript
 const user = await db.users
-  .where(u => u.email.eq('alice@example.com'))
-  .findFirst()
+  .where({ email: 'alice@example.com' })
+  .first()
 ```
 
 Both return `User | null`.
@@ -64,14 +64,14 @@ Both return `User | null`.
 
 **Prisma ORM:**
 ```typescript
-const user = await prisma.user.findUnique({
+const user = await prisma.user.unique({
   where: { email: 'alice@example.com' },
 })
 ```
 
 **Prisma Next:**
 ```typescript
-const user = await db.users.findUnique({ email: 'alice@example.com' })
+const user = await db.users.unique({ email: 'alice@example.com' })
 ```
 
 Both derive the allowed unique criteria from the schema/contract. Prisma Next passes the criterion directly as an argument rather than wrapping it in `{ where: ... }`.
@@ -634,9 +634,9 @@ const adminCount = await admins.count()
 
 ---
 
-### Custom Repository Classes with Domain Methods
+### Custom Collections with Domain Methods
 
-Prisma ORM has no built-in concept of repositories or domain-specific query methods. Extensions (`$extends`) can add model-level methods, but they don't compose with filters.
+Prisma ORM has no built-in concept of domain-specific query methods. Extensions (`$extends`) can add model-level methods, but they don't compose with filters.
 
 ```typescript
 // Prisma ORM — client extensions (limited composability)
@@ -653,8 +653,8 @@ const prisma = new PrismaClient().$extends({
 await prisma.user.findAdmins()
 // Can't chain further: .where(...), .orderBy(...), .take(...) etc.
 
-// Prisma Next — custom repository with fully composable domain methods
-class UserRepository extends Repository<Contract, 'User'> {
+// Prisma Next — custom collection with fully composable domain methods
+class UserCollection extends Collection<Contract, 'User'> {
   admins()   { return this.where(u => u.role.eq('admin')) }
   active()   { return this.where(u => u.active.eq(true)) }
   search(q: string) {
@@ -670,6 +670,11 @@ const results = await db.users
   .orderBy(u => u.createdAt.desc())
   .take(10)
   .include('posts')
+  .findMany()
+
+// Custom methods also work inside include refinements
+const usersWithRecentPosts = await db.users
+  .include('posts', p => p.published().recent(5))
   .findMany()
 ```
 
@@ -845,3 +850,396 @@ const users = await db.users.include('posts').findMany()
 ```
 
 Prisma ORM has no user-visible equivalent — its query strategy is an internal implementation detail that cannot be influenced or inspected.
+
+---
+
+## 3. Deeply Nested Queries — Side by Side
+
+The examples below show realistic, production-style queries with heavy nesting. These are the queries where the difference between the two API styles becomes most pronounced.
+
+### Blog Dashboard: Users with Posts, Comments, and Tags
+
+**Prisma ORM:**
+```typescript
+const users = await prisma.user.findMany({
+  where: {
+    active: true,
+    posts: {
+      some: {
+        published: true,
+      },
+    },
+  },
+  include: {
+    profile: true,
+    posts: {
+      where: { published: true },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: {
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+        comments: {
+          where: { approved: true },
+          orderBy: { createdAt: 'asc' },
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: { comments: true, likes: true },
+        },
+      },
+    },
+  },
+  orderBy: { name: 'asc' },
+  take: 20,
+})
+```
+
+**Prisma Next:**
+```typescript
+const users = await db.users
+  .where(u => and(
+    u.active.eq(true),
+    u.posts.some(p => p.published.eq(true)),
+  ))
+  .include('profile')
+  .include('posts', p => p
+    .published()
+    .orderBy(post => post.createdAt.desc())
+    .take(5)
+    .include('tags', t => t.include('tag'))
+    .include('comments', c => c
+      .where(comment => comment.approved.eq(true))
+      .orderBy(comment => comment.createdAt.asc())
+      .include('author', a => a.select('id', 'name', 'avatar'))
+    )
+  )
+  .orderBy(u => u.name.asc())
+  .take(20)
+  .findMany()
+```
+
+Each `.include()` call is a self-contained, composable callback. The Prisma ORM version requires mentally tracking 6 levels of brace nesting. The Prisma Next version reads top-to-bottom, one concern per line.
+
+---
+
+### E-Commerce Order History: Orders with Items, Products, Reviews, and Sellers
+
+**Prisma ORM:**
+```typescript
+const orders = await prisma.order.findMany({
+  where: {
+    userId: currentUserId,
+    status: { in: ['shipped', 'delivered'] },
+    createdAt: { gte: sixMonthsAgo },
+  },
+  include: {
+    shippingAddress: true,
+    items: {
+      include: {
+        product: {
+          include: {
+            category: true,
+            images: {
+              where: { isPrimary: true },
+              take: 1,
+            },
+            reviews: {
+              where: {
+                rating: { gte: 4 },
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 3,
+              include: {
+                author: {
+                  select: {
+                    name: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
+            seller: {
+              include: {
+                rating: true,
+                badges: {
+                  where: { active: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    payment: {
+      select: {
+        method: true,
+        last4: true,
+        status: true,
+      },
+    },
+  },
+  orderBy: { createdAt: 'desc' },
+  take: 10,
+})
+```
+
+**Prisma Next:**
+```typescript
+const orders = await db.orders
+  .where(o => and(
+    o.userId.eq(currentUserId),
+    o.status.in(['shipped', 'delivered']),
+    o.createdAt.gte(sixMonthsAgo),
+  ))
+  .include('shippingAddress')
+  .include('items', item => item
+    .include('product', prod => prod
+      .include('category')
+      .include('images', img => img.where({ isPrimary: true }).take(1))
+      .include('reviews', rev => rev
+        .where(r => r.rating.gte(4))
+        .orderBy(r => r.createdAt.desc())
+        .take(3)
+        .include('author', a => a.select('name', 'avatar'))
+      )
+      .include('seller', s => s
+        .include('rating')
+        .include('badges', b => b.where({ active: true }))
+      )
+    )
+  )
+  .include('payment', p => p.select('method', 'last4', 'status'))
+  .orderBy(o => o.createdAt.desc())
+  .take(10)
+  .findMany()
+```
+
+The Prisma ORM version is 50+ lines of nested braces where `include`, `where`, `select`, and `orderBy` all coexist at the same object level, making it easy to confuse which option belongs to which model. The Prisma Next version uses a consistent pattern at every level: the callback receives a collection for the related model, and you chain the same methods you'd use at the top level.
+
+---
+
+### Nested Create: Organization with Departments, Teams, and Members
+
+**Prisma ORM:**
+```typescript
+const org = await prisma.organization.create({
+  data: {
+    name: 'Acme Corp',
+    plan: 'enterprise',
+    owner: { connect: { id: founderId } },
+    departments: {
+      create: [
+        {
+          name: 'Engineering',
+          teams: {
+            create: [
+              {
+                name: 'Platform',
+                members: {
+                  create: [
+                    { user: { connect: { email: 'alice@acme.com' } }, role: 'lead' },
+                    { user: { connect: { email: 'bob@acme.com' } }, role: 'member' },
+                  ],
+                },
+              },
+              {
+                name: 'Product',
+                members: {
+                  create: [
+                    { user: { connect: { email: 'charlie@acme.com' } }, role: 'lead' },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        {
+          name: 'Marketing',
+          teams: {
+            create: [
+              {
+                name: 'Growth',
+                members: {
+                  create: [
+                    { user: { connect: { email: 'diana@acme.com' } }, role: 'lead' },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  },
+  include: {
+    departments: {
+      include: {
+        teams: {
+          include: {
+            members: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+})
+```
+
+**Prisma Next:**
+```typescript
+const org = await db.organizations
+  // better proposal
+  .create(c => ({
+    name: ...,
+    owner: c.connect({ id: founderId }),
+    departments: d => d.create([
+      {
+        name: 'Engineering',
+        teams: t => t.create([
+          name: 'Platform',
+          members: m => m....
+        ])
+      }
+    ])
+  }))
+  // current proposal in the spec
+  .create({
+    name: 'Acme Corp',
+    plan: 'enterprise',
+    owner: { connect: { id: founderId } },
+    departments: {
+      create: [
+        {
+          name: 'Engineering',
+          teams: {
+            create: [
+              {
+                name: 'Platform',
+                members: {
+                  create: [
+                    { user: { connect: { email: 'alice@acme.com' } }, role: 'lead' },
+                    { user: { connect: { email: 'bob@acme.com' } }, role: 'member' },
+                  ],
+                },
+              },
+              {
+                name: 'Product',
+                members: {
+                  create: [
+                    { user: { connect: { email: 'charlie@acme.com' } }, role: 'lead' },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        {
+          name: 'Marketing',
+          teams: {
+            create: [
+              {
+                name: 'Growth',
+                members: {
+                  create: [
+                    { user: { connect: { email: 'diana@acme.com' } }, role: 'lead' },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  })
+  .include('departments', d => d
+    .include('teams', t => t
+      .include('members', m => m.include('user'))
+    )
+  )
+```
+
+For nested **creates**, the payload structure is similar — both APIs need to express the same tree of records. The key differences:
+- No `data:` wrapper in Prisma Next
+- The `include` (what to return) is separated from the mutation payload, making each concern clearer
+- In Prisma ORM, the `include` block at the end repeats the nesting structure of `data`, duplicating the hierarchy
+
+---
+
+### Complex Relational Filter: Multi-Level Existence Checks
+
+**Prisma ORM:**
+```typescript
+// Find companies where at least one department has a team
+// whose lead has published a post with more than 100 likes
+const companies = await prisma.company.findMany({
+  where: {
+    active: true,
+    departments: {
+      some: {
+        teams: {
+          some: {
+            members: {
+              some: {
+                role: 'lead',
+                user: {
+                  posts: {
+                    some: {
+                      published: true,
+                      likes: {
+                        some: {},
+                      },
+                      _count: {
+                        likes: { gte: 100 },  // Note: _count in where is not actually valid Prisma ORM
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+})
+```
+
+**Prisma Next:**
+```typescript
+const companies = await db.companies
+  .where(c => and(
+    c.active.eq(true),
+    c.departments.some(d =>
+      d.teams.some(t =>
+        t.members.some(m => and(
+          m.role.eq('lead'),
+          m.user.some(u =>
+            u.posts.some(p => and(
+              p.published.eq(true),
+              p.likes.count().gte(100),
+            ))
+          ),
+        ))
+      )
+    ),
+  ))
+  .findMany()
+```
+
+At 5 levels of relational nesting, the Prisma ORM object syntax becomes a wall of braces where it's easy to lose track of which `some` belongs to which relation. The callback style makes each level's scope explicit through function parameters (`c`, `d`, `t`, `m`, `u`, `p`), and the IDE provides autocompletion at every level.
