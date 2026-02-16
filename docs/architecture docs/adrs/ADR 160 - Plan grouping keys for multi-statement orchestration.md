@@ -46,7 +46,7 @@ sequenceDiagram
 
 ## Context
 
-Prisma Next’s query plane is built around immutable Plans and the **one query → one statement** rule (ADR 003). This makes verification, guardrails, and debugging predictable: runtime plugins can lint, budget, and observe each statement deterministically.
+Prisma Next’s query plane is built around immutable Plans and the **one query → one statement** rule (see [ADR 003 — One Query One Statement](ADR 003 - One Query One Statement.md)). This makes verification, guardrails, and debugging predictable: runtime plugins can lint, budget, and observe each statement deterministically.
 
 We also want to build a higher-abstraction, model-centric client (working title: **ORM Client**) in the vein of PrismaClient / ActiveRecord. One of its key specializations is ergonomic relationship traversal and nested writes. In practice, many ORM operations will require orchestrating **multiple database statements** (for example: nested creates across multiple tables, read-then-write sequences with capability-gated strategies, retries, or explicit transaction workflows).
 
@@ -63,20 +63,20 @@ We want a grouping mechanism that:
 
 Introduce a **core, first-class Plan grouping key**:
 
-- Add optional `meta.groupingKey` to the unified Plan metadata type (`PlanMeta`) in `@prisma-next/contract/types`.
+- Extend the shared Plan metadata (`PlanMeta`) to allow an optional `meta.groupingKey`.
 - `groupingKey` groups multiple statement executions that serve the same higher-level operation.
 
 The grouping key is **informational only**:
 
-- They do not affect execution semantics, correctness, lowering, or verification
-- They are excluded from any hashing, identity, caching, or de-duplication keys
-- They exist solely to improve plugin correlation and developer experience
+- It does not affect execution semantics, correctness, lowering, or verification.
+- It is excluded from any hashing, identity, caching, or de-duplication keys.
+- It exists solely to improve plugin correlation and developer experience.
 
 ### Why this lives on `PlanMeta` (not “black box” metadata)
 
 Correlation is a cross-cutting concern in the runtime/plugin ecosystem. If it is hidden in `annotations.ext` or ad-hoc metadata bags, plugins become inconsistent and we lose the ability to standardize tooling and patterns.
 
-Making grouping a **core Plan abstraction** aligns with “Plans are the product” and “Explicit over implicit” (Architecture Overview). It also keeps the runtime core wafer-thin: the runtime does not invent meaning; it executes the Plan it is given and provides consistent surfaces to plugins (ADR 014).
+Making grouping a **core Plan abstraction** aligns with “Plans are the product” and “Explicit over implicit” (Architecture Overview). It also keeps the runtime core wafer-thin: the runtime does not invent meaning; it executes the Plan it is given and provides consistent surfaces to plugins (see [ADR 014 — Runtime Hook API](ADR 014 - Runtime Hook API.md)).
 
 ## Semantics and naming
 
@@ -123,7 +123,7 @@ The grouping mechanism is intentionally generic:
 
 - Runtime plugins can correlate multiple statement executions belonging to the same operation
 - Correlation works across lanes and lowering because it is Plan metadata (lane-neutral)
-- Orchestrators stay responsible for orchestration and grouping; adapters stay responsible for lowering (ADR 016)
+- Orchestrators stay responsible for orchestration and grouping; adapters stay responsible for lowering (see [ADR 016 — Adapter SPI for Lowering](ADR 016 - Adapter SPI for Lowering.md))
 - No changes to query semantics or execution pipeline; this is additive, informational metadata
 
 ### Trade-offs
@@ -141,7 +141,7 @@ The grouping mechanism is intentionally generic:
 
 The runtime’s current telemetry fingerprint is computed from SQL text only, so adding `meta.groupingKey` does not affect it.
 
-If/when we implement plan identity/hashing as described in ADR 013, `meta.groupingKey` must be explicitly excluded from identity inputs. Grouping is observational metadata, not part of the Plan’s executable meaning.
+If/when we implement plan identity/hashing as described in [ADR 013 — Lane Agnostic Plan Identity](ADR 013 - Lane Agnostic Plan Identity.md), `meta.groupingKey` must be explicitly excluded from identity inputs. Grouping is observational metadata, not part of the Plan’s executable meaning.
 
 ## Decision record
 
