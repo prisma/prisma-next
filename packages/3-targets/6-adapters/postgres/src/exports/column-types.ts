@@ -175,7 +175,7 @@ export const jsonbColumn: ColumnTypeDescriptor = {
 } as const;
 
 type JsonSchemaTypeParams = {
-  readonly schema: Record<string, unknown>;
+  readonly schemaJson: Record<string, unknown>;
   readonly type?: string;
 };
 
@@ -187,12 +187,22 @@ function createJsonTypeParams(schema: StandardSchemaLike): JsonSchemaTypeParams 
 
   const expression = extractStandardSchemaTypeExpression(schema);
   if (expression) {
-    return { schema: outputSchema, type: expression };
+    return { schemaJson: outputSchema, type: expression };
   }
 
-  return { schema: outputSchema };
+  return { schemaJson: outputSchema };
 }
 
+/**
+ * Typed column descriptor for JSON/JSONB columns with Standard Schema.
+ *
+ * `typeParams.schemaJson` carries the runtime JSON Schema payload (serializable record)
+ * used by the emitter to render TypeScript type expressions in contract.d.ts.
+ *
+ * `typeParams.schema` is a phantom-only key: at runtime it does not exist, but at the
+ * type level it preserves the original `TSchema` so that `ResolveStandardSchemaOutput<P>`
+ * in codec-types.ts can resolve the output type via `~standard.types.output` or `.infer`.
+ */
 type TypedColumnDescriptor<TSchema extends StandardSchemaLike> = ColumnTypeDescriptor & {
   readonly typeParams: JsonSchemaTypeParams & { readonly schema: TSchema };
 };
@@ -214,10 +224,10 @@ function createJsonColumnFactory(
     return {
       codecId,
       nativeType,
-      // Phantom type: at runtime, typeParams.schema holds a plain JSON Schema record
-      // (the result of extractStandardSchemaOutputJsonSchema), but we cast it as TSchema
-      // so that the type-level `ResolveStandardSchemaOutput<P>` in codec-types.ts can
-      // resolve the schema's output type via `~standard.types.output` or `.infer`.
+      // At runtime, typeParams only contains { schemaJson, type? }.
+      // The `schema` key exists only at the type level (phantom) so that
+      // `ResolveStandardSchemaOutput<P>` in codec-types.ts can resolve the
+      // schema's output type via `~standard.types.output` or `.infer`.
       typeParams: createJsonTypeParams(schema) as JsonSchemaTypeParams & {
         readonly schema: TSchema;
       },

@@ -76,24 +76,24 @@ describe('renderJsonTypeExpression via descriptor-meta', () => {
         properties: { name: { type: 'string' } },
         required: ['name'],
       };
-      expect(jsonbRenderer.render({ schema })).toBe('{ name: string }');
+      expect(jsonbRenderer.render({ schemaJson: schema })).toBe('{ name: string }');
     });
 
-    it('falls back to JsonValue when no schema or type', () => {
-      expect(jsonbRenderer.render({ schema: null })).toBe('JsonValue');
+    it('falls back to JsonValue when no schemaJson or type', () => {
+      expect(jsonbRenderer.render({ schemaJson: null })).toBe('JsonValue');
     });
 
-    it('falls back to JsonValue for non-object schema', () => {
-      expect(jsonbRenderer.render({ schema: 'not an object' })).toBe('JsonValue');
+    it('falls back to JsonValue for non-object schemaJson', () => {
+      expect(jsonbRenderer.render({ schemaJson: 'not an object' })).toBe('JsonValue');
     });
   });
 
-  describe('type expression takes precedence over schema', () => {
-    it('uses type when both type and schema are provided', () => {
+  describe('type expression takes precedence over schemaJson', () => {
+    it('uses type when both type and schemaJson are provided', () => {
       expect(
         jsonbRenderer.render({
           type: '{ custom: true }',
-          schema: { type: 'object', properties: { other: { type: 'string' } } },
+          schemaJson: { type: 'object', properties: { other: { type: 'string' } } },
         }),
       ).toBe('{ custom: true }');
     });

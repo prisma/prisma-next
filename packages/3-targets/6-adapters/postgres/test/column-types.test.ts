@@ -26,7 +26,7 @@ describe('adapter-postgres column-types', () => {
       expect(json()).toEqual(jsonColumn);
     });
 
-    it('attaches standard-schema output in typeParams', () => {
+    it('attaches standard-schema output in typeParams.schemaJson', () => {
       const descriptor = json(
         arktype({
           action: 'string',
@@ -37,11 +37,21 @@ describe('adapter-postgres column-types', () => {
         codecId: 'pg/json@1',
         nativeType: 'json',
         typeParams: {
-          schema: expect.objectContaining({
+          schemaJson: expect.objectContaining({
             type: 'object',
           }),
         },
       });
+    });
+
+    it('does not have a runtime schema key in typeParams', () => {
+      const descriptor = json(
+        arktype({
+          action: 'string',
+          actorId: 'number',
+        }),
+      );
+      expect(descriptor.typeParams).not.toHaveProperty('schema');
     });
   });
 
@@ -50,7 +60,7 @@ describe('adapter-postgres column-types', () => {
       expect(jsonb()).toEqual(jsonbColumn);
     });
 
-    it('attaches standard-schema output in typeParams', () => {
+    it('attaches standard-schema output in typeParams.schemaJson', () => {
       const descriptor = jsonb(
         arktype({
           source: 'string',
@@ -61,11 +71,21 @@ describe('adapter-postgres column-types', () => {
         codecId: 'pg/jsonb@1',
         nativeType: 'jsonb',
         typeParams: {
-          schema: expect.objectContaining({
+          schemaJson: expect.objectContaining({
             type: 'object',
           }),
         },
       });
+    });
+
+    it('does not have a runtime schema key in typeParams', () => {
+      const descriptor = jsonb(
+        arktype({
+          source: 'string',
+          rank: 'number',
+        }),
+      );
+      expect(descriptor.typeParams).not.toHaveProperty('schema');
     });
   });
 
