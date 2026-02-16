@@ -26,3 +26,4 @@ export const PG_TIMETZ_CODEC_ID = 'pg/timetz@1' as const;
 export const PG_INTERVAL_CODEC_ID = 'pg/interval@1' as const;
 export const PG_JSON_CODEC_ID = 'pg/json@1' as const;
 export const PG_JSONB_CODEC_ID = 'pg/jsonb@1' as const;
+export const PG_ARRAY_CODEC_ID = 'pg/array@1' as const;
