@@ -51,6 +51,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 155 | Driver/Codec boundary and lowering responsibilities | Separates lowering vs codec encoding/decoding vs driver transport; standardizes codec↔driver boundary values as `string \| Uint8Array \| null` | [ADR 155 - Driver Codec Boundary and Lowering Responsibilities.md](adrs/ADR%20155%20-%20Driver%20Codec%20Boundary%20and%20Lowering%20Responsibilities.md) |
 | 157 | Execution enums | Defines execution-plane enum behavior derived from explicit storage enforcement; builds on ADR 155 and ADR 156 | [ADR 157 - Execution enums.md](adrs/ADR%20157%20-%20Execution%20enums.md) |
 | 158 | Execution mutation defaults | Defines execution-plane mutation defaults (`execution.mutations.defaults`) and a section-owned hashing model to avoid marker churn | [ADR 158 - Execution mutation defaults.md](adrs/ADR%20158%20-%20Execution%20mutation%20defaults.md) |
+| 159 | Postgres JSON and JSONB typed columns | Adds first-class PostgreSQL `json`/`jsonb` codec and column support with Standard Schema-based typed emission in `contract.d.ts` | [ADR 159 - Postgres JSON and JSONB typed columns.md](adrs/ADR%20159%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md) |
 
 ## Migration System
 
