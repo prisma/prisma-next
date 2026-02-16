@@ -32,11 +32,26 @@
     "src"
   ],
   "exports": {
-    "./factories": "./dist/factories.mjs",
-    "./pack-types": "./dist/pack-types.mjs",
-    "./types": "./dist/types.mjs",
-    "./validate": "./dist/validate.mjs",
-    "./validators": "./dist/validators.mjs",
+    "./factories": {
+      "types": "./dist/factories.d.mts",
+      "import": "./dist/factories.mjs"
+    },
+    "./pack-types": {
+      "types": "./dist/pack-types.d.mts",
+      "import": "./dist/pack-types.mjs"
+    },
+    "./types": {
+      "types": "./dist/types.d.mts",
+      "import": "./dist/types.mjs"
+    },
+    "./validate": {
+      "types": "./dist/validate.d.mts",
+      "import": "./dist/validate.mjs"
+    },
+    "./validators": {
+      "types": "./dist/validators.d.mts",
+      "import": "./dist/validators.mjs"
+    },
     "./package.json": "./package.json"
   }
 }
