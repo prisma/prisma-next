@@ -33,7 +33,7 @@ sequenceDiagram
   ORM->>ORM: groupingKey = newGroupingKey()
 
   loop for each statement needed by orchestration
-    ORM->>RT: execute(Plan{ meta.groupingKey })
+    ORM->>RT: execute(plan)
     RT->>Plugins: beforeExecute(plan)
     RT->>DB: execute(sql, params)
     DB-->>RT: rows / result
@@ -43,6 +43,8 @@ sequenceDiagram
 
   ORM-->>App: final ORM result
 ```
+
+Note: each `plan` executed by the ORM Client carries the same `meta.groupingKey` value for the duration of that ORM operation invocation.
 
 ## Context
 
