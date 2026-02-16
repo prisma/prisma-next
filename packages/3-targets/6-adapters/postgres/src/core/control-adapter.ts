@@ -509,6 +509,11 @@ function normalizeFormattedType(formattedType: string, dataType: string, udtName
   if (dataType === 'time without time zone' || udtName === 'time') {
     return formattedType.replace(' without time zone', '').trim();
   }
+  // Only dataType === 'USER-DEFINED' should ever be quoted, but this should be safe without
+  // checking that explicitly either way
+  if (formattedType.startsWith('"') && formattedType.endsWith('"')) {
+    return formattedType.slice(1, -1);
+  }
   return formattedType;
 }
 

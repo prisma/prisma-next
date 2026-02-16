@@ -7,6 +7,7 @@ import {
   createTestDatabase,
   emptySchema,
   familyInstance,
+  formatRunnerFailure,
   frameworkComponents,
   type PostgresControlDriver,
   postgresTargetDescriptor,
@@ -62,7 +63,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       frameworkComponents,
     });
     if (!executeResult.ok) {
-      throw new Error(`runner failed: ${executeResult.failure.summary}`);
+      throw new Error(`Runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
     }
 
     await driver!.query('create table "extra" (id uuid primary key)');
