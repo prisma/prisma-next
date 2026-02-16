@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SqlContract } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { ESLint } from 'eslint';
 
 export function loadContract<Contract extends SqlContract>(name: string): Contract {

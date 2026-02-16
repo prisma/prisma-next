@@ -1,7 +1,10 @@
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
-import sqlFamilyDescriptor, { createMigrationPlan } from '@prisma-next/family-sql/control';
+import sqlFamilyDescriptor, {
+  createMigrationPlan,
+  type SqlMigrationRunnerFailure,
+} from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
@@ -127,6 +130,28 @@ export async function createTestDatabase(): Promise<Awaited<ReturnType<typeof cr
 
 export async function createDriver(connectionString: string): Promise<PostgresControlDriver> {
   return postgresDriverDescriptor.create(connectionString);
+}
+
+/**
+ * Formats a runner failure into a human-readable string for test error messages.
+ * Includes code, summary, why, and meta (with issues) for easy debugging.
+ */
+export function formatRunnerFailure(failure: SqlMigrationRunnerFailure): string {
+  const parts = [`[${failure.code}] ${failure.summary}`];
+  if (failure.why) {
+    parts.push(`  why: ${failure.why}`);
+  }
+  if (failure.meta) {
+    const issues = failure.meta['issues'];
+    if (Array.isArray(issues)) {
+      for (const issue of issues) {
+        parts.push(`  - ${JSON.stringify(issue)}`);
+      }
+    } else {
+      parts.push(`  meta: ${JSON.stringify(failure.meta, null, 2)}`);
+    }
+  }
+  return parts.join('\n');
 }
 
 export { postgresTargetDescriptor, createMigrationPlan, postgresDriverDescriptor };

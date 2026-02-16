@@ -4,7 +4,7 @@
  * This test shows how to use createControlClient for database operations
  * instead of manual SQL and the stampMarker script.
  */
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';

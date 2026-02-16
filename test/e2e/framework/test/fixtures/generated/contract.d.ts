@@ -26,7 +26,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:ef6a470e5086b66b812a56c7505fe2a14d08d0a585a5090e47e578c3aea60d79'>;
+  StorageHashBase<'sha256:cba16d765a868acad6b3c78eabb88ab5d9a7dc344148c30676a0c365a1b491e0'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589'>;
 export type ProfileHash =
@@ -63,7 +63,7 @@ export type Contract = SqlContract<
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
+        uniques: readonly [{ readonly columns: readonly ['email'] }];
         indexes: readonly [];
         foreignKeys: readonly [];
       };
@@ -138,29 +138,6 @@ export type Contract = SqlContract<
         indexes: readonly [];
         foreignKeys: readonly [];
       };
-      readonly event: {
-        columns: {
-          readonly id: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly name: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
-            readonly nullable: false;
-          };
-          readonly created_at: {
-            readonly nativeType: 'timestamptz';
-            readonly codecId: 'pg/timestamptz@1';
-            readonly nullable: false;
-          };
-        };
-        primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
-        indexes: readonly [];
-        foreignKeys: readonly [];
-      };
       readonly param_types: {
         columns: {
           readonly id: {
@@ -212,6 +189,29 @@ export type Contract = SqlContract<
             readonly nativeType: 'interval';
             readonly codecId: 'pg/interval@1';
             readonly nullable: true;
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
+      };
+      readonly event: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly name: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+          };
+          readonly created_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };

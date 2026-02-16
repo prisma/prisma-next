@@ -32,6 +32,7 @@ export const contract = defineContract<CodecTypes>()
         default: { kind: 'function', expression: 'now()' },
       })
       .column('update_at', { type: timestamptzColumn, nullable: true })
+      .unique(['email'])
       .primaryKey(['id']),
   )
   .table('post', (t) =>

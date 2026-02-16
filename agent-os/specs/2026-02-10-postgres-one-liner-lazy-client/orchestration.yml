@@ -1,0 +1,36 @@
+task_groups:
+  - name: milestone-0-tracking-alignment
+    claude_code_subagent: delivery-coordinator
+    standards:
+      - global/documentation.md
+      - global/conventions.md
+  - name: milestone-1-relocate-validate-contract
+    claude_code_subagent: sql-contract-maintainer
+    standards:
+      - global/*
+      - typescript/*
+      - testing/*
+  - name: milestone-2-postgres-package-scaffolding
+    claude_code_subagent: package-scaffolder
+    standards:
+      - global/*
+      - typescript/*
+      - testing/*
+  - name: milestone-3-implement-lazy-client
+    claude_code_subagent: runtime-integrator
+    standards:
+      - global/*
+      - backend/*
+      - typescript/*
+      - testing/*
+  - name: milestone-4-demo-migration
+    claude_code_subagent: demo-migrator
+    standards:
+      - global/*
+      - backend/*
+      - typescript/*
+      - testing/*
+  - name: milestone-5-cleanup-docs-consistency
+    claude_code_subagent: docs-and-quality
+    standards:
+      - all

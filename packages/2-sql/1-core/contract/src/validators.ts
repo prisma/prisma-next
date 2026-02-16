@@ -192,6 +192,10 @@ export function validateModel(value: unknown): ModelDefinition {
  * @throws Error if the contract structure is invalid
  */
 export function validateSqlContract<T extends SqlContract<SqlStorage>>(value: unknown): T {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('Contract structural validation failed: value must be an object');
+  }
+
   // Check targetFamily first to provide a clear error message for unsupported target families
   const rawValue = value as { targetFamily?: string };
   if (rawValue.targetFamily !== undefined && rawValue.targetFamily !== 'sql') {

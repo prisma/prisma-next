@@ -79,23 +79,17 @@ See `architecture.config.json` for the complete mapping and `pnpm lint:deps` to 
 ### Query Pattern
 
 ```typescript
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { schema } from '@prisma-next/sql-relational-core/schema';
-import { sql } from '@prisma-next/sql-lane/sql';
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import postgres from '@prisma-next/postgres/runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-const contract = validateContract<Contract>(contractJson);
-const stack = createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter, extensionPacks: [] });
-const stackInstance = instantiateExecutionStack(stack);
-const context = createExecutionContext({ contract, stackInstance });
+const db = postgres<Contract>({
+  contractJson,
+  url: process.env['DATABASE_URL']!,
+});
 
-const tables = schema(context).tables;
-const plan = sql({ context })
+const tables = db.schema.tables;
+const plan = db.sql
   .from(tables.user)
   .select({ id: tables.user.columns.id, email: tables.user.columns.email })
   .limit(10)

@@ -1,4 +1,4 @@
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import type {
   DeleteAst,
   InsertAst,
