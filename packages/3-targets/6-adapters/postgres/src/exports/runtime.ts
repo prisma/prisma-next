@@ -7,7 +7,8 @@ import type {
 } from '@prisma-next/sql-runtime';
 import { type as arktype } from 'arktype';
 import { createPostgresAdapter } from '../core/adapter';
-import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
+import { arrayParamsSchema } from '../core/array-codec';
+import { PG_ARRAY_CODEC_ID, PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
 import { codecDefinitions } from '../core/codecs';
 import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresContract, PostgresLoweredStatement } from '../core/types';
@@ -29,6 +30,11 @@ const jsonTypeParamsSchema = arktype({
   'type?': 'string',
 });
 
+const arrayCodecDescriptor: RuntimeParameterizedCodecDescriptor = {
+  codecId: PG_ARRAY_CODEC_ID,
+  paramsSchema: arrayParamsSchema,
+};
+
 const parameterizedCodecDescriptors = [
   {
     codecId: PG_JSON_CODEC_ID,
@@ -38,9 +44,8 @@ const parameterizedCodecDescriptors = [
     codecId: PG_JSONB_CODEC_ID,
     paramsSchema: jsonTypeParamsSchema,
   },
-] as const satisfies ReadonlyArray<
-  RuntimeParameterizedCodecDescriptor<{ readonly schemaJson: object; readonly type?: string }>
->;
+  arrayCodecDescriptor,
+] as const satisfies ReadonlyArray<RuntimeParameterizedCodecDescriptor>;
 
 const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', SqlRuntimeAdapter> =
   {
