@@ -25,7 +25,7 @@ import 'dotenv/config';
 import { type as arktype } from 'arktype';
 import { getUserById as getUserByIdKysely } from './kysely/get-user-by-id';
 import { insertUserTransaction as insertUserTransactionKysely } from './kysely/insert-user-transaction';
-import { getRuntime } from './prisma/runtime';
+import { db } from './prisma/db';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
@@ -54,8 +54,8 @@ const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
 
 async function main() {
-  const { databaseUrl } = loadAppConfig();
-  const runtime = getRuntime(databaseUrl);
+  loadAppConfig();
+  const runtime = db.runtime();
   try {
     if (cmd === 'users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
@@ -147,14 +147,10 @@ async function main() {
         console.error('Usage: pnpm start -- user-kysely <userId>');
         process.exit(1);
       }
-      // use a runtime without plugins to avoid false positive linting errors
-      const kyselyRuntime = getRuntime(databaseUrl, []);
-      const user = await getUserByIdKysely(userIdStr, kyselyRuntime);
+      const user = await getUserByIdKysely(userIdStr, runtime);
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'user-transaction-kysely') {
-      // use a runtime without plugins to avoid false positive linting errors
-      const kyselyRuntime = getRuntime(databaseUrl, []);
-      const newUser = await insertUserTransactionKysely(kyselyRuntime);
+      const newUser = await insertUserTransactionKysely(runtime);
       console.log('Inserted user:', JSON.stringify(newUser, null, 2));
     } else {
       console.log(

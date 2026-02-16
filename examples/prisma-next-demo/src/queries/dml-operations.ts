@@ -1,22 +1,18 @@
-import { generateId } from '@prisma-next/ids/runtime';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { sql, tables } from '../prisma/context';
+import { db } from '../prisma/db';
 
 export async function insertUser(email: string, runtime: Runtime) {
-  const userTable = tables.user;
+  const userTable = db.schema.tables.user;
   const userColumns = userTable.columns;
-  const userId = generateId({ id: 'uuidv4' });
 
-  const plan = sql
+  const plan = db.sql
     .insert(userTable, {
-      id: param('id'),
       email: param('email'),
     })
     .returning(userColumns.id, userColumns.email)
     .build({
       params: {
-        id: userId,
         email,
       },
     });
@@ -30,10 +26,10 @@ export async function insertUser(email: string, runtime: Runtime) {
 }
 
 export async function updateUser(userId: string, newEmail: string, runtime: Runtime) {
-  const userTable = tables.user;
+  const userTable = db.schema.tables.user;
   const userColumns = userTable.columns;
 
-  const plan = sql
+  const plan = db.sql
     .update(userTable, {
       email: param('newEmail'),
     })
@@ -55,10 +51,10 @@ export async function updateUser(userId: string, newEmail: string, runtime: Runt
 }
 
 export async function deleteUser(userId: string, runtime: Runtime) {
-  const userTable = tables.user;
+  const userTable = db.schema.tables.user;
   const userColumns = userTable.columns;
 
-  const plan = sql
+  const plan = db.sql
     .delete(userTable)
     .where(userColumns.id.eq(param('userId')))
     .returning(userColumns.id, userColumns.email)

@@ -1,14 +1,44 @@
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type { Runtime } from '@prisma-next/sql-runtime';
+import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
+import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { executionContext } from '../src/prisma/context';
-import { getRuntime } from '../src/prisma/runtime';
+import { db } from '../src/prisma/db';
 import { initTestDatabase } from './utils/control-client';
 
-const { contract } = executionContext;
+const context = db.context;
+const { contract } = context;
+const executionStack = db.stack;
+const executionStackInstance = instantiateExecutionStack(executionStack);
+
+function createTestDriver(connectionString: string) {
+  const driverDescriptor = executionStack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+  const pool = new Pool({ connectionString });
+  return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+}
+
+function getRuntime(connectionString: string): Runtime {
+  return createRuntime({
+    stackInstance: executionStackInstance,
+    context,
+    driver: createTestDriver(connectionString),
+    verify: { mode: 'onFirstUse', requireMarker: false },
+    plugins: [
+      budgets({
+        maxRows: 10_000,
+        defaultTableRows: 10_000,
+        tableRows: { user: 10_000, post: 10_000 },
+        maxLatencyMs: 1_000,
+      }),
+    ],
+  });
+}
 
 /**
  * Seeds test data using the runtime and query DSL.
@@ -17,7 +47,7 @@ async function seedTestData(
   runtime: Runtime,
   data: { users?: string[]; posts?: Array<{ title: string; userIndex: number }> },
 ): Promise<{ userIds: string[] }> {
-  const tables = schema(executionContext).tables;
+  const tables = schema(context).tables;
   const userTable = tables['user']!;
   const postTable = tables['post']!;
 
@@ -31,7 +61,7 @@ async function seedTestData(
       const createdAt = new Date();
       const kind = i === 0 ? 'admin' : 'user';
 
-      const plan = sql({ context: executionContext })
+      const plan = sql({ context })
         .insert(userTable, {
           id: param('id'),
           email: param('email'),
@@ -57,7 +87,7 @@ async function seedTestData(
       const id = `post_${String(i + 1).padStart(3, '0')}`;
       const createdAt = new Date();
 
-      const plan = sql({ context: executionContext })
+      const plan = sql({ context })
         .insert(postTable, {
           id: param('id'),
           title: param('title'),

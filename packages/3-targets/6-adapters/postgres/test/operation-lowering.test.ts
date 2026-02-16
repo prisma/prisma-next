@@ -1,4 +1,4 @@
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { OperationExpr, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/core/adapter';

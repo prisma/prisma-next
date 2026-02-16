@@ -1,4 +1,4 @@
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import {
   int4Column as int4ColumnType,

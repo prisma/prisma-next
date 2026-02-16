@@ -5,6 +5,12 @@ alwaysApply: false
 ---
 # validateContract Usage Pattern
 
+## Plane placement (important)
+
+`validateContract()` is **shared-plane logic** (pure normalization + structural/logical validation).
+
+- If you need contract validation from **runtime-plane** code, **do not** make runtime packages depend on migration-plane packages (e.g. `@prisma-next/sql-contract-ts`). Instead, move/extract `validateContract()` into a shared-plane package and import it from there.
+
 ## Critical Requirement
 
 `validateContract<TContract>()` **requires a fully-typed contract type** `TContract`, NOT a generic `SqlContract<SqlStorage>`. Using a generic type will cause all subsequent type inference to fail, resulting in `unknown` types throughout your code.
@@ -14,7 +20,7 @@ alwaysApply: false
 **✅ CORRECT: Use fully-typed contract type from contract.d.ts**
 
 ```typescript
-import { validateContract } from '@prisma-next/sql-query/schema';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
@@ -25,7 +31,7 @@ const contract = validateContract<Contract>(contractJson);
 **✅ CORRECT: Define contract type inline for tests**
 
 ```typescript
-import type { SqlContract } from '@prisma-next/sql-target';
+import type { SqlContract } from '@prisma-next/sql-contract/types';
 
 // Define a fully-typed contract type
 type MyContract = SqlContract<
@@ -69,8 +75,8 @@ const contract = validateContract<MyContract>({
 **❌ WRONG: Don't use generic SqlContract<SqlStorage>**
 
 ```typescript
-import { validateContract } from '@prisma-next/sql-query/schema';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-target';
+import { validateContract } from '@prisma-next/sql-contract/validate';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import contractJson from './contract.json' with { type: 'json' };
 
 const contract = validateContract<SqlContract<SqlStorage>>(contractJson);
@@ -104,5 +110,5 @@ This mistake commonly appears in:
 
 ## Related Documentation
 
-- See `validateContract()` function documentation in `packages/sql-query/src/contract.ts`
-- See `packages/sql-query/README.md` for usage examples
+- See `packages/2-sql/1-core/contract/src/validate.ts` for implementation details
+- See `packages/2-sql/1-core/contract/README.md` for usage examples

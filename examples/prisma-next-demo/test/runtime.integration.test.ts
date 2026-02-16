@@ -10,10 +10,11 @@ import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { executionContext, executionStack } from '../src/prisma/context';
-import { getRuntime } from '../src/prisma/runtime';
+import { db } from '../src/prisma/db';
 
+const executionStack = db.stack;
 const executionStackInstance = instantiateExecutionStack(executionStack);
+const context = db.context;
 
 import { initTestDatabase } from './utils/control-client';
 
@@ -26,7 +27,27 @@ function createTestDriver(connectionString: string) {
   return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
 }
 
-const { contract } = executionContext;
+function getRuntime(
+  connectionString: string,
+  plugins = [
+    budgets({
+      maxRows: 10_000,
+      defaultTableRows: 10_000,
+      tableRows: { user: 10_000, post: 10_000 },
+      maxLatencyMs: 1_000,
+    }),
+  ],
+): Runtime {
+  return createRuntime({
+    stackInstance: executionStackInstance,
+    context,
+    driver: createTestDriver(connectionString),
+    verify: { mode: 'onFirstUse', requireMarker: false },
+    plugins,
+  });
+}
+
+const { contract } = context;
 
 /**
  * Seeds test data using the runtime and query DSL.
@@ -39,7 +60,7 @@ async function seedTestData(
     posts?: Array<{ title: string; userIndex: number }>;
   },
 ): Promise<{ userIds: string[] }> {
-  const tables = schema(executionContext).tables;
+  const tables = schema(context).tables;
   const userTable = tables['user']!;
   const postTable = tables['post']!;
 
@@ -52,7 +73,7 @@ async function seedTestData(
       const id = `user_${String(i + 1).padStart(3, '0')}`;
       const kind = i === 0 ? 'admin' : 'user';
 
-      const plan = sql({ context: executionContext })
+      const plan = sql({ context })
         .insert(userTable, {
           id: param('id'),
           email: param('email'),
@@ -76,7 +97,7 @@ async function seedTestData(
       if (userId === undefined) continue;
       const id = `post_${String(i + 1).padStart(3, '0')}`;
 
-      const plan = sql({ context: executionContext })
+      const plan = sql({ context })
         .insert(postTable, {
           id: param('id'),
           title: param('title'),
@@ -104,10 +125,9 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const context = executionContext;
         const tables = schema(context).tables;
         const userTable = tables['user']!;
-        const root = sql({ context: executionContext });
+        const root = sql({ context });
         const plan = root
           .from(userTable)
           .select({
@@ -211,12 +231,11 @@ describe('runtime execute integration', () => {
             posts: [{ title: 'First Post', userIndex: 0 }],
           });
 
-          const context = executionContext;
           const tables = schema(context).tables;
           const userTable = tables['user']!;
           const postTable = tables['post']!;
 
-          const userPlan = sql({ context: executionContext })
+          const userPlan = sql({ context })
             .from(userTable)
             .select({
               id: userTable.columns['id']!,
@@ -228,7 +247,7 @@ describe('runtime execute integration', () => {
 
           type UserRow = ResultType<typeof userPlan>;
 
-          const postPlan = sql({ context: executionContext })
+          const postPlan = sql({ context })
             .from(postTable)
             .where(postTable.columns['userId']!.eq(param('userId')))
             .select({
@@ -275,7 +294,6 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const context = executionContext;
         const runtime = createRuntime({
           stackInstance: executionStackInstance,
           context,
@@ -302,7 +320,7 @@ describe('runtime execute integration', () => {
 
           const tables = schema(context).tables;
           const userTable = tables['user']!;
-          const unboundedPlan = sql({ context: executionContext })
+          const unboundedPlan = sql({ context })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -319,7 +337,7 @@ describe('runtime execute integration', () => {
             category: 'BUDGET',
           });
 
-          const boundedPlan = sql({ context: executionContext })
+          const boundedPlan = sql({ context })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -352,7 +370,6 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
-        const context = executionContext;
         const runtime = createRuntime({
           stackInstance: executionStackInstance,
           context,
@@ -379,7 +396,7 @@ describe('runtime execute integration', () => {
 
           const tables = schema(context).tables;
           const userTable = tables['user']!;
-          const plan = sql({ context: executionContext })
+          const plan = sql({ context })
             .from(tables['user']!)
             .select({
               id: userTable.columns['id']!,
@@ -426,12 +443,11 @@ describe('runtime execute integration', () => {
             ],
           });
 
-          const context = executionContext;
           const tables = schema(context).tables;
           const userTable = tables['user']!;
           const postTable = tables['post']!;
 
-          const plan = sql({ context: executionContext })
+          const plan = sql({ context })
             .from(userTable)
             .includeMany(
               postTable,

@@ -18,22 +18,20 @@ import 'dotenv/config';
 
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
-import { schema, sql } from '../src/prisma/context';
-import { getRuntime } from '../src/prisma/runtime';
+import { db } from '../src/prisma/db';
 
 async function main() {
-  // biome-ignore lint/style/noNonNullAssertion: don't care about type safety in seed script
-  const runtime = getRuntime(process.env['DATABASE_URL']!);
+  const runtime = db.runtime();
 
   try {
-    const tables = schema.tables;
+    const tables = db.schema.tables;
     const userTable = tables.user;
     const postTable = tables.post;
     const userColumns = userTable.columns;
     const postColumns = postTable.columns;
 
     // Insert users
-    const alicePlan = sql
+    const alicePlan = db.sql
       .insert(userTable, {
         email: param('email'),
         createdAt: param('createdAt'),
@@ -50,7 +48,7 @@ async function main() {
 
     const alice = (await runtime.execute(alicePlan).toArray())[0];
 
-    const bobPlan = sql
+    const bobPlan = db.sql
       .insert(userTable, {
         email: param('email'),
         createdAt: param('createdAt'),
@@ -88,7 +86,7 @@ async function main() {
     };
 
     // Insert posts with embeddings
-    const post1Plan = sql
+    const post1Plan = db.sql
       .insert(postTable, {
         title: param('title'),
         userId: param('userId'),
@@ -107,7 +105,7 @@ async function main() {
 
     const post1 = (await runtime.execute(post1Plan).toArray())[0];
 
-    const post2Plan = sql
+    const post2Plan = db.sql
       .insert(postTable, {
         title: param('title'),
         userId: param('userId'),
@@ -126,7 +124,7 @@ async function main() {
 
     const post2 = (await runtime.execute(post2Plan).toArray())[0];
 
-    const post3Plan = sql
+    const post3Plan = db.sql
       .insert(postTable, {
         title: param('title'),
         userId: param('userId'),

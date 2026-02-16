@@ -1,5 +1,5 @@
 import type { ResultType as CoreResultType } from '@prisma-next/contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { InferNestedProjectionRow } from '@prisma-next/sql-relational-core/types';
 

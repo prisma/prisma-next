@@ -3,7 +3,6 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     'exports/contract-builder': 'src/exports/contract-builder.ts',
-    'exports/contract': 'src/exports/contract.ts',
   },
   outDir: 'dist',
   format: ['esm'],

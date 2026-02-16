@@ -5,29 +5,22 @@ import { orm as ormBuilder } from '@prisma-next/sql-orm-lane';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-
 // No-emit workflow: use the TypeScript contract directly.
 import { contract } from '../../prisma/contract';
 
-export const executionStack = createSqlExecutionStack({
+export const stack = createSqlExecutionStack({
   target: postgresTarget,
   adapter: postgresAdapter,
   driver: postgresDriver,
   extensionPacks: [],
 });
 
-export const executionContext = createExecutionContext({
+export const context = createExecutionContext({
   contract,
-  stack: executionStack,
+  stack,
 });
 
-export const schema = schemaBuilder<typeof contract>(executionContext);
+export const schema = schemaBuilder(context);
 export const tables = schema.tables;
-
-export const sql = sqlBuilder<typeof contract>({
-  context: executionContext,
-});
-
-export const orm = ormBuilder<typeof contract>({
-  context: executionContext,
-});
+export const sql = sqlBuilder({ context });
+export const orm = ormBuilder({ context });

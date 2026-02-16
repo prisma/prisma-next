@@ -16,14 +16,12 @@ This package contains the SQL-specific TypeScript contract authoring surface for
 
 This package is part of the SQL family namespace (`packages/2-sql/2-authoring/contract-ts`) and provides:
 - SQL contract builder (`defineContract`) - TypeScript builder for creating SQL contracts programmatically
-- SQL contract validation (`validateContract`) - Structural and logical validation for SQL contracts
 - SQL contract JSON schema - JSON schema for validating contract structure
 
 ## Responsibilities
 
 - **SQL Contract Builder**: Provides the `defineContract()` builder API for creating SQL contracts programmatically with type safety, including pack-ref based `.target()` and `.extensionPacks()` helpers
 - **Storage Type Authoring**: Supports `storage.types` declarations and `typeRef` columns via the SQL builder
-- **SQL Contract Validation**: Implements SQL-specific contract validation (`validateContractStructure`, `validateContractLogic`, `validateContract`) and normalization
 - **SQL Contract JSON Schema**: Provides JSON schema for validating contract structure in IDEs and tooling
 - **Composition Layer**: Composes the target-agnostic builder core from `@prisma-next/contract-authoring` with SQL-specific types and validation logic
 - **Generated Defaults**: Supports client-generated defaults via `ColumnDefault.kind = 'generated'` in contract authoring
@@ -36,7 +34,6 @@ This package was created in Phase 1 and refactored in Phase 2. It now composes t
 
 - **Composes generic core**: Uses `@prisma-next/contract-authoring` for generic builder state management (`TableBuilder`, `ModelBuilder`, `ContractBuilder` base class)
 - **SQL-specific types**: Provides SQL-specific contract types (`SqlContract`, `SqlStorage`, `SqlMappings`) from `@prisma-next/sql-contract/types`
-- **SQL-specific validation**: Implements SQL-specific contract validation (`validateContractStructure`, `validateContractLogic`, `validateContract`) and normalization (`normalizeContract`)
 - **SQL-specific build()**: Implements SQL-specific `build()` method in `SqlContractBuilder` that constructs `SqlContract` instances with SQL-specific structure (uniques, indexes, foreignKeys arrays)
 
 This package is part of the package layering architecture:
@@ -46,7 +43,6 @@ This package is part of the package layering architecture:
 ## Exports
 
 - `./contract-builder` - Contract builder API (`defineContract`, `ColumnBuilder`)
-- `./contract` - Contract validation (`validateContract`, `computeMappings`)
 - `./schema-sql` - SQL contract JSON schema (`data-contract-sql-v1.json`)
 
 ## Usage
@@ -99,16 +95,13 @@ The table builder supports the following constraint methods:
 
 ### Validating Contracts
 
+Contract JSON validation now lives in `@prisma-next/sql-contract/validate` (shared plane), while this package focuses on authoring/building contracts.
+
 ```typescript
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { Contract } from './contract.d';
 
-// From JSON import
 const contract = validateContract<Contract>(contractJson);
-
-// Or with generic type (less type-safe)
-const contract = validateContract<SqlContract<SqlStorage>>(contractJson);
 ```
 
 ## Dependencies

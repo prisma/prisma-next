@@ -10,14 +10,14 @@ This rulecard is intentionally short. For full examples, see `docs/reference/que
 
 ## Keep query entrypoints small and explicit
 
-- Prefer a small `query.ts` that wires **contract validation**, **runtime context**, and exports `tables`.
+- Prefer a small `db.ts` that wires one `postgres(...)` call and keep query modules consuming `db` directly.
 - Keep complex examples and walkthroughs in docs.
 
 ## Prefer `tables` + `table.columns.*`
 
-- Access columns via `tables.user.columns.email` (avoids conflicts with table properties).
+- Access columns via `db.schema.tables.user.columns.email` (avoids conflicts with table properties).
 - If a file uses `tables` frequently, extract locals:
-  - `const user = tables.user`
+  - `const user = db.schema.tables.user`
   - `const cols = user.columns`
 
 ## Related rules
