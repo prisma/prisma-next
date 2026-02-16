@@ -9,7 +9,7 @@ This demo shows:
 - Creating Plans and executing them via the Runtime
 - Contract verification and marker management
 - Native Prisma Next patterns and best practices
-- Repository layer end-to-end examples using `@prisma-next/sql-repositories`
+- Repository layer end-to-end examples using `@prisma-next/sql-orm-client`
 - **Two workflows**: Emit workflow (JSON-based) and No-Emit workflow (TypeScript-based)
 - Client-generated UUID identifiers via `@prisma-next/ids`
 

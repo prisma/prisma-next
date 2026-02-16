@@ -103,9 +103,9 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/2-sql/6-repositories/**",
+      "glob": "packages/2-sql/6-orm-client/**",
       "domain": "sql",
-      "layer": "repositories",
+      "layer": "orm-client",
       "plane": "runtime"
     },
     {
@@ -249,6 +249,6 @@
   "crossDomainExceptions": [],
   "layerOrder": {
     "framework": ["core", "authoring", "tooling", "runtime-executor"],
-    "sql": ["core", "authoring", "tooling", "lanes", "runtime", "repositories", "adapters", "drivers"]
+    "sql": ["core", "authoring", "tooling", "lanes", "runtime", "orm-client", "adapters", "drivers"]
   }
 }

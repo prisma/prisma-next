@@ -1,7 +1,7 @@
-# Model Client / Repository Pattern
+# ORM Client
 
-**Package:** `@prisma-next/sql-repositories` (`packages/2-sql/6-repositories/`)
-**Layer:** 6 (Repository), Runtime Plane
+**Package:** `@prisma-next/sql-orm-client` (`packages/2-sql/6-orm-client/`)
+**Layer:** 6 (ORM Client), Runtime Plane
 **Status:** Draft
 **Date:** 2026-02-16
 **References:** ADR 161 (Repository Layer), ADR 015 (ORM as Optional Extension), PR #152 (AST expansion)
@@ -12,11 +12,11 @@
 
 Prisma Next provides several layers for querying databases. At the lowest level, you can write raw SQL. Above that, the DSL lane (`@prisma-next/sql-lane`) gives you a type-safe SQL query builder. But most application developers don't want to think in SQL at all — they want to think in terms of their domain: **users, posts, comments**. They want to filter, include related data, paginate, create, update, and delete records using the vocabulary of their application.
 
-That's what this spec is about: a **Model Client** that speaks in application terms. It replaces the ORM lane (ADR 015), which was our first attempt at this but was fundamentally limited by the one-query-one-statement rule (ADR 003). The repository layer (ADR 161) lifts that restriction — it can orchestrate multiple plans when needed (e.g. for nested mutations) while each individual plan still obeys ADR 003.
+That's what this spec is about: an **ORM Client** that speaks in application terms. It replaces the ORM lane (ADR 015), which was our first attempt at this but was fundamentally limited by the one-query-one-statement rule (ADR 003). The layer introduced in ADR 161 lifts that restriction — it can orchestrate multiple plans when needed (e.g. for nested mutations) while each individual plan still obeys ADR 003.
 
 ### What exists today
 
-The `@prisma-next/sql-repositories` package already has a working prototype on the current branch with:
+The `@prisma-next/sql-orm-client` package already has a working prototype on the current branch with:
 
 - A fluent, immutable query builder with `where()`, `include()`, `orderBy()`, `take()`, `skip()`, `findMany()`, `findFirst()`
 - A base class for creating model-specific entry points
@@ -35,7 +35,7 @@ This spec takes that prototype, fills in the gaps (mutations, aggregations, proj
 
 3. **Contract-derived type safety.** Every type — row shapes, field accessors, relation names, unique constraints, create inputs — is derived from the contract artifact. The contract is the single source of truth.
 
-4. **Filters are data.** Filter expressions are plain PN AST nodes (`WhereExpr`). They can be built with the ergonomic callback API, composed with `and()`/`or()`/`not()`, or constructed externally (e.g. via the Kysely integration). The model client doesn't care how a filter was built.
+4. **Filters are data.** Filter expressions are plain PN AST nodes (`WhereExpr`). They can be built with the ergonomic callback API, composed with `and()`/`or()`/`not()`, or constructed externally (e.g. via the Kysely integration). The ORM client doesn't care how a filter was built.
 
 5. **Safe by default.** `update()` and `delete()` refuse to compile without a `where()` clause. If you really want to affect every record, you write `where(all())` to make that intention explicit.
 
@@ -60,43 +60,46 @@ These terms are used throughout the spec and the codebase. Some were introduced 
 
 ### Collection
 
-The **query builder**. An immutable object that accumulates query state — filters, includes, ordering, pagination, field selection — through method chaining. Every method (`.where()`, `.include()`, `.orderBy()`, etc.) returns a **new** Collection, leaving the original unchanged. This makes it safe to store a base query and derive multiple variants from it.
+The central abstraction: an **immutable, fluent query builder** for a specific model. It accumulates query state — filters, includes, ordering, pagination, field selection — through method chaining. Every method (`.where()`, `.include()`, `.orderBy()`, etc.) returns a **new** Collection, leaving the original unchanged. This makes it safe to store a base query and derive multiple variants from it.
 
 The name "Collection" was chosen because it represents a *set of model records* that you progressively refine. You start with all records of a model and narrow it down. It's the thing you interact with most — building up a query piece by piece until you call a terminal method like `findMany()` to execute it.
 
-```typescript
-// A Collection representing "active admin users, newest first, page 1"
-const activeAdmins = db.users
-  .where(u => u.role.eq('admin'))
-  .where(u => u.active.eq(true))
-  .orderBy(u => u.createdAt.desc())
-  .take(20);
-```
-
-### Repository
-
-The **entry point** for a specific model. A Repository is a Collection with a constructor that knows how to resolve the model name to a table name from the contract. It's where you start building queries for a given model.
-
-The name "Repository" follows the well-known [Repository pattern](https://martinfowler.com/eaaCatalog/repository.html) — a mediator between the domain and data layers that provides a collection-like interface for accessing domain objects. Application developers can subclass it to add domain-specific query methods.
+Collection is also the extension point for domain-specific query methods. Application developers subclass it to add named methods that return refined collections. These custom collections are used **everywhere** — as the top-level entry point from the ORM client, inside `include()` refinement callbacks, and anywhere else a model's collection appears. There is no separate "repository" abstraction; Collection is the single concept for querying a model.
 
 ```typescript
-class UserRepository extends Repository<Contract, 'User'> {
-  admins() {
-    return this.where(u => u.role.eq('admin'));
-  }
+// A custom Collection with domain methods
+class UserCollection extends Collection<Contract, 'User'> {
+  admins()  { return this.where(u => u.role.eq('admin')) }
+  active()  { return this.where(u => u.active.eq(true)) }
 }
+
+// Used at the top level
+const users = await db.users.admins().active().findMany()
+
+// Same custom methods available inside include refinements
+const postsWithAdminAuthors = await db.posts
+  .include('author', a => a.admins())
+  .findMany()
 ```
 
 ### ORM Client
 
-The **top-level object** returned by `orm()`. It's a proxy that provides property-based access to repositories: `db.users`, `db.posts`, `db.comments`. It auto-creates default repositories on first access or uses custom ones you provide.
+The **top-level object** returned by `orm()`. It's a proxy that provides property-based access to collections: `db.users`, `db.posts`, `db.comments`. It auto-creates default collections on first access or uses custom ones you provide.
 
 We call it "ORM Client" because it's the user's primary handle for all data access, analogous to Prisma ORM's `PrismaClient`. The `orm()` factory name signals that this is an Object-Relational Mapping layer — the highest-level API that maps between application objects and database records.
 
 ```typescript
-const db = orm({ contract, runtime, repositories: { users: new UserRepository(...) } });
-db.users.admins().findMany(); // UserRepository with custom method
-db.comments.findMany();       // default Repository, auto-created
+const db = orm({
+  contract,
+  runtime,
+  collections: {
+    users: UserCollection,
+    posts: PostCollection,
+  },
+});
+
+db.users.admins().findMany(); // UserCollection with custom method
+db.comments.findMany();       // default Collection, auto-created
 ```
 
 ### ModelAccessor
@@ -114,13 +117,24 @@ db.users.where(u => /* u is a ModelAccessor<Contract, 'User'> */
 );
 ```
 
+### Model Reference
+
+A **handle to a specific record** identified by a unique criterion. This is what `findUnique()` produces in the fluent chain context — not yet an executed query, but a reference that can navigate to related collections for nested mutations.
+
+```typescript
+// The reference navigates to the related collection
+db.posts.findUnique({ id: postId }).comments.create({ body: '...' })
+```
+
+Model References may gain custom methods in the future (domain operations on a single record, distinct from Collection's set-oriented query methods). For now, the spec defines only the relation navigation use case. The extension point is noted here for forward compatibility.
+
 ### CollectionState
 
 A plain data object that holds the accumulated query state: filters, includes, ordering, limit, offset. It's what flows from the Collection API to the query compiler. It contains no query-builder types — just serializable data.
 
 ### WhereExpr
 
-The PN AST node type for filter expressions. All filters — whether built by the callback API, standalone functions, shorthand objects, or external tools — produce `WhereExpr` nodes. This is the abstraction boundary: the model client builds `WhereExpr` trees, and the query builder consumes them.
+The PN AST node type for filter expressions. All filters — whether built by the callback API, standalone functions, shorthand objects, or external tools — produce `WhereExpr` nodes. This is the abstraction boundary: the ORM client builds `WhereExpr` trees, and the query builder consumes them.
 
 ---
 
@@ -128,12 +142,12 @@ The PN AST node type for filter expressions. All filters — whether built by th
 
 ### 3.1 Where It Lives
 
-The repository layer occupies `packages/2-sql/6-repositories/` in the **runtime plane**, layer 6 in the package layering model. It sits above lanes (layer 4) and the SQL runtime (layer 5). Per ADR 161:
+The ORM client layer occupies `packages/2-sql/6-orm-client/` in the **runtime plane**, layer 6 in the package layering model. It sits above lanes (layer 4) and the SQL runtime (layer 5). Per ADR 161:
 
 | Direction | Allowed |
 |-----------|---------|
 | **May import from** | Lanes (layer 4), SQL runtime (layer 5), contract, operations, `runtime-executor` |
-| **Must not import** | Adapters, drivers (consumed by runtime, not repositories) |
+| **Must not import** | Adapters, drivers (consumed by runtime, not by this layer) |
 | **Must not be imported by** | Lower layers (lanes, runtime core, adapters, drivers) |
 
 ### 3.2 Dependencies
@@ -147,7 +161,7 @@ The repository layer occupies `packages/2-sql/6-repositories/` in the **runtime 
 
 ### 3.3 How Queries Are Built and Executed
 
-The repository layer builds Kysely queries from `CollectionState`, then delegates to `@prisma-next/integration-kysely` for everything downstream:
+The ORM client layer builds Kysely queries from `CollectionState`, then delegates to `@prisma-next/integration-kysely` for everything downstream:
 
 ```
 CollectionState (internal)
@@ -161,7 +175,7 @@ Kysely query builder (internal) --> @prisma-next/integration-kysely
 RuntimeQueryable.execute(plan)
 ```
 
-The repository layer does **not** perform SQL lowering or compilation — that is the integration package's job. This separation means we can replace Kysely in the future without changing the model client API.
+The ORM client layer does **not** perform SQL lowering or compilation — that is the integration package's job. This separation means we can replace Kysely in the future without changing the ORM client API.
 
 ### 3.4 Filter Expressions as PN AST Nodes
 
@@ -190,7 +204,7 @@ interface OrExpr { kind: 'or'; exprs: ReadonlyArray<WhereExpr>; }
 type WhereExpr = BinaryExpr | ExistsExpr | NullCheckExpr | AndExpr | OrExpr;
 ```
 
-The repository layer translates `WhereExpr` nodes to Kysely `where()` calls when building queries. The integration package then converts back to the PN AST for compilation. Filters are composable, serializable, and inspectable as data.
+The ORM client layer translates `WhereExpr` nodes to Kysely `where()` calls when building queries. The integration package then converts back to the PN AST for compilation. Filters are composable, serializable, and inspectable as data.
 
 ### 3.5 Capability-Based Include Strategy
 
@@ -208,7 +222,7 @@ Currently only Postgres is supported, but the design uses capability inspection 
 
 ### 3.6 Plugin Lifecycle Participation
 
-Each `ExecutionPlan` dispatched by the repository passes through the `RuntimeExecutor` plugin lifecycle hooks (`beforeCompile`, `afterExecute`). Plans use `meta.lane = 'repository'` to distinguish themselves from direct lane usage. Operation-level telemetry aggregates individual Plan telemetry into a summary (per ADR 161 section 8).
+Each `ExecutionPlan` dispatched by the ORM client passes through the `RuntimeExecutor` plugin lifecycle hooks (`beforeCompile`, `afterExecute`). Plans use `meta.lane = 'orm-client'` to distinguish themselves from direct lane usage. Operation-level telemetry aggregates individual Plan telemetry into a summary (per ADR 161 section 8).
 
 ---
 
@@ -303,10 +317,10 @@ This enables the type system to enforce constraints like "you can't call `cursor
 | `updateMany(data)` | `hasWhere: true` |
 | `deleteMany()` | `hasWhere: true` |
 
-The internal type machinery can be as complex as needed, but user-facing types stay simple. In particular, custom repository subclasses should not need to spell out type-state generics — they're inferred through method chaining:
+The internal type machinery can be as complex as needed, but user-facing types stay simple. Custom collection subclasses should not need to spell out type-state generics — they're inferred through method chaining:
 
 ```typescript
-class UserRepository extends Repository<Contract, 'User'> {
+class UserCollection extends Collection<Contract, 'User'> {
   admins() {
     // Return type is inferred — no explicit generics needed
     return this.where(u => u.kind.eq('admin'));
@@ -363,7 +377,7 @@ Edge cases still being finalized (see section 10.3):
 ### 5.2 Standalone Logical Functions
 
 ```typescript
-import { and, or, not, all } from '@prisma-next/sql-repositories';
+import { and, or, not, all } from '@prisma-next/sql-orm-client';
 
 and(...exprs: WhereExpr[]): AndExpr
 or(...exprs: WhereExpr[]): OrExpr
@@ -464,12 +478,15 @@ Loads related records. Return types are cardinality-aware:
 db.users.include('posts')       // { ...UserFields, posts: PostRow[] }
 db.posts.include('author')      // { ...PostFields, author: UserRow | null }
 
-// With refinement
+// With refinement — receives the related model's Collection (with custom methods if registered)
 db.users.include('posts', p =>
   p.where(post => post.published.eq(true))
    .orderBy(post => post.createdAt.desc())
    .take(5)
 )
+
+// Custom collection methods work inside include refinements
+db.users.include('posts', p => p.published().recent(5))
 
 // Nested includes
 db.users.include('posts', p =>
@@ -478,6 +495,8 @@ db.users.include('posts', p =>
   )
 )
 ```
+
+The include refinement callback receives the **registered Collection** for the related model (custom subclass if one was provided to `orm()`, otherwise a default Collection). This means domain methods defined on a custom collection are available everywhere that model's collection appears — at the top level and inside include refinements alike.
 
 The include strategy (lateral joins, correlated subqueries, or multi-query) is selected from contract capabilities as described in section 3.5.
 
@@ -671,7 +690,7 @@ const user = await db.users.create({
 });
 ```
 
-Compiles to `INSERT ... RETURNING *` when the target supports `RETURNING`. When unavailable, the repository orchestrates `INSERT` followed by `SELECT` using the known key (per ADR 161 section 5).
+Compiles to `INSERT ... RETURNING *` when the target supports `RETURNING`. When unavailable, the ORM client orchestrates `INSERT` followed by `SELECT` using the known key (per ADR 161 section 5).
 
 #### `update(data)`
 
@@ -791,7 +810,7 @@ await db.posts
   .update({ approved: true });
 ```
 
-`.findUnique({ id: postId }).comments` produces a Collection scoped to comments where `post_id = postId`, with the FK relationship inferred from the contract.
+`.findUnique({ id: postId })` produces a Model Reference (see section 2) — a handle to a specific record. Accessing `.comments` on it produces a Collection scoped to comments where `post_id = postId`, with the FK relationship inferred from the contract.
 
 #### Nested Payload Style
 
@@ -883,31 +902,44 @@ This requires the include system to recognize aggregation vs collection refineme
 
 ---
 
-## 9. Repository and ORM Client
+## 9. ORM Client
 
-### 9.1 Repository Base Class
+### 9.1 The `orm()` Factory
 
 ```typescript
-class Repository<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends keyof TContract['models'] & string,
-> extends Collection<TContract, ModelName, DefaultModelRow<TContract, ModelName>> {
-  constructor(ctx: RepositoryContext<TContract>, modelName: ModelName) {
-    const tableName = ctx.contract.mappings.modelToTable?.[modelName]
-      ?? modelName.toLowerCase();
-    super(ctx, modelName, tableName, emptyState());
-  }
-}
+const db = orm({
+  contract,
+  runtime,
+  collections: {
+    users: UserCollection,
+    posts: PostCollection,
+  },
+});
 ```
 
-The model name parameter (`'User'`) is a required runtime argument — it can't be inferred from generics because TypeScript types are erased at runtime, and we need the name to resolve table names and field mappings from the contract.
+The returned client is a `Proxy` that:
 
-#### Custom Repositories
+1. Returns instances of custom collection classes from the `collections` option by key.
+2. Falls back to lazily-created default `Collection` instances.
+3. Supports model name aliasing: `User`, `user`, and `users` all resolve to `User`.
+4. Caches created collections for subsequent access.
+5. Propagates the collection registry so that `include()` refinement callbacks receive the correct custom collection for each related model.
 
 ```typescript
-class UserRepository extends Repository<Contract, 'User'> {
+db.users     // UserCollection (custom)
+db.User      // UserCollection (same instance)
+db.comments  // Collection<Contract, 'Comment'> (default, lazily created)
+db.Comment   // same instance as db.comments
+```
+
+### 9.2 Custom Collections
+
+Application developers subclass `Collection` to add domain-specific query methods:
+
+```typescript
+class UserCollection extends Collection<Contract, 'User'> {
   admins() {
-    return this.where(u => u.kind.eq('admin'));
+    return this.where(u => u.role.eq('admin'));
   }
 
   byEmail(email: string) {
@@ -928,32 +960,19 @@ const recentAdmins = await db.users
   .findMany();
 ```
 
-### 9.2 ORM Client Factory
+Custom collections are the **primary extension mechanism** for the ORM client. Because every method returns a new Collection (immutability), custom methods compose with all built-in methods and with each other. And because the ORM client propagates the collection registry, custom methods are available everywhere the model appears — including inside `include()` refinement callbacks:
 
 ```typescript
-const db = orm({
-  contract,
-  runtime,
-  repositories: {
-    users: new UserRepository({ contract, runtime }, 'User'),
-    posts: new PostRepository({ contract, runtime }, 'Post'),
-  },
-});
+db.users.include('posts', p => p.published().recent(5))
 ```
 
-The returned client is a `Proxy` that:
+### 9.3 Collection Registry Propagation
 
-1. Returns custom repositories from the `repositories` option by key.
-2. Falls back to lazily-created default `Repository` instances.
-3. Supports model name aliasing: `User`, `user`, and `users` all resolve to `User`.
-4. Caches created repositories for subsequent access.
+When the ORM client creates a Collection (either custom or default), it attaches a **collection registry** — a mapping from model name to collection class. Every chaining method (`where()`, `include()`, `orderBy()`, etc.) preserves this registry on the new Collection it returns.
 
-```typescript
-db.users     // UserRepository (custom)
-db.User      // UserRepository (same instance)
-db.comments  // Repository<Contract, 'Comment'> (default, lazily created)
-db.Comment   // same instance as db.comments
-```
+When `include(relation, refine)` is called, it looks up the related model's collection class in the registry and passes an instance of it to the refinement callback. If no custom class is registered for that model, a default Collection is used.
+
+This is an internal mechanism. Users don't interact with the registry directly — they just pass collection classes to `orm()` and everything composes.
 
 ---
 
@@ -1007,11 +1026,11 @@ Open:
 
 ## 12. Migration Path
 
-The repository layer succeeds the ORM lane (ADR 015):
+The ORM client layer succeeds the ORM lane (ADR 015):
 
-1. **Now:** The ORM lane compiles each call to a single Plan per ADR 015. The repository prototype exists with basic reads.
+1. **Now:** The ORM lane compiles each call to a single Plan per ADR 015. The ORM client prototype exists with basic reads.
 2. **Feature parity:** This spec is implemented, covering everything the ORM lane does plus mutations, aggregations, and multi-query orchestration.
-3. **Deprecation:** ORM lane gets a deprecation notice pointing to `@prisma-next/sql-repositories`.
+3. **Deprecation:** ORM lane gets a deprecation notice pointing to `@prisma-next/sql-orm-client`.
 4. **Coexistence:** Both packages coexist during transition. Existing lane usage is unchanged.
 5. **Removal:** ORM lane removed in a future major version.
 
@@ -1026,10 +1045,9 @@ No breaking changes to existing code at any point.
 ```typescript
 import {
   orm,
-  Repository,
   Collection,
   and, or, not, all,
-} from '@prisma-next/sql-repositories';
+} from '@prisma-next/sql-orm-client';
 ```
 
 ### Chainable Methods
@@ -1086,12 +1104,12 @@ import {
 ## Appendix B: Full Example
 
 ```typescript
-import { orm, Repository, and, or } from '@prisma-next/sql-repositories';
+import { orm, Collection, and, or } from '@prisma-next/sql-orm-client';
 import type { Contract } from './.prisma/contract';
 
-// --- Custom Repositories ---
+// --- Custom Collections ---
 
-class UserRepository extends Repository<Contract, 'User'> {
+class UserCollection extends Collection<Contract, 'User'> {
   admins()  { return this.where(u => u.role.eq('admin')); }
   active()  { return this.where(u => u.active.eq(true)); }
   byEmail(email: string) { return this.where(u => u.email.eq(email)); }
@@ -1101,9 +1119,12 @@ class UserRepository extends Repository<Contract, 'User'> {
   }
 }
 
-class PostRepository extends Repository<Contract, 'Post'> {
+class PostCollection extends Collection<Contract, 'Post'> {
   published() { return this.where(p => p.published.eq(true)); }
   forUser(userId: number) { return this.where(p => p.userId.eq(userId)); }
+  recent(n: number) {
+    return this.orderBy(p => p.createdAt.desc()).take(n);
+  }
   withComments() {
     return this.include('comments', c =>
       c.where(comment => comment.approved.eq(true))
@@ -1118,9 +1139,9 @@ function createClient(contract: Contract, runtime: Runtime) {
   return orm({
     contract,
     runtime,
-    repositories: {
-      users: new UserRepository({ contract, runtime }, 'User'),
-      posts: new PostRepository({ contract, runtime }, 'Post'),
+    collections: {
+      users: UserCollection,
+      posts: PostCollection,
     },
   });
 }
@@ -1128,7 +1149,7 @@ function createClient(contract: Contract, runtime: Runtime) {
 // --- Usage ---
 
 async function main(db: ReturnType<typeof createClient>) {
-  // Composed reads
+  // Composed reads with custom collection methods
   const recentAdmins = await db.users
     .admins().active()
     .orderBy(u => u.createdAt.desc())
@@ -1144,6 +1165,11 @@ async function main(db: ReturnType<typeof createClient>) {
   // Relational filter
   const usersWithPublishedPosts = await db.users
     .where(u => u.posts.some(p => p.published.eq(true)))
+    .findMany();
+
+  // Custom collection methods work inside include refinements
+  const usersWithRecentPosts = await db.users
+    .include('posts', p => p.published().recent(3))
     .findMany();
 
   // Create with nested mutation
@@ -1181,6 +1207,8 @@ Changes needed from the current prototype to match this specification:
 
 | Area | Current State | Target State |
 |------|--------------|-------------|
+| Package name | `@prisma-next/sql-repositories` | `@prisma-next/sql-orm-client` |
+| `Repository` class | Separate subclass of Collection | Removed; users extend `Collection` directly |
 | `FilterExpr` | Internal `{ column, op, value }` | PN AST `WhereExpr` |
 | `ColumnAccessor` | Scalar comparisons only (eq, neq, gt, lt, gte, lte) | Full `ModelAccessor` with relation accessors and additional operators |
 | `where()` overloads | Callback only | Callback + direct AST + shorthand object |
@@ -1192,6 +1220,8 @@ Changes needed from the current prototype to match this specification:
 | `distinct()` / `distinctOn()` | Does not exist | Distinct selection |
 | Include cardinality | Always `Row[]` | Cardinality-aware (`Row \| null` for 1:1, `Row[]` for 1:N) |
 | Include strategy | Multi-query stitching only | Capability-based (lateral > correlated > multi-query) |
+| Include refinement | Bare Collection | Registered Collection (with custom methods) |
+| `orm()` option key | `repositories` (instances) | `collections` (classes) |
 | Mutations | Do not exist | create, update, delete, upsert + batch variants |
 | Nested mutations | Do not exist | Fluent chain + nested payload |
 | Aggregations | Do not exist | count, sum, avg, min, max, groupBy |
@@ -1199,3 +1229,4 @@ Changes needed from the current prototype to match this specification:
 | `orderBy` ergonomics | Returns `{ column, direction }` | Typed accessor with `.asc()` / `.desc()` |
 | Type-state tracking | None | Generic parameter tracking hasOrderBy, hasWhere |
 | `CollectionState` filters | `FilterExpr[]` | `WhereExpr[]` (PN AST nodes) |
+| Collection registry | Does not exist | Propagated through all chaining methods for include refinements |

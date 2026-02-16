@@ -1,17 +1,17 @@
-# @prisma-next/sql-repositories
+# @prisma-next/sql-orm-client
 
-Repository-layer API for SQL contracts in Prisma Next.
+ORM client for Prisma Next — fluent, type-safe model collections.
 
-This package provides a high-level repository surface on top of the runtime that can orchestrate multiple single-statement plans for a single logical operation (for example, parent query + includes).
+This package provides a high-level ORM client surface on top of the runtime that can orchestrate multiple single-statement plans for a single logical operation (for example, parent query + includes).
 
 ## Responsibilities
 
-- Expose typed `Repository` and `Collection` primitives for model-level data access
+- Expose typed `Collection` primitives for model-level data access
 - Build filter/order/include state from fluent APIs (`where`, `include`, `orderBy`, `take`, `skip`)
-- Compile repository state into executable SQL plans using Kysely compilation
+- Compile collection state into executable SQL plans using Kysely compilation
 - Execute and stitch include trees across multiple plan executions
 - Map storage-column rows back to model-field row shapes
-- Expose an `orm()` client with typed repository keys (for example `db.posts`)
+- Expose an `orm()` client with typed collection keys (for example `db.posts`)
 
 ## Dependency Boundaries
 
@@ -28,7 +28,7 @@ This package should not depend on target adapters or drivers directly; execution
 
 ```mermaid
 flowchart LR
-  A[Repository / Collection API] --> B[CollectionState]
+  A[Collection API] --> B[CollectionState]
   B --> C[Kysely compiler]
   C --> D[ExecutionPlan]
   D --> E[RuntimeQueryable.execute]

@@ -1,10 +1,10 @@
-import { orm, Repository } from '@prisma-next/sql-repositories';
+import { orm, Collection } from '@prisma-next/sql-orm-client';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { executionContext } from '../prisma/context';
 
 type Contract = typeof executionContext.contract;
 
-class UserRepository extends Repository<Contract, 'User'> {
+class UserCollection extends Collection<Contract, 'User'> {
   admins() {
     return this.where((user) => user.kind.eq('admin'));
   }
@@ -14,7 +14,7 @@ class UserRepository extends Repository<Contract, 'User'> {
   }
 }
 
-class PostRepository extends Repository<Contract, 'Post'> {
+class PostCollection extends Collection<Contract, 'Post'> {
   forUser(userId: string) {
     return this.where((post) => post.userId.eq(userId));
   }
@@ -26,8 +26,8 @@ export function createRepositoryClient(runtime: Runtime) {
     contract,
     runtime,
     repositories: {
-      users: new UserRepository({ contract, runtime }, 'User'),
-      posts: new PostRepository({ contract, runtime }, 'Post'),
+      users: new UserCollection({ contract, runtime }, 'User'),
+      posts: new PostCollection({ contract, runtime }, 'Post'),
     },
   });
 }

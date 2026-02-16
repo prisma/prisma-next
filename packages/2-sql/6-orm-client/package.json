@@ -1,9 +1,9 @@
 {
-  "name": "@prisma-next/sql-repositories",
+  "name": "@prisma-next/sql-orm-client",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "SQL repository abstractions for Prisma Next",
+  "description": "ORM client for Prisma Next — fluent, type-safe model collections",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",

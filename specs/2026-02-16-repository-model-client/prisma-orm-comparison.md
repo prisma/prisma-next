@@ -1,6 +1,6 @@
 # Prisma ORM vs Prisma Next — API Comparison
 
-This document compares Prisma ORM's `PrismaClient` API with the Prisma Next Model Client API specified in `spec.md`. Section 1 covers side-by-side equivalents. Section 2 covers capabilities unique to Prisma Next.
+This document compares Prisma ORM's `PrismaClient` API with the Prisma Next ORM Client API specified in `spec.md`. Section 1 covers side-by-side equivalents. Section 2 covers capabilities unique to Prisma Next.
 
 ---
 
@@ -17,7 +17,7 @@ const prisma = new PrismaClient()
 
 **Prisma Next:**
 ```typescript
-import { orm, Repository } from '@prisma-next/sql-repositories'
+import { orm, Collection } from '@prisma-next/sql-orm-client'
 
 const db = orm({ contract, runtime })
 ```

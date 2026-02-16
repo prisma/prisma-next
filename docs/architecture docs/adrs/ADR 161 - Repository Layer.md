@@ -16,7 +16,7 @@ The existing ORM lane (ADR 015) will eventually be deprecated and removed; the r
 
 ### 1) Package location and plane
 
-The repository layer lives at `packages/2-sql/6-repositories/` in the runtime plane. The package slot already exists in the architecture config.
+The repository layer lives at `packages/2-sql/6-orm-client/` in the runtime plane. The package slot already exists in the architecture config.
 
 ### 2) Dependency rules
 
