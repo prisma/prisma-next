@@ -304,7 +304,7 @@ export default {
         '/test/',
         '\\.config\\.',
         'vitest\\.config',
-        'tsup\\.config',
+        'tsdown\\.config',
         '\\.d\\.ts$',
         'dist',
         'coverage',

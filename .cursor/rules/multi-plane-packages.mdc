@@ -74,24 +74,19 @@ Multi-plane packages require **multiple globs** in `architecture.config.json`, o
 
 ## Build Configuration
 
-All entry points can be built in a single `tsup` configuration block since they all output to the same directory:
+All entry points can be built in a single `tsdown` configuration block:
 
 ```typescript
+import { defineConfig } from '@prisma-next/tsdown';
+
 export default defineConfig({
-  entry: {
-    adapter: 'src/exports/adapter.ts',
-    types: 'src/exports/types.ts',
-    'codec-types': 'src/exports/codec-types.ts',
-    control: 'src/exports/control.ts',
-    runtime: 'src/exports/runtime.ts',
-  },
-  outDir: 'dist/exports',
-  format: ['esm'],
-  sourcemap: true,
-  dts: true,
-  clean: true,
-  target: 'es2022',
-  minify: false,
+  entry: [
+    'src/exports/adapter.ts',
+    'src/exports/types.ts',
+    'src/exports/codec-types.ts',
+    'src/exports/control.ts',
+    'src/exports/runtime.ts',
+  ],
 });
 ```
 

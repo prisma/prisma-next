@@ -220,7 +220,7 @@ When Vitest loads a `vitest.config.ts` file, it imports the config module. If th
    }
    ```
 
-2. **Build configuration**: Add the utility as a separate entry point in `tsup.config.ts`:
+2. **Build configuration**: Add the utility as a separate entry point in `tsdown.config.ts`:
    ```typescript
    entry: {
      'typed-expectations': 'src/typed-expectations.ts',

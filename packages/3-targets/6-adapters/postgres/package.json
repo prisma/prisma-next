@@ -8,7 +8,7 @@
     "src"
   ],
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -36,35 +36,18 @@
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "exports": {
-    "./package.json": "./package.json",
-    "./adapter": {
-      "types": "./dist/exports/adapter.d.ts",
-      "import": "./dist/exports/adapter.js"
-    },
-    "./types": {
-      "types": "./dist/exports/types.d.ts",
-      "import": "./dist/exports/types.js"
-    },
-    "./codec-types": {
-      "types": "./dist/exports/codec-types.d.ts",
-      "import": "./dist/exports/codec-types.js"
-    },
-    "./column-types": {
-      "types": "./dist/exports/column-types.d.ts",
-      "import": "./dist/exports/column-types.js"
-    },
-    "./control": {
-      "types": "./dist/exports/control.d.ts",
-      "import": "./dist/exports/control.js"
-    },
-    "./runtime": {
-      "types": "./dist/exports/runtime.d.ts",
-      "import": "./dist/exports/runtime.js"
-    }
+    "./adapter": "./dist/adapter.mjs",
+    "./codec-types": "./dist/codec-types.mjs",
+    "./column-types": "./dist/column-types.mjs",
+    "./control": "./dist/control.mjs",
+    "./runtime": "./dist/runtime.mjs",
+    "./types": "./dist/types.mjs",
+    "./package.json": "./package.json"
   }
 }

@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "Schema and column builders, operation attachment, and AST types for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -28,7 +28,8 @@
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -37,45 +38,20 @@
     "src"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./schema": {
-      "types": "./dist/exports/schema.d.ts",
-      "import": "./dist/exports/schema.js"
-    },
-    "./param": {
-      "types": "./dist/exports/param.d.ts",
-      "import": "./dist/exports/param.js"
-    },
-    "./types": {
-      "types": "./dist/exports/types.d.ts",
-      "import": "./dist/exports/types.js"
-    },
-    "./operations-registry": {
-      "types": "./dist/exports/operations-registry.d.ts",
-      "import": "./dist/exports/operations-registry.js"
-    },
-    "./errors": {
-      "types": "./dist/exports/errors.d.ts",
-      "import": "./dist/exports/errors.js"
-    },
-    "./ast": {
-      "types": "./dist/exports/ast.d.ts",
-      "import": "./dist/exports/ast.js"
-    },
-    "./plan": {
-      "types": "./dist/exports/plan.d.ts",
-      "import": "./dist/exports/plan.js"
-    },
-    "./query-lane-context": {
-      "types": "./dist/exports/query-lane-context.d.ts",
-      "import": "./dist/exports/query-lane-context.js"
-    },
-    "./utils/guards": {
-      "types": "./dist/exports/guards.d.ts",
-      "import": "./dist/exports/guards.js"
-    }
-  }
+    ".": "./dist/index.mjs",
+    "./ast": "./dist/exports/ast.mjs",
+    "./errors": "./dist/exports/errors.mjs",
+    "./guards": "./dist/exports/guards.mjs",
+    "./operations-registry": "./dist/exports/operations-registry.mjs",
+    "./param": "./dist/exports/param.mjs",
+    "./plan": "./dist/exports/plan.mjs",
+    "./query-lane-context": "./dist/exports/query-lane-context.mjs",
+    "./schema": "./dist/exports/schema.mjs",
+    "./types": "./dist/exports/types.mjs",
+    "./utils/guards": "./dist/exports/utils/guards.mjs",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts"
 }
