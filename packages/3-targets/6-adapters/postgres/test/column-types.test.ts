@@ -1,6 +1,17 @@
 import { type as arktype } from 'arktype';
 import { describe, expect, it } from 'vitest';
-import { json, jsonb, jsonbColumn, jsonColumn } from '../src/exports/column-types';
+import { PG_ARRAY_CODEC_ID, PG_INT4_CODEC_ID, PG_TIMESTAMP_CODEC_ID } from '../src/core/codec-ids';
+import {
+  int4Column,
+  json,
+  jsonb,
+  jsonbColumn,
+  jsonColumn,
+  listOf,
+  numericColumn,
+  textColumn,
+  timestampColumn,
+} from '../src/exports/column-types';
 
 describe('adapter-postgres column-types', () => {
   describe('jsonColumn', () => {
@@ -106,5 +117,76 @@ describe('adapter-postgres column-types', () => {
       const notASchema = { foo: 'bar' } as never;
       expect(() => json(notASchema)).toThrow('json(schema) expects a Standard Schema value');
     });
+  });
+});
+
+describe('listOf', () => {
+  it('wraps a simple scalar column descriptor', () => {
+    const result = listOf(int4Column);
+
+    expect(result.codecId).toBe(PG_ARRAY_CODEC_ID);
+    expect(result.nativeType).toBe('int4[]');
+    expect(result.typeParams).toEqual({
+      element: PG_INT4_CODEC_ID,
+      elementNativeType: 'int4',
+    });
+  });
+
+  it('wraps a text column', () => {
+    const result = listOf(textColumn);
+
+    expect(result.codecId).toBe(PG_ARRAY_CODEC_ID);
+    expect(result.nativeType).toBe('text[]');
+    expect(result.typeParams?.['element']).toBe('pg/text@1');
+  });
+
+  it('includes nullableItems when specified', () => {
+    const result = listOf(int4Column, { nullableItems: true });
+
+    expect(result.typeParams).toEqual({
+      element: PG_INT4_CODEC_ID,
+      elementNativeType: 'int4',
+      nullableItems: true,
+    });
+  });
+
+  it('omits nullableItems when false', () => {
+    const result = listOf(int4Column, { nullableItems: false });
+
+    expect(result.typeParams).toEqual({
+      element: PG_INT4_CODEC_ID,
+      elementNativeType: 'int4',
+    });
+  });
+
+  it('omits nullableItems when options not provided', () => {
+    const result = listOf(int4Column);
+
+    expect(result.typeParams).not.toHaveProperty('nullableItems');
+  });
+
+  it('wraps a timestamp column', () => {
+    const result = listOf(timestampColumn);
+
+    expect(result.codecId).toBe(PG_ARRAY_CODEC_ID);
+    expect(result.nativeType).toBe('timestamp[]');
+    expect(result.typeParams?.['element']).toBe(PG_TIMESTAMP_CODEC_ID);
+  });
+
+  it('forwards element typeParams for parameterized element types', () => {
+    const numeric = numericColumn(10, 2);
+    const result = listOf(numeric);
+
+    expect(result.typeParams).toEqual({
+      element: 'pg/numeric@1',
+      elementNativeType: 'numeric',
+      elementTypeParams: { precision: 10, scale: 2 },
+    });
+  });
+
+  it('omits elementTypeParams when element has no typeParams', () => {
+    const result = listOf(int4Column);
+
+    expect(result.typeParams).not.toHaveProperty('elementTypeParams');
   });
 });

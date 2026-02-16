@@ -8,6 +8,7 @@
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
+  PG_ARRAY_CODEC_ID,
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
   PG_ENUM_CODEC_ID,
@@ -273,5 +274,21 @@ export function enumColumn<TypeName extends string>(
     codecId: PG_ENUM_CODEC_ID,
     nativeType,
     typeRef: typeName,
+  };
+}
+
+export function listOf(
+  elementDescriptor: ColumnTypeDescriptor,
+  options?: { nullableItems?: boolean },
+): ColumnTypeDescriptor {
+  return {
+    codecId: PG_ARRAY_CODEC_ID,
+    nativeType: `${elementDescriptor.nativeType}[]`,
+    typeParams: {
+      element: elementDescriptor.codecId,
+      elementNativeType: elementDescriptor.nativeType,
+      ...(options?.nullableItems ? { nullableItems: true } : {}),
+      ...(elementDescriptor.typeParams ? { elementTypeParams: elementDescriptor.typeParams } : {}),
+    },
   };
 }
