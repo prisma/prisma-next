@@ -9,6 +9,7 @@
  */
 
 import {
+  PG_ARRAY_CODEC_ID,
   PG_BIT_CODEC_ID,
   PG_CHAR_CODEC_ID,
   PG_INTERVAL_CODEC_ID,
@@ -111,6 +112,17 @@ export function expandParameterizedNativeType(input: ExpandNativeTypeInput): str
     if (isValidTypeParamNumber(precision)) {
       return `${nativeType}(${precision})`;
     }
+    return nativeType;
+  }
+
+  // Array types: nativeType is already the expanded form (e.g., 'int4[]')
+  // but if we only have the element info, construct it
+  if (codecId === PG_ARRAY_CODEC_ID) {
+    const elementNativeType = typeParams['elementNativeType'];
+    if (typeof elementNativeType === 'string') {
+      return `${elementNativeType}[]`;
+    }
+    // nativeType should already end with '[]'
     return nativeType;
   }
 

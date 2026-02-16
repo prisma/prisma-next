@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PG_ARRAY_CODEC_ID,
   PG_CHAR_CODEC_ID,
   PG_INTERVAL_CODEC_ID,
   PG_NUMERIC_CODEC_ID,
@@ -114,5 +115,35 @@ describe('expandParameterizedNativeType', () => {
     });
 
     expect(result).toBe('custom');
+  });
+
+  it('expands array type from elementNativeType param', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'int4[]',
+      codecId: PG_ARRAY_CODEC_ID,
+      typeParams: { element: 'pg/int4@1', elementNativeType: 'int4' },
+    });
+
+    expect(result).toBe('int4[]');
+  });
+
+  it('returns nativeType for array when elementNativeType missing', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'text[]',
+      codecId: PG_ARRAY_CODEC_ID,
+      typeParams: { element: 'pg/text@1' },
+    });
+
+    expect(result).toBe('text[]');
+  });
+
+  it('constructs array nativeType from elementNativeType when nativeType lacks suffix', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'timestamp',
+      codecId: PG_ARRAY_CODEC_ID,
+      typeParams: { element: 'pg/timestamp@1', elementNativeType: 'timestamp' },
+    });
+
+    expect(result).toBe('timestamp[]');
   });
 });

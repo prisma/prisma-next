@@ -1,5 +1,7 @@
+import type { RenderTypeContext } from '@prisma-next/contract/types';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import {
+  PG_ARRAY_CODEC_ID,
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
   PG_CHAR_CODEC_ID,
@@ -158,6 +160,15 @@ export const postgresAdapterDescriptorMeta = {
           kind: 'function',
           render: renderJsonTypeExpression,
         },
+        [PG_ARRAY_CODEC_ID]: {
+          kind: 'function',
+          render: (params: Record<string, unknown>, ctx: RenderTypeContext) => {
+            const elementCodecId = params['element'] as string;
+            const nullableItems = params['nullableItems'] === true;
+            const baseType = `${ctx.codecTypesName}['${elementCodecId}']['output']`;
+            return nullableItems ? `Array<${baseType} | null>` : `Array<${baseType}>`;
+          },
+        },
       },
       typeImports: [
         {
@@ -190,6 +201,7 @@ export const postgresAdapterDescriptorMeta = {
         [PG_TIMETZ_CODEC_ID]: parameterizedTypeHooks,
         [PG_INTERVAL_CODEC_ID]: parameterizedTypeHooks,
         [PG_ENUM_CODEC_ID]: pgEnumControlHooks,
+        [PG_ARRAY_CODEC_ID]: parameterizedTypeHooks,
       },
     },
     storage: [
@@ -248,6 +260,7 @@ export const postgresAdapterDescriptorMeta = {
       },
       { typeId: PG_JSON_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'json' },
       { typeId: PG_JSONB_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'jsonb' },
+      { typeId: PG_ARRAY_CODEC_ID, familyId: 'sql', targetId: 'postgres' },
     ],
   },
 } as const;

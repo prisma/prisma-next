@@ -53,7 +53,13 @@ export function createTestSchemaIR(
 export function createContractTable(
   columns: Record<
     string,
-    { nativeType: string; codecId?: string; nullable: boolean; default?: ColumnDefault }
+    {
+      nativeType: string;
+      codecId?: string;
+      nullable: boolean;
+      default?: ColumnDefault;
+      typeParams?: Record<string, unknown>;
+    }
   >,
   options?: {
     primaryKey?: { columns: readonly string[]; name?: string };
@@ -75,6 +81,7 @@ export function createContractTable(
           codecId: col.codecId ?? `pg/${col.nativeType}@1`,
           nullable: col.nullable,
           ...ifDefined('default', col.default),
+          ...ifDefined('typeParams', col.typeParams),
         },
       ]),
     ),
@@ -197,6 +204,15 @@ function mockExpandParameterizedNativeType(input: ExpandNativeTypeInput): string
     return nativeType;
   }
 
+  // Array types
+  if (codecId === 'pg/array@1') {
+    const elementNativeType = typeParams['elementNativeType'];
+    if (typeof elementNativeType === 'string') {
+      return `${elementNativeType}[]`;
+    }
+    return nativeType;
+  }
+
   return nativeType;
 }
 
@@ -219,6 +235,7 @@ export function createMockPostgresComponent(): TargetBoundComponentDescriptor<'s
     'pg/time@1',
     'pg/timetz@1',
     'pg/interval@1',
+    'pg/array@1',
   ];
 
   const controlHooks: Record<string, CodecControlHooks> = {};

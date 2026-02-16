@@ -268,6 +268,78 @@ describe('verifySqlSchema - basic', () => {
     });
   });
 
+  describe('array columns', () => {
+    it('verifies array column when nativeType matches', () => {
+      const contract = createTestContract({
+        post: createContractTable({
+          id: { nativeType: 'int4', nullable: false },
+          tags: {
+            nativeType: 'text',
+            codecId: 'pg/array@1',
+            nullable: false,
+            typeParams: { element: 'pg/text@1', elementNativeType: 'text' },
+          },
+        }),
+      });
+
+      const schema = createTestSchemaIR({
+        post: createSchemaTable('post', {
+          id: { nativeType: 'int4', nullable: false },
+          tags: { nativeType: 'text[]', nullable: false },
+        }),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [createMockPostgresComponent()],
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.schema.issues).toHaveLength(0);
+    });
+
+    it('detects type mismatch for array column with wrong element type', () => {
+      const contract = createTestContract({
+        post: createContractTable({
+          scores: {
+            nativeType: 'int4',
+            codecId: 'pg/array@1',
+            nullable: false,
+            typeParams: { element: 'pg/int4@1', elementNativeType: 'int4' },
+          },
+        }),
+      });
+
+      const schema = createTestSchemaIR({
+        post: createSchemaTable('post', {
+          scores: { nativeType: 'text[]', nullable: false },
+        }),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [createMockPostgresComponent()],
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.schema.issues).toContainEqual(
+        expect.objectContaining({
+          kind: 'type_mismatch',
+          table: 'post',
+          column: 'scores',
+          expected: 'int4[]',
+          actual: 'text[]',
+        }),
+      );
+    });
+  });
+
   describe('nullability mismatch', () => {
     it('returns nullability_mismatch issue when nullability differs', () => {
       const contract = createTestContract({

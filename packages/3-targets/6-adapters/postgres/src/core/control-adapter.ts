@@ -443,6 +443,12 @@ const TYPE_PREFIX_MAP: ReadonlyMap<string, string> = new Map([
 export function normalizeSchemaNativeType(nativeType: string): string {
   const trimmed = nativeType.trim();
 
+  // Handle array types: normalize the base type, keep '[]' suffix
+  if (trimmed.endsWith('[]')) {
+    const base = trimmed.slice(0, -2);
+    return `${normalizeSchemaNativeType(base)}[]`;
+  }
+
   // Fast path: check simple prefix replacements using the lookup map
   for (const [prefix, replacement] of TYPE_PREFIX_MAP) {
     if (trimmed.startsWith(prefix)) {
@@ -470,6 +476,15 @@ export function normalizeSchemaNativeType(nativeType: string): string {
 }
 
 function normalizeFormattedType(formattedType: string, dataType: string, udtName: string): string {
+  // Handle array types: strip '[]' suffix, normalize base type, re-append '[]'
+  if (formattedType.endsWith('[]')) {
+    const baseFormatted = formattedType.slice(0, -2);
+    // For array types, data_type is 'ARRAY' and udt_name starts with '_'
+    const baseUdtName = udtName.startsWith('_') ? udtName.slice(1) : udtName;
+    const baseNormalized = normalizeFormattedType(baseFormatted, baseFormatted, baseUdtName);
+    return `${baseNormalized}[]`;
+  }
+
   if (formattedType === 'integer') {
     return 'int4';
   }
