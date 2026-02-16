@@ -1025,6 +1025,110 @@ describe('createPostgresAdapter', () => {
     });
   });
 
+  describe('array type casting', () => {
+    const arrayContract = Object.freeze(
+      validateContract<PostgresContract>({
+        target: 'postgres',
+        targetFamily: 'sql' as const,
+        storageHash: 'sha256:test-core',
+        profileHash: 'sha256:test-profile',
+        storage: {
+          tables: {
+            post: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                tags: {
+                  codecId: 'pg/array@1',
+                  nativeType: 'text[]',
+                  nullable: false,
+                  typeParams: { element: 'pg/text@1', elementNativeType: 'text' },
+                },
+                scores: {
+                  codecId: 'pg/array@1',
+                  nativeType: 'int4[]',
+                  nullable: true,
+                  typeParams: { element: 'pg/int4@1', elementNativeType: 'int4' },
+                },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        models: {},
+        relations: {},
+        mappings: {},
+      }),
+    );
+
+    it('casts array parameters in INSERT', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: InsertAst = {
+        kind: 'insert',
+        table: { kind: 'table', name: 'post' },
+        values: {
+          id: { kind: 'param', index: 1, name: 'id' },
+          tags: { kind: 'param', index: 2, name: 'tags' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: arrayContract,
+        params: [1, ['tag1', 'tag2']],
+      });
+
+      expect(lowered.body.sql).toContain('$2::text[]');
+      expect(lowered.body.sql).not.toContain('$1::');
+    });
+
+    it('casts array parameters in UPDATE', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: UpdateAst = {
+        kind: 'update',
+        table: { kind: 'table', name: 'post' },
+        set: {
+          tags: { kind: 'param', index: 1, name: 'tags' },
+        },
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'post', column: 'id' },
+          right: { kind: 'param', index: 2, name: 'id' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: arrayContract,
+        params: [['new-tag'], 1],
+      });
+
+      expect(lowered.body.sql).toContain('$1::text[]');
+    });
+
+    it('casts nullable array parameters', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: InsertAst = {
+        kind: 'insert',
+        table: { kind: 'table', name: 'post' },
+        values: {
+          id: { kind: 'param', index: 1, name: 'id' },
+          scores: { kind: 'param', index: 2, name: 'scores' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: arrayContract,
+        params: [1, [10, 20, 30]],
+      });
+
+      expect(lowered.body.sql).toContain('$2::int4[]');
+    });
+  });
+
   describe('literal rendering', () => {
     it('renders array literals', () => {
       const adapter = createPostgresAdapter();
