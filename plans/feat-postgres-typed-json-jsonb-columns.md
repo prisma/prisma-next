@@ -1,6 +1,6 @@
 # feat(postgres): Add Typed JSON/JSONB Column Support
 
-> PR #144 · Linear: TML-1894 · ADR 155
+> PR #144 · Linear: TML-1894 · ADR 159
 > Branch: `feat/pg-json-codecs`
 
 ---
@@ -356,7 +356,7 @@ directly in the public API. Arktype is used internally for param validation sche
 - `packages/3-targets/6-adapters/postgres/test/column-types.test.ts` — column factory tests
 - `packages/3-targets/6-adapters/postgres/test/standard-schema.test.ts` — Standard Schema utility tests
 - `packages/3-targets/6-adapters/postgres/test/json-schema-type-expression.test.ts` — renderer tests
-- `docs/architecture docs/adrs/ADR 155 - Postgres JSON and JSONB typed columns.md`
+- `docs/architecture docs/adrs/ADR 159 - Postgres JSON and JSONB typed columns.md`
 
 ### Modified Files (key changes)
 - `postgres/src/core/codec-ids.ts` — add `PG_JSON_CODEC_ID`, `PG_JSONB_CODEC_ID`
@@ -372,7 +372,7 @@ directly in the public API. Arktype is used internally for param validation sche
 
 ---
 
-## 8. ADR 155 — Key Decisions Documented
+## 8. ADR 159 — Key Decisions Documented
 
 - `json` stores original text; `jsonb` stores binary-normalized (no whitespace, sorted keys, last-key-wins)
 - Both map to `JsonValue` at the JS runtime level — behavioral differences only affect storage
