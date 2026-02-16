@@ -51,6 +51,7 @@ export const contract = defineContract<CodecTypes>()
         type: jsonb(profileSchema),
         nullable: true,
       })
+      .unique(['email'])
       .primaryKey(['id']),
   )
   .table('post', (t) =>

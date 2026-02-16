@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:b116d5f7750e0f2b6a6cf33e8ca02f076eabd5d8b746f80b2e68f263cebbd8d1",
+  "storageHash": "sha256:2757b7954c4cdf19fbd72a0db818c34b2e342ce63e756d546c8bd907d302b7f4",
   "executionHash": "sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589",
   "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
@@ -410,7 +410,13 @@
             "id"
           ]
         },
-        "uniques": []
+        "uniques": [
+          {
+            "columns": [
+              "email"
+            ]
+          }
+        ]
       }
     }
   },

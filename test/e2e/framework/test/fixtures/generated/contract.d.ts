@@ -27,7 +27,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:b116d5f7750e0f2b6a6cf33e8ca02f076eabd5d8b746f80b2e68f263cebbd8d1'>;
+  StorageHashBase<'sha256:2757b7954c4cdf19fbd72a0db818c34b2e342ce63e756d546c8bd907d302b7f4'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589'>;
 export type ProfileHash =
@@ -69,7 +69,7 @@ export type Contract = SqlContract<
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
-        uniques: readonly [];
+        uniques: readonly [{ readonly columns: readonly ['email'] }];
         indexes: readonly [];
         foreignKeys: readonly [];
       };

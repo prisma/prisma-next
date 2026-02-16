@@ -272,6 +272,32 @@ describe('sql-target-family-hook', () => {
     expect(types).toContain("readonly name: 'unique_email'");
   });
 
+  it('generates contract types with composite uniques in storage', () => {
+    const ir = createContractIR({
+      targetFamily: 'sql',
+      target: 'test-db',
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              first_name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              last_name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [{ columns: ['first_name', 'last_name'] }],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
+    expect(types).toContain('uniques: readonly');
+    expect(types).toContain("readonly columns: readonly ['first_name', 'last_name']");
+  });
+
   it('generates contract types with indexes in storage', () => {
     const ir = createContractIR({
       targetFamily: 'sql',

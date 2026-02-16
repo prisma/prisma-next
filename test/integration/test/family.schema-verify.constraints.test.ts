@@ -64,6 +64,52 @@ describe('family instance schemaVerify - constraints', () => {
     );
   });
 
+  describe('unique constraint mismatch', () => {
+    beforeEach(async () => {
+      await withClient(getConnectionString(), async (client) => {
+        await client.query('DROP TABLE IF EXISTS "user"');
+        await client.query(`
+          CREATE TABLE "user" (
+            id SERIAL PRIMARY KEY,
+            email TEXT NOT NULL
+          )
+        `);
+      });
+    }, timeouts.spinUpPpgDev);
+
+    it(
+      'returns ok=false with unique_constraint_mismatch issue',
+      async () => {
+        const contract = defineContract<CodecTypes>()
+          .target(postgresPack)
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id'])
+              .unique(['email']),
+          )
+          .build();
+
+        const result = await runSchemaVerify(getConnectionString(), contract);
+
+        expect(result).toMatchObject({
+          ok: false,
+          schema: {
+            counts: { fail: expect.any(Number) },
+          },
+        });
+        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(result.schema.issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ kind: 'unique_constraint_mismatch', table: 'user' }),
+          ]),
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+
   describe('foreign key mismatch', () => {
     beforeEach(async () => {
       await withClient(getConnectionString(), async (client) => {

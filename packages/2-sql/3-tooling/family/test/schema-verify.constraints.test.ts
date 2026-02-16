@@ -124,6 +124,79 @@ describe('verifySqlSchema - constraints', () => {
         }),
       );
     });
+
+    it('returns unique_constraint_mismatch for missing composite unique constraint', () => {
+      const contract = createTestContract({
+        user: createContractTable(
+          {
+            id: { nativeType: 'int4', nullable: false },
+            first_name: { nativeType: 'text', nullable: false },
+            last_name: { nativeType: 'text', nullable: false },
+          },
+          { uniques: [{ columns: ['first_name', 'last_name'] }] },
+        ),
+      });
+
+      const schema = createTestSchemaIR({
+        user: createSchemaTable('user', {
+          id: { nativeType: 'int4', nullable: false },
+          first_name: { nativeType: 'text', nullable: false },
+          last_name: { nativeType: 'text', nullable: false },
+        }),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.schema.issues).toContainEqual(
+        expect.objectContaining({
+          kind: 'unique_constraint_mismatch',
+          table: 'user',
+        }),
+      );
+    });
+
+    it('passes when composite unique constraint matches', () => {
+      const contract = createTestContract({
+        user: createContractTable(
+          {
+            id: { nativeType: 'int4', nullable: false },
+            first_name: { nativeType: 'text', nullable: false },
+            last_name: { nativeType: 'text', nullable: false },
+          },
+          { uniques: [{ columns: ['first_name', 'last_name'] }] },
+        ),
+      });
+
+      const schema = createTestSchemaIR({
+        user: createSchemaTable(
+          'user',
+          {
+            id: { nativeType: 'int4', nullable: false },
+            first_name: { nativeType: 'text', nullable: false },
+            last_name: { nativeType: 'text', nullable: false },
+          },
+          { uniques: [{ columns: ['first_name', 'last_name'], name: 'user_name_key' }] },
+        ),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.schema.issues).toHaveLength(0);
+    });
   });
 
   describe('index mismatch', () => {
