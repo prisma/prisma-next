@@ -5,7 +5,12 @@ alwaysApply: true
 ---
 
 - Use pnpm not npm!
-- ALWAYS use the Node.js version specified in `.nvmrc` (currently v24). Before running any Node.js or pnpm commands, ensure the correct version is active (e.g., `nvm use` or equivalent). Never install or switch to a different Node.js version.
+- Use the shell's Node.js. Do not run `nvm use`, `fnm use`, or any other version-switching command.
+- The source of truth for the required Node version is the root `package.json` `engines.node` field.
+- If the shell's `node -v` does not satisfy that, or Node/pnpm commands fail due to version, report:
+  "Your shell is misconfigured for this repo. Configure your environment so that `node`
+  resolves to a version that satisfies the root package.json engines.node (e.g. set your
+  default Node in your version manager, or use Volta)."
 - We use turborepo to build, generally. `pnpm build` scripts are available in each package which delegate to turborepo
 - When you want to typecheck, use the local `pnpm typecheck` scripts instead of writing `tsc` commands from scratch
 - When you want to test, use the local `pnpm test` scripts. For coverage, use `pnpm test:coverage` (all packages) or `pnpm coverage:packages` (packages only, excludes examples)
