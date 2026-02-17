@@ -131,6 +131,15 @@ describe('sql-codecs', () => {
     expect(codec.decode(input)).toBe(expectedDecoded);
   });
 
+  it('trims trailing spaces when decoding char values', () => {
+    const charCodec = sqlCodecDefinitions.char.codec as {
+      decode: (wire: string) => string;
+    };
+
+    expect(charCodec.decode('user_001                            ')).toBe('user_001');
+    expect(charCodec.decode('user_001')).toBe('user_001');
+  });
+
   it('initializes helpers for length-parameterized codecs', () => {
     const charCodec = sqlCodecDefinitions.char.codec;
     const varcharCodec = sqlCodecDefinitions.varchar.codec;

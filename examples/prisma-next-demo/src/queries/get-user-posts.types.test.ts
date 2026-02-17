@@ -1,3 +1,4 @@
+import type { Char } from '@prisma-next/adapter-postgres/codec-types';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sql } from '@prisma-next/sql-lane/sql';
@@ -38,7 +39,7 @@ test('ResultType correctly infers number[] | null for nullable embedding column'
 
   // Verify that embedding is correctly inferred as number[] | null (nullable vector column)
   expectTypeOf<Row['embedding']>().toEqualTypeOf<number[] | null>();
-  expectTypeOf<Row['id']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['id']>().toEqualTypeOf<Char<36>>();
   expectTypeOf<Row['title']>().toEqualTypeOf<string>();
   expectTypeOf<Row['userId']>().toEqualTypeOf<string>();
   // Note: createdAt type depends on codec definition - checking it's not never
