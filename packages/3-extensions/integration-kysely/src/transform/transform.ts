@@ -477,7 +477,7 @@ function transformSelect(node: Record<string, unknown>, ctx: TransformContext): 
     );
   }
 
-  const fromsArr = fromNodeRec!['froms'] as unknown[] | undefined;
+  const fromsArr = fromNodeRec?.['froms'] as unknown[] | undefined;
   const firstFrom = Array.isArray(fromsArr) ? fromsArr[0] : undefined;
   if (!firstFrom) {
     throw new KyselyTransformError(
@@ -890,7 +890,7 @@ function extractRefsFromAst(ast: QueryAst): PlanRefs {
 
 export function transformKyselyToPnAst(
   contract: SqlContract<SqlStorage>,
-  query: unknown,
+  query: object,
   parameters: readonly unknown[],
 ): TransformResult {
   if (!query || typeof query !== 'object') {
