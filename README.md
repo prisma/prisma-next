@@ -581,5 +581,5 @@ const db = postgres<Contract>({
 });
 
 const runtime = await db.runtime();
-const results = runtime.execute(query);
+const results = await Array.fromAsync(runtime.execute(query));
 ```

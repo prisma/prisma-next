@@ -82,7 +82,15 @@ export async function createTestRuntime(
     cursor: driverOptions.cursor ?? { disabled: true },
   };
   const driver = driverDescriptor.create(createOpts);
-  await driver.connect(bindingFromDriverOptions(driverOptions));
+  const binding = bindingFromDriverOptions(driverOptions);
+  try {
+    await driver.connect(binding);
+  } catch (error) {
+    if (binding.kind === 'pgPool') {
+      await binding.pool.end();
+    }
+    throw error;
+  }
 
   return createRuntime({
     stackInstance,
