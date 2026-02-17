@@ -6,6 +6,7 @@ import type {
 import type {
   ForeignKey,
   ForeignKeyReferences,
+  ForeignKeysConfig,
   Index,
   ModelDefinition,
   ModelField,
@@ -124,6 +125,7 @@ export function contract<
   extensionPacks?: Record<string, unknown>;
   meta?: Record<string, unknown>;
   sources?: Record<string, unknown>;
+  foreignKeys?: ForeignKeysConfig;
 }): SqlContract<
   SqlStorage,
   Record<string, unknown>,
@@ -148,6 +150,7 @@ export function contract<
     ...(opts.extensionPacks !== undefined && { extensionPacks: opts.extensionPacks }),
     ...(opts.meta !== undefined && { meta: opts.meta }),
     ...(opts.sources !== undefined && { sources: opts.sources as Record<string, unknown> }),
+    ...(opts.foreignKeys !== undefined && { foreignKeys: opts.foreignKeys }),
   } as SqlContract<
     SqlStorage,
     Record<string, unknown>,

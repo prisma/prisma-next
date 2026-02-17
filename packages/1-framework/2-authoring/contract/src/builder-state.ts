@@ -128,6 +128,11 @@ export interface ModelBuilderState<
   readonly relations: Relations;
 }
 
+export interface ForeignKeysConfigState {
+  readonly constraints: boolean;
+  readonly indexes: boolean;
+}
+
 export interface ContractBuilderState<
   Target extends string | undefined = string | undefined,
   Tables extends Record<
@@ -163,6 +168,7 @@ export interface ContractBuilderState<
   readonly extensionPacks?: ExtensionPacks;
   readonly capabilities?: Capabilities;
   readonly storageTypes?: Record<string, StorageTypeInstanceState>;
+  readonly foreignKeys?: ForeignKeysConfigState;
   /**
    * Array of extension pack namespace identifiers (e.g., ['pgvector', 'postgis']).
    * Populated when extension packs are registered during contract building.

@@ -184,4 +184,47 @@ describe('contract builder constraint support', () => {
     expect(contract.storage.tables.user.uniques).toHaveLength(2);
     expect(contract.storage.tables.user.indexes).toHaveLength(2);
   });
+
+  it('defaults foreignKeys config to constraints=true, indexes=true', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .model('User', 'user', (m) => m.field('id', 'id'))
+      .build();
+
+    expect(contract.foreignKeys).toEqual({ constraints: true, indexes: true });
+  });
+
+  it('emits foreignKeys config with constraints disabled', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .foreignKeys({ constraints: false, indexes: true })
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .model('User', 'user', (m) => m.field('id', 'id'))
+      .build();
+
+    expect(contract.foreignKeys).toEqual({ constraints: false, indexes: true });
+  });
+
+  it('emits foreignKeys config with indexes disabled', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .foreignKeys({ constraints: true, indexes: false })
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .model('User', 'user', (m) => m.field('id', 'id'))
+      .build();
+
+    expect(contract.foreignKeys).toEqual({ constraints: true, indexes: false });
+  });
+
+  it('emits foreignKeys config with both disabled', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .foreignKeys({ constraints: false, indexes: false })
+      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .model('User', 'user', (m) => m.field('id', 'id'))
+      .build();
+
+    expect(contract.foreignKeys).toEqual({ constraints: false, indexes: false });
+  });
 });

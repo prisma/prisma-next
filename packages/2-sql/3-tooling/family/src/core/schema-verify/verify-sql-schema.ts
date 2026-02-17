@@ -14,7 +14,7 @@ import type {
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ForeignKeysConfig, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
@@ -75,6 +75,12 @@ export interface VerifySqlSchemaOptions {
    * with contract native types (e.g., Postgres 'varchar' → 'character varying').
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
+  /**
+   * Optional FK configuration from the contract.
+   * When provided, verification skips FK constraints/indexes when disabled.
+   * Defaults to { constraints: true, indexes: true }.
+   */
+  readonly foreignKeysConfig?: ForeignKeysConfig;
 }
 
 /**
@@ -96,8 +102,12 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     typeMetadataRegistry,
     normalizeDefault,
     normalizeNativeType,
+    foreignKeysConfig,
   } = options;
   const startTime = Date.now();
+
+  const fkConfig = foreignKeysConfig ??
+    contract.foreignKeys ?? { constraints: true, indexes: true };
 
   // Extract codec control hooks once at entry point for reuse
   const codecHooks = extractCodecControlHooks(options.frameworkComponents);
@@ -110,6 +120,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     strict,
     typeMetadataRegistry,
     codecHooks,
+    foreignKeysConfig: fkConfig,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
   });
@@ -235,6 +246,7 @@ function verifySchemaTables(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
+  foreignKeysConfig: ForeignKeysConfig;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
@@ -244,6 +256,7 @@ function verifySchemaTables(options: {
     strict,
     typeMetadataRegistry,
     codecHooks,
+    foreignKeysConfig,
     normalizeDefault,
     normalizeNativeType,
   } = options;
@@ -285,6 +298,7 @@ function verifySchemaTables(options: {
       strict,
       typeMetadataRegistry,
       codecHooks,
+      foreignKeysConfig,
       ...ifDefined('normalizeDefault', normalizeDefault),
       ...ifDefined('normalizeNativeType', normalizeNativeType),
     });
@@ -326,6 +340,7 @@ function verifyTableChildren(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
+  foreignKeysConfig: ForeignKeysConfig;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
@@ -338,6 +353,7 @@ function verifyTableChildren(options: {
     strict,
     typeMetadataRegistry,
     codecHooks,
+    foreignKeysConfig,
     normalizeDefault,
     normalizeNativeType,
   } = options;
@@ -418,15 +434,17 @@ function verifyTableChildren(options: {
     });
   }
 
-  const fkStatuses = verifyForeignKeys(
-    contractTable.foreignKeys,
-    schemaTable.foreignKeys,
-    tableName,
-    tablePath,
-    issues,
-    strict,
-  );
-  tableChildren.push(...fkStatuses);
+  if (foreignKeysConfig.constraints) {
+    const fkStatuses = verifyForeignKeys(
+      contractTable.foreignKeys,
+      schemaTable.foreignKeys,
+      tableName,
+      tablePath,
+      issues,
+      strict,
+    );
+    tableChildren.push(...fkStatuses);
+  }
 
   const uniqueStatuses = verifyUniqueConstraints(
     contractTable.uniques,

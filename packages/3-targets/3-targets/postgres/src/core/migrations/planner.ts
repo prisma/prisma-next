@@ -110,6 +110,12 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       return plannerFailure(storageTypePlan.conflicts);
     }
 
+    const fkConfig = options.contract.foreignKeys ?? { constraints: true, indexes: true };
+    const fkColumnSets =
+      fkConfig.indexes === false
+        ? this.collectForeignKeyColumnSets(options.contract.storage.tables)
+        : new Set<string>();
+
     // Build extension operations from component-owned database dependencies
     operations.push(
       ...this.buildDatabaseDependencyOperations(options),
@@ -122,12 +128,19 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         schemaName,
       ),
       ...this.buildUniqueOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildIndexOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildForeignKeyOperations(
+      ...this.buildIndexOperations(
         options.contract.storage.tables,
         options.schema,
         schemaName,
+        fkColumnSets,
       ),
+      ...(fkConfig.constraints
+        ? this.buildForeignKeyOperations(
+            options.contract.storage.tables,
+            options.schema,
+            schemaName,
+          )
+        : []),
     );
 
     const plan = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -485,15 +498,31 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     return operations;
   }
 
+  private collectForeignKeyColumnSets(
+    tables: SqlContract<SqlStorage>['storage']['tables'],
+  ): Set<string> {
+    const fkColumnSets = new Set<string>();
+    for (const [tableName, table] of Object.entries(tables)) {
+      for (const fk of table.foreignKeys) {
+        fkColumnSets.add(`${tableName}:${fk.columns.join(',')}`);
+      }
+    }
+    return fkColumnSets;
+  }
+
   private buildIndexOperations(
     tables: SqlContract<SqlStorage>['storage']['tables'],
     schema: SqlSchemaIR,
     schemaName: string,
+    skipFkIndexes?: Set<string>,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of sortedEntries(tables)) {
       const schemaTable = schema.tables[tableName];
       for (const index of table.indexes) {
+        if (skipFkIndexes?.has(`${tableName}:${index.columns.join(',')}`)) {
+          continue;
+        }
         if (schemaTable && hasIndex(schemaTable, index.columns)) {
           continue;
         }
@@ -609,6 +638,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
         kind: 'conflict';
         conflicts: SqlPlannerConflict[];
       } {
+    const fkConfig = options.contract.foreignKeys ?? { constraints: true, indexes: true };
     const verifyOptions: VerifySqlSchemaOptionsWithComponents = {
       contract: options.contract,
       schema: options.schema,
@@ -617,6 +647,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
       normalizeNativeType: normalizeSchemaNativeType,
+      foreignKeysConfig: fkConfig,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
 

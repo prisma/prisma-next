@@ -118,6 +118,11 @@ export type SqlMappings = {
   readonly operationTypes: Record<string, Record<string, unknown>>;
 };
 
+export type ForeignKeysConfig = {
+  readonly constraints: boolean;
+  readonly indexes: boolean;
+};
+
 export type SqlContract<
   S extends SqlStorage = SqlStorage,
   M extends Record<string, unknown> = Record<string, unknown>,
@@ -133,6 +138,7 @@ export type SqlContract<
   readonly relations: R;
   readonly mappings: Map;
   readonly execution?: ExecutionSection;
+  readonly foreignKeys?: ForeignKeysConfig;
 };
 
 export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> =

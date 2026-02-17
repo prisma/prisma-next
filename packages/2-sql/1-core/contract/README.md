@@ -8,7 +8,7 @@ This package provides TypeScript type definitions, Arktype validators, and facto
 
 ## Responsibilities
 
-- **SQL Contract Types**: Defines SQL-specific contract types (`SqlContract`, `SqlStorage`, `StorageTable`, `ModelDefinition`, `SqlMappings`) that extend framework-level contract types
+- **SQL Contract Types**: Defines SQL-specific contract types (`SqlContract`, `SqlStorage`, `StorageTable`, `ModelDefinition`, `SqlMappings`, `ForeignKeysConfig`) that extend framework-level contract types
 - **Contract Validation**: Provides Arktype-based structural validators and the shared `validateContract` entrypoint for runtime-safe contract validation
 - **IR Factories**: Provides pure factory functions for constructing contract IR structures in tests and authoring
 - **Shared Plane Access**: Enables both migration-plane and runtime-plane packages to import SQL contract types without violating plane boundaries
@@ -25,7 +25,7 @@ Both `nativeType` and `codecId` are required to ensure contracts are consumable 
 
 ## Package Contents
 
-- **TypeScript Types**: Type definitions for `SqlContract`, `SqlStorage`, `StorageTable`, `ModelDefinition`, and related types
+- **TypeScript Types**: Type definitions for `SqlContract`, `SqlStorage`, `StorageTable`, `ModelDefinition`, `ForeignKeysConfig`, and related types
 - **Validators**: Arktype-based validators for structural validation of contracts, storage, and models
 - **Factories**: Pure factory functions for constructing contract IR structures in tests and authoring
 
@@ -41,8 +41,22 @@ import type {
   SqlStorage,
   StorageTable,
   ModelDefinition,
+  ForeignKeysConfig,
 } from '@prisma-next/sql-contract/types';
 ```
+
+### Foreign Keys Configuration
+
+`SqlContract` includes an optional `foreignKeys` field of type `ForeignKeysConfig` that controls whether the planner emits foreign key constraints and their backing indexes:
+
+```typescript
+type ForeignKeysConfig = {
+  readonly constraints: boolean;  // Emit FOREIGN KEY constraints
+  readonly indexes: boolean;      // Emit FK-backing indexes
+};
+```
+
+When omitted, defaults to `{ constraints: true, indexes: true }`. See [ADR 161](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md) for design rationale.
 
 ### Validators
 

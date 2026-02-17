@@ -3,6 +3,7 @@ import type { ExecutionMutationDefault } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
   ContractBuilderState,
+  ForeignKeysConfigState,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
@@ -20,6 +21,7 @@ import {
   TableBuilder,
 } from '@prisma-next/contract-authoring';
 import type {
+  ForeignKeysConfig,
   ModelDefinition,
   ModelField,
   SqlContract,
@@ -414,6 +416,11 @@ class SqlContractBuilder<
       }
     }
 
+    const foreignKeys: ForeignKeysConfig = this.state.foreignKeys ?? {
+      constraints: true,
+      indexes: true,
+    };
+
     // Construct contract with explicit type that matches the generic parameters
     // This ensures TypeScript infers literal types from the generics, not runtime values
     // Always include relations, even if empty (normalized to empty object)
@@ -431,6 +438,7 @@ class SqlContractBuilder<
       capabilities: this.state.capabilities || {},
       meta: {},
       sources: {},
+      foreignKeys,
     } as unknown as BuiltContract;
 
     return contract as unknown as ReturnType<
@@ -660,6 +668,33 @@ class SqlContractBuilder<
       ...this.state,
       models: { ...this.state.models, [name]: modelState } as Models &
         Record<ModelName, ReturnType<M['build']>>,
+    });
+  }
+
+  override foreignKeys(
+    config: ForeignKeysConfigState,
+  ): SqlContractBuilder<
+    CodecTypes,
+    Target,
+    Tables,
+    Models,
+    Types,
+    StorageHash,
+    ExtensionPacks,
+    Capabilities
+  > {
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      Types,
+      StorageHash,
+      ExtensionPacks,
+      Capabilities
+    >({
+      ...this.state,
+      foreignKeys: config,
     });
   }
 

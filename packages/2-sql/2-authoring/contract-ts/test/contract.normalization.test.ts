@@ -720,6 +720,57 @@ describe('validateContract normalization', () => {
     expect(normalized.storage).not.toHaveProperty('tables');
   });
 
+  it('normalizes missing foreignKeys config to defaults', () => {
+    const contractInput = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      models: {},
+      storage: {
+        tables: {
+          User: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    };
+    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    expect(contract.foreignKeys).toEqual({ constraints: true, indexes: true });
+  });
+
+  it('preserves explicit foreignKeys config', () => {
+    const contractInput = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: 'sha256:test',
+      models: {},
+      foreignKeys: { constraints: false, indexes: true },
+      storage: {
+        tables: {
+          User: {
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    };
+    const contract = validateContract<SqlContract<SqlStorage>>(contractInput);
+    expect(contract.foreignKeys).toEqual({ constraints: false, indexes: true });
+  });
+
   it('normalizeContract handles models that is not an object', () => {
     const contractInput = {
       schemaVersion: '1',

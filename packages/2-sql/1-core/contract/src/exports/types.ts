@@ -3,6 +3,7 @@ export type {
   ExtractOperationTypes,
   ForeignKey,
   ForeignKeyReferences,
+  ForeignKeysConfig,
   Index,
   ModelDefinition,
   ModelField,

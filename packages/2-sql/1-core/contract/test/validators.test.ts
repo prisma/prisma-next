@@ -306,5 +306,76 @@ describe('SQL contract validators', () => {
       });
       expect(() => validateSqlContract(c)).not.toThrow();
     });
+
+    it('accepts optional foreignKeys config', () => {
+      const userTable = table({
+        id: col('int4', 'pg/int4@1'),
+      });
+      const s = storage({ user: userTable });
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+        foreignKeys: { constraints: true, indexes: true },
+      });
+      expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
+    it('accepts foreignKeys with constraints disabled', () => {
+      const userTable = table({
+        id: col('int4', 'pg/int4@1'),
+      });
+      const s = storage({ user: userTable });
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+        foreignKeys: { constraints: false, indexes: true },
+      });
+      expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
+    it('accepts foreignKeys with indexes disabled', () => {
+      const userTable = table({
+        id: col('int4', 'pg/int4@1'),
+      });
+      const s = storage({ user: userTable });
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+        foreignKeys: { constraints: true, indexes: false },
+      });
+      expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
+    it('accepts foreignKeys with both disabled', () => {
+      const userTable = table({
+        id: col('int4', 'pg/int4@1'),
+      });
+      const s = storage({ user: userTable });
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+        foreignKeys: { constraints: false, indexes: false },
+      });
+      expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
+    it('throws on invalid foreignKeys config (string instead of boolean)', () => {
+      const userTable = table({
+        id: col('int4', 'pg/int4@1'),
+      });
+      const s = storage({ user: userTable });
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+      });
+      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+      const invalid = { ...c, foreignKeys: { constraints: 'yes', indexes: true } } as any;
+      expect(() => validateSqlContract(invalid)).toThrow();
+    });
   });
 });

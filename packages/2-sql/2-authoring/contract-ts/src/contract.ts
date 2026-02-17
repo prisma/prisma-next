@@ -1,6 +1,7 @@
 import type {
   ForeignKey,
   ForeignKeyReferences,
+  ForeignKeysConfig,
   Index,
   ModelDefinition,
   ModelField,
@@ -112,6 +113,11 @@ const ExecutionSchema = type({
   },
 });
 
+const ForeignKeysConfigSchema = type.declare<ForeignKeysConfig>().type({
+  constraints: 'boolean',
+  indexes: 'boolean',
+});
+
 /**
  * Complete SqlContract schema for structural validation.
  * This validates the entire contract structure at once.
@@ -130,6 +136,7 @@ const SqlContractSchema = type({
   models: type({ '[string]': ModelSchema }),
   storage: StorageSchema,
   'execution?': ExecutionSchema,
+  'foreignKeys?': ForeignKeysConfigSchema,
 });
 
 /**
@@ -538,6 +545,12 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
     normalizedModels = normalizedModelsObj;
   }
 
+  // Normalize foreignKeys config: default to { constraints: true, indexes: true }
+  let normalizedForeignKeys = contractObj['foreignKeys'];
+  if (normalizedForeignKeys === undefined) {
+    normalizedForeignKeys = { constraints: true, indexes: true };
+  }
+
   // Normalize top-level fields: add empty objects if missing
   return {
     ...contractObj,
@@ -548,6 +561,7 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
     capabilities: contractObj['capabilities'] ?? {},
     meta: contractObj['meta'] ?? {},
     sources: contractObj['sources'] ?? {},
+    foreignKeys: normalizedForeignKeys,
   } as SqlContract<SqlStorage>;
 }
 
