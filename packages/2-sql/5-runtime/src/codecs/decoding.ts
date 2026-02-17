@@ -143,7 +143,14 @@ export function decodeRow(
       if (jsonValidators) {
         const ref = resolveColumnRef(alias, plan);
         if (ref) {
-          validateJsonValue(jsonValidators, ref.table, ref.column, decodedValue, 'decode', codec.id);
+          validateJsonValue(
+            jsonValidators,
+            ref.table,
+            ref.column,
+            decodedValue,
+            'decode',
+            codec.id,
+          );
         }
       }
 

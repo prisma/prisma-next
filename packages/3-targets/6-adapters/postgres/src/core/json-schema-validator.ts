@@ -30,9 +30,7 @@ export type JsonSchemaValidateFn = (value: unknown) => JsonSchemaValidationResul
  * @param schema - A JSON Schema object (draft-07 compatible)
  * @returns A validate function
  */
-export function compileJsonSchemaValidator(
-  schema: Record<string, unknown>,
-): JsonSchemaValidateFn {
+export function compileJsonSchemaValidator(schema: Record<string, unknown>): JsonSchemaValidateFn {
   const ajv = new Ajv({ allErrors: true, strict: false });
   const validate = ajv.compile(schema);
 
@@ -55,12 +53,10 @@ export function compileJsonSchemaValidator(
 /**
  * Formats validation errors into a human-readable summary string.
  */
-export function formatValidationErrors(
-  errors: ReadonlyArray<JsonSchemaValidationError>,
-): string {
+export function formatValidationErrors(errors: ReadonlyArray<JsonSchemaValidationError>): string {
   if (errors.length === 0) return 'unknown validation error';
   if (errors.length === 1) {
-    const err = errors[0]!;
+    const [err] = errors;
     return err.path === '/' ? err.message : `${err.path}: ${err.message}`;
   }
   return errors

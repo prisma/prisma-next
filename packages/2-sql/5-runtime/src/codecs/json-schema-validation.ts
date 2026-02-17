@@ -52,7 +52,7 @@ function createJsonSchemaValidationError(
 function formatErrorSummary(errors: ReadonlyArray<JsonSchemaValidationError>): string {
   if (errors.length === 0) return 'unknown validation error';
   if (errors.length === 1) {
-    const err = errors[0]!;
+    const [err] = errors;
     return err.path === '/' ? err.message : `${err.path}: ${err.message}`;
   }
   return errors

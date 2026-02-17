@@ -10,7 +10,10 @@ import { createPostgresAdapter } from '../core/adapter';
 import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
 import { codecDefinitions } from '../core/codecs';
 import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
-import { compileJsonSchemaValidator, type JsonSchemaValidateFn } from '../core/json-schema-validator';
+import {
+  compileJsonSchemaValidator,
+  type JsonSchemaValidateFn,
+} from '../core/json-schema-validator';
 import type { PostgresContract, PostgresLoweredStatement } from '../core/types';
 
 export interface SqlRuntimeAdapter

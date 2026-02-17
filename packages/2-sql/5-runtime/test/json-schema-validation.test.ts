@@ -1,5 +1,5 @@
-import { coreHash } from '@prisma-next/contract/types';
 import type { ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
@@ -272,9 +272,7 @@ describe('JSON Schema validator registry', () => {
         targetId: 'postgres' as const,
         codecs: () => registry,
         operationSignatures: () => [],
-        parameterizedCodecs: () => [
-          { codecId: 'pg/jsonb@1', paramsSchema: jsonTypeParamsSchema },
-        ],
+        parameterizedCodecs: () => [{ codecId: 'pg/jsonb@1', paramsSchema: jsonTypeParamsSchema }],
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
