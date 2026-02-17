@@ -231,6 +231,8 @@ class PostgresPoolDriverImpl
     this.pool = options.connect.pool;
   }
 
+  // Bound drivers are created via createBoundDriverFromBinding with pool already
+  // configured; connect is intentionally no-op.
   async connect(_binding: PostgresBinding): Promise<void> {}
 
   async acquireConnection(): Promise<SqlConnection> {
@@ -269,6 +271,8 @@ class PostgresDirectDriverImpl
     this.directClient = options.connect.client;
   }
 
+  // Bound drivers are created via createBoundDriverFromBinding with client already
+  // configured; connect is intentionally no-op.
   async connect(_binding: PostgresBinding): Promise<void> {}
 
   async acquireConnection(): Promise<SqlConnection> {

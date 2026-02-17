@@ -44,7 +44,7 @@ export async function getPrismaNextRuntime(): Promise<Runtime> {
 
     const driver = stackInstance.driver;
     if (!driver) {
-      throw new Error('Driver descriptor missing from execution stack');
+      throw new Error('Driver missing from execution stack');
     }
 
     try {

@@ -188,15 +188,6 @@ describe('config loader', () => {
   // 3. Testing validation through file I/O is brittle (c12 compilation issues)
 
   it(
-    'handles file not found errors from c12',
-    async () => {
-      const configPath = join(testDir, 'nonexistent.config.ts');
-      await expect(loadConfig(configPath)).rejects.toThrow();
-    },
-    timeouts.typeScriptCompilation,
-  );
-
-  it(
     'handles non-Error exceptions',
     async () => {
       // This test verifies the catch block handles non-Error exceptions

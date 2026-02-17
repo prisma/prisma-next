@@ -23,6 +23,8 @@ const USE_BEFORE_CONNECT_MESSAGE =
   'Postgres driver not connected. Call connect(binding) before acquireConnection or execute.';
 const ALREADY_CONNECTED_MESSAGE =
   'Postgres driver already connected. Call close() before reconnecting with a new binding.';
+const EXPLAIN_NOT_SUPPORTED_MESSAGE =
+  'Postgres driver does not support explain() for this binding.';
 
 class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
   readonly familyId = 'sql' as const;
@@ -81,8 +83,8 @@ class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
     if (this.#delegate === null) {
       throw new Error(USE_BEFORE_CONNECT_MESSAGE);
     }
-    if (!this.#delegate.explain) {
-      throw new Error('Postgres driver does not support explain()');
+    if (this.#delegate.explain === undefined) {
+      throw new Error(EXPLAIN_NOT_SUPPORTED_MESSAGE);
     }
     return this.#delegate.explain(request);
   }

@@ -33,6 +33,7 @@ import {
   createSqlExecutionStack,
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { type PostgresBindingInput, resolvePostgresBinding } from './binding';
 
 type NormalizeOperationTypes<T> = {
@@ -171,7 +172,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
           context,
           driver,
           verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-          ...(options.plugins ? { plugins: options.plugins } : {}),
+          ...ifDefined('plugins', options.plugins),
         });
       })();
 
