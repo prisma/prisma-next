@@ -42,7 +42,7 @@ Array columns use the same `StorageColumn` shape as any other parameterized type
   "tags": {
     "codecId": "pg/array@1",
     "nativeType": "text[]",
-    "nullable": false,
+    "nullable": true,
     "typeParams": {
       "element": "pg/text@1",
       "elementNativeType": "text",
@@ -65,6 +65,12 @@ This gives four nullability combinations:
 | false | true | `Array<number \| null>` |
 | true | true | `Array<number \| null> \| null` |
 
+TODO:
+
+Nullability: We should consider whether to allow arrays/lists to be nullable at all. Maybe coerce nulls to empty arrays.
+null -> []
+[] -> []
+
 ### 2) Authoring: `listOf()` helper
 
 ```ts
@@ -73,6 +79,8 @@ import { int4Column, listOf } from '@prisma-next/adapter-postgres/column-types';
 const scores = listOf(int4Column, { nullableItems: true });
 // → { codecId: 'pg/array@1', nativeType: 'int4[]', typeParams: { element: 'pg/int4@1', elementNativeType: 'int4', nullableItems: true } }
 ```
+
+TODO: Change listOf to take just codec and not extra parameters describing the same information
 
 `listOf` composes the element descriptor's `codecId` and `nativeType` into the array descriptor's `typeParams`, avoiding manual assembly.
 
@@ -93,6 +101,9 @@ function createArrayCodec<TElementWire, TElementJs>(
   (TElementJs | null)[]                 // JS: always array with nullable elements
 >
 ```
+
+TODO: Figure out what we want to do with the codecId in general - we are currently reusing pg/array@1 for both `pgArrayCodec` and any specific codec we create with
+`createArrayCodec` which contains a nested element codec
 
 The wire type union reflects the two paths:
 - `string` — Postgres text array literal (e.g. `{1,2,3}`), parsed by `parsePgTextArray`
@@ -198,6 +209,8 @@ INSERT INTO "post" ("id", "tags", "scores") VALUES ($1, $2::text[], $3::int4[])
 ```
 
 The `::text[]` and `::int4[]` casts are emitted by `resolveParamCast` based on the column's `codecId` and `nativeType`.
+
+TODO: Currently `resolveParamCast` is hardcoding logic for arrays along with vector in core code, but vector should be an optional extension
 
 #### C) Codec encodes parameters
 

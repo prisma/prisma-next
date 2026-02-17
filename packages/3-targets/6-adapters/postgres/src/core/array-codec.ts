@@ -29,11 +29,11 @@ export const arrayParamsSchema = arktype({
 const NEEDS_QUOTING = /[{},"\\\s]/;
 
 /**
- * Matches tokens inside a Postgres text array literal (between the outer braces):
+ * Pattern matching tokens inside a Postgres text array literal (between the outer braces):
  * - `"(?:[^"\\]|\\.)*"` — quoted element (may contain escaped chars)
  * - `[^,]+` — unquoted element (everything up to the next comma or end)
  */
-const PG_ARRAY_TOKEN = /"(?:[^"\\]|\\.)*"|[^,]+/g;
+const PG_ARRAY_TOKEN_PATTERN = /"(?:[^"\\]|\\.)*"|[^,]+/g;
 
 /** Strips the surrounding quotes and unescapes `\"` and `\\` inside a quoted token. */
 function unescapeQuoted(token: string): string {
@@ -63,10 +63,9 @@ export function parsePgTextArray(wire: string): (string | null)[] {
     return [];
   }
 
-  PG_ARRAY_TOKEN.lastIndex = 0;
   const result: (string | null)[] = [];
 
-  for (let match = PG_ARRAY_TOKEN.exec(inner); match !== null; match = PG_ARRAY_TOKEN.exec(inner)) {
+  for (const match of inner.matchAll(PG_ARRAY_TOKEN_PATTERN)) {
     const token = match[0];
     if (token[0] === '"') {
       result.push(unescapeQuoted(token));
