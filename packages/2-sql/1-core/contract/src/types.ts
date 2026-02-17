@@ -123,6 +123,11 @@ export type ForeignKeysConfig = {
   readonly indexes: boolean;
 };
 
+export const DEFAULT_FOREIGN_KEYS_CONFIG: ForeignKeysConfig = {
+  constraints: true,
+  indexes: true,
+};
+
 export type SqlContract<
   S extends SqlStorage = SqlStorage,
   M extends Record<string, unknown> = Record<string, unknown>,

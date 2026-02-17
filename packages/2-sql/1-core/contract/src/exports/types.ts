@@ -17,3 +17,5 @@ export type {
   StorageTypeInstance,
   UniqueConstraint,
 } from '../types';
+
+export { DEFAULT_FOREIGN_KEYS_CONFIG } from '../types';

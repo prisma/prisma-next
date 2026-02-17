@@ -20,14 +20,15 @@ import {
   type Mutable,
   TableBuilder,
 } from '@prisma-next/contract-authoring';
-import type {
-  ForeignKeysConfig,
-  ModelDefinition,
-  ModelField,
-  SqlContract,
-  SqlMappings,
-  SqlStorage,
-  StorageTypeInstance,
+import {
+  DEFAULT_FOREIGN_KEYS_CONFIG,
+  type ForeignKeysConfig,
+  type ModelDefinition,
+  type ModelField,
+  type SqlContract,
+  type SqlMappings,
+  type SqlStorage,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { computeMappings } from './contract';
@@ -416,10 +417,7 @@ class SqlContractBuilder<
       }
     }
 
-    const foreignKeys: ForeignKeysConfig = this.state.foreignKeys ?? {
-      constraints: true,
-      indexes: true,
-    };
+    const foreignKeys: ForeignKeysConfig = this.state.foreignKeys ?? DEFAULT_FOREIGN_KEYS_CONFIG;
 
     // Construct contract with explicit type that matches the generic parameters
     // This ensures TypeScript infers literal types from the generics, not runtime values

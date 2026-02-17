@@ -1,19 +1,20 @@
-import type {
-  ForeignKey,
-  ForeignKeyReferences,
-  ForeignKeysConfig,
-  Index,
-  ModelDefinition,
-  ModelField,
-  ModelStorage,
-  PrimaryKey,
-  SqlContract,
-  SqlMappings,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-  StorageTypeInstance,
-  UniqueConstraint,
+import {
+  DEFAULT_FOREIGN_KEYS_CONFIG,
+  type ForeignKey,
+  type ForeignKeyReferences,
+  type ForeignKeysConfig,
+  type Index,
+  type ModelDefinition,
+  type ModelField,
+  type ModelStorage,
+  type PrimaryKey,
+  type SqlContract,
+  type SqlMappings,
+  type SqlStorage,
+  type StorageColumn,
+  type StorageTable,
+  type StorageTypeInstance,
+  type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import { ColumnDefaultSchema } from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
@@ -548,7 +549,7 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
   // Normalize foreignKeys config: default to { constraints: true, indexes: true }
   let normalizedForeignKeys = contractObj['foreignKeys'];
   if (normalizedForeignKeys === undefined) {
-    normalizedForeignKeys = { constraints: true, indexes: true };
+    normalizedForeignKeys = DEFAULT_FOREIGN_KEYS_CONFIG;
   }
 
   // Normalize top-level fields: add empty objects if missing

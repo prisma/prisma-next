@@ -14,7 +14,12 @@ import type {
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import type { ForeignKeysConfig, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  DEFAULT_FOREIGN_KEYS_CONFIG,
+  type ForeignKeysConfig,
+  type SqlContract,
+  type SqlStorage,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
@@ -106,8 +111,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   } = options;
   const startTime = Date.now();
 
-  const fkConfig = foreignKeysConfig ??
-    contract.foreignKeys ?? { constraints: true, indexes: true };
+  const fkConfig = foreignKeysConfig ?? contract.foreignKeys ?? DEFAULT_FOREIGN_KEYS_CONFIG;
 
   // Extract codec control hooks once at entry point for reuse
   const codecHooks = extractCodecControlHooks(options.frameworkComponents);

@@ -26,12 +26,13 @@ import {
   isUniqueConstraintSatisfied,
   verifySqlSchema,
 } from '@prisma-next/family-sql/schema-verify';
-import type {
-  ForeignKey,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
+import {
+  DEFAULT_FOREIGN_KEYS_CONFIG,
+  type ForeignKey,
+  type SqlContract,
+  type SqlStorage,
+  type StorageColumn,
+  type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -110,7 +111,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       return plannerFailure(storageTypePlan.conflicts);
     }
 
-    const fkConfig = options.contract.foreignKeys ?? { constraints: true, indexes: true };
+    const fkConfig = options.contract.foreignKeys ?? DEFAULT_FOREIGN_KEYS_CONFIG;
     const fkColumnSets =
       fkConfig.indexes === false
         ? this.collectForeignKeyColumnSets(options.contract.storage.tables)
@@ -638,7 +639,7 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
         kind: 'conflict';
         conflicts: SqlPlannerConflict[];
       } {
-    const fkConfig = options.contract.foreignKeys ?? { constraints: true, indexes: true };
+    const fkConfig = options.contract.foreignKeys ?? DEFAULT_FOREIGN_KEYS_CONFIG;
     const verifyOptions: VerifySqlSchemaOptionsWithComponents = {
       contract: options.contract,
       schema: options.schema,
