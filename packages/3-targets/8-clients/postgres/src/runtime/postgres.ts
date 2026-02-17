@@ -142,7 +142,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
   const sql = sqlBuilder({ context });
   const orm = ormBuilder({ context });
 
-  let runtimeInstance: Runtime | undefined;
+  let runtimePromise: Promise<Runtime> | undefined;
 
   return {
     sql,
@@ -151,29 +151,35 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     context,
     stack,
     async runtime() {
-      if (runtimeInstance) {
-        return runtimeInstance;
+      if (runtimePromise) {
+        return runtimePromise;
       }
 
-      const stackInstance = instantiateExecutionStack(stack);
-      const driver = stackInstance.driver;
-      if (driver === undefined) {
-        throw new Error('Relational runtime requires a driver descriptor on the execution stack');
-      }
+      runtimePromise = (async () => {
+        const stackInstance = instantiateExecutionStack(stack);
+        const driver = stackInstance.driver;
+        if (driver === undefined) {
+          throw new Error('Relational runtime requires a driver descriptor on the execution stack');
+        }
 
-      // `binding` is normalized by resolvePostgresBinding(), so this call site remains
-      // type-safe in practice while SqlRuntimeDriverInstance currently uses SqlDriver<unknown>.
-      await driver.connect(binding);
+        // `binding` is normalized by resolvePostgresBinding(), so this call site remains
+        // type-safe in practice while SqlRuntimeDriverInstance currently uses SqlDriver<unknown>.
+        await driver.connect(binding);
 
-      runtimeInstance = createRuntime({
-        stackInstance,
-        context,
-        driver,
-        verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-        ...(options.plugins ? { plugins: options.plugins } : {}),
+        return createRuntime({
+          stackInstance,
+          context,
+          driver,
+          verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
+          ...(options.plugins ? { plugins: options.plugins } : {}),
+        });
+      })();
+
+      runtimePromise.catch(() => {
+        runtimePromise = undefined;
       });
 
-      return runtimeInstance;
+      return runtimePromise;
     },
   };
 }

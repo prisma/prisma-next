@@ -149,6 +149,50 @@ describe('postgres', () => {
     expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
   });
 
+  it('shares runtime initialization across concurrent callers', async () => {
+    let resolveConnect: (() => void) | undefined;
+    mocks.driverConnect.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveConnect = resolve;
+        }),
+    );
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const first = db.runtime();
+    const second = db.runtime();
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(0);
+
+    resolveConnect?.();
+
+    const [firstRuntime, secondRuntime] = await Promise.all([first, second]);
+    expect(firstRuntime).toBe(secondRuntime);
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries runtime initialization after connect failure', async () => {
+    mocks.driverConnect.mockRejectedValueOnce(new Error('connect failed'));
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    await expect(db.runtime()).rejects.toThrow('connect failed');
+    await expect(db.runtime()).resolves.toEqual({ id: 'runtime-instance' });
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(2);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(2);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+  });
+
   it('throws for multiple binding inputs during client construction', () => {
     expect(() =>
       postgres({
