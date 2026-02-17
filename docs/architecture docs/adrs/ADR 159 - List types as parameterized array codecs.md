@@ -175,11 +175,14 @@ Each target owns its codec implementation. The contract IR pattern is shared; th
 ```ts
 import { int4Column, textColumn, listOf } from '@prisma-next/adapter-postgres/column-types';
 
-const post = {
-  id: int4Column,
-  tags: listOf(textColumn),
-  scores: { ...listOf(int4Column), nullable: true },
-};
+// Using defineContract builder:
+.table('post', (t) =>
+  t
+    .column('id', { type: int4Column })
+    .column('tags', { type: listOf(textColumn) })
+    .column('scores', { type: listOf(int4Column), nullable: true })
+    .primaryKey(['id']),
+)
 ```
 
 ### Flow
