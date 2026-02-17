@@ -298,7 +298,7 @@ describe('DML Integration Tests', () => {
 
       const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [1]);
       expect(selectResult.rows[0].email).toBe('updated2@example.com');
-    });
+    }, timeouts.databaseOperation);
   });
 
   describe('delete', () => {
