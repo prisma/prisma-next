@@ -12,18 +12,17 @@ The `@prisma-next/cli` package exports several subpaths:
 
 - **`@prisma-next/cli`** (main export): Exports `loadContractFromTs` and `createContractEmitCommand`
 - **`@prisma-next/cli/config-types`**: Exports `defineConfig` and config types
-- **`@prisma-next/cli/pack-loading`**: Exports `loadExtensionPacks` and `loadExtensionPackManifest`
 - **`@prisma-next/cli/commands/*`**: Exports command factory functions (e.g., `createDbIntrospectCommand`, `createDbVerifyCommand`)
 - **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function
+- **`@prisma-next/cli/control-api`**: Exports control-plane API surface used by tooling
 
 ## Import Patterns
 
 **✅ CORRECT: Import from correct subpath**
 
 ```typescript
-// loadContractFromTs is exported from main package, not pack-loading
+// loadContractFromTs is exported from the main package
 import { loadContractFromTs } from '@prisma-next/cli';
-import { loadExtensionPacks } from '@prisma-next/cli/pack-loading';
 
 // Commands are exported from their specific subpaths
 import { createDbIntrospectCommand } from '@prisma-next/cli/commands/db-introspect';
@@ -36,9 +35,6 @@ import { loadConfig } from '@prisma-next/cli/config-loader';
 **❌ WRONG: Importing from wrong subpath**
 
 ```typescript
-// ❌ WRONG: loadContractFromTs is not exported from pack-loading
-import { loadContractFromTs } from '@prisma-next/cli/pack-loading';
-
 // ❌ WRONG: Commands are not exported from main package
 import { createDbIntrospectCommand } from '@prisma-next/cli';
 ```
@@ -68,8 +64,8 @@ export default defineConfig({
 {
   "exports": {
     "./commands/new-command": {
-      "types": "./dist/commands/new-command.d.ts",
-      "import": "./dist/commands/new-command.js"
+      "types": "./dist/commands/new-command.d.mts",
+      "import": "./dist/commands/new-command.mjs"
     }
   }
 }
