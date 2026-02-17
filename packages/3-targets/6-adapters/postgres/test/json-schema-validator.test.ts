@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  compileJsonSchemaValidator,
-  formatValidationErrors,
-} from '../src/core/json-schema-validator';
+import { compileJsonSchemaValidator } from '../src/core/json-schema-validator';
 
 describe('json-schema-validator', () => {
   describe('compileJsonSchemaValidator', () => {
@@ -125,7 +122,7 @@ describe('json-schema-validator', () => {
       expect(result.valid).toBe(false);
     });
 
-    it('collects all errors with allErrors mode', () => {
+    it('returns first error in fail-fast mode', () => {
       const validate = compileJsonSchemaValidator({
         type: 'object',
         properties: {
@@ -138,7 +135,8 @@ describe('json-schema-validator', () => {
       const result = validate({});
       expect(result.valid).toBe(false);
       if (!result.valid) {
-        expect(result.errors.length).toBe(2);
+        // allErrors: false → only the first error is reported
+        expect(result.errors.length).toBe(1);
       }
     });
 
@@ -149,34 +147,6 @@ describe('json-schema-validator', () => {
       expect(validate('string')).toEqual({ valid: true });
       expect(validate(42)).toEqual({ valid: true });
       expect(validate(null)).toEqual({ valid: true });
-    });
-  });
-
-  describe('formatValidationErrors', () => {
-    it('formats a single root-level error', () => {
-      const result = formatValidationErrors([
-        { path: '/', message: 'must be object', keyword: 'type' },
-      ]);
-      expect(result).toBe('must be object');
-    });
-
-    it('formats a single nested error', () => {
-      const result = formatValidationErrors([
-        { path: '/name', message: 'must be string', keyword: 'type' },
-      ]);
-      expect(result).toBe('/name: must be string');
-    });
-
-    it('formats multiple errors', () => {
-      const result = formatValidationErrors([
-        { path: '/', message: "must have required property 'name'", keyword: 'required' },
-        { path: '/age', message: 'must be number', keyword: 'type' },
-      ]);
-      expect(result).toBe("must have required property 'name'; /age: must be number");
-    });
-
-    it('returns fallback for empty errors', () => {
-      expect(formatValidationErrors([])).toBe('unknown validation error');
     });
   });
 });

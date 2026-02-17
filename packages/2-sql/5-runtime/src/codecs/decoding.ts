@@ -29,27 +29,21 @@ function resolveRowCodec(
   return null;
 }
 
+type ColumnRefIndex = Map<string, { table: string; column: string }>;
+
 /**
- * Resolves the column reference for a projection alias.
- * Uses plan.meta.refs.columns to find the { table, column } for a given alias.
- *
- * Aliases in SQL query plans typically match the column name directly.
+ * Builds a lookup index from column name → { table, column } ref.
+ * Called once per decodeRow invocation to avoid O(aliases × refs) linear scans.
  */
-function resolveColumnRef(
-  alias: string,
-  plan: ExecutionPlan,
-): { table: string; column: string } | null {
+function buildColumnRefIndex(plan: ExecutionPlan): ColumnRefIndex | null {
   const columns = plan.meta.refs?.columns;
   if (!columns) return null;
 
-  // Match alias to column name in refs
+  const index: ColumnRefIndex = new Map();
   for (const ref of columns) {
-    if (ref.column === alias) {
-      return ref;
-    }
+    index.set(ref.column, ref);
   }
-
-  return null;
+  return index;
 }
 
 export function decodeRow(
@@ -59,6 +53,9 @@ export function decodeRow(
   jsonValidators?: JsonSchemaValidatorRegistry,
 ): Record<string, unknown> {
   const decoded: Record<string, unknown> = {};
+
+  // Build column ref index once for O(1) lookups during JSON schema validation
+  const columnRefIndex = jsonValidators ? buildColumnRefIndex(plan) : null;
 
   let aliases: readonly string[];
   const projection = plan.meta.projection;
@@ -140,8 +137,8 @@ export function decodeRow(
       const decodedValue = codec.decode(wireValue);
 
       // Validate decoded JSON value against schema
-      if (jsonValidators) {
-        const ref = resolveColumnRef(alias, plan);
+      if (jsonValidators && columnRefIndex) {
+        const ref = columnRefIndex.get(alias);
         if (ref) {
           validateJsonValue(
             jsonValidators,

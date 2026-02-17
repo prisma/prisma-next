@@ -1,6 +1,7 @@
 import type { ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   JsonSchemaValidateFn,
@@ -18,12 +19,11 @@ import type {
 import { createStubAdapter, createTestContext } from './utils';
 
 // =============================================================================
-// Stub JSON Schema validator (no Ajv dependency in sql-runtime tests)
+// Shared test helpers
 // =============================================================================
 
 function createStubValidator(schema: Record<string, unknown>): JsonSchemaValidateFn {
   return (value: unknown) => {
-    // Simple validator: check required properties and top-level types
     if (schema['type'] === 'object' && typeof value === 'object' && value !== null) {
       const required = (schema['required'] ?? []) as string[];
       const obj = value as Record<string, unknown>;
@@ -53,9 +53,46 @@ function createStubValidator(schema: Record<string, unknown>): JsonSchemaValidat
   };
 }
 
-// =============================================================================
-// Test helpers
-// =============================================================================
+const metadataSchema: Record<string, unknown> = {
+  type: 'object',
+  properties: { name: { type: 'string' } },
+  required: ['name'],
+};
+
+function createMetadataValidatorRegistry(): JsonSchemaValidatorRegistry {
+  const validators = new Map<string, JsonSchemaValidateFn>();
+  validators.set('user.metadata', createStubValidator(metadataSchema));
+  return { get: (key) => validators.get(key), size: validators.size };
+}
+
+function createTestCodecRegistry(): CodecRegistry {
+  const registry = createCodecRegistry();
+  registry.register(
+    codec({
+      typeId: 'pg/jsonb@1',
+      targetTypes: ['jsonb'],
+      encode: (v: unknown) => JSON.stringify(v),
+      decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w),
+    }),
+  );
+  registry.register(
+    codec({
+      typeId: 'pg/json@1',
+      targetTypes: ['json'],
+      encode: (v: unknown) => JSON.stringify(v),
+      decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w),
+    }),
+  );
+  registry.register(
+    codec({
+      typeId: 'pg/int4@1',
+      targetTypes: ['int4'],
+      encode: (v: number) => v,
+      decode: (w: number) => w,
+    }),
+  );
+  return registry;
+}
 
 function createJsonSchemaContract(
   options?: Partial<{
@@ -88,13 +125,7 @@ function createJsonSchemaContract(
               nativeType: 'jsonb',
               codecId: 'pg/jsonb@1',
               nullable: true,
-              typeParams: {
-                schema: {
-                  type: 'object',
-                  properties: { name: { type: 'string' } },
-                  required: ['name'],
-                },
-              },
+              typeParams: { schema: metadataSchema },
             },
           },
           primaryKey: { columns: ['id'] },
@@ -167,10 +198,7 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     operationSignatures: () => [],
     parameterizedCodecs: () => parameterizedCodecs,
     create() {
-      return {
-        familyId: 'sql' as const,
-        targetId: 'postgres' as const,
-      };
+      return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
   };
 }
@@ -253,7 +281,6 @@ describe('JSON Schema validator registry', () => {
     });
 
     it('omits validator registry when no init hooks are defined', () => {
-      // Extension with no init hooks
       const registry = createCodecRegistry();
       registry.register(
         codec({
@@ -293,28 +320,7 @@ describe('JSON Schema validator registry', () => {
 // =============================================================================
 
 describe('JSON Schema encoding validation', () => {
-  function createValidatorRegistry(): JsonSchemaValidatorRegistry {
-    const validators = new Map<string, JsonSchemaValidateFn>();
-    validators.set(
-      'user.metadata',
-      createStubValidator({
-        type: 'object',
-        properties: { name: { type: 'string' } },
-        required: ['name'],
-      }),
-    );
-    return { get: (key) => validators.get(key), size: validators.size };
-  }
-
-  const codecRegistry = createCodecRegistry();
-  codecRegistry.register(
-    codec({
-      typeId: 'pg/jsonb@1',
-      targetTypes: ['jsonb'],
-      encode: (v: unknown) => JSON.stringify(v),
-      decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w),
-    }),
-  );
+  const codecRegistry = createTestCodecRegistry();
 
   it('passes valid JSON values', () => {
     const plan = createTestPlan({
@@ -334,7 +340,7 @@ describe('JSON Schema encoding validation', () => {
       },
     });
 
-    const result = encodeParams(plan, codecRegistry, createValidatorRegistry());
+    const result = encodeParams(plan, codecRegistry, createMetadataValidatorRegistry());
     expect(result[0]).toBe('{"name":"Alice"}');
   });
 
@@ -357,7 +363,7 @@ describe('JSON Schema encoding validation', () => {
     });
 
     expect(() =>
-      encodeParam({ age: 30 }, descriptor, plan, codecRegistry, createValidatorRegistry()),
+      encodeParam({ age: 30 }, descriptor, plan, codecRegistry, createMetadataValidatorRegistry()),
     ).toThrow(
       expect.objectContaining({
         code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
@@ -390,13 +396,12 @@ describe('JSON Schema encoding validation', () => {
       },
     });
 
-    // No refs → no validation → no throw
     const result = encodeParam(
       { invalid: true },
       descriptor,
       plan,
       codecRegistry,
-      createValidatorRegistry(),
+      createMetadataValidatorRegistry(),
     );
     expect(result).toBe('{"invalid":true}');
   });
@@ -410,7 +415,13 @@ describe('JSON Schema encoding validation', () => {
     };
 
     const plan = createTestPlan();
-    const result = encodeParam(null, descriptor, plan, codecRegistry, createValidatorRegistry());
+    const result = encodeParam(
+      null,
+      descriptor,
+      plan,
+      codecRegistry,
+      createMetadataValidatorRegistry(),
+    );
     expect(result).toBeNull();
   });
 
@@ -423,7 +434,6 @@ describe('JSON Schema encoding validation', () => {
     };
 
     const plan = createTestPlan();
-    // No validator → should just encode normally
     const result = encodeParam({ age: 30 }, descriptor, plan, codecRegistry);
     expect(result).toBe('{"age":30}');
   });
@@ -434,36 +444,7 @@ describe('JSON Schema encoding validation', () => {
 // =============================================================================
 
 describe('JSON Schema decoding validation', () => {
-  function createValidatorRegistry(): JsonSchemaValidatorRegistry {
-    const validators = new Map<string, JsonSchemaValidateFn>();
-    validators.set(
-      'user.metadata',
-      createStubValidator({
-        type: 'object',
-        properties: { name: { type: 'string' } },
-        required: ['name'],
-      }),
-    );
-    return { get: (key) => validators.get(key), size: validators.size };
-  }
-
-  const codecRegistry = createCodecRegistry();
-  codecRegistry.register(
-    codec({
-      typeId: 'pg/jsonb@1',
-      targetTypes: ['jsonb'],
-      encode: (v: unknown) => JSON.stringify(v),
-      decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w),
-    }),
-  );
-  codecRegistry.register(
-    codec({
-      typeId: 'pg/int4@1',
-      targetTypes: ['int4'],
-      encode: (v: number) => v,
-      decode: (w: number) => w,
-    }),
-  );
+  const codecRegistry = createTestCodecRegistry();
 
   it('passes valid decoded JSON values', () => {
     const plan = createTestPlan({
@@ -473,14 +454,12 @@ describe('JSON Schema decoding validation', () => {
         lane: 'dsl',
         paramDescriptors: [],
         projectionTypes: { metadata: 'pg/jsonb@1' },
-        refs: {
-          columns: [{ table: 'user', column: 'metadata' }],
-        },
+        refs: { columns: [{ table: 'user', column: 'metadata' }] },
       },
     });
 
     const row = { metadata: '{"name":"Alice"}' };
-    const result = decodeRow(row, plan, codecRegistry, createValidatorRegistry());
+    const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
     expect(result['metadata']).toEqual({ name: 'Alice' });
   });
 
@@ -492,14 +471,12 @@ describe('JSON Schema decoding validation', () => {
         lane: 'dsl',
         paramDescriptors: [],
         projectionTypes: { metadata: 'pg/jsonb@1' },
-        refs: {
-          columns: [{ table: 'user', column: 'metadata' }],
-        },
+        refs: { columns: [{ table: 'user', column: 'metadata' }] },
       },
     });
 
     const row = { metadata: '{"age":30}' };
-    expect(() => decodeRow(row, plan, codecRegistry, createValidatorRegistry())).toThrow(
+    expect(() => decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry())).toThrow(
       expect.objectContaining({
         code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
         category: 'RUNTIME',
@@ -522,13 +499,11 @@ describe('JSON Schema decoding validation', () => {
         lane: 'dsl',
         paramDescriptors: [],
         projectionTypes: { data: 'pg/jsonb@1' },
-        // No refs → cannot resolve column
       },
     });
 
     const row = { data: '{"bad":"data"}' };
-    // No refs → skip validation → should succeed
-    const result = decodeRow(row, plan, codecRegistry, createValidatorRegistry());
+    const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
     expect(result['data']).toEqual({ bad: 'data' });
   });
 
@@ -540,14 +515,12 @@ describe('JSON Schema decoding validation', () => {
         lane: 'dsl',
         paramDescriptors: [],
         projectionTypes: { metadata: 'pg/jsonb@1' },
-        refs: {
-          columns: [{ table: 'user', column: 'metadata' }],
-        },
+        refs: { columns: [{ table: 'user', column: 'metadata' }] },
       },
     });
 
     const row = { metadata: null };
-    const result = decodeRow(row, plan, codecRegistry, createValidatorRegistry());
+    const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
     expect(result['metadata']).toBeNull();
   });
 
@@ -559,14 +532,11 @@ describe('JSON Schema decoding validation', () => {
         lane: 'dsl',
         paramDescriptors: [],
         projectionTypes: { metadata: 'pg/jsonb@1' },
-        refs: {
-          columns: [{ table: 'user', column: 'metadata' }],
-        },
+        refs: { columns: [{ table: 'user', column: 'metadata' }] },
       },
     });
 
     const row = { metadata: '{"bad":"data"}' };
-    // No validator registry → no validation → should succeed
     const result = decodeRow(row, plan, codecRegistry);
     expect(result['metadata']).toEqual({ bad: 'data' });
   });
@@ -589,7 +559,7 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { id: 42, metadata: '{"name":"Alice"}' };
-    const result = decodeRow(row, plan, codecRegistry, createValidatorRegistry());
+    const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
     expect(result['id']).toBe(42);
     expect(result['metadata']).toEqual({ name: 'Alice' });
   });

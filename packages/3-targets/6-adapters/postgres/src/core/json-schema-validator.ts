@@ -1,25 +1,24 @@
+import type {
+  JsonSchemaValidateFn,
+  JsonSchemaValidationError,
+  JsonSchemaValidationResult,
+} from '@prisma-next/sql-relational-core/query-lane-context';
 import Ajv from 'ajv';
 
+export type { JsonSchemaValidateFn, JsonSchemaValidationError, JsonSchemaValidationResult };
+
 /**
- * A single validation error from JSON Schema validation.
+ * Shared Ajv instance for all JSON Schema validators.
+ * Reusing a single instance avoids ~50-100KB memory overhead per compiled schema.
  */
-export interface JsonSchemaValidationError {
-  readonly path: string;
-  readonly message: string;
-  readonly keyword: string;
+let sharedAjv: Ajv | undefined;
+
+function getSharedAjv(): Ajv {
+  if (!sharedAjv) {
+    sharedAjv = new Ajv({ allErrors: false, strict: false });
+  }
+  return sharedAjv;
 }
-
-/**
- * Result of a JSON Schema validation.
- */
-export type JsonSchemaValidationResult =
-  | { readonly valid: true }
-  | { readonly valid: false; readonly errors: ReadonlyArray<JsonSchemaValidationError> };
-
-/**
- * A compiled JSON Schema validate function.
- */
-export type JsonSchemaValidateFn = (value: unknown) => JsonSchemaValidationResult;
 
 /**
  * Compiles a JSON Schema object into a reusable validate function using Ajv.
@@ -27,11 +26,14 @@ export type JsonSchemaValidateFn = (value: unknown) => JsonSchemaValidationResul
  * The returned function validates a value against the schema and returns
  * a structured result with error details on failure.
  *
+ * Uses a shared Ajv instance and fail-fast mode (`allErrors: false`)
+ * to minimize memory and CPU overhead.
+ *
  * @param schema - A JSON Schema object (draft-07 compatible)
  * @returns A validate function
  */
 export function compileJsonSchemaValidator(schema: Record<string, unknown>): JsonSchemaValidateFn {
-  const ajv = new Ajv({ allErrors: true, strict: false });
+  const ajv = getSharedAjv();
   const validate = ajv.compile(schema);
 
   return (value: unknown): JsonSchemaValidationResult => {
@@ -48,18 +50,4 @@ export function compileJsonSchemaValidator(schema: Record<string, unknown>): Jso
 
     return { valid: false, errors };
   };
-}
-
-/**
- * Formats validation errors into a human-readable summary string.
- */
-export function formatValidationErrors(errors: ReadonlyArray<JsonSchemaValidationError>): string {
-  if (errors.length === 0) return 'unknown validation error';
-  if (errors.length === 1) {
-    const err = errors[0] as JsonSchemaValidationError;
-    return err.path === '/' ? err.message : `${err.path}: ${err.message}`;
-  }
-  return errors
-    .map((err) => (err.path === '/' ? err.message : `${err.path}: ${err.message}`))
-    .join('; ');
 }
