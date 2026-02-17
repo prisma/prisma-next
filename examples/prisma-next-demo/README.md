@@ -23,9 +23,9 @@ This demo includes two runtime implementations demonstrating different approache
 
 ### 1. Emit Workflow (Default)
 
-Uses emitted `contract.json` and `contract.d.ts` files:
+Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-liner client:
 
-- **Files**: `src/prisma/runtime.ts`, `src/prisma/query.ts`, `src/main.ts`
+- **Files**: `src/prisma/db.ts`, `src/main.ts`
 - **Contract source**: `src/prisma/contract.json` (emitted from `prisma/contract.ts`)
 - **Usage**: `pnpm start -- [command]`
 - **Benefits**:
@@ -46,7 +46,7 @@ pnpm start -- users
 
 Uses contract directly from TypeScript:
 
-- **Files**: `src/prisma/runtime-no-emit.ts`, `src/prisma/query-no-emit.ts`, `src/main-no-emit.ts`
+- **Files**: `src/prisma-no-emit/runtime-no-emit.ts`, `src/prisma-no-emit/context-no-emit.ts`, `src/main-no-emit.ts`
 - **Contract source**: `prisma/contract.ts` (direct import)
 - **Usage**: `pnpm start:no-emit -- [command]`
 - **Benefits**:
@@ -64,14 +64,13 @@ pnpm start:no-emit -- users
 
 ```mermaid
 flowchart LR
-  Contract[Contract] --> Stack[ExecutionStack]
-  Stack --> StackI[ExecutionStackInstance]
-  StackI --> Context[ExecutionContext]
-  Context --> QueryRoots[Query Roots]
-  AppConfig[App Config] --> Runtime[Runtime]
-  StackI --> Runtime
-  Context --> Runtime
+  Contract[Contract artifacts] --> Db[postgres(...)]
+  Db --> Static[Static roots]
+  Db --> Lazy[runtime()]
+  Lazy --> Runtime[Runtime]
 ```
+
+Contract artifacts are `contract.json` and `contract.d.ts`. Static roots are `sql`, `schema`, `orm`, `context`, and `stack`.
 
 ## Related Docs
 
@@ -109,10 +108,9 @@ flowchart LR
 - `prisma/contract.ts` - Contract definition (source of truth)
 - `src/prisma/contract.json` - Emitted contract (emit workflow only)
 - `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
-- `src/prisma/context.ts` - Env-free execution stack/context + query roots (emit workflow)
-- `src/prisma-no-emit/context.ts` - Env-free execution stack/context + query roots (no-emit workflow)
-- `src/prisma/runtime.ts` - Runtime factory (emit workflow)
-- `src/prisma-no-emit/runtime.ts` - Runtime factory (no-emit workflow)
+- `src/prisma/db.ts` - One-liner Postgres client + query roots (emit workflow)
+- `src/prisma-no-emit/context-no-emit.ts` - Env-free execution stack/context + query roots (no-emit workflow)
+- `src/prisma-no-emit/runtime-no-emit.ts` - Runtime factory (no-emit workflow)
 - `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
 - `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
 - `scripts/stamp-marker.ts` - Contract marker management

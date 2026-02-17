@@ -7,7 +7,7 @@ import type { ControlExtensionDescriptor } from '@prisma-next/core-control-plane
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { type SqlControlFamilyInstance } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { beforeAll } from 'vitest';

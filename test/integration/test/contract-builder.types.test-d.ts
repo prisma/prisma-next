@@ -1,9 +1,11 @@
+import type { JsonValue } from '@prisma-next/adapter-postgres/codec-types';
 import {
   int4Column,
+  jsonb,
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { sql } from '@prisma-next/sql-lane/sql';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -11,6 +13,7 @@ import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { type as arktype } from 'arktype';
 import { expectTypeOf, test } from 'vitest';
 import type { CodecTypes, Contract } from './fixtures/contract.d';
 import contractJson from './fixtures/contract.json' with { type: 'json' };
@@ -164,4 +167,82 @@ test('contract structure type matches SqlContract', () => {
   expectTypeOf(contract).toHaveProperty('models');
   expectTypeOf(contract).toHaveProperty('storage');
   expectTypeOf(contract).toHaveProperty('mappings');
+});
+
+test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
+  const payloadSchema = arktype({
+    action: 'string',
+    actorId: 'number',
+  });
+
+  const contract = defineContract<CodecTypes>()
+    .target(postgresPack)
+    .table('event', (t) =>
+      t
+        .column('id', { type: int4Column, nullable: false })
+        .column('payload', { type: jsonb(payloadSchema), nullable: false })
+        .column('meta', { type: jsonb(), nullable: false })
+        .primaryKey(['id']),
+    )
+    .model('Event', 'event', (m) =>
+      m.field('id', 'id').field('payload', 'payload').field('meta', 'meta'),
+    )
+    .build();
+
+  const validated = validateContract<typeof contract>(contract);
+  const context = createTestContext(validated, createStubAdapter());
+  const table = schema(context).tables['event'];
+  if (!table) throw new Error('event table not found');
+
+  const _plan = sql({ context })
+    .from(table)
+    .select({
+      payload: table.columns['payload']!,
+      meta: table.columns['meta']!,
+    })
+    .build();
+
+  type Row = ResultType<typeof _plan>;
+
+  expectTypeOf<Row['payload']>().toEqualTypeOf<unknown>();
+  expectTypeOf<Row['meta']>().toEqualTypeOf<unknown>();
+});
+
+type ResolveStandardSchemaOutput<P> = P extends { readonly schema: infer Schema }
+  ? Schema extends { readonly infer: infer Output }
+    ? Output
+    : Schema extends {
+          readonly '~standard': { readonly types?: { readonly output?: infer Output } };
+        }
+      ? Output extends undefined
+        ? JsonValue
+        : Output
+      : JsonValue
+  : JsonValue;
+
+test('ResolveStandardSchemaOutput resolves Arktype schema via .infer', () => {
+  const profileSchema = arktype({ displayName: 'string', active: 'boolean' });
+  type Resolved = ResolveStandardSchemaOutput<{ readonly schema: typeof profileSchema }>;
+
+  expectTypeOf<Resolved>().toEqualTypeOf<{ displayName: string; active: boolean }>();
+});
+
+test('ResolveStandardSchemaOutput resolves Standard Schema via ~standard.types.output', () => {
+  type BareStandardSchema = {
+    readonly '~standard': {
+      readonly types: {
+        readonly output: { rank: number; verified: boolean };
+      };
+    };
+  };
+
+  type Resolved = ResolveStandardSchemaOutput<{ readonly schema: BareStandardSchema }>;
+
+  expectTypeOf<Resolved>().toEqualTypeOf<{ rank: number; verified: boolean }>();
+});
+
+test('ResolveStandardSchemaOutput falls back to JsonValue without schema', () => {
+  type Resolved = ResolveStandardSchemaOutput<Record<never, never>>;
+
+  expectTypeOf<Resolved>().toEqualTypeOf<JsonValue>();
 });

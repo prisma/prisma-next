@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:ef6a470e5086b66b812a56c7505fe2a14d08d0a585a5090e47e578c3aea60d79",
+  "storageHash": "sha256:2757b7954c4cdf19fbd72a0db818c34b2e342ce63e756d546c8bd907d302b7f4",
   "executionHash": "sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589",
   "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
@@ -54,6 +54,9 @@
         "id": {
           "column": "id"
         },
+        "meta": {
+          "column": "meta"
+        },
         "title": {
           "column": "title"
         },
@@ -79,6 +82,9 @@
         },
         "id": {
           "column": "id"
+        },
+        "profile": {
+          "column": "profile"
         },
         "updatedAt": {
           "column": "update_at"
@@ -278,6 +284,34 @@
             "nativeType": "int4",
             "nullable": false
           },
+          "meta": {
+            "codecId": "pg/json@1",
+            "nativeType": "json",
+            "nullable": true,
+            "typeParams": {
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "properties": {
+                  "rank": {
+                    "type": "number"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "verified": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "rank",
+                  "source",
+                  "verified"
+                ],
+                "type": "object"
+              },
+              "type": "{ rank: number, source: string, verified: boolean }"
+            }
+          },
           "published": {
             "codecId": "pg/bool@1",
             "nativeType": "bool"
@@ -332,6 +366,37 @@
             "nativeType": "int4",
             "nullable": false
           },
+          "profile": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": true,
+            "typeParams": {
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "properties": {
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "active",
+                  "displayName",
+                  "tags"
+                ],
+                "type": "object"
+              },
+              "type": "{ active: boolean, displayName: string, tags: string[] }"
+            }
+          },
           "update_at": {
             "codecId": "pg/timestamptz@1",
             "nativeType": "timestamptz",
@@ -345,7 +410,13 @@
             "id"
           ]
         },
-        "uniques": []
+        "uniques": [
+          {
+            "columns": [
+              "email"
+            ]
+          }
+        ]
       }
     }
   },

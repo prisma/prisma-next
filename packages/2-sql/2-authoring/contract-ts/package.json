@@ -41,10 +41,6 @@
       "types": "./dist/exports/contract-builder.d.ts",
       "import": "./dist/exports/contract-builder.js"
     },
-    "./contract": {
-      "types": "./dist/exports/contract.d.ts",
-      "import": "./dist/exports/contract.js"
-    },
     "./schema-sql": "./schemas/data-contract-sql-v1.json"
   }
 }

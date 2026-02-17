@@ -1,23 +1,48 @@
 import type { Char } from '@prisma-next/adapter-postgres/codec-types';
 import { param } from '@prisma-next/sql-relational-core/param';
-import type { ResultType } from '@prisma-next/sql-relational-core/types';
+import type {
+  AnyExpressionSource,
+  AnyOrderBuilder,
+  ResultType,
+} from '@prisma-next/sql-relational-core/types';
 import { expectTypeOf, test } from 'vitest';
-import { sql, tables } from '../prisma/context';
+import { db } from '../prisma/db';
+
+type VectorDistanceExpression = AnyExpressionSource & {
+  asc(): AnyOrderBuilder;
+};
+
+type VectorOpsColumn = {
+  cosineDistance(arg: unknown): VectorDistanceExpression;
+};
+
+function hasVectorOpsColumn(value: unknown): value is VectorOpsColumn {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'cosineDistance' in value &&
+    typeof (value as { cosineDistance?: unknown }).cosineDistance === 'function'
+  );
+}
 
 /**
- * Type test to verify that ResultType correctly infers the distance column as number
- * when using cosineDistance operation.
+ * Type test to verify ResultType shape for similarity queries.
  */
-test('ResultType correctly infers number for cosineDistance operation result', () => {
-  const postTable = tables.post;
-  const queryParam = param('queryVector');
-  const distanceExpr = postTable.columns.embedding.cosineDistance(queryParam);
+test('ResultType exposes projected keys for similarity query result', () => {
+  const postTable = db.schema.tables.post;
+  if (!postTable) throw new Error('post table not found');
+  const postColumns = postTable.columns;
+  const embeddingColumn = postColumns.embedding;
+  if (!hasVectorOpsColumn(embeddingColumn)) {
+    throw new Error('embedding column does not expose vector operations');
+  }
+  const distanceExpr = embeddingColumn.cosineDistance(param('queryVector'));
 
-  const _plan = sql
+  const _plan = db.sql
     .from(postTable)
     .select({
-      id: postTable.columns.id,
-      title: postTable.columns.title,
+      id: postColumns.id,
+      title: postColumns.title,
       distance: distanceExpr,
     })
     .orderBy(distanceExpr.asc())
@@ -25,8 +50,6 @@ test('ResultType correctly infers number for cosineDistance operation result', (
     .build({ params: { queryVector: [1, 2, 3] } });
 
   type Row = ResultType<typeof _plan>;
-
-  // Verify that distance is correctly inferred as number
   expectTypeOf<Row['distance']>().toEqualTypeOf<number>();
   expectTypeOf<Row['id']>().toEqualTypeOf<Char<36>>();
   expectTypeOf<Row['title']>().toEqualTypeOf<string>();

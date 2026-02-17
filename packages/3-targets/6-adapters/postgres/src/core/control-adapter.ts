@@ -290,7 +290,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }
 
       // Process primary key
-      const pkRows = pksByTable.get(tableName) ?? [];
+      const pkRows = [...(pksByTable.get(tableName) ?? [])];
       const primaryKeyColumns = pkRows
         .sort((a, b) => a.ordinal_position - b.ordinal_position)
         .map((row) => row.column_name);
@@ -508,6 +508,11 @@ function normalizeFormattedType(formattedType: string, dataType: string, udtName
   }
   if (dataType === 'time without time zone' || udtName === 'time') {
     return formattedType.replace(' without time zone', '').trim();
+  }
+  // Only dataType === 'USER-DEFINED' should ever be quoted, but this should be safe without
+  // checking that explicitly either way
+  if (formattedType.startsWith('"') && formattedType.endsWith('"')) {
+    return formattedType.slice(1, -1);
   }
   return formattedType;
 }

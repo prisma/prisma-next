@@ -12,6 +12,8 @@ import {
   PG_INT4_CODEC_ID,
   PG_INT8_CODEC_ID,
   PG_INTERVAL_CODEC_ID,
+  PG_JSON_CODEC_ID,
+  PG_JSONB_CODEC_ID,
   PG_NUMERIC_CODEC_ID,
   PG_TEXT_CODEC_ID,
   PG_TIME_CODEC_ID,
@@ -26,6 +28,7 @@ import {
   SQL_VARCHAR_CODEC_ID,
 } from './codec-ids';
 import { pgEnumControlHooks } from './enum-control-hooks';
+import { renderTypeScriptTypeFromJsonSchema } from './json-schema-type-expression';
 import { expandParameterizedNativeType } from './parameterized-types';
 
 // ============================================================================
@@ -54,6 +57,34 @@ const precisionRenderer = (typeName: string) =>
 const parameterizedTypeHooks: CodecControlHooks = {
   expandNativeType: expandParameterizedNativeType,
 };
+
+/**
+ * Validates that a type expression string is safe to embed in generated .d.ts files.
+ * Rejects expressions containing patterns that could inject executable code.
+ */
+function isSafeTypeExpression(expr: string): boolean {
+  return !/import\s*\(|require\s*\(|declare\s|export\s|eval\s*\(/.test(expr);
+}
+
+function renderJsonTypeExpression(params: Record<string, unknown>): string {
+  const typeName = params['type'];
+  if (typeof typeName === 'string' && typeName.trim().length > 0) {
+    const trimmed = typeName.trim();
+    if (!isSafeTypeExpression(trimmed)) {
+      return 'JsonValue';
+    }
+    return trimmed;
+  }
+  const schema = params['schema'];
+  if (schema && typeof schema === 'object') {
+    const rendered = renderTypeScriptTypeFromJsonSchema(schema);
+    if (!isSafeTypeExpression(rendered)) {
+      return 'JsonValue';
+    }
+    return rendered;
+  }
+  return 'JsonValue';
+}
 
 // ============================================================================
 // Descriptor metadata
@@ -119,8 +150,21 @@ export const postgresAdapterDescriptorMeta = {
             return values.map((value) => `'${String(value).replace(/'/g, "\\'")}'`).join(' | ');
           },
         },
+        [PG_JSON_CODEC_ID]: {
+          kind: 'function',
+          render: renderJsonTypeExpression,
+        },
+        [PG_JSONB_CODEC_ID]: {
+          kind: 'function',
+          render: renderJsonTypeExpression,
+        },
       },
       typeImports: [
+        {
+          package: '@prisma-next/adapter-postgres/codec-types',
+          named: 'JsonValue',
+          alias: 'JsonValue',
+        },
         codecTypeImport('Char'),
         codecTypeImport('Varchar'),
         codecTypeImport('Numeric'),
@@ -202,6 +246,8 @@ export const postgresAdapterDescriptorMeta = {
         targetId: 'postgres',
         nativeType: 'interval',
       },
+      { typeId: PG_JSON_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'json' },
+      { typeId: PG_JSONB_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'jsonb' },
     ],
   },
 } as const;

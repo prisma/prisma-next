@@ -29,7 +29,7 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 
 ## Golden Rules
 
-- **Always use the Node.js version in `.nvmrc`** (currently v24) — run `nvm use` before any commands
+- **Node.js version**: Use the shell's Node. Do not run nvm/fnm or any version switcher. Source of truth is root `package.json` `engines.node`. If the shell's version is wrong or commands fail, report that the shell is misconfigured and the user should configure their environment to satisfy `engines.node`.
 - Use pnpm and local scripts (not ad‑hoc `tsc`, `jest`): `.cursor/rules/use-correct-tools.mdc`
 - Don't branch on target; use adapters: `.cursor/rules/no-target-branches.mdc`
 - Keep tests concise; omit "should": `.cursor/rules/omit-should-in-tests.mdc`
@@ -79,23 +79,17 @@ See `architecture.config.json` for the complete mapping and `pnpm lint:deps` to 
 ### Query Pattern
 
 ```typescript
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
-import { schema } from '@prisma-next/sql-relational-core/schema';
-import { sql } from '@prisma-next/sql-lane/sql';
-import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import postgres from '@prisma-next/postgres/runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-const contract = validateContract<Contract>(contractJson);
-const stack = createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter, extensionPacks: [] });
-const stackInstance = instantiateExecutionStack(stack);
-const context = createExecutionContext({ contract, stackInstance });
+const db = postgres<Contract>({
+  contractJson,
+  url: process.env['DATABASE_URL']!,
+});
 
-const tables = schema(context).tables;
-const plan = sql({ context })
+const tables = db.schema.tables;
+const plan = db.sql
   .from(tables.user)
   .select({ id: tables.user.columns.id, email: tables.user.columns.email })
   .limit(10)

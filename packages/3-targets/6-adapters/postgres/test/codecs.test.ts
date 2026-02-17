@@ -2,6 +2,37 @@ import { describe, expect, it } from 'vitest';
 import { codecDefinitions } from '../src/core/codecs';
 
 describe('adapter-postgres codecs', () => {
+  it('exports expected codec scalars', () => {
+    expect(Object.keys(codecDefinitions).sort()).toEqual([
+      'bit',
+      'bit varying',
+      'bool',
+      'char',
+      'character',
+      'character varying',
+      'double precision',
+      'enum',
+      'float',
+      'float4',
+      'float8',
+      'int',
+      'int2',
+      'int4',
+      'int8',
+      'integer',
+      'interval',
+      'json',
+      'jsonb',
+      'numeric',
+      'text',
+      'time',
+      'timestamp',
+      'timestamptz',
+      'timetz',
+      'varchar',
+    ]);
+  });
+
   describe('timestamp codec', () => {
     const timestampCodec = codecDefinitions.timestamp.codec as {
       encode: (value: string | Date) => string;
@@ -10,239 +41,86 @@ describe('adapter-postgres codecs', () => {
 
     it('encodes Date to ISO string', () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      const encoded = timestampCodec.encode?.(date);
-      expect(encoded).toBe('2024-01-15T10:30:00.000Z');
-      expect(typeof encoded).toBe('string');
-    });
-
-    it('encodes string as-is', () => {
-      const str = '2024-01-15T10:30:00Z';
-      const encoded = timestampCodec.encode?.(str);
-      expect(encoded).toBe(str);
-    });
-
-    it('encodes non-string non-Date to string', () => {
-      const num = 12345;
-      // @ts-expect-error - Testing invalid input
-      const encoded = timestampCodec.encode?.(num);
-      expect(typeof encoded).toBe('string');
-    });
-
-    it('decodes string as-is', () => {
-      const str = '2024-01-15T10:30:00Z';
-      const decoded = timestampCodec.decode(str);
-      expect(decoded).toBe(str);
+      expect(timestampCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
     });
 
     it('decodes Date to ISO string', () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      const decoded = timestampCodec.decode(date);
-      expect(decoded).toBe('2024-01-15T10:30:00.000Z');
-    });
-
-    it('decodes non-string non-Date to string', () => {
-      const num = 12345;
-      // @ts-expect-error - Testing invalid input
-      const decoded = timestampCodec.decode(num);
-      expect(typeof decoded).toBe('string');
+      expect(timestampCodec.decode(date)).toBe('2024-01-15T10:30:00.000Z');
     });
   });
 
-  describe('timestamptz codec', () => {
-    const timestamptzCodec = codecDefinitions.timestamptz.codec as {
-      encode: (value: string | Date) => string;
-      decode: (wire: string | Date) => string;
+  describe('json codec', () => {
+    const jsonCodec = codecDefinitions.json.codec as {
+      encode: (value: unknown) => string;
+      decode: (wire: string | unknown) => unknown;
     };
 
-    it('encodes Date to ISO string', () => {
-      const date = new Date('2024-01-15T10:30:00Z');
-      const encoded = timestamptzCodec.encode?.(date);
-      expect(encoded).toBe('2024-01-15T10:30:00.000Z');
-      expect(typeof encoded).toBe('string');
+    it('encodes object to JSON string', () => {
+      expect(jsonCodec.encode({ key: 'value', nested: { ok: true } })).toBe(
+        '{"key":"value","nested":{"ok":true}}',
+      );
     });
 
-    it('encodes string as-is', () => {
-      const str = '2024-01-15T10:30:00Z';
-      const encoded = timestamptzCodec.encode?.(str);
-      expect(encoded).toBe(str);
+    it('decodes JSON string to object', () => {
+      expect(jsonCodec.decode('{"key":"value"}')).toEqual({ key: 'value' });
     });
 
-    it('encodes non-string non-Date to string', () => {
-      const num = 12345;
-      // @ts-expect-error - Testing invalid input
-      const encoded = timestamptzCodec.encode?.(num);
-      expect(typeof encoded).toBe('string');
-    });
-
-    it('decodes string as-is', () => {
-      const str = '2024-01-15T10:30:00Z';
-      const decoded = timestamptzCodec.decode(str);
-      expect(decoded).toBe(str);
-    });
-
-    it('decodes Date to ISO string', () => {
-      const date = new Date('2024-01-15T10:30:00Z');
-      const decoded = timestamptzCodec.decode(date);
-      expect(decoded).toBe('2024-01-15T10:30:00.000Z');
-    });
-
-    it('decodes non-string non-Date to string', () => {
-      const num = 12345;
-      // @ts-expect-error - Testing invalid input
-      const decoded = timestamptzCodec.decode(num);
-      expect(typeof decoded).toBe('string');
+    it('passes through already-decoded values', () => {
+      expect(jsonCodec.decode({ key: 'value' })).toEqual({ key: 'value' });
     });
   });
 
-  describe('text codec', () => {
-    const textCodec = codecDefinitions.text.codec as {
-      encode: (value: string) => string;
-      decode: (wire: string) => string;
+  describe('jsonb codec', () => {
+    const jsonbCodec = codecDefinitions.jsonb.codec as {
+      encode: (value: unknown) => string;
+      decode: (wire: string | unknown) => unknown;
     };
 
-    it('encodes string as-is', () => {
-      const str = 'test string';
-      const encoded = textCodec.encode(str);
-      expect(encoded).toBe(str);
+    it('encodes arrays and null values', () => {
+      expect(jsonbCodec.encode([1, null, { active: false }])).toBe('[1,null,{"active":false}]');
     });
 
-    it('decodes string as-is', () => {
-      const str = 'test string';
-      const decoded = textCodec.decode(str);
-      expect(decoded).toBe(str);
+    it('decodes JSON string to array', () => {
+      expect(jsonbCodec.decode('[1,true,{"x":1}]')).toEqual([1, true, { x: 1 }]);
     });
   });
 
-  describe('enum codec', () => {
-    const enumCodec = codecDefinitions.enum.codec as {
-      encode: (value: string) => string;
-      decode: (wire: string) => string;
-    };
-
-    it('encodes string as-is', () => {
-      const value = 'ADMIN';
-      const encoded = enumCodec.encode(value);
-      expect(encoded).toBe(value);
+  describe('scalar passthrough codecs', () => {
+    it.each([
+      { scalar: 'text', value: 'hello world' },
+      { scalar: 'enum', value: 'ADMIN' },
+    ] as const)('keeps $scalar values unchanged', ({ scalar, value }) => {
+      const codec = codecDefinitions[scalar].codec as {
+        encode: (input: string) => string;
+        decode: (input: string) => string;
+      };
+      expect(codec.encode(value)).toBe(value);
+      expect(codec.decode(value)).toBe(value);
     });
 
-    it('decodes string as-is', () => {
-      const value = 'USER';
-      const decoded = enumCodec.decode(value);
-      expect(decoded).toBe(value);
-    });
-  });
-
-  describe('int4 codec', () => {
-    const int4Codec = codecDefinitions.int4.codec as {
-      encode: (value: number) => number;
-      decode: (wire: number) => number;
-    };
-
-    it('encodes number as-is', () => {
-      const num = 42;
-      const encoded = int4Codec.encode(num);
-      expect(encoded).toBe(num);
+    it.each([
+      { scalar: 'int2', value: 12 },
+      { scalar: 'int4', value: 42 },
+      { scalar: 'int8', value: 9001 },
+      { scalar: 'float4', value: 3.14 },
+      { scalar: 'float8', value: Math.E },
+    ] as const)('keeps $scalar values unchanged', ({ scalar, value }) => {
+      const codec = codecDefinitions[scalar].codec as {
+        encode: (input: number) => number;
+        decode: (input: number) => number;
+      };
+      expect(codec.encode(value)).toBe(value);
+      expect(codec.decode(value)).toBe(value);
     });
 
-    it('decodes number as-is', () => {
-      const num = 42;
-      const decoded = int4Codec.decode(num);
-      expect(decoded).toBe(num);
-    });
-  });
-
-  describe('int2 codec', () => {
-    const int2Codec = codecDefinitions.int2.codec as {
-      encode: (value: number) => number;
-      decode: (wire: number) => number;
-    };
-
-    it('encodes number as-is', () => {
-      const num = 42;
-      const encoded = int2Codec.encode(num);
-      expect(encoded).toBe(num);
-    });
-
-    it('decodes number as-is', () => {
-      const num = 42;
-      const decoded = int2Codec.decode(num);
-      expect(decoded).toBe(num);
-    });
-  });
-
-  describe('int8 codec', () => {
-    const int8Codec = codecDefinitions.int8.codec as {
-      encode: (value: number) => number;
-      decode: (wire: number) => number;
-    };
-
-    it('encodes number as-is', () => {
-      const num = 42;
-      const encoded = int8Codec.encode(num);
-      expect(encoded).toBe(num);
-    });
-
-    it('decodes number as-is', () => {
-      const num = 42;
-      const decoded = int8Codec.decode(num);
-      expect(decoded).toBe(num);
-    });
-  });
-
-  describe('float4 codec', () => {
-    const float4Codec = codecDefinitions.float4.codec as {
-      encode: (value: number) => number;
-      decode: (wire: number) => number;
-    };
-
-    it('encodes number as-is', () => {
-      const num = 3.14;
-      const encoded = float4Codec.encode(num);
-      expect(encoded).toBe(num);
-    });
-
-    it('decodes number as-is', () => {
-      const num = 3.14;
-      const decoded = float4Codec.decode(num);
-      expect(decoded).toBe(num);
-    });
-  });
-
-  describe('float8 codec', () => {
-    const float8Codec = codecDefinitions.float8.codec as {
-      encode: (value: number) => number;
-      decode: (wire: number) => number;
-    };
-
-    it('encodes number as-is', () => {
-      const num = 3.14;
-      const encoded = float8Codec.encode(num);
-      expect(encoded).toBe(num);
-    });
-
-    it('decodes number as-is', () => {
-      const num = 3.14;
-      const decoded = float8Codec.decode(num);
-      expect(decoded).toBe(num);
-    });
-  });
-
-  describe('bool codec', () => {
-    const boolCodec = codecDefinitions.bool.codec as {
-      encode: (value: boolean) => boolean;
-      decode: (wire: boolean) => boolean;
-    };
-
-    it('encodes boolean as-is', () => {
-      const value = true;
-      const encoded = boolCodec.encode(value);
-      expect(encoded).toBe(value);
-    });
-
-    it('decodes boolean as-is', () => {
-      const value = false;
-      const decoded = boolCodec.decode(value);
-      expect(decoded).toBe(value);
+    it('keeps boolean values unchanged', () => {
+      const boolCodec = codecDefinitions.bool.codec as {
+        encode: (input: boolean) => boolean;
+        decode: (input: boolean) => boolean;
+      };
+      expect(boolCodec.encode(true)).toBe(true);
+      expect(boolCodec.decode(false)).toBe(false);
     });
   });
 

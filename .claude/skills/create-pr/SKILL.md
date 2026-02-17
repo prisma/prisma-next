@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: Creates a GitHub PR with conventional commit title and structured description for prisma-next. Use when the user wants to create a pull request, open a PR, or submit changes for review.
+description: Creates a GitHub PR with a conventional-commit title and a narrative description for prisma-next. Use when the user wants to create a pull request, open a PR, or submit changes for review.
 ---
 
 # Create PR Skill
@@ -9,9 +9,9 @@ description: Creates a GitHub PR with conventional commit title and structured d
 
 ### Step 1: Gather Context
 
-1. Run `git log main..HEAD --oneline` to see all commits on the current branch.
-2. Run `git diff main...HEAD --stat` to see which files changed.
-3. Run `git diff main...HEAD` to read the full diff.
+1. Run `git log main..HEAD --oneline` to see all commits on the current branch (fallback: `git log origin/main..HEAD --oneline`).
+2. Run `git diff main...HEAD --stat` to see which files changed (fallback: `git diff origin/main...HEAD --stat`).
+3. Run `git diff main...HEAD` to read the full diff (fallback: `git diff origin/main...HEAD`).
 4. Identify the **conventional commit type** from the changes:
    - `feat` — new feature or capability
    - `fix` — bug fix
@@ -20,6 +20,9 @@ description: Creates a GitHub PR with conventional commit title and structured d
    - `docs` — documentation only
    - `test` — test additions or changes
 5. Identify the **scope** — the primary architectural layer or package affected (e.g., `sql-runtime`, `postgres-adapter`, `contract`, `framework`, `cli`, `sql-lane`).
+6. Check for local-only changes that won’t be in the PR unless committed:
+   - `git status -sb`
+   - If there are uncommitted changes, explicitly call out that `gh pr create` can proceed but those changes will not be in the PR.
 
 ### Step 2: Ask for Linear Ticket
 
@@ -50,57 +53,50 @@ Examples:
 
 ### Step 4: Compose the PR Description
 
-Follow this structure exactly:
+Write an approachable narrative that explains:
+
+- **Intention**: what the PR is trying to achieve (the “why”).
+- **Semantic/logical change**: what *meaningfully* changed in behavior, layering, boundaries, or guarantees (not a file list).
+- **Mechanics only as needed**: mention “what changed” when it helps the reader understand the semantics.
+
+Lead with something visual when possible:
+
+- A **before/after** code snippet that captures the goal of the PR (preferred), or
+- A small **Mermaid diagram** when structure or lifecycle is the point.
+
+Avoid “reviewer coaching” language (e.g. don’t write “anchor for the reviewer”). Use a normal, friendly narrative voice similar to existing high-quality PR descriptions in this repo.
+
+#### Suggested outline (not a rigid template)
 
 ```markdown
-This PR:
-- closes [$TICKET_ID](https://linear.app/prisma-company/issue/$TICKET_ID/$SLUG)
-- bullet point 2
-- bullet point 3
-- bullet point 4
-- ...up to 8 bullets max
+closes [$TICKET_ID](https://linear.app/prisma-company/issue/$TICKET_ID/$SLUG)
 
-## Contract: Before vs After
+## Goal / purpose
 
-**Before:**
+<2–6 sentences: what we’re trying to make true, and why it matters>
+
+## Before / After
+
 ```ts
-// relevant contract builder snippet from main
+// BEFORE — smallest snippet that shows the old shape
 ```
 
-**After:**
 ```ts
-// relevant contract builder snippet from this branch
+// AFTER — smallest snippet that shows the new shape
 ```
 
-## DDL SQL: Before vs After <!-- optional -->
+<Optional: a small mermaid diagram if lifecycle/composition is the point>
 
-**Before:**
-```sql
--- relevant SQL output from main
+## What changed and why
+
+- <bullet list of the meaningful changes; focus on semantics and rationale>
 ```
 
-**After:**
-```sql
--- relevant SQL output from this branch
-```
+#### Content rules
 
-## Architecture <!-- optional -->
-
-```mermaid
-graph TD
-  A[Layer A] --> B[Layer B]
-  B --> C[Layer C]
-```
-
-- Brief bullet explaining the diagram
-- Another bullet if needed
-```
-
-Section rules:
-- **Bullet points**: 4–8 bullets. Be concise. Only elaborate on implementation when complexity warrants it.
-- **Contract: Before vs After**: Always include. Show the most relevant TypeScript contract builder change. Pick the snippet that best illustrates the PR's impact.
-- **DDL SQL: Before vs After**: Only include if SQL generation is affected by this PR. Omit entirely otherwise.
-- **Architecture**: Only include for PRs that introduce new layers or refactor existing ones. Use a Mermaid diagram with minimal bullet-point commentary.
+- Prefer **short sections** and **concrete claims** (e.g. “imports are side-effect free because X happens only in Y”).
+- Use **before/after** snippets that match real code (pull “before” from `origin/main` when helpful).
+- Include only the sections that improve comprehension; don’t force sections that don’t apply.
 
 ### Step 5: Confirm and Create
 
@@ -119,8 +115,8 @@ EOF
 
 ## Don't Do
 
-1. Don't include diff stats or file lists in the description — the bullet points cover the "what".
-2. Don't add `## Test plan` or other sections not specified above.
+1. Don't paste diff stats or long file lists — focus on intention and semantics.
+2. Don't write “reviewer coaching” phrases (“anchor”, “read this first”, etc.). Prefer a normal narrative.
 3. Don't use uppercase after the colon in the title.
 4. Don't create the PR without showing the user the title and description first.
 5. Don't guess the Linear ticket number — always ask.

@@ -1,10 +1,10 @@
 import { param } from '@prisma-next/sql-relational-core/param';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { orm } from '../prisma/context';
+import { db } from '../prisma/db';
 import { collect } from './utils';
 
 export async function ormGetUserById(userId: string, runtime: Runtime) {
-  const plan = orm
+  const plan = db.orm
     .user()
     .where((u) => u.id.eq(param('userId')))
     .select((u) => ({

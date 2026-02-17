@@ -1,6 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sql } from '@prisma-next/sql-lane/sql';
+import { param } from '@prisma-next/sql-relational-core/param';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { executePlanAndCollect } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts } from '@prisma-next/test-utils';
@@ -283,6 +284,81 @@ describe('end-to-end nested projection queries', () => {
             post_author_name: 'user.id',
             email: 'user.email',
           });
+        },
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'typed json/jsonb columns are type-safe in projection and jsonb filters',
+    async () => {
+      await withTestRuntime<Contract>(
+        contractJsonPath,
+        async ({ tables, runtime, context, client }) => {
+          const adaProfile = {
+            displayName: 'Ada',
+            tags: ['sql', 'json'],
+            active: true,
+          } as const;
+          const tessProfile = {
+            displayName: 'Tess',
+            tags: ['api'],
+            active: false,
+          } as const;
+          const meta = {
+            source: 'editor',
+            rank: 7,
+            verified: true,
+          } as const;
+
+          await client.query(
+            'insert into "user" (email, profile) values ($1, $2::jsonb), ($3, $4::jsonb)',
+            [
+              'ada@example.com',
+              JSON.stringify(adaProfile),
+              'tess@example.com',
+              JSON.stringify(tessProfile),
+            ],
+          );
+          await client.query(
+            'insert into "post" ("userId", title, published, meta) values ($1, $2, $3, $4::json), ($5, $6, $7, $8::json)',
+            [1, 'Ada Post', true, JSON.stringify(meta), 2, 'Tess Post', true, JSON.stringify(meta)],
+          );
+
+          const user = tables.user!;
+          const post = tables.post!;
+          const plan = sql({ context })
+            .from(user)
+            .innerJoin(post, (on) => on.eqCol(user.columns.id!, post.columns.userId!))
+            .where(user.columns.profile!.eq(param('profile')))
+            .where(post.columns.title!.eq(param('title')))
+            .select({
+              email: user.columns.email!,
+              profile: user.columns.profile!,
+              meta: post.columns.meta!,
+            })
+            .build({ params: { profile: adaProfile, title: 'Ada Post' } });
+
+          const rows = await executePlanAndCollect(runtime, plan);
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            email: 'ada@example.com',
+            profile: adaProfile,
+            meta,
+          });
+
+          type Row = ResultType<typeof plan>;
+          expectTypeOf<Row['profile']>().toMatchTypeOf<{
+            readonly displayName: string;
+            readonly tags: readonly string[];
+            readonly active: boolean;
+          } | null>();
+          expectTypeOf<Row['meta']>().toMatchTypeOf<{
+            readonly source: string;
+            readonly rank: number;
+            readonly verified: boolean;
+          } | null>();
         },
       );
     },

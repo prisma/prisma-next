@@ -420,6 +420,75 @@ describe('PostgresControlAdapter', () => {
       expect(result.tables['user']?.columns['value']?.nativeType).toBe('numeric');
     });
 
+    it('maps json and jsonb columns to native types', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+        familyId: 'sql',
+        targetId: 'postgres',
+        query: async <Row = Record<string, unknown>>(sql: string) => {
+          if (sql.includes('information_schema.tables')) {
+            return { rows: [{ table_name: 'event' }] as Row[] };
+          }
+          if (sql.includes('information_schema.columns')) {
+            return {
+              rows: [
+                {
+                  table_name: 'event',
+                  column_name: 'payload',
+                  data_type: 'jsonb',
+                  udt_name: 'jsonb',
+                  is_nullable: 'NO',
+                  character_maximum_length: null,
+                  numeric_precision: null,
+                  numeric_scale: null,
+                },
+                {
+                  table_name: 'event',
+                  column_name: 'raw',
+                  data_type: 'json',
+                  udt_name: 'json',
+                  is_nullable: 'YES',
+                  character_maximum_length: null,
+                  numeric_precision: null,
+                  numeric_scale: null,
+                },
+              ] as Row[],
+            };
+          }
+          if (sql.includes('PRIMARY KEY')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('FOREIGN KEY')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('UNIQUE')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('pg_indexes')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('pg_extension')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('pg_enum')) {
+            return { rows: [] as Row[] };
+          }
+          if (sql.includes('version()')) {
+            return {
+              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
+            };
+          }
+          return { rows: [] as Row[] };
+        },
+        close: async () => {},
+      };
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.tables['event']?.columns['payload']?.nativeType).toBe('jsonb');
+      expect(result.tables['event']?.columns['raw']?.nativeType).toBe('json');
+    });
+
     it('uses formatted_type for bit length', async () => {
       const adapter = new PostgresControlAdapter();
       const mockDriver = createMockDriver([
@@ -1460,6 +1529,81 @@ describe('PostgresControlAdapter', () => {
         name: 'user_pkey',
       });
       expect(result.tables['user']?.uniques).toEqual([]);
+    });
+  });
+
+  describe('introspect - USER-DEFINED enum types', () => {
+    it('strips surrounding double quotes from mixed-case enum formatted_type', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'Organization' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'Organization',
+              column_name: 'billingState',
+              data_type: 'USER-DEFINED',
+              udt_name: 'BillingState',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: '"BillingState"',
+            },
+          ],
+        },
+        { match: includes('PRIMARY KEY'), rows: [] },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('pg_enum'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      // format_type() returns '"BillingState"' for mixed-case enums;
+      // introspection must strip the quotes so it matches the contract's unquoted name
+      expect(result.tables['Organization']?.columns['billingState']?.nativeType).toBe(
+        'BillingState',
+      );
+    });
+
+    it('preserves lowercase enum formatted_type (no quotes from format_type)', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'user' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'user',
+              column_name: 'role',
+              data_type: 'USER-DEFINED',
+              udt_name: 'role',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'role',
+            },
+          ],
+        },
+        { match: includes('PRIMARY KEY'), rows: [] },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('pg_enum'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      // Lowercase enum names are not quoted by format_type(), should pass through unchanged
+      expect(result.tables['user']?.columns['role']?.nativeType).toBe('role');
     });
   });
 

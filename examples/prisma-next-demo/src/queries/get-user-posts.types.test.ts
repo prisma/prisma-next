@@ -1,6 +1,6 @@
 import type { Char } from '@prisma-next/adapter-postgres/codec-types';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sql } from '@prisma-next/sql-lane/sql';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';

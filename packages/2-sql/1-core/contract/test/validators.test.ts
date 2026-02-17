@@ -55,19 +55,22 @@ describe('SQL contract validators', () => {
       expect(() => validateStorage(invalid)).toThrow();
     });
 
-    it('throws when both typeParams and typeRef are provided', () => {
+    it('throws when column declares both typeParams and typeRef', () => {
       const invalid = {
         tables: {
           user: {
             columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
+              embedding: {
+                nativeType: 'vector',
+                codecId: 'pg/vector@1',
                 nullable: false,
-                typeParams: { precision: 32 },
-                typeRef: 'someType',
+                typeParams: { dimensions: 1536 },
+                typeRef: 'vector_1536',
               },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
       } as unknown;
@@ -109,6 +112,10 @@ describe('SQL contract validators', () => {
   });
 
   describe('validateSqlContract', () => {
+    it('throws when contract value is not an object', () => {
+      expect(() => validateSqlContract(null)).toThrow(/value must be an object/);
+    });
+
     it('validates valid contract', () => {
       const userTable = table({
         id: col('int4', 'pg/int4@1'),

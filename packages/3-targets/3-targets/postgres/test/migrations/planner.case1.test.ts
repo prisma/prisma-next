@@ -169,6 +169,25 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
         },
       ],
     });
+    const uniqueOp = operations.find((op) => op.id === 'unique.user.user_email_key');
+    expect(uniqueOp).toMatchObject({
+      operationClass: 'additive',
+      target: {
+        details: {
+          objectType: 'unique',
+          name: 'user_email_key',
+          table: 'user',
+          schema: 'public',
+        },
+      },
+      execute: [
+        {
+          sql: expect.stringContaining('UNIQUE ("email")'),
+        },
+      ],
+    });
+    expect(uniqueOp!.execute[0]!.sql).toContain('ALTER TABLE');
+    expect(uniqueOp!.execute[0]!.sql).toContain('"user_email_key"');
   });
 
   it('renders parameterized column types in DDL', () => {
@@ -428,6 +447,71 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
   });
 });
 
+describe('PostgresMigrationPlanner - composite unique constraint DDL', () => {
+  it('generates correct ALTER TABLE SQL for composite unique constraint', () => {
+    const planner = createPostgresMigrationPlanner();
+    const compositeContract: SqlContract<SqlStorage> = {
+      schemaVersion: '1',
+      target: 'postgres',
+      targetFamily: 'sql',
+      storageHash: coreHash('sha256:composite-unique'),
+      profileHash: profileHash('sha256:composite-unique-profile'),
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              first_name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              last_name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [{ columns: ['first_name', 'last_name'] }],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      models: {},
+      relations: {},
+      mappings: { codecTypes: {}, operationTypes: {} },
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      sources: {},
+    } as SqlContract<SqlStorage>;
+
+    const result = planner.plan({
+      contract: compositeContract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [],
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') throw new Error(`Expected success: ${JSON.stringify(result)}`);
+
+    const uniqueOp = result.plan.operations.find((op) => op.id.startsWith('unique.user.'));
+    expect(uniqueOp).toMatchObject({
+      operationClass: 'additive',
+      target: {
+        details: {
+          objectType: 'unique',
+          name: 'user_first_name_last_name_key',
+          table: 'user',
+          schema: 'public',
+        },
+      },
+      execute: [
+        {
+          sql: expect.stringContaining('UNIQUE ("first_name", "last_name")'),
+        },
+      ],
+    });
+    expect(uniqueOp!.execute[0]!.sql).toContain('ALTER TABLE');
+    expect(uniqueOp!.execute[0]!.sql).toContain('"user_first_name_last_name_key"');
+  });
+});
+
 describe('PostgresMigrationPlanner - column defaults', () => {
   type ColumnDef = PostgresStorageColumn & { nativeType: string; codecId: string };
 
@@ -576,5 +660,16 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       },
     });
     expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid(INTERVAL \'5500 years\') NOT NULL');
+  });
+
+  it('preserves json and jsonb native types in CREATE TABLE', () => {
+    const sql = planTableSql('event_payloads', {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      payload: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: false },
+      raw: { nativeType: 'json', codecId: 'pg/json@1', nullable: true },
+    });
+
+    expect(sql).toContain('"payload" jsonb NOT NULL');
+    expect(sql).toContain('"raw" json');
   });
 });

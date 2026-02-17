@@ -17,8 +17,8 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import type { OperationRegistry } from '@prisma-next/operations';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
 import {
   ensureSchemaStatement,
   ensureTableStatement,

@@ -1,5 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract-ts/contract';
+import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SqlOperationSignature } from '@prisma-next/sql-operations';
 import { vectorColumn as vectorColumnType } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
