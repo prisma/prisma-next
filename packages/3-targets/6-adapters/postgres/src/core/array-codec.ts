@@ -29,6 +29,18 @@ export const arrayParamsSchema = arktype({
 const NEEDS_QUOTING = /[{},"\\\s]/;
 
 /**
+ * Matches tokens inside a Postgres text array literal (between the outer braces):
+ * - `"(?:[^"\\]|\\.)*"` — quoted element (may contain escaped chars)
+ * - `[^,]+` — unquoted element (everything up to the next comma or end)
+ */
+const PG_ARRAY_TOKEN = /"(?:[^"\\]|\\.)*"|[^,]+/g;
+
+/** Strips the surrounding quotes and unescapes `\"` and `\\` inside a quoted token. */
+function unescapeQuoted(token: string): string {
+  return token.slice(1, -1).replace(/\\(.)/g, '$1');
+}
+
+/**
  * Parses a Postgres text array literal into a JavaScript array of strings and nulls.
  *
  * Handles:
@@ -42,7 +54,7 @@ const NEEDS_QUOTING = /[{},"\\\s]/;
  * @returns Array of string values and nulls
  */
 export function parsePgTextArray(wire: string): (string | null)[] {
-  if (!wire.startsWith('{') || !wire.endsWith('}')) {
+  if (wire.length < 2 || wire[0] !== '{' || wire[wire.length - 1] !== '}') {
     throw new Error(`Invalid Postgres array literal: expected '{...}', got: ${wire.slice(0, 50)}`);
   }
 
@@ -51,41 +63,17 @@ export function parsePgTextArray(wire: string): (string | null)[] {
     return [];
   }
 
+  PG_ARRAY_TOKEN.lastIndex = 0;
   const result: (string | null)[] = [];
-  let i = 0;
 
-  while (i < inner.length) {
-    if (inner[i] === ',') {
-      i++;
-      continue;
-    }
-
-    if (inner[i] === '"') {
-      // Quoted element
-      i++; // skip opening quote
-      let element = '';
-      while (i < inner.length && inner[i] !== '"') {
-        if (inner[i] === '\\' && i + 1 < inner.length) {
-          i++; // skip backslash
-          element += inner[i];
-        } else {
-          element += inner[i];
-        }
-        i++;
-      }
-      i++; // skip closing quote
-      result.push(element);
+  for (let match = PG_ARRAY_TOKEN.exec(inner); match !== null; match = PG_ARRAY_TOKEN.exec(inner)) {
+    const token = match[0];
+    if (token[0] === '"') {
+      result.push(unescapeQuoted(token));
+    } else if (token === 'NULL') {
+      result.push(null);
     } else {
-      // Unquoted element
-      const nextComma = inner.indexOf(',', i);
-      const raw = nextComma === -1 ? inner.slice(i) : inner.slice(i, nextComma);
-      i = nextComma === -1 ? inner.length : nextComma;
-
-      if (raw === 'NULL') {
-        result.push(null);
-      } else {
-        result.push(raw);
-      }
+      result.push(token);
     }
   }
 
@@ -108,7 +96,7 @@ export function formatPgTextArray(values: (string | null)[]): string {
     if (value === null) {
       return 'NULL';
     }
-    if (value === '' || NEEDS_QUOTING.test(value)) {
+    if (value === '' || value === 'NULL' || NEEDS_QUOTING.test(value)) {
       // Quote and escape
       return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
     }
@@ -154,6 +142,7 @@ export function createArrayCodec<TElementWire, TElementJs>(
       ? {
           encode(value: (TElementJs | null)[]): (TElementWire | null)[] {
             return value.map((item) =>
+              // biome-ignore lint/style/noNonNullAssertion: encode is guaranteed by outer check
               item === null || item === undefined ? null : elementCodec.encode!(item),
             );
           },

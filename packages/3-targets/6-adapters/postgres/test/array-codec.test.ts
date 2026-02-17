@@ -58,12 +58,52 @@ describe('parsePgTextArray', () => {
     ]);
   });
 
+  it('parses quoted NULL as the string "NULL" (not null)', () => {
+    expect(parsePgTextArray('{"NULL"}')).toEqual(['NULL']);
+  });
+
+  it('treats unquoted lowercase null as a regular string', () => {
+    expect(parsePgTextArray('{null}')).toEqual(['null']);
+  });
+
+  it('parses multiple consecutive NULLs', () => {
+    expect(parsePgTextArray('{NULL,NULL,NULL}')).toEqual([null, null, null]);
+  });
+
+  it('parses element containing literal newline', () => {
+    expect(parsePgTextArray('{"line1\nline2"}')).toEqual(['line1\nline2']);
+  });
+
+  it('parses element containing literal tab', () => {
+    expect(parsePgTextArray('{"col1\tcol2"}')).toEqual(['col1\tcol2']);
+  });
+
+  it('parses unicode content', () => {
+    expect(parsePgTextArray('{héllo,wörld}')).toEqual(['héllo', 'wörld']);
+  });
+
+  it('parses quoted unicode with special chars', () => {
+    expect(parsePgTextArray('{"emoji 🎉","日本語"}')).toEqual(['emoji 🎉', '日本語']);
+  });
+
+  it('parses single NULL element', () => {
+    expect(parsePgTextArray('{NULL}')).toEqual([null]);
+  });
+
+  it('parses boolean-like strings without special treatment', () => {
+    expect(parsePgTextArray('{true,false}')).toEqual(['true', 'false']);
+  });
+
   it('throws for invalid input without braces', () => {
     expect(() => parsePgTextArray('1,2,3')).toThrow('Invalid Postgres array literal');
   });
 
   it('throws for input missing opening brace', () => {
     expect(() => parsePgTextArray('1,2}')).toThrow('Invalid Postgres array literal');
+  });
+
+  it('throws for empty string', () => {
+    expect(() => parsePgTextArray('')).toThrow('Invalid Postgres array literal');
   });
 });
 
@@ -107,6 +147,10 @@ describe('formatPgTextArray', () => {
   it('quotes values containing braces', () => {
     expect(formatPgTextArray(['{nested}'])).toBe('{"{nested}"}');
   });
+
+  it('quotes the string NULL to distinguish from null token', () => {
+    expect(formatPgTextArray(['NULL'])).toBe('{"NULL"}');
+  });
 });
 
 describe('formatPgTextArray and parsePgTextArray roundtrip', () => {
@@ -116,6 +160,12 @@ describe('formatPgTextArray and parsePgTextArray roundtrip', () => {
     { values: [null, 'a', null] },
     { values: ['hello world', 'has,comma', 'with "quotes"'] },
     { values: ['', 'path\\dir', '{braces}'] },
+    { values: [null, null, null] },
+    { values: ['NULL', 'null', 'Null'] },
+    { values: ['true', 'false'] },
+    { values: ['héllo', 'wörld', '日本語', '🎉'] },
+    { values: ['line\nnewline', 'tab\there'] },
+    { values: ['a'.repeat(1000)] },
   ])('roundtrips $values', ({ values }) => {
     expect(parsePgTextArray(formatPgTextArray(values))).toEqual(values);
   });
