@@ -1,5 +1,7 @@
 import type { ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
+import { validateJsonValue } from './json-schema-validation';
 
 function resolveParamCodec(
   paramDescriptor: ParamDescriptor,
@@ -31,9 +33,16 @@ export function encodeParam(
   paramDescriptor: ParamDescriptor,
   plan: ExecutionPlan,
   registry: CodecRegistry,
+  jsonValidators?: JsonSchemaValidatorRegistry,
 ): unknown {
   if (value === null || value === undefined) {
     return null;
+  }
+
+  // Validate JSON value against schema before encoding
+  if (jsonValidators && paramDescriptor.refs) {
+    const { table, column } = paramDescriptor.refs;
+    validateJsonValue(jsonValidators, table, column, value, 'encode', paramDescriptor.codecId);
   }
 
   const codec = resolveParamCodec(paramDescriptor, plan, registry);
@@ -54,7 +63,11 @@ export function encodeParam(
   return value;
 }
 
-export function encodeParams(plan: ExecutionPlan, registry: CodecRegistry): readonly unknown[] {
+export function encodeParams(
+  plan: ExecutionPlan,
+  registry: CodecRegistry,
+  jsonValidators?: JsonSchemaValidatorRegistry,
+): readonly unknown[] {
   if (plan.params.length === 0) {
     return plan.params;
   }
@@ -66,7 +79,7 @@ export function encodeParams(plan: ExecutionPlan, registry: CodecRegistry): read
     const paramDescriptor = plan.meta.paramDescriptors[i];
 
     if (paramDescriptor) {
-      encoded.push(encodeParam(paramValue, paramDescriptor, plan, registry));
+      encoded.push(encodeParam(paramValue, paramDescriptor, plan, registry, jsonValidators));
     } else {
       encoded.push(paramValue);
     }
