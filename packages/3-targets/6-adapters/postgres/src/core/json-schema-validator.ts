@@ -56,7 +56,7 @@ export function compileJsonSchemaValidator(schema: Record<string, unknown>): Jso
 export function formatValidationErrors(errors: ReadonlyArray<JsonSchemaValidationError>): string {
   if (errors.length === 0) return 'unknown validation error';
   if (errors.length === 1) {
-    const [err] = errors;
+    const err = errors[0] as JsonSchemaValidationError;
     return err.path === '/' ? err.message : `${err.path}: ${err.message}`;
   }
   return errors

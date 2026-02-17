@@ -24,8 +24,8 @@ import { createStubAdapter, createTestContext } from './utils';
 function createStubValidator(schema: Record<string, unknown>): JsonSchemaValidateFn {
   return (value: unknown) => {
     // Simple validator: check required properties and top-level types
-    if (schema.type === 'object' && typeof value === 'object' && value !== null) {
-      const required = (schema.required ?? []) as string[];
+    if (schema['type'] === 'object' && typeof value === 'object' && value !== null) {
+      const required = (schema['required'] ?? []) as string[];
       const obj = value as Record<string, unknown>;
       for (const prop of required) {
         if (!(prop in obj)) {
@@ -43,7 +43,7 @@ function createStubValidator(schema: Record<string, unknown>): JsonSchemaValidat
       }
       return { valid: true };
     }
-    if (schema.type === 'object' && (typeof value !== 'object' || value === null)) {
+    if (schema['type'] === 'object' && (typeof value !== 'object' || value === null)) {
       return {
         valid: false,
         errors: [{ path: '/', message: 'must be object', keyword: 'type' }],
@@ -127,14 +127,14 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
       codecId: 'pg/json@1',
       paramsSchema: jsonTypeParamsSchema,
       init: (params: Record<string, unknown>) => ({
-        validate: createStubValidator(params.schema as Record<string, unknown>),
+        validate: createStubValidator(params['schema'] as Record<string, unknown>),
       }),
     },
     {
       codecId: 'pg/jsonb@1',
       paramsSchema: jsonTypeParamsSchema,
       init: (params: Record<string, unknown>) => ({
-        validate: createStubValidator(params.schema as Record<string, unknown>),
+        validate: createStubValidator(params['schema'] as Record<string, unknown>),
       }),
     },
   ];
@@ -481,7 +481,7 @@ describe('JSON Schema decoding validation', () => {
 
     const row = { metadata: '{"name":"Alice"}' };
     const result = decodeRow(row, plan, codecRegistry, createValidatorRegistry());
-    expect(result.metadata).toEqual({ name: 'Alice' });
+    expect(result['metadata']).toEqual({ name: 'Alice' });
   });
 
   it('throws RUNTIME.JSON_SCHEMA_VALIDATION_FAILED for invalid decoded values', () => {
@@ -529,7 +529,7 @@ describe('JSON Schema decoding validation', () => {
     const row = { data: '{"bad":"data"}' };
     // No refs → skip validation → should succeed
     const result = decodeRow(row, plan, codecRegistry, createValidatorRegistry());
-    expect(result.data).toEqual({ bad: 'data' });
+    expect(result['data']).toEqual({ bad: 'data' });
   });
 
   it('skips validation for null wire values', () => {
@@ -548,7 +548,7 @@ describe('JSON Schema decoding validation', () => {
 
     const row = { metadata: null };
     const result = decodeRow(row, plan, codecRegistry, createValidatorRegistry());
-    expect(result.metadata).toBeNull();
+    expect(result['metadata']).toBeNull();
   });
 
   it('skips validation when no registry is provided', () => {
@@ -568,7 +568,7 @@ describe('JSON Schema decoding validation', () => {
     const row = { metadata: '{"bad":"data"}' };
     // No validator registry → no validation → should succeed
     const result = decodeRow(row, plan, codecRegistry);
-    expect(result.metadata).toEqual({ bad: 'data' });
+    expect(result['metadata']).toEqual({ bad: 'data' });
   });
 
   it('decodes non-JSON columns without validation', () => {
@@ -590,7 +590,7 @@ describe('JSON Schema decoding validation', () => {
 
     const row = { id: 42, metadata: '{"name":"Alice"}' };
     const result = decodeRow(row, plan, codecRegistry, createValidatorRegistry());
-    expect(result.id).toBe(42);
-    expect(result.metadata).toEqual({ name: 'Alice' });
+    expect(result['id']).toBe(42);
+    expect(result['metadata']).toEqual({ name: 'Alice' });
   });
 });

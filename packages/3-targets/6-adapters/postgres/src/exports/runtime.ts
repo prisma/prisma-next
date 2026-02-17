@@ -33,7 +33,8 @@ const jsonTypeParamsSchema = arktype({
   'type?': 'string',
 });
 
-type JsonTypeParams = { readonly schema: Record<string, unknown>; readonly type?: string };
+/** The inferred type params shape from the arktype schema. */
+type JsonTypeParams = typeof jsonTypeParamsSchema.infer;
 
 /**
  * Helper returned by the JSON/JSONB `init` hook.
@@ -42,7 +43,7 @@ type JsonTypeParams = { readonly schema: Record<string, unknown>; readonly type?
 export type JsonCodecHelper = { readonly validate: JsonSchemaValidateFn };
 
 function initJsonCodecHelper(params: JsonTypeParams): JsonCodecHelper {
-  return { validate: compileJsonSchemaValidator(params.schema) };
+  return { validate: compileJsonSchemaValidator(params.schema as Record<string, unknown>) };
 }
 
 const parameterizedCodecDescriptors = [
