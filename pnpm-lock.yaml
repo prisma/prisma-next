@@ -1427,6 +1427,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/shared/utils
+      ajv:
+        specifier: ^8.17.1
+        version: 8.17.1
       arktype:
         specifier: ^2.0.0
         version: 2.1.29
