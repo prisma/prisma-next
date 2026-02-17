@@ -18,7 +18,7 @@ That's what this spec is about: an **ORM Client** that speaks in application ter
 
 The `@prisma-next/sql-orm-client` package already has a working prototype on the current branch with:
 
-- A fluent, immutable query builder with `where()`, `include()`, `orderBy()`, `take()`, `skip()`, `findMany()`, `findFirst()`
+- A fluent, immutable query builder with `where()`, `include()`, `orderBy()`, `take()`, `skip()`, `all()`, `find()`
 - A base class for creating model-specific entry points
 - An `orm()` factory that creates a typed client object (e.g. `db.users`, `db.posts`)
 - Custom subclasses with domain methods (e.g. `admins()`, `forUser(userId)`)
@@ -46,7 +46,7 @@ This spec takes that prototype, fills in the gaps (mutations, aggregations, proj
 ### Non-Goals
 
 - Transactions (deferred to TML-1912)
-- Error handling taxonomy / `findUniqueOrThrow` (deferred to TML-1911)
+- Error handling taxonomy / `findOrThrow` (deferred to TML-1911)
 - Raw SQL escape hatch (use the DSL lane or driver directly)
 - Computed fields or renaming within `select()`
 - Opaque cursor tokens
@@ -62,7 +62,7 @@ These terms are used throughout the spec and the codebase. Some were introduced 
 
 The central abstraction: an **immutable, fluent query builder** for a specific model. It accumulates query state — filters, includes, ordering, pagination, field selection — through method chaining. Every method (`.where()`, `.include()`, `.orderBy()`, etc.) returns a **new** Collection, leaving the original unchanged. This makes it safe to store a base query and derive multiple variants from it.
 
-The name "Collection" was chosen because it represents a *set of model records* that you progressively refine. You start with all records of a model and narrow it down. It's the thing you interact with most — building up a query piece by piece until you call a terminal method like `findMany()` to execute it.
+The name "Collection" was chosen because it represents a *set of model records* that you progressively refine. You start with all records of a model and narrow it down. It's the thing you interact with most — building up a query piece by piece until you call a terminal method like `all()` to execute it.
 
 Collection is also the extension point for domain-specific query methods. Application developers subclass it to add named methods that return refined collections. These custom collections are used **everywhere** — as the top-level entry point from the ORM client, inside `include()` refinement callbacks, and anywhere else a model's collection appears. There is no separate "repository" abstraction; Collection is the single concept for querying a model.
 
@@ -74,13 +74,23 @@ class UserCollection extends Collection<Contract, 'User'> {
 }
 
 // Used at the top level
-const users = await db.users.admins().active().findMany()
+const users = await db.users.admins().active().all()
 
 // Same custom methods available inside include refinements
 const postsWithAdminAuthors = await db.posts
   .include('author', a => a.admins())
-  .findMany()
+  .all()
 ```
+
+#### Why one class, not two?
+
+An earlier design considered splitting query building and query execution into separate classes (a "Collection" for building and a "Repository" for executing). We chose a single class for three reasons:
+
+1. **Terminal methods are needed everywhere execution happens.** That's not just the top level — it's stored base queries (`const admins = db.users.admins(); await admins.count()`), scoped collections passed between functions, and any other context where you want to run a query. Restricting terminal methods to a "top-level" class would mean losing them in too many legitimate contexts.
+
+2. **Include refinements are already safe.** The one place where calling a terminal method would be a mistake — inside an `include()` refinement callback — is already caught by the type system. The callback's return type expects a `Collection`, not an `AsyncIterableResult` or `Promise`. Calling `p.all()` inside `include('posts', p => ...)` is a type error without any extra machinery.
+
+3. **Covariant `this` is simpler with one class.** If custom methods are defined on Collection and a separate Repository extends it, then `admins()` (defined on Collection) returns `Collection` — losing the terminal methods. Making the return type preserve the subclass requires `this`-type plumbing and careful clone logic. With one class, `this` always has everything.
 
 ### ORM Client
 
@@ -98,8 +108,8 @@ const db = orm({
   },
 });
 
-db.users.admins().findMany(); // UserCollection with custom method
-db.comments.findMany();       // default Collection, auto-created
+db.users.admins().all(); // UserCollection with custom method
+db.comments.all();       // default Collection, auto-created
 ```
 
 ### ModelAccessor
@@ -116,17 +126,6 @@ db.users.where(u => /* u is a ModelAccessor<Contract, 'User'> */
   )
 );
 ```
-
-### Model Reference
-
-A **handle to a specific record** identified by a unique criterion. This is what `findUnique()` produces in the fluent chain context — not yet an executed query, but a reference that can navigate to related collections for nested mutations.
-
-```typescript
-// The reference navigates to the related collection
-db.posts.findUnique({ id: postId }).comments.create({ body: '...' })
-```
-
-Model References may gain custom methods in the future (domain operations on a single record, distinct from Collection's set-oriented query methods). For now, the spec defines only the relation navigation use case. The extension point is noted here for forward compatibility.
 
 ### CollectionState
 
@@ -255,23 +254,7 @@ type IncludeResultType<Cardinality, Row> =
 
 This means `.include('author')` on a post returns `UserRow | null`, while `.include('posts')` on a user returns `PostRow[]`.
 
-### 4.3 Unique Constraint Types
-
-For `findUnique()`, a discriminated union is derived from the contract's primary key and unique constraints:
-
-```typescript
-// Given a model with:
-//   primaryKey: { columns: ['id'] }
-//   uniques: [{ columns: ['email'] }, { columns: ['tenantId', 'slug'] }]
-//
-// The derived type is:
-type UserUniqueCriterion =
-  | { id: number }
-  | { email: string }
-  | { tenantId: string; slug: string };
-```
-
-### 4.4 Create Input Types
+### 4.3 Create Input Types
 
 For `create()`, the input type distinguishes required from optional fields based on contract metadata:
 
@@ -287,7 +270,7 @@ type CreateInput<TContract, ModelName> = {
 };
 ```
 
-### 4.5 Type-State Tracking
+### 4.4 Type-State Tracking
 
 The Collection carries generic type parameters that track query builder state for compile-time method gating:
 
@@ -392,7 +375,7 @@ function activeAdmins(u: ModelAccessor<Contract, 'User'>): WhereExpr {
   return and(u.role.eq('admin'), u.active.eq(true));
 }
 
-db.users.where(u => activeAdmins(u)).findMany();
+db.users.where(u => activeAdmins(u)).all();
 ```
 
 ### 5.3 The ModelAccessor
@@ -583,51 +566,56 @@ db.users.orderBy(u => u.createdAt.desc()).distinctOn('email')  // DISTINCT ON (P
 
 These are **terminal methods** — they execute the query.
 
-#### `findMany()`
+#### `all()`
 
 ```typescript
 // Streaming (async iterable)
-for await (const user of db.users.where(u => u.active.eq(true)).findMany()) {
+for await (const user of db.users.where(u => u.active.eq(true)).all()) {
   console.log(user);
 }
 
 // Collect into array (thenable shorthand)
 const users: UserRow[] = await db.users
   .where(u => u.active.eq(true))
-  .findMany();
+  .all();
 ```
 
 Returns `AsyncIterableResult<Row>`, which implements both the async iterable protocol (`for await...of`) and the thenable protocol (`await` resolves to `Row[]`). Streaming is a first-class capability; the thenable shorthand eliminates `.toArray()` boilerplate for the common case.
 
-#### `findFirst()`
+#### Eager execution, lazy consumption
+
+Unlike Prisma ORM's `PrismaPromise`, which defers the database request until `.then()` is called, the Prisma Next ORM client sends the query to the database **eagerly** when a terminal method is called. The `AsyncIterableResult` returned by `all()` represents an in-flight query whose response has not yet been read — not a deferred query that hasn't been sent.
+
+```typescript
+const result = db.users.all();  // query is sent to the database NOW
+// ...do other work...
+for await (const user of result) { /* rows are read lazily */ }
+```
+
+This distinction matters for two reasons:
+
+1. **Predictable timing.** The query executes when you call `all()`, not when you happen to consume the result. There are no hidden side effects inside `.then()` or `Symbol.asyncIterator`.
+
+2. **Compatibility with effect systems.** Libraries like Effect's `tryPromise` expect to receive a function that initiates work. With eager execution, the terminal method is that function — the returned thenable is a straightforward value, not a lazy thunk that re-executes on each `.then()` call.
+
+#### `find()`
 
 Returns the first matching record or `null`. Compiles to `LIMIT 1`.
 
 ```typescript
 const user: UserRow | null = await db.users
-  .where(u => u.email.eq('alice@example.com'))
-  .findFirst();
-```
+  .where({ email: 'alice@example.com' })
+  .find();
 
-#### `findUnique(criterion)`
-
-Accepts a type-safe unique criterion derived from the contract's primary key and unique constraints. Returns `Promise<Row | null>`.
-
-```typescript
-const user = await db.users.findUnique({ id: 42 });
-const user = await db.users.findUnique({ email: 'alice@example.com' });
-const post = await db.posts.findUnique({ tenantId: 'acme', slug: 'hello-world' });
-```
-
-`findUnique()` is available directly on any Collection without requiring prior `where()` calls — the unique criterion is its own argument. It composes with `select()` and `include()`:
-
-```typescript
 const user = await db.users
   .select('name', 'email')
   .include('posts')
-  .findUnique({ id: 42 });
+  .where({ id: 42 })
+  .find();
 // Type: { name: string; email: string; posts: PostRow[] } | null
 ```
+
+There is no separate `findUnique` method. Unique lookups use the same `where()` + `find()` pattern — the database optimizer will use the unique index regardless. This keeps the API surface minimal: `where()` is the single way to specify criteria, `find()` is the single way to get one record.
 
 ### 6.3 Include Execution Strategies
 
@@ -791,55 +779,102 @@ const result = await db.users.create({ ... }).include('posts');
 
 ### 7.4 Nested Mutations
 
-Two styles serve different ergonomic needs.
+Relation fields in `create()` and `update()` payloads use **callbacks** that receive a typed `RelationMutator` for the related model. This is consistent with the rest of the API: just as `where()` and `include()` use callbacks with typed accessors, nested mutations use callbacks with typed mutators.
 
-#### Fluent Chain Style
-
-Navigate from a parent to a related collection and mutate:
-
-```typescript
-await db.posts
-  .findUnique({ id: postId })
-  .comments
-  .create({ body: 'Great post!' });
-
-await db.posts
-  .findUnique({ id: postId })
-  .comments
-  .where(c => c.approved.eq(false))
-  .update({ approved: true });
-```
-
-`.findUnique({ id: postId })` produces a Model Reference (see section 2) — a handle to a specific record. Accessing `.comments` on it produces a Collection scoped to comments where `post_id = postId`, with the FK relationship inferred from the contract.
-
-#### Nested Payload Style
-
-Inline related mutations with the parent payload:
+#### Basic nested create
 
 ```typescript
 const user = await db.users.create({
   name: 'Alice',
   email: 'alice@example.com',
-  posts: {
-    create: [
-      { title: 'First Post' },
-      { title: 'Second Post' },
-    ],
-  },
-});
-
-const post = await db.posts.create({
-  title: 'New Post',
-  author: { connect: { id: authorId } },
+  posts: p => p.create([
+    { title: 'First Post' },
+    { title: 'Second Post' },
+  ]),
 });
 ```
 
-Nested mutation operations:
-- `create` — create new related records
-- `connect` — link to existing records by unique criterion
-- `disconnect` — unlink related records (set FK to null where allowed)
+The callback `p => p.create([...])` receives a `RelationMutator<Contract, 'Post'>` and returns a `RelationMutation` — an opaque instruction describing what to do. Scalar fields are plain values; relation fields are callbacks.
 
-Nested payloads execute within a **transaction** by default (per ADR 161 section 6), orchestrating multiple INSERT statements with propagated generated keys.
+#### Connecting existing records
+
+```typescript
+const post = await db.posts.create({
+  title: 'New Post',
+  author: a => a.connect({ id: authorId }),
+});
+```
+
+`connect()` takes a unique criterion identifying the record to link. For to-many relations, it accepts an array:
+
+```typescript
+const post = await db.posts.create({
+  title: 'Tagged Post',
+  tags: t => t.connect([{ id: tag1Id }, { id: tag2Id }]),
+});
+```
+
+#### Deep nesting
+
+The data argument to `create()` on a relation mutator is itself a `CreateInput` for the related model — so relation fields at any depth use the same callback pattern:
+
+```typescript
+const org = await db.organizations.create({
+  name: 'Acme Corp',
+  plan: 'enterprise',
+  owner: o => o.connect({ id: founderId }),
+  departments: d => d.create([
+    {
+      name: 'Engineering',
+      teams: t => t.create([
+        {
+          name: 'Platform',
+          members: m => m.create([
+            { role: 'lead', user: u => u.connect({ email: 'alice@acme.com' }) },
+            { role: 'member', user: u => u.connect({ email: 'bob@acme.com' }) },
+          ]),
+        },
+        {
+          name: 'Product',
+          members: m => m.create([
+            { role: 'lead', user: u => u.connect({ email: 'charlie@acme.com' }) },
+          ]),
+        },
+      ]),
+    },
+    {
+      name: 'Marketing',
+      teams: t => t.create([
+        {
+          name: 'Growth',
+          members: m => m.create([
+            { role: 'lead', user: u => u.connect({ email: 'diana@acme.com' }) },
+          ]),
+        },
+      ]),
+    },
+  ]),
+});
+```
+
+Compare with the Prisma ORM equivalent of the same operation, which uses `{ create: [...] }` / `{ connect: {...} }` objects at each level. The callback style provides IDE autocompletion on the mutator methods and makes the operation name (create vs connect) a method call rather than a key buried in nested braces.
+
+#### RelationMutator methods
+
+| Method | Available in | Cardinality | Description |
+|--------|-------------|-------------|-------------|
+| `create(data)` | create, update | to-one | Create a new related record |
+| `create(data[])` | create, update | to-many | Create new related records |
+| `connect(criterion)` | create, update | to-one | Link to an existing record by unique fields |
+| `connect(criterion[])` | create, update | to-many | Link to existing records by unique fields |
+| `disconnect()` | update | to-one (nullable FK) | Unlink the related record (set FK to null) |
+| `disconnect(criterion[])` | update | to-many | Unlink specific related records |
+
+The `criterion` argument to `connect()` and `disconnect()` is an object identifying a record by its unique constraint fields (primary key or unique index), similar to Prisma ORM's `connect` syntax.
+
+#### Execution semantics
+
+Nested mutations execute within a **transaction** by default (per ADR 161 section 6). The ORM client orchestrates multiple INSERT/UPDATE statements with propagated generated keys — a parent's auto-generated `id` is captured and used as the FK value in child inserts.
 
 ---
 
@@ -861,7 +896,7 @@ Field arguments for `sum`, `avg`, `min`, `max` are typed to accept only numeric 
 
 ### 8.2 GroupBy
 
-`groupBy()` produces a **different builder type** (`GroupedCollection`) with distinct type state. It is not chainable with `findMany()`.
+`groupBy()` produces a **different builder type** (`GroupedCollection`) with distinct type state. It is not chainable with `all()`.
 
 ```typescript
 const roleStats = await db.users
@@ -957,7 +992,7 @@ const recentAdmins = await db.users
   .admins()
   .recentlyCreated(lastWeek)
   .take(10)
-  .findMany();
+  .all();
 ```
 
 Custom collections are the **primary extension mechanism** for the ORM client. Because every method returns a new Collection (immutability), custom methods compose with all built-in methods and with each other. And because the ORM client propagates the collection registry, custom methods are available everywhere the model appears — including inside `include()` refinement callbacks:
@@ -981,7 +1016,7 @@ This is an internal mechanism. Users don't interact with the registry directly �
 | Item | Rationale | Tracking |
 |------|-----------|----------|
 | Transactions | Separate design concern: isolation levels, retry semantics, savepoints | TML-1912 |
-| Error handling taxonomy | `findUniqueOrThrow`, structured errors, constraint violations | TML-1911 |
+| Error handling taxonomy | `findOrThrow`, structured errors, constraint violations | TML-1911 |
 | Raw SQL escape hatch | Use the DSL lane or driver directly | N/A |
 | Additional comparison operators | `between`, `regex`, `jsonPath` — add incrementally, same pattern | N/A |
 | Computed fields / renaming in select | Significant type complexity, defer | Deferred |
@@ -1068,9 +1103,8 @@ import {
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `findMany()` | `AsyncIterableResult<Row>` | Execute query; async iterable + thenable (`await` → `Row[]`) |
-| `findFirst()` | `Promise<Row \| null>` | First match or null |
-| `findUnique(criterion)` | `Promise<Row \| null>` | Find by unique constraint |
+| `all()` | `AsyncIterableResult<Row>` | All matches; async iterable + thenable (`await` → `Row[]`) |
+| `find()` | `Promise<Row \| null>` | First match or null (LIMIT 1) |
 | `count()` | `Promise<number>` | Count matching records |
 | `sum(field)` | `Promise<number>` | Sum a numeric field |
 | `avg(field)` | `Promise<number>` | Average a numeric field |
@@ -1154,29 +1188,30 @@ async function main(db: ReturnType<typeof createClient>) {
     .admins().active()
     .orderBy(u => u.createdAt.desc())
     .take(10)
-    .findMany();
+    .all();
 
-  // Find unique with projections
+  // Find one with projections
   const alice = await db.users
     .select('name', 'email')
     .include('posts', p => p.published().take(5))
-    .findUnique({ email: 'alice@example.com' });
+    .where({ email: 'alice@example.com' })
+    .find();
 
   // Relational filter
   const usersWithPublishedPosts = await db.users
     .where(u => u.posts.some(p => p.published.eq(true)))
-    .findMany();
+    .all();
 
   // Custom collection methods work inside include refinements
   const usersWithRecentPosts = await db.users
     .include('posts', p => p.published().recent(3))
-    .findMany();
+    .all();
 
   // Create with nested mutation
   const newUser = await db.users.create({
     name: 'Bob',
     email: 'bob@example.com',
-    posts: { create: [{ title: 'My First Post', published: false }] },
+    posts: p => p.create([{ title: 'My First Post', published: false }]),
   });
 
   // Scoped update
@@ -1195,7 +1230,7 @@ async function main(db: ReturnType<typeof createClient>) {
     .orderBy(p => p.id.asc())
     .cursor({ id: lastSeenId })
     .take(20)
-    .findMany();
+    .all();
 }
 ```
 
@@ -1212,9 +1247,9 @@ Changes needed from the current prototype to match this specification:
 | `FilterExpr` | Internal `{ column, op, value }` | PN AST `WhereExpr` |
 | `ColumnAccessor` | Scalar comparisons only (eq, neq, gt, lt, gte, lte) | Full `ModelAccessor` with relation accessors and additional operators |
 | `where()` overloads | Callback only | Callback + direct AST + shorthand object |
-| `findFirst()` return | `AsyncIterableResult<Row>` | `Promise<Row \| null>` |
-| `findMany()` return | `AsyncIterableResult<Row>` (iterable only) | `AsyncIterableResult<Row>` (iterable + thenable) |
-| `findUnique()` | Does not exist | Type-safe unique criterion |
+| `findFirst()` → `find()` | `AsyncIterableResult<Row>` | `Promise<Row \| null>` |
+| `findMany()` → `all()` | `AsyncIterableResult<Row>` (iterable only) | `AsyncIterableResult<Row>` (iterable + thenable) |
+| `findUnique()` | Does not exist | Removed; use `where()` + `find()` |
 | `select()` | Does not exist | Field projection with type narrowing |
 | `cursor()` | Does not exist | Cursor-based pagination |
 | `distinct()` / `distinctOn()` | Does not exist | Distinct selection |
@@ -1223,7 +1258,7 @@ Changes needed from the current prototype to match this specification:
 | Include refinement | Bare Collection | Registered Collection (with custom methods) |
 | `orm()` option key | `repositories` (instances) | `collections` (classes) |
 | Mutations | Do not exist | create, update, delete, upsert + batch variants |
-| Nested mutations | Do not exist | Fluent chain + nested payload |
+| Nested mutations | Do not exist | Nested payload style |
 | Aggregations | Do not exist | count, sum, avg, min, max, groupBy |
 | Logical combinators | Do not exist | `and()`, `or()`, `not()`, `all()` |
 | `orderBy` ergonomics | Returns `{ column, direction }` | Typed accessor with `.asc()` / `.desc()` |

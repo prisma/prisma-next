@@ -34,6 +34,10 @@ const users = await prisma.user.findMany()
 **Prisma Next:**
 ```typescript
 const users = await db.users.findMany()
+
+for await (const user of db.users.findMany()) {
+  
+}
 ```
 
 Both return all records. In Prisma Next, `findMany()` returns an `AsyncIterableResult` that is both async-iterable (for streaming) and thenable (so `await` collects into an array).
@@ -64,7 +68,7 @@ Both return `User | null`.
 
 **Prisma ORM:**
 ```typescript
-const user = await prisma.user.unique({
+const user = await prisma.user.findUnique({
   where: { email: 'alice@example.com' },
 })
 ```
@@ -178,6 +182,20 @@ const users = await db.users
 ```
 
 Same naming (`some`, `every`, `none`). Prisma Next uses callbacks instead of nested objects, which enables IDE autocompletion on the related model's fields.
+
+---
+
+### Composability of Filters
+
+Filters can be defined as free functions so you can use them anywhere a filter is expected and compose them with other filters:
+
+```typescript
+function publishedPosts(posts: Collection<Contract, 'Post'>) {
+  return posts.where(p => p.published.eq(true))
+}
+```
+
+TODO: figure out how we could build reusable filters that work on generic models (e.g. any model that has an `email` field).
 
 ---
 
@@ -494,16 +512,14 @@ const user = await prisma.user.create({
 const user = await db.users.create({
   name: 'Alice',
   email: 'alice@example.com',
-  posts: {
-    create: [
-      { title: 'First Post' },
-      { title: 'Second Post' },
-    ],
-  },
+  posts: p => p.create([
+    { title: 'First Post' },
+    { title: 'Second Post' },
+  ]),
 })
 ```
 
-Nearly identical. Prisma Next drops the `data:` wrapper.
+Prisma ORM uses `{ create: [...] }` objects on relation fields. Prisma Next uses callbacks: the relation field receives a typed `RelationMutator` and the operation name is a method call. This provides IDE autocompletion on the available operations and is consistent with the callback pattern used everywhere else in the API (`where()`, `include()`, `orderBy()`).
 
 ---
 
@@ -523,7 +539,7 @@ const post = await prisma.post.create({
 ```typescript
 const post = await db.posts.create({
   title: 'New Post',
-  author: { connect: { id: authorId } },
+  author: a => a.connect({ id: authorId }),
 })
 ```
 
@@ -555,6 +571,8 @@ const avg = await db.orders.where(o => o.status.eq('completed')).avg('amount')
 
 Prisma ORM bundles aggregations into a single `aggregate()` call with `_sum`, `_avg` etc. Prisma Next has individual methods that return scalars directly.
 
+TODO: fix this, you need to be able to do that in one query.
+
 ---
 
 ### GroupBy
@@ -579,6 +597,8 @@ const result = await db.users
   .count()
 // result: Array<{ role: string; count: number }>
 ```
+
+TODO: `count()` method is confusing
 
 ---
 
@@ -752,6 +772,11 @@ await db.posts
   .findUnique({ id: postId })
   .comments
   .create({ body: 'Great post!' })
+
+await db.comments.create({
+  body: 'Great post!',
+  postId,
+})
 ```
 
 The FK value is inferred from the contract relationship, so you never manually set `postId`.
@@ -788,6 +813,8 @@ await prisma.user.findMany({
 await db.users.cursor({ id: 42 }).findMany()
 //             ^^^^^^ Type error: cursor() requires orderBy()
 ```
+
+Cursors (and other methods) should have an ergonomic and type safe way to conditionally apply them.
 
 ---
 
@@ -1104,68 +1131,41 @@ const org = await prisma.organization.create({
 **Prisma Next:**
 ```typescript
 const org = await db.organizations
-  // better proposal
-  .create(c => ({
-    name: ...,
-    owner: c.connect({ id: founderId }),
+  .create({
+    name: 'Acme Corp',
+    plan: 'enterprise',
+    owner: o => o.connect({ id: founderId }),
     departments: d => d.create([
       {
         name: 'Engineering',
         teams: t => t.create([
-          name: 'Platform',
-          members: m => m....
-        ])
-      }
-    ])
-  }))
-  // current proposal in the spec
-  .create({
-    name: 'Acme Corp',
-    plan: 'enterprise',
-    owner: { connect: { id: founderId } },
-    departments: {
-      create: [
-        {
-          name: 'Engineering',
-          teams: {
-            create: [
-              {
-                name: 'Platform',
-                members: {
-                  create: [
-                    { user: { connect: { email: 'alice@acme.com' } }, role: 'lead' },
-                    { user: { connect: { email: 'bob@acme.com' } }, role: 'member' },
-                  ],
-                },
-              },
-              {
-                name: 'Product',
-                members: {
-                  create: [
-                    { user: { connect: { email: 'charlie@acme.com' } }, role: 'lead' },
-                  ],
-                },
-              },
-            ],
+          {
+            name: 'Platform',
+            members: m => m.create([
+              { role: 'lead', user: u => u.connect({ email: 'alice@acme.com' }) },
+              { role: 'member', user: u => u.connect({ email: 'bob@acme.com' }) },
+            ]),
           },
-        },
-        {
-          name: 'Marketing',
-          teams: {
-            create: [
-              {
-                name: 'Growth',
-                members: {
-                  create: [
-                    { user: { connect: { email: 'diana@acme.com' } }, role: 'lead' },
-                  ],
-                },
-              },
-            ],
+          {
+            name: 'Product',
+            members: m => m.create([
+              { role: 'lead', user: u => u.connect({ email: 'charlie@acme.com' }) },
+            ]),
           },
-        },
-      ],
-    },
+        ]),
+      },
+      {
+        name: 'Marketing',
+        teams: t => t.create([
+          {
+            name: 'Growth',
+            members: m => m.create([
+              { role: 'lead', user: u => u.connect({ email: 'diana@acme.com' }) },
+            ]),
+          },
+        ]),
+      },
+    ]),
   })
   .include('departments', d => d
     .include('teams', t => t
@@ -1174,7 +1174,7 @@ const org = await db.organizations
   )
 ```
 
-For nested **creates**, the payload structure is similar — both APIs need to express the same tree of records. The key differences:
+The Prisma ORM version uses `{ create: [...] }` and `{ connect: {...} }` wrapper objects at every relation level, which are easy to confuse with actual data fields. The Prisma Next version uses callbacks: each relation field receives a typed mutator, and the operation (`create`, `connect`) is a method call with IDE autocompletion. Additional differences:
 - No `data:` wrapper in Prisma Next
 - The `include` (what to return) is separated from the mutation payload, making each concern clearer
 - In Prisma ORM, the `include` block at the end repeats the nesting structure of `data`, duplicating the hierarchy
@@ -1243,3 +1243,43 @@ const companies = await db.companies
 ```
 
 At 5 levels of relational nesting, the Prisma ORM object syntax becomes a wall of braces where it's easy to lose track of which `some` belongs to which relation. The callback style makes each level's scope explicit through function parameters (`c`, `d`, `t`, `m`, `u`, `p`), and the IDE provides autocompletion at every level.
+
+## Q&A Session on Feb 17
+
+---
+
+findMany() -> all()
+findUnique() -> find()
+
+---
+
+Demonstrate composability of filters with free-standing functions.
+
+---
+
+`isNull()`
+
+---
+
+Operations shouldn't be delayed until `then` is called, we already send the request to the database, we just don't read the response until you choose how to consume the result (array or stream).
+
+We need to be compatible with Effect.tryPromise
+
+---
+
+Consider models
+
+---
+
+question: how would we mix into our repositories custom functions for e.g. ParadeDB search operations?
+answer: you build a `WhereExpr` node that contains a raw SQL operator added by the ParadeDB extension
+
+---
+
+`omit` shouldn't be mutually exclusive with `select` so that we don't break composition
+
+Idea: `omit` shouldn't even be a method on the collection, `select` is the only way to define the projection. For omit functionality, consider this:
+
+```typescript
+db.users.select(schema.users.fields.omit('password'))
+```
