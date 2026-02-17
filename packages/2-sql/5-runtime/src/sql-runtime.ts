@@ -198,8 +198,30 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     return new AsyncIterableResult(iterator(this));
   }
 
-  connection(): Promise<RuntimeConnection> {
-    return this.core.connection();
+  async connection(): Promise<RuntimeConnection> {
+    const coreConn = await this.core.connection();
+    const self = this;
+    const wrappedConnection: RuntimeConnection = {
+      async transaction(): Promise<RuntimeTransaction> {
+        const coreTx = await coreConn.transaction();
+        return {
+          commit: coreTx.commit.bind(coreTx),
+          rollback: coreTx.rollback.bind(coreTx),
+          execute<Row = Record<string, unknown>>(
+            plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+          ): AsyncIterableResult<Row> {
+            return self.execute(plan);
+          },
+        };
+      },
+      release: coreConn.release.bind(coreConn),
+      execute<Row = Record<string, unknown>>(
+        plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+      ): AsyncIterableResult<Row> {
+        return self.execute(plan);
+      },
+    };
+    return wrappedConnection;
   }
 
   telemetry(): RuntimeTelemetryEvent | null {

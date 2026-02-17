@@ -1,6 +1,11 @@
 import type { ContractBase, ExecutionPlan } from '@prisma-next/contract/types';
-import type { RuntimeConnection, RuntimeTransaction } from '@prisma-next/runtime-executor';
+import type {
+  AsyncIterableResult,
+  RuntimeConnection,
+  RuntimeTransaction,
+} from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { CompiledQuery, DatabaseConnection, QueryResult, TransactionSettings } from 'kysely';
 import { runGuardrails } from './transform/guardrails';
@@ -43,10 +48,11 @@ export class KyselyPrismaConnection implements DatabaseConnection {
     if (!this.#connection) {
       throw new Error('Invoked executeQuery on released connection');
     }
-    const plan = this.#createExecutionPlan(compiledQuery as CompiledQuery<R>);
-    return {
-      rows: await this.#connection.execute(plan).toArray(),
+    const plan = this.#createExecutionPlan<R>(compiledQuery);
+    const conn = this.#connection as {
+      execute<P>(p: ExecutionPlan<P> | SqlQueryPlan<P>): AsyncIterableResult<P>;
     };
+    return { rows: await conn.execute(plan).toArray() };
   }
 
   async release(): Promise<void> {
@@ -69,8 +75,11 @@ export class KyselyPrismaConnection implements DatabaseConnection {
     if (!this.#connection) {
       throw new Error('Invoked streamQuery on released connection');
     }
-    const plan = this.#createExecutionPlan(compiledQuery as CompiledQuery<R>);
-    const results = this.#connection.execute(plan);
+    const plan = this.#createExecutionPlan<R>(compiledQuery);
+    const conn = this.#connection as {
+      execute<P>(p: ExecutionPlan<P> | SqlQueryPlan<P>): AsyncIterableResult<P>;
+    };
+    const results = conn.execute(plan);
 
     const generator = async function* (): AsyncIterableIterator<QueryResult<R>> {
       let chunk: R[] = [];
@@ -89,7 +98,7 @@ export class KyselyPrismaConnection implements DatabaseConnection {
     return generator();
   }
 
-  #createExecutionPlan<R>(compiledQuery: CompiledQuery<R>): ExecutionPlan<R, unknown> {
+  #createExecutionPlan<R>(compiledQuery: CompiledQuery<R>): SqlQueryPlan<R> | ExecutionPlan<R> {
     const query = (compiledQuery as { query?: unknown }).query;
     const sqlContract = this.#contract as SqlContract<SqlStorage>;
 
@@ -111,17 +120,19 @@ export class KyselyPrismaConnection implements DatabaseConnection {
         annotations.selectAllIntent = metaAdditions.selectAllIntent;
       }
 
+      const paramDescriptors = metaAdditions.paramDescriptors;
+      const params = compiledQuery.parameters.slice(0, paramDescriptors.length);
+
       return {
         ast,
-        sql: compiledQuery.sql,
-        params: compiledQuery.parameters,
+        params,
         meta: {
           target: this.#contract.target,
           targetFamily: this.#contract.targetFamily,
           storageHash: this.#contract.storageHash,
           ...ifDefined('profileHash', this.#contract.profileHash),
           lane: 'kysely' as const,
-          paramDescriptors: metaAdditions.paramDescriptors,
+          paramDescriptors,
           refs: metaAdditions.refs,
           ...ifDefined('projection', metaAdditions.projection),
           ...ifDefined(
