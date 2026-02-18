@@ -598,24 +598,36 @@ This distinction matters for two reasons:
 
 2. **Compatibility with effect systems.** Libraries like Effect's `tryPromise` expect to receive a function that initiates work. With eager execution, the terminal method is that function — the returned thenable is a straightforward value, not a lazy thunk that re-executes on each `.then()` call.
 
-#### `find()`
+#### `find(filter?)`
 
 Returns the first matching record or `null`. Compiles to `LIMIT 1`.
 
+`find()` accepts the same filter argument as `where()` — callback, AST node, or shorthand object. If provided, it is ANDed with any existing `where()` filters on the collection. This is a convenience so that common lookups don't require a separate `.where()` call:
+
 ```typescript
-const user: UserRow | null = await db.users
-  .where({ email: 'alice@example.com' })
+// Inline filter (most common for unique lookups)
+const user = await db.users.find({ id: 42 });
+const user = await db.users.find({ email: 'alice@example.com' });
+
+// Composes with prior where() — filters are ANDed
+const activeAlice = await db.users
+  .where(u => u.active.eq(true))
+  .find({ email: 'alice@example.com' });
+
+// No argument — first match from accumulated filters
+const firstAdmin = await db.users
+  .where(u => u.role.eq('admin'))
   .find();
 
+// Composes with select() and include()
 const user = await db.users
   .select('name', 'email')
   .include('posts')
-  .where({ id: 42 })
-  .find();
+  .find({ id: 42 });
 // Type: { name: string; email: string; posts: PostRow[] } | null
 ```
 
-There is no separate `findUnique` method. Unique lookups use the same `where()` + `find()` pattern — the database optimizer will use the unique index regardless. This keeps the API surface minimal: `where()` is the single way to specify criteria, `find()` is the single way to get one record.
+There is no separate `findUnique` method. The database optimizer will use a unique index when the filter matches one, regardless of whether the API knows about it.
 
 ### 6.3 Include Execution Strategies
 
@@ -1104,7 +1116,7 @@ import {
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `all()` | `AsyncIterableResult<Row>` | All matches; async iterable + thenable (`await` → `Row[]`) |
-| `find()` | `Promise<Row \| null>` | First match or null (LIMIT 1) |
+| `find(filter?)` | `Promise<Row \| null>` | First match or null (LIMIT 1); filter ANDed with existing `where()` |
 | `count()` | `Promise<number>` | Count matching records |
 | `sum(field)` | `Promise<number>` | Sum a numeric field |
 | `avg(field)` | `Promise<number>` | Average a numeric field |
@@ -1194,8 +1206,7 @@ async function main(db: ReturnType<typeof createClient>) {
   const alice = await db.users
     .select('name', 'email')
     .include('posts', p => p.published().take(5))
-    .where({ email: 'alice@example.com' })
-    .find();
+    .find({ email: 'alice@example.com' });
 
   // Relational filter
   const usersWithPublishedPosts = await db.users

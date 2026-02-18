@@ -1,6 +1,6 @@
 # Prisma ORM vs Prisma Next — API Comparison
 
-This document compares Prisma ORM's `PrismaClient` API with the Prisma Next ORM Client API specified in `spec.md`. Section 1 covers side-by-side equivalents. Section 2 covers capabilities unique to Prisma Next.
+This document compares Prisma ORM's `PrismaClient` API with the Prisma Next ORM Client API specified in `spec.md`. Section 1 covers side-by-side equivalents. Section 2 covers capabilities unique to Prisma Next. Section 3 shows deeply nested queries side by side.
 
 ---
 
@@ -24,7 +24,7 @@ const db = orm({ contract, runtime })
 
 ---
 
-### findMany
+### all (findMany)
 
 **Prisma ORM:**
 ```typescript
@@ -33,41 +33,28 @@ const users = await prisma.user.findMany()
 
 **Prisma Next:**
 ```typescript
-const users = await db.users.findMany()
+const users = await db.users.all()
 
-for await (const user of db.users.findMany()) {
-  
+// Streaming — rows arrive as they're read from the database
+for await (const user of db.users.all()) {
+  process.stdout.write(JSON.stringify(user) + '\n')
 }
 ```
 
-Both return all records. In Prisma Next, `findMany()` returns an `AsyncIterableResult` that is both async-iterable (for streaming) and thenable (so `await` collects into an array).
+Both return all records. In Prisma Next, `all()` returns an `AsyncIterableResult` that is both async-iterable (for streaming) and thenable (so `await` collects into an array). The query is sent eagerly when `all()` is called — only reading the response is lazy.
 
 ---
 
-### findFirst
+### find (findFirst / findUnique)
 
 **Prisma ORM:**
 ```typescript
+// findFirst — first match
 const user = await prisma.user.findFirst({
   where: { email: 'alice@example.com' },
 })
-```
 
-**Prisma Next:**
-```typescript
-const user = await db.users
-  .where({ email: 'alice@example.com' })
-  .first()
-```
-
-Both return `User | null`.
-
----
-
-### findUnique
-
-**Prisma ORM:**
-```typescript
+// findUnique — by unique constraint
 const user = await prisma.user.findUnique({
   where: { email: 'alice@example.com' },
 })
@@ -75,10 +62,21 @@ const user = await prisma.user.findUnique({
 
 **Prisma Next:**
 ```typescript
-const user = await db.users.unique({ email: 'alice@example.com' })
+// find() with inline filter — covers both findFirst and findUnique use cases
+const user = await db.users.find({ email: 'alice@example.com' })
+
+// find() with prior where()
+const user = await db.users
+  .where(u => u.active.eq(true))
+  .find({ email: 'alice@example.com' })
+
+// find() with no argument — first match from accumulated filters
+const firstAdmin = await db.users
+  .where(u => u.role.eq('admin'))
+  .find()
 ```
 
-Both derive the allowed unique criteria from the schema/contract. Prisma Next passes the criterion directly as an argument rather than wrapping it in `{ where: ... }`.
+Prisma Next has a single `find()` method that returns `Promise<Row | null>` (LIMIT 1). It optionally accepts a filter argument (same types as `where()`), ANDed with any existing filters. There is no separate `findUnique` — the database optimizer uses the unique index regardless.
 
 ---
 
@@ -94,10 +92,10 @@ const admins = await prisma.user.findMany({
 **Prisma Next:**
 ```typescript
 // Shorthand (same shape as Prisma ORM's where)
-const admins = await db.users.where({ role: 'admin' }).findMany()
+const admins = await db.users.where({ role: 'admin' }).all()
 
 // Callback with typed accessor
-const admins = await db.users.where(u => u.role.eq('admin')).findMany()
+const admins = await db.users.where(u => u.role.eq('admin')).all()
 ```
 
 ---
@@ -124,7 +122,7 @@ const users = await db.users
     or(u.email.ilike('%@example.com'), u.role.eq('admin')),
     not(u.active.eq(false)),
   ))
-  .findMany()
+  .all()
 ```
 
 Prisma ORM uses nested objects (`AND`, `OR`, `NOT` keys). Prisma Next uses composable functions (`and()`, `or()`, `not()`).
@@ -154,7 +152,7 @@ const recent = await db.users
     u.role.in(['admin', 'moderator']),
     u.deletedAt.isNull(),
   ))
-  .findMany()
+  .all()
 ```
 
 Prisma ORM uses nested objects for operators (`{ gte: ... }`). Prisma Next uses method calls on typed field accessors (`.gte()`, `.ilike()`, `.in()`).
@@ -178,7 +176,7 @@ const users = await prisma.user.findMany({
 ```typescript
 const users = await db.users
   .where(u => u.posts.some(p => p.published.eq(true)))
-  .findMany()
+  .all()
 ```
 
 Same naming (`some`, `every`, `none`). Prisma Next uses callbacks instead of nested objects, which enables IDE autocompletion on the related model's fields.
@@ -210,7 +208,7 @@ const users = await prisma.user.findMany({
 
 **Prisma Next:**
 ```typescript
-const users = await db.users.include('posts').findMany()
+const users = await db.users.include('posts').all()
 ```
 
 ---
@@ -238,7 +236,7 @@ const users = await db.users
      .orderBy(post => post.createdAt.desc())
      .take(5)
   )
-  .findMany()
+  .all()
 ```
 
 Prisma ORM nests options inside the include object. Prisma Next uses a refinement callback that receives a Collection for the related model, so the same chainable API is used at every level.
@@ -264,7 +262,7 @@ const users = await prisma.user.findMany({
 ```typescript
 const users = await db.users
   .include('posts', p => p.include('comments'))
-  .findMany()
+  .all()
 ```
 
 ---
@@ -280,7 +278,7 @@ const users = await prisma.user.findMany({
 
 **Prisma Next:**
 ```typescript
-const users = await db.users.select('id', 'email').findMany()
+const users = await db.users.select('id', 'email').all()
 ```
 
 Prisma ORM uses `{ field: true }` objects. Prisma Next uses string arguments. In Prisma ORM, `select` and `include` are mutually exclusive. In Prisma Next, they are complementary (see section 2).
@@ -303,7 +301,7 @@ const users = await prisma.user.findMany({
 ```typescript
 const users = await db.users
   .orderBy([u => u.lastName.asc(), u => u.firstName.asc()])
-  .findMany()
+  .all()
 ```
 
 ---
@@ -325,7 +323,7 @@ const users = await db.users
   .orderBy(u => u.createdAt.desc())
   .skip(20)
   .take(10)
-  .findMany()
+  .all()
 ```
 
 ---
@@ -348,7 +346,7 @@ const users = await db.users
   .orderBy(u => u.id.asc())
   .cursor({ id: 42 })
   .take(10)
-  .findMany()
+  .all()
 ```
 
 ---
@@ -364,13 +362,13 @@ const users = await prisma.user.findMany({
 
 **Prisma Next:**
 ```typescript
-const users = await db.users.distinct('role').findMany()
+const users = await db.users.distinct('role').all()
 
 // Or DISTINCT ON (Postgres) with required ordering:
 const users = await db.users
   .orderBy(u => u.createdAt.desc())
   .distinctOn('email')
-  .findMany()
+  .all()
 ```
 
 ---
@@ -613,7 +611,7 @@ Prisma ORM always collects results into an array in memory before returning.
 const users = await prisma.user.findMany() // User[]
 
 // Prisma Next — stream rows as they arrive from the database
-for await (const user of db.users.findMany()) {
+for await (const user of db.users.all()) {
   process.stdout.write(JSON.stringify(user) + '\n')
 }
 ```
@@ -647,7 +645,7 @@ const recentAdmins = await admins
   .where(u => u.createdAt.gte(lastWeek))
   .orderBy(u => u.createdAt.desc())
   .take(10)
-  .findMany()
+  .all()
 
 const adminCount = await admins.count()
 ```
@@ -690,12 +688,12 @@ const results = await db.users
   .orderBy(u => u.createdAt.desc())
   .take(10)
   .include('posts')
-  .findMany()
+  .all()
 
 // Custom methods also work inside include refinements
 const usersWithRecentPosts = await db.users
   .include('posts', p => p.published().recent(5))
-  .findMany()
+  .all()
 ```
 
 ---
@@ -721,7 +719,7 @@ function buildFilters(params: URLSearchParams): WhereExpr[] {
 const externalFilters = buildFilters(req.query)
 const users = await db.users
   .where(and(...externalFilters))
-  .findMany()
+  .all()
 ```
 
 ---
@@ -749,37 +747,39 @@ const user = await prisma.user.findUnique({
 const user = await db.users
   .select('name', 'email')
   .include('posts')
-  .findUnique({ id: 42 })
+  .find({ id: 42 })
 // Type: { name: string; email: string; posts: PostRow[] } | null
 ```
 
 ---
 
-### Fluent Chain Nested Mutations
+### Callback-Based Nested Mutations
 
-Prisma ORM supports nested writes inside `create`/`update` payloads, but navigating from a parent to a child collection for a targeted mutation requires separate queries.
+Prisma ORM uses `{ create: [...] }` / `{ connect: {...} }` wrapper objects on relation fields. These are structurally identical to data fields, making it easy to confuse operations with values in deeply nested payloads.
+
+Prisma Next uses callbacks: each relation field receives a typed `RelationMutator`, and the operation is a method call with IDE autocompletion.
 
 ```typescript
-// Prisma ORM — must look up the parent, then create on the child model
-const post = await prisma.post.findUnique({ where: { id: postId } })
-if (!post) throw new Error('not found')
-await prisma.comment.create({
-  data: { body: 'Great post!', postId: post.id },
+// Prisma ORM — nested objects, hard to distinguish operations from data
+const user = await prisma.user.create({
+  data: {
+    name: 'Alice',
+    posts: {
+      create: [{ title: 'Post' }],
+    },
+    department: {
+      connect: { id: deptId },
+    },
+  },
 })
 
-// Prisma Next — fluent chain navigates from parent to child
-await db.posts
-  .findUnique({ id: postId })
-  .comments
-  .create({ body: 'Great post!' })
-
-await db.comments.create({
-  body: 'Great post!',
-  postId,
+// Prisma Next — callbacks make operations explicit
+const user = await db.users.create({
+  name: 'Alice',
+  posts: p => p.create([{ title: 'Post' }]),
+  department: d => d.connect({ id: deptId }),
 })
 ```
-
-The FK value is inferred from the contract relationship, so you never manually set `postId`.
 
 ---
 
@@ -810,7 +810,7 @@ await prisma.user.findMany({
 })
 
 // Prisma Next — compile-time error
-await db.users.cursor({ id: 42 }).findMany()
+await db.users.cursor({ id: 42 }).all()
 //             ^^^^^^ Type error: cursor() requires orderBy()
 ```
 
@@ -853,7 +853,7 @@ const users = await db.users
       )
     )
   )
-  .findMany()
+  .all()
 ```
 
 The callback style provides autocompletion for each related model's fields, whereas the object style requires remembering the nested structure.
@@ -866,7 +866,7 @@ Prisma ORM always uses a fixed query strategy per target. Prisma Next selects th
 
 ```typescript
 // Both produce the same API call:
-const users = await db.users.include('posts').findMany()
+const users = await db.users.include('posts').all()
 
 // But under the hood:
 // — On Postgres (has lateral + jsonAgg): single query with LATERAL subquery
@@ -954,7 +954,7 @@ const users = await db.users
   )
   .orderBy(u => u.name.asc())
   .take(20)
-  .findMany()
+  .all()
 ```
 
 Each `.include()` call is a self-contained, composable callback. The Prisma ORM version requires mentally tracking 6 levels of brace nesting. The Prisma Next version reads top-to-bottom, one concern per line.
@@ -1050,7 +1050,7 @@ const orders = await db.orders
   .include('payment', p => p.select('method', 'last4', 'status'))
   .orderBy(o => o.createdAt.desc())
   .take(10)
-  .findMany()
+  .all()
 ```
 
 The Prisma ORM version is 50+ lines of nested braces where `include`, `where`, `select`, and `orderBy` all coexist at the same object level, making it easy to confuse which option belongs to which model. The Prisma Next version uses a consistent pattern at every level: the callback receives a collection for the related model, and you chain the same methods you'd use at the top level.
@@ -1239,47 +1239,21 @@ const companies = await db.companies
       )
     ),
   ))
-  .findMany()
+  .all()
 ```
 
 At 5 levels of relational nesting, the Prisma ORM object syntax becomes a wall of braces where it's easy to lose track of which `some` belongs to which relation. The callback style makes each level's scope explicit through function parameters (`c`, `d`, `t`, `m`, `u`, `p`), and the IDE provides autocompletion at every level.
 
-## Q&A Session on Feb 17
-
 ---
 
-findMany() -> all()
-findUnique() -> find()
+## Open Questions from Q&A Session (Feb 17)
 
----
+These items were raised during team review and haven't been fully incorporated into the spec yet.
 
-Demonstrate composability of filters with free-standing functions.
-
----
-
-`isNull()`
-
----
-
-Operations shouldn't be delayed until `then` is called, we already send the request to the database, we just don't read the response until you choose how to consume the result (array or stream).
-
-We need to be compatible with Effect.tryPromise
-
----
-
-Consider models
-
----
-
-question: how would we mix into our repositories custom functions for e.g. ParadeDB search operations?
-answer: you build a `WhereExpr` node that contains a raw SQL operator added by the ParadeDB extension
-
----
-
-`omit` shouldn't be mutually exclusive with `select` so that we don't break composition
-
-Idea: `omit` shouldn't even be a method on the collection, `select` is the only way to define the projection. For omit functionality, consider this:
-
-```typescript
-db.users.select(schema.users.fields.omit('password'))
-```
+- **Aggregation in one query:** The current spec has separate `sum()`, `avg()` etc. methods that each execute a query. Need a way to compute multiple aggregations in a single round-trip.
+- **GroupBy `count()` naming:** The `count()` method on `GroupedCollection` is confusing — it reads like a terminal that returns a number, but it adds a count column to the group result.
+- **Generic reusable filters:** How to build filters that work on any model with a given field (e.g. any model with an `email` field).
+- **ParadeDB / extension operators:** Build a `WhereExpr` node containing a raw SQL operator added by the extension.
+- **`omit` as a complement to `select`:** Rather than a separate method, use `select(schema.users.fields.omit('password'))` to keep composition clean.
+- **Conditional method application:** Cursors and other methods need an ergonomic, type-safe way to be conditionally applied.
+- **Consider models:** Explore what typed model instances could look like beyond plain row objects.
