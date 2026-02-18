@@ -289,7 +289,7 @@
             "nativeType": "json",
             "nullable": true,
             "typeParams": {
-              "schema": {
+              "schemaJson": {
                 "$schema": "http://json-schema.org/draft-07/schema#",
                 "properties": {
                   "rank": {
@@ -371,7 +371,7 @@
             "nativeType": "jsonb",
             "nullable": true,
             "typeParams": {
-              "schema": {
+              "schemaJson": {
                 "$schema": "http://json-schema.org/draft-07/schema#",
                 "properties": {
                   "active": {

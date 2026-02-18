@@ -49,7 +49,7 @@ protocol. Any compliant schema value exposes:
 | Property                         | Used For                     |
 | -------------------------------- | ---------------------------- |
 | `~standard.types.output`         | **Compile-time** — TypeScript type narrowing in `contract.d.ts` via `parameterizedOutput` |
-| `~standard.jsonSchema.output`    | **Build-time** — serializable JSON Schema stored in `contract.json` `typeParams.schema`   |
+| `~standard.jsonSchema.output`    | **Build-time** — serializable JSON Schema stored in `contract.json` `typeParams.schemaJson`   |
 | `.expression` (Arktype-specific) | **Optional shortcut** — if the library provides a TS expression string, the renderer uses it directly instead of deriving from JSON Schema |
 
 ### Why users are NOT forced to use Arktype
@@ -89,7 +89,7 @@ directly in the public API. Arktype is used internally for param validation sche
               │  column-types.ts                  │
               │  createJsonColumnFactory()        │
               │  → extracts ~standard.jsonSchema  │
-              │  → stores in typeParams.schema    │
+              │  → stores in typeParams.schemaJson │
               │  → optionally stores .expression  │
               │    in typeParams.type             │
               └──────────┬───────────────────────┘
@@ -98,7 +98,7 @@ directly in the public API. Arktype is used internally for param validation sche
          ▼               ▼                       ▼
   contract.json    descriptor-meta.ts      codec-types.ts
   (typeParams.     (parameterized          (compile-time
-   schema: {...})   renderer →              parameterizedOutput
+   schemaJson: {...}) renderer →            parameterizedOutput
                     renderJsonType          → ResolveStandard
                     Expression())            SchemaOutput<P>)
          │               │                       │
@@ -113,12 +113,14 @@ directly in the public API. Arktype is used internally for param validation sche
 ### Data flow (authoring → emission → runtime)
 
 1. **Authoring**: `jsonb(schema)` extracts `~standard.jsonSchema.output` → stores as
-   `typeParams.schema` (a plain JSON Schema object). If the schema also exposes
+   `typeParams.schemaJson` (a plain JSON Schema object). If the schema also exposes
    `.expression` (Arktype does), stores it as `typeParams.type`.
+   The `schema` key is preserved only at the type level as a phantom for
+   `ResolveStandardSchemaOutput<P>`.
 
 2. **Emission**: The parameterized renderer in `descriptor-meta.ts` checks `typeParams`:
    - If `typeParams.type` exists and passes safety check → emit that string directly
-   - Else if `typeParams.schema` exists → run `renderTypeScriptTypeFromJsonSchema()` to
+  - Else if `typeParams.schemaJson` exists → run `renderTypeScriptTypeFromJsonSchema()` to
      convert JSON Schema → inline TS type expression
    - Else → emit `JsonValue`
 
@@ -192,7 +194,7 @@ directly in the public API. Arktype is used internally for param validation sche
 - Add static descriptors: `jsonColumn` and `jsonbColumn` (no schema, untyped)
 - Add factory functions: `json(schema?)` and `jsonb(schema?)` with overloads:
   - No-arg: returns static descriptor (equivalent to `jsonColumn` / `jsonbColumn`)
-  - With schema: validates it's Standard Schema, extracts JSON Schema → `typeParams.schema`,
+  - With schema: validates it's Standard Schema, extracts JSON Schema → `typeParams.schemaJson`,
     optionally extracts `.expression` → `typeParams.type`
 - Define `TypedColumnDescriptor<TSchema>` return type that preserves the schema reference
   in `typeParams` for compile-time type inference
@@ -222,7 +224,7 @@ directly in the public API. Arktype is used internally for param validation sche
 **What to do:**
 - Add parameterized renderers for `PG_JSON_CODEC_ID` and `PG_JSONB_CODEC_ID`:
   - Both use `renderJsonTypeExpression(params)` function
-  - Resolution order: `params.type` string → `params.schema` JSON Schema → `'JsonValue'`
+  - Resolution order: `params.type` string → `params.schemaJson` JSON Schema → `'JsonValue'`
 - Add `isSafeTypeExpression(expr)` — rejects `import()`, `require()`, `declare`, `export`,
   `eval()` patterns to prevent code injection in `.d.ts` files
 - Add `JsonValue` to `typeImports` array so it's available in generated contract types
@@ -245,7 +247,7 @@ directly in the public API. Arktype is used internally for param validation sche
 - `packages/3-targets/6-adapters/postgres/src/exports/runtime.ts`
 
 **What to do:**
-- Add `jsonTypeParamsSchema` (Arktype: `{ schema: 'object', 'type?': 'string' }`)
+- Add `jsonTypeParamsSchema` (Arktype: `{ schemaJson: 'object', 'type?': 'string' }`)
 - Add `parameterizedCodecDescriptors` for both `PG_JSON_CODEC_ID` and `PG_JSONB_CODEC_ID`
   with the params schema — enables runtime verification of `typeParams` shape
 - These descriptors are exposed via `parameterizedCodecs()` on the adapter descriptor
@@ -330,7 +332,7 @@ directly in the public API. Arktype is used internally for param validation sche
 | Test File | Covers |
 |-----------|--------|
 | `test/integration/test/contract-builder.types.test-d.ts` | Type inference: `jsonb(schema)` preserves typed output, `jsonb()` falls back to `JsonValue`, `ResultType<>` resolves correctly |
-| `sql-family/test/emit-parameterized.test.ts` | Emitter renders concrete types from `typeParams.schema`, falls back to `JsonValue`, handles Arktype `.expression` shortcut |
+| `sql-family/test/emit-parameterized.test.ts` | Emitter renders concrete types from `typeParams.schemaJson`, falls back to `JsonValue`, handles Arktype `.expression` shortcut |
 
 ### DDL Tests
 
