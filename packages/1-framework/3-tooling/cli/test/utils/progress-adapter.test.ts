@@ -29,7 +29,7 @@ describe('progress adapter', () => {
     adapter(event);
   });
 
-  it('handles spanStart and spanEnd events', () => {
+  it('handles spanStart and spanEnd events', { timeout: 2000 }, () => {
     // Mock process.stdout.isTTY
     const originalIsTTY = process.stdout.isTTY;
     process.stdout.isTTY = true;
