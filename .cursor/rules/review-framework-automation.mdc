@@ -1,0 +1,12 @@
+---
+description: Review-framework automation should use helper scripts, not inline parsers
+globs:
+  - "agent-os/specs/review-framework/**/*.json"
+  - ".claude/skills/review-implement-phase/**/*"
+alwaysApply: false
+---
+
+- For review-framework automation, do not use inline parser snippets (`python -c`, `node -e`, `ruby -e`, ad-hoc awk/sed JSON parsing).
+- Use dedicated helper scripts for GitHub thread admin operations (reply, resolve, status updates).
+- `jq` is a required dependency for review implement workflows. If `jq` is missing, halt and ask the user to install it before continuing.
+- Keep shell commands short and encoded; avoid long inline scripts in prompts or execution steps.
