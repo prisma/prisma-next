@@ -25,7 +25,8 @@ Expose contract authoring helpers:
 
 Use existing parameterized type infrastructure (`typeParams`) to carry schema metadata:
 
-- `jsonb(auditSchema)` stores schema output JSON Schema in `typeParams.schema`
+- `jsonb(auditSchema)` stores schema output JSON Schema in `typeParams.schemaJson`
+- `typeParams.schema` is a phantom type-level key used only for Standard Schema output inference
 - `contract.d.ts` rendering derives a type expression from schema metadata when present
 - fallback type is `JsonValue` when no schema is provided
 

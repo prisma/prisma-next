@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "Postgres target pack for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -33,7 +33,8 @@
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -43,17 +44,9 @@
     "packs"
   ],
   "exports": {
-    "./control": {
-      "types": "./dist/exports/control.d.ts",
-      "import": "./dist/exports/control.js"
-    },
-    "./runtime": {
-      "types": "./dist/exports/runtime.d.ts",
-      "import": "./dist/exports/runtime.js"
-    },
-    "./pack": {
-      "types": "./dist/exports/pack.d.ts",
-      "import": "./dist/exports/pack.js"
-    }
+    "./control": "./dist/control.mjs",
+    "./pack": "./dist/pack.mjs",
+    "./runtime": "./dist/runtime.mjs",
+    "./package.json": "./package.json"
   }
 }

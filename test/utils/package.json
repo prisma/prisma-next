@@ -5,7 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "scripts": {
-    "build": "tsup --config tsup.config.ts",
+    "build": "tsdown",
     "test": "vitest run --passWithNoTests",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
@@ -17,30 +17,31 @@
     "@prisma/dev": "catalog:",
     "@types/pg": "catalog:",
     "pg": "catalog:",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "exports": {
     ".": {
-      "types": "./dist/exports/index.d.ts",
-      "import": "./dist/exports/index.js"
+      "types": "./dist/exports/index.d.mts",
+      "import": "./dist/exports/index.mjs"
     },
     "./column-descriptors": {
-      "types": "./dist/exports/column-descriptors.d.ts",
-      "import": "./dist/exports/column-descriptors.js"
+      "types": "./dist/exports/column-descriptors.d.mts",
+      "import": "./dist/exports/column-descriptors.mjs"
     },
     "./operation-descriptors": {
-      "types": "./dist/exports/operation-descriptors.d.ts",
-      "import": "./dist/exports/operation-descriptors.js"
+      "types": "./dist/exports/operation-descriptors.d.mts",
+      "import": "./dist/exports/operation-descriptors.mjs"
     },
     "./timeouts": {
-      "types": "./dist/exports/timeouts.d.ts",
-      "import": "./dist/exports/timeouts.js"
+      "types": "./dist/exports/timeouts.d.mts",
+      "import": "./dist/exports/timeouts.mjs"
     },
     "./typed-expectations": {
-      "types": "./dist/exports/typed-expectations.d.ts",
-      "import": "./dist/exports/typed-expectations.js"
+      "types": "./dist/exports/typed-expectations.d.mts",
+      "import": "./dist/exports/typed-expectations.mjs"
     }
   }
 }

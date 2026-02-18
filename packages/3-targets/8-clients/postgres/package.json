@@ -43,8 +43,14 @@
     "node": ">=20"
   },
   "exports": {
-    ".": "./dist/runtime.mjs",
-    "./runtime": "./dist/runtime.mjs",
+    ".": {
+      "types": "./dist/runtime.d.mts",
+      "import": "./dist/runtime.mjs"
+    },
+    "./runtime": {
+    "types": "./dist/runtime.d.mts",
+    "import": "./dist/runtime.mjs"
+  },
     "./package.json": "./package.json"
   },
   "main": "./dist/runtime.mjs",

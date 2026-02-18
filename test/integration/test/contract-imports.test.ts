@@ -198,13 +198,13 @@ type UserIdColumn = UserColumns['id'];
           baseUrl: '.',
           paths: {
             '@prisma-next/sql-contract/types': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types.d.ts`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/types.d.mts`,
             ],
             '@prisma-next/sql-contract/types/*': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types/*`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
-              `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/exports/*`,
+              `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/*`,
             ],
           },
         },
@@ -331,22 +331,22 @@ type CodecIntType = CodecTypes['pg/int4@1'];
           baseUrl: '.',
           paths: {
             '@prisma-next/sql-contract-ts/*': [
-              `${relativeToWorkspace}/packages/2-sql/2-authoring/contract-ts/dist/exports/*.d.ts`,
+              `${relativeToWorkspace}/packages/2-sql/2-authoring/contract-ts/dist/*`,
             ],
             '@prisma-next/sql-contract/types': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/types.d.ts`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/types.d.mts`,
             ],
             '@prisma-next/sql-contract/types/*': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/*`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/*`,
             ],
             '@prisma-next/sql-contract/validate': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/validate.d.ts`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/validate.d.mts`,
             ],
             '@prisma-next/sql-contract/validate/*': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/exports/validate/*`,
+              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/*`,
             ],
             '@prisma-next/adapter-postgres/*': [
-              `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/exports/*`,
+              `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/*`,
             ],
             '@prisma-next/sql-query/*': [
               `${relativeToWorkspace}/packages/sql-query/dist/exports/*.d.ts`,

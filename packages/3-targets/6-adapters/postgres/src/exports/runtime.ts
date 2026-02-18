@@ -29,7 +29,7 @@ function createPostgresCodecRegistry(): CodecRegistry {
 }
 
 const jsonTypeParamsSchema = arktype({
-  schema: 'object',
+  schemaJson: 'object',
   'type?': 'string',
 });
 

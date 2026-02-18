@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "ORM builder, include lowering, and relation filters for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -27,7 +27,8 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -36,13 +37,11 @@
     "src"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/exports/orm.d.ts",
-      "import": "./dist/exports/orm.js"
-    },
-    "./orm": {
-      "types": "./dist/exports/orm.d.ts",
-      "import": "./dist/exports/orm.js"
-    }
-  }
+    ".": "./dist/index.mjs",
+    "./orm": "./dist/exports/orm.mjs",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts"
 }

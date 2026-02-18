@@ -1,3 +1,4 @@
+import type { Char } from '@prisma-next/adapter-postgres/codec-types';
 import { param } from '@prisma-next/sql-relational-core/param';
 import type {
   AnyExpressionSource,
@@ -49,9 +50,7 @@ test('ResultType exposes projected keys for similarity query result', () => {
     .build({ params: { queryVector: [1, 2, 3] } });
 
   type Row = ResultType<typeof _plan>;
-  expectTypeOf<Row>().toExtend<{
-    id: unknown;
-    title: unknown;
-    distance: unknown;
-  }>();
+  expectTypeOf<Row['distance']>().toEqualTypeOf<number>();
+  expectTypeOf<Row['id']>().toEqualTypeOf<Char<36>>();
+  expectTypeOf<Row['title']>().toEqualTypeOf<string>();
 });

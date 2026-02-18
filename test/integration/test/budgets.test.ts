@@ -206,46 +206,50 @@ describe('budgets plugin integration', () => {
     expect(results.length).toBe(5);
   });
 
-  it('blocks streaming when observed rows exceed budget', async () => {
-    const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
-      fixtureContract,
-      {
-        connect: { client },
-        cursor: { disabled: true },
-      },
-      {
-        verify: { mode: 'onFirstUse', requireMarker: false },
-        plugins: [
-          budgets({
-            maxRows: 10,
-            defaultTableRows: 10_000,
-            tableRows: { user: 10_000 },
-          }),
-        ],
-      },
-    );
+  it(
+    'blocks streaming when observed rows exceed budget',
+    async () => {
+      const adapter = createPostgresAdapter();
+      const runtime = createTestRuntime(
+        fixtureContract,
+        {
+          connect: { client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: false },
+          plugins: [
+            budgets({
+              maxRows: 10,
+              defaultTableRows: 10_000,
+              tableRows: { user: 10_000 },
+            }),
+          ],
+        },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const tables = schema(context).tables;
-    const userTable = tables['user']!;
-    const userColumns = userTable.columns;
-    const builder = sql({ context });
-    // Use LIMIT that's within heuristic but exceeds streaming budget
-    const plan = builder
-      .from(userTable)
-      .select({ id: userColumns['id']!, email: userColumns['email']! })
-      .limit(100)
-      .build();
+      const context = createTestContext(fixtureContract, adapter);
+      const tables = schema(context).tables;
+      const userTable = tables['user']!;
+      const userColumns = userTable.columns;
+      const builder = sql({ context });
+      // Use LIMIT that's within heuristic but exceeds streaming budget
+      const plan = builder
+        .from(userTable)
+        .select({ id: userColumns['id']!, email: userColumns['email']! })
+        .limit(100)
+        .build();
 
-    // Should throw during streaming when observed rows > maxRows
-    await expect(async () => {
-      await drainPlanExecution(runtime, plan);
-    }).rejects.toMatchObject({
-      code: 'BUDGET.ROWS_EXCEEDED',
-      category: 'BUDGET',
-    });
-  });
+      // Should throw during streaming when observed rows > maxRows
+      await expect(async () => {
+        await drainPlanExecution(runtime, plan);
+      }).rejects.toMatchObject({
+        code: 'BUDGET.ROWS_EXCEEDED',
+        category: 'BUDGET',
+      });
+    },
+    timeouts.databaseOperation,
+  );
 
   it('blocks unbounded raw SELECT without detectable LIMIT', async () => {
     const adapter = createPostgresAdapter();

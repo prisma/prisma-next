@@ -753,7 +753,7 @@ type Row = ResultType<typeof plan>;  // Optional: for type tests
 
 **Issue:** When bundling packages that use dependencies with native modules or data files (e.g., `@prisma/dev` with pglite), bundling can cause runtime errors like `ENOENT: no such file or directory, open '.../pglite.data'`.
 
-**Solution:** Mark dependencies as external in `tsup.config.ts`:
+**Solution:** Mark dependencies as external in `tsdown.config.ts`:
 
 ```typescript
 export default defineConfig({
