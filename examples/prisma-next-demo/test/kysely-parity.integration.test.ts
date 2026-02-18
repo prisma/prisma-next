@@ -72,7 +72,7 @@ async function seedTestData(
           email: param('email'),
           kind: param('kind'),
         })
-        .returning(userTable.columns['id']!)
+        .returning(userTable.columns.id!)
         .build({ params: { id, email, kind } });
 
       type InsertedRow = ResultType<typeof plan>;
