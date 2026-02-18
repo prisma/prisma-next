@@ -17,11 +17,10 @@ import { updateWithoutWhere } from '../src/kysely/update-without-where';
 import { db } from '../src/prisma/db';
 import { initTestDatabase } from './utils/control-client';
 
-const executionStack = db.stack;
 const executionContext = db.context;
 const { contract } = executionContext;
 
-function createTestDriver(connectionString: string) {
+function createTestDriver(connectionString: string, executionStack: (typeof db)['stack']) {
   const driverDescriptor = executionStack.driver;
   if (!driverDescriptor) {
     throw new Error('Driver descriptor missing from execution stack');
@@ -31,10 +30,11 @@ function createTestDriver(connectionString: string) {
 }
 
 function getRuntime(connectionString: string): Runtime {
+  const executionStack = db.stack;
   return createRuntime({
     stackInstance: instantiateExecutionStack(executionStack),
     context: executionContext,
-    driver: createTestDriver(connectionString),
+    driver: createTestDriver(connectionString, executionStack),
     verify: { mode: 'onFirstUse', requireMarker: false },
     plugins: [
       lints(),
