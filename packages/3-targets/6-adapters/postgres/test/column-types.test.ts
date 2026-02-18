@@ -127,8 +127,7 @@ describe('listOf', () => {
     expect(result.codecId).toBe(PG_ARRAY_CODEC_ID);
     expect(result.nativeType).toBe('int4[]');
     expect(result.typeParams).toEqual({
-      element: PG_INT4_CODEC_ID,
-      elementNativeType: 'int4',
+      element: { codecId: PG_INT4_CODEC_ID, nativeType: 'int4' },
     });
   });
 
@@ -137,32 +136,30 @@ describe('listOf', () => {
 
     expect(result.codecId).toBe(PG_ARRAY_CODEC_ID);
     expect(result.nativeType).toBe('text[]');
-    expect(result.typeParams?.['element']).toBe('pg/text@1');
+    expect((result.typeParams?.['element'] as { codecId: string }).codecId).toBe('pg/text@1');
   });
 
-  it('includes nullableItems when specified', () => {
-    const result = listOf(int4Column, { nullableItems: true });
+  it('includes nullableElement when specified', () => {
+    const result = listOf(int4Column, { nullableElement: true });
 
     expect(result.typeParams).toEqual({
-      element: PG_INT4_CODEC_ID,
-      elementNativeType: 'int4',
-      nullableItems: true,
+      element: { codecId: PG_INT4_CODEC_ID, nativeType: 'int4' },
+      nullableElement: true,
     });
   });
 
-  it('omits nullableItems when false', () => {
-    const result = listOf(int4Column, { nullableItems: false });
+  it('omits nullableElement when false', () => {
+    const result = listOf(int4Column, { nullableElement: false });
 
     expect(result.typeParams).toEqual({
-      element: PG_INT4_CODEC_ID,
-      elementNativeType: 'int4',
+      element: { codecId: PG_INT4_CODEC_ID, nativeType: 'int4' },
     });
   });
 
-  it('omits nullableItems when options not provided', () => {
+  it('omits nullableElement when options not provided', () => {
     const result = listOf(int4Column);
 
-    expect(result.typeParams).not.toHaveProperty('nullableItems');
+    expect(result.typeParams).not.toHaveProperty('nullableElement');
   });
 
   it('wraps a timestamp column', () => {
@@ -170,7 +167,9 @@ describe('listOf', () => {
 
     expect(result.codecId).toBe(PG_ARRAY_CODEC_ID);
     expect(result.nativeType).toBe('timestamp[]');
-    expect(result.typeParams?.['element']).toBe(PG_TIMESTAMP_CODEC_ID);
+    expect((result.typeParams?.['element'] as { codecId: string }).codecId).toBe(
+      PG_TIMESTAMP_CODEC_ID,
+    );
   });
 
   it('forwards element typeParams for parameterized element types', () => {
@@ -178,15 +177,18 @@ describe('listOf', () => {
     const result = listOf(numeric);
 
     expect(result.typeParams).toEqual({
-      element: 'pg/numeric@1',
-      elementNativeType: 'numeric',
-      elementTypeParams: { precision: 10, scale: 2 },
+      element: {
+        codecId: 'pg/numeric@1',
+        nativeType: 'numeric',
+        typeParams: { precision: 10, scale: 2 },
+      },
     });
   });
 
-  it('omits elementTypeParams when element has no typeParams', () => {
+  it('omits element typeParams when element has none', () => {
     const result = listOf(int4Column);
+    const element = result.typeParams?.['element'] as Record<string, unknown>;
 
-    expect(result.typeParams).not.toHaveProperty('elementTypeParams');
+    expect(element).not.toHaveProperty('typeParams');
   });
 });

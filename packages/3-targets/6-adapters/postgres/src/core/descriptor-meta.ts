@@ -163,10 +163,10 @@ export const postgresAdapterDescriptorMeta = {
         [PG_ARRAY_CODEC_ID]: {
           kind: 'function',
           render: (params: Record<string, unknown>, ctx: RenderTypeContext) => {
-            const elementCodecId = params['element'] as string;
-            const nullableItems = params['nullableItems'] === true;
-            const baseType = `${ctx.codecTypesName}['${elementCodecId}']['output']`;
-            return nullableItems ? `Array<${baseType} | null>` : `Array<${baseType}>`;
+            const element = params['element'] as { codecId: string };
+            const nullableElement = params['nullableElement'] === true;
+            const baseType = `${ctx.codecTypesName}['${element.codecId}']['output']`;
+            return nullableElement ? `Array<${baseType} | null>` : `Array<${baseType}>`;
           },
         },
       },

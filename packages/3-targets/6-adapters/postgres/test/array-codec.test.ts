@@ -105,6 +105,14 @@ describe('parsePgTextArray', () => {
   it('throws for empty string', () => {
     expect(() => parsePgTextArray('')).toThrow('Invalid Postgres array literal');
   });
+
+  it('throws for nested/multi-dimensional array', () => {
+    expect(() => parsePgTextArray('{{1,2},{3,4}}')).toThrow('Nested/multi-dimensional');
+  });
+
+  it('parses quoted braces without triggering nested guard', () => {
+    expect(parsePgTextArray('{"{nested}"}')).toEqual(['{nested}']);
+  });
 });
 
 describe('formatPgTextArray', () => {
@@ -257,8 +265,8 @@ describe('pgArrayCodec', () => {
     expect(pgArrayCodec.decode('{a,b,c}')).toEqual(['a', 'b', 'c']);
   });
 
-  it('wraps non-array non-string value', () => {
-    expect(pgArrayCodec.decode(42)).toEqual([42]);
+  it('throws for unexpected wire type', () => {
+    expect(() => pgArrayCodec.decode(42)).toThrow('Unexpected wire type');
   });
 
   it('encodes as identity (passthrough)', () => {

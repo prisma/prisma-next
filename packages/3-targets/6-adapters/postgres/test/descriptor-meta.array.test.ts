@@ -18,13 +18,19 @@ describe('array parameterized type renderer', () => {
   });
 
   it('renders Array<ElementType> for non-nullable items', () => {
-    const result = arrayRenderer.render({ element: 'pg/int4@1' }, ctx);
+    const result = arrayRenderer.render(
+      { element: { codecId: 'pg/int4@1', nativeType: 'int4' } },
+      ctx,
+    );
 
     expect(result).toBe("Array<CodecTypes['pg/int4@1']['output']>");
   });
 
   it('renders Array<ElementType | null> for nullable items', () => {
-    const result = arrayRenderer.render({ element: 'pg/text@1', nullableItems: true }, ctx);
+    const result = arrayRenderer.render(
+      { element: { codecId: 'pg/text@1', nativeType: 'text' }, nullableElement: true },
+      ctx,
+    );
 
     expect(result).toBe("Array<CodecTypes['pg/text@1']['output'] | null>");
   });
@@ -32,7 +38,10 @@ describe('array parameterized type renderer', () => {
   it('uses the provided codecTypesName from context', () => {
     const customCtx: RenderTypeContext = { codecTypesName: 'MyTypes' };
 
-    const result = arrayRenderer.render({ element: 'pg/float8@1' }, customCtx);
+    const result = arrayRenderer.render(
+      { element: { codecId: 'pg/float8@1', nativeType: 'float8' } },
+      customCtx,
+    );
 
     expect(result).toBe("Array<MyTypes['pg/float8@1']['output']>");
   });

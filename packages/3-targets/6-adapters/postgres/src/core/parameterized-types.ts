@@ -115,14 +115,11 @@ export function expandParameterizedNativeType(input: ExpandNativeTypeInput): str
     return nativeType;
   }
 
-  // Array types: nativeType is already the expanded form (e.g., 'int4[]')
-  // but if we only have the element info, construct it
   if (codecId === PG_ARRAY_CODEC_ID) {
-    const elementNativeType = typeParams['elementNativeType'];
-    if (typeof elementNativeType === 'string') {
-      return `${elementNativeType}[]`;
+    const element = typeParams['element'] as { nativeType: string } | undefined;
+    if (element?.nativeType) {
+      return `${element.nativeType}[]`;
     }
-    // nativeType should already end with '[]'
     return nativeType;
   }
 

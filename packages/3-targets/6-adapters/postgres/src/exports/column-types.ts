@@ -279,16 +279,18 @@ export function enumColumn<TypeName extends string>(
 
 export function listOf(
   elementDescriptor: ColumnTypeDescriptor,
-  options?: { nullableItems?: boolean },
+  options?: { nullableElement?: boolean },
 ): ColumnTypeDescriptor {
   return {
     codecId: PG_ARRAY_CODEC_ID,
     nativeType: `${elementDescriptor.nativeType}[]`,
     typeParams: {
-      element: elementDescriptor.codecId,
-      elementNativeType: elementDescriptor.nativeType,
-      ...(options?.nullableItems ? { nullableItems: true } : {}),
-      ...(elementDescriptor.typeParams ? { elementTypeParams: elementDescriptor.typeParams } : {}),
+      element: {
+        codecId: elementDescriptor.codecId,
+        nativeType: elementDescriptor.nativeType,
+        ...(elementDescriptor.typeParams ? { typeParams: elementDescriptor.typeParams } : {}),
+      },
+      ...(options?.nullableElement ? { nullableElement: true } : {}),
     },
   };
 }

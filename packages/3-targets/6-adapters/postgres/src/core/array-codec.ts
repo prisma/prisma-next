@@ -17,12 +17,18 @@ import { PG_ARRAY_CODEC_ID } from './codec-ids';
 
 /**
  * Arktype schema for array codec type parameters.
+ *
+ * `element.typeParams` is validated as `Record<string, unknown>` intentionally — deep
+ * validation of the element's own params is deferred to its codec's `paramsSchema` during
+ * runtime context creation.
  */
 export const arrayParamsSchema = arktype({
-  element: 'string',
-  'nullableItems?': 'boolean',
-  'elementNativeType?': 'string',
-  'elementTypeParams?': 'Record<string, unknown>',
+  element: {
+    codecId: 'string',
+    nativeType: 'string',
+    'typeParams?': 'Record<string, unknown>',
+  },
+  'nullableElement?': 'boolean',
 });
 
 /** Characters that require quoting inside a Postgres text array literal. */
@@ -61,6 +67,10 @@ export function parsePgTextArray(wire: string): (string | null)[] {
   const inner = wire.slice(1, -1);
   if (inner === '') {
     return [];
+  }
+
+  if (inner[0] === '{') {
+    throw new Error('Nested/multi-dimensional arrays are not supported');
   }
 
   const result: (string | null)[] = [];
@@ -127,11 +137,12 @@ export function createArrayCodec<TElementWire, TElementJs>(
     id: PG_ARRAY_CODEC_ID,
     targetTypes: [],
     decode(wire: string | (TElementWire | null)[]) {
+      if (!Array.isArray(wire) && typeof wire !== 'string') {
+        throw new Error(`Unexpected wire type for array codec: ${typeof wire}`);
+      }
       const arr: (TElementWire | null)[] = Array.isArray(wire)
         ? wire
-        : typeof wire === 'string'
-          ? (parsePgTextArray(wire) as (TElementWire | null)[])
-          : [wire as TElementWire];
+        : (parsePgTextArray(wire) as (TElementWire | null)[]);
 
       return arr.map((item) =>
         item === null || item === undefined ? null : elementCodec.decode(item),
@@ -172,6 +183,6 @@ export const pgArrayCodec = codec<typeof PG_ARRAY_CODEC_ID, unknown, unknown[]>(
     if (typeof wire === 'string') {
       return parsePgTextArray(wire);
     }
-    return [wire];
+    throw new Error(`Unexpected wire type for array codec: ${typeof wire}`);
   },
 });

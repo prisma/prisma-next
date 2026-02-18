@@ -439,6 +439,10 @@ const TYPE_PREFIX_MAP: ReadonlyMap<string, string> = new Map([
  *
  * Uses a pre-computed lookup map for simple prefix replacements (O(1))
  * and handles complex temporal type normalization separately.
+ *
+ * TODO: Introspected SqlColumnIR only carries nativeType — it does not populate codecId
+ * or typeParams for array columns, so schema verification for arrays operates at the
+ * nativeType string level only.
  */
 export function normalizeSchemaNativeType(nativeType: string): string {
   const trimmed = nativeType.trim();

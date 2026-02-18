@@ -277,7 +277,7 @@ describe('verifySqlSchema - basic', () => {
             nativeType: 'text',
             codecId: 'pg/array@1',
             nullable: false,
-            typeParams: { element: 'pg/text@1', elementNativeType: 'text' },
+            typeParams: { element: { codecId: 'pg/text@1', nativeType: 'text' } },
           },
         }),
       });
@@ -308,7 +308,7 @@ describe('verifySqlSchema - basic', () => {
             nativeType: 'int4',
             codecId: 'pg/array@1',
             nullable: false,
-            typeParams: { element: 'pg/int4@1', elementNativeType: 'int4' },
+            typeParams: { element: { codecId: 'pg/int4@1', nativeType: 'int4' } },
           },
         }),
       });

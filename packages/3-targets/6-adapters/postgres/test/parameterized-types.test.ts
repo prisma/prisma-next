@@ -117,31 +117,31 @@ describe('expandParameterizedNativeType', () => {
     expect(result).toBe('custom');
   });
 
-  it('expands array type from elementNativeType param', () => {
+  it('expands array type from nested element nativeType', () => {
     const result = expandParameterizedNativeType({
       nativeType: 'int4[]',
       codecId: PG_ARRAY_CODEC_ID,
-      typeParams: { element: 'pg/int4@1', elementNativeType: 'int4' },
+      typeParams: { element: { codecId: 'pg/int4@1', nativeType: 'int4' } },
     });
 
     expect(result).toBe('int4[]');
   });
 
-  it('returns nativeType for array when elementNativeType missing', () => {
+  it('returns nativeType for array when element has no nativeType', () => {
     const result = expandParameterizedNativeType({
       nativeType: 'text[]',
       codecId: PG_ARRAY_CODEC_ID,
-      typeParams: { element: 'pg/text@1' },
+      typeParams: { element: { codecId: 'pg/text@1' } },
     });
 
     expect(result).toBe('text[]');
   });
 
-  it('constructs array nativeType from elementNativeType when nativeType lacks suffix', () => {
+  it('constructs array nativeType from element when nativeType lacks suffix', () => {
     const result = expandParameterizedNativeType({
       nativeType: 'timestamp',
       codecId: PG_ARRAY_CODEC_ID,
-      typeParams: { element: 'pg/timestamp@1', elementNativeType: 'timestamp' },
+      typeParams: { element: { codecId: 'pg/timestamp@1', nativeType: 'timestamp' } },
     });
 
     expect(result).toBe('timestamp[]');

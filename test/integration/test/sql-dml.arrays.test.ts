@@ -1,4 +1,5 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { int4Column, listOf, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import type { ResultType } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -25,18 +26,8 @@ const fixtureContractRaw: SqlContract<SqlStorage> = {
         columns: {
           id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          tags: {
-            nativeType: 'text[]',
-            codecId: 'pg/array@1',
-            nullable: false,
-            typeParams: { element: 'pg/text@1', elementNativeType: 'text' },
-          },
-          scores: {
-            nativeType: 'int4[]',
-            codecId: 'pg/array@1',
-            nullable: true,
-            typeParams: { element: 'pg/int4@1', elementNativeType: 'int4' },
-          },
+          tags: { ...listOf(textColumn), nullable: false },
+          scores: { ...listOf(int4Column), nullable: true },
         },
         primaryKey: {
           columns: ['id'],

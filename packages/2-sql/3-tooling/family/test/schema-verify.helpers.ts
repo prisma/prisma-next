@@ -204,11 +204,10 @@ function mockExpandParameterizedNativeType(input: ExpandNativeTypeInput): string
     return nativeType;
   }
 
-  // Array types
   if (codecId === 'pg/array@1') {
-    const elementNativeType = typeParams['elementNativeType'];
-    if (typeof elementNativeType === 'string') {
-      return `${elementNativeType}[]`;
+    const element = typeParams['element'] as { nativeType: string } | undefined;
+    if (element?.nativeType) {
+      return `${element.nativeType}[]`;
     }
     return nativeType;
   }
