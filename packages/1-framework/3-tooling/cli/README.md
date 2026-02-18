@@ -22,6 +22,7 @@ Provide a command-line interface that:
 - **Extension Pack Descriptor Assembly**: Collect adapter and extension descriptors for emission
 - **Help Output Formatting**: Custom styled help output with command trees and formatted descriptions
 - **Config Management**: Load and validate `prisma-next.config.ts` files using Arktype validation
+- **CLI Binary Compatibility**: Build emits `dist/cli.mjs` and also writes a compatibility shim at `dist/cli.js`
 
 ### Wiring validation
 

@@ -85,3 +85,25 @@ The base config sets `exports.enabled: 'local-only'`, which means tsdown automat
 The `customExports` function in the base config strips `exports/` prefixes from entry paths, so `src/exports/types.ts` becomes the export `./types`.
 
 If you need to add a new export, add the entry file to `tsdown.config.ts` and rebuild.
+
+### Export convention (required)
+
+Use this decision tree for package migrations and new packages:
+
+1. Prefer base config auto-exports (`exports.enabled: 'local-only'`).
+2. Model public subpaths with `entry` values, usually under `src/exports/*`.
+3. Commit generated `package.json#exports` after `pnpm build`.
+
+### Allowed exceptions
+
+Only disable exports generation (`exports: { enabled: false }`) when at least one of these applies:
+
+- You must keep non-code exports that tsdown cannot infer from `entry` (for example JSON schema assets).
+- You must preserve a legacy root export shape that cannot be represented via `entry` + shared `customExports` without changing runtime semantics.
+- You must emit a custom dist layout that intentionally diverges from the base mapping behavior.
+
+When using an exception:
+
+- Keep the exception local to that package only.
+- Add a short comment in `tsdown.config.ts` explaining why it cannot use auto-exports.
+- Keep `package.json#exports` minimal and explicit.

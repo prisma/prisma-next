@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "ID generator helpers for Prisma Next contracts",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -22,7 +22,8 @@
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -31,13 +32,11 @@
     "src"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./runtime": {
-      "types": "./dist/runtime.d.ts",
-      "import": "./dist/runtime.js"
-    }
-  }
+    ".": "./dist/index.mjs",
+    "./runtime": "./dist/runtime.mjs",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts"
 }

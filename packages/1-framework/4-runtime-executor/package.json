@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "Target-agnostic execution engine for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -23,7 +23,8 @@
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma/dev": "catalog:",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -32,9 +33,10 @@
     "src"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  }
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts"
 }

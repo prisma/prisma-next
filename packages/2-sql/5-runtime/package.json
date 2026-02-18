@@ -5,7 +5,7 @@
   "sideEffects": false,
   "description": "SQL runtime implementation for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -31,7 +31,8 @@
     "@prisma-next/tsconfig": "workspace:*",
     "@types/pg": "catalog:",
     "pg": "catalog:",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -41,13 +42,11 @@
     "test"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/src/exports/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./test/utils": {
-      "types": "./dist/test/utils.d.ts",
-      "import": "./dist/test/utils.js"
-    }
-  }
+    ".": "./dist/index.mjs",
+    "./test/utils": "./dist/test/utils.mjs",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts"
 }

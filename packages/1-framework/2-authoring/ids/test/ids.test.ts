@@ -6,8 +6,9 @@ describe('@prisma-next/ids', () => {
   it('builds a generated column spec for uuidv4', () => {
     const spec = uuidv4();
     expect(spec).toEqual({
-      type: { codecId: 'pg/text@1', nativeType: 'text' },
+      type: { codecId: 'sql/char@1', nativeType: 'character' },
       nullable: false,
+      typeParams: { length: 36 },
       generated: { kind: 'generator', id: 'uuidv4' },
     });
   });

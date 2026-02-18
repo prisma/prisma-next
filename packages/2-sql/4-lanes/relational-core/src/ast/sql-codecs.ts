@@ -28,7 +28,7 @@ const sqlCharCodec = codec<typeof SQL_CHAR_CODEC_ID, string, string>({
   typeId: SQL_CHAR_CODEC_ID,
   targetTypes: ['char'],
   encode: (value: string): string => value,
-  decode: (wire: string): string => wire,
+  decode: (wire: string): string => wire.trimEnd(),
   paramsSchema: lengthParamsSchema,
   init: createLengthTypeHelper('fixed'),
 });

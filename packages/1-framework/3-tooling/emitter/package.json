@@ -9,7 +9,7 @@
     "test"
   ],
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -28,18 +28,19 @@
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "exports": {
     ".": {
-      "types": "./dist/src/exports/index.d.ts",
-      "import": "./dist/exports/index.js"
+      "types": "./dist/exports/index.d.mts",
+      "import": "./dist/exports/index.mjs"
     },
     "./test/utils": {
-      "types": "./dist/test/utils.d.ts",
-      "import": "./dist/test/utils.js"
+      "types": "./dist/test/utils.d.mts",
+      "import": "./dist/test/utils.mjs"
     }
   }
 }
