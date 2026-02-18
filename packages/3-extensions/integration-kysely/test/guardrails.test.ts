@@ -151,6 +151,28 @@ describe('runGuardrails', () => {
       }
     });
 
+    it('rejects IdentifierNode column ref in multi-table scope (regression: getTableName fallback bug)', () => {
+      const query = selectWithJoin([
+        {
+          kind: 'SelectionNode',
+          selection: {
+            kind: 'ReferenceNode',
+            column: { kind: 'IdentifierNode', name: 'id' },
+          },
+        },
+      ]);
+
+      expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
+      try {
+        runGuardrails(contract, query);
+      } catch (e) {
+        expect(KyselyTransformError.is(e)).toBe(true);
+        expect((e as KyselyTransformError).code).toBe(
+          KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+        );
+      }
+    });
+
     it('allows qualified column refs in multi-table scope', () => {
       const query = selectWithJoin([
         {

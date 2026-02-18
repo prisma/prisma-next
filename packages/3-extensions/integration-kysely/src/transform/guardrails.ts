@@ -14,7 +14,10 @@ function isMultiTableSelect(node: Record<string, unknown>): boolean {
 }
 
 function hasExplicitTableRef(node: unknown): boolean {
-  return getTableName(node) !== undefined;
+  if (typeof node !== 'object' || node === null) return false;
+  const n = node as Record<string, unknown>;
+  const table = n['table'];
+  return typeof table === 'object' && table !== null;
 }
 
 function isColumnRef(node: unknown): boolean {
