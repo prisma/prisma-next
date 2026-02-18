@@ -254,7 +254,24 @@ type IncludeResultType<Cardinality, Row> =
 
 This means `.include('author')` on a post returns `UserRow | null`, while `.include('posts')` on a user returns `PostRow[]`.
 
-### 4.3 Create Input Types
+### 4.3 Unique Criterion Types
+
+Even without a dedicated `findUnique()` API, unique criteria are still first-class types in this layer. They are used by relation `connect()` / `disconnect()` and `upsert({ conflictOn })`.
+
+```typescript
+type UniqueConstraintCriterion<TContract, ModelName> =
+  /* union of object shapes derived from the model primary key and unique indexes */;
+
+// Example:
+type UserUniqueCriterion =
+  | { id: number }
+  | { email: string }
+  | { tenantId: string; slug: string };
+```
+
+This type is derived from `TContract['storage']['tables'][TableName]`.
+
+### 4.4 Create Input Types
 
 For `create()`, the input type distinguishes required from optional fields based on contract metadata:
 
@@ -270,7 +287,7 @@ type CreateInput<TContract, ModelName> = {
 };
 ```
 
-### 4.4 Type-State Tracking
+### 4.5 Type-State Tracking
 
 The Collection carries generic type parameters that track query builder state for compile-time method gating:
 
@@ -506,6 +523,19 @@ db.users.include('posts', p => p.select('title', 'createdAt'))
 
 Calling `select()` multiple times replaces the previous selection (last call wins).
 
+Type-level behavior: the `Row` generic tracks the current result shape. `select()` narrows scalar fields on the current model while preserving already-included relation fields.
+
+```typescript
+select<Fields extends (keyof FieldsOf<TContract, ModelName> & string)[]>(
+  ...fields: Fields
+): Collection<
+  TContract,
+  ModelName,
+  Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> & IncludedRelationsOf<Row>,
+  State
+>;
+```
+
 #### `orderBy(fn | array)`
 
 Orders results using typed field accessors:
@@ -713,6 +743,26 @@ const count = await db.users.createCount([
 All mutation variants that return rows (`create`, `createAll`, `update`, `updateAll`, `delete`, `deleteAll`, `upsert`) **require the `returning` capability** in the contract. On targets without `RETURNING` (e.g. MySQL), only the `*Count` variants are available. This is a deliberate choice: the ORM client does not assume the presence of primary keys or attempt multi-step fallbacks (SELECT-then-mutate), which would be fragile for views, keyless tables, and concurrent workloads.
 
 `createCount`, `updateCount`, and `deleteCount` work on all targets.
+
+### 7.1.1 `select()` / `include()` with Mutations
+
+`select()` and `include()` apply to row-returning mutation variants when configured on the collection before the terminal mutation call.
+
+```typescript
+const created = await db.users
+  .select('id', 'email')
+  .create({ name: 'Alice', email: 'alice@example.com' });
+// Type: { id: number; email: string }
+
+const updated = await db.users
+  .include('posts')
+  .where({ id: 42 })
+  .update({ name: 'Alice Updated' });
+// Type: { ...UserFields, posts: PostRow[] } | null
+```
+
+`*Count` variants return `Promise<number>` and do not support projection/include result shaping.
+Include loading follows the same capability-based strategy used by read operations.
 
 ### 7.2 Update
 
@@ -936,6 +986,8 @@ const stats = await db.orders
   .sum('amount');
 ```
 
+`GroupedCollection` has a restricted surface by design. It supports aggregation builders (`count`, `sum`, `avg`, `min`, `max`) and `having`, but does not expose relation loading or row-query terminals (`all`, `find`, `select`, `include`) or mutation terminals.
+
 ### 8.3 Aggregations in Includes (Exploratory)
 
 **Design TBD.** An interesting possibility:
@@ -1021,6 +1073,17 @@ When the ORM client creates a Collection (either custom or default), it attaches
 When `include(relation, refine)` is called, it looks up the related model's collection class in the registry and passes an instance of it to the refinement callback. If no custom class is registered for that model, a default Collection is used.
 
 This is an internal mechanism. Users don't interact with the registry directly — they just pass collection classes to `orm()` and everything composes.
+
+### 9.4 Type Mapping
+
+```typescript
+type ModelAliasKeys<Name extends string> =
+  | Name
+  | LowercaseFirst<Name>
+  | `${LowercaseFirst<Name>}s`;
+```
+
+When a custom collection is provided under a key matching a model alias, the custom collection type takes precedence for that alias, preserving custom methods in the client type.
 
 ---
 
@@ -1172,6 +1235,17 @@ import {
 | `not(expr)` | `WhereExpr` | Negate a filter |
 | `all()` | `WhereExpr` | Match all records (sentinel for whole-table mutations) |
 | `orm(options)` | `OrmClient` | Create typed client |
+
+### GroupedCollection Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `count()` | `GroupedCollection` (or terminal) | Add count aggregation |
+| `sum(field)` | `GroupedCollection` | Add sum aggregation |
+| `avg(field)` | `GroupedCollection` | Add avg aggregation |
+| `min(field)` | `GroupedCollection` | Add min aggregation |
+| `max(field)` | `GroupedCollection` | Add max aggregation |
+| `having(predicate)` | `GroupedCollection` | Filter groups |
 
 ---
 
