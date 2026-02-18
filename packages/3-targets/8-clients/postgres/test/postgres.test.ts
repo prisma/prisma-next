@@ -53,9 +53,7 @@ vi.mock('@prisma-next/driver-postgres/runtime', () => ({
 }));
 
 vi.mock('pg', () => {
-  class Pool {
-    constructor(_options: unknown) {}
-  }
+  class Pool {}
 
   class Client {}
 

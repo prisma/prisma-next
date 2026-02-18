@@ -9,6 +9,27 @@ import postgresRuntimeDriverDescriptor from '../src/exports/runtime';
 describe('@prisma-next/driver-postgres', () => {
   let cleanup: (() => Promise<void>) | undefined;
 
+  async function createMemPoolDriver(options?: {
+    readonly cursor?: { readonly batchSize?: number; readonly disabled?: boolean };
+    readonly autoCleanup?: boolean;
+  }) {
+    const db = newDb();
+    const { Pool } = db.adapters.createPg();
+    const pool = new Pool();
+    const driver = postgresRuntimeDriverDescriptor.create(
+      options?.cursor ? { cursor: options.cursor } : undefined,
+    );
+
+    if (options?.autoCleanup ?? true) {
+      cleanup = async () => {
+        await driver.close();
+      };
+    }
+
+    await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+    return driver;
+  }
+
   afterEach(async () => {
     if (cleanup) {
       await cleanup();
@@ -19,19 +40,7 @@ describe('@prisma-next/driver-postgres', () => {
   it(
     'streams rows using buffered fallback when cursor disabled',
     async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create({
-        cursor: { disabled: true },
-      });
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+      const driver = await createMemPoolDriver({ cursor: { disabled: true } });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
 
@@ -53,19 +62,7 @@ describe('@prisma-next/driver-postgres', () => {
   it(
     'streams rows using cursor mode when enabled',
     async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create({
-        cursor: { batchSize: 1 },
-      });
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+      const driver = await createMemPoolDriver({ cursor: { batchSize: 1 } });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1), ($2), ($3)', ['a', 'b', 'c']);
 
@@ -88,19 +85,7 @@ describe('@prisma-next/driver-postgres', () => {
   it(
     'uses custom cursor batch size',
     async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create({
-        cursor: { batchSize: 2 },
-      });
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+      const driver = await createMemPoolDriver({ cursor: { batchSize: 2 } });
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1), ($2), ($3), ($4)', [
         'a',
@@ -126,17 +111,7 @@ describe('@prisma-next/driver-postgres', () => {
   it(
     'executes explain query',
     async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create();
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+      const driver = await createMemPoolDriver();
       await driver.query('create table items(id serial primary key, name text)');
 
       // pg-mem doesn't support EXPLAIN (FORMAT JSON), so we test that explain() is callable
@@ -161,17 +136,7 @@ describe('@prisma-next/driver-postgres', () => {
   it(
     'executes query with params',
     async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create();
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+      const driver = await createMemPoolDriver();
       await driver.query('create table items(id serial primary key, name text)');
       await driver.query('insert into items(name) values ($1)', ['test']);
 
@@ -267,13 +232,7 @@ describe('@prisma-next/driver-postgres', () => {
   it(
     'handles pool already ended when closing',
     async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create();
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+      const driver = await createMemPoolDriver({ autoCleanup: false });
       await driver.close();
 
       // Closing again should not throw (pool.ended check)
@@ -285,13 +244,7 @@ describe('@prisma-next/driver-postgres', () => {
   it(
     'closes pool connection',
     async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create();
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+      const driver = await createMemPoolDriver({ autoCleanup: false });
       await driver.close();
 
       // pg-mem Pool doesn't have an 'ended' property, so we just verify close() doesn't throw
@@ -303,17 +256,7 @@ describe('@prisma-next/driver-postgres', () => {
   it(
     'handles empty result set',
     async () => {
-      const db = newDb();
-      const { Pool } = db.adapters.createPg();
-      const pool = new Pool();
-
-      const driver = postgresRuntimeDriverDescriptor.create();
-
-      cleanup = async () => {
-        await driver.close();
-      };
-
-      await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+      const driver = await createMemPoolDriver();
       await driver.query('create table items(id serial primary key, name text)');
 
       const rows: Array<{ id: number; name: string }> = [];
@@ -419,17 +362,7 @@ describe('@prisma-next/driver-postgres', () => {
     it(
       'acquires and releases connections from pool',
       async () => {
-        const db = newDb();
-        const { Pool } = db.adapters.createPg();
-        const pool = new Pool();
-
-        const driver = postgresRuntimeDriverDescriptor.create();
-
-        cleanup = async () => {
-          await driver.close();
-        };
-
-        await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+        const driver = await createMemPoolDriver();
         await driver.query('create table items(id serial primary key, name text)');
 
         const connection = await driver.acquireConnection();
@@ -489,19 +422,7 @@ describe('@prisma-next/driver-postgres', () => {
     it(
       'connection can stream data with execute method',
       async () => {
-        const db = newDb();
-        const { Pool } = db.adapters.createPg();
-        const pool = new Pool();
-
-        const driver = postgresRuntimeDriverDescriptor.create({
-          cursor: { disabled: true },
-        });
-
-        cleanup = async () => {
-          await driver.close();
-        };
-
-        await driver.connect({ kind: 'pgPool', pool: pool as unknown as Pool });
+        const driver = await createMemPoolDriver({ cursor: { disabled: true } });
         await driver.query('create table items(id serial primary key, name text)');
         await driver.query('insert into items(name) values ($1), ($2)', ['a', 'b']);
 
