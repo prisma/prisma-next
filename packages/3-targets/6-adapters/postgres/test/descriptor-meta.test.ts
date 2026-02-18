@@ -24,7 +24,7 @@ describe('renderJsonTypeExpression via descriptor-meta', () => {
       expect(jsonbRenderer.render({ type: '   ' })).toBe('JsonValue');
     });
 
-    it('falls back to JsonValue when no type or schema is provided', () => {
+    it('falls back to JsonValue when no type or schemaJson is provided', () => {
       expect(jsonbRenderer.render({})).toBe('JsonValue');
     });
 
