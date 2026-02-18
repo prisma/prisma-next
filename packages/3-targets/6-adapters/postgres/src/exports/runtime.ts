@@ -43,7 +43,7 @@ type JsonTypeParams = typeof jsonTypeParamsSchema.infer;
 export type JsonCodecHelper = { readonly validate: JsonSchemaValidateFn };
 
 function initJsonCodecHelper(params: JsonTypeParams): JsonCodecHelper {
-  return { validate: compileJsonSchemaValidator(params.schema as Record<string, unknown>) };
+  return { validate: compileJsonSchemaValidator(params.schemaJson as Record<string, unknown>) };
 }
 
 const parameterizedCodecDescriptors = [
