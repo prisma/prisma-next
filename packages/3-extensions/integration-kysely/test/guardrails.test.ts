@@ -1,4 +1,5 @@
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from '../src/transform/errors';
 import { runGuardrails } from '../src/transform/guardrails';
@@ -53,7 +54,7 @@ function selectWithJoin(selections: unknown[], where?: unknown) {
         },
       },
     ],
-    ...(where != null ? { where: { kind: 'WhereNode', node: where } } : {}),
+    ...ifDefined('where', where != null ? { kind: 'WhereNode', node: where } : undefined),
   };
 }
 
