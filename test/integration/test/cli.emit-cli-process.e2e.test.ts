@@ -124,7 +124,7 @@ describe('contract emit command (CLI process e2e)', () => {
       expect(validatedContract.targetFamily).toBe('sql');
       expect(validatedContract.target).toBe('postgres');
     },
-    timeouts.typeScriptCompilation,
+    timeouts.spinUpPpgDev,
   );
 
   it(
@@ -184,6 +184,6 @@ describe('contract emit command (CLI process e2e)', () => {
         }
       }
     },
-    timeouts.typeScriptCompilation,
+    timeouts.spinUpPpgDev,
   );
 });

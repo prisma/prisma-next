@@ -13,6 +13,7 @@ import {
   createTableRef,
   createUpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { lints } from '../src/plugins/lints';
 
@@ -253,24 +254,28 @@ describe('lints plugin', () => {
   });
 
   describe('fallback when plan.ast missing', () => {
-    it('runs raw heuristic when fallbackWhenAstMissing is raw', async () => {
-      const plan = createPlan({
-        ast: undefined,
-        sql: 'SELECT id FROM user',
-        params: [],
-        meta: {},
-      });
-      const plugin = lints({ fallbackWhenAstMissing: 'raw' });
-      const ctx = createPluginContext();
+    it(
+      'runs raw heuristic when fallbackWhenAstMissing is raw',
+      async () => {
+        const plan = createPlan({
+          ast: undefined,
+          sql: 'SELECT id FROM user',
+          params: [],
+          meta: {},
+        });
+        const plugin = lints({ fallbackWhenAstMissing: 'raw' });
+        const ctx = createPluginContext();
 
-      await plugin.beforeExecute?.(plan, ctx);
-      expect(ctx.log.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 'LINT.NO_LIMIT',
-          message: expect.stringContaining('omits LIMIT'),
-        }),
-      );
-    });
+        await plugin.beforeExecute?.(plan, ctx);
+        expect(ctx.log.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: 'LINT.NO_LIMIT',
+            message: expect.stringContaining('omits LIMIT'),
+          }),
+        );
+      },
+      timeouts.default,
+    );
 
     it('skips linting when fallbackWhenAstMissing is skip', async () => {
       const plan = createPlan({
