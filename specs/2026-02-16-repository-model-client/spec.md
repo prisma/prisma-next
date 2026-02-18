@@ -350,8 +350,8 @@ db.users.where({ role: 'admin', active: true })
 - `null` values → `NullCheckExpr` with `isNull: true`
 - Nested objects are not supported (use the callback for relational filters)
 
-Edge cases still being finalized (see section 10.3):
-- `{ field: [1, 2, 3] }` → likely `IN` (aligns with Prisma ORM)
+Additional behaviors still being finalized (see section 11.4):
+- `{ field: [1, 2, 3] }` → equality against a scalar list value (not `IN`; use the callback for `IN`)
 - `{ field: undefined }` → likely silently ignored (supports conditional filters)
 - `{}` → likely identity (no filter)
 
@@ -1085,8 +1085,10 @@ Pros: Reuses the read vocabulary exactly, no new method names. Cons: `delete().f
 
 Defined: `{ field: value }` → equality, multiple fields → AND, `null` → `isNull`.
 
+Defined:
+- `{ field: [1, 2, 3] }` → equality check against a scalar list value (not `IN`). For `IN`, use the callback: `.where(u => u.field.in([1, 2, 3]))`.
+
 Open:
-- `{ field: [1, 2, 3] }` → `IN`? (Leaning yes — aligns with Prisma ORM.)
 - `{ field: undefined }` → silently ignored? (Leaning yes — supports conditional filters.)
 - `{}` → identity / no filter? (Leaning yes.)
 
