@@ -909,7 +909,7 @@ describe('transformKyselyToPnAst', () => {
   describe('lowering parity', () => {
     it('matches Kysely compiled SQL for simple insert', async () => {
       const db = new Kysely<TestDb>({
-        dialect: new PostgresDialect({ pool: {} as never }),
+        dialect: new PostgresDialect({ pool: {} as unknown as import('pg').Pool }),
       });
 
       try {
@@ -932,7 +932,7 @@ describe('transformKyselyToPnAst', () => {
 
     it('keeps select semantics aligned with Kysely compiled output', async () => {
       const db = new Kysely<TestDb>({
-        dialect: new PostgresDialect({ pool: {} as never }),
+        dialect: new PostgresDialect({ pool: {} as unknown as import('pg').Pool }),
       });
 
       try {
