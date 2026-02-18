@@ -305,7 +305,7 @@ Create `@prisma-next/postgres` as a composition package whose runtime entrypoint
 Proposed structure (exact file names flexible; exports must be curated and side-effect free):
 
 ```
-packages/3-targets/8-clients/postgres/        # new package location (exact folder TBD)
+packages/3-extensions/postgres/               # new package location
   package.json                                # name: @prisma-next/postgres
   src/
     exports/
