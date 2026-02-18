@@ -77,7 +77,7 @@ Principles:
    - **Entry point**: `@prisma-next/postgres/runtime` (default export `postgres`)
 2. [x] Scaffold minimal package boilerplate aligned with repo conventions:
    - `package.json` with `exports` for `./runtime`
-   - `biome.jsonc`, `tsconfig.json`, `tsconfig.build.json`, `tsup.config.ts`, `vitest.config.ts` (mirror nearby Postgres packages in `packages/3-targets/**/postgres`)
+   - `biome.jsonc`, `tsconfig.json`, `tsconfig.build.json`, `tsdown.config.ts`, `vitest.config.ts` (mirror nearby Postgres packages in `packages/3-targets/**/postgres`)
    - `src/exports/runtime.ts`
 3. [x] Add `README.md` for the new package (doc-maintenance):
    - Responsibilities + dependency list

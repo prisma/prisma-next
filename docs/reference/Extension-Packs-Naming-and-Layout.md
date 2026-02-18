@@ -46,7 +46,7 @@ Extension packs use multi-plane entrypoints to separate control (migration) and 
 packages/3-extensions/<name>/
   package.json
   README.md
-  tsup.config.ts
+  tsdown.config.ts
   src/
     core/                # Shared plane code
       types.ts           # Type definitions

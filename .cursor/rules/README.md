@@ -44,7 +44,8 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/cli-error-handling.mdc` — CLI command error handling patterns
 - `.cursor/rules/cli-e2e-test-patterns.mdc` — CLI e2e test fixture patterns using shared fixture app
 - `.cursor/rules/cli-test-fixture-cleanup.mdc` — Avoid committing generated CLI test fixtures
-- `.cursor/rules/cli-package-exports.mdc` — CLI package export structure and import patterns
+- `.cursor/rules/cli-package-exports.mdc` — CLI package export structure and auto-generated export patterns
+- `.cursor/rules/tsdown-dist-layout-in-tests.mdc` — Use tsdown `dist/*.d.mts` paths in test tsconfig mappings
 
 ## Imports & Layering
 - `.cursor/rules/import-validation.mdc` — Layering rules and exceptions
@@ -91,6 +92,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/family-instance-domain-actions.mdc` — Family instance domain actions (inline core logic, import helper functions)
 - `.cursor/rules/storage-type-hooks.mdc` — Codec-owned storage type hooks (avoid enum fields in shared IR)
 - `.cursor/rules/capabilities-ownership.mdc` — Capabilities are adapter-reported; contracts declare requirements
+- `.cursor/rules/tsdown-config-package-source-only.mdc` — Keep `@prisma-next/tsdown` exports source-only (no `.js` workaround files)
 
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.

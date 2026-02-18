@@ -16,12 +16,18 @@ async function loadWarningConfig() {
   try {
     const configContent = await readFile(configPath, 'utf-8');
     const config = JSON.parse(configContent);
-    return config.warningOnly || [];
+    return {
+      warningOnly: config.warningOnly || [],
+      excludedPackages: config.excludedPackages || [],
+    };
   } catch {
     console.warn(
       'Warning: Could not load coverage.config.json, no warning-only packages configured.',
     );
-    return [];
+    return {
+      warningOnly: [],
+      excludedPackages: [],
+    };
   }
 }
 
@@ -40,7 +46,11 @@ function checkExpiry(warningEntry) {
   };
 }
 
-async function getPackages() {
+async function getPackages(excludedPackages = []) {
+  const excludedSet = new Set(
+    excludedPackages.map((pkg) => (pkg.startsWith('packages/') ? pkg : `packages/${pkg}`)),
+  );
+
   // Use pnpm to get all packages recursively
   const { stdout } = await execAsync('pnpm -r list --json', { cwd: ROOT });
   const packages = JSON.parse(stdout);
@@ -60,6 +70,7 @@ async function getPackages() {
       if (EXCLUDED_PATHS.some((excluded) => path.startsWith(excluded))) return false;
       return true;
     })
+    .filter((path) => !excludedSet.has(path))
     .map((path) => path.replace('packages/', ''));
 
   return packagePaths;
@@ -532,7 +543,8 @@ async function formatResults(results, warningConfig) {
 }
 
 async function main() {
-  const warningConfig = await loadWarningConfig();
+  const config = await loadWarningConfig();
+  const warningConfig = config.warningOnly;
 
   // Check for expired warnings FIRST
   const expiredWarnings = warningConfig.filter((entry) => {
@@ -568,7 +580,7 @@ async function main() {
     process.exit(1);
   }
 
-  const packages = await getPackages();
+  const packages = await getPackages(config.excludedPackages);
 
   console.log(`Running coverage for ${packages.length} packages...\n`);
 

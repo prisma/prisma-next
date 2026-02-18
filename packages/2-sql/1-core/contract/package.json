@@ -6,7 +6,7 @@
   "sideEffects": false,
   "description": "SQL contract types, validators, and IR factories for Prisma Next",
   "scripts": {
-    "build": "tsup --config tsup.config.ts && tsc --project tsconfig.build.json",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
@@ -22,7 +22,8 @@
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "tsup": "catalog:",
+    "@prisma-next/tsdown": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -31,25 +32,26 @@
     "src"
   ],
   "exports": {
-    "./types": {
-      "types": "./dist/exports/types.d.ts",
-      "import": "./dist/exports/types.js"
-    },
-    "./validators": {
-      "types": "./dist/exports/validators.d.ts",
-      "import": "./dist/exports/validators.js"
-    },
-    "./validate": {
-      "types": "./dist/exports/validate.d.ts",
-      "import": "./dist/exports/validate.js"
-    },
     "./factories": {
-      "types": "./dist/exports/factories.d.ts",
-      "import": "./dist/exports/factories.js"
+      "types": "./dist/factories.d.mts",
+      "import": "./dist/factories.mjs"
     },
     "./pack-types": {
-      "types": "./dist/exports/pack-types.d.ts",
-      "import": "./dist/exports/pack-types.js"
-    }
+      "types": "./dist/pack-types.d.mts",
+      "import": "./dist/pack-types.mjs"
+    },
+    "./types": {
+      "types": "./dist/types.d.mts",
+      "import": "./dist/types.mjs"
+    },
+    "./validate": {
+      "types": "./dist/validate.d.mts",
+      "import": "./dist/validate.mjs"
+    },
+    "./validators": {
+      "types": "./dist/validators.d.mts",
+      "import": "./dist/validators.mjs"
+    },
+    "./package.json": "./package.json"
   }
 }
