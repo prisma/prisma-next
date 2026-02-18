@@ -1,6 +1,8 @@
 import { defineConfig } from '@prisma-next/tsdown';
 
 export default defineConfig({
-  entry: ['src/exports/runtime.ts'],
-  exports: { enabled: false },
+  entry: {
+    '.': 'src/exports/runtime.ts',
+    runtime: 'src/exports/runtime.ts',
+  },
 });

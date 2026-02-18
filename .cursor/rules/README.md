@@ -44,7 +44,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/cli-error-handling.mdc` — CLI command error handling patterns
 - `.cursor/rules/cli-e2e-test-patterns.mdc` — CLI e2e test fixture patterns using shared fixture app
 - `.cursor/rules/cli-test-fixture-cleanup.mdc` — Avoid committing generated CLI test fixtures
-- `.cursor/rules/cli-package-exports.mdc` — CLI package export structure and import patterns
+- `.cursor/rules/cli-package-exports.mdc` — CLI package export structure and auto-generated export patterns
 - `.cursor/rules/tsdown-dist-layout-in-tests.mdc` — Use tsdown `dist/*.d.mts` paths in test tsconfig mappings
 
 ## Imports & Layering
