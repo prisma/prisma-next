@@ -366,6 +366,8 @@ describe('family instance introspect', () => {
         try {
           invalidDriver = await postgresDriver.create('postgresql://invalid:5432/invalid');
         } catch {
+          // Driver creation might fail immediately, which is fine
+          // We'll skip this test if driver creation fails
           return;
         }
 
@@ -383,7 +385,9 @@ describe('family instance introspect', () => {
             }),
           ).rejects.toThrow();
         } finally {
-          await invalidDriver.close().catch(() => {});
+          await invalidDriver.close().catch(() => {
+            // Ignore cleanup errors
+          });
         }
       },
       timeouts.databaseOperation,

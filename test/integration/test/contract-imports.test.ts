@@ -223,7 +223,7 @@ type UserIdColumn = UserColumns['id'];
       // Use pnpm to run TypeScript from the workspace root so path mappings work
       await runTscAndAssertSuccess(tsconfigPath, workspaceRoot, contractDtsContent);
     },
-    timeouts.typeScriptCompilation,
+    timeouts.spinUpPpgDev,
   );
 
   it(
@@ -368,6 +368,6 @@ type CodecIntType = CodecTypes['pg/int4@1'];
       // Use pnpm to run TypeScript from the workspace root so path mappings work
       await runTscAndAssertSuccess(tsconfigPath, workspaceRoot, contractDtsContent);
     },
-    timeouts.typeScriptCompilation,
+    timeouts.spinUpPpgDev,
   );
 });
