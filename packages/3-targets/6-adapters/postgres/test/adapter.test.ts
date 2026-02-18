@@ -457,7 +457,7 @@ describe('createPostgresAdapter', () => {
         });
 
         expect(lowered.body).toEqual({
-          sql: 'INSERT INTO "user" ("email", "createdAt") VALUES ($1, $2)',
+          sql: 'INSERT INTO "user" ("email", "createdAt") VALUES ($1::text, $2::timestamptz)',
           params: ['test@example.com', new Date('2024-01-01')],
         });
       });
@@ -484,7 +484,7 @@ describe('createPostgresAdapter', () => {
         });
 
         expect(lowered.body).toEqual({
-          sql: 'INSERT INTO "user" ("email", "createdAt") VALUES ($1, $2) RETURNING "user"."id", "user"."email"',
+          sql: 'INSERT INTO "user" ("email", "createdAt") VALUES ($1::text, $2::timestamptz) RETURNING "user"."id", "user"."email"',
           params: ['test@example.com', new Date('2024-01-01')],
         });
       });
@@ -507,7 +507,7 @@ describe('createPostgresAdapter', () => {
         });
 
         expect(lowered.body).toEqual({
-          sql: 'INSERT INTO "user" ("email", "copyFrom") VALUES ($1, "user"."otherColumn")',
+          sql: 'INSERT INTO "user" ("email", "copyFrom") VALUES ($1::text, "user"."otherColumn")',
           params: ['test@example.com'],
         });
       });
@@ -550,7 +550,7 @@ describe('createPostgresAdapter', () => {
         const lowered = adapter.lower(ast, { contract, params: ['updated@example.com', 1] });
 
         expect(lowered.body).toEqual({
-          sql: 'UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2',
+          sql: 'UPDATE "user" SET "email" = $1::text WHERE "user"."id" = $2',
           params: ['updated@example.com', 1],
         });
       });
@@ -579,7 +579,7 @@ describe('createPostgresAdapter', () => {
         const lowered = adapter.lower(ast, { contract, params: ['updated@example.com', 1] });
 
         expect(lowered.body).toEqual({
-          sql: 'UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2 RETURNING "user"."id", "user"."email"',
+          sql: 'UPDATE "user" SET "email" = $1::text WHERE "user"."id" = $2 RETURNING "user"."id", "user"."email"',
           params: ['updated@example.com', 1],
         });
       });
@@ -605,7 +605,7 @@ describe('createPostgresAdapter', () => {
         const lowered = adapter.lower(ast, { contract, params: ['updated@example.com', 1] });
 
         expect(lowered.body).toEqual({
-          sql: 'UPDATE "user" SET "email" = $1, "copyFrom" = "user"."otherColumn" WHERE "user"."id" = $2',
+          sql: 'UPDATE "user" SET "email" = $1::text, "copyFrom" = "user"."otherColumn" WHERE "user"."id" = $2',
           params: ['updated@example.com', 1],
         });
       });
@@ -917,7 +917,7 @@ describe('createPostgresAdapter', () => {
       expect(lowered.body.sql).toContain('$1::vector');
     });
 
-    it('casts vector operation parameters', () => {
+    it('does not inject casts for operation parameters (template owns the cast)', () => {
       const adapter = createPostgresAdapter();
 
       const ast: SelectAst = {
@@ -949,7 +949,8 @@ describe('createPostgresAdapter', () => {
         params: [[1, 2, 3]],
       });
 
-      expect(lowered.body.sql).toContain('$1::vector');
+      expect(lowered.body.sql).toContain('<=> $1');
+      expect(lowered.body.sql).not.toContain('$1::vector');
     });
   });
 
@@ -1041,13 +1042,13 @@ describe('createPostgresAdapter', () => {
                   codecId: 'pg/array@1',
                   nativeType: 'text[]',
                   nullable: false,
-                  typeParams: { element: 'pg/text@1', elementNativeType: 'text' },
+                  typeParams: { element: { codecId: 'pg/text@1', nativeType: 'text' } },
                 },
                 scores: {
                   codecId: 'pg/array@1',
                   nativeType: 'int4[]',
                   nullable: true,
-                  typeParams: { element: 'pg/int4@1', elementNativeType: 'int4' },
+                  typeParams: { element: { codecId: 'pg/int4@1', nativeType: 'int4' } },
                 },
               },
               uniques: [],
@@ -1079,8 +1080,8 @@ describe('createPostgresAdapter', () => {
         params: [1, ['tag1', 'tag2']],
       });
 
+      expect(lowered.body.sql).toContain('$1::int4');
       expect(lowered.body.sql).toContain('$2::text[]');
-      expect(lowered.body.sql).not.toContain('$1::');
     });
 
     it('casts array parameters in UPDATE', () => {
@@ -1259,7 +1260,7 @@ describe('createPostgresAdapter', () => {
       const lowered = adapter.lower(ast, { contract, params: ['new@email.com'] });
 
       expect(lowered.body.sql).toBe(
-        'UPDATE "user" SET "email" = $1 WHERE "user"."createdAt" IS NULL',
+        'UPDATE "user" SET "email" = $1::text WHERE "user"."createdAt" IS NULL',
       );
     });
 

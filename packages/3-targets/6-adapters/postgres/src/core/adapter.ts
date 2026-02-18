@@ -20,11 +20,9 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { PG_ARRAY_CODEC_ID, PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
+
 import { codecDefinitions } from './codecs';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
-
-const VECTOR_CODEC_ID = 'pg/vector@1' as const;
 
 const defaultCapabilities = Object.freeze({
   postgres: {
@@ -180,6 +178,11 @@ function renderNullCheck(expr: NullCheckExpr, contract?: PostgresContract): stri
   return expr.isNull ? `${renderedExpr} IS NULL` : `${renderedExpr} IS NOT NULL`;
 }
 
+/**
+ * WHERE clause parameters intentionally omit ::nativeType casts — Postgres infers the
+ * type from the comparison column. INSERT/UPDATE params are cast explicitly because they
+ * lack that inference context.
+ */
 function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   const leftExpr = expr.left as ColumnRef | OperationExpr;
   const left = renderExpr(leftExpr, contract);
@@ -217,32 +220,12 @@ function renderExpr(expr: ColumnRef | OperationExpr, contract?: PostgresContract
   return renderColumn(expr);
 }
 
-/**
- * Resolves the SQL type cast for a column parameter.
- * Returns the cast suffix (e.g., '::vector', '::integer[]') or empty string for no cast.
- */
-function resolveParamCast(
+function getColumnNativeType(
   contract: PostgresContract,
   tableName: string,
   columnName: string,
-): string {
-  const tableMeta = contract.storage.tables[tableName];
-  const columnMeta = tableMeta?.columns[columnName];
-  if (!columnMeta) return '';
-  if (columnMeta.codecId === VECTOR_CODEC_ID) {
-    return '::vector';
-  }
-  if (columnMeta.codecId === PG_JSON_CODEC_ID) {
-    return '::json';
-  }
-  if (columnMeta.codecId === PG_JSONB_CODEC_ID) {
-    return '::jsonb';
-  }
-  if (columnMeta.codecId === PG_ARRAY_CODEC_ID) {
-    // Cast to the array's nativeType (e.g., 'int4[]' → '::int4[]')
-    return `::${columnMeta.nativeType}`;
-  }
-  return '';
+): string | undefined {
+  return contract.storage.tables[tableName]?.columns[columnName]?.nativeType;
 }
 
 function renderParam(
@@ -252,9 +235,9 @@ function renderParam(
   columnName?: string,
 ): string {
   if (contract && tableName && columnName) {
-    const cast = resolveParamCast(contract, tableName, columnName);
-    if (cast) {
-      return `$${ref.index}${cast}`;
+    const nativeType = getColumnNativeType(contract, tableName, columnName);
+    if (nativeType) {
+      return `$${ref.index}::${nativeType}`;
     }
   }
   return `$${ref.index}`;
@@ -278,15 +261,12 @@ function renderLiteral(expr: LiteralExpr): string {
 
 function renderOperation(expr: OperationExpr, contract?: PostgresContract): string {
   const self = renderExpr(expr.self, contract);
-  // For vector operations, cast param arguments to vector type
-  const isVectorOperation = expr.forTypeId === VECTOR_CODEC_ID;
   const args = expr.args.map((arg: ColumnRef | ParamRef | LiteralExpr | OperationExpr) => {
     if (arg.kind === 'col') {
       return renderColumn(arg);
     }
     if (arg.kind === 'param') {
-      // Cast vector operation parameters to vector type
-      return isVectorOperation ? `$${arg.index}::vector` : renderParam(arg, contract);
+      return renderParam(arg, contract);
     }
     if (arg.kind === 'literal') {
       return renderLiteral(arg);
@@ -302,10 +282,6 @@ function renderOperation(expr: OperationExpr, contract?: PostgresContract): stri
   result = result.replace(/\$\{self\}/g, self);
   for (let i = 0; i < args.length; i++) {
     result = result.replace(new RegExp(`\\$\\{arg${i}\\}`, 'g'), args[i] ?? '');
-  }
-
-  if (expr.lowering.strategy === 'function') {
-    return result;
   }
 
   return result;
@@ -432,8 +408,8 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
   const columns = Object.keys(ast.values).map((col) => quoteIdentifier(col));
   const values = Object.entries(ast.values).map(([colName, val]) => {
     if (val.kind === 'param') {
-      const cast = resolveParamCast(contract, ast.table.name, colName);
-      return `$${val.index}${cast}`;
+      const nativeType = getColumnNativeType(contract, ast.table.name, colName);
+      return nativeType ? `$${val.index}::${nativeType}` : `$${val.index}`;
     }
     if (val.kind === 'col') {
       return `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
@@ -455,8 +431,8 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
     const column = quoteIdentifier(col);
     let value: string;
     if (val.kind === 'param') {
-      const cast = resolveParamCast(contract, ast.table.name, col);
-      value = `$${val.index}${cast}`;
+      const nativeType = getColumnNativeType(contract, ast.table.name, col);
+      value = nativeType ? `$${val.index}::${nativeType}` : `$${val.index}`;
     } else if (val.kind === 'col') {
       value = `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
     } else {
