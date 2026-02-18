@@ -92,7 +92,7 @@ describe('pgvector extension pack integration', () => {
     expect(cosineDistanceOp?.method).toBe('cosineDistance');
   });
 
-  it('codecs can be registered in registry', () => {
+  it('codecs can be registered in registry', { timeout: 1_000 }, () => {
     const codecs = pgvector.codecs();
     expect(codecs).toBeDefined();
 
