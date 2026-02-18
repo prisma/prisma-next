@@ -3,7 +3,7 @@ import { compileJsonSchemaValidator } from '../src/core/json-schema-validator';
 
 describe('json-schema-validator', () => {
   describe('compileJsonSchemaValidator', () => {
-    it('validates a simple object schema', () => {
+    it('validates a simple object schema', { timeout: 2000 }, () => {
       const validate = compileJsonSchemaValidator({
         type: 'object',
         properties: {
