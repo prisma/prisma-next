@@ -53,7 +53,6 @@ import {
   insertUser as insertUserKysely,
   updateUser as updateUserKysely,
 } from './kysely/dml-operations';
-import { getAllPostsUnbounded as getAllPostsUnboundedKysely } from './kysely/get-all-posts-unbounded';
 import { getUserById as getUserByIdKysely } from './kysely/get-user-by-id';
 import { getUserPosts as getUserPostsKysely } from './kysely/get-user-posts';
 import { getUsers as getUsersKysely } from './kysely/get-users';

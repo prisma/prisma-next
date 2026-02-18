@@ -1,13 +1,8 @@
-import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { Kysely } from 'kysely';
-import { executionContext } from '../prisma/context';
+import { db } from '../prisma/db';
 
 export async function getUsers(runtime: Runtime, limit = 10) {
-  const contract = executionContext.contract;
-  const kysely = new Kysely<KyselifyContract<typeof contract>>({
-    dialect: new KyselyPrismaDialect({ runtime, contract }),
-  });
+  const kysely = db.kysely(runtime);
 
   return kysely
     .selectFrom('user')

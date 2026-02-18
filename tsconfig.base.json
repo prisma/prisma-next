@@ -40,6 +40,6 @@
     { "path": "./packages/3-targets/3-targets/postgres" },
     { "path": "./packages/3-targets/6-adapters/postgres" },
     { "path": "./packages/3-targets/7-drivers/postgres" },
-    { "path": "./packages/3-targets/8-clients/postgres" }
+    { "path": "./packages/3-extensions/postgres" }
   ]
 }

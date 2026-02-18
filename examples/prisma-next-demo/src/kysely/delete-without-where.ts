@@ -1,7 +1,5 @@
-import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { Kysely } from 'kysely';
-import { executionContext } from '../prisma/context';
+import { db } from '../prisma/db';
 
 /**
  * Guardrail-proving query: DELETE without WHERE.
@@ -9,10 +7,7 @@ import { executionContext } from '../prisma/context';
  * Used to validate that LINT.DELETE_WITHOUT_WHERE is enforced.
  */
 export async function deleteWithoutWhere(runtime: Runtime) {
-  const contract = executionContext.contract;
-  const kysely = new Kysely<KyselifyContract<typeof contract>>({
-    dialect: new KyselyPrismaDialect({ runtime, contract }),
-  });
+  const kysely = db.kysely(runtime);
 
   await kysely.deleteFrom('user').execute();
 }

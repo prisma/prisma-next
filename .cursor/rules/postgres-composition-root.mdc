@@ -1,0 +1,5 @@
+# Postgres Composition Root Placement
+
+- `@prisma-next/postgres` is treated as a composition-root helper and lives under `packages/3-extensions/postgres`.
+- Keep target/adapter/driver descriptors in `3-targets`, and compose them from this helper package.
+- Expose both `db.sql` and `db.kysely(runtime)` so SQL-lane and Kysely-lane call sites can coexist during migration.
