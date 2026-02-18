@@ -53,6 +53,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 158 | Execution mutation defaults | Defines execution-plane mutation defaults (`execution.mutations.defaults`) and a section-owned hashing model to avoid marker churn | [ADR 158 - Execution mutation defaults.md](adrs/ADR%20158%20-%20Execution%20mutation%20defaults.md) |
 | 159 | Postgres JSON and JSONB typed columns | Adds first-class PostgreSQL `json`/`jsonb` codec and column support with Standard Schema-based typed emission in `contract.d.ts` | [ADR 159 - Postgres JSON and JSONB typed columns.md](adrs/ADR%20159%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md) |
 | 160 | Plan grouping keys for multi-statement orchestration | Adds `meta.groupingKey` to correlate multiple statement executions that serve one higher-level operation | [ADR 160 - Plan grouping keys for multi-statement orchestration.md](adrs/ADR%20160%20-%20Plan%20grouping%20keys%20for%20multi-statement%20orchestration.md) |
+| 162 | List types as parameterized array codecs | Adds list/array column support via `pg/array@1` parameterized codec with element delegation, universal parameter casting, and full layer integration | [ADR 162 - List types as parameterized array codecs.md](adrs/ADR%20162%20-%20List%20types%20as%20parameterized%20array%20codecs.md) |
 
 ## Migration System
 

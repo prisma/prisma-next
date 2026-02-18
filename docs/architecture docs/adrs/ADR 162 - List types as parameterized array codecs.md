@@ -1,4 +1,4 @@
-# ADR 159 — List types as parameterized array codecs
+# ADR 162 — List types as parameterized array codecs
 
 ## Context
 
@@ -44,21 +44,22 @@ Array columns use the same `StorageColumn` shape as any other parameterized type
     "nativeType": "text[]",
     "nullable": true,
     "typeParams": {
-      "element": "pg/text@1",
-      "elementNativeType": "text",
-      "nullableItems": false
+      "element": {
+        "codecId": "pg/text@1",
+        "nativeType": "text"
+      },
+      "nullableElement": false
     }
   }
 }
 ```
 
-- `element` — the element codec ID, used for type emission and runtime codec composition
-- `elementNativeType` — the element's native type, used for type expansion and verification
-- `nullableItems` — whether individual elements can be null (distinct from column-level nullability)
+- `element` — the full element type descriptor (nested `ColumnTypeDescriptor`), containing `codecId`, `nativeType`, and optionally its own `typeParams`. This avoids duplicating element metadata across separate `element`, `elementNativeType`, and `elementTypeParams` fields.
+- `nullableElement` — whether individual elements can be null (distinct from column-level nullability)
 
 This gives four nullability combinations:
 
-| Column nullable | nullableItems | TS type |
+| Column nullable | nullableElement | TS type |
 |---|---|---|
 | false | false | `Array<number>` |
 | true | false | `Array<number> \| null` |
@@ -76,13 +77,11 @@ null -> []
 ```ts
 import { int4Column, listOf } from '@prisma-next/adapter-postgres/column-types';
 
-const scores = listOf(int4Column, { nullableItems: true });
-// → { codecId: 'pg/array@1', nativeType: 'int4[]', typeParams: { element: 'pg/int4@1', elementNativeType: 'int4', nullableItems: true } }
+const scores = listOf(int4Column, { nullableElement: true });
+// → { codecId: 'pg/array@1', nativeType: 'int4[]', typeParams: { element: { codecId: 'pg/int4@1', nativeType: 'int4' }, nullableElement: true } }
 ```
 
-TODO: Change listOf to take just codec and not extra parameters describing the same information
-
-`listOf` composes the element descriptor's `codecId` and `nativeType` into the array descriptor's `typeParams`, avoiding manual assembly.
+`listOf` nests the element descriptor directly into `typeParams.element`, avoiding duplication of element metadata.
 
 ### 3) Codec: generic factory with element delegation
 
@@ -111,26 +110,26 @@ The wire type union reflects the two paths:
 
 `parsePgTextArray` and `formatPgTextArray` handle the Postgres text array wire format, including quoting, escaping, and NULL representation.
 
-### 4) SQL lowering: type casts for array parameters
+### 4) SQL lowering: always-cast parameters
 
-Array parameters require explicit casts so Postgres can parse bound text values as the correct array type:
+All DML parameters (INSERT values, UPDATE SET) are cast to their column's `nativeType`:
 
 ```sql
-INSERT INTO "post" ("tags") VALUES ($1::text[])
+INSERT INTO "post" ("id", "tags") VALUES ($1::int4, $2::text[])
 UPDATE "post" SET "scores" = $1::int4[] WHERE ...
 ```
 
-This is handled by `resolveParamCast()`, which unifies cast logic for vectors and arrays. The cast suffix is derived from the column's `nativeType` in the contract (e.g. `text[]` → `::text[]`).
+The adapter appends `::nativeType` to every parameter in INSERT/UPDATE contexts using the column metadata from the contract. This is universal — no codec-specific branching. Scalar casts like `$1::int4` are redundant but harmless; extension types like `$1::vector` and array types like `$1::text[]` require them. This eliminates the need for the adapter to know about specific codec IDs, keeping extension types like pgvector fully decoupled from core adapter code.
 
 ### 5) Type generation: parameterized type renderer
 
-The `pg/array@1` renderer in `descriptor-meta.ts` emits TypeScript types by looking up the element codec's output type:
+The `pg/array@1` renderer in `descriptor-meta.ts` emits TypeScript types by reading `element.codecId` from the nested element descriptor:
 
 ```ts
-// For element: 'pg/int4@1', nullableItems: false
+// For element: { codecId: 'pg/int4@1', nativeType: 'int4' }, nullableElement: false
 Array<CodecTypes['pg/int4@1']['output']>
 
-// For element: 'pg/text@1', nullableItems: true
+// For element: { codecId: 'pg/text@1', nativeType: 'text' }, nullableElement: true
 Array<CodecTypes['pg/text@1']['output'] | null>
 ```
 
@@ -142,7 +141,7 @@ Postgres reports array columns via `information_schema` with `data_type = 'ARRAY
 
 ### 7) Schema verification: array type expansion
 
-`expandParameterizedNativeType` constructs the expected native type from `elementNativeType` + `[]` suffix when the codec is `pg/array@1`. Verification then compares this against the introspected native type.
+`expandParameterizedNativeType` constructs the expected native type from `element.nativeType` + `[]` suffix when the codec is `pg/array@1`. Verification then compares this against the introspected native type.
 
 ### 8) Target scope and future extensibility
 
@@ -170,11 +169,11 @@ Each target owns its codec implementation. The contract IR pattern is shared; th
       "id": { "codecId": "pg/int4@1", "nativeType": "int4", "nullable": false },
       "tags": {
         "codecId": "pg/array@1", "nativeType": "text[]", "nullable": false,
-        "typeParams": { "element": "pg/text@1", "elementNativeType": "text" }
+        "typeParams": { "element": { "codecId": "pg/text@1", "nativeType": "text" } }
       },
       "scores": {
         "codecId": "pg/array@1", "nativeType": "int4[]", "nullable": true,
-        "typeParams": { "element": "pg/int4@1", "elementNativeType": "int4" }
+        "typeParams": { "element": { "codecId": "pg/int4@1", "nativeType": "int4" } }
       }
     }
   }
@@ -205,12 +204,10 @@ import { int4Column, textColumn, listOf } from '@prisma-next/adapter-postgres/co
 #### B) Adapter lowers to SQL with casts
 
 ```sql
-INSERT INTO "post" ("id", "tags", "scores") VALUES ($1, $2::text[], $3::int4[])
+INSERT INTO "post" ("id", "tags", "scores") VALUES ($1::int4, $2::text[], $3::int4[])
 ```
 
-The `::text[]` and `::int4[]` casts are emitted by `resolveParamCast` based on the column's `codecId` and `nativeType`.
-
-TODO: Currently `resolveParamCast` is hardcoding logic for arrays along with vector in core code, but vector should be an optional extension
+The `::int4`, `::text[]`, and `::int4[]` casts are emitted universally for all DML parameters based on the column's `nativeType`.
 
 #### C) Codec encodes parameters
 
@@ -246,7 +243,7 @@ scores: Array<CodecTypes['pg/int4@1']['output']> | null // Array<number> | null
 - No new fields on `StorageColumn` — uses the established parameterized codec pattern
 - Full type safety from authoring through runtime: element types flow through generics
 - Introspection and verification work with no special-case schema queries
-- `resolveParamCast` unifies and simplifies the vector/array cast logic in the adapter
+- Universal `::nativeType` parameter casting eliminates codec-specific branching in the adapter, keeping extension types decoupled from core
 - Clear extensibility path for other targets without shared implementation coupling
 
 ### Costs

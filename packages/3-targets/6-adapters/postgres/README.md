@@ -131,7 +131,7 @@ flowchart TD
 **Column Types Export (`column-types.ts`)**
 - Exports column descriptors for built-in types and enum helpers (`enumType`, `enumColumn(typeRef, nativeType)`)
 - Parameterized helpers: `charColumn(length)`, `varcharColumn(length)`, `numericColumn(precision, scale?)`, `bitColumn(length)`, `varbitColumn(length)`, `timeColumn(precision?)`, `timetzColumn(precision?)`, `intervalColumn(precision?)`
-- List helper: `listOf(elementDescriptor, options?)` — wraps any scalar column type as a PostgreSQL array (e.g., `listOf(int4Column)` → `int4[]`). Supports `{ nullableItems: true }` for nullable elements.
+- List helper: `listOf(elementDescriptor, options?)` — wraps any scalar column type as a PostgreSQL array (e.g., `listOf(int4Column)` → `int4[]`). Supports `{ nullableElement: true }` for nullable elements.
 
 - Exports JSON helpers:
   - `jsonColumn`, `jsonbColumn`
@@ -317,7 +317,7 @@ import { int4Column, textColumn, listOf } from '@prisma-next/adapter-postgres/co
 const scores = listOf(int4Column);
 
 // text[] column with nullable items: (string | null)[]
-const tags = listOf(textColumn, { nullableItems: true });
+const tags = listOf(textColumn, { nullableElement: true });
 ```
 
 ### Contract IR
@@ -329,8 +329,10 @@ Array columns use `codecId: 'pg/array@1'` with `typeParams`:
   "codecId": "pg/array@1",
   "nativeType": "int4[]",
   "typeParams": {
-    "element": "pg/int4@1",
-    "elementNativeType": "int4"
+    "element": {
+      "codecId": "pg/int4@1",
+      "nativeType": "int4"
+    }
   }
 }
 ```
@@ -339,8 +341,8 @@ Array columns use `codecId: 'pg/array@1'` with `typeParams`:
 
 - All existing scalar column types as element types
 - Nullable lists (`nullable: true` on the column)
-- Nullable items within lists (`typeParams.nullableItems: true`)
-- SQL lowering with proper type casts (e.g., `$1::int4[]`)
+- Nullable elements within lists (`typeParams.nullableElement: true`)
+- SQL lowering with universal `::nativeType` parameter casts (e.g., `$1::int4[]`)
 - Schema introspection and verification
 - Type generation producing `Array<T>` or `Array<T | null>`
 
