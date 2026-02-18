@@ -1094,17 +1094,9 @@ Open:
 
 ---
 
-## 12. Migration Path
+## 12. Replacing the ORM Lane
 
-The ORM client layer succeeds the ORM lane (ADR 015):
-
-1. **Now:** The ORM lane compiles each call to a single Plan per ADR 015. The ORM client prototype exists with basic reads.
-2. **Feature parity:** This spec is implemented, covering everything the ORM lane does plus mutations, aggregations, and multi-query orchestration.
-3. **Deprecation:** ORM lane gets a deprecation notice pointing to `@prisma-next/sql-orm-client`.
-4. **Coexistence:** Both packages coexist during transition. Existing lane usage is unchanged.
-5. **Removal:** ORM lane removed in a future major version.
-
-No breaking changes to existing code at any point.
+The ORM client replaces the ORM lane (ADR 015). Once this spec is implemented, the ORM lane package (`@prisma-next/sql-orm-lane`) is deleted and its demo usage is migrated to the ORM client.
 
 ---
 
