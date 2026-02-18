@@ -7,17 +7,14 @@ import type {
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 const QUERY_AST_KINDS = new Set(['select', 'insert', 'update', 'delete']);
 
 function isSqlQueryAst(ast: unknown): ast is QueryAst {
-  return (
-    ast !== null &&
-    typeof ast === 'object' &&
-    'kind' in ast &&
-    typeof (ast as { kind: string }).kind === 'string' &&
-    QUERY_AST_KINDS.has((ast as { kind: string }).kind)
-  );
+  if (ast === null || typeof ast !== 'object' || !('kind' in ast)) return false;
+  const kind = (ast as { kind: string }).kind;
+  return typeof kind === 'string' && QUERY_AST_KINDS.has(kind);
 }
 
 export interface LintsOptions {
@@ -108,7 +105,7 @@ function evaluateAstLints(ast: QueryAst, meta: PlanMeta): LintFinding[] {
         code: 'LINT.SELECT_STAR',
         severity: 'warn',
         message: 'Query selects all columns via selectAll intent',
-        ...(table !== undefined ? { details: { table } } : {}),
+        ...ifDefined('details', table !== undefined ? { table } : undefined),
       });
     }
   }
