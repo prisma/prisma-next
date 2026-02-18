@@ -85,6 +85,9 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/no-barrel-files.mdc` — Avoid barrels
 - `.cursor/rules/no-backward-compatibility.md` — No backward-compat shims; update call sites instead
 
+## Review Framework
+- `.cursor/rules/review-framework-automation.mdc` — Use helper scripts for review automation; require jq; avoid inline parser snippets
+
 ## Architecture
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview first
 - `.cursor/rules/adr-writing.mdc` — ADR writing guidelines (clarity, flow, examples)
