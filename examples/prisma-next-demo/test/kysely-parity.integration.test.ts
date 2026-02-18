@@ -18,7 +18,6 @@ import { db } from '../src/prisma/db';
 import { initTestDatabase } from './utils/control-client';
 
 const executionStack = db.stack;
-const executionStackInstance = instantiateExecutionStack(executionStack);
 const executionContext = db.context;
 const { contract } = executionContext;
 
@@ -33,7 +32,7 @@ function createTestDriver(connectionString: string) {
 
 function getRuntime(connectionString: string): Runtime {
   return createRuntime({
-    stackInstance: executionStackInstance,
+    stackInstance: instantiateExecutionStack(executionStack),
     context: executionContext,
     driver: createTestDriver(connectionString),
     verify: { mode: 'onFirstUse', requireMarker: false },
