@@ -49,7 +49,7 @@ The transformer (`src/transform/`) converts Kysely AST nodes to PN SQL AST:
 | `FromNode` / `TableNode` | `TableRef` |
 | `ReferenceNode` + `ColumnNode` | `ColumnRef` |
 | `SelectAllNode` | Expanded columns + `selectAllIntent` |
-| `BinaryOperationNode` | `BinaryExpr` (=, <>, >, <, >=, <=, like, in) |
+| `BinaryOperationNode` | `BinaryExpr` (=, <>, >, <, >=, <=, like, ilike, in, notIn) |
 | `PrimitiveValueListNode` | `ListLiteralExpr` |
 | `AndNode` / `OrNode` | `AndExpr` / `OrExpr` |
 | `JoinNode` + `OnNode` | `JoinAst` |
@@ -67,10 +67,10 @@ Pre-transform guardrails (`runGuardrails`) run before the transformer in the Kys
 
 | Rule | Condition | Error |
 |------|-----------|-------|
-| Qualified refs | Multi-table scope (joins) with unqualified column ref | `UNQUALIFIED_REF_IN_MULTI_TABLE` |
+| Qualified refs | Multi-table scope (joins **or** multiple `FROM` entries) with unqualified column ref | `UNQUALIFIED_REF_IN_MULTI_TABLE` |
 | Ambiguous selectAll | Multi-table scope with `selectAll()` / `select *` without table qualification | `AMBIGUOUS_SELECT_ALL` |
 
-Only `SelectQueryNode` with joins is validated; INSERT/UPDATE/DELETE are single-table.
+Multi-table scope is triggered by either joins (`JoinNode` present) or multiple `FROM` entries (`froms.length > 1`). Only `SelectQueryNode` is validated; INSERT/UPDATE/DELETE are single-table.
 
 ## Dependencies
 
