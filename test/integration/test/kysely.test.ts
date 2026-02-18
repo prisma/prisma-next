@@ -333,7 +333,7 @@ describe('Kysely integration', () => {
           .execute();
 
         expect(captured).toHaveLength(1);
-        const plan = captured[0];
+        const plan = captured[0]!;
         expect(plan).toMatchObject({
           ast: { kind: 'select' },
           meta: {
@@ -413,7 +413,7 @@ describe('Kysely integration', () => {
         `.execute(kysely);
 
         expect(captured).toHaveLength(1);
-        const plan = captured[0];
+        const plan = captured[0]!;
         expect(plan.ast).toBeUndefined();
         expect(plan.meta.lane).toBe('raw');
         expect(plan.meta.paramDescriptors).toEqual([]);
