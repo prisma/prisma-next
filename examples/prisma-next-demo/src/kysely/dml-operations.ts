@@ -1,15 +1,10 @@
 import { generateId } from '@prisma-next/ids/runtime';
-import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { Kysely } from 'kysely';
-import { executionContext } from '../prisma/context';
+import { db } from '../prisma/db';
 
 export async function insertUser(email: string, runtime: Runtime) {
   const userId = generateId({ id: 'uuidv4' });
-  const contract = executionContext.contract;
-  const kysely = new Kysely<KyselifyContract<typeof contract>>({
-    dialect: new KyselyPrismaDialect({ runtime, contract }),
-  });
+  const kysely = db.kysely(runtime);
 
   const rows = await kysely
     .insertInto('user')
@@ -26,10 +21,7 @@ export async function insertUser(email: string, runtime: Runtime) {
 }
 
 export async function updateUser(userId: string, newEmail: string, runtime: Runtime) {
-  const contract = executionContext.contract;
-  const kysely = new Kysely<KyselifyContract<typeof contract>>({
-    dialect: new KyselyPrismaDialect({ runtime, contract }),
-  });
+  const kysely = db.kysely(runtime);
 
   const rows = await kysely
     .updateTable('user')
@@ -42,10 +34,7 @@ export async function updateUser(userId: string, newEmail: string, runtime: Runt
 }
 
 export async function deleteUser(userId: string, runtime: Runtime) {
-  const contract = executionContext.contract;
-  const kysely = new Kysely<KyselifyContract<typeof contract>>({
-    dialect: new KyselyPrismaDialect({ runtime, contract }),
-  });
+  const kysely = db.kysely(runtime);
 
   const rows = await kysely
     .deleteFrom('user')

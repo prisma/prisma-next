@@ -1,0 +1,51 @@
+{
+  "name": "@prisma-next/postgres",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "description": "One-liner lazy Postgres client composition for Prisma Next",
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/core-execution-plane": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/integration-kysely": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-lane": "workspace:*",
+    "@prisma-next/sql-orm-lane": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
+    "kysely": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
+    "@types/pg": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    "./runtime": "./dist/runtime.mjs",
+    "./package.json": "./package.json"
+  }
+}

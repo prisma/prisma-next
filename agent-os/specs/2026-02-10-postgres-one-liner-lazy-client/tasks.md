@@ -72,7 +72,7 @@ Principles:
 ## Milestone 2 — New package scaffolding: `@prisma-next/postgres`
 
 1. [x] Create a new workspace package for the one-liner client:
-   - **Location**: `packages/3-targets/8-clients/postgres/` (new directory)
+   - **Location**: `packages/3-extensions/postgres/` (new directory)
    - **Name**: `@prisma-next/postgres`
    - **Entry point**: `@prisma-next/postgres/runtime` (default export `postgres`)
 2. [x] Scaffold minimal package boilerplate aligned with repo conventions:

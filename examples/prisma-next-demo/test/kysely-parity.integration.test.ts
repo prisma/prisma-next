@@ -1,8 +1,11 @@
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
+import { budgets, createRuntime, lints, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
+import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
 import { deleteWithoutWhere } from '../src/kysely/delete-without-where';
 import { getAllPostsUnbounded } from '../src/kysely/get-all-posts-unbounded';
@@ -11,11 +14,40 @@ import { getUserPosts } from '../src/kysely/get-user-posts';
 import { getUsers } from '../src/kysely/get-users';
 import { getUsersWithPosts } from '../src/kysely/get-users-with-posts';
 import { updateWithoutWhere } from '../src/kysely/update-without-where';
-import { executionContext } from '../src/prisma/context';
-import { getRuntime } from '../src/prisma/runtime';
+import { db } from '../src/prisma/db';
 import { initTestDatabase } from './utils/control-client';
 
+const executionStack = db.stack;
+const executionStackInstance = instantiateExecutionStack(executionStack);
+const executionContext = db.context;
 const { contract } = executionContext;
+
+function createTestDriver(connectionString: string) {
+  const driverDescriptor = executionStack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+  const pool = new Pool({ connectionString });
+  return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+}
+
+function getRuntime(connectionString: string): Runtime {
+  return createRuntime({
+    stackInstance: executionStackInstance,
+    context: executionContext,
+    driver: createTestDriver(connectionString),
+    verify: { mode: 'onFirstUse', requireMarker: false },
+    plugins: [
+      lints(),
+      budgets({
+        maxRows: 10_000,
+        defaultTableRows: 10_000,
+        tableRows: { user: 10_000, post: 10_000 },
+        maxLatencyMs: 1_000,
+      }),
+    ],
+  });
+}
 
 async function seedTestData(
   runtime: ReturnType<typeof getRuntime>,
@@ -25,8 +57,8 @@ async function seedTestData(
   },
 ): Promise<{ userIds: string[] }> {
   const tables = schema(executionContext).tables;
-  const userTable = tables.user!;
-  const postTable = tables.post!;
+  const userTable = tables['user']!;
+  const postTable = tables['post']!;
   const userIds: string[] = [];
 
   if (data.users) {
