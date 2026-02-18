@@ -4,6 +4,7 @@ import {
   createBinaryExpr,
   createColumnRef,
   createJoin,
+  createLiteralExpr,
   createSelectAst,
   createTableRef,
 } from '@prisma-next/sql-relational-core/ast';
@@ -284,10 +285,7 @@ describe('Postgres adapter join rendering', () => {
               createColumnRef('user', 'id'),
               createColumnRef('post', 'userId'),
             ),
-            createBinaryExpr('neq', createColumnRef('post', 'title'), {
-              kind: 'literal',
-              value: '',
-            }),
+            createBinaryExpr('neq', createColumnRef('post', 'title'), createLiteralExpr('')),
           ],
         }),
       ],
