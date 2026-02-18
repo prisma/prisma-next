@@ -398,20 +398,38 @@ Prisma Next drops the `data:` wrapper — the fields are the top-level argument.
 
 **Prisma ORM:**
 ```typescript
+// Single record
 const user = await prisma.user.update({
   where: { id: 42 },
   data: { name: 'Alice Updated' },
+})
+
+// Batch — returns count only
+await prisma.user.updateMany({
+  where: { role: 'guest' },
+  data: { active: false },
 })
 ```
 
 **Prisma Next:**
 ```typescript
+// Single record — update first match, return it
 const user = await db.users
-  .where(u => u.id.eq(42))
+  .where({ id: 42 })
   .update({ name: 'Alice Updated' })
+
+// All matches — return affected rows (streamable)
+const users = await db.users
+  .where(u => u.role.eq('guest'))
+  .updateAll({ active: false })
+
+// All matches — return count
+const count = await db.users
+  .where(u => u.role.eq('guest'))
+  .updateCount({ active: false })
 ```
 
-Prisma ORM requires `where` inside the argument object. Prisma Next uses the same chainable `.where()` as reads.
+Prisma ORM has `update` (single, requires unique where) and `updateMany` (batch, returns count only). There is also `updateManyAndReturn` (Postgres/CockroachDB/SQLite only) that returns affected rows. Prisma Next has three variants: `update` (first match, return it), `updateAll` (all matches, return rows), `updateCount` (all matches, return count). `update` and `updateAll` require the `returning` capability; `updateCount` works on all targets.
 
 ---
 
@@ -422,11 +440,22 @@ Prisma ORM requires `where` inside the argument object. Prisma Next uses the sam
 const user = await prisma.user.delete({
   where: { id: 42 },
 })
+
+await prisma.user.deleteMany({
+  where: { active: false },
+})
 ```
 
 **Prisma Next:**
 ```typescript
-await db.users.where(u => u.id.eq(42)).delete()
+// Single — delete first match, return it
+const user = await db.users.where({ id: 42 }).delete()
+
+// All matches — return affected rows (streamable)
+const users = await db.users.where(u => u.active.eq(false)).deleteAll()
+
+// All matches — return count
+const count = await db.users.where(u => u.active.eq(false)).deleteCount()
 ```
 
 ---
@@ -452,38 +481,43 @@ const user = await db.users.upsert({
 
 ---
 
-### Batch Operations
+### Batch Create
 
 **Prisma ORM:**
 ```typescript
-const count = await prisma.user.createMany({
+// createMany — returns count only
+const { count } = await prisma.user.createMany({
   data: [
     { email: 'a@example.com', name: 'A' },
     { email: 'b@example.com', name: 'B' },
   ],
 })
 
-await prisma.user.updateMany({
-  where: { role: 'guest' },
-  data: { active: false },
-})
-
-await prisma.user.deleteMany({
-  where: { active: false },
+// createManyAndReturn — returns rows (Postgres/CockroachDB/SQLite only)
+const users = await prisma.user.createManyAndReturn({
+  data: [
+    { email: 'a@example.com', name: 'A' },
+    { email: 'b@example.com', name: 'B' },
+  ],
 })
 ```
 
 **Prisma Next:**
 ```typescript
-const count = await db.users.createMany([
+// Return created rows (streamable) — works on all targets
+const users = await db.users.createAll([
   { email: 'a@example.com', name: 'A' },
   { email: 'b@example.com', name: 'B' },
 ])
 
-await db.users.where(u => u.role.eq('guest')).updateMany({ active: false })
-
-await db.users.where(u => u.active.eq(false)).deleteMany()
+// Or just the count
+const count = await db.users.createCount([
+  { email: 'a@example.com', name: 'A' },
+  { email: 'b@example.com', name: 'B' },
+])
 ```
+
+Prisma ORM's `createManyAndReturn` only works on Postgres, CockroachDB, and SQLite (targets with `RETURNING`). Same for Prisma Next's `createAll` — it requires the `returning` capability. On targets without it (e.g. MySQL), use `createCount` (works everywhere). The ORM client deliberately does not attempt multi-step fallbacks, which would be fragile for views, keyless tables, and concurrent workloads.
 
 ---
 

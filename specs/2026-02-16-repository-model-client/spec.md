@@ -295,10 +295,8 @@ This enables the type system to enforce constraints like "you can't call `cursor
 |--------|----------|
 | `cursor({ field: value })` | `hasOrderBy: true` |
 | `distinctOn(...fields)` | `hasOrderBy: true` |
-| `update(data)` | `hasWhere: true` |
-| `delete()` | `hasWhere: true` |
-| `updateMany(data)` | `hasWhere: true` |
-| `deleteMany()` | `hasWhere: true` |
+| `update(data)` / `updateAll(data)` / `updateCount(data)` | `hasWhere: true` |
+| `delete()` / `deleteAll()` / `deleteCount()` | `hasWhere: true` |
 
 The internal type machinery can be as complex as needed, but user-facing types stay simple. Custom collection subclasses should not need to spell out type-state generics — they're inferred through method chaining:
 
@@ -675,57 +673,114 @@ Compilation:
 
 ## 7. Mutation API
 
-### 7.1 Single-Record Mutations
+Every mutation operation has three variants that mirror the read terminals:
 
-#### `create(data)`
+| Variant | Suffix | Returns | Analogous read |
+|---------|--------|---------|---------------|
+| **Single** | (base name) | `Promise<Row>` or `Promise<Row \| null>` | `find()` |
+| **Multi** | `*All` | `AsyncIterableResult<Row>` | `all()` |
+| **Count** | `*Count` | `Promise<number>` | `count()` |
 
-Inserts a new record. The data type distinguishes required from optional fields (see section 4.4).
+The single variant applies LIMIT 1 (for update/delete), just as `find()` does for reads. The multi variant streams results back, just as `all()` does. The count variant returns only the number of affected rows.
+
+### 7.1 Create
 
 ```typescript
+// create — insert one record, return it
 const user = await db.users.create({
   email: 'alice@example.com',  // required
   name: 'Alice',               // required
   // id: auto-generated, optional
   // createdAt: has default, optional
 });
+// → Promise<Row>
+
+// createAll — insert multiple records, return them (streamable)
+const users = await db.users.createAll([
+  { email: 'alice@example.com', name: 'Alice' },
+  { email: 'bob@example.com', name: 'Bob' },
+]);
+// → AsyncIterableResult<Row>
+
+// createCount — insert multiple records, return count
+const count = await db.users.createCount([
+  { email: 'alice@example.com', name: 'Alice' },
+  { email: 'bob@example.com', name: 'Bob' },
+]);
+// → Promise<number>
 ```
 
-Compiles to `INSERT ... RETURNING *` when the target supports `RETURNING`. When unavailable, the ORM client orchestrates `INSERT` followed by `SELECT` using the known key (per ADR 161 section 5).
+All mutation variants that return rows (`create`, `createAll`, `update`, `updateAll`, `delete`, `deleteAll`, `upsert`) **require the `returning` capability** in the contract. On targets without `RETURNING` (e.g. MySQL), only the `*Count` variants are available. This is a deliberate choice: the ORM client does not assume the presence of primary keys or attempt multi-step fallbacks (SELECT-then-mutate), which would be fragile for views, keyless tables, and concurrent workloads.
 
-#### `update(data)`
+`createCount`, `updateCount`, and `deleteCount` work on all targets.
 
-Updates records matching the current `where()` filters. **Requires at least one `where()` filter** (type-state gated).
+### 7.2 Update
+
+All update variants **require at least one `where()` filter** (type-state gated).
 
 ```typescript
-await db.users
-  .where(u => u.id.eq(42))
+// update — update first match, return it
+const user = await db.users
+  .where({ id: 42 })
   .update({ name: 'Alice Updated' });
+// → Promise<Row | null>
+
+// updateAll — update all matches, return them (streamable)
+const users = await db.users
+  .where(u => u.role.eq('guest'))
+  .updateAll({ active: false });
+// → AsyncIterableResult<Row>
+
+// updateCount — update all matches, return count
+const count = await db.users
+  .where(u => u.role.eq('guest'))
+  .updateCount({ active: false });
+// → Promise<number>
 
 // Type error — no where():
 await db.users.update({ name: 'oops' });
 
 // Whole-table update requires explicit intent:
-await db.users.where(all()).update({ active: false });
+await db.users.where(all()).updateCount({ active: false });
 ```
 
-#### `delete()`
+### 7.3 Delete
 
-Deletes records matching the current `where()` filters. Same safety guardrail as `update()`.
+All delete variants **require at least one `where()` filter** (type-state gated).
 
 ```typescript
-await db.users.where(u => u.id.eq(42)).delete();
-await db.users.where(all()).delete();  // whole-table
+// delete — delete first match, return it
+const user = await db.users
+  .where({ id: 42 })
+  .delete();
+// → Promise<Row | null>
+
+// deleteAll — delete all matches, return them (streamable)
+const users = await db.users
+  .where(u => u.active.eq(false))
+  .deleteAll();
+// → AsyncIterableResult<Row>
+
+// deleteCount — delete all matches, return count
+const count = await db.users
+  .where(u => u.active.eq(false))
+  .deleteCount();
+// → Promise<number>
+
+// Whole-table
+await db.users.where(all()).deleteCount();
 ```
 
-#### `upsert({ create, update })`
+### 7.4 Upsert
 
-Insert or update on conflict. Compiles to `INSERT ... ON CONFLICT DO UPDATE`.
+Insert or update on conflict. Compiles to `INSERT ... ON CONFLICT DO UPDATE`. Returns the affected record.
 
 ```typescript
 const user = await db.users.upsert({
   create: { email: 'alice@example.com', name: 'Alice' },
   update: { name: 'Alice Updated' },
 });
+// → Promise<Row>
 
 // When multiple unique constraints exist, specify which one:
 const user = await db.users.upsert({
@@ -733,60 +788,6 @@ const user = await db.users.upsert({
   create: { email: 'alice@example.com', name: 'Alice' },
   update: { name: 'Alice Updated' },
 });
-```
-
-### 7.2 Batch Operations
-
-```typescript
-// Bulk insert — returns count
-const count = await db.users.createMany([
-  { email: 'alice@example.com', name: 'Alice' },
-  { email: 'bob@example.com', name: 'Bob' },
-]);
-
-// Bulk update — requires where(), returns count
-const count = await db.users
-  .where(u => u.role.eq('guest'))
-  .updateMany({ active: false });
-
-// Bulk delete — requires where(), returns count
-const count = await db.users
-  .where(u => u.active.eq(false))
-  .deleteMany();
-```
-
-### 7.3 Mutation Result Variants
-
-Some mutations need to return the affected record(s), others just a count. The API must distinguish these without SQL jargon like "returning" or "rows".
-
-The confirmed direction is a **method-based approach** to avoid method-name explosion. We document three options for team discussion:
-
-**Option A: Default record return, chain for count** (recommended to explore)
-
-```typescript
-const user = await db.users.create({ ... });                    // returns record
-const count = await db.users.where(...).delete().count();       // returns count
-```
-
-**Option B: Separate named methods**
-
-```typescript
-const user = await db.users.create({ ... });                    // returns record
-const count = await db.users.where(...).deleteCount();          // returns count
-```
-
-**Option C: Execution modifier**
-
-```typescript
-const user = await db.users.create({ ... }).get();              // returns record
-const count = await db.users.where(...).delete().exec();        // returns count
-```
-
-`select()` and `include()` compose with mutations to control what data comes back:
-
-```typescript
-const result = await db.users.create({ ... }).select('id', 'email');
-const result = await db.users.create({ ... }).include('posts');
 ```
 
 ### 7.4 Nested Mutations
@@ -1049,16 +1050,36 @@ Open:
 - Should `groupBy` support `.where()` on the grouped builder (before grouping) in addition to `.having()` (after)?
 - What is the exact return type shape for multi-aggregation groupBy?
 
-### 11.2 Mutation Result Variant Naming
+### 11.2 Mutation Method Naming: `create` vs `createOne`
 
-**Status:** Method-based approach confirmed; exact names need team discussion.
+**Status:** Three-variant pattern established (`verb` / `verbAll` / `verbCount`). One naming question remains.
 
-Options A, B, C documented in section 7.3. The team needs to align on:
-- Which option to adopt
-- Exact method names for the count variant
-- Whether `create()` should always include `RETURNING` or only when the result is consumed
+The single-record variant currently uses the bare verb: `create`, `update`, `delete`. An alternative is to use suffixes everywhere for consistency: `createOne`/`createAll`/`createCount`, `updateOne`/`updateAll`/`updateCount`, `deleteOne`/`deleteAll`/`deleteCount`.
 
-### 11.3 Shorthand Filter Edge Cases
+Trade-offs:
+- Bare verb is shorter and handles the most common case without ceremony.
+- Suffixed form is more consistent — every variant has an explicit suffix, no implicit "single" behavior.
+- Bare verb has precedent: `find()` (the single-record read) doesn't use `findOne`.
+
+### 11.3 Alternative: Chainable Mutations with Read Terminals
+
+**Status:** Noted as alternative to the suffix approach. Worth revisiting.
+
+Instead of separate method names (`update`/`updateAll`/`updateCount`), mutations could be **chainable** — `update(data)` returns an intermediate "pending mutation" that you terminate with the same read terminals:
+
+```typescript
+db.users.where({ id: 42 }).update({ name: 'Bob' }).find()    // → Promise<Row | null>
+db.users.where(...).update({ name: 'Bob' }).all()             // → AsyncIterableResult<Row>
+db.users.where(...).update({ name: 'Bob' }).count()           // → Promise<number>
+
+db.users.where({ id: 42 }).delete().find()                    // → Promise<Row | null>
+db.users.where(...).delete().all()                             // → AsyncIterableResult<Row>
+db.users.where(...).delete().count()                           // → Promise<number>
+```
+
+Pros: Reuses the read vocabulary exactly, no new method names. Cons: `delete().find()` reads oddly (you're not "finding" the deleted row), and mutations become two calls instead of one.
+
+### 11.4 Shorthand Filter Edge Cases
 
 **Status:** Core behavior defined; edge cases need specification.
 
@@ -1123,17 +1144,30 @@ import {
 | `min(field)` | `Promise<number>` | Minimum of a field |
 | `max(field)` | `Promise<number>` | Maximum of a field |
 
-### Terminal Methods — Mutations
+### Terminal Methods — Mutations (Single, requires `returning`)
 
 | Method | Requires `where()` | Returns | Description |
 |--------|-------------------|---------|-------------|
-| `create(data)` | No | `Promise<Row>` | Insert one record |
-| `update(data)` | Yes | `Promise<Row[]>` | Update matching records |
-| `delete()` | Yes | `Promise<Row[]>` | Delete matching records |
-| `upsert({ create, update })` | No | `Promise<Row>` | Insert or update |
-| `createMany(data[])` | No | `Promise<number>` | Bulk insert |
-| `updateMany(data)` | Yes | `Promise<number>` | Bulk update |
-| `deleteMany()` | Yes | `Promise<number>` | Bulk delete |
+| `create(data)` | No | `Promise<Row>` | Insert one record, return it |
+| `update(data)` | Yes | `Promise<Row \| null>` | Update first match (LIMIT 1), return it |
+| `delete()` | Yes | `Promise<Row \| null>` | Delete first match (LIMIT 1), return it |
+| `upsert({ create, update })` | No | `Promise<Row>` | Insert or update on conflict |
+
+### Terminal Methods — Mutations (Multi → Rows, requires `returning`)
+
+| Method | Requires `where()` | Returns | Description |
+|--------|-------------------|---------|-------------|
+| `createAll(data[])` | No | `AsyncIterableResult<Row>` | Insert records, return them (streamable) |
+| `updateAll(data)` | Yes | `AsyncIterableResult<Row>` | Update all matches, return them (streamable) |
+| `deleteAll()` | Yes | `AsyncIterableResult<Row>` | Delete all matches, return them (streamable) |
+
+### Terminal Methods — Mutations (Multi → Count, all targets)
+
+| Method | Requires `where()` | Returns | Description |
+|--------|-------------------|---------|-------------|
+| `createCount(data[])` | No | `Promise<number>` | Insert records, return count |
+| `updateCount(data)` | Yes | `Promise<number>` | Update all matches, return count |
+| `deleteCount()` | Yes | `Promise<number>` | Delete all matches, return count |
 
 ### Standalone Functions
 
@@ -1225,11 +1259,16 @@ async function main(db: ReturnType<typeof createClient>) {
     posts: p => p.create([{ title: 'My First Post', published: false }]),
   });
 
-  // Scoped update
-  await db.users
+  // Scoped update — single record
+  const updated = await db.users
+    .where({ id: 42 })
+    .update({ name: 'Alice Updated' });
+
+  // Scoped update — all matches, return count
+  const deactivated = await db.users
     .where(u => u.role.eq('guest'))
     .where(u => u.lastLoginAt.lt(thirtyDaysAgo))
-    .update({ active: false });
+    .updateCount({ active: false });
 
   // Aggregation + GroupBy
   const activeCount = await db.users.active().count();
@@ -1268,8 +1307,8 @@ Changes needed from the current prototype to match this specification:
 | Include strategy | Multi-query stitching only | Capability-based (lateral > correlated > multi-query) |
 | Include refinement | Bare Collection | Registered Collection (with custom methods) |
 | `orm()` option key | `repositories` (instances) | `collections` (classes) |
-| Mutations | Do not exist | create, update, delete, upsert + batch variants |
-| Nested mutations | Do not exist | Nested payload style |
+| Mutations | Do not exist | Three variants per operation: single (`create`/`update`/`delete`), multi-return (`*All`), count (`*Count`), plus `upsert` |
+| Nested mutations | Do not exist | Callback-based (`p => p.create(...)`) |
 | Aggregations | Do not exist | count, sum, avg, min, max, groupBy |
 | Logical combinators | Do not exist | `and()`, `or()`, `not()`, `all()` |
 | `orderBy` ergonomics | Returns `{ column, direction }` | Typed accessor with `.asc()` / `.desc()` |
