@@ -93,6 +93,65 @@ describe('TableBuilder', () => {
     });
   });
 
+  it('stores foreign key with referential actions via options object', () => {
+    const builder = createTable('post');
+    const table = builder
+      .column('userId', { type: intColumn })
+      .foreignKey(
+        ['userId'],
+        { table: 'user', columns: ['id'] },
+        {
+          onDelete: 'cascade',
+          onUpdate: 'noAction',
+        },
+      )
+      .build();
+
+    expect(table.foreignKeys).toHaveLength(1);
+    expect(table.foreignKeys[0]).toEqual({
+      columns: ['userId'],
+      references: { table: 'user', columns: ['id'] },
+      onDelete: 'cascade',
+      onUpdate: 'noAction',
+    });
+  });
+
+  it('stores foreign key with name and referential actions via options', () => {
+    const builder = createTable('post');
+    const table = builder
+      .column('userId', { type: intColumn })
+      .foreignKey(
+        ['userId'],
+        { table: 'user', columns: ['id'] },
+        {
+          name: 'post_userId_fkey',
+          onDelete: 'setNull',
+        },
+      )
+      .build();
+
+    expect(table.foreignKeys).toHaveLength(1);
+    expect(table.foreignKeys[0]).toEqual({
+      columns: ['userId'],
+      references: { table: 'user', columns: ['id'] },
+      name: 'post_userId_fkey',
+      onDelete: 'setNull',
+    });
+  });
+
+  it('backward compat: string name still works for foreignKey()', () => {
+    const table = createTable('post')
+      .column('userId', { type: intColumn })
+      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey')
+      .build();
+
+    expect(table.foreignKeys[0]).toEqual({
+      columns: ['userId'],
+      references: { table: 'user', columns: ['id'] },
+      name: 'post_userId_fkey',
+    });
+  });
+
   it('stores primary key name when provided', () => {
     const builder = createTable('user');
     const table = builder

@@ -276,6 +276,8 @@ class SqlContractBuilder<
         columns: fk.columns,
         references: fk.references,
         ...(fk.name ? { name: fk.name } : {}),
+        ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
+        ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
       }));
 
       const table = {

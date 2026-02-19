@@ -1,4 +1,5 @@
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 
 /**
  * Column type descriptor containing both codec ID and native type.
@@ -86,6 +87,8 @@ export interface ForeignKeyDef {
     readonly columns: readonly string[];
   };
   readonly name?: string;
+  readonly onDelete?: ReferentialAction;
+  readonly onUpdate?: ReferentialAction;
 }
 
 export interface TableBuilderState<

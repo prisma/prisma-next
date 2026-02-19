@@ -273,9 +273,28 @@ export class TableBuilder<
   foreignKey(
     columns: readonly string[],
     references: { table: string; columns: readonly string[] },
-    name?: string,
+    nameOrOptions?:
+      | string
+      | {
+          name?: string;
+          onDelete?: import('@prisma-next/sql-contract/types').ReferentialAction;
+          onUpdate?: import('@prisma-next/sql-contract/types').ReferentialAction;
+        },
   ): TableBuilder<Name, Columns, PrimaryKey> {
-    const fkDef: ForeignKeyDef = name ? { columns, references, name } : { columns, references };
+    let fkDef: ForeignKeyDef;
+    if (typeof nameOrOptions === 'string') {
+      fkDef = { columns, references, name: nameOrOptions };
+    } else if (nameOrOptions) {
+      fkDef = {
+        columns,
+        references,
+        ...(nameOrOptions.name !== undefined && { name: nameOrOptions.name }),
+        ...(nameOrOptions.onDelete !== undefined && { onDelete: nameOrOptions.onDelete }),
+        ...(nameOrOptions.onUpdate !== undefined && { onUpdate: nameOrOptions.onUpdate }),
+      };
+    } else {
+      fkDef = { columns, references };
+    }
     return new TableBuilder(
       this._state.name,
       this._state.columns,
