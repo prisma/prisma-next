@@ -55,22 +55,26 @@ Array columns use the same `StorageColumn` shape as any other parameterized type
 ```
 
 - `element` — the full element type descriptor (nested `ColumnTypeDescriptor`), containing `codecId`, `nativeType`, and optionally its own `typeParams`. This avoids duplicating element metadata across separate `element`, `elementNativeType`, and `elementTypeParams` fields.
-- `nullableElement` — whether individual elements can be null (distinct from column-level nullability)
+- `nullableElement` — whether individual elements can be null, distinct from column-level `nullable`
 
-This gives four nullability combinations:
+#### Nullability model
 
-| Column nullable | nullableElement | TS type |
-|---|---|---|
-| false | false | `Array<number>` |
-| true | false | `Array<number> \| null` |
-| false | true | `Array<number \| null>` |
-| true | true | `Array<number \| null> \| null` |
+Array columns support all four combinations of column-level and element-level nullability:
 
-TODO:
+| `nullable` | `nullableElement` | TS type | Meaning |
+|---|---|---|---|
+| `false` | `false` | `Array<number>` | Required array, no null elements |
+| `true` | `false` | `Array<number> \| null` | Optional array, no null elements |
+| `false` | `true` | `Array<number \| null>` | Required array, elements may be null |
+| `true` | `true` | `Array<number \| null> \| null` | Optional array, elements may be null |
 
-Nullability: We should consider whether to allow arrays/lists to be nullable at all. Maybe coerce nulls to empty arrays.
-null -> []
-[] -> []
+Column-level `nullable` controls whether the entire array value can be `null`. `nullableElement` controls whether individual elements within the array can be `null`. These are orthogonal concerns.
+
+#### Why `nullableElement` is top-level in `typeParams`, not inside `element`
+
+`nullableElement` is a property of the *array type* ("this array permits null holes"), not a property of the *element type* ("what int4 means"). The `element` object is structurally a `ColumnTypeDescriptor` — the same shape used for standalone columns. A standalone `int4` column has no concept of "nullable element"; that notion only exists in the context of a container.
+
+Placing `nullableElement` inside `element` would conflate the element's identity with the container's nullability rules, breaking the structural alignment between `element` and `ColumnTypeDescriptor`. It would also mean the `element` object could no longer be treated as a plain element descriptor in contexts that don't care about the container (e.g., codec lookup, type expansion).
 
 ### 2) Authoring: `listOf()` helper
 
