@@ -12,7 +12,7 @@ import { createTestContext, executePlanAndCollect } from '@prisma-next/sql-runti
 import { createDevDatabase, teardownTestDatabase, timeouts } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestRuntime, setupTestDatabase } from './utils';
+import { createTestRuntimeFromClient, setupTestDatabase } from './utils';
 
 const fixtureContractRaw: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -95,11 +95,9 @@ describe('DML Integration Tests — Array Columns', () => {
   }, timeouts.spinUpPpgDev);
 
   function createRuntime() {
-    return createTestRuntime(
-      fixtureContract,
-      { connect: { client }, cursor: { disabled: true } },
-      { verify: { mode: 'onFirstUse', requireMarker: true } },
-    );
+    return createTestRuntimeFromClient(fixtureContract, client, {
+      verify: { mode: 'onFirstUse', requireMarker: true },
+    });
   }
 
   function createContext() {
@@ -114,7 +112,7 @@ describe('DML Integration Tests — Array Columns', () => {
     it(
       'inserts a row with text array and returns it',
       async () => {
-        const runtime = createRuntime();
+        const runtime = await createRuntime();
         const { context, postTable, columns } = createContext();
         const builder = sql({ context });
 
@@ -151,7 +149,7 @@ describe('DML Integration Tests — Array Columns', () => {
     it(
       'inserts a row with integer array',
       async () => {
-        const runtime = createRuntime();
+        const runtime = await createRuntime();
         const { context, postTable, columns } = createContext();
         const builder = sql({ context });
 
@@ -182,7 +180,7 @@ describe('DML Integration Tests — Array Columns', () => {
     it(
       'inserts a row with null array column',
       async () => {
-        const runtime = createRuntime();
+        const runtime = await createRuntime();
         const { context, postTable, columns } = createContext();
         const builder = sql({ context });
 
@@ -213,7 +211,7 @@ describe('DML Integration Tests — Array Columns', () => {
     it(
       'inserts a row with empty array',
       async () => {
-        const runtime = createRuntime();
+        const runtime = await createRuntime();
         const { context, postTable, columns } = createContext();
         const builder = sql({ context });
 
@@ -253,7 +251,7 @@ describe('DML Integration Tests — Array Columns', () => {
     it(
       'selects rows with array columns',
       async () => {
-        const runtime = createRuntime();
+        const runtime = await createRuntime();
         const { context, postTable, columns } = createContext();
         const builder = sql({ context });
 
@@ -295,7 +293,7 @@ describe('DML Integration Tests — Array Columns', () => {
     it(
       'updates array columns and returns them',
       async () => {
-        const runtime = createRuntime();
+        const runtime = await createRuntime();
         const { context, postTable, columns } = createContext();
         const builder = sql({ context });
 
