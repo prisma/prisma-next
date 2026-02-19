@@ -5,6 +5,7 @@ import type {
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
+  SqlReferentialAction,
   SqlSchemaIR,
   SqlTableIR,
   SqlUniqueIR,
@@ -137,7 +138,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          ORDER BY tc.table_name, kcu.ordinal_position`,
         [schema],
       ),
-      // Query all foreign keys for all tables in schema
+      // Query all foreign keys for all tables in schema, including referential actions
       driver.query<{
         table_name: string;
         constraint_name: string;
@@ -146,6 +147,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         referenced_table_schema: string;
         referenced_table_name: string;
         referenced_column_name: string;
+        delete_rule: string;
+        update_rule: string;
       }>(
         `SELECT
            tc.table_name,
@@ -154,7 +157,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            kcu.ordinal_position,
            ccu.table_schema AS referenced_table_schema,
            ccu.table_name AS referenced_table_name,
-           ccu.column_name AS referenced_column_name
+           ccu.column_name AS referenced_column_name,
+           rc.delete_rule,
+           rc.update_rule
          FROM information_schema.table_constraints tc
          JOIN information_schema.key_column_usage kcu
            ON tc.constraint_name = kcu.constraint_name
@@ -163,6 +168,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          JOIN information_schema.constraint_column_usage ccu
            ON ccu.constraint_name = tc.constraint_name
            AND ccu.table_schema = tc.table_schema
+         JOIN information_schema.referential_constraints rc
+           ON rc.constraint_name = tc.constraint_name
+           AND rc.constraint_schema = tc.table_schema
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'FOREIGN KEY'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
@@ -305,7 +313,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       // Process foreign keys
       const foreignKeysMap = new Map<
         string,
-        { columns: string[]; referencedTable: string; referencedColumns: string[]; name: string }
+        {
+          columns: string[];
+          referencedTable: string;
+          referencedColumns: string[];
+          name: string;
+          deleteRule: string;
+          updateRule: string;
+        }
       >();
       for (const fkRow of fksByTable.get(tableName) ?? []) {
         const existing = foreignKeysMap.get(fkRow.constraint_name);
@@ -318,6 +333,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
             referencedTable: fkRow.referenced_table_name,
             referencedColumns: [fkRow.referenced_column_name],
             name: fkRow.constraint_name,
+            deleteRule: fkRow.delete_rule,
+            updateRule: fkRow.update_rule,
           });
         }
       }
@@ -327,6 +344,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           referencedTable: fk.referencedTable,
           referencedColumns: Object.freeze([...fk.referencedColumns]) as readonly string[],
           name: fk.name,
+          ...ifDefined('onDelete', mapReferentialAction(fk.deleteRule)),
+          ...ifDefined('onUpdate', mapReferentialAction(fk.updateRule)),
         }),
       );
 
@@ -515,6 +534,24 @@ function normalizeFormattedType(formattedType: string, dataType: string, udtName
     return formattedType.slice(1, -1);
   }
   return formattedType;
+}
+
+const PG_REFERENTIAL_ACTION_MAP: Record<string, SqlReferentialAction> = {
+  'NO ACTION': 'noAction',
+  RESTRICT: 'restrict',
+  CASCADE: 'cascade',
+  'SET NULL': 'setNull',
+  'SET DEFAULT': 'setDefault',
+};
+
+/**
+ * Maps a Postgres referential action rule to the canonical SqlReferentialAction.
+ * Returns undefined for 'NO ACTION' (the database default) to keep the IR sparse.
+ */
+function mapReferentialAction(rule: string): SqlReferentialAction | undefined {
+  const mapped = PG_REFERENTIAL_ACTION_MAP[rule];
+  if (mapped === 'noAction') return undefined;
+  return mapped;
 }
 
 /**
