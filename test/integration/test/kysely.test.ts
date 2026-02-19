@@ -316,7 +316,7 @@ describe('Kysely integration', () => {
       'attaches plan.ast, meta.lane, meta.refs, paramDescriptors for Kysely select',
       async () => {
         const captured: ExecutionPlan[] = [];
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
           plugins: [createPlanCapturePlugin(captured)],
         });
@@ -356,7 +356,7 @@ describe('Kysely integration', () => {
     it(
       'AST-first lints block Kysely DELETE without WHERE',
       async () => {
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
           plugins: [lints()],
         });
@@ -376,7 +376,7 @@ describe('Kysely integration', () => {
     it(
       'AST-first lints block Kysely UPDATE without WHERE',
       async () => {
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
           plugins: [lints()],
         });
@@ -399,7 +399,7 @@ describe('Kysely integration', () => {
       'uses lane raw and no ast for raw sql queries',
       async () => {
         const captured: ExecutionPlan[] = [];
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
           plugins: [createPlanCapturePlugin(captured)],
         });
