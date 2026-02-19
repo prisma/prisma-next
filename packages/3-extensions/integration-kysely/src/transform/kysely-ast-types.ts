@@ -1,86 +1,219 @@
-/**
- * Minimal Kysely AST node type definitions for the transformer.
- * Kysely does not export its internal AST types; these interfaces describe
- * the shapes we expect based on compiled query structure.
- */
-export interface KyselyOperationNode {
-  readonly kind: string;
-  [key: string]: unknown;
+import {
+  AliasNode,
+  ColumnNode,
+  DeleteQueryNode,
+  FromNode,
+  IdentifierNode,
+  InsertQueryNode,
+  OnNode,
+  type OperationNode,
+  type OrderByItemNode,
+  RawNode,
+  ReferenceNode,
+  SchemableIdentifierNode,
+  SelectAllNode,
+  SelectionNode,
+  SelectQueryNode,
+  TableNode,
+  UpdateQueryNode,
+  WhereNode,
+} from 'kysely';
+
+export type TransformableRootNode =
+  | SelectQueryNode
+  | InsertQueryNode
+  | UpdateQueryNode
+  | DeleteQueryNode;
+
+export interface TableReferenceInfo {
+  readonly table: string;
+  readonly alias?: string;
 }
 
-export function hasKind(node: unknown, kind: string): node is KyselyOperationNode {
+export function hasKind(node: unknown, kind: string): node is OperationNode {
+  return isOperationNode(node) && node.kind === kind;
+}
+
+export function isOperationNode(node: unknown): node is OperationNode {
   return (
     typeof node === 'object' &&
     node !== null &&
     'kind' in node &&
-    (node as KyselyOperationNode).kind === kind
+    typeof (node as { kind?: unknown }).kind === 'string'
   );
 }
 
+export function isTransformableRootNode(node: unknown): node is TransformableRootNode {
+  if (!isOperationNode(node)) {
+    return false;
+  }
+  return (
+    SelectQueryNode.is(node) ||
+    InsertQueryNode.is(node) ||
+    UpdateQueryNode.is(node) ||
+    DeleteQueryNode.is(node)
+  );
+}
+
+export function getIdentifierName(node: OperationNode | undefined): string | undefined {
+  if (!node) {
+    return undefined;
+  }
+  if (IdentifierNode.is(node)) {
+    return node.name;
+  }
+  return undefined;
+}
+
+function getSchemableIdentifierName(node: OperationNode): string | undefined {
+  if (!SchemableIdentifierNode.is(node)) {
+    return undefined;
+  }
+  return getIdentifierName(node.identifier);
+}
+
+export function getAliasName(node: unknown): string | undefined {
+  if (!isOperationNode(node)) {
+    return undefined;
+  }
+  if (!AliasNode.is(node)) {
+    return undefined;
+  }
+  return getIdentifierName(node.alias);
+}
+
 export function getTableName(node: unknown): string | undefined {
-  if (typeof node !== 'object' || node === null) return undefined;
-  const n = node as Record<string, unknown>;
-  const table = n['table'] ?? n['reference'] ?? n['into'];
-  if (typeof table === 'string') return table;
-  if (typeof table === 'object' && table !== null) {
-    const t = table as Record<string, unknown>;
-    if ('name' in t && typeof (t as { name: string }).name === 'string') {
-      return (t as { name: string }).name;
-    }
-    const identifier = t['identifier'];
-    if (typeof identifier === 'object' && identifier !== null) {
-      const id = identifier as Record<string, unknown>;
-      if ('name' in id && typeof (id as { name: string }).name === 'string') {
-        return String((id as { name: string }).name);
-      }
-    }
-    const innerTable = t['table'];
-    if (typeof innerTable === 'object' && innerTable !== null) {
-      const inner = innerTable as Record<string, unknown>;
-      if ('name' in inner && typeof (inner as { name: string }).name === 'string') {
-        return String((inner as { name: string }).name);
-      }
-      const innerId = inner['identifier'];
-      if (typeof innerId === 'object' && innerId !== null && 'name' in innerId) {
-        return String((innerId as { name: string }).name);
-      }
-    }
+  if (!isOperationNode(node)) {
+    return undefined;
   }
-  if ('name' in n && typeof (n as { name: string }).name === 'string') {
-    return (n as { name: string }).name;
+
+  if (AliasNode.is(node)) {
+    return getTableName(node.node);
   }
-  const froms = n['froms'];
-  if (Array.isArray(froms) && froms.length > 0) {
-    return getTableName(froms[0]);
+
+  if (FromNode.is(node)) {
+    const firstFrom = node.froms[0];
+    return firstFrom ? getTableName(firstFrom) : undefined;
   }
+
+  if (ReferenceNode.is(node)) {
+    return node.table ? getTableName(node.table) : undefined;
+  }
+
+  if (TableNode.is(node)) {
+    return getSchemableIdentifierName(node.table);
+  }
+
+  if (SchemableIdentifierNode.is(node)) {
+    return getSchemableIdentifierName(node);
+  }
+
+  if (IdentifierNode.is(node)) {
+    return node.name;
+  }
+
   return undefined;
 }
 
 export function getColumnName(node: unknown): string | undefined {
-  if (typeof node !== 'object' || node === null) return undefined;
-  const n = node as Record<string, unknown>;
-  const col = n['column'] ?? n['reference'];
-  if (typeof col === 'object' && col !== null && 'column' in col) {
-    return getColumnName((col as { column: unknown }).column);
+  if (!isOperationNode(node)) {
+    return undefined;
   }
-  if (typeof col === 'object' && col !== null && 'name' in col) {
-    return String((col as { name: string }).name);
+
+  if (AliasNode.is(node)) {
+    return getColumnName(node.node);
   }
-  if (typeof col === 'object' && col !== null) {
-    const c = col as Record<string, unknown>;
-    const identifier = c['identifier'];
-    if (typeof identifier === 'object' && identifier !== null && 'name' in identifier) {
-      return String((identifier as { name: string }).name);
-    }
+
+  if (ReferenceNode.is(node)) {
+    return getColumnName(node.column);
   }
-  if (typeof col === 'string') return col;
-  const name = n['name'];
-  if (typeof name === 'string') return name;
-  if (typeof n['identifier'] === 'object' && n['identifier'] !== null) {
-    const id = n['identifier'] as Record<string, unknown>;
-    if ('name' in id && typeof (id as { name: string }).name === 'string') {
-      return String((id as { name: string }).name);
-    }
+
+  if (ColumnNode.is(node)) {
+    return getIdentifierName(node.column);
   }
+
+  if (IdentifierNode.is(node)) {
+    return node.name;
+  }
+
   return undefined;
+}
+
+export function getTableReferenceInfo(node: unknown): TableReferenceInfo | undefined {
+  if (!isOperationNode(node)) {
+    return undefined;
+  }
+
+  if (FromNode.is(node)) {
+    const firstFrom = node.froms[0];
+    return firstFrom ? getTableReferenceInfo(firstFrom) : undefined;
+  }
+
+  if (AliasNode.is(node)) {
+    const inner = getTableReferenceInfo(node.node);
+    if (!inner) {
+      return undefined;
+    }
+    const alias = getIdentifierName(node.alias);
+    return alias ? { table: inner.table, alias } : inner;
+  }
+
+  if (TableNode.is(node)) {
+    const table = getTableName(node);
+    return table ? { table } : undefined;
+  }
+
+  return undefined;
+}
+
+export function unwrapWhereNode(node: unknown): OperationNode | undefined {
+  if (!isOperationNode(node)) {
+    return undefined;
+  }
+  return WhereNode.is(node) ? node.where : node;
+}
+
+export function unwrapOnNode(node: unknown): OperationNode | undefined {
+  if (!isOperationNode(node)) {
+    return undefined;
+  }
+  return OnNode.is(node) ? node.on : node;
+}
+
+export function unwrapSelectionNode(node: OperationNode): OperationNode {
+  return SelectionNode.is(node) ? node.selection : node;
+}
+
+export function unwrapAliasNode(node: OperationNode): {
+  readonly node: OperationNode;
+  readonly alias?: string;
+} {
+  if (!AliasNode.is(node)) {
+    return { node };
+  }
+  const alias = getIdentifierName(node.alias);
+  return alias ? { node: node.node, alias } : { node: node.node };
+}
+
+export function isSelectAllReference(
+  node: OperationNode,
+): node is ReferenceNode & { readonly column: SelectAllNode } {
+  return ReferenceNode.is(node) && SelectAllNode.is(node.column);
+}
+
+export function parseOrderByDirection(node: OrderByItemNode): 'asc' | 'desc' {
+  if (!node.direction) {
+    return 'asc';
+  }
+
+  if (RawNode.is(node.direction)) {
+    const direction = node.direction.sqlFragments.join('').trim().toLowerCase();
+    return direction === 'desc' ? 'desc' : 'asc';
+  }
+
+  if (IdentifierNode.is(node.direction)) {
+    return node.direction.name.toLowerCase() === 'desc' ? 'desc' : 'asc';
+  }
+
+  return 'asc';
 }
