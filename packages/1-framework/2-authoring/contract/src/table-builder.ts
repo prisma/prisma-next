@@ -6,6 +6,7 @@ import type {
   ForeignKeyDef,
   IndexDef,
   NullableColumnCannotHaveDefault,
+  ReferentialAction,
   TableBuilderState,
   UniqueConstraintDef,
 } from './builder-state';
@@ -277,8 +278,8 @@ export class TableBuilder<
       | string
       | {
           name?: string;
-          onDelete?: import('@prisma-next/sql-contract/types').ReferentialAction;
-          onUpdate?: import('@prisma-next/sql-contract/types').ReferentialAction;
+          onDelete?: ReferentialAction;
+          onUpdate?: ReferentialAction;
         },
   ): TableBuilder<Name, Columns, PrimaryKey> {
     let fkDef: ForeignKeyDef;

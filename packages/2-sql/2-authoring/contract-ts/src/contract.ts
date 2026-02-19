@@ -7,6 +7,7 @@ import {
   type ModelField,
   type ModelStorage,
   type PrimaryKey,
+  type ReferentialAction,
   type SqlContract,
   type SqlMappings,
   type SqlStorage,
@@ -59,10 +60,16 @@ const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({
   columns: type.string.array().readonly(),
 });
 
+const ReferentialActionSchema = type
+  .declare<ReferentialAction>()
+  .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
+
 const ForeignKeySchema = type.declare<ForeignKey>().type({
   columns: type.string.array().readonly(),
   references: ForeignKeyReferencesSchema,
   'name?': 'string',
+  'onDelete?': ReferentialActionSchema,
+  'onUpdate?': ReferentialActionSchema,
 });
 
 const StorageTableSchema = type.declare<StorageTable>().type({

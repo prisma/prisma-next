@@ -1,5 +1,6 @@
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
-import type { ReferentialAction } from '@prisma-next/sql-contract/types';
+
+export type ReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
 
 /**
  * Column type descriptor containing both codec ID and native type.
