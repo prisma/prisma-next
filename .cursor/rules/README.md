@@ -32,6 +32,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 ## Testing
 - `.cursor/rules/test-import-patterns.mdc` — Test import patterns (source files, relative paths, don't export for tests)
 - `.cursor/rules/test-file-organization.mdc` — Test file organization (max 500 lines, split by functionality)
+- `.cursor/rules/test-intent-readability.mdc` — Tests must be readable by context (BDD-style grouping)
 - `.cursor/rules/test-database-limitations.mdc` — Test database limitations and patterns
 - `.cursor/rules/test-fixture-typechecking.mdc` — Exclude test fixture config files from typechecking
 - `.cursor/rules/typed-contract-in-tests.mdc` — Use typed Contract from fixtures in integration tests

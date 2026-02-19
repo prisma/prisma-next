@@ -24,6 +24,7 @@
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "pg": "catalog:"
   },
   "devDependencies": {
@@ -52,5 +53,8 @@
       "import": "./dist/runtime.mjs"
     },
     "./package.json": "./package.json"
-  }
+  },
+  "main": "./dist/runtime.mjs",
+  "module": "./dist/runtime.mjs",
+  "types": "./dist/runtime.d.mts"
 }

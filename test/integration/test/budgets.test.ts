@@ -91,10 +91,10 @@ describe('budgets plugin integration', () => {
     'blocks unbounded DSL SELECT exceeding budget',
     async () => {
       const adapter = createPostgresAdapter();
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -132,10 +132,10 @@ describe('budgets plugin integration', () => {
 
   it('blocks unbounded DSL SELECT when estimated equals budget', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -172,10 +172,10 @@ describe('budgets plugin integration', () => {
 
   it('allows bounded DSL SELECT within budget', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -210,10 +210,10 @@ describe('budgets plugin integration', () => {
     'blocks streaming when observed rows exceed budget',
     async () => {
       const adapter = createPostgresAdapter();
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -253,10 +253,10 @@ describe('budgets plugin integration', () => {
 
   it('blocks unbounded raw SELECT without detectable LIMIT', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -284,10 +284,10 @@ describe('budgets plugin integration', () => {
 
   it('allows raw SELECT with detectable LIMIT via annotations', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -312,10 +312,10 @@ describe('budgets plugin integration', () => {
   it('logs warning when latency exceeds budget in non-strict mode', async () => {
     const logWarn = vi.fn();
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -362,10 +362,10 @@ describe('budgets plugin integration', () => {
 
   it('throws error when latency exceeds budget in strict mode with error severity', async () => {
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -405,10 +405,10 @@ describe('budgets plugin integration', () => {
   it('does not throw when latency exceeds budget in non-strict mode with error severity', async () => {
     const logWarn = vi.fn();
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -455,10 +455,10 @@ describe('budgets plugin integration', () => {
   it('does not log warning when latency is within budget', async () => {
     const logWarn = vi.fn();
     const adapter = createPostgresAdapter();
-    const runtime = createTestRuntime(
+    const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {

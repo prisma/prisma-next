@@ -93,15 +93,18 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       await initTestDatabase({ connection: connectionString, contractIR: contract });
 
       // Seed 100 test users using a runtime without strict budgets
-      const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+      const { runtime: seedRuntime, pool: seedPool } = await createTestRuntime(
+        connectionString,
+        contract,
+      );
       try {
         await seedTestUsers(seedRuntime, 100);
       } finally {
-        await seedRuntime.close();
+        await closeTestRuntime({ runtime: seedRuntime, pool: seedPool });
       }
 
       // Now create a runtime with strict budget for testing
-      const { runtime, pool } = createTestRuntime(connectionString, contract, {
+      const { runtime, pool } = await createTestRuntime(connectionString, contract, {
         maxRows: 50,
         defaultTableRows: 10_000,
         tableRows: { User: 10_000 },
@@ -142,14 +145,17 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       await initTestDatabase({ connection: connectionString, contractIR: contract });
 
       // Seed users using a runtime without strict budgets
-      const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+      const { runtime: seedRuntime, pool: seedPool } = await createTestRuntime(
+        connectionString,
+        contract,
+      );
       try {
         await seedTestUsers(seedRuntime, 100);
       } finally {
-        await seedRuntime.close();
+        await closeTestRuntime({ runtime: seedRuntime, pool: seedPool });
       }
 
-      const { runtime, pool } = createTestRuntime(connectionString, contract, {
+      const { runtime, pool } = await createTestRuntime(connectionString, contract, {
         maxRows: 10_000,
         defaultTableRows: 10_000,
         tableRows: { User: 10_000 },
@@ -188,14 +194,17 @@ describe('budgets plugin integration (prisma-orm-demo)', { timeout: 30000 }, () 
       await initTestDatabase({ connection: connectionString, contractIR: contract });
 
       // Seed users using a runtime without strict budgets
-      const { runtime: seedRuntime } = createTestRuntime(connectionString, contract);
+      const { runtime: seedRuntime, pool: seedPool } = await createTestRuntime(
+        connectionString,
+        contract,
+      );
       try {
         await seedTestUsers(seedRuntime, 100);
       } finally {
-        await seedRuntime.close();
+        await closeTestRuntime({ runtime: seedRuntime, pool: seedPool });
       }
 
-      const { runtime, pool } = createTestRuntime(connectionString, contract, {
+      const { runtime, pool } = await createTestRuntime(connectionString, contract, {
         maxRows: 10,
         defaultTableRows: 10_000,
         tableRows: { User: 10_000 },
