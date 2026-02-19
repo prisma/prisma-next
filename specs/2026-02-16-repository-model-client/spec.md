@@ -14,6 +14,8 @@ Prisma Next provides several layers for querying databases. At the lowest level,
 
 That's what this spec is about: an **ORM Client** that speaks in application terms. It replaces the ORM lane (ADR 015), which was our first attempt at this but was fundamentally limited by the one-query-one-statement rule (ADR 003). The layer introduced in ADR 161 lifts that restriction — it can orchestrate multiple plans when needed (e.g. for nested mutations) while each individual plan still obeys ADR 003.
 
+See also [Prisma ORM Comparison](./prisma-orm-comparison.md) for context and code snippets.
+
 ### What exists today
 
 The `@prisma-next/sql-orm-client` package already has a working prototype on the current branch with:
@@ -86,9 +88,9 @@ const postsWithAdminAuthors = await db.posts
 
 An earlier design considered splitting query building and query execution into separate classes (a "Collection" for building and a "Repository" for executing). We chose a single class for three reasons:
 
-1. **Terminal methods are needed everywhere execution happens.** That's not just the top level — it's stored base queries (`const admins = db.users.admins(); await admins.count()`), scoped collections passed between functions, and any other context where you want to run a query. Restricting terminal methods to a "top-level" class would mean losing them in too many legitimate contexts.
+1. **Terminal methods are needed everywhere execution happens.** That's not just the top level — it's stored base queries (`const admins = db.users.admins(); await admins.aggregate(a => ({ count: a.count() }))`), scoped collections passed between functions, and any other context where you want to run a query. Restricting terminal methods to a "top-level" class would mean losing them in too many legitimate contexts.
 
-2. **Include refinements are already safe.** The one place where calling a terminal method would be a mistake — inside an `include()` refinement callback — is already caught by the type system. The callback's return type expects a `Collection`, not an `AsyncIterableResult` or `Promise`. Calling `p.all()` inside `include('posts', p => ...)` is a type error without any extra machinery.
+2. **Include refinements are already safe.** The one place where executing would be a mistake — inside an `include()` refinement callback — is prevented by the type system. The callback receives a restricted collection that has no query-executing terminals (`all()`, `find()`, mutations). It can only return query fragments (`where`, `orderBy`, `take`, nested `include`, `combine`, and to-many aggregation selectors), which the parent query compiles.
 
 3. **Covariant `this` is simpler with one class.** If custom methods are defined on Collection and a separate Repository extends it, then `admins()` (defined on Collection) returns `Collection` — losing the terminal methods. Making the return type preserve the subclass requires `this`-type plumbing and careful clone logic. With one class, `this` always has everything.
 
@@ -476,7 +478,8 @@ Loads related records. Return types are cardinality-aware:
 db.users.include('posts')       // { ...UserFields, posts: PostRow[] }
 db.posts.include('author')      // { ...PostFields, author: UserRow | null }
 
-// With refinement — receives the related model's Collection (with custom methods if registered)
+// With refinement — receives the related model's include collection (with custom methods if registered).
+// It does not execute queries — it has no `all()` / `find()` / mutation terminals.
 db.users.include('posts', p =>
   p.where(post => post.published.eq(true))
    .orderBy(post => post.createdAt.desc())
@@ -494,7 +497,9 @@ db.users.include('posts', p =>
 )
 ```
 
-The include refinement callback receives the **registered Collection** for the related model (custom subclass if one was provided to `orm()`, otherwise a default Collection). This means domain methods defined on a custom collection are available everywhere that model's collection appears — at the top level and inside include refinements alike.
+The include refinement callback receives an instance of the **registered collection class** for the related model (custom subclass if one was provided to `orm()`, otherwise a default Collection), but with the include-only surface (no query execution terminals). This means domain methods defined on a custom collection are available everywhere that model's collection appears — at the top level and inside include refinements alike.
+
+For to-many includes, refinements may also return scalar aggregations (e.g. `count()`) or a `combine()` shape to return multiple named branches for a single relation (rows and/or aggregations). See section 8.3.
 
 The include strategy (lateral joins, correlated subqueries, or multi-query) is selected from contract capabilities as described in section 3.5.
 
@@ -709,7 +714,7 @@ Every mutation operation has three variants that mirror the read terminals:
 |---------|--------|---------|---------------|
 | **Single** | (base name) | `Promise<Row>` or `Promise<Row \| null>` | `find()` |
 | **Multi** | `*All` | `AsyncIterableResult<Row>` | `all()` |
-| **Count** | `*Count` | `Promise<number>` | `count()` |
+| **Count** | `*Count` | `Promise<number>` | `aggregate()` |
 
 The single variant applies LIMIT 1 (for update/delete), just as `find()` does for reads. The multi variant streams results back, just as `all()` does. The count variant returns only the number of affected rows.
 
@@ -943,17 +948,26 @@ Nested mutations execute within a **transaction** by default (per ADR 161 sectio
 
 ## 8. Aggregations
 
-### 8.1 Simple Aggregations
+### 8.1 Root `aggregate()`
 
-Aggregation methods are terminal methods on Collection that return scalar values:
+The root collection exposes a single aggregation terminal: `aggregate()`.
+
+This keeps one obvious way to aggregate (instead of separate `count()` / `sum()` / `avg()` terminals) and enables computing **multiple aggregations in one round-trip**.
 
 ```typescript
-const count = await db.users.where(u => u.active.eq(true)).count();
-const total = await db.orders.where(o => o.status.eq('completed')).sum('amount');
-const avg   = await db.orders.avg('amount');
-const min   = await db.orders.min('amount');
-const max   = await db.orders.max('amount');
+const stats = await db.orders
+  .where(o => o.status.eq('completed'))
+  .aggregate(a => ({
+    count: a.count(),
+    total: a.sum('amount'),
+    avg: a.avg('amount'),
+  }));
+// Type: { count: number; total: number | null; avg: number | null }
 ```
+
+Nullability:
+- `count` is always `number`.
+- `sum` / `avg` / `min` / `max` are `number | null` (empty input → `null`).
 
 Field arguments for `sum`, `avg`, `min`, `max` are typed to accept only numeric fields.
 
@@ -964,41 +978,68 @@ Field arguments for `sum`, `avg`, `min`, `max` are typed to accept only numeric 
 ```typescript
 const roleStats = await db.users
   .groupBy('role')
-  .count();
+  .aggregate(a => ({ count: a.count() }));
 // Type: Array<{ role: string; count: number }>
 
 const deptSalaries = await db.employees
   .groupBy('department')
-  .avg('salary')
-  .sum('salary');
-// Type: Array<{ department: string; avgSalary: number; sumSalary: number }>
+  .aggregate(a => ({
+    avgSalary: a.avg('salary'),
+    sumSalary: a.sum('salary'),
+  }));
+// Type: Array<{ department: string; avgSalary: number | null; sumSalary: number | null }>
 
 // With having
 const activeDepts = await db.employees
   .groupBy('department')
-  .having(g => g.count().gt(5))
-  .count();
+  .having(h => h.count().gt(5))
+  .aggregate(a => ({ count: a.count() }));
 
 // Multi-column
 const stats = await db.orders
   .groupBy('status', 'region')
-  .count()
-  .sum('amount');
+  .having(h => h.count().gt(5))
+  .aggregate(a => ({
+    count: a.count(),
+    total: a.sum('amount'),
+  }));
 ```
 
-`GroupedCollection` has a restricted surface by design. It supports aggregation builders (`count`, `sum`, `avg`, `min`, `max`) and `having`, but does not expose relation loading or row-query terminals (`all`, `find`, `select`, `include`) or mutation terminals.
+`GroupedCollection` has a restricted surface by design. It supports `having` and `aggregate`, but does not expose relation loading or row-query terminals (`all`, `find`, `select`, `include`) or mutation terminals. Aggregation builders (`count`, `sum`, `avg`, `min`, `max`) are available inside the `having` and `aggregate` callbacks.
 
-### 8.3 Aggregations in Includes (Exploratory)
+### 8.3 Aggregations in Includes + `combine()`
 
-**Design TBD.** An interesting possibility:
+Include refinement callbacks do **not** execute queries (they have no `all()` / `find()` terminals). Instead, they return a *query fragment* describing how the include should be loaded.
+
+For **to-many** includes, refinement collections also expose scalar aggregation selectors (`count`, `sum`, `avg`, `min`, `max`). These do not execute either — they describe what the parent include should compute for that relation.
 
 ```typescript
-const usersWithPostCount = await db.users
-  .include('posts', p => p.count());
-// Type: { ...UserFields, posts: number }
+const postsWithCommentCount = await db.posts
+  .include('comments', c => c.count())
+  .all();
+// Type: Array<{ ...PostFields, comments: number }>
 ```
 
-This requires the include system to recognize aggregation vs collection refinement and compile accordingly (e.g. `COUNT(*)` in the lateral subquery instead of `json_agg(*)`). Marked as exploratory.
+To compute multiple results for a single relation (multiple row branches and/or scalar aggregations), use `combine()`:
+
+```typescript
+const posts = await db.posts
+  .include('comments', c => {
+    const base = c.where({ deleted: false });
+    return base.combine({
+      approved: base.where({ approved: true }),
+      hidden: base.where({ approved: false }),
+      totalCount: base.count(),
+    });
+  })
+  .all();
+// Type: Array<{
+//   ...PostFields,
+//   comments: { approved: CommentRow[]; hidden: CommentRow[]; totalCount: number }
+// }>
+```
+
+Each `combine()` leaf is evaluated against the row-set described by that leaf (so `where` / `orderBy` / `take` / `skip` can be used to scope aggregation selectors, and different leaves can intentionally see different row-sets).
 
 ---
 
@@ -1106,12 +1147,11 @@ When a custom collection is provided under a key matching a model alias, the cus
 
 ### 11.1 Aggregation Detailed API
 
-**Status:** General direction established, specific signatures need exploration.
+**Status:** Direction established. `aggregate()` is the root aggregation terminal. `sum` / `avg` / `min` / `max` return `number | null`.
 
 Open:
-- Should `sum('field')` return `Promise<number>` or `Promise<number | null>` (when no rows match)?
 - Should `groupBy` support `.where()` on the grouped builder (before grouping) in addition to `.having()` (after)?
-- What is the exact return type shape for multi-aggregation groupBy?
+- What is the exact return type shape and naming for multi-aggregation groupBy?
 
 ### 11.2 Mutation Method Naming: `create` vs `createOne`
 
@@ -1133,11 +1173,11 @@ Instead of separate method names (`update`/`updateAll`/`updateCount`), mutations
 ```typescript
 db.users.where({ id: 42 }).update({ name: 'Bob' }).find()    // → Promise<Row | null>
 db.users.where(...).update({ name: 'Bob' }).all()             // → AsyncIterableResult<Row>
-db.users.where(...).update({ name: 'Bob' }).count()           // → Promise<number>
+db.users.where(...).update({ name: 'Bob' }).aggregate(a => ({ count: a.count() }))  // → Promise<{ count: number }>
 
 db.users.where({ id: 42 }).delete().find()                    // → Promise<Row | null>
 db.users.where(...).delete().all()                             // → AsyncIterableResult<Row>
-db.users.where(...).delete().count()                           // → Promise<number>
+db.users.where(...).delete().aggregate(a => ({ count: a.count() }))  // → Promise<{ count: number }>
 ```
 
 Pros: Reuses the read vocabulary exactly, no new method names. Cons: `delete().find()` reads oddly (you're not "finding" the deleted row), and mutations become two calls instead of one.
@@ -1188,6 +1228,7 @@ import {
 | `cursor({ field: value })` | `Collection` | Cursor pagination (requires orderBy) |
 | `distinct(...fields)` | `Collection` | SELECT DISTINCT |
 | `distinctOn(...fields)` | `Collection` | DISTINCT ON (requires orderBy) |
+| `groupBy(...fields)` | `GroupedCollection` | Group results and aggregate |
 
 ### Terminal Methods — Reads
 
@@ -1195,11 +1236,7 @@ import {
 |--------|---------|-------------|
 | `all()` | `AsyncIterableResult<Row>` | All matches; async iterable + thenable (`await` → `Row[]`) |
 | `find(filter?)` | `Promise<Row \| null>` | First match or null (LIMIT 1); filter ANDed with existing `where()` |
-| `count()` | `Promise<number>` | Count matching records |
-| `sum(field)` | `Promise<number>` | Sum a numeric field |
-| `avg(field)` | `Promise<number>` | Average a numeric field |
-| `min(field)` | `Promise<number>` | Minimum of a field |
-| `max(field)` | `Promise<number>` | Maximum of a field |
+| `aggregate(fn)` | `Promise<object>` | Compute one or more aggregations in a single query |
 
 ### Terminal Methods — Mutations (Single, requires `returning`)
 
@@ -1240,12 +1277,30 @@ import {
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `count()` | `GroupedCollection` (or terminal) | Add count aggregation |
-| `sum(field)` | `GroupedCollection` | Add sum aggregation |
-| `avg(field)` | `GroupedCollection` | Add avg aggregation |
-| `min(field)` | `GroupedCollection` | Add min aggregation |
-| `max(field)` | `GroupedCollection` | Add max aggregation |
 | `having(predicate)` | `GroupedCollection` | Filter groups |
+| `aggregate(fn)` | `Promise<Array<object>>` | Compute one or more aggregations per group |
+
+### Include Refinement Collections (Non-Executing)
+
+Include refinement callbacks receive a non-executing collection surface. These objects support query-building methods (e.g. `where`, `orderBy`, `take`, `skip`, nested `include`) but do not expose terminals like `all()` / `find()` / mutations.
+
+They also support `combine()` to return multiple named branches for a single relation:
+
+| Method | Available in | Description |
+|--------|--------------|-------------|
+| `combine(spec)` | to-one and to-many includes | Return a named shape of branches (rows and/or scalars) for the relation |
+
+For to-many includes, the refinement collection also exposes scalar aggregation selectors:
+
+These return selector nodes (conceptually `IncludeScalar<T>`) — they do not execute queries on their own, but can be returned directly from the include refinement or used as `combine()` leaves.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `count()` | `IncludeScalar<number>` | Count matching related records |
+| `sum(field)` | `IncludeScalar<number \| null>` | Sum a numeric field |
+| `avg(field)` | `IncludeScalar<number \| null>` | Average a numeric field |
+| `min(field)` | `IncludeScalar<number \| null>` | Minimum of a field |
+| `max(field)` | `IncludeScalar<number \| null>` | Maximum of a field |
 
 ---
 
@@ -1339,8 +1394,13 @@ async function main(db: ReturnType<typeof createClient>) {
     .updateCount({ active: false });
 
   // Aggregation + GroupBy
-  const activeCount = await db.users.active().count();
-  const roleCounts = await db.users.groupBy('role').count();
+  const activeStats = await db.users
+    .active()
+    .aggregate(a => ({ count: a.count() }));
+
+  const roleCounts = await db.users
+    .groupBy('role')
+    .aggregate(a => ({ count: a.count() }));
 
   // Cursor pagination
   const nextPage = await db.posts
@@ -1377,7 +1437,7 @@ Changes needed from the current prototype to match this specification:
 | `orm()` option key | `repositories` (instances) | `collections` (classes) |
 | Mutations | Do not exist | Three variants per operation: single (`create`/`update`/`delete`), multi-return (`*All`), count (`*Count`), plus `upsert` |
 | Nested mutations | Do not exist | Callback-based (`p => p.create(...)`) |
-| Aggregations | Do not exist | count, sum, avg, min, max, groupBy |
+| Aggregations | Do not exist | Root `aggregate()`, `groupBy(...).aggregate()`, include `count/sum/avg/min/max` + `combine()` |
 | Logical combinators | Do not exist | `and()`, `or()`, `not()`, `all()` |
 | `orderBy` ergonomics | Returns `{ column, direction }` | Typed accessor with `.asc()` / `.desc()` |
 | Type-state tracking | None | Generic parameter tracking hasOrderBy, hasWhere |

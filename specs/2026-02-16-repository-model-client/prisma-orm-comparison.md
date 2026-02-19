@@ -595,15 +595,41 @@ const result = await prisma.order.aggregate({
 
 **Prisma Next:**
 ```typescript
-const count = await db.users.where(u => u.active.eq(true)).count()
+const { count } = await db.users
+  .where(u => u.active.eq(true))
+  .aggregate(a => ({ count: a.count() }))
 
-const total = await db.orders.where(o => o.status.eq('completed')).sum('amount')
-const avg = await db.orders.where(o => o.status.eq('completed')).avg('amount')
+const result = await db.orders
+  .where(o => o.status.eq('completed'))
+  .aggregate(a => ({
+    total: a.sum('amount'),
+    avg: a.avg('amount'),
+  }))
+// result.total, result.avg
 ```
 
-Prisma ORM bundles aggregations into a single `aggregate()` call with `_sum`, `_avg` etc. Prisma Next has individual methods that return scalars directly.
+Relational aggregation in parallel with loading the same relationship with different filters:
 
-TODO: fix this, you need to be able to do that in one query.
+```typescript
+await db.post
+  .include('comments', c => c.combine({
+    totalCount: c.count()
+    approved: c.where({ approved: true }),
+  }))
+  .select('id', 'title')
+  .all()
+
+// result: Array<{
+//   id: number,
+//   title: string,
+//   comments: {
+//     totalCount: number,
+//     approved: Comment[],
+//   }
+// }>
+```
+
+Prisma ORM bundles aggregations into a single `aggregate()` call with `_sum`, `_avg` etc. Prisma Next uses a single `aggregate()` terminal that can compute multiple metrics in a single round-trip.
 
 ---
 
@@ -625,12 +651,10 @@ const result = await prisma.user.groupBy({
 ```typescript
 const result = await db.users
   .groupBy('role')
-  .having(g => g.count().gt(5))
-  .count()
+  .having(h => h.count().gt(5))
+  .aggregate(a => ({ count: a.count() }))
 // result: Array<{ role: string; count: number }>
 ```
-
-TODO: `count()` method is confusing
 
 ---
 
@@ -681,7 +705,7 @@ const recentAdmins = await admins
   .take(10)
   .all()
 
-const adminCount = await admins.count()
+const { count: adminCount } = await admins.aggregate(a => ({ count: a.count() }))
 ```
 
 ---
@@ -980,11 +1004,14 @@ const users = await db.users
     .orderBy(post => post.createdAt.desc())
     .take(5)
     .include('tags', t => t.include('tag'))
-    .include('comments', c => c
-      .where(comment => comment.approved.eq(true))
-      .orderBy(comment => comment.createdAt.asc())
-      .include('author', a => a.select('id', 'name', 'avatar'))
-    )
+    .include('likes', l => l.count())
+    .include('comments', c => c.combine({
+      approved: c
+        .where(comment => comment.approved.eq(true))
+        .orderBy(comment => comment.createdAt.asc())
+        .include('author', a => a.select('id', 'name', 'avatar')),
+      totalCount: c.count(),
+    }))
   )
   .orderBy(u => u.name.asc())
   .take(20)
@@ -1284,8 +1311,6 @@ At 5 levels of relational nesting, the Prisma ORM object syntax becomes a wall o
 
 These items were raised during team review and haven't been fully incorporated into the spec yet.
 
-- **Aggregation in one query:** The current spec has separate `sum()`, `avg()` etc. methods that each execute a query. Need a way to compute multiple aggregations in a single round-trip.
-- **GroupBy `count()` naming:** The `count()` method on `GroupedCollection` is confusing — it reads like a terminal that returns a number, but it adds a count column to the group result.
 - **Generic reusable filters:** How to build filters that work on any model with a given field (e.g. any model with an `email` field).
 - **ParadeDB / extension operators:** Build a `WhereExpr` node containing a raw SQL operator added by the extension.
 - **`omit` as a complement to `select`:** Rather than a separate method, use `select(schema.users.fields.omit('password'))` to keep composition clean.
