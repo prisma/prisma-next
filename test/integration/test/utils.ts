@@ -14,7 +14,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import type { Client, Pool } from 'pg';
+import type { Client } from 'pg';
 
 export interface CreateTestRuntimeOptions {
   readonly verify?: {
@@ -28,16 +28,8 @@ export interface CreateTestRuntimeOptions {
 }
 
 interface IntegrationDriverOptions {
-  readonly connect: { readonly client: Client } | { readonly pool: Pool };
+  readonly binding: PostgresBinding;
   readonly cursor?: PostgresDriverCreateOptions['cursor'];
-}
-
-function bindingFromDriverOptions(opts: IntegrationDriverOptions): PostgresBinding {
-  const { connect } = opts;
-  if ('client' in connect) {
-    return { kind: 'pgClient', client: connect.client };
-  }
-  return { kind: 'pgPool', pool: connect.pool };
 }
 
 /**
@@ -82,7 +74,7 @@ export async function createTestRuntime(
     cursor: driverOptions.cursor ?? { disabled: true },
   };
   const driver = driverDescriptor.create(createOpts);
-  const binding = bindingFromDriverOptions(driverOptions);
+  const binding = driverOptions.binding;
   try {
     await driver.connect(binding);
   } catch (error) {
@@ -115,7 +107,7 @@ export async function createTestRuntimeFromClient(
   return createTestRuntime(
     contract,
     {
-      connect: { client },
+      binding: { kind: 'pgClient', client },
       cursor: { disabled: true },
     },
     {

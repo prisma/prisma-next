@@ -94,7 +94,7 @@ describe('budgets plugin integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -135,7 +135,7 @@ describe('budgets plugin integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -175,7 +175,7 @@ describe('budgets plugin integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -206,27 +206,25 @@ describe('budgets plugin integration', () => {
     expect(results.length).toBe(5);
   });
 
-  it(
-    'blocks streaming when observed rows exceed budget',
-    async () => {
-      const adapter = createPostgresAdapter();
-      const runtime = await createTestRuntime(
-        fixtureContract,
-        {
-          connect: { client },
-          cursor: { disabled: true },
-        },
-        {
-          verify: { mode: 'onFirstUse', requireMarker: false },
-          plugins: [
-            budgets({
-              maxRows: 10,
-              defaultTableRows: 10_000,
-              tableRows: { user: 10_000 },
-            }),
-          ],
-        },
-      );
+  it('blocks streaming when observed rows exceed budget', async () => {
+    const adapter = createPostgresAdapter();
+    const runtime = await createTestRuntime(
+      fixtureContract,
+      {
+        binding: { kind: 'pgClient', client },
+        cursor: { disabled: true },
+      },
+      {
+        verify: { mode: 'onFirstUse', requireMarker: false },
+        plugins: [
+          budgets({
+            maxRows: 10,
+            defaultTableRows: 10_000,
+            tableRows: { user: 10_000 },
+          }),
+        ],
+      },
+    );
 
       const context = createTestContext(fixtureContract, adapter);
       const tables = schema(context).tables;
@@ -256,7 +254,7 @@ describe('budgets plugin integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -287,7 +285,7 @@ describe('budgets plugin integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -315,7 +313,7 @@ describe('budgets plugin integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -365,7 +363,7 @@ describe('budgets plugin integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -408,7 +406,7 @@ describe('budgets plugin integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -458,7 +456,7 @@ describe('budgets plugin integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {

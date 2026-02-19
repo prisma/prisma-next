@@ -66,7 +66,7 @@ describe('comparison operators integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         { verify: { mode: 'onFirstUse', requireMarker: true } },
@@ -94,7 +94,7 @@ describe('comparison operators integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         { verify: { mode: 'onFirstUse', requireMarker: true } },
@@ -122,7 +122,7 @@ describe('comparison operators integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         { verify: { mode: 'onFirstUse', requireMarker: true } },
@@ -150,7 +150,7 @@ describe('comparison operators integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         { verify: { mode: 'onFirstUse', requireMarker: true } },
@@ -178,7 +178,7 @@ describe('comparison operators integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         { verify: { mode: 'onFirstUse', requireMarker: true } },
@@ -233,7 +233,7 @@ describe('comparison operators integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         { verify: { mode: 'onFirstUse', requireMarker: true } },
@@ -265,7 +265,7 @@ describe('comparison operators integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         { verify: { mode: 'onFirstUse', requireMarker: true } },
@@ -293,7 +293,7 @@ describe('comparison operators integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         { verify: { mode: 'onFirstUse', requireMarker: true } },

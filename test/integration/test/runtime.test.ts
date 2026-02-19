@@ -62,7 +62,7 @@ describe('runtime execute integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -95,7 +95,7 @@ describe('runtime execute integration', () => {
     const runtime = await createTestRuntime(
       mismatchedContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -122,7 +122,7 @@ describe('runtime execute integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -153,7 +153,7 @@ describe('runtime execute integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -179,7 +179,7 @@ describe('runtime execute integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -210,7 +210,7 @@ describe('runtime execute integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {
@@ -239,7 +239,7 @@ describe('runtime execute integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -272,7 +272,7 @@ describe('runtime execute integration', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -305,7 +305,7 @@ describe('runtime execute integration', () => {
     const runtime = await createTestRuntime(
       fixtureContract,
       {
-        connect: { client },
+        binding: { kind: 'pgClient', client },
         cursor: { disabled: true },
       },
       {

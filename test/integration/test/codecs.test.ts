@@ -104,7 +104,7 @@ describe('Codecs Integration Tests', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -154,7 +154,7 @@ describe('Codecs Integration Tests', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -200,7 +200,7 @@ describe('Codecs Integration Tests', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -243,7 +243,7 @@ describe('Codecs Integration Tests', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -286,7 +286,7 @@ describe('Codecs Integration Tests', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -346,7 +346,7 @@ describe('Codecs Integration Tests', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -386,7 +386,7 @@ describe('Codecs Integration Tests', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -435,7 +435,7 @@ describe('Codecs Integration Tests', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -487,7 +487,7 @@ describe('Codecs Integration Tests', () => {
       const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
