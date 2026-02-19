@@ -12,6 +12,7 @@ import type {
   ModelField,
   ModelStorage,
   PrimaryKey,
+  ReferentialAction,
   SqlContract,
   SqlMappings,
   SqlStorage,
@@ -58,16 +59,29 @@ export function fk(
   columns: readonly string[],
   refTable: string,
   refColumns: readonly string[],
-  name?: string,
+  nameOrOptions?:
+    | string
+    | {
+        name?: string;
+        onDelete?: ReferentialAction;
+        onUpdate?: ReferentialAction;
+      },
 ): ForeignKey {
   const references: ForeignKeyReferences = {
     table: refTable,
     columns: refColumns,
   };
+
+  if (typeof nameOrOptions === 'string') {
+    return { columns, references, name: nameOrOptions };
+  }
+
   return {
     columns,
     references,
-    ...(name !== undefined && { name }),
+    ...(nameOrOptions?.name !== undefined && { name: nameOrOptions.name }),
+    ...(nameOrOptions?.onDelete !== undefined && { onDelete: nameOrOptions.onDelete }),
+    ...(nameOrOptions?.onUpdate !== undefined && { onUpdate: nameOrOptions.onUpdate }),
   };
 }
 

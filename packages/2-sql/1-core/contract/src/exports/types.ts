@@ -9,6 +9,7 @@ export type {
   ModelField,
   ModelStorage,
   PrimaryKey,
+  ReferentialAction,
   SqlContract,
   SqlMappings,
   SqlStorage,

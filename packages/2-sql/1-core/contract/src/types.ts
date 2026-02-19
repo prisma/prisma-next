@@ -56,10 +56,14 @@ export type ForeignKeyReferences = {
   readonly columns: readonly string[];
 };
 
+export type ReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
+
 export type ForeignKey = {
   readonly columns: readonly string[];
   readonly references: ForeignKeyReferences;
   readonly name?: string;
+  readonly onDelete?: ReferentialAction;
+  readonly onUpdate?: ReferentialAction;
 };
 
 export type StorageTable = {

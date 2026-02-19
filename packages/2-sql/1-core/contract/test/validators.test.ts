@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { col, contract, model, storage, table } from '../src/factories';
+import { col, contract, fk, model, storage, table } from '../src/factories';
+import type { ReferentialAction } from '../src/types';
 import { validateModel, validateSqlContract, validateStorage } from '../src/validators';
 
 describe('SQL contract validators', () => {
@@ -361,6 +362,62 @@ describe('SQL contract validators', () => {
         foreignKeys: { constraints: false, indexes: false },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
+    it('validates storage with FK referential actions', () => {
+      const actions: ReferentialAction[] = [
+        'noAction',
+        'restrict',
+        'cascade',
+        'setNull',
+        'setDefault',
+      ];
+      for (const action of actions) {
+        const postTable = table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1'),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: action })] },
+        );
+        const s = storage({ post: postTable });
+        expect(() => validateStorage(s)).not.toThrow();
+      }
+    });
+
+    it('validates storage with FK onDelete and onUpdate', () => {
+      const postTable = table(
+        {
+          id: col('int4', 'pg/int4@1'),
+          userId: col('int4', 'pg/int4@1'),
+        },
+        { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'cascade', onUpdate: 'noAction' })] },
+      );
+      const s = storage({ post: postTable });
+      expect(() => validateStorage(s)).not.toThrow();
+    });
+
+    it('throws on invalid referential action string', () => {
+      const invalid = {
+        tables: {
+          post: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                columns: ['userId'],
+                references: { table: 'user', columns: ['id'] },
+                onDelete: 'invalidAction',
+              },
+            ],
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(invalid)).toThrow();
     });
 
     it('throws on invalid foreignKeys config (string instead of boolean)', () => {
