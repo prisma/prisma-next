@@ -57,9 +57,15 @@ The transformer (`src/transform/`) converts Kysely AST nodes to PN SQL AST:
 | `ColumnUpdateNode` | `UpdateAst.set` |
 | `ReturningNode` | `returning` column refs |
 
+Compatibility target: `kysely@0.28.x` AST node contracts.
+
+The transform implementation is typed against Kysely-exported node interfaces/guards (for example `WhereNode.where`, `OnNode.on`, `SelectionNode.selection`, `ReferenceNode.table/column`, and `OrderByItemNode.direction` as `RawNode`).
+
 All refs are validated against the contract. Unsupported node kinds throw `KyselyTransformError` with stable codes.
 
 The transformer also throws defensively if ambiguous or invalid shapes slip through (e.g. when invoked without guardrails): unqualified column refs in multi-table scope, ambiguous `selectAll` in multi-table scope, and unsupported node kinds.
+
+There is no fallback to raw-lane execution when transform fails: unsupported/unknown AST shapes fail fast by design.
 
 ## Guardrails
 
@@ -71,6 +77,10 @@ Pre-transform guardrails (`runGuardrails`) run before the transformer in the Kys
 | Ambiguous selectAll | Multi-table scope with `selectAll()` / `select *` without table qualification | `AMBIGUOUS_SELECT_ALL` |
 
 Multi-table scope is triggered by either joins (`JoinNode` present) or multiple `FROM` entries (`froms.length > 1`). Only `SelectQueryNode` is validated; INSERT/UPDATE/DELETE are single-table.
+
+## Test Strategy
+
+Transformer tests use real Kysely builders and compiled queries (`.compile()`), then assert semantic PN AST fields and lane metadata (instead of asserting synthetic hand-authored AST fixtures or large snapshots).
 
 ## Dependencies
 

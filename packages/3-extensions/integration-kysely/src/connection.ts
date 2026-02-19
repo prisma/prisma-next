@@ -45,14 +45,8 @@ export class KyselyPrismaConnection implements DatabaseConnection {
   }
 
   async executeQuery<R>(compiledQuery: CompiledQuery<unknown>): Promise<QueryResult<R>> {
-    if (!this.#connection) {
-      throw new Error('Invoked executeQuery on released connection');
-    }
     const plan = this.#createExecutionPlan<R>(compiledQuery);
-    const conn = this.#connection as {
-      execute<P>(p: ExecutionPlan<P> | SqlQueryPlan<P>): AsyncIterableResult<P>;
-    };
-    return { rows: await conn.execute(plan).toArray() };
+    return { rows: await this.#activeQueryable().execute(plan).toArray() };
   }
 
   async release(): Promise<void> {
@@ -72,14 +66,8 @@ export class KyselyPrismaConnection implements DatabaseConnection {
     compiledQuery: CompiledQuery<unknown>,
     chunkSize?: number | undefined,
   ): AsyncIterableIterator<QueryResult<R>> {
-    if (!this.#connection) {
-      throw new Error('Invoked streamQuery on released connection');
-    }
     const plan = this.#createExecutionPlan<R>(compiledQuery);
-    const conn = this.#connection as {
-      execute<P>(p: ExecutionPlan<P> | SqlQueryPlan<P>): AsyncIterableResult<P>;
-    };
-    const results = conn.execute(plan);
+    const results = this.#activeQueryable().execute(plan);
 
     const generator = async function* (): AsyncIterableIterator<QueryResult<R>> {
       let chunk: R[] = [];
@@ -96,6 +84,18 @@ export class KyselyPrismaConnection implements DatabaseConnection {
     };
 
     return generator();
+  }
+
+  #activeQueryable(): {
+    execute<P>(plan: ExecutionPlan<P> | SqlQueryPlan<P>): AsyncIterableResult<P>;
+  } {
+    if (this.#transaction) {
+      return this.#transaction;
+    }
+    if (this.#connection) {
+      return this.#connection;
+    }
+    throw new Error('Invoked query execution on released connection');
   }
 
   #createExecutionPlan<R>(compiledQuery: CompiledQuery<R>): SqlQueryPlan<R> | ExecutionPlan<R> {

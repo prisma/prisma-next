@@ -10,8 +10,21 @@ import type {
   ParamRef,
   WhereExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import {
+  AndNode,
+  BinaryOperationNode,
+  type OperationNode,
+  OperatorNode,
+  OrderByItemNode,
+  OrNode,
+  ParensNode,
+  PrimitiveValueListNode,
+  ReferenceNode,
+  ValueListNode,
+  ValueNode,
+} from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
-import { hasKind } from './kysely-ast-types';
+import { isOperationNode, parseOrderByDirection } from './kysely-ast-types';
 import { addParamDescriptor, nextParamIndex, type TransformContext } from './transform-context';
 import { resolveColumnRef } from './transform-validate';
 
@@ -32,30 +45,34 @@ export function transformValue(
     addParamDescriptor(ctx, descriptor);
   };
 
-  if (typeof node !== 'object' || node === null) {
+  if (!isOperationNode(node)) {
     const nextCompiledParam = ctx.parameters[ctx.paramIndex];
     if (ctx.paramIndex < ctx.parameters.length && Object.is(nextCompiledParam, node)) {
-      const idx = nextParamIndex(ctx);
+      const index = nextParamIndex(ctx);
       addDescriptorForCurrentParam();
-      return { kind: 'param', index: idx };
+      return { kind: 'param', index };
     }
     return { kind: 'literal', value: node };
   }
-  const n = node as Record<string, unknown>;
-  if (hasKind(node, 'ValueNode')) {
-    const idx = nextParamIndex(ctx);
+
+  if (ValueNode.is(node)) {
+    if (node.immediate === true) {
+      return { kind: 'literal', value: node.value };
+    }
+    const index = nextParamIndex(ctx);
     addDescriptorForCurrentParam();
-    return { kind: 'param', index: idx };
+    return { kind: 'param', index };
   }
-  const nodeKind = String((n as { kind?: string })['kind'] ?? 'unknown');
+
   throw new KyselyTransformError(
-    `Unsupported value node: ${nodeKind}`,
+    `Unsupported value node: ${node.kind}`,
     KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-    { nodeKind },
+    { nodeKind: node.kind },
   );
 }
 
 export function mapOperator(op: string): BinaryOp | undefined {
+  const normalized = op.trim().toLowerCase();
   const map: Record<string, BinaryOp> = {
     '=': 'eq',
     '==': 'eq',
@@ -68,22 +85,71 @@ export function mapOperator(op: string): BinaryOp | undefined {
     like: 'like',
     ilike: 'ilike',
     in: 'in',
-    notIn: 'notIn',
+    'not in': 'notIn',
+    notin: 'notIn',
   };
-  return map[op?.toLowerCase?.() ?? op];
+  return map[normalized];
 }
 
 export function getOperatorFromNode(node: unknown): string | undefined {
-  if (typeof node !== 'object' || node === null) return undefined;
-  const n = node as Record<string, unknown>;
-  if (hasKind(node, 'OperatorNode')) {
-    const op = n['operator'];
-    if (typeof op === 'string') {
-      return op;
-    }
+  if (!isOperationNode(node) || !OperatorNode.is(node)) {
     return undefined;
   }
-  return undefined;
+  return typeof node.operator === 'string' ? node.operator : undefined;
+}
+
+function flattenLogical(
+  node: OperationNode,
+  logicalKind: 'and' | 'or',
+  ctx: TransformContext,
+  defaultTable: string | undefined,
+  out: WhereExpr[],
+): void {
+  const current = ParensNode.is(node) ? node.node : node;
+
+  if (logicalKind === 'and' && AndNode.is(current)) {
+    flattenLogical(current.left, logicalKind, ctx, defaultTable, out);
+    flattenLogical(current.right, logicalKind, ctx, defaultTable, out);
+    return;
+  }
+
+  if (logicalKind === 'or' && OrNode.is(current)) {
+    flattenLogical(current.left, logicalKind, ctx, defaultTable, out);
+    flattenLogical(current.right, logicalKind, ctx, defaultTable, out);
+    return;
+  }
+
+  const transformed = transformWhereExpr(current, ctx, defaultTable);
+  if (transformed) {
+    out.push(transformed);
+  }
+}
+
+function transformRightOperand(
+  node: OperationNode,
+  ctx: TransformContext,
+  defaultTable: string | undefined,
+  refs: { table: string; column: string },
+): ColumnRef | ParamRef | LiteralExpr | ListLiteralExpr {
+  if (ReferenceNode.is(node)) {
+    return resolveColumnRef(node, ctx, defaultTable);
+  }
+
+  if (PrimitiveValueListNode.is(node)) {
+    return {
+      kind: 'listLiteral',
+      values: node.values.map((value) => transformValue(value, ctx, refs)),
+    };
+  }
+
+  if (ValueListNode.is(node)) {
+    return {
+      kind: 'listLiteral',
+      values: node.values.map((value) => transformValue(value, ctx, refs)),
+    };
+  }
+
+  return transformValue(node, ctx, refs);
 }
 
 export function transformWhereExpr(
@@ -91,98 +157,71 @@ export function transformWhereExpr(
   ctx: TransformContext,
   defaultTable?: string,
 ): WhereExpr | undefined {
-  if (!node) return undefined;
-  if (typeof node !== 'object') return undefined;
+  if (!node) {
+    return undefined;
+  }
 
-  const n = node as Record<string, unknown>;
+  if (!isOperationNode(node)) {
+    return undefined;
+  }
 
-  const exprsArr = n['exprs'];
-  if (hasKind(node, 'AndNode') || (n['kind'] === 'AndNode' && Array.isArray(exprsArr))) {
-    const arr = Array.isArray(exprsArr) ? exprsArr : [];
-    const exprs = arr
-      .map((e: unknown) => transformWhereExpr(e, ctx, defaultTable))
-      .filter((e): e is WhereExpr => e !== undefined);
+  if (ParensNode.is(node)) {
+    return transformWhereExpr(node.node, ctx, defaultTable);
+  }
+
+  if (AndNode.is(node)) {
+    const exprs: WhereExpr[] = [];
+    flattenLogical(node, 'and', ctx, defaultTable, exprs);
     if (exprs.length === 0) return undefined;
     if (exprs.length === 1) return exprs[0];
     return { kind: 'and', exprs };
   }
 
-  const orExprsArr = n['exprs'];
-  if (hasKind(node, 'OrNode') || (n['kind'] === 'OrNode' && Array.isArray(orExprsArr))) {
-    const orArr = Array.isArray(orExprsArr) ? orExprsArr : [];
-    const exprs = orArr
-      .map((e: unknown) => transformWhereExpr(e, ctx, defaultTable))
-      .filter((e): e is WhereExpr => e !== undefined);
+  if (OrNode.is(node)) {
+    const exprs: WhereExpr[] = [];
+    flattenLogical(node, 'or', ctx, defaultTable, exprs);
     if (exprs.length === 0) return undefined;
     if (exprs.length === 1) return exprs[0];
     return { kind: 'or', exprs };
   }
 
-  if (
-    hasKind(node, 'BinaryOperationNode') ||
-    ((n['kind'] === 'BinaryOperationNode' || hasKind(node, 'BinaryOperationNode')) &&
-      n['operator'] &&
-      (n['left'] || n['leftOperand']) &&
-      (n['right'] || n['rightOperand']))
-  ) {
-    const leftNode = (n['left'] ?? n['leftOperand']) as unknown;
-    const rightNode = (n['right'] ?? n['rightOperand']) as unknown;
-    const opNode = n['operator'] as unknown;
-    const opStr = getOperatorFromNode(opNode);
-    const op = opStr ? mapOperator(opStr) : undefined;
-    if (!op) {
-      throw new KyselyTransformError(
-        `Unsupported operator: ${opStr ?? 'unknown'}`,
-        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-        { nodeKind: 'BinaryOperationNode', operator: opStr },
-      );
-    }
-
-    let left: ColumnRef | ParamRef | LiteralExpr;
-    let right: ColumnRef | ParamRef | LiteralExpr | ListLiteralExpr;
-
-    if (hasKind(leftNode, 'ReferenceNode')) {
-      const leftRec = leftNode as Record<string, unknown>;
-      const colRef = resolveColumnRef(leftRec['column'] ?? leftNode, ctx, defaultTable);
-      left = colRef;
-      ctx.refsColumns.set(`${colRef.table}.${colRef.column}`, {
-        table: colRef.table,
-        column: colRef.column,
-      });
-
-      if (hasKind(rightNode, 'ReferenceNode')) {
-        const rightRec = rightNode as Record<string, unknown>;
-        right = resolveColumnRef(rightRec['column'] ?? rightNode, ctx, defaultTable);
-      } else if (hasKind(rightNode, 'ValueNode')) {
-        right = transformValue(rightNode, ctx, { table: colRef.table, column: colRef.column });
-      } else if (
-        hasKind(rightNode, 'PrimitiveValueListNode') ||
-        ((rightNode as Record<string, unknown>)['kind'] === 'PrimitiveValueListNode' &&
-          Array.isArray((rightNode as Record<string, unknown>)['values']))
-      ) {
-        const rightRec = rightNode as Record<string, unknown>;
-        const values = (rightRec['values'] ?? []) as unknown[];
-        const listValues = values.map((v: unknown) =>
-          transformValue(v, ctx, { table: colRef.table, column: colRef.column }),
-        );
-        right = { kind: 'listLiteral', values: listValues };
-      } else {
-        right = transformValue(rightNode, ctx);
-      }
-    } else {
-      left = transformValue(leftNode, ctx) as ColumnRef | ParamRef | LiteralExpr;
-      right = transformValue(rightNode, ctx);
-    }
-
-    return {
-      kind: 'bin',
-      op,
-      left: left as ColumnRef,
-      right,
-    };
+  if (!BinaryOperationNode.is(node)) {
+    return undefined;
   }
 
-  return undefined;
+  const operatorString = getOperatorFromNode(node.operator);
+  const operator = operatorString ? mapOperator(operatorString) : undefined;
+  if (!operator) {
+    throw new KyselyTransformError(
+      `Unsupported operator: ${operatorString ?? 'unknown'}`,
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+      { nodeKind: node.kind, operator: operatorString },
+    );
+  }
+
+  const leftNode = node.leftOperand;
+  const rightNode = node.rightOperand;
+
+  if (!ReferenceNode.is(leftNode)) {
+    throw new KyselyTransformError(
+      `Unsupported left operand kind: ${leftNode.kind}`,
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+      { nodeKind: leftNode.kind },
+    );
+  }
+
+  const left = resolveColumnRef(leftNode, ctx, defaultTable);
+  const right = transformRightOperand(rightNode, ctx, defaultTable, {
+    table: left.table,
+    column: left.column,
+  });
+
+  return {
+    kind: 'bin',
+    op: operator,
+    left,
+    right,
+  };
 }
 
 export function transformOrderByItem(
@@ -190,11 +229,12 @@ export function transformOrderByItem(
   ctx: TransformContext,
   defaultTable?: string,
 ): { expr: Expression; dir: Direction } | undefined {
-  if (typeof node !== 'object' || node === null) return undefined;
-  const n = node as Record<string, unknown>;
-  const exprNode = n['column'] ?? n['orderBy'] ?? n;
-  const colRef = resolveColumnRef(exprNode, ctx, defaultTable);
-  const dir = (n['direction'] === 'desc' ? 'desc' : 'asc') as Direction;
+  if (!isOperationNode(node) || !OrderByItemNode.is(node)) {
+    return undefined;
+  }
+
+  const colRef = resolveColumnRef(node.orderBy, ctx, defaultTable);
+  const dir = parseOrderByDirection(node);
   return { expr: colRef, dir };
 }
 
@@ -211,6 +251,7 @@ export function transformJoinOn(
       KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
     );
   }
+
   if (
     expr.kind === 'bin' &&
     expr.op === 'eq' &&
@@ -220,8 +261,9 @@ export function transformJoinOn(
     return {
       kind: 'eqCol',
       left: expr.left,
-      right: expr.right as ColumnRef,
+      right: expr.right,
     };
   }
+
   return expr;
 }
