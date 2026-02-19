@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import prismaInternals from '@prisma/internals';
+import { getPrismaConfig, getPrismaDmmf } from './prisma-wasm';
 import { sanitizePrismaSchemaForPrisma7 } from './schema-normalize';
 import type {
   ContractColumnDefault,
@@ -126,13 +126,6 @@ interface PrismaInternalsDmmfResult {
   readonly datamodel: DmmfDatamodel;
 }
 
-interface PrismaInternalsModule {
-  readonly getConfig: (options: { datamodel: string }) => Promise<PrismaInternalsGetConfigResult>;
-  readonly getDMMF: (options: { datamodel: string }) => Promise<PrismaInternalsDmmfResult>;
-}
-
-const internals = prismaInternals as unknown as PrismaInternalsModule;
-
 interface ModelContext {
   readonly model: DmmfModel;
   readonly tableName: string;
@@ -182,7 +175,7 @@ export async function convertPrismaSchemaToContract(
   const missingFeatures = new Set<string>();
   collectSchemaLevelFeatureGaps(loaded.schema, missingFeatures);
 
-  const config = await internals.getConfig({ datamodel: loaded.sanitizedSchema });
+  const config = getPrismaConfig<PrismaInternalsGetConfigResult>(loaded.sanitizedSchema);
   const provider = resolveProvider(config);
   if (provider !== 'postgresql') {
     throw new Error(
@@ -190,7 +183,7 @@ export async function convertPrismaSchemaToContract(
     );
   }
 
-  const dmmf = await internals.getDMMF({ datamodel: loaded.sanitizedSchema });
+  const dmmf = getPrismaDmmf<PrismaInternalsDmmfResult>(loaded.sanitizedSchema);
   const datamodel = dmmf.datamodel;
 
   if (datamodel.types && datamodel.types.length > 0) {
