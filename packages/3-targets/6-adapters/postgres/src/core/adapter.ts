@@ -22,6 +22,7 @@ import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relationa
 import { ifDefined } from '@prisma-next/utils/defined';
 
 import { codecDefinitions } from './codecs';
+import { expandParameterizedNativeType } from './parameterized-types';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
 const defaultCapabilities = Object.freeze({
@@ -220,12 +221,14 @@ function renderExpr(expr: ColumnRef | OperationExpr, contract?: PostgresContract
   return renderColumn(expr);
 }
 
-function getColumnNativeType(
+function getColumnCastType(
   contract: PostgresContract,
   tableName: string,
   columnName: string,
 ): string | undefined {
-  return contract.storage.tables[tableName]?.columns[columnName]?.nativeType;
+  const col = contract.storage.tables[tableName]?.columns[columnName];
+  if (!col) return undefined;
+  return expandParameterizedNativeType(col);
 }
 
 function renderParam(
@@ -235,9 +238,9 @@ function renderParam(
   columnName?: string,
 ): string {
   if (contract && tableName && columnName) {
-    const nativeType = getColumnNativeType(contract, tableName, columnName);
-    if (nativeType) {
-      return `$${ref.index}::${nativeType}`;
+    const castType = getColumnCastType(contract, tableName, columnName);
+    if (castType) {
+      return `$${ref.index}::${castType}`;
     }
   }
   return `$${ref.index}`;
@@ -408,8 +411,8 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
   const columns = Object.keys(ast.values).map((col) => quoteIdentifier(col));
   const values = Object.entries(ast.values).map(([colName, val]) => {
     if (val.kind === 'param') {
-      const nativeType = getColumnNativeType(contract, ast.table.name, colName);
-      return nativeType ? `$${val.index}::${nativeType}` : `$${val.index}`;
+      const castType = getColumnCastType(contract, ast.table.name, colName);
+      return castType ? `$${val.index}::${castType}` : `$${val.index}`;
     }
     if (val.kind === 'col') {
       return `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
@@ -431,8 +434,8 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
     const column = quoteIdentifier(col);
     let value: string;
     if (val.kind === 'param') {
-      const nativeType = getColumnNativeType(contract, ast.table.name, col);
-      value = nativeType ? `$${val.index}::${nativeType}` : `$${val.index}`;
+      const castType = getColumnCastType(contract, ast.table.name, col);
+      value = castType ? `$${val.index}::${castType}` : `$${val.index}`;
     } else if (val.kind === 'col') {
       value = `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
     } else {
