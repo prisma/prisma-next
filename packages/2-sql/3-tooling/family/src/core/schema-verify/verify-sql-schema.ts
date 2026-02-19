@@ -461,8 +461,17 @@ function verifyTableChildren(options: {
   );
   tableChildren.push(...uniqueStatuses);
 
+  // Filter out FK-backing indexes when foreignKeys.indexes is disabled
+  let indexesToVerify = contractTable.indexes;
+  if (!foreignKeysConfig.indexes) {
+    const fkColumnSets = new Set(contractTable.foreignKeys.map((fk) => fk.columns.join(',')));
+    indexesToVerify = contractTable.indexes.filter(
+      (index) => !fkColumnSets.has(index.columns.join(',')),
+    );
+  }
+
   const indexStatuses = verifyIndexes(
-    contractTable.indexes,
+    indexesToVerify,
     schemaTable.indexes,
     schemaTable.uniques,
     tableName,

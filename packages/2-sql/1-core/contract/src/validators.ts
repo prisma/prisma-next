@@ -128,7 +128,7 @@ const ModelSchema = type.declare<ModelDefinition>().type({
   relations: type({ '[string]': 'unknown' }),
 });
 
-const ForeignKeysConfigSchema = type.declare<ForeignKeysConfig>().type({
+export const ForeignKeysConfigSchema = type.declare<ForeignKeysConfig>().type({
   constraints: 'boolean',
   indexes: 'boolean',
 });

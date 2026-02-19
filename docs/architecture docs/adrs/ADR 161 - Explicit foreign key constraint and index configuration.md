@@ -101,9 +101,11 @@ Postgres reports `sql.foreignKeys: true` and `sql.autoIndexesForeignKeys: false`
 - Contract schema/types for global FK knobs.
 - TS contract builder support.
 - Deterministic planner emission/omission.
-- Capability-gated behavior.
 - Schema verification updates.
 - Postgres-first implementation and tests.
+
+**v2 (deferred):**
+- Capability-gated behavior (`sql.foreignKeys`, `sql.autoIndexesForeignKeys`). Capability keys are documented in `capabilities.md` but planner enforcement is deferred until a non-Postgres target requires it.
 
 **Out of scope:**
 - Runtime emulated referential integrity.

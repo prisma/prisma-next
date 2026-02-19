@@ -120,6 +120,10 @@
       }
     }
   },
+  "foreignKeys": {
+    "constraints": true,
+    "indexes": true
+  },
   "capabilities": {
     "postgres": {
       "jsonAgg": true,

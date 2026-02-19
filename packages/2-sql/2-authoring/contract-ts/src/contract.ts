@@ -2,7 +2,6 @@ import {
   DEFAULT_FOREIGN_KEYS_CONFIG,
   type ForeignKey,
   type ForeignKeyReferences,
-  type ForeignKeysConfig,
   type Index,
   type ModelDefinition,
   type ModelField,
@@ -16,7 +15,7 @@ import {
   type StorageTypeInstance,
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import { ColumnDefaultSchema } from '@prisma-next/sql-contract/validators';
+import { ColumnDefaultSchema, ForeignKeysConfigSchema } from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
@@ -112,11 +111,6 @@ const ExecutionSchema = type({
   mutations: {
     defaults: ExecutionMutationDefaultSchema.array().readonly(),
   },
-});
-
-const ForeignKeysConfigSchema = type.declare<ForeignKeysConfig>().type({
-  constraints: 'boolean',
-  indexes: 'boolean',
 });
 
 /**
