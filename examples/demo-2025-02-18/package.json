@@ -1,0 +1,54 @@
+{
+  "name": "demo-2025-02-18",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "emit:arktype": "prisma-next contract emit --config prisma-next.arktype.config.ts",
+    "emit:zod": "prisma-next contract emit --config prisma-next.zod.config.ts",
+    "emit:ids": "prisma-next contract emit --config prisma-next.ids.config.ts",
+    "emit": "pnpm run emit:arktype && pnpm run emit:zod && pnpm run emit:ids",
+    "db:create": "tsx src/setup/create-demo-databases.ts",
+    "db:init": "prisma-next db init --config prisma-next.arktype.config.ts && prisma-next db init --config prisma-next.zod.config.ts && prisma-next db init --config prisma-next.ids.config.ts",
+    "db:sign": "prisma-next db sign --config prisma-next.arktype.config.ts && prisma-next db sign --config prisma-next.zod.config.ts && prisma-next db sign --config prisma-next.ids.config.ts",
+    "start": "tsx src/main.ts",
+    "demo:arktype-json": "bun src/demo-arktype-json.ts",
+    "demo:zod-discriminated-union": "bun src/demo-zod-discriminated-union.ts",
+    "demo:id-generators": "bun src/demo-id-generators.ts",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/ids": "workspace:*",
+    "@prisma-next/postgres": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
+    "arktype": "catalog:",
+    "dotenv": "^16.4.5",
+    "pg": "catalog:",
+    "uniku": "^0.0.12",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/vite-plugin-contract-emit": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "tsx": "^4.19.2",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
