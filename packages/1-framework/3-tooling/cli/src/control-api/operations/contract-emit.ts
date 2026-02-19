@@ -1,10 +1,16 @@
 import { mkdir, writeFile } from 'node:fs/promises';
+import { convertPrismaSchemaToContract } from '@prisma-next/contract-psl';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing } from '../../utils/cli-errors';
+import {
+  isPrismaContractSourceDescriptor,
+  looksLikePrismaSchemaText,
+  resolvePrismaSchemaPathFromSource,
+} from '../../utils/prisma-schema-source';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
 /**
@@ -54,13 +60,9 @@ export async function executeContractEmit(
     });
   }
 
-  // Validate source is defined and is either a function or a non-null object
-  if (
-    contractConfig.source === null ||
-    (typeof contractConfig.source !== 'function' && typeof contractConfig.source !== 'object')
-  ) {
+  if (contractConfig.source === undefined) {
     throw errorContractConfigMissing({
-      why: 'Contract config must include a valid source (function or non-null object)',
+      why: 'Contract config must include a valid source (value or function)',
     });
   }
 
@@ -78,10 +80,11 @@ export async function executeContractEmit(
   const familyInstance = config.family.create(stack);
 
   // Resolve contract source from config
-  const contractRaw =
+  const sourceValue =
     typeof contractConfig.source === 'function'
       ? await unlessAborted(contractConfig.source())
       : contractConfig.source;
+  const contractRaw = await unlessAborted(resolveContractSourceValue(sourceValue, configDir));
 
   // Emit contract via family instance
   const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: contractRaw }));
@@ -100,4 +103,33 @@ export async function executeContractEmit(
       dts: outputDtsPath,
     },
   };
+}
+
+async function resolveContractSourceValue(value: unknown, configDir: string): Promise<unknown> {
+  if (isPrismaContractSourceDescriptor(value)) {
+    const convertOptions =
+      typeof value.schema === 'string'
+        ? { schema: value.schema, ...(value.schemaPath ? { schemaPath: value.schemaPath } : {}) }
+        : {
+            schemaPath: resolve(configDir, value.schemaPath ?? 'prisma/schema.prisma'),
+          };
+    const result = await convertPrismaSchemaToContract(convertOptions);
+    return result.contract;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (looksLikePrismaSchemaText(trimmed)) {
+      const result = await convertPrismaSchemaToContract({ schema: value });
+      return result.contract;
+    }
+
+    const schemaPath = resolvePrismaSchemaPathFromSource(value, configDir);
+    if (schemaPath) {
+      const result = await convertPrismaSchemaToContract({ schemaPath });
+      return result.contract;
+    }
+  }
+
+  return value;
 }

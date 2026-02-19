@@ -105,24 +105,15 @@ export function setupTestDirectoryFromFixtures(
     throw new Error(`Fixture subdirectory not found: ${fixturesSubdirPath}`);
   }
 
-  // Copy contract.ts if it exists
-  const fixtureContractPath = join(fixturesSubdirPath, 'contract.ts');
-  if (existsSync(fixtureContractPath)) {
-    const contractPath = join(testDir, 'contract.ts');
-    copyFileSync(fixtureContractPath, contractPath);
-  }
-
-  // Copy precomputed contract.json and contract.d.ts if they exist
-  // Note: outputDir was already created above, so no need for mkdirSync here
-  const fixtureContractJsonPath = join(fixturesSubdirPath, 'contract.json');
-  const fixtureContractDtsPath = join(fixturesSubdirPath, 'contract.d.ts');
-  if (existsSync(fixtureContractJsonPath)) {
-    const contractJsonPath = join(outputDir, 'contract.json');
-    copyFileSync(fixtureContractJsonPath, contractJsonPath);
-  }
-  if (existsSync(fixtureContractDtsPath)) {
-    const contractDtsPath = join(outputDir, 'contract.d.ts');
-    copyFileSync(fixtureContractDtsPath, contractDtsPath);
+  // Copy all non-config files from fixture directory.
+  const fixtureFiles = readdirSync(fixturesSubdirPath);
+  for (const file of fixtureFiles) {
+    if (file === configFileName) {
+      continue;
+    }
+    const source = join(fixturesSubdirPath, file);
+    const destination = join(testDir, file);
+    copyFileSync(source, destination);
   }
 
   // Copy and process config file

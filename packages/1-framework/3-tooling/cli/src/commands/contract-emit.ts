@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
+import { convertPrismaSchemaToContract } from '@prisma-next/contract-psl';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -17,6 +18,11 @@ import {
   formatStyledHeader,
   formatSuccessMessage,
 } from '../utils/output';
+import {
+  isPrismaContractSourceDescriptor,
+  looksLikePrismaSchemaText,
+  resolvePrismaSchemaPathFromSource,
+} from '../utils/prisma-schema-source';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 
@@ -32,6 +38,35 @@ interface ContractEmitOptions {
   readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+}
+
+async function resolveContractSourceValue(value: unknown, configDir: string): Promise<unknown> {
+  if (isPrismaContractSourceDescriptor(value)) {
+    const convertOptions =
+      typeof value.schema === 'string'
+        ? { schema: value.schema, ...(value.schemaPath ? { schemaPath: value.schemaPath } : {}) }
+        : {
+            schemaPath: resolve(configDir, value.schemaPath ?? 'prisma/schema.prisma'),
+          };
+    const result = await convertPrismaSchemaToContract(convertOptions);
+    return result.contract;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (looksLikePrismaSchemaText(trimmed)) {
+      const result = await convertPrismaSchemaToContract({ schema: value });
+      return result.contract;
+    }
+
+    const schemaPath = resolvePrismaSchemaPathFromSource(value, configDir);
+    if (schemaPath) {
+      const result = await convertPrismaSchemaToContract({ schemaPath });
+      return result.contract;
+    }
+  }
+
+  return value;
 }
 
 /**
@@ -109,6 +144,7 @@ async function executeContractEmitCommand(
     );
   }
   const outputJsonPath = resolve(contractConfig.output);
+  const configDir = options.config ? dirname(resolve(options.config)) : process.cwd();
   // Colocate .d.ts with .json (contract.json → contract.d.ts)
   const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 
@@ -147,12 +183,16 @@ async function executeContractEmitCommand(
   const onProgress = createProgressAdapter({ flags });
 
   try {
-    // Convert user config source to discriminated union
-    // Type assertion is safe: we check typeof to determine if it's a function
-    const source: EmitContractSource =
-      typeof contractConfig.source === 'function'
-        ? { kind: 'loader', load: contractConfig.source as () => unknown | Promise<unknown> }
-        : { kind: 'value', value: contractConfig.source };
+    const source: EmitContractSource = {
+      kind: 'loader',
+      load: async () => {
+        const rawSource =
+          typeof contractConfig.source === 'function'
+            ? await (contractConfig.source as () => unknown | Promise<unknown>)()
+            : contractConfig.source;
+        return resolveContractSourceValue(rawSource, configDir);
+      },
+    };
 
     // Call emit with progress callback
     const result = await client.emit({

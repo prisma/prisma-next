@@ -7,6 +7,8 @@ export default defineConfig({
     'src/exports/config-types.ts',
     'src/commands/db-init.ts',
     'src/commands/db-introspect.ts',
+    'src/commands/db-pull.ts',
+    'src/commands/db-push.ts',
     'src/commands/db-schema-verify.ts',
     'src/commands/db-sign.ts',
     'src/commands/db-verify.ts',

@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("POSTGRES_PRISMA_URL")
+  directUrl         = env("POSTGRES_PRISMA_URL_NON_POOLING")
+  shadowDatabaseUrl = env("POSTGRES_PRISMA_SHADOW_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id        String    @id @default(uuid()) @db.Uuid
+  email     String    @unique
+  role      UserRole  @default(USER)
+  createdAt DateTime  @default(now())
+  posts     Post[]
+  profile   Profile?
+
+  @@index([createdAt])
+}
+
+model Profile {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  bio       String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Post {
+  id        Int      @id @default(autoincrement())
+  authorId  String   @db.Uuid
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  title     String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([authorId, createdAt(sort: Desc)])
+}
+

@@ -110,6 +110,7 @@ Quick links to detailed subsystem specifications:
 - [Migration System](architecture%20docs/subsystems/7.%20Migration%20System.md) — Contract→contract edges, planner/runner, checks, and idempotency
 - [Preflight & CI Integration](architecture%20docs/subsystems/8.%20Preflight%20&%20CI%20Integration.md) — Shadow/EXPLAIN, policy gates, and CI flows
 - [No-Emit Workflow](architecture%20docs/subsystems/9.%20No-Emit%20Workflow.md) — TS-first authoring, watch plugins, and CI trust model
+- [Prisma Schema Interop](architecture%20docs/subsystems/10.%20Prisma%20Schema%20Interop.md) — `.prisma` source ingestion plus Prisma-compatible push/pull workflows
 - [Error Handling](Error%20Handling.md) — Shared taxonomy (failures vs operational errors vs bugs) and boundary conversion patterns
 
 ## Control Plane — Self-Verifying Change

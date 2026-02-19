@@ -6,6 +6,8 @@
   "description": "PSL parser and IR for Prisma Next (future)",
   "scripts": {
     "build": "tsdown",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write .",
@@ -16,7 +18,8 @@
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "files": [
     "dist",
@@ -28,5 +31,11 @@
   },
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts"
+  "types": "./dist/index.d.mts",
+  "dependencies": {
+    "@prisma-next/contract": "workspace:*",
+    "@prisma/internals": "7.4.0",
+    "pathe": "^2.0.3",
+    "prisma": "7.4.0"
+  }
 }
