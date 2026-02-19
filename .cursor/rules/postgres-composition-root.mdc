@@ -1,3 +1,9 @@
+---
+description: Placement and responsibilities for @prisma-next/postgres composition root
+globs:
+alwaysApply: false
+---
+
 # Postgres Composition Root Placement
 
 - `@prisma-next/postgres` is treated as a composition-root helper and lives under `packages/3-extensions/postgres`.
