@@ -228,3 +228,37 @@ export function validateSqlContract<T extends SqlContract<SqlStorage>>(value: un
   // between Arktype's inferred type and the generic T, but runtime-wise they're compatible
   return contractResult as T;
 }
+
+/**
+ * Validates semantic constraints on SqlStorage that cannot be expressed in Arktype schemas.
+ *
+ * Returns an array of human-readable error strings. Empty array = valid.
+ *
+ * Currently checks:
+ * - `setNull` referential action on a non-nullable FK column (would fail at runtime)
+ */
+export function validateStorageSemantics(storage: SqlStorage): string[] {
+  const errors: string[] = [];
+
+  for (const [tableName, table] of Object.entries(storage.tables)) {
+    for (const fk of table.foreignKeys) {
+      for (const colName of fk.columns) {
+        const column = table.columns[colName];
+        if (!column) continue;
+
+        if (fk.onDelete === 'setNull' && !column.nullable) {
+          errors.push(
+            `Table "${tableName}": onDelete setNull on foreign key column "${colName}" which is NOT NULL`,
+          );
+        }
+        if (fk.onUpdate === 'setNull' && !column.nullable) {
+          errors.push(
+            `Table "${tableName}": onUpdate setNull on foreign key column "${colName}" which is NOT NULL`,
+          );
+        }
+      }
+    }
+  }
+
+  return errors;
+}

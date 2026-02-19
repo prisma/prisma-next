@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { col, contract, fk, model, storage, table } from '../src/factories';
 import type { ReferentialAction } from '../src/types';
-import { validateModel, validateSqlContract, validateStorage } from '../src/validators';
+import {
+  validateModel,
+  validateSqlContract,
+  validateStorage,
+  validateStorageSemantics,
+} from '../src/validators';
 
 describe('SQL contract validators', () => {
   describe('validateStorage', () => {
@@ -433,6 +438,79 @@ describe('SQL contract validators', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
       const invalid = { ...c, foreignKeys: { constraints: 'yes', indexes: true } } as any;
       expect(() => validateSqlContract(invalid)).toThrow();
+    });
+  });
+
+  describe('validateStorageSemantics', () => {
+    it('rejects setNull on non-nullable FK column', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', false),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('setNull');
+      expect(errors[0]).toContain('userId');
+    });
+
+    it('allows setNull on nullable FK column', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', true),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('allows cascade on non-nullable FK column', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', false),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'cascade' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('rejects setNull on onUpdate for non-nullable FK column', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', false),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onUpdate: 'setNull' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('setNull');
+    });
+
+    it('returns no errors for storage without FKs', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
     });
   });
 });
