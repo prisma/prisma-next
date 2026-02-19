@@ -240,6 +240,57 @@ describe('@prisma-next/driver-postgres', () => {
     expect(client.query).toHaveBeenCalled();
   });
 
+  it('shares in-flight direct client connect across concurrent queries', async () => {
+    let resolveConnect: (() => void) | undefined;
+    const connectPending = new Promise<void>((resolve) => {
+      resolveConnect = resolve;
+    });
+
+    const client = {
+      connect: vi.fn(async () => {
+        await connectPending;
+      }),
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    } as unknown as Client;
+
+    const driver = postgresRuntimeDriverDescriptor.create();
+    await driver.connect({ kind: 'pgClient', client });
+
+    const first = driver.query('select 1');
+    const second = driver.query('select 1');
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(client.connect).toHaveBeenCalledTimes(1);
+
+    resolveConnect?.();
+    await Promise.all([first, second]);
+  });
+
+  it('releases direct-connection lease when initial acquireConnection fails', async () => {
+    const connect = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('connect failed'))
+      .mockResolvedValue(undefined);
+
+    const client = {
+      connect,
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    } as unknown as Client;
+
+    const driver = postgresRuntimeDriverDescriptor.create();
+    await driver.connect({ kind: 'pgClient', client });
+
+    await expect(driver.acquireConnection()).rejects.toThrow('connect failed');
+
+    const connection = await driver.acquireConnection();
+    await connection.release();
+
+    expect(connect).toHaveBeenCalledTimes(2);
+  });
+
   it('calls client.end when closing direct client', async () => {
     const mockClient = {
       connect: vi.fn(async () => {}),
@@ -410,5 +461,36 @@ describe('@prisma-next/driver-postgres', () => {
     expect(
       (directClient as unknown as { end: ReturnType<typeof vi.fn> }).end,
     ).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes bound driver state transitions for pool and direct client', async () => {
+    const pool = {
+      connect: vi.fn(async () => ({
+        query: vi.fn(async () => ({ rows: [] })),
+        release: vi.fn(),
+      })),
+      end: vi.fn(async () => {}),
+    } as unknown as Pool;
+
+    const directClient = {
+      connect: vi.fn(async () => {}),
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    } as unknown as Client;
+
+    const poolDriver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, { disabled: true });
+    const directDriver = createBoundDriverFromBinding(
+      { kind: 'pgClient', client: directClient },
+      { disabled: true },
+    );
+
+    expect(poolDriver.state).toBe('connected');
+    expect(directDriver.state).toBe('connected');
+
+    await poolDriver.close();
+    await directDriver.close();
+
+    expect(poolDriver.state).toBe('closed');
+    expect(directDriver.state).toBe('closed');
   });
 });
