@@ -179,5 +179,5 @@
 
 ### Build Tools
 - **Compiler:** TypeScript 5.9+ with composite projects
-- **Bundler:** tsup for package builds
+- **Bundler:** tsdown for package builds
 - **Optimization:** Turbo for build caching and parallelization

@@ -1,15 +1,6 @@
 {
   "$schema": "./coverage.config.schema.json",
   "description": "WARNING-ONLY PACKAGES: Time-limited exceptions for packages with coverage/test failures. Each entry MUST have an expiry date. When expired, CI will fail until issues are resolved or config is updated with justification.",
-  "warningOnly": [
-    {
-      "package": "1-framework/3-tooling/eslint-plugin",
-      "reason": "Partial implementation for proof of concept",
-      "addedDate": "2026-01-02",
-      "expiryDays": 46,
-      "assignee": "Jacek / Alberto",
-      "linear": "https://linear.app/prisma-company/project/pn-static-linting-182a175b4d1c",
-      "notes": "Extended to end of sprint (Feb 17rd)"
-    }
-  ]
+  "warningOnly": [],
+  "excludedPackages": ["1-framework/3-tooling/eslint-plugin"]
 }

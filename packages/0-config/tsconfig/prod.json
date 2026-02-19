@@ -11,5 +11,8 @@
     // so we could compare `tsc` outputs between prod and dev builds when needed.
     "outDir": "${configDir}/dist-tsc-prod",
     "rootDir": "${configDir}"
-  }
+  },
+  // exclude test files from production builds to tighten DTS generation scope.
+  // packages that export test utilities (emitter, sql-runtime) override this locally.
+  "exclude": ["test", "dist", "dist-tsc", "dist-tsc-prod", "coverage"]
 }

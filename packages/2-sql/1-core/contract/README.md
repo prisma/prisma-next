@@ -135,6 +135,7 @@ const c = contract({
 - `./validators`: Arktype validators for structural validation
 - `./validate`: Shared `validateContract` helper for JSON imports
 - `./factories`: Factory functions for constructing contract IR
+- `./pack-types`: Shared extension/pack typing helpers
 
 ## Architecture
 

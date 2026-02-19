@@ -25,7 +25,7 @@ function createPostgresCodecRegistry(): CodecRegistry {
 }
 
 const jsonTypeParamsSchema = arktype({
-  schema: 'object',
+  schemaJson: 'object',
   'type?': 'string',
 });
 
@@ -39,7 +39,7 @@ const parameterizedCodecDescriptors = [
     paramsSchema: jsonTypeParamsSchema,
   },
 ] as const satisfies ReadonlyArray<
-  RuntimeParameterizedCodecDescriptor<{ readonly schema: object; readonly type?: string }>
+  RuntimeParameterizedCodecDescriptor<{ readonly schemaJson: object; readonly type?: string }>
 >;
 
 const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', SqlRuntimeAdapter> =
