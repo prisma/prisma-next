@@ -11,7 +11,9 @@ import type { PlanRefs } from '@prisma-next/contract/types';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { QueryAst } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { DeleteQueryNode, InsertQueryNode, SelectQueryNode, UpdateQueryNode } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
+import { isTransformableRootNode } from './kysely-ast-types';
 import type { TransformResult } from './transform-context';
 import { createContext } from './transform-context';
 import { transformDelete, transformInsert, transformUpdate } from './transform-dml';
@@ -43,8 +45,8 @@ function extractRefsFromAst(ast: QueryAst): PlanRefs {
       columns.push({ table, column });
       return;
     }
-    for (const v of Object.values(n)) {
-      visit(v);
+    for (const value of Object.values(n)) {
+      visit(value);
     }
   }
 
@@ -57,58 +59,67 @@ function extractRefsFromAst(ast: QueryAst): PlanRefs {
 
 export function transformKyselyToPnAst(
   contract: SqlContract<SqlStorage>,
-  query: object,
+  query: unknown,
   parameters: readonly unknown[],
 ): TransformResult {
-  if (!query || typeof query !== 'object') {
+  if (!isTransformableRootNode(query)) {
+    const nodeKind =
+      query && typeof query === 'object' && 'kind' in query
+        ? String((query as { kind?: unknown }).kind ?? 'unknown')
+        : 'unknown';
+
     throw new KyselyTransformError(
-      'Query must be a non-null object',
+      `Unsupported query kind: ${nodeKind}`,
       KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+      { nodeKind },
     );
   }
-
-  const node = query as Record<string, unknown>;
-  const kind = node['kind'];
 
   const ctx = createContext(contract, parameters);
 
   let ast: QueryAst;
-
-  if (kind === 'SelectQueryNode') {
-    ast = transformSelect(node, ctx);
-  } else if (kind === 'InsertQueryNode') {
-    ast = transformInsert(node, ctx);
-  } else if (kind === 'UpdateQueryNode') {
-    ast = transformUpdate(node, ctx);
-  } else if (kind === 'DeleteQueryNode') {
-    ast = transformDelete(node, ctx);
+  if (SelectQueryNode.is(query)) {
+    ast = transformSelect(query, ctx);
+  } else if (InsertQueryNode.is(query)) {
+    ast = transformInsert(query, ctx);
+  } else if (UpdateQueryNode.is(query)) {
+    ast = transformUpdate(query, ctx);
+  } else if (DeleteQueryNode.is(query)) {
+    ast = transformDelete(query, ctx);
   } else {
+    const exhaustiveCheck: never = query;
+    void exhaustiveCheck;
     throw new KyselyTransformError(
-      `Unsupported query kind: ${kind ?? 'unknown'}`,
+      'Unsupported query kind',
       KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-      { nodeKind: String(kind) },
+      { nodeKind: 'unknown' },
     );
   }
 
   const refs = extractRefsFromAst(ast);
 
-  const paramDescriptors = ctx.paramDescriptors.map((d, i) => ({
-    ...d,
-    index: i + 1,
+  const paramDescriptors = ctx.paramDescriptors.map((descriptor, index) => ({
+    ...descriptor,
+    index: index + 1,
   }));
 
   let projection: Record<string, string> | undefined;
   let projectionTypes: Record<string, string> | undefined;
   if (ast.kind === 'select') {
     projection = Object.fromEntries(
-      ast.project.map((p) => [p.alias, p.expr.kind === 'col' ? p.expr.column : p.alias]),
+      ast.project.map((projected) => [
+        projected.alias,
+        projected.expr.kind === 'col' ? projected.expr.column : projected.alias,
+      ]),
     );
+
     projectionTypes = {};
-    for (const p of ast.project) {
-      if (p.expr.kind === 'col') {
-        const col = ctx.contract.storage.tables[p.expr.table]?.columns[p.expr.column];
-        if (col) {
-          projectionTypes[p.alias] = col.codecId;
+    for (const projected of ast.project) {
+      if (projected.expr.kind === 'col') {
+        const column =
+          ctx.contract.storage.tables[projected.expr.table]?.columns[projected.expr.column];
+        if (column) {
+          projectionTypes[projected.alias] = column.codecId;
         }
       }
     }
@@ -124,5 +135,6 @@ export function transformKyselyToPnAst(
     ),
     ...ifDefined('selectAllIntent', ast.kind === 'select' ? ast.selectAllIntent : undefined),
   };
+
   return { ast, metaAdditions };
 }
