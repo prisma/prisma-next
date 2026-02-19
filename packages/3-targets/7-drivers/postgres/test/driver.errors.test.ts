@@ -222,12 +222,10 @@ describe('@prisma-next/driver-postgres', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it('reuses already connected direct client without invoking connect', async () => {
+  it('accepts already connected errors from direct client connect', async () => {
     const client = {
-      _connection: {},
-      _ending: false,
       connect: vi.fn(async () => {
-        throw new Error('connect should not be called');
+        throw new Error('Client is already connected');
       }),
       query: vi.fn(async () => ({ rows: [] })),
       end: vi.fn(async () => {}),
@@ -238,19 +236,15 @@ describe('@prisma-next/driver-postgres', () => {
     await driver.connect({ kind: 'pgClient', client });
     await driver.query('select 1');
 
-    expect(client.connect).not.toHaveBeenCalled();
+    expect(client.connect).toHaveBeenCalledTimes(1);
     expect(client.query).toHaveBeenCalled();
   });
 
   it('calls client.end when closing direct client', async () => {
     const mockClient = {
-      _connection: {},
-      _ending: false,
       connect: vi.fn(async () => {}),
       query: vi.fn(async () => ({ rows: [] })),
-      end: vi.fn(async () => {
-        mockClient._ending = true;
-      }),
+      end: vi.fn(async () => {}),
     };
     const client = mockClient as unknown as Client;
 
@@ -264,8 +258,6 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('normalizes non-Error cursor failures from read callbacks', async () => {
     const client = {
-      _connection: {},
-      _ending: false,
       connect: vi.fn(async () => {}),
       end: vi.fn(async () => {}),
       query: vi.fn((queryArg: unknown) => {
@@ -302,8 +294,6 @@ describe('@prisma-next/driver-postgres', () => {
       },
     );
     const client = {
-      _connection: {},
-      _ending: false,
       connect: vi.fn(async () => {}),
       end: vi.fn(async () => {}),
       query: vi.fn((queryArg: unknown) => {
@@ -341,8 +331,6 @@ describe('@prisma-next/driver-postgres', () => {
     } as unknown as Pool;
 
     const directClient = {
-      _connection: {},
-      _ending: false,
       connect: vi.fn(async () => {}),
       query: vi.fn(async () => ({ rows: [] })),
       end: vi.fn(async () => {}),
@@ -370,8 +358,6 @@ describe('@prisma-next/driver-postgres', () => {
 
   it('releases direct-connection handles without pool release function', async () => {
     const directClient = {
-      _connection: {},
-      _ending: false,
       connect: vi.fn(async () => {}),
       query: vi.fn(async (sql: string) => {
         if (sql === 'BEGIN') {
@@ -391,9 +377,8 @@ describe('@prisma-next/driver-postgres', () => {
     await expect(connection.release()).resolves.toBeUndefined();
   });
 
-  it('skips pool.end when pool is already ended', async () => {
+  it('closes pool once when close is called repeatedly', async () => {
     const pool = {
-      ended: true,
       connect: vi.fn(async () => ({
         query: vi.fn(async () => ({ rows: [] })),
         release: vi.fn(),
@@ -403,14 +388,13 @@ describe('@prisma-next/driver-postgres', () => {
 
     const driver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, { disabled: true });
     await driver.close();
+    await driver.close();
 
-    expect((pool as unknown as { end: ReturnType<typeof vi.fn> }).end).not.toHaveBeenCalled();
+    expect((pool as unknown as { end: ReturnType<typeof vi.fn> }).end).toHaveBeenCalledTimes(1);
   });
 
-  it('skips client.end when direct client is already ending', async () => {
+  it('closes direct client once when close is called repeatedly', async () => {
     const directClient = {
-      _connection: {},
-      _ending: true,
       connect: vi.fn(async () => {}),
       query: vi.fn(async () => ({ rows: [] })),
       end: vi.fn(async () => {}),
@@ -421,28 +405,10 @@ describe('@prisma-next/driver-postgres', () => {
       { disabled: true },
     );
     await driver.close();
+    await driver.close();
 
     expect(
       (directClient as unknown as { end: ReturnType<typeof vi.fn> }).end,
-    ).not.toHaveBeenCalled();
-  });
-
-  it('ignores already connected errors from client.connect', async () => {
-    const directClient = {
-      _connection: undefined,
-      _ending: false,
-      connect: vi.fn(async () => {
-        throw new Error('Client is already connected');
-      }),
-      query: vi.fn(async () => ({ rows: [{ one: 1 }] })),
-      end: vi.fn(async () => {}),
-    } as unknown as Client;
-
-    const driver = createBoundDriverFromBinding(
-      { kind: 'pgClient', client: directClient },
-      { disabled: true },
-    );
-
-    await expect(driver.query('select 1')).resolves.toEqual({ rows: [{ one: 1 }] });
+    ).toHaveBeenCalledTimes(1);
   });
 });

@@ -420,6 +420,40 @@ describe('@prisma-next/driver-postgres', () => {
     );
 
     it(
+      'serializes concurrent acquireConnection calls for direct client',
+      async () => {
+        const db = newDb();
+        const { Client } = db.adapters.createPg();
+        const client = new Client();
+
+        const driver = postgresRuntimeDriverDescriptor.create();
+
+        cleanup = async () => {
+          await driver.close();
+        };
+
+        await driver.connect({ kind: 'pgClient', client: client as unknown as Client });
+        await driver.query('create table items(id serial primary key, name text)');
+
+        const first = await driver.acquireConnection();
+        let secondResolved = false;
+        const secondPromise = driver.acquireConnection().then((connection) => {
+          secondResolved = true;
+          return connection;
+        });
+
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(secondResolved).toBe(false);
+
+        await first.release();
+        const second = await secondPromise;
+        await second.release();
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
       'connection can stream data with execute method',
       async () => {
         const driver = await createMemPoolDriver({ cursor: { disabled: true } });
