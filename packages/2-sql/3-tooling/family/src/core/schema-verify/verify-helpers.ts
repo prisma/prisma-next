@@ -179,19 +179,39 @@ export function verifyForeignKeys(
         children: [],
       });
     } else {
-      // Name differences are ignored for semantic satisfaction.
-      // Names are persisted for deterministic DDL and diagnostics but are not identity.
-      nodes.push({
-        status: 'pass',
-        kind: 'foreignKey',
-        name: `foreignKey(${contractFK.columns.join(', ')})`,
-        contractPath: fkPath,
-        code: '',
-        message: '',
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      });
+      const actionMismatch = hasReferentialActionMismatch(contractFK, matchingFK);
+      if (actionMismatch) {
+        issues.push({
+          kind: 'foreign_key_mismatch',
+          table: tableName,
+          expected: actionMismatch.expected,
+          actual: actionMismatch.actual,
+          message: `Table "${tableName}" foreign key ${contractFK.columns.join(', ')} -> ${contractFK.references.table}: ${actionMismatch.message}`,
+        });
+        nodes.push({
+          status: 'fail',
+          kind: 'foreignKey',
+          name: `foreignKey(${contractFK.columns.join(', ')})`,
+          contractPath: fkPath,
+          code: 'foreign_key_mismatch',
+          message: actionMismatch.message,
+          expected: contractFK,
+          actual: matchingFK,
+          children: [],
+        });
+      } else {
+        nodes.push({
+          status: 'pass',
+          kind: 'foreignKey',
+          name: `foreignKey(${contractFK.columns.join(', ')})`,
+          contractPath: fkPath,
+          code: '',
+          message: '',
+          expected: undefined,
+          actual: undefined,
+          children: [],
+        });
+      }
     }
   }
 
@@ -529,4 +549,30 @@ export function computeCounts(node: SchemaVerificationNode): {
     fail,
     totalNodes: pass + warn + fail,
   };
+}
+
+/**
+ * Compares referential actions between a contract FK and a schema FK.
+ * Only compares when the contract FK explicitly specifies onDelete or onUpdate.
+ * Returns a mismatch descriptor if there's a difference, or undefined if OK.
+ */
+function hasReferentialActionMismatch(
+  contractFK: ForeignKey,
+  schemaFK: SqlForeignKeyIR,
+): { expected: string; actual: string; message: string } | undefined {
+  if (contractFK.onDelete !== undefined && contractFK.onDelete !== schemaFK.onDelete) {
+    return {
+      expected: `onDelete: ${contractFK.onDelete}`,
+      actual: `onDelete: ${schemaFK.onDelete ?? 'undefined'}`,
+      message: `onDelete mismatch: expected ${contractFK.onDelete}, got ${schemaFK.onDelete ?? 'noAction (default)'}`,
+    };
+  }
+  if (contractFK.onUpdate !== undefined && contractFK.onUpdate !== schemaFK.onUpdate) {
+    return {
+      expected: `onUpdate: ${contractFK.onUpdate}`,
+      actual: `onUpdate: ${schemaFK.onUpdate ?? 'undefined'}`,
+      message: `onUpdate mismatch: expected ${contractFK.onUpdate}, got ${schemaFK.onUpdate ?? 'noAction (default)'}`,
+    };
+  }
+  return undefined;
 }
