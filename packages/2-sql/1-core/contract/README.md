@@ -58,6 +58,45 @@ type ForeignKeysConfig = {
 
 When omitted, defaults to `{ constraints: true, indexes: true }`. See [ADR 161](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md) for design rationale.
 
+### Referential Actions
+
+`ForeignKey` supports optional `onDelete` and `onUpdate` fields of type `ReferentialAction`:
+
+```typescript
+type ReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
+
+type ForeignKey = {
+  readonly columns: readonly string[];
+  readonly references: ForeignKeyReferences;
+  readonly name?: string;
+  readonly onDelete?: ReferentialAction;
+  readonly onUpdate?: ReferentialAction;
+};
+```
+
+When omitted, the database applies its default behavior (Postgres: `NO ACTION`). See [ADR 162](../../../docs/architecture%20docs/adrs/ADR%20162%20-%20Referential%20actions%20for%20foreign%20keys.md) for design rationale.
+
+The `fk()` factory accepts referential actions via an options object:
+
+```typescript
+import { fk } from '@prisma-next/sql-contract/factories';
+
+// Simple FK (no referential actions)
+const simple = fk(['userId'], 'user', ['id']);
+
+// FK with onDelete cascade
+const cascading = fk(['userId'], 'user', ['id'], { onDelete: 'cascade' });
+
+// FK with name and both actions
+const named = fk(['userId'], 'user', ['id'], {
+  name: 'post_userId_fkey',
+  onDelete: 'cascade',
+  onUpdate: 'noAction',
+});
+```
+
+**Semantic validation:** `validateStorageSemantics()` rejects `setNull` when the FK column is `NOT NULL` (the database would fail at runtime).
+
 ### Validators
 
 Validate contract structures using Arktype validators:
