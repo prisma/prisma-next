@@ -54,7 +54,15 @@ export async function createTestRuntime(
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    driver: postgresDriver,
+    driver:
+      driverOptions.cursor === undefined
+        ? postgresDriver
+        : {
+            ...postgresDriver,
+            create() {
+              return postgresDriver.create({ cursor: driverOptions.cursor });
+            },
+          },
     extensionPacks: options?.extensionPacks ?? [],
   });
 
@@ -65,15 +73,10 @@ export async function createTestRuntime(
     stack,
   });
 
-  const driverDescriptor = stack.driver;
-  if (!driverDescriptor) {
-    throw new Error('Driver descriptor missing from execution stack');
+  const driver = stackInstance.driver;
+  if (!driver) {
+    throw new Error('Driver missing from execution stack instance');
   }
-
-  const createOpts: PostgresDriverCreateOptions = {
-    cursor: driverOptions.cursor ?? { disabled: true },
-  };
-  const driver = driverDescriptor.create(createOpts);
   const binding = driverOptions.binding;
   try {
     await driver.connect(binding);
