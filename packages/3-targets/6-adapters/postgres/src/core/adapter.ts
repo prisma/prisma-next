@@ -228,7 +228,20 @@ function getColumnCastType(
 ): string | undefined {
   const col = contract.storage.tables[tableName]?.columns[columnName];
   if (!col) return undefined;
-  return expandParameterizedNativeType(col);
+  return quoteCastType(expandParameterizedNativeType(col));
+}
+
+/**
+ * Quotes a SQL type name for use in a `::type` cast if it requires quoting.
+ * Mixed-case identifiers (e.g. enum names like "UserRole") must be quoted to
+ * preserve case in PostgreSQL. Built-in types with parameters (character varying(255),
+ * numeric(10,2)) and array types (int4[]) are always lowercase and don't need quoting.
+ */
+function quoteCastType(typeName: string): string {
+  if (typeName !== typeName.toLowerCase() && !typeName.includes('(') && !typeName.includes('[')) {
+    return `"${typeName}"`;
+  }
+  return typeName;
 }
 
 function renderParam(

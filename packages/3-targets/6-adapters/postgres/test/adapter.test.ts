@@ -1130,6 +1130,206 @@ describe('createPostgresAdapter', () => {
     });
   });
 
+  describe('parameterized type casting', () => {
+    const paramContract = Object.freeze(
+      validateContract<PostgresContract>({
+        target: 'postgres',
+        targetFamily: 'sql' as const,
+        storageHash: 'sha256:test-core',
+        profileHash: 'sha256:test-profile',
+        storage: {
+          tables: {
+            record: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                code: {
+                  codecId: 'sql/char@1',
+                  nativeType: 'character',
+                  nullable: false,
+                  typeParams: { length: 36 },
+                },
+                name: {
+                  codecId: 'sql/varchar@1',
+                  nativeType: 'character varying',
+                  nullable: false,
+                  typeParams: { length: 255 },
+                },
+                price: {
+                  codecId: 'pg/numeric@1',
+                  nativeType: 'numeric',
+                  nullable: true,
+                  typeParams: { precision: 10, scale: 2 },
+                },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        models: {},
+        relations: {},
+        mappings: {},
+      }),
+    );
+
+    it('expands character(N) in INSERT cast', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: InsertAst = {
+        kind: 'insert',
+        table: { kind: 'table', name: 'record' },
+        values: {
+          code: { kind: 'param', index: 1, name: 'code' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: paramContract,
+        params: ['abc-123'],
+      });
+
+      expect(lowered.body.sql).toContain('$1::character(36)');
+    });
+
+    it('expands character varying(N) in INSERT cast', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: InsertAst = {
+        kind: 'insert',
+        table: { kind: 'table', name: 'record' },
+        values: {
+          name: { kind: 'param', index: 1, name: 'name' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: paramContract,
+        params: ['Alice'],
+      });
+
+      expect(lowered.body.sql).toContain('$1::character varying(255)');
+    });
+
+    it('expands numeric(P,S) in UPDATE cast', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: UpdateAst = {
+        kind: 'update',
+        table: { kind: 'table', name: 'record' },
+        set: {
+          price: { kind: 'param', index: 1, name: 'price' },
+        },
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'record', column: 'id' },
+          right: { kind: 'param', index: 2, name: 'id' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: paramContract,
+        params: ['99.99', 1],
+      });
+
+      expect(lowered.body.sql).toContain('$1::numeric(10,2)');
+    });
+  });
+
+  describe('enum type casting', () => {
+    const enumContract = Object.freeze(
+      validateContract<PostgresContract>({
+        target: 'postgres',
+        targetFamily: 'sql' as const,
+        storageHash: 'sha256:test-core',
+        profileHash: 'sha256:test-profile',
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                role: { codecId: 'pg/enum@1', nativeType: 'UserRole', nullable: false },
+                status: { codecId: 'pg/enum@1', nativeType: 'status', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        models: {},
+        relations: {},
+        mappings: {},
+      }),
+    );
+
+    it('casts camelCase enum in INSERT', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: InsertAst = {
+        kind: 'insert',
+        table: { kind: 'table', name: 'user' },
+        values: {
+          id: { kind: 'param', index: 1, name: 'id' },
+          role: { kind: 'param', index: 2, name: 'role' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: enumContract,
+        params: [1, 'ADMIN'],
+      });
+
+      expect(lowered.body.sql).toContain('$2::"UserRole"');
+    });
+
+    it('casts lowercase enum without quoting', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: InsertAst = {
+        kind: 'insert',
+        table: { kind: 'table', name: 'user' },
+        values: {
+          id: { kind: 'param', index: 1, name: 'id' },
+          status: { kind: 'param', index: 2, name: 'status' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: enumContract,
+        params: [1, 'active'],
+      });
+
+      expect(lowered.body.sql).toContain('$2::status');
+    });
+
+    it('casts camelCase enum in UPDATE', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: UpdateAst = {
+        kind: 'update',
+        table: { kind: 'table', name: 'user' },
+        set: {
+          role: { kind: 'param', index: 1, name: 'role' },
+        },
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'user', column: 'id' },
+          right: { kind: 'param', index: 2, name: 'userId' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: enumContract,
+        params: ['MODERATOR', 1],
+      });
+
+      expect(lowered.body.sql).toContain('$1::"UserRole"');
+    });
+  });
+
   describe('literal rendering', () => {
     it('renders array literals', () => {
       const adapter = createPostgresAdapter();
