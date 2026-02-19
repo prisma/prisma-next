@@ -68,11 +68,11 @@ export interface TestRuntime {
 /**
  * Creates a test runtime configured for the prisma-orm-demo stack.
  */
-export function createTestRuntime<TContract extends SqlContract<SqlStorage>>(
+export async function createTestRuntime<TContract extends SqlContract<SqlStorage>>(
   connectionString: string,
   contract: TContract,
   budgetConfig?: { maxRows: number; defaultTableRows: number; tableRows: Record<string, number> },
-): TestRuntime {
+): Promise<TestRuntime> {
   const stack = createSqlExecutionStack({
     target: postgresTargetRuntime,
     adapter: postgresAdapterRuntime,
@@ -89,13 +89,17 @@ export function createTestRuntime<TContract extends SqlContract<SqlStorage>>(
     throw new Error('Driver descriptor missing from execution stack');
   }
   const pool = new Pool({ connectionString });
+  const driver = driverDescriptor.create({ cursor: { disabled: true } });
+  try {
+    await driver.connect({ kind: 'pgPool', pool });
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
   const runtime = createRuntime({
     stackInstance,
     context,
-    driver: driverDescriptor.create({
-      connect: { pool },
-      cursor: { disabled: true },
-    }),
+    driver,
     verify: { mode: 'onFirstUse', requireMarker: false },
     plugins: budgetConfig ? [budgets(budgetConfig)] : [],
   });

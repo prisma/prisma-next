@@ -1,6 +1,9 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import type { PostgresDriverOptions } from '@prisma-next/driver-postgres/runtime';
+import type {
+  PostgresBinding,
+  PostgresDriverCreateOptions,
+} from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Log, Plugin, Runtime, SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
@@ -24,15 +27,20 @@ export interface CreateTestRuntimeOptions {
   readonly log?: Log;
 }
 
+interface IntegrationDriverOptions {
+  readonly binding: PostgresBinding;
+  readonly cursor?: PostgresDriverCreateOptions['cursor'];
+}
+
 /**
  * Creates a runtime with standard test configuration using runtime descriptors.
  * This helper DRYs up the common pattern of runtime creation in tests.
  */
-export function createTestRuntime(
+export async function createTestRuntime(
   contract: SqlContract<SqlStorage>,
-  driverOptions: PostgresDriverOptions,
+  driverOptions: IntegrationDriverOptions,
   options?: CreateTestRuntimeOptions,
-): Runtime {
+): Promise<Runtime> {
   const verify: {
     mode: 'onFirstUse' | 'startup' | 'always';
     requireMarker: boolean;
@@ -46,7 +54,15 @@ export function createTestRuntime(
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    driver: postgresDriver,
+    driver:
+      driverOptions.cursor === undefined
+        ? postgresDriver
+        : {
+            ...postgresDriver,
+            create() {
+              return postgresDriver.create({ cursor: driverOptions.cursor });
+            },
+          },
     extensionPacks: options?.extensionPacks ?? [],
   });
 
@@ -57,15 +73,24 @@ export function createTestRuntime(
     stack,
   });
 
-  const driverDescriptor = stack.driver;
-  if (!driverDescriptor) {
-    throw new Error('Driver descriptor missing from execution stack');
+  const driver = stackInstance.driver;
+  if (!driver) {
+    throw new Error('Driver missing from execution stack instance');
+  }
+  const binding = driverOptions.binding;
+  try {
+    await driver.connect(binding);
+  } catch (error) {
+    if (binding.kind === 'pgPool') {
+      await binding.pool.end();
+    }
+    throw error;
   }
 
   return createRuntime({
     stackInstance,
     context,
-    driver: driverDescriptor.create(driverOptions),
+    driver,
     verify,
     ...(options?.plugins ? { plugins: options.plugins } : {}),
     ...(options?.mode ? { mode: options.mode } : {}),
@@ -77,15 +102,15 @@ export function createTestRuntime(
  * Creates a runtime with the given contract and database client using runtime descriptors.
  * This helper DRYs up the common pattern of runtime creation in e2e tests.
  */
-export function createTestRuntimeFromClient(
+export async function createTestRuntimeFromClient(
   contract: SqlContract<SqlStorage>,
   client: Client,
   options?: CreateTestRuntimeOptions,
-): Runtime {
+): Promise<Runtime> {
   return createTestRuntime(
     contract,
     {
-      connect: { client },
+      binding: { kind: 'pgClient', client },
       cursor: { disabled: true },
     },
     {

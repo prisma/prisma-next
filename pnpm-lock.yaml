@@ -1588,6 +1588,9 @@ importers:
       '@prisma-next/target-postgres':
         specifier: workspace:*
         version: link:../../3-targets/postgres
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/shared/utils
       pg:
         specifier: 'catalog:'
         version: 8.16.3

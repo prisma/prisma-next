@@ -18,7 +18,7 @@ One-liner lazy Postgres client for Prisma Next runtime composition.
 - `db.context`
 - `db.stack`
 
-Runtime and connection resources are deferred until `db.runtime()` is called.
+Runtime and connection resources are deferred until `await db.runtime()` is called. The getter returns `Promise<Runtime>`.
 
 When URL binding is used, pool timeouts are configurable via `poolOptions`:
 
@@ -30,8 +30,9 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - Build a static Postgres execution stack from target, adapter, and driver descriptors
 - Build static query roots from the execution context
 - Normalize runtime binding input (`binding`, `url`, `pg`)
-- Lazily instantiate runtime resources on first `db.runtime()` call
-- Memoize runtime so repeated `db.runtime()` calls return one instance
+- Lazily instantiate stack and driver on first `await db.runtime()` call
+- Connect driver with resolved binding before creating runtime
+- Memoize runtime so repeated `await db.runtime()` calls return one instance
 
 ## Dependencies
 
@@ -44,7 +45,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - `@prisma-next/sql-relational-core` for `schema(...)`
 - `@prisma-next/sql-orm-lane` for `orm(...)`
 - `@prisma-next/sql-contract` for `validateContract(...)` and contract types
-- `pg` for lazy `Pool` construction when using URL binding
+- `pg` for binding validation when using `pg` (Pool or Client) input
 
 ## Architecture
 
@@ -56,9 +57,9 @@ flowchart TD
 
     Lazy --> Instantiate[instantiateExecutionStack]
     Lazy --> Bind[Resolve binding: url or pg]
-    Bind --> Pool[pg.Pool for url binding]
-    Bind --> Reuse[Reuse Pool or Client for pg binding]
-    Lazy --> Runtime[createRuntime]
+    Bind --> Assert[Assert stackInstance.driver]
+    Assert --> Connect[driver.connect binding]
+    Connect --> Runtime[createRuntime]
 
     Runtime --> Target[@prisma-next/target-postgres]
     Runtime --> Adapter[@prisma-next/adapter-postgres]

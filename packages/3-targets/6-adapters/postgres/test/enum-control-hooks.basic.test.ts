@@ -1,5 +1,6 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { timeouts } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import { parsePostgresArray, pgEnumControlHooks } from '../src/core/enum-control-hooks';
@@ -250,90 +251,94 @@ describe('pgEnumControlHooks.planTypeOperations', () => {
     ]);
   });
 
-  it('rebuilds enum when values are reordered', () => {
-    const contract = createTestContract({
-      tables: {
-        user: {
-          columns: {
-            role: {
-              codecId: ENUM_CODEC_ID,
-              nativeType: 'role',
-              nullable: false,
-              typeRef: 'Role',
+  it(
+    'rebuilds enum when values are reordered',
+    () => {
+      const contract = createTestContract({
+        tables: {
+          user: {
+            columns: {
+              role: {
+                codecId: ENUM_CODEC_ID,
+                nativeType: 'role',
+                nullable: false,
+                typeRef: 'Role',
+              },
+              altRole: {
+                codecId: ENUM_CODEC_ID,
+                nativeType: 'role',
+                nullable: false,
+              },
             },
-            altRole: {
-              codecId: ENUM_CODEC_ID,
-              nativeType: 'role',
-              nullable: false,
-            },
+            primaryKey: { columns: ['role'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['role'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
-      },
-      types: {
-        Role: {
+        types: {
+          Role: {
+            codecId: ENUM_CODEC_ID,
+            nativeType: 'role',
+            typeParams: { values: ['B', 'A'] },
+          },
+        },
+      });
+
+      const schema = createTestSchema({
+        role: {
+          codecId: ENUM_CODEC_ID,
+          nativeType: 'role',
+          typeParams: { values: ['A', 'B'] },
+        },
+      });
+
+      const result = pgEnumControlHooks.planTypeOperations?.({
+        typeName: 'Role',
+        typeInstance: {
           codecId: ENUM_CODEC_ID,
           nativeType: 'role',
           typeParams: { values: ['B', 'A'] },
         },
-      },
-    });
+        contract,
+        schema,
+        schemaName: 'public',
+        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      });
 
-    const schema = createTestSchema({
-      role: {
-        codecId: ENUM_CODEC_ID,
-        nativeType: 'role',
-        typeParams: { values: ['A', 'B'] },
-      },
-    });
-
-    const result = pgEnumControlHooks.planTypeOperations?.({
-      typeName: 'Role',
-      typeInstance: {
-        codecId: ENUM_CODEC_ID,
-        nativeType: 'role',
-        typeParams: { values: ['B', 'A'] },
-      },
-      contract,
-      schema,
-      schemaName: 'public',
-      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
-    });
-
-    expect(result?.operations).toHaveLength(1);
-    const operation = result?.operations[0];
-    expect(operation).toMatchObject({
-      id: 'type.Role.rebuild',
-      operationClass: 'destructive',
-    });
-    // Verify execute steps include orphan cleanup and all rebuild steps
-    expect(operation?.execute).toEqual(
-      expect.arrayContaining([
-        // First: clean up any orphaned temp type from failed previous migrations
-        expect.objectContaining({
-          sql: 'DROP TYPE IF EXISTS "public"."role__pn_rebuild"',
-        }),
-        expect.objectContaining({
-          sql: 'CREATE TYPE "public"."role__pn_rebuild" AS ENUM (\'B\', \'A\')',
-        }),
-        expect.objectContaining({
-          sql: expect.stringContaining('ALTER TABLE "public"."user"'),
-        }),
-        expect.objectContaining({
-          sql: expect.stringContaining('ALTER COLUMN "altRole"'),
-        }),
-        expect.objectContaining({
-          sql: 'DROP TYPE "public"."role"',
-        }),
-        expect.objectContaining({
-          sql: 'ALTER TYPE "public"."role__pn_rebuild" RENAME TO "role"',
-        }),
-      ]),
-    );
-  });
+      expect(result?.operations).toHaveLength(1);
+      const operation = result?.operations[0];
+      expect(operation).toMatchObject({
+        id: 'type.Role.rebuild',
+        operationClass: 'destructive',
+      });
+      // Verify execute steps include orphan cleanup and all rebuild steps
+      expect(operation?.execute).toEqual(
+        expect.arrayContaining([
+          // First: clean up any orphaned temp type from failed previous migrations
+          expect.objectContaining({
+            sql: 'DROP TYPE IF EXISTS "public"."role__pn_rebuild"',
+          }),
+          expect.objectContaining({
+            sql: 'CREATE TYPE "public"."role__pn_rebuild" AS ENUM (\'B\', \'A\')',
+          }),
+          expect.objectContaining({
+            sql: expect.stringContaining('ALTER TABLE "public"."user"'),
+          }),
+          expect.objectContaining({
+            sql: expect.stringContaining('ALTER COLUMN "altRole"'),
+          }),
+          expect.objectContaining({
+            sql: 'DROP TYPE "public"."role"',
+          }),
+          expect.objectContaining({
+            sql: 'ALTER TYPE "public"."role__pn_rebuild" RENAME TO "role"',
+          }),
+        ]),
+      );
+    },
+    timeouts.databaseOperation,
+  );
 
   it('throws when enum value exceeds length limit', () => {
     const longValue = 'a'.repeat(64);
