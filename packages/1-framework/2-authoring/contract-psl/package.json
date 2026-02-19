@@ -35,7 +35,6 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma/prisma-schema-wasm": "7.4.0-20.ab56fe763f921d033a6c195e7ddeb3e255bdbb57",
-    "pathe": "^2.0.3",
-    "prisma": "7.4.0"
+    "pathe": "^2.0.3"
   }
 }

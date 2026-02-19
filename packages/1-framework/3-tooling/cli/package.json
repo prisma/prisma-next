@@ -68,14 +68,6 @@
       "types": "./dist/commands/db-introspect.d.mts",
       "import": "./dist/commands/db-introspect.mjs"
     },
-    "./commands/db-pull": {
-      "types": "./dist/commands/db-pull.d.mts",
-      "import": "./dist/commands/db-pull.mjs"
-    },
-    "./commands/db-push": {
-      "types": "./dist/commands/db-push.d.mts",
-      "import": "./dist/commands/db-push.mjs"
-    },
     "./commands/db-schema-verify": {
       "types": "./dist/commands/db-schema-verify.d.mts",
       "import": "./dist/commands/db-schema-verify.mjs"

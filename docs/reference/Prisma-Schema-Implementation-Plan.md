@@ -2,14 +2,14 @@
 
 ## Goal
 
-Enable Prisma Next to ingest `.prisma` schemas, emit correct contracts, push schema structure to databases with Prisma 7 parity, and introspect databases back into formatted `.prisma` output.
+Enable Prisma Next to ingest `.prisma` schemas, emit correct contracts, and apply/verify schemas using Prisma Next-native database flows (no Prisma engines).
 
 ## Success Criteria
 
 1. `config.contract.source` can be a Prisma schema file or inline PSL.
 2. `prisma-next contract emit` produces `contract.json`/`contract.d.ts` from `.prisma`.
-3. `prisma-next db push` creates the same database structure Prisma 7 `prisma db push` would create.
-4. `prisma-next db pull` prints Prisma-formatted schema output equivalent in behavior to Prisma 7 `prisma db pull --print`.
+3. `prisma-next db init` applies the emitted contract to an empty database.
+4. `prisma-next db schema-verify` and `prisma-next db introspect` validate and inspect the resulting live schema.
 5. Unsupported contract-representation areas are explicitly tracked, tested, and documented.
 
 ## Plan
@@ -18,7 +18,7 @@ Enable Prisma Next to ingest `.prisma` schemas, emit correct contracts, push sch
 
 - [x] Add `.prisma` schema source loading from path or inline text.
 - [x] Add Prisma 7 schema sanitizer for datasource URL keys.
-- [x] Integrate Prisma 7 internals parser (`getConfig`, `getDMMF`).
+- [x] Integrate Prisma schema WASM parser (`get_config`, `get_dmmf`) without Prisma internals.
 
 ### Phase 2: Contract Conversion
 
@@ -31,14 +31,13 @@ Enable Prisma Next to ingest `.prisma` schemas, emit correct contracts, push sch
 
 - [x] Extend `contract emit` source resolution to support `.prisma`.
 - [x] Add CLI helpers for Prisma schema source detection.
-- [x] Add `db push` command backed by Prisma CLI.
-- [x] Add `db pull` command backed by Prisma CLI.
+- [x] Validate `.prisma` flow through native `db init` + `db schema-verify` + `db introspect` commands.
 
 ### Phase 4: Parity and Validation
 
-- [x] Add integration tests for emit/push/pull `.prisma` workflows against real Postgres.
-- [x] Assert relational parity indicators (tables, FK actions, index ordering) after push.
-- [x] Assert pull output includes expected formatted schema blocks.
+- [x] Add integration tests for emit/init/verify/introspect `.prisma` workflows against real Postgres.
+- [x] Assert relational structure indicators (tables, FKs, indexes) after `db init`.
+- [x] Assert schema verification and introspection output contains expected structures.
 
 ### Phase 5: Real-World Schema Coverage
 
@@ -49,7 +48,7 @@ Enable Prisma Next to ingest `.prisma` schemas, emit correct contracts, push sch
 
 - [x] Document architecture and command behavior.
 - [x] Publish parity/gap matrix for unsupported or partial features.
-- [x] Add command docs links for `db push` and `db pull`.
+- [x] Add command docs links for native `db introspect` and `db schema-verify`.
 
 ## Remaining Backlog
 
@@ -60,4 +59,3 @@ Items intentionally deferred to dedicated follow-up work:
 - Broader provider support beyond `postgresql`.
 
 See `docs/reference/Prisma-Schema-Parity-and-Gaps.md`.
-

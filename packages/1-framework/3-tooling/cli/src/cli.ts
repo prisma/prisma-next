@@ -2,8 +2,6 @@ import { Command } from 'commander';
 import { createContractEmitCommand } from './commands/contract-emit';
 import { createDbInitCommand } from './commands/db-init';
 import { createDbIntrospectCommand } from './commands/db-introspect';
-import { createDbPullCommand } from './commands/db-pull';
-import { createDbPushCommand } from './commands/db-push';
 import { createDbSchemaVerifyCommand } from './commands/db-schema-verify';
 import { createDbSignCommand } from './commands/db-sign';
 import { createDbVerifyCommand } from './commands/db-verify';
@@ -180,14 +178,6 @@ dbCommand.addCommand(dbInitCommand);
 // Add introspect subcommand to db
 const dbIntrospectCommand = createDbIntrospectCommand();
 dbCommand.addCommand(dbIntrospectCommand);
-
-// Add push subcommand to db
-const dbPushCommand = createDbPushCommand();
-dbCommand.addCommand(dbPushCommand);
-
-// Add pull subcommand to db
-const dbPullCommand = createDbPullCommand();
-dbCommand.addCommand(dbPullCommand);
 
 // Add schema-verify subcommand to db
 const dbSchemaVerifyCommand = createDbSchemaVerifyCommand();

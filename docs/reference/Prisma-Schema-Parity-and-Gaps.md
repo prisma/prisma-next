@@ -5,16 +5,18 @@
 This document tracks `.prisma` feature support in Prisma Next for:
 
 - Contract emission (`contract emit` from `.prisma`)
-- Schema apply parity (`db push`)
-- Database introspection parity (`db pull`)
+- Native schema apply (`db init`)
+- Native schema inspection (`db introspect`)
+- Native schema verification (`db schema-verify`)
 
 ## Current Status
 
 ### Fully covered paths
 
-- Prisma PSL parsing compatibility: delegated to Prisma 7 parser/CLI.
-- Database schema application parity: delegated to Prisma 7 `db push`.
-- Database introspection formatting parity: delegated to Prisma 7 `db pull --print`.
+- Prisma PSL parsing compatibility: delegated to Prisma schema WASM parser.
+- Database schema application through Prisma Next-native `db init` migration planning/execution.
+- Database schema inspection through Prisma Next-native `db introspect`.
+- Database schema verification through Prisma Next-native `db schema-verify`.
 
 ### Contract conversion (partial/lossy areas)
 
@@ -34,11 +36,12 @@ The conversion layer currently emits warnings in `contract.meta.prismaPsl.missin
 
 ### Migration-system implications
 
-Current Prisma Next migration operations cannot yet recreate every structure that Prisma can create via `db push`. Notable examples:
+Current Prisma Next migration operations cannot yet recreate every structure expressible in PSL. Notable examples:
 
 - Advanced index variants/options listed above.
 - Structures requiring richer contract metadata than current storage schema exposes.
 - Feature classes currently tracked as missing by converter metadata.
+- Prisma-style formatted PSL output from introspection (`prisma db pull --print` equivalent) is not yet available via native commands.
 
 Where unsupported, the system reports gaps instead of silently claiming parity.
 

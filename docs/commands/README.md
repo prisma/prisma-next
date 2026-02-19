@@ -13,6 +13,5 @@ The canonical, always-up-to-date command documentation lives in:
 These pages are intentionally thin and primarily exist to provide stable, user-facing anchors in `docs/`:
 
 - `db init`: `docs/commands/db-init.md`
-- `db push`: `docs/commands/db-push.md`
-- `db pull`: `docs/commands/db-pull.md`
-
+- `db introspect`: `docs/commands/db-introspect.md`
+- `db schema-verify`: `docs/commands/db-schema-verify.md`

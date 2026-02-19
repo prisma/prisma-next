@@ -416,76 +416,15 @@ The SQL family provides this via `@prisma-next/family-sql/control`. The `introsp
 
 **Note:** The introspection output displays native database types (e.g., `int4`, `text`, `timestamptz`) rather than mapped codec IDs (e.g., `pg/int4@1`). This reflects the actual database state, which may be enriched with type mappings later.
 
-### `prisma-next db push`
+### Native `.prisma` workflow (no Prisma engines)
 
-Apply a Prisma schema file to a database using Prisma 7 `db push` semantics.
+Prisma Next supports `.prisma` authoring without `db push`/`db pull` command wrappers.
 
-**Command:**
-```bash
-prisma-next db push [--schema <path>] [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
-```
+Use this flow:
 
-Options:
-- `--schema <path>`: Optional schema path. If omitted, resolves from `config.contract.source` when that source is a `.prisma` path
-- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
-- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
-- `--json`: Output as JSON object
-- `-q, --quiet`: Quiet mode (errors only)
-- `-v, --verbose`: Verbose output (debug info, timings)
-- `-vv, --trace`: Trace output (deep internals, stack traces)
-- `--timestamps`: Add timestamps to output
-- `--color/--no-color`: Force/disable color output
-
-Examples:
-```bash
-# Use Prisma schema path from config.contract.source
-prisma-next db push
-
-# Override schema path
-prisma-next db push --schema ./prisma/schema.prisma
-
-# Override db URL and emit JSON
-prisma-next db push --db postgresql://user:pass@localhost/db --json
-```
-
-Behavior notes:
-- Uses Prisma CLI internally (`prisma db push`), so schema-apply behavior aligns with Prisma 7.
-- Sanitizes datasource URL fields before invoking Prisma 7 parser/CLI to support existing schema files.
-- Intended for `.prisma` workflows; for contract-driven apply, continue to use `db init` and migration flows.
-
-### `prisma-next db pull`
-
-Introspect a database and print Prisma-formatted schema text using Prisma 7 `db pull --print`.
-
-**Command:**
-```bash
-prisma-next db pull [--schema <path>] [--db <url>] [--config <path>] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
-```
-
-Options:
-- `--schema <path>`: Optional schema path. If omitted, resolves from `config.contract.source` when that source is a `.prisma` path
-- `--db <url>`: Database connection string (optional; defaults to `config.db.connection` if set)
-- `--config <path>`: Optional. Path to `prisma-next.config.ts` (defaults to `./prisma-next.config.ts` if present)
-- `--json`: Output as JSON object (`schema` field contains introspected PSL text)
-- `-q, --quiet`: Quiet mode (errors only)
-- `-v, --verbose`: Verbose output (debug info, timings)
-- `-vv, --trace`: Trace output (deep internals, stack traces)
-- `--timestamps`: Add timestamps to output
-- `--color/--no-color`: Force/disable color output
-
-Examples:
-```bash
-# Pull using schema path from config
-prisma-next db pull
-
-# Pull using explicit schema and db URL
-prisma-next db pull --schema ./prisma/schema.prisma --db postgresql://user:pass@localhost/db
-```
-
-Behavior notes:
-- Uses Prisma CLI internally (`prisma db pull --print`) for output and formatting parity.
-- Prints the introspected schema to stdout in human-readable mode.
-- In JSON mode, returns a structured envelope with the introspected schema text.
+1. `prisma-next contract emit` to convert `.prisma` input into contract artifacts.
+2. `prisma-next db init` to apply the emitted contract to the database.
+3. `prisma-next db schema-verify` and `prisma-next db introspect` to validate and inspect the live schema.
 
 ### `prisma-next db sign`
 
