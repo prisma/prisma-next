@@ -26,7 +26,7 @@ export type PostgresBinding =
   | { readonly kind: 'pgPool'; readonly pool: PoolType }
   | { readonly kind: 'pgClient'; readonly client: Client };
 
-export interface PostgresDriverOptions {
+interface PostgresDriverOptions {
   readonly connect: { client: Client } | { pool: PoolType };
   readonly cursor?:
     | {
@@ -36,14 +36,7 @@ export interface PostgresDriverOptions {
     | undefined;
 }
 
-export interface PostgresDriverCreateOptions {
-  readonly cursor?:
-    | {
-        readonly batchSize?: number;
-        readonly disabled?: boolean;
-      }
-    | undefined;
-}
+export type PostgresDriverCreateOptions = Omit<PostgresDriverOptions, 'connect'>;
 
 const DEFAULT_BATCH_SIZE = 100;
 
