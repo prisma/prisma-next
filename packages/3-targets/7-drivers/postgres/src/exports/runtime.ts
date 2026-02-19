@@ -23,80 +23,122 @@ const USE_BEFORE_CONNECT_MESSAGE =
   'Postgres driver not connected. Call connect(binding) before acquireConnection or execute.';
 const ALREADY_CONNECTED_MESSAGE =
   'Postgres driver already connected. Call close() before reconnecting with a new binding.';
-const EXPLAIN_NOT_SUPPORTED_MESSAGE =
-  'Postgres driver does not support explain() for this binding.';
+
+interface DriverRuntimeError extends Error {
+  readonly code: 'DRIVER.NOT_CONNECTED' | 'DRIVER.ALREADY_CONNECTED';
+  readonly category: 'RUNTIME';
+  readonly severity: 'error';
+  readonly details?: Record<string, unknown>;
+}
+
+function driverError(
+  code: DriverRuntimeError['code'],
+  message: string,
+  details?: Record<string, unknown>,
+): DriverRuntimeError {
+  const error = new Error(message) as DriverRuntimeError;
+  Object.defineProperty(error, 'name', {
+    value: 'RuntimeError',
+    configurable: true,
+  });
+  return Object.assign(error, {
+    code,
+    category: 'RUNTIME' as const,
+    severity: 'error' as const,
+    message,
+    details,
+  });
+}
+
+function unboundExecute<Row>(): AsyncIterable<Row> {
+  return {
+    [Symbol.asyncIterator]() {
+      return {
+        async next() {
+          throw driverError('DRIVER.NOT_CONNECTED', USE_BEFORE_CONNECT_MESSAGE);
+        },
+      };
+    },
+  };
+}
 
 class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
   readonly familyId = 'sql' as const;
   readonly targetId = 'postgres' as const;
 
   #delegate: SqlDriver<PostgresBinding> | null = null;
+  #closed = false;
   #cursorOpts: PostgresDriverCreateOptions['cursor'];
 
   constructor(cursorOpts?: PostgresDriverCreateOptions['cursor']) {
     this.#cursorOpts = cursorOpts;
   }
 
+  get state(): 'unbound' | 'connected' | 'closed' {
+    if (this.#delegate !== null) {
+      return 'connected';
+    }
+    if (this.#closed) {
+      return 'closed';
+    }
+    return 'unbound';
+  }
+
+  #requireDelegate(): SqlDriver<PostgresBinding> {
+    const delegate = this.#delegate;
+    if (delegate === null) {
+      throw driverError('DRIVER.NOT_CONNECTED', USE_BEFORE_CONNECT_MESSAGE);
+    }
+    return delegate;
+  }
+
   async connect(binding: PostgresBinding): Promise<void> {
     if (this.#delegate !== null) {
-      throw new Error(ALREADY_CONNECTED_MESSAGE);
+      throw driverError('DRIVER.ALREADY_CONNECTED', ALREADY_CONNECTED_MESSAGE, {
+        bindingKind: binding.kind,
+      });
     }
     this.#delegate = createBoundDriverFromBinding(binding, this.#cursorOpts);
+    this.#closed = false;
   }
 
   async acquireConnection(): Promise<SqlConnection> {
-    if (this.#delegate === null) {
-      throw new Error(USE_BEFORE_CONNECT_MESSAGE);
-    }
-    return this.#delegate.acquireConnection();
+    const delegate = this.#requireDelegate();
+    return delegate.acquireConnection();
   }
 
   async close(): Promise<void> {
-    if (this.#delegate !== null) {
-      await this.#delegate.close();
+    const delegate = this.#delegate;
+    if (delegate !== null) {
       this.#delegate = null;
+      await delegate.close();
     }
+    this.#closed = true;
   }
 
   execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
-    if (this.#delegate === null) {
-      return {
-        [Symbol.asyncIterator]() {
-          return {
-            async next() {
-              throw new Error(USE_BEFORE_CONNECT_MESSAGE);
-            },
-            async return() {
-              return { done: true, value: undefined };
-            },
-            async throw(error?: unknown) {
-              throw error ?? new Error(USE_BEFORE_CONNECT_MESSAGE);
-            },
-          };
-        },
-      };
+    const delegate = this.#delegate;
+    if (delegate === null) {
+      return unboundExecute<Row>();
     }
-    return this.#delegate.execute<Row>(request);
+    return delegate.execute<Row>(request);
   }
 
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
-    if (this.#delegate === null) {
-      throw new Error(USE_BEFORE_CONNECT_MESSAGE);
+    const delegate = this.#requireDelegate();
+    const explain = delegate.explain;
+    if (explain === undefined) {
+      throw driverError('DRIVER.NOT_CONNECTED', USE_BEFORE_CONNECT_MESSAGE);
     }
-    if (this.#delegate.explain === undefined) {
-      throw new Error(EXPLAIN_NOT_SUPPORTED_MESSAGE);
-    }
-    return this.#delegate.explain(request);
+    return explain.call(delegate, request);
   }
 
   async query<Row = Record<string, unknown>>(
     sql: string,
     params?: readonly unknown[],
   ): Promise<SqlQueryResult<Row>> {
-    if (this.#delegate === null) {
-      throw new Error(USE_BEFORE_CONNECT_MESSAGE);
-    }
-    return this.#delegate.query<Row>(sql, params);
+    const delegate = this.#requireDelegate();
+    return delegate.query<Row>(sql, params);
   }
 }
 

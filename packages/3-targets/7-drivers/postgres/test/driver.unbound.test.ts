@@ -48,26 +48,65 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
 
     it('throws when acquireConnection is called', async () => {
       const driver = createDriver();
-      await expect(driver.acquireConnection()).rejects.toThrow(useBeforeConnectMessage);
+      await expect(driver.acquireConnection()).rejects.toMatchObject({
+        code: 'DRIVER.NOT_CONNECTED',
+        category: 'RUNTIME',
+        message: useBeforeConnectMessage,
+      });
     });
 
     it('throws when query is called', async () => {
       const driver = createDriver();
-      await expect(driver.query('select 1')).rejects.toThrow(useBeforeConnectMessage);
+      await expect(driver.query('select 1')).rejects.toMatchObject({
+        code: 'DRIVER.NOT_CONNECTED',
+        category: 'RUNTIME',
+        message: useBeforeConnectMessage,
+      });
     });
 
     it('throws when execute is iterated', async () => {
       const driver = createDriver();
       const iter = driver.execute({ sql: 'select 1' });
       const iterator = iter[Symbol.asyncIterator]();
-      await expect(iterator.next()).rejects.toThrow(useBeforeConnectMessage);
+      await expect(iterator.next()).rejects.toMatchObject({
+        code: 'DRIVER.NOT_CONNECTED',
+        category: 'RUNTIME',
+        message: useBeforeConnectMessage,
+      });
     });
 
     it('throws when explain is called', async () => {
       const driver = createDriver();
       expect(driver.explain).toBeDefined();
-      await expect(driver.explain!({ sql: 'select 1' })).rejects.toThrow(useBeforeConnectMessage);
+      await expect(driver.explain!({ sql: 'select 1' })).rejects.toMatchObject({
+        code: 'DRIVER.NOT_CONNECTED',
+        category: 'RUNTIME',
+        message: useBeforeConnectMessage,
+      });
     });
+
+    it(
+      'exposes state transitions across connect close reconnect',
+      async () => {
+        const db = newDb();
+        const { Pool: MemPool } = db.adapters.createPg();
+        const poolA = new MemPool();
+        const poolB = new MemPool();
+
+        const driver = createDriver();
+        expect(driver.state).toBe('unbound');
+
+        await driver.connect({ kind: 'pgPool', pool: poolA as unknown as Pool });
+        expect(driver.state).toBe('connected');
+
+        await driver.close();
+        expect(driver.state).toBe('closed');
+
+        await driver.connect({ kind: 'pgPool', pool: poolB as unknown as Pool });
+        expect(driver.state).toBe('connected');
+      },
+      timeouts.spinUpPpgDev,
+    );
 
     describe('when connected with pgPool binding', () => {
       it(
@@ -103,9 +142,12 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
           const binding = { kind: 'pgPool' as const, pool: memPool as unknown as Pool };
 
           await driver.connect(binding);
-          await expect(driver.connect(binding)).rejects.toThrow(
-            'Postgres driver already connected. Call close() before reconnecting with a new binding.',
-          );
+          await expect(driver.connect(binding)).rejects.toMatchObject({
+            code: 'DRIVER.ALREADY_CONNECTED',
+            category: 'RUNTIME',
+            message:
+              'Postgres driver already connected. Call close() before reconnecting with a new binding.',
+          });
 
           await driver.query('create table items(id serial primary key, name text)');
           const result = await driver.query<{ id: number; name: string }>(
