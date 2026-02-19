@@ -26,7 +26,11 @@ function createTestDriver(connectionString: string, executionStack: (typeof db)[
     throw new Error('Driver descriptor missing from execution stack');
   }
   const pool = new Pool({ connectionString });
-  return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+  const driver = driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+  if ('connect' in driver && typeof driver.connect === 'function') {
+    void driver.connect({ kind: 'pgPool', pool });
+  }
+  return driver;
 }
 
 function getRuntime(connectionString: string): Runtime {
