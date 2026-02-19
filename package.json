@@ -44,6 +44,7 @@
     "gray-matter": "catalog:",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
+    "tsx": "^4.20.6",
     "turbo": "^2.6.1",
     "typescript": "catalog:",
     "vitest": "catalog:"

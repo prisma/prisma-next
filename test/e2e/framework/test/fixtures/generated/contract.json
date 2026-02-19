@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:2757b7954c4cdf19fbd72a0db818c34b2e342ce63e756d546c8bd907d302b7f4",
+  "storageHash": "sha256:71579d801236bc6056f21fed2e23443e646b53d1d475df1342ee50408ddd323b",
   "executionHash": "sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589",
   "profileHash": "sha256:c7dbcc5e3a05e240eb2cd7ba6216ac54390d96622752612f95012025da7d6f61",
   "models": {
@@ -39,11 +39,46 @@
         },
         "name": {
           "column": "name"
+        },
+        "scheduledAt": {
+          "column": "scheduled_at"
         }
       },
       "relations": {},
       "storage": {
         "table": "event"
+      }
+    },
+    "LiteralDefaults": {
+      "fields": {
+        "active": {
+          "column": "active"
+        },
+        "bigCount": {
+          "column": "big_count"
+        },
+        "id": {
+          "column": "id"
+        },
+        "label": {
+          "column": "label"
+        },
+        "metadata": {
+          "column": "metadata"
+        },
+        "rating": {
+          "column": "rating"
+        },
+        "score": {
+          "column": "score"
+        },
+        "tags": {
+          "column": "tags"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "literal_defaults"
       }
     },
     "Post": {
@@ -153,12 +188,116 @@
             "nullable": false
           },
           "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text"
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "typeParams": {
+              "length": 36
+            }
           },
           "name": {
             "codecId": "pg/text@1",
             "nativeType": "text"
+          },
+          "scheduled_at": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "kind": "literal",
+              "value": "2024-01-15T10:30:00.000Z"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "literal_defaults": {
+        "columns": {
+          "active": {
+            "codecId": "pg/bool@1",
+            "default": {
+              "kind": "literal",
+              "value": true
+            },
+            "nativeType": "bool",
+            "nullable": false
+          },
+          "big_count": {
+            "codecId": "pg/int8@1",
+            "default": {
+              "kind": "literal",
+              "value": {
+                "$type": "bigint",
+                "value": "9007199254740993"
+              }
+            },
+            "nativeType": "int8",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "default": {
+              "expression": "autoincrement()",
+              "kind": "function"
+            },
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "label": {
+            "codecId": "pg/text@1",
+            "default": {
+              "kind": "literal",
+              "value": "draft"
+            },
+            "nativeType": "text",
+            "nullable": false
+          },
+          "metadata": {
+            "codecId": "pg/jsonb@1",
+            "default": {
+              "kind": "literal",
+              "value": {
+                "key": "default"
+              }
+            },
+            "nativeType": "jsonb",
+            "nullable": false
+          },
+          "rating": {
+            "codecId": "pg/float8@1",
+            "default": {
+              "kind": "literal",
+              "value": 3.14
+            },
+            "nativeType": "float8",
+            "nullable": false
+          },
+          "score": {
+            "codecId": "pg/int4@1",
+            "default": {
+              "kind": "literal",
+              "value": 0
+            },
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "tags": {
+            "codecId": "pg/jsonb@1",
+            "default": {
+              "kind": "literal",
+              "value": [
+                "alpha",
+                "beta"
+              ]
+            },
+            "nativeType": "jsonb",
+            "nullable": false
           }
         },
         "foreignKeys": [],

@@ -1,4 +1,13 @@
-import type { ModelDefinition, SqlContract, SqlMappings, SqlStorage } from './types';
+import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
+import { isTaggedBigInt } from '@prisma-next/contract/types';
+import type {
+  ModelDefinition,
+  SqlContract,
+  SqlMappings,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+} from './types';
 import { validateSqlContract } from './validators';
 
 type ResolvedMappings = {
@@ -195,6 +204,14 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
       }
     }
 
+    for (const [colName, column] of Object.entries(table.columns)) {
+      if (!column.nullable && column.default?.kind === 'literal' && column.default.value === null) {
+        throw new Error(
+          `Table "${tableName}" column "${colName}" is NOT NULL but has a literal null default`,
+        );
+      }
+    }
+
     for (const fk of table.foreignKeys) {
       for (const colName of fk.columns) {
         if (!columnNames.has(colName)) {
@@ -229,6 +246,104 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
       }
     }
   }
+}
+
+const TEMPORAL_NATIVE_TYPES = new Set([
+  'timestamp',
+  'timestamptz',
+  'timestamp without time zone',
+  'timestamp with time zone',
+  'date',
+]);
+
+export function isTemporalColumn(column: StorageColumn): boolean {
+  const nativeType = column.nativeType?.toLowerCase() ?? '';
+  if (TEMPORAL_NATIVE_TYPES.has(nativeType)) return true;
+  const codecId = column.codecId?.toLowerCase() ?? '';
+  return codecId.includes('timestamp') || codecId.includes('timestamptz') || codecId === 'date';
+}
+
+export function decodeDefaultLiteralValue(
+  value: ColumnDefaultLiteralInputValue,
+  column: StorageColumn,
+  tableName: string,
+  columnName: string,
+): ColumnDefaultLiteralInputValue {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (isTaggedBigInt(value)) {
+    try {
+      return BigInt(value.value);
+    } catch {
+      throw new Error(
+        `Invalid tagged bigint for default value on "${tableName}.${columnName}": "${value.value}" is not a valid integer`,
+      );
+    }
+  }
+  if (isTemporalColumn(column) && typeof value === 'string') {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error(
+        `Invalid ISO date string for default value on "${tableName}.${columnName}": "${value}"`,
+      );
+    }
+    return parsed;
+  }
+  return value;
+}
+
+export function decodeContractDefaults<T extends SqlContract<SqlStorage>>(contract: T): T {
+  const tables = contract.storage.tables;
+  let tablesChanged = false;
+  const decodedTables: Record<string, StorageTable> = {};
+
+  for (const [tableName, table] of Object.entries(tables)) {
+    let columnsChanged = false;
+    const decodedColumns: Record<string, StorageColumn> = {};
+
+    for (const [columnName, column] of Object.entries(table.columns)) {
+      if (column.default?.kind === 'literal') {
+        const decodedValue = decodeDefaultLiteralValue(
+          column.default.value,
+          column,
+          tableName,
+          columnName,
+        );
+        if (decodedValue !== column.default.value) {
+          columnsChanged = true;
+          decodedColumns[columnName] = {
+            ...column,
+            default: { kind: 'literal', value: decodedValue },
+          };
+          continue;
+        }
+      }
+      decodedColumns[columnName] = column;
+    }
+
+    if (columnsChanged) {
+      tablesChanged = true;
+      decodedTables[tableName] = { ...table, columns: decodedColumns };
+    } else {
+      decodedTables[tableName] = table;
+    }
+  }
+
+  if (!tablesChanged) {
+    return contract;
+  }
+
+  // The spread widens to SqlContract<SqlStorage>, but this transformation only
+  // decodes default literal values (tagged bigint → BigInt, ISO string → Date)
+  // and preserves all other properties of T.
+  return {
+    ...contract,
+    storage: {
+      ...contract.storage,
+      tables: decodedTables,
+    },
+  } as T;
 }
 
 function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
@@ -317,8 +432,10 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
   );
   const mappings = mergeMappings(defaultMappings, existingMappings);
 
-  return {
+  const contractWithMappings = {
     ...structurallyValid,
     mappings,
-  } as TContract;
+  };
+
+  return decodeContractDefaults(contractWithMappings) as TContract;
 }

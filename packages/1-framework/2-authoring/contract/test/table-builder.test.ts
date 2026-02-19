@@ -140,7 +140,7 @@ describe('TableBuilder', () => {
       })
       .column('active', {
         type: textColumn,
-        default: { kind: 'literal', expression: 'true' },
+        default: { kind: 'literal', value: 'true' },
       })
       .build();
 
@@ -149,7 +149,7 @@ describe('TableBuilder', () => {
       kind: 'function',
       expression: 'gen_random_uuid()',
     });
-    expect(table.columns.active.default).toEqual({ kind: 'literal', expression: 'true' });
+    expect(table.columns.active.default).toEqual({ kind: 'literal', value: 'true' });
   });
 
   it('stores execution defaults via generated()', () => {
@@ -291,14 +291,14 @@ describe('TableBuilder', () => {
         .column('status', {
           type: textColumn,
           nullable: false,
-          default: { kind: 'literal', expression: "'active'" },
+          default: { kind: 'literal', value: 'active' },
         })
         .build();
 
       expect(table.columns.status.nullable).toBe(false);
       expect(table.columns.status.default).toEqual({
         kind: 'literal',
-        expression: "'active'",
+        value: 'active',
       });
     });
 
@@ -311,7 +311,7 @@ describe('TableBuilder', () => {
         .column('bad', {
           type: textColumn,
           nullable: true,
-          default: { kind: 'literal', expression: 'foo' },
+          default: { kind: 'literal', value: 'foo' },
         });
     });
   });

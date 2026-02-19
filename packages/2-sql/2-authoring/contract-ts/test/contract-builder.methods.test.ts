@@ -424,3 +424,120 @@ describe('typeParams', () => {
     });
   });
 });
+
+describe('column default encoding', () => {
+  const textColumn = columnDescriptor('pg/text@1');
+  const bigintColumn = columnDescriptor('pg/int8@1');
+  const timestampColumn = columnDescriptor('pg/timestamptz@1');
+
+  it('encodes JSON-safe literal defaults', () => {
+    const payload = { role: 'admin', tags: ['a', 'b'], active: true } as const;
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('meta', { type: textColumn, default: { kind: 'literal', value: payload } })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.user.columns.meta.default).toEqual({
+      kind: 'literal',
+      value: payload,
+    });
+  });
+
+  it('encodes bigint literal defaults as tagged bigint', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('counter', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('value', { type: bigintColumn, default: { kind: 'literal', value: 42n } })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.counter.columns.value.default).toEqual({
+      kind: 'literal',
+      value: { $type: 'bigint', value: '42' },
+    });
+  });
+
+  it('encodes Date literal defaults as ISO strings', () => {
+    const dateValue = new Date('2025-01-01T00:00:00.000Z');
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('event', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('startsAt', {
+            type: timestampColumn,
+            default: { kind: 'literal', value: dateValue },
+          })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.event.columns.startsAt.default).toEqual({
+      kind: 'literal',
+      value: '2025-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('keeps tagged bigint literal defaults unchanged', () => {
+    const tagged = { $type: 'bigint', value: '9007199254740993' } as const;
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('counter', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('value', { type: bigintColumn, default: { kind: 'literal', value: tagged } })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.counter.columns.value.default).toEqual({
+      kind: 'literal',
+      value: tagged,
+    });
+  });
+
+  it('keeps function defaults', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('post', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('createdAt', {
+            type: timestampColumn,
+            default: { kind: 'function', expression: 'now()' },
+          })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.post.columns.createdAt.default).toEqual({
+      kind: 'function',
+      expression: 'now()',
+    });
+  });
+
+  it('throws for unsupported literal default values', () => {
+    expect(() =>
+      defineContract<CodecTypes>()
+        .target(postgresTargetPack)
+        .table('user', (t) =>
+          t
+            .column('id', { type: int4Column })
+            .column('meta', {
+              type: textColumn,
+              default: { kind: 'literal', value: () => 'nope' },
+            })
+            .primaryKey(['id']),
+        )
+        .build(),
+    ).toThrow(/Unsupported column default literal value/);
+  });
+});

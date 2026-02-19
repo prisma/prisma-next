@@ -1,4 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
+import { bigintJsonReplacer } from '@prisma-next/contract/types';
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
 import { ifDefined } from '@prisma-next/utils/defined';
 
@@ -39,6 +40,7 @@ const TOP_LEVEL_ORDER = [
 function isDefaultValue(value: unknown): boolean {
   if (value === false) return true;
   if (value === null) return false;
+  if (value instanceof Date) return false;
   if (Array.isArray(value) && value.length === 0) return true;
   if (typeof value === 'object' && value !== null) {
     const keys = Object.keys(value);
@@ -49,6 +51,10 @@ function isDefaultValue(value: unknown): boolean {
 
 function omitDefaults(obj: unknown, path: readonly string[]): unknown {
   if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (obj instanceof Date) {
     return obj;
   }
 
@@ -150,6 +156,10 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
 
 function sortObjectKeys(obj: unknown): unknown {
   if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (obj instanceof Date) {
     return obj;
   }
 
@@ -272,5 +282,5 @@ export function canonicalizeContract(
   const withSortedKeys = sortObjectKeys(withSortedStorage) as Record<string, unknown>;
   const withOrderedTopLevel = orderTopLevel(withSortedKeys);
 
-  return JSON.stringify(withOrderedTopLevel, null, 2);
+  return JSON.stringify(withOrderedTopLevel, bigintJsonReplacer, 2);
 }

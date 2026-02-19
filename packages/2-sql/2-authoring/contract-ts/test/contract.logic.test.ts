@@ -677,7 +677,7 @@ describe('validateContract logic validation', () => {
                   codecId: 'pg/text@1',
                   nativeType: 'text',
                   nullable: false,
-                  default: { kind: 'literal', expression: "'draft'" },
+                  default: { kind: 'literal', value: 'draft' },
                 },
               },
               primaryKey: { columns: ['id'] },
@@ -690,6 +690,39 @@ describe('validateContract logic validation', () => {
         // No capabilities needed for non-function defaults
       };
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
+    });
+
+    it('decodes ISO string defaults to Date for timestamp columns', () => {
+      const contract = {
+        ...baseContract,
+        storage: {
+          tables: {
+            Post: {
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                createdAt: {
+                  codecId: 'pg/timestamptz@1',
+                  nativeType: 'timestamptz',
+                  nullable: false,
+                  default: { kind: 'literal', value: '2024-01-01T00:00:00.000Z' },
+                },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+      };
+
+      const validated = validateContract<SqlContract<SqlStorage>>(contract);
+      const defaultValue = validated.storage.tables['Post']!.columns['createdAt']!.default;
+      if (defaultValue?.kind !== 'literal') {
+        throw new Error('Expected literal default');
+      }
+      expect(defaultValue.value).toBeInstanceOf(Date);
+      expect((defaultValue.value as Date).toISOString()).toBe('2024-01-01T00:00:00.000Z');
     });
 
     it('throws for default with unsupported kind', () => {
@@ -718,7 +751,7 @@ describe('validateContract logic validation', () => {
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow();
     });
 
-    it('throws for default missing expression', () => {
+    it('throws for default missing value', () => {
       const contract = {
         ...baseContract,
         storage: {

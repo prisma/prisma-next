@@ -38,6 +38,13 @@ export type ProfileHash =
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = PgVectorOperationTypes;
+type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyof CodecTypes
+  ? CodecTypes[CodecId] extends { readonly output: infer O }
+    ? O extends Date | bigint
+      ? O
+      : Encoded
+    : Encoded
+  : Encoded;
 
 export type Contract = SqlContract<
   {

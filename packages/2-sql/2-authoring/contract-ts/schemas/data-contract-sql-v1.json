@@ -169,12 +169,19 @@
               "type": "string",
               "enum": ["literal"]
             },
-            "expression": {
-              "type": "string",
-              "description": "SQL literal expression for the default value"
+            "value": {
+              "description": "JSON literal value (or tagged bigint) for the default value",
+              "oneOf": [
+                { "type": "string" },
+                { "type": "number" },
+                { "type": "boolean" },
+                { "type": "null" },
+                { "type": "array" },
+                { "type": "object" }
+              ]
             }
           },
-          "required": ["kind", "expression"]
+          "required": ["kind", "value"]
         },
         {
           "type": "object",

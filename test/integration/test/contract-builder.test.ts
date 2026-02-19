@@ -260,7 +260,7 @@ describe('builder integration', () => {
     const row: Row = {
       id: 1,
       email: 'test@example.com',
-      createdAt: '2024-01-01T00:00:00Z',
+      createdAt: new Date('2024-01-01T00:00:00Z'),
     };
     expect(row).toBeDefined();
 
@@ -272,7 +272,7 @@ describe('builder integration', () => {
     type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
     expectTypeOf<ContractCodecTypes['pg/text@1']['output']>().toEqualTypeOf<string>();
-    expectTypeOf<ContractCodecTypes['pg/timestamptz@1']['output']>().toEqualTypeOf<string>();
+    expectTypeOf<ContractCodecTypes['pg/timestamptz@1']['output']>().toEqualTypeOf<Date>();
   });
 
   it('contract structure matches fixture contract', () => {

@@ -57,11 +57,11 @@ describe('Kysely integration', () => {
       // Insert some seed data
       await c.query('insert into "user" (email, "createdAt") values ($1, $2), ($3, $4), ($5, $6)', [
         'ada@example.com',
-        new Date().toISOString(),
+        new Date(),
         'tess@example.com',
-        new Date().toISOString(),
+        new Date(),
         'mike@example.com',
-        new Date().toISOString(),
+        new Date(),
       ]);
     });
   }, timeouts.spinUpPpgDev);
@@ -85,7 +85,7 @@ describe('Kysely integration', () => {
         const newUser = {
           id: userId,
           email: 'test@example.com',
-          createdAt: new Date().toISOString(),
+          createdAt: new Date(),
         };
 
         const result = await kysely.insertInto('user').values(newUser).returningAll().execute();
@@ -140,7 +140,7 @@ describe('Kysely integration', () => {
           .values({
             id: userId,
             email: 'old@example.com',
-            createdAt: new Date().toISOString(),
+            createdAt: new Date(),
           })
           .returningAll()
           .execute();
@@ -178,7 +178,7 @@ describe('Kysely integration', () => {
           .values({
             id: userId,
             email: 'delete@example.com',
-            createdAt: new Date().toISOString(),
+            createdAt: new Date(),
           })
           .execute();
 
@@ -223,7 +223,7 @@ describe('Kysely integration', () => {
             .values({
               id: userId,
               email: 'transaction@example.com',
-              createdAt: new Date().toISOString(),
+              createdAt: new Date(),
             })
             .execute();
 
@@ -232,7 +232,7 @@ describe('Kysely integration', () => {
             .values({
               id: userId + 1,
               email: 'transaction2@example.com',
-              createdAt: new Date().toISOString(),
+              createdAt: new Date(),
             })
             .execute();
         });
@@ -269,7 +269,7 @@ describe('Kysely integration', () => {
               .values({
                 id: userId,
                 email: 'rollback@example.com',
-                createdAt: new Date().toISOString(),
+                createdAt: new Date(),
               })
               .execute();
 
@@ -278,7 +278,7 @@ describe('Kysely integration', () => {
               .values({
                 id: userId + 1,
                 email: 'rollback2@example.com',
-                createdAt: new Date().toISOString(),
+                createdAt: new Date(),
               })
               .execute();
 

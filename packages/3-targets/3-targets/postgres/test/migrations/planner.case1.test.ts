@@ -610,25 +610,25 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         nativeType: 'bool',
         codecId: 'pg/bool@1',
         nullable: false,
-        default: { kind: 'literal', expression: 'true' },
+        default: { kind: 'literal', value: true },
       },
       disabled: {
         nativeType: 'bool',
         codecId: 'pg/bool@1',
         nullable: false,
-        default: { kind: 'literal', expression: 'false' },
+        default: { kind: 'literal', value: false },
       },
       name: {
         nativeType: 'text',
         codecId: 'pg/text@1',
         nullable: false,
-        default: { kind: 'literal', expression: "'default'" },
+        default: { kind: 'literal', value: 'default' },
       },
       priority: {
         nativeType: 'int4',
         codecId: 'pg/int4@1',
         nullable: false,
-        default: { kind: 'literal', expression: '0' },
+        default: { kind: 'literal', value: 0 },
       },
     });
     expect(sql).toContain('"enabled" bool DEFAULT true NOT NULL');

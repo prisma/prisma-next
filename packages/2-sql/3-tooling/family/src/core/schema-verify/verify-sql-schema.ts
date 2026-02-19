@@ -8,6 +8,7 @@
 
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
+import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type {
   OperationContext,
   SchemaIssue,
@@ -936,7 +937,7 @@ function renderExpectedNativeType(
 function describeColumnDefault(columnDefault: ColumnDefault): string {
   switch (columnDefault.kind) {
     case 'literal':
-      return `literal(${columnDefault.expression})`;
+      return `literal(${formatLiteralValue(columnDefault.value)})`;
     case 'function':
       return columnDefault.expression;
   }
@@ -962,7 +963,14 @@ function columnDefaultsEqual(
 ): boolean {
   // If no normalizer provided, fall back to direct string comparison
   if (!normalizer) {
-    return contractDefault.expression === schemaDefault;
+    if (contractDefault.kind === 'function') {
+      return contractDefault.expression === schemaDefault;
+    }
+    const normalizedValue = normalizeLiteralValue(contractDefault.value, nativeType);
+    if (typeof normalizedValue === 'string') {
+      return normalizedValue === schemaDefault || `'${normalizedValue}'` === schemaDefault;
+    }
+    return String(normalizedValue) === schemaDefault;
   }
 
   // Normalize the raw schema default using target-specific logic
@@ -977,13 +985,9 @@ function columnDefaultsEqual(
     return false;
   }
   if (contractDefault.kind === 'literal' && normalizedSchema.kind === 'literal') {
-    // Normalize both sides: the contract expression may also contain a type cast
-    // (e.g. 'atRisk'::"BillingState") that the normalizer strips, so run the
-    // normalizer on the contract expression too for a fair comparison.
-    const normalizedContract = normalizer(contractDefault.expression, nativeType ?? '');
-    const contractExpr = (normalizedContract?.expression ?? contractDefault.expression).trim();
-    const schemaExpr = normalizedSchema.expression.trim();
-    return contractExpr === schemaExpr;
+    const contractValue = normalizeLiteralValue(contractDefault.value, nativeType);
+    const schemaValue = normalizeLiteralValue(normalizedSchema.value, nativeType);
+    return literalValuesEqual(contractValue, schemaValue);
   }
   if (contractDefault.kind === 'function' && normalizedSchema.kind === 'function') {
     // Normalize function expressions for comparison (case-insensitive, whitespace-tolerant)
@@ -991,4 +995,67 @@ function columnDefaultsEqual(
     return normalizeExpr(contractDefault.expression) === normalizeExpr(normalizedSchema.expression);
   }
   return false;
+}
+
+function isTemporalNativeType(nativeType?: string): boolean {
+  if (!nativeType) return false;
+  const normalized = nativeType.toLowerCase();
+  return normalized.includes('timestamp') || normalized === 'date';
+}
+
+function normalizeLiteralValue(value: unknown, nativeType?: string): unknown {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (isTaggedBigInt(value)) {
+    return value.value;
+  }
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (typeof value === 'string' && isTemporalNativeType(nativeType)) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  return value;
+}
+
+function literalValuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+  if (typeof a === 'object' && a !== null && typeof b === 'string') {
+    try {
+      return JSON.stringify(a) === JSON.stringify(JSON.parse(b));
+    } catch {
+      return false;
+    }
+  }
+  if (typeof a === 'string' && typeof b === 'object' && b !== null) {
+    try {
+      return JSON.stringify(JSON.parse(a)) === JSON.stringify(b);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function formatLiteralValue(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (isTaggedBigInt(value)) {
+    return value.value;
+  }
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  return JSON.stringify(value);
 }

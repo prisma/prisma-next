@@ -197,13 +197,13 @@ test('sql() query builder result works with core ResultType from @prisma-next/co
   // This test would have failed before the fix - Row['email'] would be 'never'
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['createdAt']>().toEqualTypeOf<Date>();
 
   // Verify the complete row structure
   expectTypeOf<Row>().toExtend<{
     id: number;
     email: string;
-    createdAt: string;
+    createdAt: Date;
   }>();
 
   // Verify plan is a SqlQueryPlan (not Plan - no sql field)
@@ -474,7 +474,7 @@ test('codec mapping resolves scalar types correctly', () => {
 
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['createdAt']>().toEqualTypeOf<Date>();
 
   type ContractCodecTypes = Contract['mappings'] extends { codecTypes: infer C } ? C : never;
   expectTypeOf<ContractCodecTypes>().toExtend<CodecTypes>();
@@ -512,13 +512,13 @@ test('representative contract resolves types correctly end-to-end', () => {
   // Strict checks: verify fields are NOT never
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
+  expectTypeOf<Row['createdAt']>().toEqualTypeOf<Date>();
 
   // Also verify the overall structure
   expectTypeOf<Row>().toExtend<{
     id: number; // pg/int4@1 → number
     email: string; // pg/text@1 → string
-    createdAt: string; // pg/timestamptz@1 → string
+    createdAt: Date; // pg/timestamptz@1 → Date
   }>();
 });
 

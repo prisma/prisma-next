@@ -85,10 +85,41 @@ export type GeneratedValueSpec = {
   readonly params?: Record<string, unknown>;
 };
 
+export type JsonPrimitive = string | number | boolean | null;
+
+export type JsonValue =
+  | JsonPrimitive
+  | { readonly [key: string]: JsonValue }
+  | readonly JsonValue[];
+
+export type TaggedBigInt = { readonly $type: 'bigint'; readonly value: string };
+
+export function isTaggedBigInt(value: unknown): value is TaggedBigInt {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { $type?: unknown }).$type === 'bigint' &&
+    typeof (value as { value?: unknown }).value === 'string'
+  );
+}
+
+export function bigintJsonReplacer(_key: string, value: unknown): unknown {
+  if (typeof value === 'bigint') {
+    return { $type: 'bigint', value: value.toString() } satisfies TaggedBigInt;
+  }
+  return value;
+}
+
+export type TaggedLiteralValue = TaggedBigInt;
+
+export type ColumnDefaultLiteralValue = JsonValue | TaggedLiteralValue;
+
+export type ColumnDefaultLiteralInputValue = ColumnDefaultLiteralValue | bigint | Date;
+
 export type ColumnDefault =
   | {
       readonly kind: 'literal';
-      readonly expression: string;
+      readonly value: ColumnDefaultLiteralInputValue;
     }
   | { readonly kind: 'function'; readonly expression: string };
 

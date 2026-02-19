@@ -220,8 +220,7 @@ export function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>,
       typeId: 'pg/timestamptz@1',
       targetTypes: ['timestamptz'],
       encode: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
-      decode: (wire: string | Date) =>
-        typeof wire === 'string' ? wire : wire instanceof Date ? wire.toISOString() : String(wire),
+      decode: (wire: string | Date) => (wire instanceof Date ? wire : new Date(wire)),
     }),
   );
 

@@ -36,7 +36,7 @@ describe('adapter-postgres codecs', () => {
   describe('timestamp codec', () => {
     const timestampCodec = codecDefinitions.timestamp.codec as {
       encode: (value: string | Date) => string;
-      decode: (wire: string | Date) => string;
+      decode: (wire: string | Date) => Date;
     };
 
     it('encodes Date to ISO string', () => {
@@ -44,9 +44,15 @@ describe('adapter-postgres codecs', () => {
       expect(timestampCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
     });
 
-    it('decodes Date to ISO string', () => {
+    it('decodes Date to Date', () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(timestampCodec.decode(date)).toBe('2024-01-15T10:30:00.000Z');
+      expect(timestampCodec.decode(date)).toEqual(new Date('2024-01-15T10:30:00.000Z'));
+    });
+
+    it('decodes string to Date', () => {
+      const result = timestampCodec.decode('2024-01-15T10:30:00.000Z');
+      expect(result).toBeInstanceOf(Date);
+      expect(result.toISOString()).toBe('2024-01-15T10:30:00.000Z');
     });
   });
 

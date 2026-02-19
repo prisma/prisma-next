@@ -15,14 +15,14 @@ createTable('user').column('email', { type: textColumn, nullable: true });
 // VALID: default without nullable (defaults to false)
 createTable('user').column('email', {
   type: textColumn,
-  default: { kind: 'literal', expression: 'foo' },
+  default: { kind: 'literal', value: 'foo' },
 });
 
 // VALID: explicit nullable: false with default
 createTable('user').column('email', {
   type: textColumn,
   nullable: false,
-  default: { kind: 'literal', expression: 'foo' },
+  default: { kind: 'literal', value: 'foo' },
 });
 
 // VALID: nullable: false without default
@@ -34,5 +34,5 @@ createTable('user').column('email', { type: textColumn, nullable: false });
 createTable('user').column('email', {
   type: textColumn,
   nullable: true,
-  default: { kind: 'literal', expression: 'foo' },
+  default: { kind: 'literal', value: 'foo' },
 });

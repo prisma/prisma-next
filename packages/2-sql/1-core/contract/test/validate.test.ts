@@ -42,8 +42,13 @@ describe('validateContract', () => {
         ? { -readonly [K in keyof T]: Mutable<T[K]> }
         : T;
 
-  function makeContract() {
-    return structuredClone(baseContract) as Mutable<SqlContract<SqlStorage>>;
+  function makeContract(tables?: Record<string, unknown>) {
+    const clone = structuredClone(baseContract) as Mutable<SqlContract<SqlStorage>>;
+    if (tables) {
+      (clone as Record<string, unknown>).storage = { tables };
+      (clone as Record<string, unknown>).models = {};
+    }
+    return clone;
   }
 
   it('validates and computes mappings', () => {
@@ -448,6 +453,195 @@ describe('validateContract', () => {
 
     expect(() => validateContract<SqlContract<SqlStorage>>(invalid)).toThrow(
       /Contract structural validation failed/,
+    );
+  });
+
+  it('decodes tagged bigint default to native BigInt', () => {
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          count: {
+            codecId: 'pg/int8@1',
+            nativeType: 'bigint',
+            nullable: false,
+            default: { kind: 'literal', value: { $type: 'bigint', value: '9007199254740993' } },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    const col = result.storage.tables.User.columns.count;
+    expect(col.default).toEqual({ kind: 'literal', value: 9007199254740993n });
+  });
+
+  it('decodes ISO date string to Date on temporal column', () => {
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          created_at: {
+            codecId: 'pg/timestamptz@1',
+            nativeType: 'timestamptz',
+            nullable: false,
+            default: { kind: 'literal', value: '2025-01-01T00:00:00.000Z' },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    const col = result.storage.tables.User.columns.created_at;
+    expect(col.default).toEqual({ kind: 'literal', value: new Date('2025-01-01T00:00:00.000Z') });
+  });
+
+  it('decodes ISO date string to Date on temporal codec id', () => {
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          created_at: {
+            codecId: 'pg/timestamp@1',
+            nativeType: 'custom_temporal',
+            nullable: false,
+            default: { kind: 'literal', value: '2025-02-03T10:20:30.000Z' },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    const col = result.storage.tables.User.columns.created_at;
+    expect(col.default).toEqual({ kind: 'literal', value: new Date('2025-02-03T10:20:30.000Z') });
+  });
+
+  it('keeps Date literal defaults unchanged', () => {
+    const dateValue = new Date('2025-03-04T12:00:00.000Z');
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          created_at: {
+            codecId: 'pg/timestamptz@1',
+            nativeType: 'timestamptz',
+            nullable: false,
+            default: { kind: 'literal', value: dateValue },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    const col = result.storage.tables.User.columns.created_at;
+    expect(col.default).toEqual({ kind: 'literal', value: dateValue });
+    expect(col.default?.kind).toBe('literal');
+    if (col.default?.kind === 'literal') {
+      expect(col.default.value).toBe(dateValue);
+    }
+  });
+
+  it('keeps non-temporal string defaults unchanged', () => {
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          status: {
+            codecId: 'pg/text@1',
+            nativeType: 'text',
+            nullable: false,
+            default: { kind: 'literal', value: 'draft' },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    const col = result.storage.tables.User.columns.status;
+    expect(col.default).toEqual({ kind: 'literal', value: 'draft' });
+  });
+
+  it('throws on invalid tagged bigint value', () => {
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          count: {
+            codecId: 'pg/int8@1',
+            nativeType: 'bigint',
+            nullable: false,
+            default: { kind: 'literal', value: { $type: 'bigint', value: 'not-a-number' } },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /Invalid tagged bigint/,
+    );
+  });
+
+  it('throws on invalid ISO date string for temporal column default', () => {
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          created_at: {
+            codecId: 'pg/timestamptz@1',
+            nativeType: 'timestamptz',
+            nullable: false,
+            default: { kind: 'literal', value: 'not-a-date' },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /Invalid ISO date string/,
+    );
+  });
+
+  it('throws on NOT NULL column with literal null default', () => {
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          name: {
+            codecId: 'pg/text@1',
+            nativeType: 'text',
+            nullable: false,
+            default: { kind: 'literal', value: null },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
+      /NOT NULL but has a literal null default/,
     );
   });
 });
