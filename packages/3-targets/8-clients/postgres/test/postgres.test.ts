@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
   driverConnect: vi.fn(),
+  driverClose: vi.fn(),
   driverCreate: vi.fn(),
   validateContract: vi.fn(),
 }));
@@ -88,6 +89,7 @@ describe('postgres', () => {
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
     mocks.driverConnect.mockReset();
+    mocks.driverClose.mockReset();
     mocks.driverCreate.mockReset();
     mocks.validateContract.mockReset();
 
@@ -106,6 +108,7 @@ describe('postgres', () => {
     const mockDriver = {
       id: 'driver-instance',
       connect: mocks.driverConnect.mockResolvedValue(undefined),
+      close: mocks.driverClose.mockResolvedValue(undefined),
     };
     mocks.instantiateExecutionStack.mockReturnValue({
       adapter: {},
@@ -191,24 +194,56 @@ describe('postgres', () => {
     expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
   });
 
+  it('closes connected driver when createRuntime fails and retries cleanly', async () => {
+    mocks.createRuntime.mockImplementationOnce(() => {
+      throw new Error('runtime creation failed');
+    });
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    await expect(db.runtime()).rejects.toThrow('runtime creation failed');
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+    expect(mocks.driverClose).toHaveBeenCalledTimes(1);
+
+    await expect(db.runtime()).resolves.toEqual({ id: 'runtime-instance' });
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(2);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(2);
+    expect(mocks.driverClose).toHaveBeenCalledTimes(1);
+  });
+
   it('throws for multiple binding inputs during client construction', () => {
-    expect(() =>
+    try {
       postgres({
         contract,
         url: 'postgres://localhost:5432/db',
         binding: { kind: 'url', url: 'postgres://localhost:5432/db2' },
-      } as unknown as Parameters<typeof postgres<typeof contract>>[0]),
-    ).toThrow('Provide one binding input');
+      } as unknown as Parameters<typeof postgres<typeof contract>>[0]);
+      throw new Error('Expected constructor to throw');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'DRIVER.BINDING_INVALID',
+        category: 'RUNTIME',
+      });
+    }
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
   });
 
   it('throws for missing binding input during client construction', () => {
-    expect(() =>
+    try {
       postgres({
         contract,
-      } as unknown as Parameters<typeof postgres<typeof contract>>[0]),
-    ).toThrow('Provide one binding input');
+      } as unknown as Parameters<typeof postgres<typeof contract>>[0]);
+      throw new Error('Expected constructor to throw');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'DRIVER.BINDING_INVALID',
+        category: 'RUNTIME',
+      });
+    }
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
   });
@@ -324,21 +359,33 @@ describe('postgres', () => {
   });
 
   it('throws for empty url binding', () => {
-    expect(() =>
+    try {
       postgres({
         contract,
         url: '   ',
-      }),
-    ).toThrow('Postgres URL must be a non-empty string');
+      });
+      throw new Error('Expected constructor to throw');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'DRIVER.BINDING_INVALID',
+        category: 'RUNTIME',
+      });
+    }
   });
 
   it('throws for invalid url scheme', () => {
-    expect(() =>
+    try {
       postgres({
         contract,
         url: 'mysql://localhost:5432/db',
-      }),
-    ).toThrow('Postgres URL must use postgres:// or postgresql://');
+      });
+      throw new Error('Expected constructor to throw');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'DRIVER.BINDING_INVALID',
+        category: 'RUNTIME',
+      });
+    }
   });
 
   it('uses pg pool binding', async () => {
@@ -387,12 +434,18 @@ describe('postgres', () => {
   });
 
   it('throws when pg input is neither Pool nor Client', () => {
-    expect(() =>
+    try {
       postgres({
         contract,
         pg: { query: () => {} } as unknown as Client,
-      }),
-    ).toThrow('Unable to determine pg binding type from pg input');
+      });
+      throw new Error('Expected constructor to throw');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'DRIVER.BINDING_INVALID',
+        category: 'RUNTIME',
+      });
+    }
   });
 
   it('passes cursor options into driver descriptor create', () => {

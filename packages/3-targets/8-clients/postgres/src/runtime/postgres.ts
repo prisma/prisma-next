@@ -163,17 +163,22 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
           throw new Error('Relational runtime requires a driver descriptor on the execution stack');
         }
 
-        // `binding` is normalized by resolvePostgresBinding(), so this call site remains
-        // type-safe in practice while SqlRuntimeDriverInstance currently uses SqlDriver<unknown>.
-        await driver.connect(binding);
+        try {
+          // `binding` is normalized by resolvePostgresBinding(), so this call site remains
+          // type-safe in practice while SqlRuntimeDriverInstance currently uses SqlDriver<unknown>.
+          await driver.connect(binding);
 
-        return createRuntime({
-          stackInstance,
-          context,
-          driver,
-          verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-          ...ifDefined('plugins', options.plugins),
-        });
+          return createRuntime({
+            stackInstance,
+            context,
+            driver,
+            verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
+            ...ifDefined('plugins', options.plugins),
+          });
+        } catch (error) {
+          await driver.close().catch(() => undefined);
+          throw error;
+        }
       })();
 
       runtimePromise.catch(() => {
