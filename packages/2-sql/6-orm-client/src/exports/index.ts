@@ -1,20 +1,20 @@
 export { Collection } from '../collection';
 export type { OrmOptions } from '../orm';
 export { orm } from '../orm';
-export { Repository } from '../repository';
 export type {
+  CollectionContext,
+  CollectionModelName,
   CollectionState,
-  ColumnAccessor,
   ComparisonMethods,
   ComparisonOp,
   DefaultModelRow,
   FilterExpr,
   IncludeExpr,
+  ModelAccessor,
   OrderExpr,
   RelatedModelName,
   RelationNames,
   RelationsOf,
-  RepositoryContext,
   RuntimeQueryable,
 } from '../types';
 export { emptyState } from '../types';

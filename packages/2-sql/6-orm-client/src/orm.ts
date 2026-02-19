@@ -1,17 +1,26 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import { Repository } from './repository';
-import type { RepositoryContext, RepositoryModelName, RuntimeQueryable } from './types';
+import { Collection } from './collection';
+import type {
+  CollectionContext,
+  CollectionModelName,
+  DefaultModelRow,
+  RuntimeQueryable,
+} from './types';
 
 export interface OrmOptions<
   TContract extends SqlContract<SqlStorage>,
-  Repos extends Partial<Record<string, Repository<TContract, RepositoryModelName<TContract>>>>,
+  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
 > {
   readonly contract: TContract;
   readonly runtime: RuntimeQueryable;
-  readonly repositories?: Repos;
+  readonly collections?: Collections;
 }
 
-type ModelNames<TContract extends SqlContract<SqlStorage>> = RepositoryModelName<TContract>;
+type ModelNames<TContract extends SqlContract<SqlStorage>> = CollectionModelName<TContract>;
+
+type AnyCollectionClass<TContract extends SqlContract<SqlStorage>> = new (
+  ...args: never[]
+) => Collection<TContract, string, unknown>;
 
 type LowercaseFirst<Name extends string> = Name extends `${infer Head}${infer Tail}`
   ? `${Lowercase<Head>}${Tail}`
@@ -19,45 +28,61 @@ type LowercaseFirst<Name extends string> = Name extends `${infer Head}${infer Ta
 
 type ModelAliasKeys<Name extends string> = Name | LowercaseFirst<Name> | `${LowercaseFirst<Name>}s`;
 
-type ModelRepositoryMap<TContract extends SqlContract<SqlStorage>> = {
-  [K in ModelNames<TContract> as ModelAliasKeys<K>]: Repository<TContract, K>;
+type CustomCollectionForKey<
+  TContract extends SqlContract<SqlStorage>,
+  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+  Key extends string,
+> = Key extends keyof Collections
+  ? Collections[Key] extends AnyCollectionClass<TContract>
+    ? InstanceType<Collections[Key]>
+    : never
+  : never;
+
+type CustomCollectionForModel<
+  TContract extends SqlContract<SqlStorage>,
+  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+  ModelName extends ModelNames<TContract>,
+> =
+  | CustomCollectionForKey<TContract, Collections, ModelName>
+  | CustomCollectionForKey<TContract, Collections, LowercaseFirst<ModelName>>
+  | CustomCollectionForKey<TContract, Collections, `${LowercaseFirst<ModelName>}s`>;
+
+type ModelCollection<
+  TContract extends SqlContract<SqlStorage>,
+  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+  ModelName extends ModelNames<TContract>,
+> = [CustomCollectionForModel<TContract, Collections, ModelName>] extends [never]
+  ? Collection<TContract, ModelName, DefaultModelRow<TContract, ModelName>>
+  : CustomCollectionForModel<TContract, Collections, ModelName>;
+
+type ModelCollectionMap<
+  TContract extends SqlContract<SqlStorage>,
+  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+> = {
+  [K in ModelNames<TContract> as ModelAliasKeys<K>]: ModelCollection<TContract, Collections, K>;
 };
 
 type OrmClient<
   TContract extends SqlContract<SqlStorage>,
-  Repos extends Partial<Record<string, Repository<TContract, RepositoryModelName<TContract>>>>,
-> = ModelRepositoryMap<TContract> & Repos;
+  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+> = ModelCollectionMap<TContract, Collections>;
 
 export function orm<
   TContract extends SqlContract<SqlStorage>,
-  Repos extends Partial<Record<string, Repository<TContract, ModelNames<TContract>>>> = Record<
-    never,
-    never
-  >,
->(options: OrmOptions<TContract, Repos>): OrmClient<TContract, Repos> {
-  const { contract, runtime, repositories } = options;
-  const ctx: RepositoryContext<TContract> = { contract, runtime };
-  const cache = new Map<string, Repository<TContract, ModelNames<TContract>>>();
+  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>> = Record<never, never>,
+>(options: OrmOptions<TContract, Collections>): OrmClient<TContract, Collections> {
+  const { contract, runtime, collections } = options;
+  const ctx: CollectionContext<TContract> = { contract, runtime };
   const modelAliases = createModelAliases(contract);
+  const collectionRegistry = createCollectionRegistry(contract, collections, modelAliases);
+  const cache = new Map<ModelNames<TContract>, Collection<TContract, string, unknown>>();
 
-  return new Proxy({} as OrmClient<TContract, Repos>, {
+  return new Proxy({} as OrmClient<TContract, Collections>, {
     get(_target, prop: string | symbol): unknown {
       if (typeof prop !== 'string') {
         return undefined;
       }
 
-      // Check custom repositories first
-      if (repositories && Object.hasOwn(repositories, prop)) {
-        return repositories[prop as keyof Repos];
-      }
-
-      // Check cache
-      const cached = cache.get(prop);
-      if (cached) {
-        return cached;
-      }
-
-      // Resolve model name from plural key
       const modelName = resolveModelName(prop, modelAliases);
       if (!modelName) {
         throw new Error(
@@ -65,9 +90,27 @@ export function orm<
         );
       }
 
-      const repo = new Repository(ctx, modelName as ModelNames<TContract>);
-      cache.set(prop, repo);
-      return repo;
+      const cached = cache.get(modelName);
+      if (cached) {
+        return cached;
+      }
+
+      const CollectionClass =
+        collectionRegistry.get(modelName as ModelNames<TContract>) ??
+        (Collection as AnyCollectionClass<TContract>);
+      const CollectionCtor = CollectionClass as unknown as new (
+        ctx: CollectionContext<TContract>,
+        modelName: string,
+        options?: Record<string, unknown>,
+      ) => Collection<TContract, string, unknown>;
+      const collection = new CollectionCtor(ctx, modelName, {
+        registry: collectionRegistry,
+      }) as ModelCollection<TContract, Collections, ModelNames<TContract>>;
+      cache.set(
+        modelName as ModelNames<TContract>,
+        collection as Collection<TContract, string, unknown>,
+      );
+      return collection;
     },
   });
 }
@@ -96,6 +139,35 @@ function createModelAliases<TContract extends SqlContract<SqlStorage>>(
   }
 
   return aliases;
+}
+
+function createCollectionRegistry<
+  TContract extends SqlContract<SqlStorage>,
+  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+>(
+  contract: TContract,
+  collections: Collections | undefined,
+  aliases: Map<string, ModelNames<TContract>>,
+): Map<ModelNames<TContract>, AnyCollectionClass<TContract>> {
+  const registry = new Map<ModelNames<TContract>, AnyCollectionClass<TContract>>();
+  if (!collections) {
+    return registry;
+  }
+
+  for (const [key, collectionClass] of Object.entries(collections)) {
+    if (!collectionClass) {
+      continue;
+    }
+    const modelName = resolveModelName(key, aliases);
+    if (!modelName) {
+      throw new Error(
+        `No model found for custom collection '${key}'. Available models: ${Object.keys(contract.models as Record<string, unknown>).join(', ')}`,
+      );
+    }
+    registry.set(modelName, collectionClass as AnyCollectionClass<TContract>);
+  }
+
+  return registry;
 }
 
 function resolveModelName<ModelName extends string>(

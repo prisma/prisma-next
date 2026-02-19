@@ -1,20 +1,50 @@
+import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import { sql } from '@prisma-next/sql-lane';
 import { param } from '@prisma-next/sql-relational-core/param';
 import { schema } from '@prisma-next/sql-relational-core/schema';
-import type { Runtime } from '@prisma-next/sql-runtime';
+import { budgets, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
+import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
-import { executionContext } from '../src/prisma/context';
-import { getRuntime } from '../src/prisma/runtime';
-import { repositoryGetAdminUsers } from '../src/repositories/get-admin-users';
-import { repositoryGetUserPosts } from '../src/repositories/get-user-posts';
-import { repositoryGetUsers } from '../src/repositories/get-users';
+import { ormClientGetAdminUsers } from '../src/orm-client/get-admin-users';
+import { ormClientGetUserPosts } from '../src/orm-client/get-user-posts';
+import { ormClientGetUsers } from '../src/orm-client/get-users';
+import { db } from '../src/prisma/db';
 import { initTestDatabase } from './utils/control-client';
 
-const { contract } = executionContext;
+const context = db.context;
+const { contract } = context;
+const executionStack = db.stack;
+const executionStackInstance = instantiateExecutionStack(executionStack);
 
-async function seedRepositoryData(runtime: Runtime): Promise<void> {
-  const tables = schema(executionContext).tables;
+function createTestDriver(connectionString: string) {
+  const driverDescriptor = executionStack.driver;
+  if (!driverDescriptor) {
+    throw new Error('Driver descriptor missing from execution stack');
+  }
+  const pool = new Pool({ connectionString });
+  return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+}
+
+function getRuntime(connectionString: string): Runtime {
+  return createRuntime({
+    stackInstance: executionStackInstance,
+    context,
+    driver: createTestDriver(connectionString),
+    verify: { mode: 'onFirstUse', requireMarker: false },
+    plugins: [
+      budgets({
+        maxRows: 10_000,
+        defaultTableRows: 10_000,
+        tableRows: { user: 10_000, post: 10_000 },
+        maxLatencyMs: 1_000,
+      }),
+    ],
+  });
+}
+
+async function seedOrmClientData(runtime: Runtime): Promise<void> {
+  const tables = schema(context).tables;
   const userTable = tables['user']!;
   const postTable = tables['post']!;
 
@@ -34,7 +64,7 @@ async function seedRepositoryData(runtime: Runtime): Promise<void> {
   ];
 
   for (const user of users) {
-    const plan = sql({ context: executionContext })
+    const plan = sql({ context })
       .insert(userTable, {
         id: param('id'),
         email: param('email'),
@@ -70,7 +100,7 @@ async function seedRepositoryData(runtime: Runtime): Promise<void> {
   ];
 
   for (const post of posts) {
-    const plan = sql({ context: executionContext })
+    const plan = sql({ context })
       .insert(postTable, {
         id: param('id'),
         title: param('title'),
@@ -85,17 +115,17 @@ async function seedRepositoryData(runtime: Runtime): Promise<void> {
   }
 }
 
-describe('Repository integration examples', () => {
+describe('ORM client integration examples', () => {
   it(
-    'repositoryGetUsers returns limited rows',
+    'ormClientGetUsers returns limited rows',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
         const runtime = getRuntime(connectionString);
 
         try {
-          await seedRepositoryData(runtime);
-          const users = await repositoryGetUsers(1, runtime);
+          await seedOrmClientData(runtime);
+          const users = await ormClientGetUsers(1, runtime);
 
           expect(users).toHaveLength(1);
           expect(users[0]).toMatchObject({
@@ -112,15 +142,15 @@ describe('Repository integration examples', () => {
   );
 
   it(
-    'repositoryGetAdminUsers returns only admin rows',
+    'ormClientGetAdminUsers returns only admin rows',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
         const runtime = getRuntime(connectionString);
 
         try {
-          await seedRepositoryData(runtime);
-          const users = await repositoryGetAdminUsers(10, runtime);
+          await seedOrmClientData(runtime);
+          const users = await ormClientGetAdminUsers(10, runtime);
 
           expect(users).toHaveLength(1);
           expect(users[0]).toMatchObject({
@@ -137,15 +167,15 @@ describe('Repository integration examples', () => {
   );
 
   it(
-    'repositoryGetUserPosts returns scoped posts in descending createdAt order',
+    'ormClientGetUserPosts returns scoped posts in descending createdAt order',
     async () => {
       await withDevDatabase(async ({ connectionString }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
         const runtime = getRuntime(connectionString);
 
         try {
-          await seedRepositoryData(runtime);
-          const posts = await repositoryGetUserPosts('user_001', 10, runtime);
+          await seedOrmClientData(runtime);
+          const posts = await ormClientGetUserPosts('user_001', 10, runtime);
           const postRecords = posts as Array<Record<string, unknown>>;
 
           expect(postRecords.map((post) => post['id'])).toEqual(['post_002', 'post_001']);

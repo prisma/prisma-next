@@ -1,8 +1,9 @@
 import { orm, Collection } from '@prisma-next/sql-orm-client';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { executionContext } from '../prisma/context';
+import type { Contract } from '../prisma/contract.d';
+import contractJson from '../prisma/contract.json' with { type: 'json' };
 
-type Contract = typeof executionContext.contract;
+const contract = contractJson as unknown as Contract;
 
 class UserCollection extends Collection<Contract, 'User'> {
   admins() {
@@ -20,14 +21,13 @@ class PostCollection extends Collection<Contract, 'Post'> {
   }
 }
 
-export function createRepositoryClient(runtime: Runtime) {
-  const contract = executionContext.contract;
+export function createOrmClient(runtime: Runtime) {
   return orm({
     contract,
     runtime,
-    repositories: {
-      users: new UserCollection({ contract, runtime }, 'User'),
-      posts: new PostCollection({ contract, runtime }, 'Post'),
+    collections: {
+      users: UserCollection,
+      posts: PostCollection,
     },
   });
 }

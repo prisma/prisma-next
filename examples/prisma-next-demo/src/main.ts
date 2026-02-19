@@ -13,9 +13,9 @@
  * - user <id>                  Get user by ID
  * - posts <userId>             Get posts for a user
  * - users-with-posts [limit]   Users with nested posts (includeMany)
- * - repo-users [limit]         Users via repository API
- * - repo-admins [limit]        Admin users via custom repository scope
- * - repo-posts <userId> [limit] Posts for a user via repository API
+ * - repo-users [limit]         Users via ORM client API
+ * - repo-admins [limit]        Admin users via custom collection scope
+ * - repo-posts <userId> [limit] Posts for a user via ORM client API
  * - users-paginate [cursor]    Cursor-based pagination
  * - similarity-search <vec>    Vector similarity search (pgvector)
  * - budget-violation           Demo budget enforcement error
@@ -35,9 +35,9 @@ import { getUserPosts } from './queries/get-user-posts';
 import { getUsers } from './queries/get-users';
 import { getUsersWithPosts } from './queries/get-users-with-posts';
 import { ormGetUsersBackward, ormGetUsersByIdCursor } from './queries/orm-pagination';
-import { repositoryGetAdminUsers } from './repositories/get-admin-users';
-import { repositoryGetUserPosts } from './repositories/get-user-posts';
-import { repositoryGetUsers } from './repositories/get-users';
+import { ormClientGetAdminUsers } from './orm-client/get-admin-users';
+import { ormClientGetUserPosts } from './orm-client/get-user-posts';
+import { ormClientGetUsers } from './orm-client/get-users';
 import { similaritySearch } from './queries/similarity-search';
 
 const appConfigSchema = arktype({
@@ -90,11 +90,11 @@ async function main() {
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
-      const users = await repositoryGetUsers(limit, runtime);
+      const users = await ormClientGetUsers(limit, runtime);
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-admins') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
-      const users = await repositoryGetAdminUsers(limit, runtime);
+      const users = await ormClientGetAdminUsers(limit, runtime);
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-posts') {
       const [userIdStr, limitStr] = args;
@@ -103,7 +103,7 @@ async function main() {
         process.exit(1);
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
-      const posts = await repositoryGetUserPosts(userIdStr, limit, runtime);
+      const posts = await ormClientGetUserPosts(userIdStr, limit, runtime);
       console.log(JSON.stringify(posts, null, 2));
     } else if (cmd === 'similarity-search') {
       const [queryVectorStr, limitStr] = args;

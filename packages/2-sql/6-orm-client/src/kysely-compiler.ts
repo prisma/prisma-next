@@ -90,7 +90,7 @@ export function createExecutionPlan<Row>(
       target: contract.target,
       targetFamily: contract.targetFamily,
       storageHash: contract.storageHash,
-      lane: 'repository',
+      lane: 'orm-client',
       paramDescriptors: [],
     },
   };

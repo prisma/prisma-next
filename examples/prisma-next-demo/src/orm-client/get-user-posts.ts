@@ -1,0 +1,12 @@
+import type { Runtime } from '@prisma-next/sql-runtime';
+import { createOrmClient } from './client';
+
+export async function ormClientGetUserPosts(userId: string, limit: number, runtime: Runtime) {
+  const db = createOrmClient(runtime);
+  return db.posts
+    .forUser(userId)
+    .orderBy(() => ({ column: 'createdAt', direction: 'desc' }))
+    .take(limit)
+    .all()
+    .toArray();
+}

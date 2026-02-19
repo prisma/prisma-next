@@ -1,25 +1,26 @@
 # New API sketches
 
-## Repository-based client structure
+## Collection-based client structure
 
 ```typescript
-class PostRepository extends Repository<Contract, "Post"> {
+class PostCollection extends Collection<Contract, "Post"> {
   popular() {
-    return this.filter((p) => p.views.gt(1000));
+    return this.where((p) => p.views.gt(1000));
   }
 }
 
 // ...
 
 const db = orm({
-  context: executionContext,
-  repositories: {
-    post: new PostRepository(executionContext),
-    // Use default repositories for the rest of the model
+  contract,
+  runtime,
+  collections: {
+    posts: PostCollection,
+    // Use default collections for the rest of the model
   }
 });
 
-const posts = await db.posts.popular().findMany().collect()
+const posts = await db.posts.popular().all().toArray()
 ```
 
 ## Filter parent records by child records
@@ -27,8 +28,8 @@ const posts = await db.posts.popular().findMany().collect()
 ```typescript
 const users = await db
   .users
-  .where((u) => u.posts.has((p) => p.popular()))
-  .findMany()
+  .where((u) => u.posts.some((p) => p.popular()))
+  .all()
   .toArray()
 ```
 
@@ -38,21 +39,21 @@ const users = await db
 db
   .users
   .where(conditions)
-  .include(user.posts, (p) =>
-    p.where(conditions).include(post.comments)
+  .include('posts', (p) =>
+    p.where(conditions).include('comments')
   )
-  .findMany()
+  .all()
 ```
 
 ## Nested mutation
 
-We're not awaiting `findUnique`, instead using `.comments` to drop to a `comments` repository attached to the parent `post` record.
+We're not awaiting `find()`, instead using `.comments` to drop to a `comments` collection attached to the parent `post` record.
 
 ```typescript
  db
   .posts
   .where({ id: postId })
-  .findUnique()
+  .find()
   .comments
   .create(commentInput)
 ```
@@ -64,7 +65,7 @@ We're not awaiting `findUnique`, instead using `.comments` to drop to a `comment
 ```typescript
 const users = await db
   .user
-  .filter(/* ... */)
+  .where(/* ... */)
   // option 1
   .select((u) => ({
     name: u.name,
@@ -81,8 +82,8 @@ const users = await db
       comments: true
     }
   })
-  .findMany()
-  .collect()
+  .all()
+  .toArray()
 ```
 
 

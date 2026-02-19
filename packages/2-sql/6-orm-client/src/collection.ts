@@ -3,15 +3,15 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { createColumnAccessor } from './column-accessor';
 import { compileRelationSelect, compileSelect, createExecutionPlan } from './kysely-compiler';
 import type {
+  CollectionContext,
   CollectionState,
-  ColumnAccessor,
   DefaultModelRow,
   FilterExpr,
   IncludeExpr,
+  ModelAccessor,
   OrderExpr,
   RelatedModelName,
   RelationNames,
-  RepositoryContext,
   RuntimeConnection,
   RuntimeScope,
 } from './types';
@@ -22,33 +22,49 @@ interface RowEnvelope {
   readonly mapped: Record<string, unknown>;
 }
 
-export class Collection<TContract extends SqlContract<SqlStorage>, ModelName extends string, Row> {
+interface CollectionInit<TContract extends SqlContract<SqlStorage>> {
+  readonly tableName?: string | undefined;
+  readonly state?: CollectionState | undefined;
+  readonly registry?: ReadonlyMap<string, CollectionConstructor<TContract>> | undefined;
+}
+
+type CollectionConstructor<TContract extends SqlContract<SqlStorage>> = new (
+  ctx: CollectionContext<TContract>,
+  modelName: string,
+  options?: CollectionInit<TContract>,
+) => Collection<TContract, string, unknown>;
+
+export class Collection<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  Row = DefaultModelRow<TContract, ModelName>,
+> {
   /** @internal */
-  readonly ctx: RepositoryContext<TContract>;
+  readonly ctx: CollectionContext<TContract>;
   /** @internal */
   readonly modelName: ModelName;
   /** @internal */
   readonly tableName: string;
   /** @internal */
   readonly state: CollectionState;
+  /** @internal */
+  readonly registry: ReadonlyMap<string, CollectionConstructor<TContract>>;
 
-  protected constructor(
-    ctx: RepositoryContext<TContract>,
+  constructor(
+    ctx: CollectionContext<TContract>,
     modelName: ModelName,
-    tableName: string,
-    state: CollectionState,
+    options: CollectionInit<TContract> = {},
   ) {
     this.ctx = ctx;
     this.modelName = modelName;
-    this.tableName = tableName;
-    this.state = state;
+    this.tableName = options.tableName ?? resolveModelTableName(ctx.contract, modelName);
+    this.state = options.state ?? emptyState();
+    this.registry = options.registry ?? new Map<string, CollectionConstructor<TContract>>();
   }
 
-  where(
-    fn: (model: ColumnAccessor<TContract, ModelName>) => FilterExpr,
-  ): Collection<TContract, ModelName, Row> {
+  where(fn: (model: ModelAccessor<TContract, ModelName>) => FilterExpr): this {
     const accessor = createColumnAccessor(this.ctx.contract, this.modelName);
-    const filter = fn(accessor as ColumnAccessor<TContract, ModelName>);
+    const filter = fn(accessor as ModelAccessor<TContract, ModelName>);
     return this.#clone({
       filters: [...this.state.filters, filter],
     });
@@ -74,7 +90,8 @@ export class Collection<TContract extends SqlContract<SqlStorage>, ModelName ext
     Row & {
       [K in RelName]: IncludedRow[];
     }
-  > {
+  > &
+    this {
     const relation = resolveIncludeRelation(
       this.ctx.contract,
       this.modelName,
@@ -84,16 +101,13 @@ export class Collection<TContract extends SqlContract<SqlStorage>, ModelName ext
     // Build nested state from refine callback
     let nestedState = emptyState();
     if (refineFn) {
-      const nestedCollection = new Collection<
-        TContract,
+      const nestedCollection = this.#createCollection<
         RelatedName,
         DefaultModelRow<TContract, RelatedName>
-      >(
-        this.ctx,
-        relation.relatedModelName as RelatedName,
-        relation.relatedTableName,
-        emptyState(),
-      );
+      >(relation.relatedModelName as RelatedName, {
+        tableName: relation.relatedTableName,
+        state: emptyState(),
+      });
       const refined = refineFn(nestedCollection);
       nestedState = refined.state;
     }
@@ -107,25 +121,23 @@ export class Collection<TContract extends SqlContract<SqlStorage>, ModelName ext
       nested: nestedState,
     };
 
-    return this.#clone({
-      includes: [...this.state.includes, includeExpr],
-    }) as Collection<
-      TContract,
-      ModelName,
+    return this.#cloneWithRow<
       Row & {
         [K in RelName]: IncludedRow[];
       }
-    >;
+    >({
+      includes: [...this.state.includes, includeExpr],
+    });
   }
 
   orderBy(
-    fn: (model: ColumnAccessor<TContract, ModelName>) => {
+    fn: (model: ModelAccessor<TContract, ModelName>) => {
       column: string;
       direction: 'asc' | 'desc';
     },
-  ): Collection<TContract, ModelName, Row> {
+  ): this {
     const accessor = createColumnAccessor(this.ctx.contract, this.modelName);
-    const order = fn(accessor as ColumnAccessor<TContract, ModelName>);
+    const order = fn(accessor as ModelAccessor<TContract, ModelName>);
     const orderExpr: OrderExpr = {
       column: order.column,
       direction: order.direction,
@@ -136,28 +148,66 @@ export class Collection<TContract extends SqlContract<SqlStorage>, ModelName ext
     });
   }
 
-  take(n: number): Collection<TContract, ModelName, Row> {
+  take(n: number): this {
     return this.#clone({ limit: n });
   }
 
-  skip(n: number): Collection<TContract, ModelName, Row> {
+  skip(n: number): this {
     return this.#clone({ offset: n });
   }
 
-  findMany(): AsyncIterableResult<Row> {
+  all(): AsyncIterableResult<Row> {
     return this.#dispatch();
   }
 
-  findFirst(): AsyncIterableResult<Row> {
-    const limited = this.#clone({ limit: 1 });
-    return limited.#dispatch();
+  async find(
+    filter?: (model: ModelAccessor<TContract, ModelName>) => FilterExpr,
+  ): Promise<Row | null> {
+    const scoped = filter ? this.where(filter) : this;
+    const limited = scoped.take(1);
+    const rows = await limited.#dispatch().toArray();
+    return rows[0] ?? null;
   }
 
-  #clone(overrides: Partial<CollectionState>): Collection<TContract, ModelName, Row> {
-    return new Collection(this.ctx, this.modelName, this.tableName, {
+  #clone(overrides: Partial<CollectionState>): this {
+    return this.#createSelf<Row>({
       ...this.state,
       ...overrides,
     });
+  }
+
+  #cloneWithRow<NextRow>(
+    overrides: Partial<CollectionState>,
+  ): Collection<TContract, ModelName, NextRow> & this {
+    return this.#createSelf<NextRow>({
+      ...this.state,
+      ...overrides,
+    });
+  }
+
+  #createSelf<NextRow>(state: CollectionState): Collection<TContract, ModelName, NextRow> & this {
+    const Ctor = this.constructor as CollectionConstructor<TContract>;
+    return new Ctor(this.ctx, this.modelName, {
+      tableName: this.tableName,
+      state,
+      registry: this.registry,
+    }) as unknown as Collection<TContract, ModelName, NextRow> & this;
+  }
+
+  #createCollection<ModelNameInner extends string, RowInner>(
+    modelName: ModelNameInner,
+    options: CollectionInit<TContract>,
+  ): Collection<TContract, ModelNameInner, RowInner> {
+    const Ctor =
+      (this.registry.get(modelName) as CollectionConstructor<TContract> | undefined) ??
+      (Collection as unknown as CollectionConstructor<TContract>);
+    return new Ctor(this.ctx, modelName, {
+      tableName: options.tableName,
+      state: options.state,
+      registry:
+        options.registry ??
+        (this.registry as ReadonlyMap<string, CollectionConstructor<TContract>>),
+    }) as unknown as Collection<TContract, ModelNameInner, RowInner>;
   }
 
   #dispatch(): AsyncIterableResult<Row> {
@@ -301,7 +351,7 @@ function mapResultRows<TIn, TOut>(
 }
 
 async function acquireRuntimeScope(
-  runtime: RepositoryContext<SqlContract<SqlStorage>>['runtime'],
+  runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'],
 ): Promise<{
   scope: RuntimeScope;
   release?: () => Promise<void>;

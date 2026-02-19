@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { Collection } from '../src/collection';
 import { orm } from '../src/orm';
-import { Repository } from '../src/repository';
 import type { TestContract } from './helpers';
 import { createMockRuntime, createTestContract } from './helpers';
 
-class PostRepository extends Repository<TestContract, 'Post'> {
+class PostCollection extends Collection<TestContract, 'Post'> {
   popular() {
     return this.where((p) => p.views.gt(1000));
   }
@@ -13,22 +13,21 @@ class PostRepository extends Repository<TestContract, 'Post'> {
 describe('orm()', () => {
   const contract = createTestContract();
 
-  it('returns custom repositories by key', () => {
+  it('returns custom collections by key', () => {
     const runtime = createMockRuntime();
-    const postRepo = new PostRepository({ contract, runtime }, 'Post');
     const db = orm({
       contract,
       runtime,
-      repositories: { posts: postRepo },
+      collections: { posts: PostCollection },
     });
-    expect(db.posts).toBe(postRepo);
+    expect(db.posts).toBeInstanceOf(PostCollection);
   });
 
-  it('creates default repositories for model names', async () => {
+  it('creates default collections for model names', async () => {
     const runtime = createMockRuntime();
     const db = orm({ contract, runtime });
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
-    const results = await db.users.findMany().toArray();
+    const results = await db.users.all().toArray();
     expect(results).toHaveLength(1);
   });
 
@@ -50,12 +49,18 @@ describe('orm()', () => {
     expect(db.comments.modelName).toBe('Comment');
   });
 
-  it('caches lazily created repositories', () => {
+  it('caches lazily created collections', () => {
     const runtime = createMockRuntime();
     const db = orm({ contract, runtime });
     const first = db.users;
     const second = db.users;
     expect(first).toBe(second);
+  });
+
+  it('shares cached collection across model aliases', () => {
+    const runtime = createMockRuntime();
+    const db = orm({ contract, runtime });
+    expect(db.users).toBe(db.User);
   });
 
   it('throws for unknown model name', () => {
@@ -66,16 +71,15 @@ describe('orm()', () => {
     );
   });
 
-  it('custom repository overrides default for same key', () => {
+  it('custom collection overrides default for same key', () => {
     const runtime = createMockRuntime();
-    const customPostRepo = new PostRepository({ contract, runtime }, 'Post');
     const db = orm({
       contract,
       runtime,
-      repositories: { posts: customPostRepo },
+      collections: { posts: PostCollection },
     });
 
-    expect(db.posts).toBeInstanceOf(PostRepository);
+    expect(db.posts).toBeInstanceOf(PostCollection);
   });
 
   it('does not type unknown keys on the client', () => {
@@ -83,7 +87,7 @@ describe('orm()', () => {
     const db = orm({ contract, runtime });
     expect(db.users).toBeDefined();
     type DbClient = typeof db;
-    // @ts-expect-error unknown repository key should not exist on typed client
-    type _UnknownRepo = DbClient['unknown'];
+    // @ts-expect-error unknown collection key should not exist on typed client
+    type _UnknownCollection = DbClient['unknown'];
   });
 });

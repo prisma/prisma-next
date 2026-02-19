@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { Repository } from '../src/repository';
+import { Collection } from '../src/collection';
 import { createMockRuntime, createTestContract } from './helpers';
 
 describe('Collection', () => {
   const contract = createTestContract();
 
-  function createRepo() {
+  function createCollection() {
     const runtime = createMockRuntime();
-    const repo = new Repository({ contract, runtime }, 'User');
-    return { repo, runtime };
+    const collection = new Collection({ contract, runtime }, 'User');
+    return { collection, runtime };
   }
 
   describe('chain methods', () => {
     it('where() appends a filter and returns new collection', () => {
-      const { repo } = createRepo();
-      const filtered = repo.where((u) => u.name.eq('Alice'));
+      const { collection } = createCollection();
+      const filtered = collection.where((u) => u.name.eq('Alice'));
       expect(filtered.state.filters).toHaveLength(1);
       expect(filtered.state.filters[0]).toEqual({
         column: 'name',
@@ -22,34 +22,34 @@ describe('Collection', () => {
         value: 'Alice',
       });
       // Original is not mutated
-      expect(repo.state.filters).toHaveLength(0);
+      expect(collection.state.filters).toHaveLength(0);
     });
 
     it('where() can be chained multiple times', () => {
-      const { repo } = createRepo();
-      const filtered = repo
+      const { collection } = createCollection();
+      const filtered = collection
         .where((u) => u.name.eq('Alice'))
         .where((u) => u.email.neq('old@example.com'));
       expect(filtered.state.filters).toHaveLength(2);
     });
 
     it('take() sets limit', () => {
-      const { repo } = createRepo();
-      const limited = repo.take(10);
+      const { collection } = createCollection();
+      const limited = collection.take(10);
       expect(limited.state.limit).toBe(10);
-      expect(repo.state.limit).toBeUndefined();
+      expect(collection.state.limit).toBeUndefined();
     });
 
     it('skip() sets offset', () => {
-      const { repo } = createRepo();
-      const skipped = repo.skip(5);
+      const { collection } = createCollection();
+      const skipped = collection.skip(5);
       expect(skipped.state.offset).toBe(5);
-      expect(repo.state.offset).toBeUndefined();
+      expect(collection.state.offset).toBeUndefined();
     });
 
     it('include() appends an include expression', () => {
-      const { repo } = createRepo();
-      const withPosts = repo.include('posts');
+      const { collection } = createCollection();
+      const withPosts = collection.include('posts');
       expect(withPosts.state.includes).toHaveLength(1);
       expect(withPosts.state.includes[0]).toMatchObject({
         relationName: 'posts',
@@ -58,12 +58,14 @@ describe('Collection', () => {
         fkColumn: 'user_id',
       });
       // Original is not mutated
-      expect(repo.state.includes).toHaveLength(0);
+      expect(collection.state.includes).toHaveLength(0);
     });
 
     it('include() with refine callback captures nested state', () => {
-      const { repo } = createRepo();
-      const withPosts = repo.include('posts', (p) => p.where((post) => post.views.gt(100)).take(5));
+      const { collection } = createCollection();
+      const withPosts = collection.include('posts', (p) =>
+        p.where((post) => post.views.gt(100)).take(5),
+      );
       const inc = withPosts.state.includes[0]!;
       expect(inc.nested.filters).toHaveLength(1);
       expect(inc.nested.filters[0]).toEqual({
@@ -76,48 +78,49 @@ describe('Collection', () => {
   });
 
   describe('terminal methods', () => {
-    it('findMany() compiles and executes a SELECT query', async () => {
-      const { repo, runtime } = createRepo();
+    it('all() compiles and executes a SELECT query', async () => {
+      const { collection, runtime } = createCollection();
       runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
-      const results = await repo.findMany().toArray();
+      const results = await collection.all().toArray();
       expect(results).toEqual([{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
       expect(runtime.executions).toHaveLength(1);
       expect(runtime.executions[0]!.plan.sql).toContain('select');
       expect(runtime.executions[0]!.plan.sql).toContain('"users"');
-      expect(runtime.executions[0]!.plan.meta.lane).toBe('repository');
+      expect(runtime.executions[0]!.plan.meta.lane).toBe('orm-client');
     });
 
-    it('findMany() with where() produces WHERE clause', async () => {
-      const { repo, runtime } = createRepo();
+    it('all() with where() produces WHERE clause', async () => {
+      const { collection, runtime } = createCollection();
       runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
-      await repo
+      await collection
         .where((u) => u.name.eq('Alice'))
-        .findMany()
+        .all()
         .toArray();
       const sql = runtime.executions[0]!.plan.sql;
       expect(sql).toContain('where');
       expect(sql).toContain('"name"');
     });
 
-    it('findMany() with take/skip adds LIMIT/OFFSET', async () => {
-      const { repo, runtime } = createRepo();
+    it('all() with take/skip adds LIMIT/OFFSET', async () => {
+      const { collection, runtime } = createCollection();
       runtime.setNextResults([[]]);
-      await repo.take(10).skip(5).findMany().toArray();
+      await collection.take(10).skip(5).all().toArray();
       const sql = runtime.executions[0]!.plan.sql;
       expect(sql).toContain('limit');
       expect(sql).toContain('offset');
     });
 
-    it('findFirst() adds limit 1', async () => {
-      const { repo, runtime } = createRepo();
+    it('find() adds limit 1', async () => {
+      const { collection, runtime } = createCollection();
       runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
-      await repo.findFirst().toArray();
+      const result = await collection.find();
+      expect(result).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
       const sql = runtime.executions[0]!.plan.sql;
       expect(sql).toContain('limit');
     });
 
-    it('findMany() with include executes multiple queries and stitches results', async () => {
-      const { repo, runtime } = createRepo();
+    it('all() with include executes multiple queries and stitches results', async () => {
+      const { collection, runtime } = createCollection();
       runtime.setNextResults([
         // Parent query result
         [
@@ -132,7 +135,7 @@ describe('Collection', () => {
         ],
       ]);
 
-      const results = await repo.include('posts').findMany().toArray();
+      const results = await collection.include('posts').all().toArray();
 
       expect(results).toHaveLength(2);
       expect(results[0]).toMatchObject({
@@ -153,22 +156,22 @@ describe('Collection', () => {
       expect(runtime.executions).toHaveLength(2);
     });
 
-    it('findMany() with include returns empty relations when no children match', async () => {
-      const { repo, runtime } = createRepo();
+    it('all() with include returns empty relations when no children match', async () => {
+      const { collection, runtime } = createCollection();
       runtime.setNextResults([
         [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
         [], // No posts
       ]);
 
-      const results = await repo.include('posts').findMany().toArray();
+      const results = await collection.include('posts').all().toArray();
       expect(results[0]).toMatchObject({
         id: 1,
         posts: [],
       });
     });
 
-    it('findMany() with include and nested take() applies limit per parent', async () => {
-      const { repo, runtime } = createRepo();
+    it('all() with include and nested take() applies limit per parent', async () => {
+      const { collection, runtime } = createCollection();
       runtime.setNextResults([
         [
           { id: 1, name: 'Alice', email: 'alice@example.com' },
@@ -182,11 +185,11 @@ describe('Collection', () => {
         ],
       ]);
 
-      const results = await repo
+      const results = await collection
         .include('posts', (post) =>
           post.orderBy(() => ({ column: 'id', direction: 'asc' })).take(1),
         )
-        .findMany()
+        .all()
         .toArray();
 
       expect(results).toMatchObject([
@@ -195,9 +198,9 @@ describe('Collection', () => {
       ]);
     });
 
-    it('findMany() supports nested include dispatch', async () => {
+    it('all() supports nested include dispatch', async () => {
       const runtime = createMockRuntime();
-      const postRepo = new Repository({ contract, runtime }, 'Post');
+      const postCollection = new Collection({ contract, runtime }, 'Post');
       runtime.setNextResults([
         [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
         [
@@ -206,11 +209,11 @@ describe('Collection', () => {
         ],
       ]);
 
-      const results = await postRepo
+      const results = await postCollection
         .include('comments', (comment) =>
           comment.orderBy(() => ({ column: 'id', direction: 'asc' })),
         )
-        .findMany()
+        .all()
         .toArray();
 
       expect(results).toMatchObject([

@@ -9,7 +9,7 @@ This demo shows:
 - Creating Plans and executing them via the Runtime
 - Contract verification and marker management
 - Native Prisma Next patterns and best practices
-- Repository layer end-to-end examples using `@prisma-next/sql-orm-client`
+- ORM client end-to-end examples using `@prisma-next/sql-orm-client`
 - **Two workflows**: Emit workflow (JSON-based) and No-Emit workflow (TypeScript-based)
 - Client-generated UUID identifiers via `@prisma-next/ids`
 
@@ -79,13 +79,13 @@ Contract artifacts are `contract.json` and `contract.d.ts`. Static roots are `sq
 - **[Runtime & Plugin Framework](../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)** — Runtime execution pipeline
 - **[ADR 161 - Repository Layer](../../docs/architecture%20docs/adrs/ADR%20161%20-%20Repository%20Layer.md)** — Multi-query repository orchestration layer
 
-## Repository Examples
+## ORM Client Examples
 
-The demo includes repository API examples under `src/repositories/`:
+The demo includes ORM client examples under `src/orm-client/`:
 
-- `repositoryGetUsers(limit, runtime)` — list users using repository API
-- `repositoryGetAdminUsers(limit, runtime)` — filter through a custom repository scope
-- `repositoryGetUserPosts(userId, limit, runtime)` — fetch user posts with repository filters + ordering
+- `ormClientGetUsers(limit, runtime)` — list users using ORM client API
+- `ormClientGetAdminUsers(limit, runtime)` — filter through a custom collection scope
+- `ormClientGetUserPosts(userId, limit, runtime)` — fetch user posts with collection filters + ordering
 
 Run from the CLI:
 
@@ -129,8 +129,8 @@ pnpm start -- repo-posts user_001 10
 - `src/prisma/db.ts` - One-liner Postgres client + query roots (emit workflow)
 - `src/prisma-no-emit/context-no-emit.ts` - Env-free execution stack/context + query roots (no-emit workflow)
 - `src/prisma-no-emit/runtime-no-emit.ts` - Runtime factory (no-emit workflow)
-- `src/repositories/client.ts` - Repository client + custom repository scopes
-- `src/repositories/*.ts` - End-to-end repository query examples
+- `src/orm-client/client.ts` - ORM client + custom collection scopes
+- `src/orm-client/*.ts` - End-to-end ORM client query examples
 - `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
 - `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
 - `scripts/stamp-marker.ts` - Contract marker management

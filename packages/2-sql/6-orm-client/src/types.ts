@@ -57,7 +57,7 @@ export function emptyState(): CollectionState {
 }
 
 // ---------------------------------------------------------------------------
-// RepositoryContext — bundles lane context + runtime
+// CollectionContext — bundles lane context + runtime
 // ---------------------------------------------------------------------------
 
 export interface RuntimeScope {
@@ -79,13 +79,13 @@ export interface RuntimeQueryable extends RuntimeScope {
   transaction?(): Promise<RuntimeTransaction>;
 }
 
-export interface RepositoryContext<TContract extends SqlContract<SqlStorage>> {
+export interface CollectionContext<TContract extends SqlContract<SqlStorage>> {
   readonly contract: TContract;
   readonly runtime: RuntimeQueryable;
 }
 
 // ---------------------------------------------------------------------------
-// ColumnAccessor — type-safe proxy for where() callbacks
+// ModelAccessor — type-safe proxy for where() callbacks
 // ---------------------------------------------------------------------------
 
 export type ComparisonMethods<T> = {
@@ -97,7 +97,7 @@ export type ComparisonMethods<T> = {
   lte(value: T): FilterExpr;
 };
 
-export type ColumnAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {
+export type ModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {
   [K in keyof FieldsOf<TContract, ModelName> & string]: ComparisonMethods<
     FieldJsType<TContract, ModelName, K>
   >;
@@ -298,5 +298,5 @@ export type RelatedModelName<
     : never
   : never;
 
-export type RepositoryModelName<TContract extends SqlContract<SqlStorage>> =
+export type CollectionModelName<TContract extends SqlContract<SqlStorage>> =
   keyof ModelsOf<TContract> & string;

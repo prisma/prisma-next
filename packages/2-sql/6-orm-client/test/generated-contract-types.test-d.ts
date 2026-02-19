@@ -1,5 +1,5 @@
 import type { SqlContract, StorageTable } from '@prisma-next/sql-contract/types';
-import { Repository } from '../src/repository';
+import { Collection } from '../src/collection';
 import { createMockRuntime } from './helpers';
 
 type GeneratedLikeContract = SqlContract<
@@ -77,7 +77,7 @@ type GeneratedLikeContract = SqlContract<
   }
 >;
 
-class PostRepository extends Repository<GeneratedLikeContract, 'Post'> {
+class PostCollection extends Collection<GeneratedLikeContract, 'Post'> {
   forUser(userId: string) {
     return this.where((post) => post.userId.eq(userId));
   }
@@ -85,5 +85,5 @@ class PostRepository extends Repository<GeneratedLikeContract, 'Post'> {
 
 const runtime = createMockRuntime();
 const contract = {} as GeneratedLikeContract;
-const repo = new PostRepository({ contract, runtime }, 'Post');
-repo.forUser('user_001');
+const collection = new PostCollection({ contract, runtime }, 'Post');
+collection.forUser('user_001');
