@@ -1,13 +1,11 @@
 import {
   DEFAULT_FOREIGN_KEYS_CONFIG,
   type ForeignKey,
-  type ForeignKeyReferences,
   type Index,
   type ModelDefinition,
   type ModelField,
   type ModelStorage,
   type PrimaryKey,
-  type ReferentialAction,
   type SqlContract,
   type SqlMappings,
   type SqlStorage,
@@ -16,7 +14,13 @@ import {
   type StorageTypeInstance,
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import { ColumnDefaultSchema, ForeignKeysConfigSchema } from '@prisma-next/sql-contract/validators';
+import {
+  ColumnDefaultSchema,
+  ForeignKeyReferencesSchema,
+  ForeignKeySchema,
+  ForeignKeysConfigSchema,
+  ReferentialActionSchema,
+} from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
@@ -55,22 +59,8 @@ const IndexSchema = type.declare<Index>().type({
   'name?': 'string',
 });
 
-const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({
-  table: 'string',
-  columns: type.string.array().readonly(),
-});
-
-const ReferentialActionSchema = type
-  .declare<ReferentialAction>()
-  .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
-
-const ForeignKeySchema = type.declare<ForeignKey>().type({
-  columns: type.string.array().readonly(),
-  references: ForeignKeyReferencesSchema,
-  'name?': 'string',
-  'onDelete?': ReferentialActionSchema,
-  'onUpdate?': ReferentialActionSchema,
-});
+// ForeignKeyReferencesSchema, ReferentialActionSchema, and ForeignKeySchema
+// are imported from @prisma-next/sql-contract/validators to avoid duplication.
 
 const StorageTableSchema = type.declare<StorageTable>().type({
   columns: type({ '[string]': StorageColumnSchema }),

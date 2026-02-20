@@ -1,5 +1,9 @@
 import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 
+/**
+ * Duplicated from sql-contract to avoid cross-layer dependency
+ * (framework authoring cannot depend on the SQL domain's contract package).
+ */
 export type ReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
 
 /**
@@ -79,17 +83,23 @@ export interface IndexDef {
 }
 
 /**
+ * Options for configuring a foreign key's name and referential actions.
+ */
+export type ForeignKeyOptions = {
+  readonly name?: string;
+  readonly onDelete?: ReferentialAction;
+  readonly onUpdate?: ReferentialAction;
+};
+
+/**
  * Foreign key definition for table builder.
  */
-export interface ForeignKeyDef {
+export interface ForeignKeyDef extends ForeignKeyOptions {
   readonly columns: readonly string[];
   readonly references: {
     readonly table: string;
     readonly columns: readonly string[];
   };
-  readonly name?: string;
-  readonly onDelete?: ReferentialAction;
-  readonly onUpdate?: ReferentialAction;
 }
 
 export interface TableBuilderState<

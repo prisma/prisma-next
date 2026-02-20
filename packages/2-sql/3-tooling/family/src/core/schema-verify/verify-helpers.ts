@@ -179,14 +179,20 @@ export function verifyForeignKeys(
         children: [],
       });
     } else {
-      const actionMismatch = hasReferentialActionMismatch(contractFK, matchingFK);
-      if (actionMismatch) {
+      const actionMismatches = getReferentialActionMismatches(contractFK, matchingFK);
+      if (actionMismatches.length > 0) {
+        const combinedMessage = actionMismatches.map((m) => m.message).join('; ');
+        const combinedExpected = actionMismatches.map((m) => m.expected).join(', ');
+        const combinedActual = actionMismatches.map((m) => m.actual).join(', ');
         issues.push({
           kind: 'foreign_key_mismatch',
           table: tableName,
-          expected: actionMismatch.expected,
-          actual: actionMismatch.actual,
-          message: `Table "${tableName}" foreign key ${contractFK.columns.join(', ')} -> ${contractFK.references.table}: ${actionMismatch.message}`,
+          // Set indexOrConstraint so the planner classifies this as a non-additive
+          // conflict (existing FK with wrong actions cannot be fixed additively).
+          indexOrConstraint: matchingFK.name ?? `fk(${contractFK.columns.join(',')})`,
+          expected: combinedExpected,
+          actual: combinedActual,
+          message: `Table "${tableName}" foreign key ${contractFK.columns.join(', ')} -> ${contractFK.references.table}: ${combinedMessage}`,
         });
         nodes.push({
           status: 'fail',
@@ -194,7 +200,7 @@ export function verifyForeignKeys(
           name: `foreignKey(${contractFK.columns.join(', ')})`,
           contractPath: fkPath,
           code: 'foreign_key_mismatch',
-          message: actionMismatch.message,
+          message: combinedMessage,
           expected: contractFK,
           actual: matchingFK,
           children: [],
@@ -554,25 +560,45 @@ export function computeCounts(node: SchemaVerificationNode): {
 /**
  * Compares referential actions between a contract FK and a schema FK.
  * Only compares when the contract FK explicitly specifies onDelete or onUpdate.
- * Returns a mismatch descriptor if there's a difference, or undefined if OK.
+ * Returns all mismatches (both onDelete and onUpdate) so both are reported at once.
+ *
+ * Note: 'noAction' in the contract is semantically equivalent to undefined in the
+ * schema IR, because the introspection adapter omits 'NO ACTION' (the database default)
+ * to keep the IR sparse. We normalize both sides before comparing.
  */
-function hasReferentialActionMismatch(
+function getReferentialActionMismatches(
   contractFK: ForeignKey,
   schemaFK: SqlForeignKeyIR,
-): { expected: string; actual: string; message: string } | undefined {
-  if (contractFK.onDelete !== undefined && contractFK.onDelete !== schemaFK.onDelete) {
-    return {
+): ReadonlyArray<{ expected: string; actual: string; message: string }> {
+  const mismatches: Array<{ expected: string; actual: string; message: string }> = [];
+
+  const contractOnDelete = normalizeReferentialAction(contractFK.onDelete);
+  const schemaOnDelete = normalizeReferentialAction(schemaFK.onDelete);
+  if (contractOnDelete !== undefined && contractOnDelete !== schemaOnDelete) {
+    mismatches.push({
       expected: `onDelete: ${contractFK.onDelete}`,
-      actual: `onDelete: ${schemaFK.onDelete ?? 'undefined'}`,
+      actual: `onDelete: ${schemaFK.onDelete ?? 'noAction (default)'}`,
       message: `onDelete mismatch: expected ${contractFK.onDelete}, got ${schemaFK.onDelete ?? 'noAction (default)'}`,
-    };
+    });
   }
-  if (contractFK.onUpdate !== undefined && contractFK.onUpdate !== schemaFK.onUpdate) {
-    return {
+
+  const contractOnUpdate = normalizeReferentialAction(contractFK.onUpdate);
+  const schemaOnUpdate = normalizeReferentialAction(schemaFK.onUpdate);
+  if (contractOnUpdate !== undefined && contractOnUpdate !== schemaOnUpdate) {
+    mismatches.push({
       expected: `onUpdate: ${contractFK.onUpdate}`,
-      actual: `onUpdate: ${schemaFK.onUpdate ?? 'undefined'}`,
+      actual: `onUpdate: ${schemaFK.onUpdate ?? 'noAction (default)'}`,
       message: `onUpdate mismatch: expected ${contractFK.onUpdate}, got ${schemaFK.onUpdate ?? 'noAction (default)'}`,
-    };
+    });
   }
-  return undefined;
+
+  return mismatches;
+}
+
+/**
+ * Normalizes a referential action value for comparison.
+ * 'noAction' is the database default and equivalent to undefined (omitted) in the sparse IR.
+ */
+function normalizeReferentialAction(action: string | undefined): string | undefined {
+  return action === 'noAction' ? undefined : action;
 }

@@ -138,7 +138,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          ORDER BY tc.table_name, kcu.ordinal_position`,
         [schema],
       ),
-      // Query all foreign keys for all tables in schema, including referential actions
+      // Query all foreign keys for all tables in schema, including referential actions.
+      // Uses pg_catalog for correct positional pairing of composite FK columns
+      // (information_schema.constraint_column_usage lacks ordinal_position,
+      // which causes Cartesian products for multi-column FKs).
       driver.query<{
         table_name: string;
         constraint_name: string;
@@ -155,9 +158,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            tc.constraint_name,
            kcu.column_name,
            kcu.ordinal_position,
-           ccu.table_schema AS referenced_table_schema,
-           ccu.table_name AS referenced_table_name,
-           ccu.column_name AS referenced_column_name,
+           ref_ns.nspname AS referenced_table_schema,
+           ref_cl.relname AS referenced_table_name,
+           ref_att.attname AS referenced_column_name,
            rc.delete_rule,
            rc.update_rule
          FROM information_schema.table_constraints tc
@@ -165,9 +168,18 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            ON tc.constraint_name = kcu.constraint_name
            AND tc.table_schema = kcu.table_schema
            AND tc.table_name = kcu.table_name
-         JOIN information_schema.constraint_column_usage ccu
-           ON ccu.constraint_name = tc.constraint_name
-           AND ccu.table_schema = tc.table_schema
+         JOIN pg_catalog.pg_constraint pgc
+           ON pgc.conname = tc.constraint_name
+           AND pgc.connamespace = (
+             SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = tc.table_schema
+           )
+         JOIN pg_catalog.pg_class ref_cl
+           ON ref_cl.oid = pgc.confrelid
+         JOIN pg_catalog.pg_namespace ref_ns
+           ON ref_ns.oid = ref_cl.relnamespace
+         JOIN pg_catalog.pg_attribute ref_att
+           ON ref_att.attrelid = pgc.confrelid
+           AND ref_att.attnum = pgc.confkey[kcu.ordinal_position]
          JOIN information_schema.referential_constraints rc
            ON rc.constraint_name = tc.constraint_name
            AND rc.constraint_schema = tc.table_schema
@@ -536,7 +548,13 @@ function normalizeFormattedType(formattedType: string, dataType: string, udtName
   return formattedType;
 }
 
-const PG_REFERENTIAL_ACTION_MAP: Record<string, SqlReferentialAction> = {
+/**
+ * The five standard PostgreSQL referential action rules as returned by
+ * `information_schema.referential_constraints.delete_rule` / `update_rule`.
+ */
+type PgReferentialActionRule = 'NO ACTION' | 'RESTRICT' | 'CASCADE' | 'SET NULL' | 'SET DEFAULT';
+
+const PG_REFERENTIAL_ACTION_MAP: Record<PgReferentialActionRule, SqlReferentialAction> = {
   'NO ACTION': 'noAction',
   RESTRICT: 'restrict',
   CASCADE: 'cascade',
@@ -547,9 +565,15 @@ const PG_REFERENTIAL_ACTION_MAP: Record<string, SqlReferentialAction> = {
 /**
  * Maps a Postgres referential action rule to the canonical SqlReferentialAction.
  * Returns undefined for 'NO ACTION' (the database default) to keep the IR sparse.
+ * Throws for unrecognized rules to prevent silent data loss.
  */
 function mapReferentialAction(rule: string): SqlReferentialAction | undefined {
-  const mapped = PG_REFERENTIAL_ACTION_MAP[rule];
+  const mapped = PG_REFERENTIAL_ACTION_MAP[rule as PgReferentialActionRule];
+  if (mapped === undefined) {
+    throw new Error(
+      `Unknown PostgreSQL referential action rule: "${rule}". Expected one of: NO ACTION, RESTRICT, CASCADE, SET NULL, SET DEFAULT.`,
+    );
+  }
   if (mapped === 'noAction') return undefined;
   return mapped;
 }

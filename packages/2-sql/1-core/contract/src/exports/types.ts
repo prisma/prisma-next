@@ -2,6 +2,7 @@ export type {
   ExtractCodecTypes,
   ExtractOperationTypes,
   ForeignKey,
+  ForeignKeyOptions,
   ForeignKeyReferences,
   ForeignKeysConfig,
   Index,

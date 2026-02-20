@@ -4,9 +4,9 @@ import type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
   ForeignKeyDef,
+  ForeignKeyOptions,
   IndexDef,
   NullableColumnCannotHaveDefault,
-  ReferentialAction,
   TableBuilderState,
   UniqueConstraintDef,
 } from './builder-state';
@@ -274,13 +274,7 @@ export class TableBuilder<
   foreignKey(
     columns: readonly string[],
     references: { table: string; columns: readonly string[] },
-    nameOrOptions?:
-      | string
-      | {
-          name?: string;
-          onDelete?: ReferentialAction;
-          onUpdate?: ReferentialAction;
-        },
+    nameOrOptions?: string | ForeignKeyOptions,
   ): TableBuilder<Name, Columns, PrimaryKey> {
     let fkDef: ForeignKeyDef;
     if (typeof nameOrOptions === 'string') {
@@ -289,9 +283,9 @@ export class TableBuilder<
       fkDef = {
         columns,
         references,
-        ...(nameOrOptions.name !== undefined && { name: nameOrOptions.name }),
-        ...(nameOrOptions.onDelete !== undefined && { onDelete: nameOrOptions.onDelete }),
-        ...(nameOrOptions.onUpdate !== undefined && { onUpdate: nameOrOptions.onUpdate }),
+        ...ifDefined('name', nameOrOptions.name),
+        ...ifDefined('onDelete', nameOrOptions.onDelete),
+        ...ifDefined('onUpdate', nameOrOptions.onUpdate),
       };
     } else {
       fkDef = { columns, references };

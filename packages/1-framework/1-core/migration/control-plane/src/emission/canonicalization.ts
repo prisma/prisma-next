@@ -81,6 +81,13 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       continue;
     }
 
+    // Strip 'noAction' referential actions (the database default) for hash stability.
+    // A contract with explicit `onDelete: 'noAction'` is semantically identical to
+    // one that omits `onDelete` entirely, so they should produce the same hash.
+    if ((key === 'onDelete' || key === 'onUpdate') && value === 'noAction') {
+      continue;
+    }
+
     if (isDefaultValue(value)) {
       const isRequiredModels = isArrayEqual(currentPath, ['models']);
       const isRequiredTables = isArrayEqual(currentPath, ['storage', 'tables']);

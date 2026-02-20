@@ -1,5 +1,5 @@
 import type { ModelDefinition, SqlContract, SqlMappings, SqlStorage } from './types';
-import { validateSqlContract } from './validators';
+import { validateSqlContract, validateStorageSemantics } from './validators';
 
 type ResolvedMappings = {
   modelToTable: Record<string, string>;
@@ -310,6 +310,11 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
   const normalized = normalizeContract(value);
   const structurallyValid = validateSqlContract<SqlContract<SqlStorage>>(normalized);
   validateContractLogic(structurallyValid);
+
+  const semanticErrors = validateStorageSemantics(structurallyValid.storage);
+  if (semanticErrors.length > 0) {
+    throw new Error(`Contract semantic validation failed: ${semanticErrors.join('; ')}`);
+  }
 
   const existingMappings = (structurallyValid as { mappings?: Partial<SqlMappings> }).mappings;
   const defaultMappings = computeDefaultMappings(

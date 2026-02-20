@@ -91,16 +91,16 @@ const IndexSchema = type.declare<Index>().type({
   'name?': 'string',
 });
 
-const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({
+export const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({
   table: 'string',
   columns: type.string.array().readonly(),
 });
 
-const ReferentialActionSchema = type
+export const ReferentialActionSchema = type
   .declare<ReferentialAction>()
   .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
 
-const ForeignKeySchema = type.declare<ForeignKey>().type({
+export const ForeignKeySchema = type.declare<ForeignKey>().type({
   columns: type.string.array().readonly(),
   references: ForeignKeyReferencesSchema,
   'name?': 'string',
@@ -236,6 +236,7 @@ export function validateSqlContract<T extends SqlContract<SqlStorage>>(value: un
  *
  * Currently checks:
  * - `setNull` referential action on a non-nullable FK column (would fail at runtime)
+ * - `setDefault` referential action on a non-nullable FK column without a DEFAULT (would fail at runtime)
  */
 export function validateStorageSemantics(storage: SqlStorage): string[] {
   const errors: string[] = [];
@@ -254,6 +255,16 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
         if (fk.onUpdate === 'setNull' && !column.nullable) {
           errors.push(
             `Table "${tableName}": onUpdate setNull on foreign key column "${colName}" which is NOT NULL`,
+          );
+        }
+        if (fk.onDelete === 'setDefault' && !column.nullable && column.default === undefined) {
+          errors.push(
+            `Table "${tableName}": onDelete setDefault on foreign key column "${colName}" which is NOT NULL and has no DEFAULT`,
+          );
+        }
+        if (fk.onUpdate === 'setDefault' && !column.nullable && column.default === undefined) {
+          errors.push(
+            `Table "${tableName}": onUpdate setDefault on foreign key column "${colName}" which is NOT NULL and has no DEFAULT`,
           );
         }
       }

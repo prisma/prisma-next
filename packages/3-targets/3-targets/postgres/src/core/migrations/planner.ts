@@ -1074,10 +1074,18 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
     .join(', ')})`;
 
   if (foreignKey.onDelete !== undefined) {
-    sql += `\nON DELETE ${REFERENTIAL_ACTION_SQL[foreignKey.onDelete]}`;
+    const action = REFERENTIAL_ACTION_SQL[foreignKey.onDelete];
+    if (!action) {
+      throw new Error(`Unknown referential action for onDelete: ${String(foreignKey.onDelete)}`);
+    }
+    sql += `\nON DELETE ${action}`;
   }
   if (foreignKey.onUpdate !== undefined) {
-    sql += `\nON UPDATE ${REFERENTIAL_ACTION_SQL[foreignKey.onUpdate]}`;
+    const action = REFERENTIAL_ACTION_SQL[foreignKey.onUpdate];
+    if (!action) {
+      throw new Error(`Unknown referential action for onUpdate: ${String(foreignKey.onUpdate)}`);
+    }
+    sql += `\nON UPDATE ${action}`;
   }
 
   return sql;

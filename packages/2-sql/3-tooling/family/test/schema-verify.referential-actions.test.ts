@@ -178,6 +178,60 @@ describe('verifySqlSchema - referential actions', () => {
     );
   });
 
+  it('passes when contract FK specifies noAction and schema has undefined (database default)', () => {
+    const contract = createTestContract({
+      user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
+      post: createContractTable(
+        {
+          id: { nativeType: 'int4', nullable: false },
+          userId: { nativeType: 'int4', nullable: false },
+        },
+        {
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              references: { table: 'user', columns: ['id'] },
+              onDelete: 'noAction',
+              onUpdate: 'noAction',
+            },
+          ],
+        },
+      ),
+    });
+
+    const schema = createTestSchemaIR({
+      user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
+      post: createSchemaTable(
+        'post',
+        {
+          id: { nativeType: 'int4', nullable: false },
+          userId: { nativeType: 'int4', nullable: false },
+        },
+        {
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              referencedTable: 'user',
+              referencedColumns: ['id'],
+              // onDelete and onUpdate are undefined (sparse IR for NO ACTION)
+            },
+          ],
+        },
+      ),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
   it('passes when contract FK omits referential actions (does not compare)', () => {
     const contract = createTestContract({
       user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),

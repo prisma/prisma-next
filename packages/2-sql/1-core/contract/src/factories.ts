@@ -5,6 +5,7 @@ import type {
 } from '@prisma-next/contract/types';
 import type {
   ForeignKey,
+  ForeignKeyOptions,
   ForeignKeyReferences,
   ForeignKeysConfig,
   Index,
@@ -12,7 +13,6 @@ import type {
   ModelField,
   ModelStorage,
   PrimaryKey,
-  ReferentialAction,
   SqlContract,
   SqlMappings,
   SqlStorage,
@@ -59,13 +59,7 @@ export function fk(
   columns: readonly string[],
   refTable: string,
   refColumns: readonly string[],
-  nameOrOptions?:
-    | string
-    | {
-        name?: string;
-        onDelete?: ReferentialAction;
-        onUpdate?: ReferentialAction;
-      },
+  nameOrOptions?: string | ForeignKeyOptions,
 ): ForeignKey {
   const references: ForeignKeyReferences = {
     table: refTable,

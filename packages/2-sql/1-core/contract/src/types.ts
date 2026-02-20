@@ -58,6 +58,12 @@ export type ForeignKeyReferences = {
 
 export type ReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
 
+export type ForeignKeyOptions = {
+  readonly name?: string;
+  readonly onDelete?: ReferentialAction;
+  readonly onUpdate?: ReferentialAction;
+};
+
 export type ForeignKey = {
   readonly columns: readonly string[];
   readonly references: ForeignKeyReferences;

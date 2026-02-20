@@ -25,6 +25,7 @@ import {
   type ForeignKeysConfig,
   type ModelDefinition,
   type ModelField,
+  type ReferentialAction,
   type SqlContract,
   type SqlMappings,
   type SqlStorage,
@@ -73,6 +74,8 @@ type BuildStorageTable<
     readonly columns: readonly string[];
     readonly references: { readonly table: string; readonly columns: readonly string[] };
     readonly name?: string;
+    readonly onDelete?: ReferentialAction;
+    readonly onUpdate?: ReferentialAction;
   }>;
 } & (PK extends readonly string[]
   ? { readonly primaryKey: { readonly columns: PK; readonly name?: string } }

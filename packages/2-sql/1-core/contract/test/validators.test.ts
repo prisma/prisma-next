@@ -505,6 +505,76 @@ describe('SQL contract validators', () => {
       expect(errors[0]).toContain('setNull');
     });
 
+    it('rejects setDefault on non-nullable FK column without DEFAULT', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', false),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('setDefault');
+      expect(errors[0]).toContain('userId');
+      expect(errors[0]).toContain('NOT NULL');
+      expect(errors[0]).toContain('no DEFAULT');
+    });
+
+    it('allows setDefault on non-nullable FK column with DEFAULT', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
+              default: { kind: 'literal', expression: '0' },
+            },
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('allows setDefault on nullable FK column without DEFAULT', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', true),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('rejects setDefault on onUpdate for non-nullable FK column without DEFAULT', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', false),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onUpdate: 'setDefault' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('setDefault');
+    });
+
     it('returns no errors for storage without FKs', () => {
       const s = storage({
         user: table({ id: col('int4', 'pg/int4@1') }),
