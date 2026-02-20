@@ -74,7 +74,7 @@ describe('Kysely integration', () => {
     it(
       'creates a user successfully',
       async () => {
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
         });
 
@@ -101,7 +101,7 @@ describe('Kysely integration', () => {
     it(
       'reads users with select queries',
       async () => {
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
         });
 
@@ -126,7 +126,7 @@ describe('Kysely integration', () => {
     it(
       'updates a user email',
       async () => {
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
         });
 
@@ -164,7 +164,7 @@ describe('Kysely integration', () => {
     it(
       'deletes a user',
       async () => {
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
         });
 
@@ -209,7 +209,7 @@ describe('Kysely integration', () => {
     it(
       'commits transaction successfully',
       async () => {
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
         });
 
@@ -254,7 +254,7 @@ describe('Kysely integration', () => {
     it(
       'rolls back transaction on error',
       async () => {
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
         });
 
@@ -304,7 +304,7 @@ describe('Kysely integration', () => {
     it(
       'creates dialect instance successfully',
       async () => {
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
         });
 
@@ -321,7 +321,7 @@ describe('Kysely integration', () => {
     it(
       'executes raw SQL queries',
       async () => {
-        const runtime = createTestRuntimeFromClient(fixtureContract, client, {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
         });
 

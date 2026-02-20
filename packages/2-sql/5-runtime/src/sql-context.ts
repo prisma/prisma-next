@@ -98,7 +98,7 @@ export type SqlExecutionStackWithDriver<TTargetId extends string = string> = Omi
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId, SqlRuntimeAdapterInstance<TTargetId>>;
   readonly driver:
-    | RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>
+    | RuntimeDriverDescriptor<'sql', TTargetId, unknown, SqlRuntimeDriverInstance<TTargetId>>
     | undefined;
   readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
 };
@@ -112,17 +112,23 @@ export type SqlRuntimeAdapterInstance<TTargetId extends string = string> = Runti
 > &
   Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
 
+/**
+ * NOTE: Binding type is intentionally erased to unknown at this shared runtime layer.
+ * Target clients (for example `postgres()`) validate and construct the concrete binding
+ * before calling `driver.connect(binding)`, which keeps runtime behavior safe today.
+ * A future follow-up can preserve TBinding through stack/context generics end-to-end.
+ */
 export type SqlRuntimeDriverInstance<TTargetId extends string = string> = RuntimeDriverInstance<
   'sql',
   TTargetId
 > &
-  SqlDriver;
+  SqlDriver<unknown>;
 
 export function createSqlExecutionStack<TTargetId extends string>(options: {
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId>;
   readonly driver?:
-    | RuntimeDriverDescriptor<'sql', TTargetId, SqlRuntimeDriverInstance<TTargetId>>
+    | RuntimeDriverDescriptor<'sql', TTargetId, unknown, SqlRuntimeDriverInstance<TTargetId>>
     | undefined;
   readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[] | undefined;
 }): SqlExecutionStackWithDriver<TTargetId> {

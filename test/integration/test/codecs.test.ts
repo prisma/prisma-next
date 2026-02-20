@@ -101,10 +101,10 @@ describe('Codecs Integration Tests', () => {
   it(
     'encodes JS Date parameter to ISO string',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -151,10 +151,10 @@ describe('Codecs Integration Tests', () => {
   it(
     'decodes timestamptz to ISO string',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -197,10 +197,10 @@ describe('Codecs Integration Tests', () => {
   it(
     'round-trips numbers correctly',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -240,10 +240,10 @@ describe('Codecs Integration Tests', () => {
   it(
     'round-trips strings correctly',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -283,10 +283,10 @@ describe('Codecs Integration Tests', () => {
   it(
     'uses codec override via annotations.codecs',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -343,10 +343,10 @@ describe('Codecs Integration Tests', () => {
       // First, alter table to allow nullable created_at for this test
       await client.query('ALTER TABLE test_data ALTER COLUMN created_at DROP NOT NULL');
 
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -383,10 +383,10 @@ describe('Codecs Integration Tests', () => {
   it(
     'decodes multiple columns with different types',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -432,10 +432,10 @@ describe('Codecs Integration Tests', () => {
   it(
     'uses codec assignments from contract column types',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {
@@ -484,10 +484,10 @@ describe('Codecs Integration Tests', () => {
   it(
     'uses codec assignments from contract column types for WHERE clause parameters',
     async () => {
-      const runtime = createTestRuntime(
+      const runtime = await createTestRuntime(
         fixtureContract,
         {
-          connect: { client },
+          binding: { kind: 'pgClient', client },
           cursor: { disabled: true },
         },
         {

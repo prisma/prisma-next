@@ -18,3 +18,11 @@ packages/e2e-tests/.tmp-output
 test/**/fixtures/generated/
 !test/e2e/framework/test/fixtures/generated/
 !test/e2e/framework/test/fixtures/generated/**
+
+# Generated review-framework artifacts (never commit)
+agent-os/specs/**/review-state.json
+agent-os/specs/**/review-state.md
+agent-os/specs/**/review-targets.json
+agent-os/specs/**/review-actions.json
+agent-os/specs/**/review-actions.md
+agent-os/specs/**/summary.txt

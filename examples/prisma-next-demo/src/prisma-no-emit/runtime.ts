@@ -3,7 +3,7 @@ import { budgets, createRuntime, type Plugin, type Runtime } from '@prisma-next/
 import { Pool } from 'pg';
 import { context, stack } from './context';
 
-export function getRuntime(
+export async function getRuntime(
   databaseUrl: string,
   plugins: Plugin<typeof context.contract>[] = [
     budgets({
@@ -13,19 +13,20 @@ export function getRuntime(
       maxLatencyMs: 1_000,
     }),
   ],
-): Runtime {
+): Promise<Runtime> {
   const pool = new Pool({ connectionString: databaseUrl });
 
-  // Avoid import-time instantiation: instantiate when runtime is requested.
   const stackInstance = instantiateExecutionStack(stack);
-  const driverDescriptor = stack.driver;
-  if (!driverDescriptor) {
+  const driver = stackInstance.driver;
+  if (!driver) {
     throw new Error('Driver descriptor missing from execution stack');
   }
-  const driver = driverDescriptor.create({
-    connect: { pool },
-    cursor: { disabled: true },
-  });
+  try {
+    await driver.connect({ kind: 'pgPool', pool });
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
 
   return createRuntime({
     stackInstance,

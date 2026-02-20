@@ -1,4 +1,5 @@
 import type { ControlDriverInstance } from '@prisma-next/core-control-plane/types';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { normalizeSchemaNativeType, PostgresControlAdapter } from '../src/core/control-adapter';
 
@@ -1192,32 +1193,36 @@ describe('PostgresControlAdapter', () => {
       expect(result.annotations?.['pg']).toMatchObject({ schema: 'custom_schema' });
     });
 
-    it('handles version string without match', async () => {
-      const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
-        familyId: 'sql',
-        targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
+    it(
+      'handles version string without match',
+      async () => {
+        const adapter = new PostgresControlAdapter();
+        const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
+          familyId: 'sql',
+          targetId: 'postgres',
+          query: async <Row = Record<string, unknown>>(sql: string) => {
+            if (sql.includes('information_schema.tables')) {
+              return { rows: [] as Row[] };
+            }
+            if (sql.includes('pg_extension')) {
+              return { rows: [] as Row[] };
+            }
+            if (sql.includes('version()')) {
+              return {
+                rows: [{ version: 'Unknown database version' }] as Row[],
+              };
+            }
             return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_extension')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('version()')) {
-            return {
-              rows: [{ version: 'Unknown database version' }] as Row[],
-            };
-          }
-          return { rows: [] as Row[] };
-        },
-        close: async () => {},
-      };
+          },
+          close: async () => {},
+        };
 
-      const result = await adapter.introspect(mockDriver);
+        const result = await adapter.introspect(mockDriver);
 
-      expect(result.annotations?.['pg']).toMatchObject({ version: 'unknown' });
-    });
+        expect(result.annotations?.['pg']).toMatchObject({ version: 'unknown' });
+      },
+      timeouts.databaseOperation,
+    );
 
     it('handles missing version result', async () => {
       const adapter = new PostgresControlAdapter();

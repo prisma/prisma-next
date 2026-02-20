@@ -11,7 +11,7 @@ This package provides TypeScript type definitions for execution/runtime-plane de
 - **Runtime Instance Types**: Base interfaces for runtime plane instances (`RuntimeFamilyInstance`, `RuntimeTargetInstance`, `RuntimeAdapterInstance`, `RuntimeDriverInstance`, `RuntimeExtensionInstance`)
 - **Runtime Descriptor Types**: Type definitions for runtime plane descriptors (`RuntimeFamilyDescriptor`, `RuntimeTargetDescriptor`, `RuntimeAdapterDescriptor`, `RuntimeDriverDescriptor`, `RuntimeExtensionDescriptor`)
 - **Execution Stack Types**: Descriptors-only execution stack (`ExecutionStack`) and instantiated stack (`ExecutionStackInstance`)
-- **Stack Instantiation**: Helper to instantiate a stack (`instantiateExecutionStack`)
+- **Stack Instantiation**: Helper to instantiate a stack (`instantiateExecutionStack`). When stack has a driver descriptor, instance includes unbound `driver`; caller connects at boundary then passes driver to runtime.
 
 ## Dependencies
 
@@ -81,7 +81,7 @@ const adapter: RuntimeAdapterInstance<'sql', 'postgres'> = adapterDescriptor.cre
 
 ### Execution Stack
 
-Execution stacks group runtime descriptors and are instantiated explicitly:
+Execution stacks group runtime descriptors and are instantiated explicitly. When the stack has a driver descriptor, `instantiateExecutionStack` includes an unbound driver; connect at the boundary then create runtime:
 
 ```typescript
 import { createExecutionStack, instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
@@ -94,6 +94,9 @@ const stack = createExecutionStack({
 });
 
 const stackInstance = instantiateExecutionStack(stack);
+// stackInstance.driver is unbound; caller connects at boundary:
+await stackInstance.driver!.connect(binding);
+// then createRuntime({ stackInstance, context, driver: stackInstance.driver, ... })
 ```
 
 ## Package Location
@@ -106,7 +109,8 @@ This package is part of the **framework domain**, **core layer**, **runtime plan
 
 ## Related Documentation
 
-- `docs/architecture docs/adrs/ADR 152 - Runtime Plane Descriptors and Instances.md`: Complete ADR specification
+- [ADR 152 — Execution Plane Descriptors and Instances](../../../../docs/architecture%20docs/adrs/ADR%20152%20-%20Execution%20Plane%20Descriptors%20and%20Instances.md)
+- [ADR 159 — Driver Terminology and Lifecycle](../../../../docs/architecture%20docs/adrs/ADR%20159%20-%20Driver%20Terminology%20and%20Lifecycle.md): Driver instantiation vs connection binding
 - `.cursor/rules/multi-plane-packages.mdc`: Multi-plane package structure
 - `packages/1-framework/1-core/migration/control-plane/README.md`: Control plane counterpart
 

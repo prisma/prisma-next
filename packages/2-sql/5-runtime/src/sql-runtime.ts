@@ -40,12 +40,12 @@ export interface RuntimeOptions<
 > {
   readonly context: ExecutionContext<TContract>;
   readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
-  readonly driver: SqlDriver;
+  readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
   readonly plugins?: readonly Plugin<
     TContract,
     Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
-    SqlDriver
+    SqlDriver<unknown>
   >[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
@@ -63,12 +63,12 @@ export interface CreateRuntimeOptions<
     SqlRuntimeExtensionInstance<TTargetId>
   >;
   readonly context: ExecutionContext<TContract>;
-  readonly driver: SqlDriver;
+  readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
   readonly plugins?: readonly Plugin<
     TContract,
     Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
-    SqlDriver
+    SqlDriver<unknown>
   >[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
@@ -105,7 +105,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
   private readonly core: RuntimeCore<
     TContract,
     Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
-    SqlDriver
+    SqlDriver<unknown>
   >;
   private readonly contract: TContract;
   private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
@@ -126,7 +126,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     const coreOptions: RuntimeCoreOptions<
       TContract,
       Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
-      SqlDriver
+      SqlDriver<unknown>
     > = {
       familyAdapter,
       driver,
@@ -134,7 +134,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
       plugins: plugins as readonly Plugin<
         TContract,
         Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement>,
-        SqlDriver
+        SqlDriver<unknown>
       >[],
       ...ifDefined('mode', mode),
       ...ifDefined('log', log),

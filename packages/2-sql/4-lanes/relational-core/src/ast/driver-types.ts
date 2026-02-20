@@ -13,8 +13,11 @@ export interface SqlExplainResult<Row = Record<string, unknown>> {
   readonly rows: ReadonlyArray<Row>;
 }
 
-export interface SqlDriver extends SqlQueryable {
-  connect(): Promise<void>;
+export type SqlDriverState = 'unbound' | 'connected' | 'closed';
+
+export interface SqlDriver<TBinding = void> extends SqlQueryable {
+  readonly state?: SqlDriverState;
+  connect(binding: TBinding): Promise<void>;
   acquireConnection(): Promise<SqlConnection>;
   close(): Promise<void>;
 }

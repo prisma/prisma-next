@@ -1,10 +1,6 @@
+import type { PostgresBinding } from '@prisma-next/driver-postgres/runtime';
 import type { Client, Pool } from 'pg';
 import { Client as PgClient, Pool as PgPool } from 'pg';
-
-export type PostgresBinding =
-  | { readonly kind: 'url'; readonly url: string }
-  | { readonly kind: 'pgPool'; readonly pool: Pool }
-  | { readonly kind: 'pgClient'; readonly client: Client };
 
 export type PostgresBindingInput =
   | {
@@ -23,21 +19,53 @@ export type PostgresBindingInput =
       readonly url?: never;
     };
 
+interface PostgresBindingError extends Error {
+  readonly code: 'DRIVER.BINDING_INVALID';
+  readonly category: 'RUNTIME';
+  readonly severity: 'error';
+  readonly details?: Record<string, unknown>;
+}
+
+function bindingError(message: string, details?: Record<string, unknown>): PostgresBindingError {
+  const error = new Error(message) as PostgresBindingError;
+  Object.defineProperty(error, 'name', {
+    value: 'RuntimeError',
+    configurable: true,
+  });
+  return Object.assign(error, {
+    code: 'DRIVER.BINDING_INVALID' as const,
+    category: 'RUNTIME' as const,
+    severity: 'error' as const,
+    message,
+    details,
+  });
+}
+
 function validatePostgresUrl(url: string): string {
   const trimmed = url.trim();
   if (trimmed.length === 0) {
-    throw new Error('Postgres URL must be a non-empty string');
+    throw bindingError('Postgres URL must be a non-empty string', {
+      field: 'url',
+      reason: 'empty',
+    });
   }
 
   let parsed: URL;
   try {
     parsed = new URL(trimmed);
   } catch {
-    throw new Error('Postgres URL must be a valid URL');
+    throw bindingError('Postgres URL must be a valid URL', {
+      field: 'url',
+      reason: 'invalid-url',
+    });
   }
 
   if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
-    throw new Error('Postgres URL must use postgres:// or postgresql://');
+    throw bindingError('Postgres URL must use postgres:// or postgresql://', {
+      field: 'url',
+      reason: 'invalid-protocol',
+      protocol: parsed.protocol,
+    });
   }
 
   return trimmed;
@@ -50,7 +78,9 @@ export function resolvePostgresBinding(options: PostgresBindingInput): PostgresB
     Number(options.pg !== undefined);
 
   if (providedCount !== 1) {
-    throw new Error('Provide one binding input: binding, url, or pg');
+    throw bindingError('Provide one binding input: binding, url, or pg', {
+      providedCount,
+    });
   }
 
   if (options.binding !== undefined) {
@@ -63,7 +93,9 @@ export function resolvePostgresBinding(options: PostgresBindingInput): PostgresB
 
   const pgBinding = options.pg;
   if (pgBinding === undefined) {
-    throw new Error('Invariant violation: expected pg binding after validation');
+    throw bindingError('Invariant violation: expected pg binding after validation', {
+      reason: 'missing-pg-binding',
+    });
   }
 
   if (pgBinding instanceof PgPool) {
@@ -74,7 +106,10 @@ export function resolvePostgresBinding(options: PostgresBindingInput): PostgresB
     return { kind: 'pgClient', client: pgBinding };
   }
 
-  throw new Error(
+  throw bindingError(
     'Unable to determine pg binding type from pg input; use binding with explicit kind',
+    {
+      reason: 'unknown-pg-instance',
+    },
   );
 }

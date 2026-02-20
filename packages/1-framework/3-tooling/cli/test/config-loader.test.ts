@@ -125,22 +125,34 @@ describe('config loader', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('throws error for missing config file', async () => {
-    const configPath = join(testDir, 'nonexistent.config.ts');
-    await expect(loadConfig(configPath)).rejects.toThrow();
-  });
+  it(
+    'throws error for missing config file',
+    async () => {
+      const configPath = join(testDir, 'nonexistent.config.ts');
+      await expect(loadConfig(configPath)).rejects.toThrow();
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('throws error when config is not an object', async () => {
-    const configPath = join(testDir, 'prisma-next.config.ts');
-    writeFileSync(configPath, 'export default null;', 'utf-8');
-    await expect(loadConfig(configPath)).rejects.toThrow();
-  });
+  it(
+    'throws error when config is not an object',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(configPath, 'export default null;', 'utf-8');
+      await expect(loadConfig(configPath)).rejects.toThrow();
+    },
+    timeouts.typeScriptCompilation,
+  );
 
-  it('throws error when config is a string', async () => {
-    const configPath = join(testDir, 'prisma-next.config.ts');
-    writeFileSync(configPath, `export default 'invalid';`, 'utf-8');
-    await expect(loadConfig(configPath)).rejects.toThrow();
-  });
+  it(
+    'throws error when config is a string',
+    async () => {
+      const configPath = join(testDir, 'prisma-next.config.ts');
+      writeFileSync(configPath, `export default 'invalid';`, 'utf-8');
+      await expect(loadConfig(configPath)).rejects.toThrow();
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it(
     'throws error for invalid config structure',
@@ -174,11 +186,6 @@ describe('config loader', () => {
   // 1. config-loader.ts is excluded from coverage (mostly file I/O and error handling)
   // 2. Validation is tested via e2e tests which exercise the full command flow
   // 3. Testing validation through file I/O is brittle (c12 compilation issues)
-
-  it('handles file not found errors from c12', async () => {
-    const configPath = join(testDir, 'nonexistent.config.ts');
-    await expect(loadConfig(configPath)).rejects.toThrow();
-  });
 
   it(
     'handles non-Error exceptions',
