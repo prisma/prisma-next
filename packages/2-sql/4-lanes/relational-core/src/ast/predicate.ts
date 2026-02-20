@@ -3,6 +3,8 @@ import type {
   BinaryOp,
   ExistsExpr,
   Expression,
+  ListLiteralExpr,
+  LiteralExpr,
   NullCheckExpr,
   ParamRef,
   SelectAst,
@@ -11,7 +13,7 @@ import type {
 export function createBinaryExpr(
   op: BinaryOp,
   left: Expression,
-  right: Expression | ParamRef,
+  right: Expression | ParamRef | LiteralExpr | ListLiteralExpr,
 ): BinaryExpr {
   return {
     kind: 'bin',

@@ -14,7 +14,7 @@ Total estimated tasks: 15 task groups, ~65 sub-tasks.
 
 The most fundamental internal change. Everything downstream (new operators, relational filters, shorthand filters, logical combinators) depends on the filter representation being PN AST `WhereExpr` nodes instead of the prototype's internal `FilterExpr`.
 
-- [ ] **1.1 Extend WhereExpr to support AndExpr, OrExpr, and ListLiteralExpr**
+- [x] **1.1 Extend WhereExpr to support AndExpr, OrExpr, and ListLiteralExpr**
   - The spec (section 3.4) requires `AndExpr`, `OrExpr`, `ListLiteralExpr` in the `WhereExpr` union, but the current AST types at `/Users/aqrln/prisma/prisma-next/packages/2-sql/4-lanes/relational-core/src/ast/types.ts` only have `BinaryExpr | ExistsExpr | NullCheckExpr`
   - Add `AndExpr { kind: 'and'; exprs: ReadonlyArray<WhereExpr> }` and `OrExpr { kind: 'or'; exprs: ReadonlyArray<WhereExpr> }` to the `WhereExpr` union
   - Add `ListLiteralExpr { kind: 'listLiteral'; values: ReadonlyArray<ParamRef | LiteralExpr> }` to support `in`/`notIn` operations

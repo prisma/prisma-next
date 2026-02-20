@@ -89,6 +89,10 @@ describe('ast/predicate', () => {
       'lt',
       'gte',
       'lte',
+      'like',
+      'ilike',
+      'in',
+      'notIn',
     ] as const)('creates binary expr with %s operator', (op) => {
       const left = createColumnRef('user', 'id');
       const right = createColumnRef('post', 'userId');
@@ -96,6 +100,21 @@ describe('ast/predicate', () => {
 
       expect(binaryExpr.op).toBe(op);
       expect(binaryExpr.right.kind).toBe('col');
+    });
+
+    it('creates binary expr with list literal right-hand side', () => {
+      const left = createColumnRef('user', 'id');
+      const right = {
+        kind: 'listLiteral' as const,
+        values: [createParamRef(0, 'firstId'), createParamRef(1, 'secondId')],
+      };
+      const binaryExpr = createBinaryExpr('in', left, right);
+
+      expect(binaryExpr).toMatchObject({
+        kind: 'bin',
+        op: 'in',
+        right,
+      });
     });
 
     it('creates binary expr with operation expr and column ref on the right', () => {
