@@ -1,5 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { BinaryExpr, LiteralExpr } from '@prisma-next/sql-relational-core/ast';
 import type { ComparisonMethods } from './types';
 
 const OPS: ReadonlyArray<keyof ComparisonMethods<unknown>> = [
@@ -10,6 +10,8 @@ const OPS: ReadonlyArray<keyof ComparisonMethods<unknown>> = [
   'gte',
   'lte',
 ];
+
+type SupportedComparisonOp = (typeof OPS)[number];
 
 /**
  * Creates a Proxy-based column accessor for use inside `where()` callbacks.
@@ -23,6 +25,10 @@ export function createColumnAccessor<
   ModelName extends string,
 >(contract: TContract, modelName: ModelName): Record<string, ComparisonMethods<unknown>> {
   const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
+  const tableName =
+    contract.mappings.modelToTable?.[modelName] ??
+    contract.models?.[modelName]?.storage?.table ??
+    modelName;
 
   return new Proxy({} as Record<string, ComparisonMethods<unknown>>, {
     get(_target, prop: string | symbol): ComparisonMethods<unknown> | undefined {
@@ -31,14 +37,24 @@ export function createColumnAccessor<
       }
       const columnName = fieldToColumn[prop] ?? prop;
 
-      const methods: Record<string, (value: unknown) => WhereExpr> = {};
+      const methods: Record<string, (value: unknown) => BinaryExpr> = {};
       for (const op of OPS) {
-        methods[op] = (value: unknown): WhereExpr =>
-          ({
-            column: columnName,
-            op,
+        methods[op] = (value: unknown): BinaryExpr => {
+          const literal: LiteralExpr = {
+            kind: 'literal',
             value,
-          }) as unknown as WhereExpr;
+          };
+          return {
+            kind: 'bin',
+            op: op as SupportedComparisonOp,
+            left: {
+              kind: 'col',
+              table: tableName,
+              column: columnName,
+            },
+            right: literal,
+          };
+        };
       }
       return methods as ComparisonMethods<unknown>;
     },

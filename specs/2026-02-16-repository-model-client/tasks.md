@@ -31,7 +31,7 @@ The most fundamental internal change. Everything downstream (new operators, rela
   - Update exports in `/Users/aqrln/prisma/prisma-next/packages/2-sql/6-orm-client/src/exports/index.ts`
   - Files to modify: `src/types.ts`, `src/exports/index.ts`
 
-- [ ] **1.3 Rewrite createColumnAccessor to produce WhereExpr nodes**
+- [x] **1.3 Rewrite createColumnAccessor to produce WhereExpr nodes**
   - The current accessor at `src/column-accessor.ts` produces `FilterExpr` objects `{ column, op, value }`
   - Rewrite to produce `BinaryExpr` nodes with proper `ColumnRef` left-hand side and `ParamRef`/`LiteralExpr` right-hand side
   - Resolve field names to storage column names using `contract.mappings.fieldToColumn`, and populate the `ColumnRef.table` from `contract.mappings.modelToTable`
