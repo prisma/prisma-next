@@ -17,9 +17,10 @@ describe('Collection', () => {
       const filtered = collection.where((u) => u.name.eq('Alice'));
       expect(filtered.state.filters).toHaveLength(1);
       expect(filtered.state.filters[0]).toEqual({
-        column: 'name',
+        kind: 'bin',
         op: 'eq',
-        value: 'Alice',
+        left: { kind: 'col', table: 'users', column: 'name' },
+        right: { kind: 'literal', value: 'Alice' },
       });
       // Original is not mutated
       expect(collection.state.filters).toHaveLength(0);
@@ -69,9 +70,10 @@ describe('Collection', () => {
       const inc = withPosts.state.includes[0]!;
       expect(inc.nested.filters).toHaveLength(1);
       expect(inc.nested.filters[0]).toEqual({
-        column: 'views',
+        kind: 'bin',
         op: 'gt',
-        value: 100,
+        left: { kind: 'col', table: 'posts', column: 'views' },
+        right: { kind: 'literal', value: 100 },
       });
       expect(inc.nested.limit).toBe(5);
     });

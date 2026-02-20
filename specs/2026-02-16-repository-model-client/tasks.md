@@ -44,7 +44,7 @@ The most fundamental internal change. Everything downstream (new operators, rela
   - Use Kysely's `ExpressionBuilder` and `eb.and()`, `eb.or()`, `eb.exists()` for compound expressions
   - Files to modify: `src/kysely-compiler.ts`
 
-- [ ] **1.5 Update existing tests to match new WhereExpr-based filter shapes**
+- [x] **1.5 Update existing tests to match new WhereExpr-based filter shapes**
   - Tests in `test/collection.test.ts` and `test/column-accessor.test.ts` assert on `FilterExpr` shapes (`{ column, op, value }`)
   - Update assertions to match `WhereExpr` node shapes (`{ kind: 'bin', op, left: { kind: 'col', ... }, right: { kind: 'param', ... } }`)
   - Ensure all existing tests pass with the new internal representation
