@@ -140,6 +140,16 @@ export function createSqlExecutionStack<TTargetId extends string>(options: {
 
 export type { ExecutionContext, TypeHelperRegistry };
 
+/**
+ * Validates that the execution stack satisfies the contract's requirements.
+ *
+ * Checks three things in order:
+ * 1. Target family matches (e.g. contract says 'sql', stack provides 'sql')
+ * 2. Target ID matches (e.g. contract says 'postgres', stack provides 'postgres')
+ * 3. All extension packs referenced by the contract are present in the stack
+ *
+ * Throws a structured runtime error on the first mismatch found.
+ */
 export function assertExecutionStackContractRequirements(
   contract: SqlContract<SqlStorage>,
   stack: SqlExecutionStack,
@@ -190,6 +200,13 @@ export function assertExecutionStackContractRequirements(
   }
 }
 
+/**
+ * Validates a set of type parameters against a codec descriptor's arktype schema.
+ *
+ * Returns the validated (and possibly narrowed) params on success.
+ * Throws a `RUNTIME.TYPE_PARAMS_INVALID` error if validation fails, including
+ * the location (type name or table.column) for diagnostics.
+ */
 function validateTypeParams(
   typeParams: Record<string, unknown>,
   codecDescriptor: RuntimeParameterizedCodecDescriptor,
@@ -210,6 +227,17 @@ function validateTypeParams(
   return result as Record<string, unknown>;
 }
 
+/**
+ * Collects parameterized codec descriptors from all stack contributors
+ * (target, adapter, extension packs) into a single map keyed by codec ID.
+ *
+ * Each contributor may provide descriptors for codecs that support type
+ * parameters (e.g. `pg/array@1`, `pg/vector@1`). These descriptors carry
+ * the arktype validation schema and optional `init` hook.
+ *
+ * Throws `RUNTIME.DUPLICATE_PARAMETERIZED_CODEC` if two contributors
+ * register descriptors for the same codec ID.
+ */
 function collectParameterizedCodecDescriptors(
   contributors: ReadonlyArray<SqlStaticContributions>,
 ): Map<string, RuntimeParameterizedCodecDescriptor> {
@@ -231,6 +259,22 @@ function collectParameterizedCodecDescriptors(
   return descriptors;
 }
 
+/**
+ * Builds the type helper registry from named storage types (`storage.types`).
+ *
+ * For each named type instance (e.g. `Embedding1536` with codecId `pg/vector@1`):
+ * 1. Finds the matching parameterized codec descriptor
+ * 2. Validates the type's `typeParams` against the descriptor's schema
+ * 3. Calls the descriptor's `init` hook if present, storing the result
+ * 4. Falls back to storing the raw `StorageTypeInstance` if no `init` hook
+ *
+ * The resulting registry is exposed as `context.types` and made available
+ * to schema builders via `schema(context).types`.
+ *
+ * Note: this only processes named types in `storage.types`, not inline
+ * column `typeParams`. Column-level params are validated separately by
+ * {@link validateColumnTypeParams}.
+ */
 function initializeTypeHelpers(
   storageTypes: Record<string, StorageTypeInstance> | undefined,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
@@ -262,6 +306,17 @@ function initializeTypeHelpers(
   return helpers;
 }
 
+/**
+ * Validates inline `typeParams` on every column across all tables.
+ *
+ * Iterates over `storage.tables[*].columns[*]` and, for each column that
+ * carries `typeParams`, looks up the matching parameterized codec descriptor
+ * and validates the params against its schema. Throws on the first invalid
+ * column encountered.
+ *
+ * This is the column-level counterpart to {@link initializeTypeHelpers},
+ * which handles named types in `storage.types`.
+ */
 function validateColumnTypeParams(
   storage: SqlStorage,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
@@ -278,6 +333,12 @@ function validateColumnTypeParams(
   }
 }
 
+/**
+ * Produces a concrete default value from an execution-time default spec.
+ *
+ * Currently only supports `kind: 'generator'`, which delegates to
+ * `@prisma-next/ids/runtime` to generate client-side IDs (uuidv7, ulid, etc.).
+ */
 function computeExecutionDefaultValue(spec: ExecutionMutationDefaultValue): unknown {
   switch (spec.kind) {
     case 'generator':
@@ -285,6 +346,19 @@ function computeExecutionDefaultValue(spec: ExecutionMutationDefaultValue): unkn
   }
 }
 
+/**
+ * Applies execution-time mutation defaults for a given table and operation.
+ *
+ * Scans the contract's `execution.mutations.defaults` for entries matching
+ * the target table. For each matching default:
+ * - Selects `onCreate` or `onUpdate` based on the operation
+ * - Skips columns that already have caller-provided values
+ * - Skips columns that have already been defaulted (prevents duplicates)
+ * - Computes the default value via {@link computeExecutionDefaultValue}
+ *
+ * Returns a list of `{ column, value }` pairs. The caller (lane or runtime)
+ * is responsible for merging these into the mutation payload.
+ */
 function applyMutationDefaults(
   contract: SqlContract<SqlStorage>,
   options: MutationDefaultsOptions,
@@ -323,6 +397,37 @@ function applyMutationDefaults(
   return applied;
 }
 
+/**
+ * Builds an {@link ExecutionContext} from a contract and execution stack.
+ *
+ * This is the main entry point for wiring up the runtime. It performs
+ * the following steps in order:
+ *
+ * 1. **Validates contract/stack compatibility** — target family, target ID,
+ *    and extension pack requirements must all match.
+ *
+ * 2. **Populates registries** — iterates over all stack contributors
+ *    (target, adapter, extension packs) and registers their codecs and
+ *    operation signatures into shared registries.
+ *
+ * 3. **Collects parameterized codec descriptors** — gathers descriptors
+ *    for codecs that support `typeParams` (e.g. `pg/array@1`, `pg/vector@1`).
+ *
+ * 4. **Validates column typeParams** — for every column in the contract that
+ *    carries `typeParams`, validates them against the codec's arktype schema.
+ *
+ * 5. **Initializes type helpers** — processes named types in `storage.types`,
+ *    calling `init` hooks where provided, to populate `context.types`.
+ *
+ * The returned context is immutable and used by query lanes (`sql()`, `orm()`),
+ * the adapter (for lowering), and the runtime (for encode/decode).
+ *
+ * **Known limitation**: The codec registry contains only the base codecs
+ * registered by contributors. For parameterized codecs like `pg/array@1`,
+ * the registry holds the generic base codec — not a per-column composed
+ * codec that delegates to element codecs. This means element-level
+ * encode/decode is not applied for array columns at runtime.
+ */
 export function createExecutionContext<
   TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>,
   TTargetId extends string = string,
