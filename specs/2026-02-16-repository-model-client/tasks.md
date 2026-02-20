@@ -258,7 +258,7 @@ Depends on: Group 1 (WhereExpr integration)
 
 Depends on: Group 6 (include cardinality)
 
-- [ ] **7.1 Implement include strategy selection from contract capabilities**
+- [x] **7.1 Implement include strategy selection from contract capabilities**
   - Read `contract.capabilities` to determine available strategies
   - Define capability keys: `lateral` (lateral joins), `jsonAgg` (JSON aggregation)
   - Implement strategy selection logic:

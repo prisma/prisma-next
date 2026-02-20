@@ -2,6 +2,7 @@ import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { shorthandToWhereExpr } from './filters';
+import { selectIncludeStrategy } from './include-strategy';
 import { compileRelationSelect, compileSelect, createExecutionPlan } from './kysely-compiler';
 import { createModelAccessor } from './model-accessor';
 import type {
@@ -384,6 +385,12 @@ export class Collection<
         source,
         (rawRow) => mapStorageRowToModelFields(contract, tableName, rawRow) as Row,
       );
+    }
+
+    const includeStrategy = selectIncludeStrategy(contract);
+    if (includeStrategy !== 'multiQuery') {
+      // Single-query include strategies are implemented in later tasks.
+      // Until then, use the existing multi-query stitching path.
     }
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
