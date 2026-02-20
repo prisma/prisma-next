@@ -37,6 +37,12 @@ describe('orm()', () => {
     expect(results).toHaveLength(1);
   });
 
+  it('returns undefined for symbol-based property lookups on the proxy', () => {
+    const runtime = createMockRuntime();
+    const db = orm({ contract, runtime });
+    expect((db as Record<PropertyKey, unknown>)[Symbol.toStringTag]).toBeUndefined();
+  });
+
   it('resolves plural names to PascalCase model names', () => {
     const runtime = createMockRuntime();
     const db = orm({ contract, runtime });
@@ -77,6 +83,13 @@ describe('orm()', () => {
     );
   });
 
+  it('resolves singular fallback when key ends with s but exact alias is missing', () => {
+    const runtime = createMockRuntime();
+    const db = orm({ contract, runtime });
+
+    expect((db as Record<string, Collection<TestContract, string>>)['Users']).toBe(db.User);
+  });
+
   it('custom collection overrides default for same key', () => {
     const runtime = createMockRuntime();
     const db = orm({
@@ -86,6 +99,30 @@ describe('orm()', () => {
     });
 
     expect(db.posts).toBeInstanceOf(PostCollection);
+  });
+
+  it('ignores undefined custom collection entries and falls back to default collection', () => {
+    const runtime = createMockRuntime();
+    const db = orm({
+      contract,
+      runtime,
+      collections: { posts: undefined as unknown as typeof PostCollection },
+    });
+
+    expect(db.posts).toBeInstanceOf(Collection);
+    expect(db.posts).not.toBeInstanceOf(PostCollection);
+  });
+
+  it('throws when a custom collection key cannot resolve to a model', () => {
+    const runtime = createMockRuntime();
+
+    expect(() =>
+      orm({
+        contract,
+        runtime,
+        collections: { unknownCollection: PostCollection },
+      }),
+    ).toThrow(/No model found for custom collection 'unknownCollection'/);
   });
 
   it('does not type unknown keys on the client', () => {

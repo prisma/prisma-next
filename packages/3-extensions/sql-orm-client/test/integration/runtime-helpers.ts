@@ -1,7 +1,7 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { Pool } from 'pg';
-import type { RuntimeQueryable } from '../src/types';
+import type { RuntimeQueryable } from '../../src/types';
 
 interface SeedUser {
   id: number;

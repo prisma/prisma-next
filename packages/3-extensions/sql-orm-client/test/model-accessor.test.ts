@@ -205,4 +205,173 @@ describe('createModelAccessor', () => {
       },
     });
   });
+
+  it('returns undefined for symbol property access on accessor proxy', () => {
+    const accessor = createModelAccessor(contract, 'User');
+    expect((accessor as Record<PropertyKey, unknown>)[Symbol.iterator]).toBeUndefined();
+  });
+
+  it('relation shorthand ignores unknown fields and returns undefined for empty predicates', () => {
+    const accessor = createModelAccessor(contract, 'User');
+
+    expect(accessor['posts']!.some({ unknown: 'value' })).toMatchObject({
+      kind: 'exists',
+      not: false,
+      subquery: {
+        where: {
+          kind: 'and',
+          exprs: [
+            { kind: 'bin', op: 'eq' },
+            { kind: 'bin', op: 'eq' },
+          ],
+        },
+      },
+    });
+
+    expect(accessor['posts']!.some({ unknown: undefined })).toMatchObject({
+      kind: 'exists',
+      not: false,
+      subquery: {
+        where: { kind: 'bin', op: 'eq' },
+      },
+    });
+  });
+
+  it('relation shorthand maps null to isNull filters', () => {
+    const accessor = createModelAccessor(contract, 'Post');
+
+    expect(accessor['comments']!.some({ body: null })).toMatchObject({
+      kind: 'exists',
+      subquery: {
+        where: {
+          kind: 'and',
+          exprs: [
+            { kind: 'bin', op: 'eq' },
+            { kind: 'nullCheck', isNull: true },
+          ],
+        },
+      },
+    });
+  });
+
+  it('throws when relation metadata misses model references or join columns', () => {
+    const missingToContract = {
+      ...createTestContract(),
+      relations: {
+        ...createTestContract().relations,
+        users: {
+          posts: {
+            on: {
+              parentCols: ['id'],
+              childCols: ['user_id'],
+            },
+          },
+        },
+      },
+    };
+
+    const brokenJoinContract = {
+      ...createTestContract(),
+      relations: {
+        ...createTestContract().relations,
+        users: {
+          posts: {
+            to: 'Post',
+            cardinality: '1:N',
+            on: {
+              parentCols: [],
+              childCols: [],
+            },
+          },
+        },
+      },
+    };
+
+    expect(() => createModelAccessor(missingToContract as never, 'User')['posts']!.some()).toThrow(
+      /missing the "to" model reference/,
+    );
+    expect(() => createModelAccessor(brokenJoinContract as never, 'User')['posts']!.some()).toThrow(
+      /missing join columns/,
+    );
+  });
+
+  it('supports composite relation joins and firstChild fallback projection', () => {
+    const compositeContract = {
+      ...createTestContract(),
+      mappings: {
+        ...createTestContract().mappings,
+        modelToTable: {
+          ...createTestContract().mappings.modelToTable,
+          User: 'users_alt',
+        },
+      },
+      models: {
+        ...createTestContract().models,
+        User: {
+          ...createTestContract().models.User,
+          storage: {
+            table: 'users_alt',
+          },
+        },
+      },
+      relations: {
+        ...createTestContract().relations,
+        users_alt: {
+          posts: {
+            to: 'Post',
+            cardinality: '1:N',
+            on: {
+              parentCols: ['id', 'email'],
+              childCols: ['user_id', 'title'],
+            },
+          },
+        },
+      },
+    };
+
+    expect(createModelAccessor(compositeContract as never, 'User')['posts']!.some()).toMatchObject({
+      kind: 'exists',
+      subquery: {
+        project: [
+          {
+            alias: '_exists',
+            expr: { kind: 'col', table: 'posts', column: 'user_id' },
+          },
+        ],
+        where: {
+          kind: 'and',
+          exprs: [
+            { kind: 'bin', op: 'eq' },
+            { kind: 'bin', op: 'eq' },
+          ],
+        },
+      },
+    });
+
+    const noChildColsContract = {
+      ...compositeContract,
+      relations: {
+        ...compositeContract.relations,
+        users_alt: {
+          posts: {
+            to: 'Post',
+            cardinality: '1:N',
+            on: {
+              parentCols: ['id', 'name'],
+              childCols: [undefined, 'title'],
+            },
+          },
+        },
+      },
+    };
+
+    expect(
+      createModelAccessor(noChildColsContract as never, 'User')['posts']!.some(),
+    ).toMatchObject({
+      kind: 'exists',
+      subquery: {
+        project: [{ expr: { column: 'id' } }],
+      },
+    });
+  });
 });

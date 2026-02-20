@@ -28,47 +28,11 @@ describe('Collection construction', () => {
     expect(collection.state.offset).toBeUndefined();
   });
 
-  it('supports custom subclass with named scopes', async () => {
+  it('supports custom subclass with named scopes', () => {
     const runtime = createMockRuntime();
     const collection = new PostCollection({ contract, runtime }, 'Post');
-    runtime.setNextResults([[{ id: 1, title: 'Popular Post', user_id: 1, views: 5000 }]]);
-
-    const results = await collection.popular().all().toArray();
-    expect(results).toHaveLength(1);
-    expect(runtime.executions[0]!.plan.sql).toContain('"views"');
-  });
-
-  it('chains where and all correctly', async () => {
-    const runtime = createMockRuntime();
-    const collection = new Collection({ contract, runtime }, 'User');
-    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
-
-    const results = await collection
-      .where((u) => u.name.eq('Alice'))
-      .all()
-      .toArray();
-
-    expect(results).toHaveLength(1);
-  });
-
-  it('supports include + where + all flow', async () => {
-    const runtime = createMockRuntime();
-    const collection = new Collection({ contract, runtime }, 'User');
-    runtime.setNextResults([
-      [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
-      [{ id: 10, title: 'Post A', user_id: 1, views: 500 }],
-    ]);
-
-    const results = await collection
-      .where((u) => u.name.eq('Alice'))
-      .include('posts')
-      .all()
-      .toArray();
-
-    expect(results[0]).toMatchObject({
-      id: 1,
-      name: 'Alice',
-      posts: [{ id: 10, title: 'Post A' }],
-    });
+    const scoped = collection.popular();
+    expect(scoped.state.filters).toHaveLength(1);
+    expect(scoped.state.filters[0]).toMatchObject({ kind: 'bin', op: 'gt' });
   });
 });

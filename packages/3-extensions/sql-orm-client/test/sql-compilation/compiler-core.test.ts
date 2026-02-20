@@ -1,0 +1,313 @@
+import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import { describe, expect, it } from 'vitest';
+import {
+  compileDeleteCount,
+  compileDeleteReturning,
+  compileRelationSelect,
+  compileSelect,
+  compileUpdateCount,
+  compileUpdateReturning,
+} from '../../src/kysely-compiler';
+import { emptyState } from '../../src/types';
+
+function stateWithFilters(filters: readonly WhereExpr[]) {
+  return {
+    ...emptyState(),
+    filters,
+  };
+}
+
+describe('sql-compilation/compiler-core', () => {
+  it('compileUpdateReturning and compileDeleteReturning support no-filter mutations', () => {
+    const updateCompiled = compileUpdateReturning('users', { name: 'A' }, [], ['id']);
+    const updateReturningAll = compileUpdateReturning('users', { name: 'B' }, [], undefined);
+    const deleteCompiled = compileDeleteReturning('users', [], ['id']);
+    const deleteReturningAll = compileDeleteReturning('users', [], undefined);
+
+    expect(updateCompiled.sql.toLowerCase()).toContain('update "users" set');
+    expect(updateCompiled.sql.toLowerCase()).toContain('returning "id"');
+    expect(updateReturningAll.sql.toLowerCase()).toContain('returning *');
+
+    expect(deleteCompiled.sql.toLowerCase()).toContain('delete from "users"');
+    expect(deleteCompiled.sql.toLowerCase()).toContain('returning "id"');
+    expect(deleteReturningAll.sql.toLowerCase()).toContain('returning *');
+  });
+
+  it('compileUpdateCount and compileDeleteCount support no-filter mutations', () => {
+    const updateCompiled = compileUpdateCount('users', { name: 'A' }, []);
+    const deleteCompiled = compileDeleteCount('users', []);
+
+    expect(updateCompiled.sql.toLowerCase()).toBe('update "users" set "name" = $1');
+    expect(updateCompiled.parameters).toEqual(['A']);
+
+    expect(deleteCompiled.sql.toLowerCase()).toBe('delete from "users"');
+    expect(deleteCompiled.parameters).toEqual([]);
+  });
+
+  it('compileSelect compiles null checks and exists predicates', () => {
+    const nullCheckState = stateWithFilters([
+      {
+        kind: 'nullCheck',
+        expr: { kind: 'col', table: 'users', column: 'email' },
+        isNull: false,
+      },
+    ]);
+
+    const existsState = stateWithFilters([
+      {
+        kind: 'exists',
+        not: true,
+        subquery: {
+          kind: 'select',
+          from: { kind: 'table', name: 'posts' },
+          project: [{ alias: '_exists', expr: { kind: 'literal', value: 1 } }],
+          where: {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'posts', column: 'user_id' },
+            right: { kind: 'col', table: 'users', column: 'id' },
+          },
+        },
+      },
+    ]);
+
+    const nullCheck = compileSelect('users', nullCheckState);
+    const exists = compileSelect('users', existsState);
+
+    expect(nullCheck.sql.toLowerCase()).toContain('is not null');
+    expect(exists.sql.toLowerCase()).toContain('not (exists');
+  });
+
+  it('compileSelect supports list literals and array literals for in/not in', () => {
+    const listLiteralState = stateWithFilters([
+      {
+        kind: 'bin',
+        op: 'in',
+        left: { kind: 'col', table: 'users', column: 'id' },
+        right: {
+          kind: 'listLiteral',
+          values: [
+            { kind: 'literal', value: 1 },
+            { kind: 'literal', value: 2 },
+          ],
+        },
+      },
+    ]);
+
+    const arrayLiteralState = stateWithFilters([
+      {
+        kind: 'bin',
+        op: 'notIn',
+        left: { kind: 'col', table: 'users', column: 'id' },
+        right: { kind: 'literal', value: [3, 4] },
+      },
+    ]);
+
+    const listLiteral = compileSelect('users', listLiteralState);
+    const arrayLiteral = compileSelect('users', arrayLiteralState);
+
+    expect(listLiteral.sql.toLowerCase()).toContain(' in ($1, $2)');
+    expect(listLiteral.parameters).toEqual([1, 2]);
+
+    expect(arrayLiteral.sql.toLowerCase()).toContain(' not in ($1, $2)');
+    expect(arrayLiteral.parameters).toEqual([3, 4]);
+  });
+
+  it('compileSelect throws for unsupported cursor and expression forms', () => {
+    const missingCursorValueState = {
+      ...emptyState(),
+      orderBy: [
+        { column: 'name', direction: 'asc' as const },
+        { column: 'email', direction: 'asc' as const },
+      ],
+      cursor: { name: 'Alice' },
+    };
+
+    const nonInListState = stateWithFilters([
+      {
+        kind: 'bin',
+        op: 'eq',
+        left: { kind: 'col', table: 'users', column: 'id' },
+        right: {
+          kind: 'listLiteral',
+          values: [{ kind: 'literal', value: 1 }],
+        },
+      },
+    ]);
+
+    const paramState = stateWithFilters([
+      {
+        kind: 'bin',
+        op: 'eq',
+        left: { kind: 'col', table: 'users', column: 'id' },
+        right: { kind: 'param', index: 0, name: 'id' },
+      },
+    ]);
+
+    const operationExpr = {
+      kind: 'operation',
+      method: 'lower',
+      forTypeId: 'pg/text@1',
+      self: { kind: 'col', table: 'users', column: 'name' },
+      args: [],
+      returns: { kind: 'value', type: 'string' },
+      lowering: { kind: 'raw', sql: 'lower(?)' },
+    } as never;
+
+    const operationState = stateWithFilters([
+      {
+        kind: 'bin',
+        op: 'eq',
+        left: operationExpr,
+        right: { kind: 'literal', value: 'alice' },
+      } as unknown as WhereExpr,
+    ]);
+
+    expect(() => compileSelect('users', missingCursorValueState)).toThrow(
+      /Missing cursor value for orderBy column "email"/,
+    );
+    expect(() => compileSelect('users', nonInListState)).toThrow(/does not support list literals/);
+    expect(() => compileSelect('users', paramState)).toThrow(/ParamRef "id" is not supported/);
+    expect(() => compileSelect('users', operationState)).toThrow(
+      /Operation expressions are not yet supported in orm-client filters/,
+    );
+  });
+
+  it('compileSelect throws for unsupported subquery projection and orderBy forms', () => {
+    const includeRefState = stateWithFilters([
+      {
+        kind: 'exists',
+        not: false,
+        subquery: {
+          kind: 'select',
+          from: { kind: 'table', name: 'posts' },
+          project: [{ alias: 'posts', expr: { kind: 'includeRef', alias: 'posts' } }],
+        },
+      } as unknown as WhereExpr,
+    ]);
+
+    const operationOrderByState = stateWithFilters([
+      {
+        kind: 'exists',
+        not: false,
+        subquery: {
+          kind: 'select',
+          from: { kind: 'table', name: 'posts' },
+          project: [{ alias: '_exists', expr: { kind: 'literal', value: 1 } }],
+          orderBy: [
+            {
+              expr: {
+                kind: 'operation',
+                method: 'lower',
+                forTypeId: 'pg/text@1',
+                self: { kind: 'col', table: 'posts', column: 'title' },
+                args: [],
+                returns: { kind: 'value', type: 'string' },
+                lowering: { kind: 'raw', sql: 'lower(?)' },
+              },
+              dir: 'asc',
+            },
+          ],
+        },
+      } as unknown as WhereExpr,
+    ]);
+
+    expect(() => compileSelect('users', includeRefState)).toThrow(
+      /Include refs are not supported inside EXISTS subqueries/,
+    );
+    expect(() => compileSelect('users', operationOrderByState)).toThrow(
+      /Operation expressions are not supported in subquery orderBy clauses/,
+    );
+  });
+
+  it('compileSelect supports all join types in EXISTS subqueries', () => {
+    for (const joinType of ['inner', 'left', 'right', 'full'] as const) {
+      const joinState = stateWithFilters([
+        {
+          kind: 'exists',
+          not: false,
+          subquery: {
+            kind: 'select',
+            from: { kind: 'table', name: 'posts' },
+            joins: [
+              {
+                kind: 'join',
+                joinType,
+                table: { kind: 'table', name: 'users' },
+                on: {
+                  kind: 'eqCol',
+                  left: { kind: 'col', table: 'posts', column: 'user_id' },
+                  right: { kind: 'col', table: 'users', column: 'id' },
+                },
+              },
+            ],
+            project: [{ alias: '_exists', expr: { kind: 'literal', value: 1 } }],
+          },
+        },
+      ]);
+
+      const compiled = compileSelect('users', joinState);
+      expect(compiled.sql.toLowerCase()).toContain('exists');
+    }
+  });
+
+  it('compileSelect throws for unsupported join type and where kind', () => {
+    const badJoinState = stateWithFilters([
+      {
+        kind: 'exists',
+        not: false,
+        subquery: {
+          kind: 'select',
+          from: { kind: 'table', name: 'posts' },
+          joins: [
+            {
+              kind: 'join',
+              joinType: 'cross',
+              table: { kind: 'table', name: 'users' },
+              on: {
+                kind: 'eqCol',
+                left: { kind: 'col', table: 'posts', column: 'user_id' },
+                right: { kind: 'col', table: 'users', column: 'id' },
+              },
+            },
+          ],
+          project: [{ alias: '_exists', expr: { kind: 'literal', value: 1 } }],
+        },
+      } as unknown as WhereExpr,
+    ]);
+
+    const badWhereState = {
+      ...emptyState(),
+      filters: [{ kind: 'unexpected' } as unknown as WhereExpr],
+    };
+
+    expect(() => compileSelect('users', badJoinState)).toThrow(/Unsupported join type/);
+    expect(() => compileSelect('users', badWhereState)).toThrow(
+      /Unsupported where expression kind/,
+    );
+  });
+
+  it('compileRelationSelect applies nested filters/order/distinct/cursor', () => {
+    const compiled = compileRelationSelect('posts', 'user_id', [1, 2], {
+      ...emptyState(),
+      distinctOn: ['user_id'],
+      selectedFields: ['id', 'user_id'],
+      filters: [
+        {
+          kind: 'bin',
+          op: 'gt',
+          left: { kind: 'col', table: 'posts', column: 'views' },
+          right: { kind: 'literal', value: 100 },
+        },
+      ],
+      orderBy: [{ column: 'id', direction: 'desc' }],
+      cursor: { id: 10 },
+    });
+
+    expect(compiled.sql.toLowerCase()).toContain('distinct on');
+    expect(compiled.sql.toLowerCase()).toContain('where "user_id" in ($1, $2)');
+    expect(compiled.sql.toLowerCase()).toContain('"posts"."id" < $4');
+    expect(compiled.sql.toLowerCase()).toContain('order by "id" desc');
+    expect(compiled.parameters).toEqual([1, 2, 100, 10]);
+  });
+});
