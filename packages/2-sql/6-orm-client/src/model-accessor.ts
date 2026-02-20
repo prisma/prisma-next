@@ -177,7 +177,7 @@ function createExistsExpr<TContract extends SqlContract<SqlStorage>>(
   relation: RelationMeta,
   options: {
     readonly mode: 'some' | 'every' | 'none';
-    readonly predicate?: RelationPredicateInput<TContract, string>;
+    readonly predicate: RelationPredicateInput<TContract, string> | undefined;
   },
 ): ExistsExpr {
   const joinWhere = buildJoinWhere(parentTableName, relatedTableName, relation);
@@ -230,7 +230,7 @@ function createExistsExpr<TContract extends SqlContract<SqlStorage>>(
 function toRelationWhereExpr<TContract extends SqlContract<SqlStorage>>(
   contract: TContract,
   relatedModelName: string,
-  predicate?: RelationPredicateInput<TContract, string>,
+  predicate: RelationPredicateInput<TContract, string> | undefined,
 ): WhereExpr | undefined {
   if (!predicate) {
     return undefined;
@@ -306,7 +306,12 @@ function buildJoinWhere(
     throw new Error('Relation metadata is missing join columns');
   }
 
-  return joinExprs.length === 1 ? joinExprs[0]! : and(...joinExprs);
+  const firstExpr = joinExprs[0];
+  if (joinExprs.length === 1 && firstExpr !== undefined) {
+    return firstExpr;
+  }
+
+  return and(...joinExprs);
 }
 
 function firstChildColumn(relation: RelationMeta): string | undefined {
@@ -330,7 +335,15 @@ function resolveModelTableName<TContract extends SqlContract<SqlStorage>>(
     return mapped;
   }
 
-  const modelTable = contract.models?.[modelName]?.storage?.table;
+  const models = contract.models as Record<
+    string,
+    {
+      storage?: {
+        table?: string;
+      };
+    }
+  >;
+  const modelTable = models[modelName]?.storage?.table;
   if (modelTable) {
     return modelTable;
   }

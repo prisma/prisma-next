@@ -171,7 +171,7 @@ Depends on: Group 2 (ModelAccessor)
   - Files to modify: `src/collection.ts`, `src/types.ts`, `src/kysely-compiler.ts`
   - Write 3-4 tests: `select('name', 'email')` narrows result; `select()` then `include()` preserves relations; `select()` replaces previous selection; select compiles to specific columns in SQL
 
-- [ ] **4.3 Write type-level tests for select() and type-state**
+- [x] **4.3 Write type-level tests for select() and type-state**
   - Add type assertions in `test/generated-contract-types.test-d.ts` (or a new `.test-d.ts` file)
   - Test that `select('name', 'email')` result type is `{ name: string; email: string }`
   - Test that `select('name').include('posts')` result type includes both `name` and `posts`

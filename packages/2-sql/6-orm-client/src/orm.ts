@@ -3,13 +3,14 @@ import { Collection } from './collection';
 import type {
   CollectionContext,
   CollectionModelName,
+  CollectionTypeState,
   DefaultModelRow,
   RuntimeQueryable,
 } from './types';
 
 export interface OrmOptions<
   TContract extends SqlContract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+  Collections extends Partial<Record<string, AnyCollectionClass>>,
 > {
   readonly contract: TContract;
   readonly runtime: RuntimeQueryable;
@@ -18,9 +19,7 @@ export interface OrmOptions<
 
 type ModelNames<TContract extends SqlContract<SqlStorage>> = CollectionModelName<TContract>;
 
-type AnyCollectionClass<TContract extends SqlContract<SqlStorage>> = new (
-  ...args: never[]
-) => Collection<TContract, string, unknown>;
+type AnyCollectionClass = new (...args: never[]) => object;
 
 type LowercaseFirst<Name extends string> = Name extends `${infer Head}${infer Tail}`
   ? `${Lowercase<Head>}${Tail}`
@@ -29,27 +28,26 @@ type LowercaseFirst<Name extends string> = Name extends `${infer Head}${infer Ta
 type ModelAliasKeys<Name extends string> = Name | LowercaseFirst<Name> | `${LowercaseFirst<Name>}s`;
 
 type CustomCollectionForKey<
-  TContract extends SqlContract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+  Collections extends Partial<Record<string, AnyCollectionClass>>,
   Key extends string,
 > = Key extends keyof Collections
-  ? Collections[Key] extends AnyCollectionClass<TContract>
+  ? Collections[Key] extends AnyCollectionClass
     ? InstanceType<Collections[Key]>
     : never
   : never;
 
 type CustomCollectionForModel<
   TContract extends SqlContract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+  Collections extends Partial<Record<string, AnyCollectionClass>>,
   ModelName extends ModelNames<TContract>,
 > =
-  | CustomCollectionForKey<TContract, Collections, ModelName>
-  | CustomCollectionForKey<TContract, Collections, LowercaseFirst<ModelName>>
-  | CustomCollectionForKey<TContract, Collections, `${LowercaseFirst<ModelName>}s`>;
+  | CustomCollectionForKey<Collections, ModelName>
+  | CustomCollectionForKey<Collections, LowercaseFirst<ModelName>>
+  | CustomCollectionForKey<Collections, `${LowercaseFirst<ModelName>}s`>;
 
 type ModelCollection<
   TContract extends SqlContract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+  Collections extends Partial<Record<string, AnyCollectionClass>>,
   ModelName extends ModelNames<TContract>,
 > = [CustomCollectionForModel<TContract, Collections, ModelName>] extends [never]
   ? Collection<TContract, ModelName, DefaultModelRow<TContract, ModelName>>
@@ -57,25 +55,28 @@ type ModelCollection<
 
 type ModelCollectionMap<
   TContract extends SqlContract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+  Collections extends Partial<Record<string, AnyCollectionClass>>,
 > = {
   [K in ModelNames<TContract> as ModelAliasKeys<K>]: ModelCollection<TContract, Collections, K>;
 };
 
 type OrmClient<
   TContract extends SqlContract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+  Collections extends Partial<Record<string, AnyCollectionClass>>,
 > = ModelCollectionMap<TContract, Collections>;
 
 export function orm<
   TContract extends SqlContract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>> = Record<never, never>,
+  Collections extends Partial<Record<string, AnyCollectionClass>> = Record<never, never>,
 >(options: OrmOptions<TContract, Collections>): OrmClient<TContract, Collections> {
   const { contract, runtime, collections } = options;
   const ctx: CollectionContext<TContract> = { contract, runtime };
   const modelAliases = createModelAliases(contract);
   const collectionRegistry = createCollectionRegistry(contract, collections, modelAliases);
-  const cache = new Map<ModelNames<TContract>, Collection<TContract, string, unknown>>();
+  const cache = new Map<
+    ModelNames<TContract>,
+    Collection<TContract, string, unknown, CollectionTypeState>
+  >();
 
   return new Proxy({} as OrmClient<TContract, Collections>, {
     get(_target, prop: string | symbol): unknown {
@@ -97,18 +98,18 @@ export function orm<
 
       const CollectionClass =
         collectionRegistry.get(modelName as ModelNames<TContract>) ??
-        (Collection as AnyCollectionClass<TContract>);
+        (Collection as unknown as AnyCollectionClass);
       const CollectionCtor = CollectionClass as unknown as new (
         ctx: CollectionContext<TContract>,
         modelName: string,
         options?: Record<string, unknown>,
-      ) => Collection<TContract, string, unknown>;
+      ) => Collection<TContract, string, unknown, CollectionTypeState>;
       const collection = new CollectionCtor(ctx, modelName, {
         registry: collectionRegistry,
       }) as ModelCollection<TContract, Collections, ModelNames<TContract>>;
       cache.set(
         modelName as ModelNames<TContract>,
-        collection as Collection<TContract, string, unknown>,
+        collection as unknown as Collection<TContract, string, unknown, CollectionTypeState>,
       );
       return collection;
     },
@@ -143,13 +144,13 @@ function createModelAliases<TContract extends SqlContract<SqlStorage>>(
 
 function createCollectionRegistry<
   TContract extends SqlContract<SqlStorage>,
-  Collections extends Partial<Record<string, AnyCollectionClass<TContract>>>,
+  Collections extends Partial<Record<string, AnyCollectionClass>>,
 >(
   contract: TContract,
   collections: Collections | undefined,
   aliases: Map<string, ModelNames<TContract>>,
-): Map<ModelNames<TContract>, AnyCollectionClass<TContract>> {
-  const registry = new Map<ModelNames<TContract>, AnyCollectionClass<TContract>>();
+): Map<ModelNames<TContract>, AnyCollectionClass> {
+  const registry = new Map<ModelNames<TContract>, AnyCollectionClass>();
   if (!collections) {
     return registry;
   }
@@ -164,7 +165,7 @@ function createCollectionRegistry<
         `No model found for custom collection '${key}'. Available models: ${Object.keys(contract.models as Record<string, unknown>).join(', ')}`,
       );
     }
-    registry.set(modelName, collectionClass as AnyCollectionClass<TContract>);
+    registry.set(modelName, collectionClass as AnyCollectionClass);
   }
 
   return registry;

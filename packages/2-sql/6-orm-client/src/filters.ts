@@ -69,10 +69,16 @@ export function shorthandToWhereExpr<
   modelName: ModelName,
   filters: ShorthandWhereFilter<TContract, ModelName>,
 ): WhereExpr | undefined {
+  const models = contract.models as Record<
+    string,
+    {
+      storage?: {
+        table?: string;
+      };
+    }
+  >;
   const tableName =
-    contract.mappings.modelToTable?.[modelName] ??
-    contract.models?.[modelName]?.storage?.table ??
-    modelName;
+    contract.mappings.modelToTable?.[modelName] ?? models[modelName]?.storage?.table ?? modelName;
   const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
 
   const exprs: WhereExpr[] = [];

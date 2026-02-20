@@ -84,22 +84,22 @@ export class Collection<
 
   where(
     fn: (model: ModelAccessor<TContract, ModelName>) => WhereExpr,
-  ): Collection<TContract, ModelName, Row, WithWhereState<State>> & this;
+  ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
     filters: ShorthandWhereFilter<TContract, ModelName>,
-  ): Collection<TContract, ModelName, Row, WithWhereState<State>> & this;
+  ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
   where(
     input:
       | ((model: ModelAccessor<TContract, ModelName>) => WhereExpr)
       | ShorthandWhereFilter<TContract, ModelName>,
-  ): Collection<TContract, ModelName, Row, WithWhereState<State>> & this {
+  ): Collection<TContract, ModelName, Row, WithWhereState<State>> {
     const filter =
       typeof input === 'function'
         ? input(createModelAccessor(this.ctx.contract, this.modelName))
         : shorthandToWhereExpr(this.ctx.contract, this.modelName, input);
 
     if (!filter) {
-      return this as Collection<TContract, ModelName, Row, WithWhereState<State>> & this;
+      return this as Collection<TContract, ModelName, Row, WithWhereState<State>>;
     }
 
     return this.#clone<WithWhereState<State>>({
@@ -133,8 +133,7 @@ export class Collection<
       [K in RelName]: IncludedRow[];
     },
     State
-  > &
-    this {
+  > {
     const relation = resolveIncludeRelation(
       this.ctx.contract,
       this.modelName,
@@ -188,8 +187,7 @@ export class Collection<
     Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> &
       IncludedRelationsForRow<TContract, ModelName, Row>,
     State
-  > &
-    this {
+  > {
     const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
     const selectedFields = fields.map((fieldName) => fieldToColumn[fieldName] ?? fieldName);
 
@@ -206,7 +204,7 @@ export class Collection<
     selection:
       | ((model: ModelAccessor<TContract, ModelName>) => OrderByDirective)
       | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => OrderByDirective>,
-  ): Collection<TContract, ModelName, Row, WithOrderByState<State>> & this {
+  ): Collection<TContract, ModelName, Row, WithOrderByState<State>> {
     const accessor = createModelAccessor(this.ctx.contract, this.modelName);
     const selectors = Array.isArray(selection) ? selection : [selection];
     const nextOrders: OrderExpr[] = selectors.map((selector) => {
@@ -222,11 +220,11 @@ export class Collection<
     });
   }
 
-  take(n: number): this {
+  take(n: number): Collection<TContract, ModelName, Row, State> {
     return this.#clone({ limit: n });
   }
 
-  skip(n: number): this {
+  skip(n: number): Collection<TContract, ModelName, Row, State> {
     return this.#clone({ offset: n });
   }
 
@@ -244,7 +242,12 @@ export class Collection<
       | ((model: ModelAccessor<TContract, ModelName>) => WhereExpr)
       | ShorthandWhereFilter<TContract, ModelName>,
   ): Promise<Row | null> {
-    const scoped = filter ? this.where(filter) : this;
+    const scoped =
+      filter === undefined
+        ? this
+        : typeof filter === 'function'
+          ? this.where(filter)
+          : this.where(filter);
     const limited = scoped.take(1);
     const rows = await limited.#dispatch().toArray();
     return rows[0] ?? null;
@@ -252,7 +255,7 @@ export class Collection<
 
   #clone<NextState extends CollectionTypeState = State>(
     overrides: Partial<CollectionState>,
-  ): Collection<TContract, ModelName, Row, NextState> & this {
+  ): Collection<TContract, ModelName, Row, NextState> {
     return this.#createSelf<Row, NextState>({
       ...this.state,
       ...overrides,
@@ -261,7 +264,7 @@ export class Collection<
 
   #cloneWithRow<NextRow, NextState extends CollectionTypeState = State>(
     overrides: Partial<CollectionState>,
-  ): Collection<TContract, ModelName, NextRow, NextState> & this {
+  ): Collection<TContract, ModelName, NextRow, NextState> {
     return this.#createSelf<NextRow, NextState>({
       ...this.state,
       ...overrides,
@@ -270,13 +273,13 @@ export class Collection<
 
   #createSelf<NextRow, NextState extends CollectionTypeState>(
     state: CollectionState,
-  ): Collection<TContract, ModelName, NextRow, NextState> & this {
+  ): Collection<TContract, ModelName, NextRow, NextState> {
     const Ctor = this.constructor as CollectionConstructor<TContract>;
     return new Ctor(this.ctx, this.modelName, {
       tableName: this.tableName,
       state,
       registry: this.registry,
-    }) as unknown as Collection<TContract, ModelName, NextRow, NextState> & this;
+    }) as unknown as Collection<TContract, ModelName, NextRow, NextState>;
   }
 
   #createCollection<

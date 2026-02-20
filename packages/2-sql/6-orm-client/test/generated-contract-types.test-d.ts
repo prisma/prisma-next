@@ -1,12 +1,32 @@
-import type { SqlContract, StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { Collection } from '../src/collection';
 import { createMockRuntime } from './helpers';
 
 type GeneratedLikeContract = SqlContract<
   {
     tables: {
-      user: StorageTable;
-      post: StorageTable;
+      user: {
+        columns: {
+          id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+          name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+          email: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+        };
+        primaryKey: { columns: ['id'] };
+        uniques: [];
+        indexes: [];
+        foreignKeys: [];
+      };
+      post: {
+        columns: {
+          id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+          userId: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+          title: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
+        };
+        primaryKey: { columns: ['id'] };
+        uniques: [];
+        indexes: [];
+        foreignKeys: [];
+      };
     };
   },
   {
@@ -14,6 +34,7 @@ type GeneratedLikeContract = SqlContract<
       storage: { table: 'user' };
       fields: {
         id: string;
+        name: string;
         email: string;
       };
     };
@@ -51,6 +72,7 @@ type GeneratedLikeContract = SqlContract<
     fieldToColumn: {
       User: {
         id: 'id';
+        name: 'name';
         email: 'email';
       };
       Post: {
@@ -62,6 +84,7 @@ type GeneratedLikeContract = SqlContract<
     columnToField: {
       user: {
         id: 'id';
+        name: 'name';
         email: 'email';
       };
       post: {
@@ -83,7 +106,55 @@ class PostCollection extends Collection<GeneratedLikeContract, 'Post'> {
   }
 }
 
+type RowOf<TCollection> =
+  TCollection extends Collection<
+    infer _Contract extends SqlContract<SqlStorage>,
+    infer _ModelName extends string,
+    infer Row,
+    infer _State
+  >
+    ? Row
+    : never;
+
+type StateOf<TCollection> =
+  TCollection extends Collection<
+    infer _Contract extends SqlContract<SqlStorage>,
+    infer _ModelName extends string,
+    infer _Row,
+    infer State
+  >
+    ? State
+    : never;
+
 const runtime = createMockRuntime();
 const contract = {} as GeneratedLikeContract;
 const collection = new PostCollection({ contract, runtime }, 'Post');
 collection.forUser('user_001');
+
+const userCollection = new Collection({ contract, runtime }, 'User');
+
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+
+type Assert<T extends true> = T;
+
+const selectedUsers = userCollection.select('name', 'email');
+const selectedUsersWithPosts = userCollection.select('name').include('posts');
+const filteredUsers = userCollection.where({ email: 'alice@example.com' });
+
+type SelectedUserRow = RowOf<typeof selectedUsers>;
+type SelectedUserWithPostsRow = RowOf<typeof selectedUsersWithPosts>;
+type FilteredUsersState = StateOf<typeof filteredUsers>;
+
+export type GeneratedContractTypeAssertions = [
+  Assert<Equal<keyof SelectedUserRow, 'name' | 'email'>>,
+  Assert<Equal<SelectedUserRow['name'], string>>,
+  Assert<Equal<SelectedUserRow['email'], string>>,
+  Assert<Equal<keyof SelectedUserWithPostsRow, 'name' | 'posts'>>,
+  Assert<Equal<SelectedUserWithPostsRow['name'], string>>,
+  Assert<Equal<keyof SelectedUserWithPostsRow['posts'][number], 'id' | 'userId' | 'title'>>,
+  Assert<Equal<SelectedUserWithPostsRow['posts'][number]['id'], string>>,
+  Assert<Equal<SelectedUserWithPostsRow['posts'][number]['userId'], string>>,
+  Assert<Equal<SelectedUserWithPostsRow['posts'][number]['title'], string>>,
+  Assert<Equal<FilteredUsersState['hasWhere'], true>>,
+];

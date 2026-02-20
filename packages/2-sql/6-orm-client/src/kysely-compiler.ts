@@ -14,6 +14,7 @@ import {
   DummyDriver,
   type ExpressionBuilder,
   Kysely,
+  type OperandExpression,
   PostgresAdapter,
   PostgresIntrospector,
   PostgresQueryCompiler,
@@ -26,6 +27,8 @@ import type { CollectionState } from './types';
 type AnyDB = Record<string, Record<string, unknown>>;
 type AnySelectQueryBuilder = SelectQueryBuilder<AnyDB, string, Record<string, unknown>>;
 type SqlComparable = AstExpression | ParamRef | LiteralExpr | ListLiteralExpr;
+type SqlPredicate = OperandExpression<SqlBool>;
+type SqlValueExpression = OperandExpression<unknown>;
 
 const queryCompiler = new Kysely<AnyDB>({
   dialect: {
@@ -115,8 +118,11 @@ function applyWhereFilters<QueryBuilder extends AnySelectQueryBuilder>(
     return qb;
   }
 
+  const firstFilter = filters[0];
   const whereExpr: WhereExpr =
-    filters.length === 1 ? filters[0]! : { kind: 'and', exprs: [...filters] };
+    filters.length === 1 && firstFilter !== undefined
+      ? firstFilter
+      : { kind: 'and', exprs: [...filters] };
 
   return qb.where((eb) =>
     whereExprToKysely(eb as ExpressionBuilder<AnyDB, string>, whereExpr),
@@ -136,7 +142,7 @@ function applyProjection<QueryBuilder extends AnySelectQueryBuilder>(
   return qb.select(qualified) as QueryBuilder;
 }
 
-function whereExprToKysely(eb: ExpressionBuilder<AnyDB, string>, expr: WhereExpr): unknown {
+function whereExprToKysely(eb: ExpressionBuilder<AnyDB, string>, expr: WhereExpr): SqlPredicate {
   switch (expr.kind) {
     case 'bin':
       return binaryExprToKysely(expr);
@@ -155,7 +161,7 @@ function whereExprToKysely(eb: ExpressionBuilder<AnyDB, string>, expr: WhereExpr
   }
 }
 
-function binaryExprToKysely(expr: BinaryExpr): unknown {
+function binaryExprToKysely(expr: BinaryExpr): SqlPredicate {
   const left = astExpressionToKysely(expr.left);
 
   if (expr.op === 'in' || expr.op === 'notIn') {
@@ -175,12 +181,12 @@ function binaryExprToKysely(expr: BinaryExpr): unknown {
   return sql<SqlBool>`${left} ${sql.raw(op)} ${right}`;
 }
 
-function nullCheckExprToKysely(expr: AstExpression, isNull: boolean): unknown {
+function nullCheckExprToKysely(expr: AstExpression, isNull: boolean): SqlPredicate {
   const operand = astExpressionToKysely(expr);
   return isNull ? sql<SqlBool>`${operand} is null` : sql<SqlBool>`${operand} is not null`;
 }
 
-function existsExprToKysely(subquery: SelectAst, not: boolean): unknown {
+function existsExprToKysely(subquery: SelectAst, not: boolean): SqlPredicate {
   const existsSql = sql<SqlBool>`exists (${buildSelectQuery(subquery)})`;
   return not ? sql<SqlBool>`not (${existsSql})` : existsSql;
 }
@@ -201,14 +207,16 @@ function buildSelectQuery(ast: SelectAst): AnySelectQueryBuilder {
       );
     }
 
-    const projected = expr.kind === 'literal' ? sql`${expr.value}` : astExpressionToKysely(expr);
+    const projected =
+      expr.kind === 'literal' ? sql`${expr.value}` : sql`${astExpressionToKysely(expr)}`;
     return projected.as(projection.alias || `_p${index}`);
   });
 
   qb = qb.select(projectSql.length > 0 ? projectSql : [sql`1`.as('_exists')]);
 
-  if (ast.where) {
-    qb = qb.where((eb) => whereExprToKysely(eb as ExpressionBuilder<AnyDB, string>, ast.where));
+  const astWhere = ast.where;
+  if (astWhere !== undefined) {
+    qb = qb.where((eb) => whereExprToKysely(eb as ExpressionBuilder<AnyDB, string>, astWhere));
   }
 
   if (ast.orderBy) {
@@ -247,7 +255,7 @@ function applyJoin(qb: AnySelectQueryBuilder, join: JoinAst): AnySelectQueryBuil
   }
 }
 
-function astExpressionToKysely(expr: AstExpression): unknown {
+function astExpressionToKysely(expr: AstExpression): SqlValueExpression {
   switch (expr.kind) {
     case 'col':
       return sql.ref(`${expr.table}.${expr.column}`);
@@ -260,7 +268,7 @@ function astExpressionToKysely(expr: AstExpression): unknown {
   }
 }
 
-function sqlComparableToKysely(value: Exclude<SqlComparable, ListLiteralExpr>): unknown {
+function sqlComparableToKysely(value: Exclude<SqlComparable, ListLiteralExpr>): SqlValueExpression {
   switch (value.kind) {
     case 'col':
     case 'operation':
