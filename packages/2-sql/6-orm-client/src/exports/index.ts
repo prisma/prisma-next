@@ -8,6 +8,7 @@ export type {
   CollectionState,
   CollectionTypeState,
   ComparisonMethods,
+  CreateInput,
   DefaultCollectionTypeState,
   DefaultModelRow,
   IncludeExpr,

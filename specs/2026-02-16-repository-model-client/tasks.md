@@ -301,7 +301,7 @@ Depends on: Group 6 (include cardinality)
 
 Depends on: Group 4 (type-state, select), Group 1 (WhereExpr)
 
-- [ ] **8.1 Define CreateInput type derived from contract**
+- [x] **8.1 Define CreateInput type derived from contract**
   - `CreateInput<TContract, ModelName>` distinguishes required from optional fields
   - Required: non-nullable fields without defaults
   - Optional: nullable fields, fields with defaults, auto-generated fields (autoincrement, etc.)

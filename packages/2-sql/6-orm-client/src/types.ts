@@ -303,6 +303,110 @@ type FieldJsType<
     : FieldValueType<TContract, ModelName, FieldName>
   : FieldStorageJsType<TContract, ModelName, FieldName>;
 
+type FieldStorageColumn<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = ModelTableName<TContract, ModelName> extends infer TableName extends string
+  ? FieldColumnName<TContract, ModelName, FieldName> extends infer ColName extends string
+    ? TContract['storage']['tables'] extends Record<
+        string,
+        { readonly columns: Record<string, unknown> }
+      >
+      ? TableName extends keyof TContract['storage']['tables']
+        ? ColName extends keyof TContract['storage']['tables'][TableName]['columns']
+          ? TContract['storage']['tables'][TableName]['columns'][ColName] extends StorageColumn
+            ? TContract['storage']['tables'][TableName]['columns'][ColName]
+            : never
+          : never
+        : never
+      : never
+    : never
+  : never;
+
+type ExecutionDefaultEntry<TContract extends SqlContract<SqlStorage>> =
+  TContract['execution'] extends {
+    readonly mutations: {
+      readonly defaults: infer Defaults;
+    };
+  }
+    ? Defaults extends ReadonlyArray<unknown>
+      ? Defaults[number]
+      : never
+    : never;
+
+type HasExecutionCreateDefault<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = [
+  Extract<
+    ExecutionDefaultEntry<TContract>,
+    {
+      readonly ref: {
+        readonly table: ModelTableName<TContract, ModelName>;
+        readonly column: FieldColumnName<TContract, ModelName, FieldName>;
+      };
+      readonly onCreate?: unknown;
+    }
+  >,
+] extends [never]
+  ? false
+  : true;
+
+type IsOptionalCreateField<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = FieldStorageColumn<TContract, ModelName, FieldName> extends infer Column
+  ? Column extends StorageColumn
+    ? Column['nullable'] extends true
+      ? true
+      : Column extends { readonly default: unknown }
+        ? true
+        : HasExecutionCreateDefault<TContract, ModelName, FieldName>
+    : HasExecutionCreateDefault<TContract, ModelName, FieldName>
+  : HasExecutionCreateDefault<TContract, ModelName, FieldName>;
+
+type CreateFieldNames<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = keyof DefaultModelRow<TContract, ModelName> & string;
+
+type RequiredCreateFieldNames<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = {
+  [K in CreateFieldNames<TContract, ModelName>]-?: IsOptionalCreateField<
+    TContract,
+    ModelName,
+    K
+  > extends true
+    ? never
+    : K;
+}[CreateFieldNames<TContract, ModelName>];
+
+type OptionalCreateFieldNames<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = {
+  [K in CreateFieldNames<TContract, ModelName>]-?: IsOptionalCreateField<
+    TContract,
+    ModelName,
+    K
+  > extends true
+    ? K
+    : never;
+}[CreateFieldNames<TContract, ModelName>];
+
+export type CreateInput<TContract extends SqlContract<SqlStorage>, ModelName extends string> = Pick<
+  DefaultModelRow<TContract, ModelName>,
+  RequiredCreateFieldNames<TContract, ModelName>
+> &
+  Partial<
+    Pick<DefaultModelRow<TContract, ModelName>, OptionalCreateFieldNames<TContract, ModelName>>
+  >;
+
 // ---------------------------------------------------------------------------
 // Relation helpers
 // ---------------------------------------------------------------------------
