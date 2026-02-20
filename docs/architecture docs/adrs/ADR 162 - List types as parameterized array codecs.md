@@ -20,6 +20,7 @@ Specifically, we need:
 - an authoring helper so developers don't hand-assemble typeParams
 - correct SQL lowering (parameter casts like `$1::text[]`)
 - correct type emission in `contract.d.ts` (e.g. `Array<number>`, `Array<string | null>`)
+- runtime encode/decode that applies the element codec to each array element, regardless of driver wire format
 - introspection that maps Postgres array columns back to the contract representation
 - schema verification that compares expected vs actual array types
 
@@ -105,8 +106,7 @@ function createArrayCodec<TElementWire, TElementJs>(
 >
 ```
 
-TODO: Figure out what we want to do with the codecId in general - we are currently reusing pg/array@1 for both `pgArrayCodec` and any specific codec we create with
-`createArrayCodec` which contains a nested element codec
+Both artifacts share `pg/array@1` as their codec ID. The registry can only hold one entry per ID, so only the base `pgArrayCodec` is registered. `createArrayCodec` exists as a composition primitive but is not yet wired into the runtime — see [Runtime codec composition gap](#runtime-codec-composition-gap) below.
 
 The wire type union reflects the two paths:
 - `string` — Postgres text array literal (e.g. `{1,2,3}`), parsed by `parsePgTextArray`
@@ -227,10 +227,12 @@ On SELECT, the pg driver returns arrays as JS arrays (binary mode) or the runtim
 
 #### F) Codec decodes row values
 
-- Binary mode: `pgArrayCodec.decode([95, 87, 100])` → `[95, 87, 100]` (passthrough)
-- Text mode: `pgArrayCodec.decode('{95,87,100}')` → `['95', '87', '100']` (parsed from text literal)
+The runtime calls `registry.get('pg/array@1')` which returns the base `pgArrayCodec`:
 
-With `createArrayCodec(int4Codec)`, element-level decoding converts each string to a number.
+- Binary mode: `pgArrayCodec.decode([95, 87, 100])` → `[95, 87, 100]` (passthrough)
+- Text mode: `pgArrayCodec.decode('{95,87,100}')` → `['95', '87', '100']` (parsed from text literal, elements remain strings)
+
+The element codec (`pg/int4@1`) is **not** consulted for individual elements. For `int4[]` and `text[]` this produces correct results because the pg driver pre-parses elements into the correct JS types. For element types with non-trivial transformations (e.g. `timestamptz` converting `Date` → ISO string), element-level decoding would not be applied. See [Runtime codec composition gap](#runtime-codec-composition-gap).
 
 ### Generated TypeScript type
 
@@ -253,8 +255,27 @@ scores: Array<CodecTypes['pg/int4@1']['output']> | null // Array<number> | null
 ### Costs
 
 - `parsePgTextArray` / `formatPgTextArray` add ~80 lines of parsing logic; this is tested but is a surface for edge cases in exotic array content
-- Element-level codec composition via `createArrayCodec` is not yet wired into the runtime execution pipeline (the base `pgArrayCodec` handles the common case where the pg driver pre-parses arrays)
 - No query operators (`@>`, `<@`, `&&`, `ANY()`) — follow-up work
+- Element-level codec composition is not yet wired into the runtime — see next section
+
+### Runtime codec composition gap
+
+The runtime resolves codecs by doing a flat `registry.get(codecId)` lookup per column, per row, at decode and encode time. All array columns share `codecId: 'pg/array@1'`, so they all resolve to the same base `pgArrayCodec`, which passes arrays through without applying element-level transformations.
+
+`createArrayCodec(elementCodec)` exists as a factory that correctly composes element-level encode/decode. But no code path calls it: nothing reads `typeParams.element.codecId`, looks up the element codec from the registry, composes a per-column codec, and stores it where the encode/decode paths can find it.
+
+**What works today**: `text[]` and `int4[]` — the pg driver pre-parses these into correct JS types (`string[]`, `number[]`), so the base codec's passthrough produces correct results.
+
+**What breaks**: Element types with non-trivial codec transformations:
+- `timestamptz[]` — the codec converts `Date` → ISO string, but element decode is never applied, so the runtime returns `Date[]` instead of `string[]`
+- `numeric[]` — the codec converts `number` → `string` for precision safety, but element decode is never applied
+- Text protocol — if a driver returns the raw Postgres literal `{1,2,3}`, the base codec returns it as a raw string instead of parsing and element-decoding
+
+**Why this is a problem**: The contract says "this column's element type is `pg/timestamptz@1`" but the runtime never applies that codec. Correct behavior depends on the pg driver's pre-parsing, which is driver-specific and not guaranteed by the contract.
+
+**Path forward**: Resolve per-column codecs upfront during `createExecutionContext` instead of at decode/encode time. For each column with `typeParams`, compose the appropriate codec (e.g. `createArrayCodec(elementCodec)`) and store it in a per-column map. The decode/encode paths would check this map first, falling back to the registry for non-composed codecs. See `codec-composition-gap.md` in the repo root for a detailed analysis.
+
+Tests exposing this gap exist in `packages/2-sql/5-runtime/test/array-codec-composition.test.ts`.
 
 ### Out of scope
 

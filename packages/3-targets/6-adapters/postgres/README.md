@@ -346,6 +346,16 @@ Array columns use `codecId: 'pg/array@1'` with `typeParams`:
 - Schema introspection and verification
 - Type generation producing `Array<T>` or `Array<T | null>`
 
+### Limitation: Element-Level Codec Composition
+
+The runtime uses the base `pgArrayCodec` for all array columns. This codec passes arrays through without applying element-level encode/decode. A composed codec factory (`createArrayCodec(elementCodec)`) exists but is not yet wired into the runtime.
+
+**Works correctly**: `text[]`, `int4[]`, and other element types where the pg driver pre-parses elements into the correct JS types.
+
+**Does not work**: Element types with non-trivial codec transformations — e.g. `timestamptz[]` (should convert `Date` → ISO string per-element) or `numeric[]` (should convert `number` → `string` per-element). The element codec is not consulted, so the runtime returns whatever the driver produces.
+
+See [ADR 162](../../../docs/architecture%20docs/adrs/ADR%20162%20-%20List%20types%20as%20parameterized%20array%20codecs.md) and `codec-composition-gap.md` for the full analysis and path forward.
+
 ### Out of Scope
 
 - Multi-dimensional arrays (e.g., `integer[][]`)
