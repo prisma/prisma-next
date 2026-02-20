@@ -38,7 +38,7 @@ The most fundamental internal change. Everything downstream (new operators, rela
   - Keep the Proxy-based approach
   - Files to modify: `src/column-accessor.ts`
 
-- [ ] **1.4 Rewrite kysely-compiler to consume WhereExpr**
+- [x] **1.4 Rewrite kysely-compiler to consume WhereExpr**
   - Replace the `comparisonOpToSql` mapping and `qb.where(f.column, op, f.value)` pattern in `src/kysely-compiler.ts` with a recursive `WhereExpr`-to-Kysely translation
   - Handle `BinaryExpr`, `NullCheckExpr`, `AndExpr`, `OrExpr`, `ExistsExpr` node kinds
   - Use Kysely's `ExpressionBuilder` and `eb.and()`, `eb.or()`, `eb.exists()` for compound expressions
