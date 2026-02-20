@@ -64,7 +64,7 @@ The most fundamental internal change. Everything downstream (new operators, rela
 
 Depends on: Group 1 (WhereExpr integration)
 
-- [ ] **2.1 Implement `and()`, `or()`, `not()`, `all()` standalone functions**
+- [x] **2.1 Implement `and()`, `or()`, `not()`, `all()` standalone functions**
   - Create a new file `src/filters.ts` exporting these four functions
   - `and(...exprs: WhereExpr[]): AndExpr` -- produces `{ kind: 'and', exprs }`
   - `or(...exprs: WhereExpr[]): OrExpr` -- produces `{ kind: 'or', exprs }`

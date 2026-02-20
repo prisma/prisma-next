@@ -1,4 +1,5 @@
 export { Collection } from '../collection';
+export { all, and, not, or } from '../filters';
 export type { OrmOptions } from '../orm';
 export { orm } from '../orm';
 export type {
