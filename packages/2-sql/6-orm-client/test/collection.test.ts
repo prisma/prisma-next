@@ -118,6 +118,15 @@ describe('Collection', () => {
       ]);
     });
 
+    it('select() stores mapped selected fields and replaces previous selections', () => {
+      const { collection } = createCollection();
+      const selected = collection.select('name', 'email');
+      expect(selected.state.selectedFields).toEqual(['name', 'email']);
+
+      const replaced = selected.select('email');
+      expect(replaced.state.selectedFields).toEqual(['email']);
+    });
+
     it('include() appends an include expression', () => {
       const { collection } = createCollection();
       const withPosts = collection.include('posts');
@@ -173,6 +182,31 @@ describe('Collection', () => {
       expect(sql).toContain('"name"');
     });
 
+    it('select() narrows projected fields in runtime results', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[{ name: 'Alice', email: 'alice@example.com' }]]);
+
+      const result = await collection.select('name', 'email').all().toArray();
+      expect(result).toEqual([{ name: 'Alice', email: 'alice@example.com' }]);
+    });
+
+    it('select() with include() keeps selected scalars and relation payloads', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([
+        [{ id: 1, name: 'Alice' }],
+        [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
+      ]);
+
+      const results = await collection.select('name').include('posts').all().toArray();
+      expect(results).toEqual([
+        {
+          name: 'Alice',
+          posts: [{ id: 10, title: 'Post A', userId: 1, views: 100 }],
+        },
+      ]);
+      expect('id' in results[0]!).toBe(false);
+    });
+
     it('all() with take/skip adds LIMIT/OFFSET', async () => {
       const { collection, runtime } = createCollection();
       runtime.setNextResults([[]]);
@@ -180,6 +214,17 @@ describe('Collection', () => {
       const sql = runtime.executions[0]!.plan.sql;
       expect(sql).toContain('limit');
       expect(sql).toContain('offset');
+    });
+
+    it('select() compiles to an explicit projection instead of selectAll()', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[]]);
+
+      await collection.select('name', 'email').all().toArray();
+      const sql = runtime.executions[0]!.plan.sql.toLowerCase();
+      expect(sql).toContain('"users"."name"');
+      expect(sql).toContain('"users"."email"');
+      expect(sql).not.toContain('*');
     });
 
     it('find() adds limit 1', async () => {

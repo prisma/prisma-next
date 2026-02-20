@@ -162,7 +162,7 @@ Depends on: Group 2 (ModelAccessor)
   - Files to modify: `src/collection.ts`, `src/types.ts`
   - Acceptance: Existing tests compile without changes; `pnpm typecheck` passes
 
-- [ ] **4.2 Implement select() with type narrowing**
+- [x] **4.2 Implement select() with type narrowing**
   - Add `select(...fields: FieldName[])` method to Collection
   - Returns a new Collection with `Row` narrowed to `Pick<DefaultModelRow, Fields> & IncludedRelations`
   - Last call wins (replaces previous selection)

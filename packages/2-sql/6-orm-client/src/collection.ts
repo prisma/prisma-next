@@ -47,6 +47,12 @@ type WithOrderByState<State extends CollectionTypeState> = Omit<State, 'hasOrder
   readonly hasOrderBy: true;
 };
 
+type IncludedRelationsForRow<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  Row,
+> = Omit<Row, keyof DefaultModelRow<TContract, ModelName>>;
+
 export class Collection<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
@@ -169,6 +175,33 @@ export class Collection<
     });
   }
 
+  select<
+    Fields extends readonly [
+      keyof DefaultModelRow<TContract, ModelName> & string,
+      ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
+    ],
+  >(
+    ...fields: Fields
+  ): Collection<
+    TContract,
+    ModelName,
+    Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> &
+      IncludedRelationsForRow<TContract, ModelName, Row>,
+    State
+  > &
+    this {
+    const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
+    const selectedFields = fields.map((fieldName) => fieldToColumn[fieldName] ?? fieldName);
+
+    return this.#cloneWithRow<
+      Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> &
+        IncludedRelationsForRow<TContract, ModelName, Row>,
+      State
+    >({
+      selectedFields,
+    });
+  }
+
   orderBy(
     selection:
       | ((model: ModelAccessor<TContract, ModelName>) => OrderByDirective)
@@ -284,9 +317,13 @@ export class Collection<
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       const { scope, release } = await acquireRuntimeScope(runtime);
       try {
+        const parentJoinColumns = state.includes.map((include) => include.parentPkColumn);
+        const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
+          augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
         const parentCompiled = compileSelect(tableName, {
           ...state,
           includes: [],
+          selectedFields: parentSelectedForQuery,
         });
         const parentPlan = createExecutionPlan<Record<string, unknown>>(parentCompiled, contract);
         const parentRowsRaw = await scope.execute(parentPlan).toArray();
@@ -296,6 +333,12 @@ export class Collection<
 
         const parentRows = parentRowsRaw.map((row) => createRowEnvelope(contract, tableName, row));
         await stitchIncludes(scope, contract, parentRows, state.includes);
+
+        if (hiddenParentColumns.length > 0) {
+          for (const row of parentRows) {
+            stripHiddenMappedFields(contract, tableName, row.mapped, hiddenParentColumns);
+          }
+        }
 
         for (const row of parentRows) {
           yield row.mapped as Row;
@@ -331,11 +374,17 @@ async function stitchIncludes(
       continue;
     }
 
+    const { selectedForQuery: childSelectedForQuery, hiddenColumns: hiddenChildColumns } =
+      augmentSelectionForJoinColumns(include.nested.selectedFields, [include.fkColumn]);
+
     const childCompiled = compileRelationSelect(
       include.relatedTableName,
       include.fkColumn,
       parentJoinValues,
-      include.nested,
+      {
+        ...include.nested,
+        selectedFields: childSelectedForQuery,
+      },
     );
     const childPlan = createExecutionPlan<Record<string, unknown>>(childCompiled, contract);
     const childRowsRaw = await scope.execute(childPlan).toArray();
@@ -350,6 +399,16 @@ async function stitchIncludes(
     const childByParentJoin = new Map<unknown, Record<string, unknown>[]>();
     for (const child of childRows) {
       const joinValue = child.raw[include.fkColumn];
+
+      if (hiddenChildColumns.length > 0) {
+        stripHiddenMappedFields(
+          contract,
+          include.relatedTableName,
+          child.mapped,
+          hiddenChildColumns,
+        );
+      }
+
       let bucket = childByParentJoin.get(joinValue);
       if (!bucket) {
         bucket = [];
@@ -363,6 +422,51 @@ async function stitchIncludes(
       const relatedRows = childByParentJoin.get(parentJoinValue) ?? [];
       parent.mapped[include.relationName] = slicePerParent(relatedRows, include.nested);
     }
+  }
+}
+
+function augmentSelectionForJoinColumns(
+  selectedFields: readonly string[] | undefined,
+  requiredColumns: readonly string[],
+): {
+  selectedForQuery: readonly string[] | undefined;
+  hiddenColumns: readonly string[];
+} {
+  if (!selectedFields) {
+    return {
+      selectedForQuery: selectedFields,
+      hiddenColumns: [],
+    };
+  }
+
+  const hiddenColumns = requiredColumns.filter((column) => !selectedFields.includes(column));
+  if (hiddenColumns.length === 0) {
+    return {
+      selectedForQuery: selectedFields,
+      hiddenColumns: [],
+    };
+  }
+
+  return {
+    selectedForQuery: [...selectedFields, ...hiddenColumns],
+    hiddenColumns,
+  };
+}
+
+function stripHiddenMappedFields(
+  contract: SqlContract<SqlStorage>,
+  tableName: string,
+  mapped: Record<string, unknown>,
+  hiddenColumns: readonly string[],
+): void {
+  if (hiddenColumns.length === 0) {
+    return;
+  }
+
+  const columnToField = contract.mappings.columnToField?.[tableName] ?? {};
+  for (const hiddenColumn of hiddenColumns) {
+    const fieldName = columnToField[hiddenColumn] ?? hiddenColumn;
+    delete mapped[fieldName];
   }
 }
 

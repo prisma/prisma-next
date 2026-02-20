@@ -50,7 +50,8 @@ const comparisonOpToSql: Record<BinaryExpr['op'], string> = {
 };
 
 export function compileSelect(tableName: string, state: CollectionState): CompiledQuery {
-  let qb = queryCompiler.selectFrom(tableName).selectAll();
+  let qb = queryCompiler.selectFrom(tableName);
+  qb = applyProjection(qb, tableName, state.selectedFields);
   qb = applyWhereFilters(qb, state.filters);
 
   if (state.orderBy) {
@@ -76,10 +77,8 @@ export function compileRelationSelect(
   parentPks: readonly unknown[],
   nestedState: CollectionState,
 ): CompiledQuery {
-  let qb = queryCompiler
-    .selectFrom(relatedTableName)
-    .selectAll()
-    .where(fkColumn, 'in', [...parentPks]);
+  let qb = queryCompiler.selectFrom(relatedTableName).where(fkColumn, 'in', [...parentPks]);
+  qb = applyProjection(qb, relatedTableName, nestedState.selectedFields);
   qb = applyWhereFilters(qb, nestedState.filters);
 
   if (nestedState.orderBy) {
@@ -122,6 +121,19 @@ function applyWhereFilters<QueryBuilder extends AnySelectQueryBuilder>(
   return qb.where((eb) =>
     whereExprToKysely(eb as ExpressionBuilder<AnyDB, string>, whereExpr),
   ) as QueryBuilder;
+}
+
+function applyProjection<QueryBuilder extends AnySelectQueryBuilder>(
+  qb: QueryBuilder,
+  tableName: string,
+  selectedFields: readonly string[] | undefined,
+): QueryBuilder {
+  if (!selectedFields || selectedFields.length === 0) {
+    return qb.selectAll() as QueryBuilder;
+  }
+
+  const qualified = selectedFields.map((column) => `${tableName}.${column}`);
+  return qb.select(qualified) as QueryBuilder;
 }
 
 function whereExprToKysely(eb: ExpressionBuilder<AnyDB, string>, expr: WhereExpr): unknown {
