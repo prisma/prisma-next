@@ -22,13 +22,16 @@ import {
   type SqlBool,
   sql,
 } from 'kysely';
-import type { CollectionState } from './types';
+import type { CollectionState, OrderExpr } from './types';
 
 type AnyDB = Record<string, Record<string, unknown>>;
 type AnySelectQueryBuilder = SelectQueryBuilder<AnyDB, string, Record<string, unknown>>;
 type SqlComparable = AstExpression | ParamRef | LiteralExpr | ListLiteralExpr;
 type SqlPredicate = OperandExpression<SqlBool>;
 type SqlValueExpression = OperandExpression<unknown>;
+type CursorOrderEntry = OrderExpr & {
+  readonly value: unknown;
+};
 
 const queryCompiler = new Kysely<AnyDB>({
   dialect: {
@@ -56,6 +59,7 @@ export function compileSelect(tableName: string, state: CollectionState): Compil
   let qb = queryCompiler.selectFrom(tableName);
   qb = applyProjection(qb, tableName, state.selectedFields);
   qb = applyWhereFilters(qb, state.filters);
+  qb = applyCursorPagination(qb, tableName, state.orderBy, state.cursor);
 
   if (state.orderBy) {
     for (const o of state.orderBy) {
@@ -83,6 +87,7 @@ export function compileRelationSelect(
   let qb = queryCompiler.selectFrom(relatedTableName).where(fkColumn, 'in', [...parentPks]);
   qb = applyProjection(qb, relatedTableName, nestedState.selectedFields);
   qb = applyWhereFilters(qb, nestedState.filters);
+  qb = applyCursorPagination(qb, relatedTableName, nestedState.orderBy, nestedState.cursor);
 
   if (nestedState.orderBy) {
     for (const o of nestedState.orderBy) {
@@ -140,6 +145,92 @@ function applyProjection<QueryBuilder extends AnySelectQueryBuilder>(
 
   const qualified = selectedFields.map((column) => `${tableName}.${column}`);
   return qb.select(qualified) as QueryBuilder;
+}
+
+function applyCursorPagination<QueryBuilder extends AnySelectQueryBuilder>(
+  qb: QueryBuilder,
+  tableName: string,
+  orderBy: readonly OrderExpr[] | undefined,
+  cursor: Readonly<Record<string, unknown>> | undefined,
+): QueryBuilder {
+  if (!cursor || !orderBy || orderBy.length === 0) {
+    return qb;
+  }
+
+  const entries: CursorOrderEntry[] = [];
+  for (const order of orderBy) {
+    const value = cursor[order.column];
+    if (value === undefined) {
+      throw new Error(`Missing cursor value for orderBy column "${order.column}"`);
+    }
+    entries.push({
+      ...order,
+      value,
+    });
+  }
+
+  const firstEntry = entries[0];
+  if (entries.length === 1 && firstEntry !== undefined) {
+    return applySingleCursorPagination(qb, tableName, firstEntry);
+  }
+
+  const firstDirection = entries[0]?.direction;
+  const isUniformDirection =
+    firstDirection !== undefined && entries.every((entry) => entry.direction === firstDirection);
+
+  if (isUniformDirection) {
+    return applyTupleCursorPagination(qb, tableName, entries, firstDirection === 'asc' ? '>' : '<');
+  }
+
+  return applyLexicographicCursorPagination(qb, tableName, entries);
+}
+
+function applySingleCursorPagination<QueryBuilder extends AnySelectQueryBuilder>(
+  qb: QueryBuilder,
+  tableName: string,
+  cursor: CursorOrderEntry,
+): QueryBuilder {
+  const comparator = cursor.direction === 'asc' ? '>' : '<';
+  const columnRef = sql.ref(`${tableName}.${cursor.column}`);
+  const cursorValue = sql`${cursor.value}`;
+  return qb.where(sql<SqlBool>`${columnRef} ${sql.raw(comparator)} ${cursorValue}`) as QueryBuilder;
+}
+
+function applyTupleCursorPagination<QueryBuilder extends AnySelectQueryBuilder>(
+  qb: QueryBuilder,
+  tableName: string,
+  entries: readonly CursorOrderEntry[],
+  comparator: '>' | '<',
+): QueryBuilder {
+  const tupleColumns = sql.join(entries.map((entry) => sql.ref(`${tableName}.${entry.column}`)));
+  const tupleValues = sql.join(entries.map((entry) => sql`${entry.value}`));
+  return qb.where(
+    sql<SqlBool>`(${tupleColumns}) ${sql.raw(comparator)} (${tupleValues})`,
+  ) as QueryBuilder;
+}
+
+function applyLexicographicCursorPagination<QueryBuilder extends AnySelectQueryBuilder>(
+  qb: QueryBuilder,
+  tableName: string,
+  entries: readonly CursorOrderEntry[],
+): QueryBuilder {
+  const branches = entries.map((entry, index) => {
+    const equalities = entries.slice(0, index).map((prefixEntry) => {
+      const columnRef = sql.ref(`${tableName}.${prefixEntry.column}`);
+      return sql<SqlBool>`${columnRef} = ${sql`${prefixEntry.value}`}`;
+    });
+
+    const comparator = entry.direction === 'asc' ? '>' : '<';
+    const boundary = sql<SqlBool>`${sql.ref(`${tableName}.${entry.column}`)} ${sql.raw(comparator)} ${sql`${entry.value}`}`;
+
+    if (equalities.length === 0) {
+      return boundary;
+    }
+
+    return sql<SqlBool>`(${sql.join([...equalities, boundary], sql` and `)})`;
+  });
+
+  return qb.where(sql<SqlBool>`${sql.join(branches, sql` or `)}`) as QueryBuilder;
 }
 
 function whereExprToKysely(eb: ExpressionBuilder<AnyDB, string>, expr: WhereExpr): SqlPredicate {

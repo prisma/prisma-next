@@ -141,10 +141,16 @@ type Assert<T extends true> = T;
 const selectedUsers = userCollection.select('name', 'email');
 const selectedUsersWithPosts = userCollection.select('name').include('posts');
 const filteredUsers = userCollection.where({ email: 'alice@example.com' });
+const orderedUsers = userCollection.orderBy((user) => user.id.asc());
+const cursorPagedUsers = orderedUsers.cursor({ id: 'user_001' });
+// @ts-expect-error cursor() requires orderBy() first
+userCollection.cursor({ id: 'user_001' });
 
 type SelectedUserRow = RowOf<typeof selectedUsers>;
 type SelectedUserWithPostsRow = RowOf<typeof selectedUsersWithPosts>;
 type FilteredUsersState = StateOf<typeof filteredUsers>;
+type OrderedUsersState = StateOf<typeof orderedUsers>;
+type CursorPagedUsersState = StateOf<typeof cursorPagedUsers>;
 
 export type GeneratedContractTypeAssertions = [
   Assert<Equal<keyof SelectedUserRow, 'name' | 'email'>>,
@@ -157,4 +163,6 @@ export type GeneratedContractTypeAssertions = [
   Assert<Equal<SelectedUserWithPostsRow['posts'][number]['userId'], string>>,
   Assert<Equal<SelectedUserWithPostsRow['posts'][number]['title'], string>>,
   Assert<Equal<FilteredUsersState['hasWhere'], true>>,
+  Assert<Equal<OrderedUsersState['hasOrderBy'], true>>,
+  Assert<Equal<CursorPagedUsersState['hasOrderBy'], true>>,
 ];

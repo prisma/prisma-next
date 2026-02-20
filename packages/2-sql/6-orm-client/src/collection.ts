@@ -220,6 +220,31 @@ export class Collection<
     });
   }
 
+  cursor(
+    cursorValues: State['hasOrderBy'] extends true
+      ? Partial<Record<keyof DefaultModelRow<TContract, ModelName> & string, unknown>>
+      : never,
+  ): Collection<TContract, ModelName, Row, State> {
+    const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
+    const mappedCursor: Record<string, unknown> = {};
+
+    for (const [fieldName, value] of Object.entries(cursorValues as Record<string, unknown>)) {
+      if (value === undefined) {
+        continue;
+      }
+      const columnName = fieldToColumn[fieldName] ?? fieldName;
+      mappedCursor[columnName] = value;
+    }
+
+    if (Object.keys(mappedCursor).length === 0) {
+      return this;
+    }
+
+    return this.#clone({
+      cursor: mappedCursor,
+    });
+  }
+
   take(n: number): Collection<TContract, ModelName, Row, State> {
     return this.#clone({ limit: n });
   }

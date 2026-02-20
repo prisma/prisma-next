@@ -190,7 +190,7 @@ Depends on: Group 2 (ModelAccessor)
 
 Depends on: Group 4 (type-state tracking)
 
-- [ ] **5.1 Implement cursor() with type-state gating**
+- [x] **5.1 Implement cursor() with type-state gating**
   - Add `cursor(cursor: Record<string, unknown>)` method to Collection
   - Gate at type level: only available when `State['hasOrderBy']` is `true`
   - For single-column orderBy: compile to `WHERE field > value` (or `< value` for desc)

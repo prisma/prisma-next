@@ -118,6 +118,14 @@ describe('Collection', () => {
       ]);
     });
 
+    it('cursor() stores mapped order cursor values', () => {
+      const runtime = createMockRuntime();
+      const postCollection = new Collection({ contract, runtime }, 'Post');
+      const paged = postCollection.orderBy((p) => p.userId.asc()).cursor({ userId: 7 });
+
+      expect(paged.state.cursor).toEqual({ user_id: 7 });
+    });
+
     it('select() stores mapped selected fields and replaces previous selections', () => {
       const { collection } = createCollection();
       const selected = collection.select('name', 'email');
@@ -214,6 +222,35 @@ describe('Collection', () => {
       const sql = runtime.executions[0]!.plan.sql;
       expect(sql).toContain('limit');
       expect(sql).toContain('offset');
+    });
+
+    it('all() with cursor() applies a single-column cursor boundary', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[]]);
+
+      await collection
+        .orderBy((u) => u.id.asc())
+        .cursor({ id: 42 })
+        .take(10)
+        .all()
+        .toArray();
+
+      const sql = runtime.executions[0]!.plan.sql.toLowerCase();
+      expect(sql).toContain('"users"."id" >');
+    });
+
+    it('all() with compound cursor() compiles tuple comparison', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[]]);
+
+      await collection
+        .orderBy([(u) => u.name.asc(), (u) => u.email.asc()])
+        .cursor({ name: 'Alice', email: 'alice@example.com' })
+        .all()
+        .toArray();
+
+      const sql = runtime.executions[0]!.plan.sql.toLowerCase();
+      expect(sql).toContain('("users"."name", "users"."email") >');
     });
 
     it('select() compiles to an explicit projection instead of selectAll()', async () => {

@@ -37,6 +37,7 @@ export interface CollectionState {
   readonly filters: readonly WhereExpr[];
   readonly includes: readonly IncludeExpr[];
   readonly orderBy: readonly OrderExpr[] | undefined;
+  readonly cursor: Readonly<Record<string, unknown>> | undefined;
   readonly selectedFields: readonly string[] | undefined;
   readonly limit: number | undefined;
   readonly offset: number | undefined;
@@ -47,6 +48,7 @@ export function emptyState(): CollectionState {
     filters: [],
     includes: [],
     orderBy: undefined,
+    cursor: undefined,
     selectedFields: undefined,
     limit: undefined,
     offset: undefined,
