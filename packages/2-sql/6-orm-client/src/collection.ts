@@ -3,12 +3,19 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { shorthandToWhereExpr } from './filters';
 import { type IncludeStrategy, selectIncludeStrategy } from './include-strategy';
-import { compileRelationSelect, compileSelect, createExecutionPlan } from './kysely-compiler';
+import {
+  compileInsertCount,
+  compileInsertReturning,
+  compileRelationSelect,
+  compileSelect,
+  createExecutionPlan,
+} from './kysely-compiler';
 import { createModelAccessor } from './model-accessor';
 import type {
   CollectionContext,
   CollectionState,
   CollectionTypeState,
+  CreateInput,
   DefaultCollectionTypeState,
   DefaultModelRow,
   IncludeExpr,
@@ -323,6 +330,96 @@ export class Collection<
     return rows[0] ?? null;
   }
 
+  async create(data: CreateInput<TContract, ModelName>): Promise<Row> {
+    assertReturningCapability(this.ctx.contract, 'create()');
+    const rows = await this.createAll([data]).toArray();
+    const created = rows[0];
+    if (!created) {
+      throw new Error(`create() for model "${this.modelName}" did not return a row`);
+    }
+    return created;
+  }
+
+  createAll(data: readonly CreateInput<TContract, ModelName>[]): AsyncIterableResult<Row> {
+    if (data.length === 0) {
+      const generator = async function* (): AsyncGenerator<Row, void, unknown> {};
+      return new AsyncIterableResult(generator());
+    }
+
+    assertReturningCapability(this.ctx.contract, 'createAll()');
+
+    const mappedRows = data.map((row) =>
+      mapCreateInputToStorageRow(this.ctx.contract, this.modelName, row),
+    );
+    const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
+    const { selectedForQuery: selectedForInsert, hiddenColumns } = augmentSelectionForJoinColumns(
+      this.state.selectedFields,
+      parentJoinColumns,
+    );
+    const compiled = compileInsertReturning(this.tableName, mappedRows, selectedForInsert);
+    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
+
+    if (this.state.includes.length === 0) {
+      const source = this.ctx.runtime.execute(plan);
+      return mapResultRows(source, (rawRow) => {
+        const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, rawRow);
+        if (hiddenColumns.length > 0) {
+          stripHiddenMappedFields(this.ctx.contract, this.tableName, mapped, hiddenColumns);
+        }
+        return mapped as Row;
+      });
+    }
+
+    const contract = this.ctx.contract;
+    const runtime = this.ctx.runtime;
+    const state = this.state;
+    const tableName = this.tableName;
+    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+      const { scope, release } = await acquireRuntimeScope(runtime);
+      try {
+        const insertedRowsRaw = await scope.execute(plan).toArray();
+        if (insertedRowsRaw.length === 0) {
+          return;
+        }
+
+        const insertedRows = insertedRowsRaw.map((row) =>
+          createRowEnvelope(contract, tableName, row),
+        );
+        await stitchIncludes(scope, contract, insertedRows, state.includes);
+
+        if (hiddenColumns.length > 0) {
+          for (const row of insertedRows) {
+            stripHiddenMappedFields(contract, tableName, row.mapped, hiddenColumns);
+          }
+        }
+
+        for (const row of insertedRows) {
+          yield row.mapped as Row;
+        }
+      } finally {
+        if (release) {
+          await release();
+        }
+      }
+    };
+
+    return new AsyncIterableResult(generator());
+  }
+
+  async createCount(data: readonly CreateInput<TContract, ModelName>[]): Promise<number> {
+    if (data.length === 0) {
+      return 0;
+    }
+
+    const mappedRows = data.map((row) =>
+      mapCreateInputToStorageRow(this.ctx.contract, this.modelName, row),
+    );
+    const compiled = compileInsertCount(this.tableName, mappedRows);
+    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
+    await this.ctx.runtime.execute(plan).toArray();
+    return data.length;
+  }
+
   #clone<NextState extends CollectionTypeState = State>(
     overrides: Partial<CollectionState>,
   ): Collection<TContract, ModelName, Row, NextState> {
@@ -608,6 +705,46 @@ function mapStorageRowToModelFields(
     mapped[columnToField[columnName] ?? columnName] = value;
   }
   return mapped;
+}
+
+function mapCreateInputToStorageRow(
+  contract: SqlContract<SqlStorage>,
+  modelName: string,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
+  const mapped: Record<string, unknown> = {};
+  for (const [fieldName, value] of Object.entries(row)) {
+    if (value === undefined) {
+      continue;
+    }
+    const columnName = fieldToColumn[fieldName] ?? fieldName;
+    mapped[columnName] = value;
+  }
+  return mapped;
+}
+
+function assertReturningCapability(contract: SqlContract<SqlStorage>, action: string): void {
+  if (hasContractCapability(contract, 'returning')) {
+    return;
+  }
+
+  throw new Error(`${action} requires contract capability "returning"`);
+}
+
+function hasContractCapability(contract: SqlContract<SqlStorage>, capability: string): boolean {
+  const capabilities = contract.capabilities as Record<string, unknown> | undefined;
+  const value = capabilities?.[capability];
+
+  if (value === true) {
+    return true;
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  return Object.values(value as Record<string, unknown>).some((flag) => flag === true);
 }
 
 function mapResultRows<TIn, TOut>(

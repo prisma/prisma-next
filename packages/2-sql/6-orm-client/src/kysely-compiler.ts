@@ -100,6 +100,27 @@ export function compileRelationSelect(
   return qb.compile();
 }
 
+export function compileInsertReturning(
+  tableName: string,
+  values: readonly Record<string, unknown>[],
+  returningColumns: readonly string[] | undefined,
+): CompiledQuery {
+  const qb = queryCompiler.insertInto(tableName).values(values);
+
+  if (returningColumns && returningColumns.length > 0) {
+    return qb.returning(returningColumns).compile();
+  }
+
+  return qb.returningAll().compile();
+}
+
+export function compileInsertCount(
+  tableName: string,
+  values: readonly Record<string, unknown>[],
+): CompiledQuery {
+  return queryCompiler.insertInto(tableName).values(values).compile();
+}
+
 export function createExecutionPlan<Row>(
   compiled: CompiledQuery,
   contract: ContractBase,

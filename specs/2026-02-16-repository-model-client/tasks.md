@@ -310,7 +310,7 @@ Depends on: Group 4 (type-state, select), Group 1 (WhereExpr)
   - Files to modify: `src/types.ts`
   - Write type-level tests in `test/` verifying correct required/optional field derivation
 
-- [ ] **8.2 Implement create(), createAll(), createCount()**
+- [x] **8.2 Implement create(), createAll(), createCount()**
   - `create(data: CreateInput)` -- `INSERT ... RETURNING *`, returns `Promise<Row>`
   - `createAll(data: CreateInput[])` -- `INSERT ... RETURNING *`, returns `AsyncIterableResult<Row>`
   - `createCount(data: CreateInput[])` -- `INSERT` without RETURNING, returns `Promise<number>`
