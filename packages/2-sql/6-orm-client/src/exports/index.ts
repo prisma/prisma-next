@@ -19,5 +19,6 @@ export type {
   RelationPredicateInput,
   RelationsOf,
   RuntimeQueryable,
+  ShorthandWhereFilter,
 } from '../types';
 export { emptyState } from '../types';

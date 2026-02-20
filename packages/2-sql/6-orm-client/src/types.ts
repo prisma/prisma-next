@@ -145,6 +145,16 @@ export type DefaultModelRow<TContract extends SqlContract<SqlStorage>, ModelName
   [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
 };
 
+export type ShorthandWhereFilter<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = Partial<{
+  [K in keyof DefaultModelRow<TContract, ModelName> & string]:
+    | DefaultModelRow<TContract, ModelName>[K]
+    | null
+    | undefined;
+}>;
+
 // ---------------------------------------------------------------------------
 // Helpers for extracting fields / types from the contract
 // ---------------------------------------------------------------------------

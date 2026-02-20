@@ -34,6 +34,52 @@ describe('Collection', () => {
       expect(filtered.state.filters).toHaveLength(2);
     });
 
+    it('where() accepts shorthand object filters', () => {
+      const { collection } = createCollection();
+      const filtered = collection.where({ name: 'Alice', email: 'alice@example.com' });
+      expect(filtered.state.filters).toHaveLength(1);
+      expect(filtered.state.filters[0]).toEqual({
+        kind: 'and',
+        exprs: [
+          {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'users', column: 'name' },
+            right: { kind: 'literal', value: 'Alice' },
+          },
+          {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'users', column: 'email' },
+            right: { kind: 'literal', value: 'alice@example.com' },
+          },
+        ],
+      });
+    });
+
+    it('where() converts null and ignores undefined in shorthand filters', () => {
+      const { collection } = createCollection();
+      const filtered = collection.where({
+        email: null,
+        // biome-ignore lint/style/noNonNullAssertion: test intentionally checks undefined omission
+        name: undefined!,
+      });
+
+      expect(filtered.state.filters).toHaveLength(1);
+      expect(filtered.state.filters[0]).toEqual({
+        kind: 'nullCheck',
+        expr: { kind: 'col', table: 'users', column: 'email' },
+        isNull: true,
+      });
+    });
+
+    it('where({}) is identity', () => {
+      const { collection } = createCollection();
+      const filtered = collection.where({});
+      expect(filtered).toBe(collection);
+      expect(filtered.state.filters).toHaveLength(0);
+    });
+
     it('take() sets limit', () => {
       const { collection } = createCollection();
       const limited = collection.take(10);
@@ -143,6 +189,26 @@ describe('Collection', () => {
       expect(result).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
       const sql = runtime.executions[0]!.plan.sql;
       expect(sql).toContain('limit');
+    });
+
+    it('find() accepts shorthand object filters', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[{ id: 42, name: 'Alice', email: 'alice@example.com' }]]);
+      const result = await collection.find({ id: 42 });
+
+      expect(result).toEqual({ id: 42, name: 'Alice', email: 'alice@example.com' });
+      expect(runtime.executions[0]!.plan.sql).toContain('"id"');
+      expect(runtime.executions[0]!.plan.sql).toContain('limit');
+    });
+
+    it('find() combines inline filters with pre-existing where() filters', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[{ id: 42, name: 'Alice', email: 'alice@example.com' }]]);
+      await collection.where({ name: 'Alice' }).find((u) => u.id.eq(42));
+
+      const sql = runtime.executions[0]!.plan.sql;
+      expect(sql).toContain('"name"');
+      expect(sql).toContain('"id"');
     });
 
     it('all() with include executes multiple queries and stitches results', async () => {

@@ -1,6 +1,7 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import { shorthandToWhereExpr } from './filters';
 import { compileRelationSelect, compileSelect, createExecutionPlan } from './kysely-compiler';
 import { createModelAccessor } from './model-accessor';
 import type {
@@ -15,6 +16,7 @@ import type {
   RelationNames,
   RuntimeConnection,
   RuntimeScope,
+  ShorthandWhereFilter,
 } from './types';
 import { emptyState } from './types';
 
@@ -63,9 +65,22 @@ export class Collection<
     this.registry = options.registry ?? new Map<string, CollectionConstructor<TContract>>();
   }
 
-  where(fn: (model: ModelAccessor<TContract, ModelName>) => WhereExpr): this {
-    const accessor = createModelAccessor(this.ctx.contract, this.modelName);
-    const filter = fn(accessor as ModelAccessor<TContract, ModelName>);
+  where(fn: (model: ModelAccessor<TContract, ModelName>) => WhereExpr): this;
+  where(filters: ShorthandWhereFilter<TContract, ModelName>): this;
+  where(
+    input:
+      | ((model: ModelAccessor<TContract, ModelName>) => WhereExpr)
+      | ShorthandWhereFilter<TContract, ModelName>,
+  ): this {
+    const filter =
+      typeof input === 'function'
+        ? input(createModelAccessor(this.ctx.contract, this.modelName))
+        : shorthandToWhereExpr(this.ctx.contract, this.modelName, input);
+
+    if (!filter) {
+      return this;
+    }
+
     return this.#clone({
       filters: [...this.state.filters, filter],
     });
@@ -163,8 +178,15 @@ export class Collection<
     return this.#dispatch();
   }
 
+  async find(): Promise<Row | null>;
   async find(
-    filter?: (model: ModelAccessor<TContract, ModelName>) => WhereExpr,
+    filter: (model: ModelAccessor<TContract, ModelName>) => WhereExpr,
+  ): Promise<Row | null>;
+  async find(filter: ShorthandWhereFilter<TContract, ModelName>): Promise<Row | null>;
+  async find(
+    filter?:
+      | ((model: ModelAccessor<TContract, ModelName>) => WhereExpr)
+      | ShorthandWhereFilter<TContract, ModelName>,
   ): Promise<Row | null> {
     const scoped = filter ? this.where(filter) : this;
     const limited = scoped.take(1);

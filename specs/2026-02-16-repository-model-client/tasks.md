@@ -118,7 +118,7 @@ Depends on: Group 1 (WhereExpr integration)
 
 Depends on: Group 2 (expanded ModelAccessor, logical combinators)
 
-- [ ] **3.1 Implement shorthand object filter overload for where()**
+- [x] **3.1 Implement shorthand object filter overload for where()**
   - Add a second overload to `Collection.where()` accepting `Partial<Record<ScalarFieldName, FieldValue>>`
   - Desugar `{ field: value }` into `BinaryExpr` with `eq` operator
   - Multiple fields produce `AndExpr`
@@ -130,7 +130,7 @@ Depends on: Group 2 (expanded ModelAccessor, logical combinators)
   - Files to modify: `src/collection.ts`, `src/filters.ts`, `src/types.ts`
   - Write 4-6 tests: basic `where({ role: 'admin' })`, multi-field `where({ role: 'admin', active: true })`, null handling, undefined handling, empty object
 
-- [ ] **3.2 Add filter overloads to find()**
+- [x] **3.2 Add filter overloads to find()**
   - `find()` currently accepts an optional callback filter
   - Add a second overload accepting shorthand object (same as `where()`)
   - `find({ email: 'alice@example.com' })` -- shorthand equality
