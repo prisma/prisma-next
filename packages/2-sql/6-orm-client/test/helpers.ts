@@ -28,6 +28,7 @@ export type TestContract = SqlContract<
       users: StorageTable;
       posts: StorageTable;
       comments: StorageTable;
+      profiles: StorageTable;
     };
   },
   {
@@ -59,12 +60,29 @@ export type TestContract = SqlContract<
       };
       relations: Record<string, never>;
     };
+    Profile: {
+      storage: { table: 'profiles' };
+      fields: {
+        id: { column: 'id' };
+        userId: { column: 'user_id' };
+        bio: { column: 'bio' };
+      };
+      relations: Record<string, never>;
+    };
   },
   {
     users: {
       posts: {
         to: 'Post';
         cardinality: '1:N';
+        on: {
+          parentCols: ['id'];
+          childCols: ['user_id'];
+        };
+      };
+      profile: {
+        to: 'Profile';
+        cardinality: '1:1';
         on: {
           parentCols: ['id'];
           childCols: ['user_id'];
@@ -80,8 +98,17 @@ export type TestContract = SqlContract<
           childCols: ['post_id'];
         };
       };
+      author: {
+        to: 'User';
+        cardinality: 'N:1';
+        on: {
+          parentCols: ['user_id'];
+          childCols: ['id'];
+        };
+      };
     };
     comments: Record<string, never>;
+    profiles: Record<string, never>;
   }
 >;
 
@@ -122,6 +149,14 @@ export function createTestContract(): TestContract {
           },
           ['id'],
         ),
+        profiles: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            user_id: col('int4', 'pg/int4@1'),
+            bio: col('text', 'pg/text@1'),
+          },
+          ['id'],
+        ),
       },
     },
     models: {
@@ -153,12 +188,29 @@ export function createTestContract(): TestContract {
         },
         relations: {},
       },
+      Profile: {
+        storage: { table: 'profiles' },
+        fields: {
+          id: { column: 'id' },
+          userId: { column: 'user_id' },
+          bio: { column: 'bio' },
+        },
+        relations: {},
+      },
     },
     relations: {
       users: {
         posts: {
           to: 'Post',
           cardinality: '1:N',
+          on: {
+            parentCols: ['id'],
+            childCols: ['user_id'],
+          },
+        },
+        profile: {
+          to: 'Profile',
+          cardinality: '1:1',
           on: {
             parentCols: ['id'],
             childCols: ['user_id'],
@@ -174,21 +226,32 @@ export function createTestContract(): TestContract {
             childCols: ['post_id'],
           },
         },
+        author: {
+          to: 'User',
+          cardinality: 'N:1',
+          on: {
+            parentCols: ['user_id'],
+            childCols: ['id'],
+          },
+        },
       },
       comments: {},
+      profiles: {},
     },
     mappings: {
-      modelToTable: { User: 'users', Post: 'posts', Comment: 'comments' },
-      tableToModel: { users: 'User', posts: 'Post', comments: 'Comment' },
+      modelToTable: { User: 'users', Post: 'posts', Comment: 'comments', Profile: 'profiles' },
+      tableToModel: { users: 'User', posts: 'Post', comments: 'Comment', profiles: 'Profile' },
       fieldToColumn: {
         User: { id: 'id', name: 'name', email: 'email' },
         Post: { id: 'id', title: 'title', userId: 'user_id', views: 'views' },
         Comment: { id: 'id', body: 'body', postId: 'post_id' },
+        Profile: { id: 'id', userId: 'user_id', bio: 'bio' },
       },
       columnToField: {
         users: { id: 'id', name: 'name', email: 'email' },
         posts: { id: 'id', title: 'title', user_id: 'userId', views: 'views' },
         comments: { id: 'id', body: 'body', post_id: 'postId' },
+        profiles: { id: 'id', user_id: 'userId', bio: 'bio' },
       },
       codecTypes: {
         'pg/int4@1': { output: 0 as number },

@@ -231,7 +231,7 @@ Depends on: Group 1 (WhereExpr integration)
   - Files to modify: `src/collection.ts`, `src/types.ts`
   - Write 3-4 tests: to-many include returns array, to-one include returns single object or null, to-one with no match returns null
 
-- [ ] **6.2 Extend test contract with to-one relations**
+- [x] **6.2 Extend test contract with to-one relations**
   - The current test contract (`test/helpers.ts`) only has `1:N` relations (User->Posts, Post->Comments)
   - Add `author` relation from Post to User (`N:1`) and `profile` from User to Profile (`1:1`)
   - Add a `Profile` model to the test contract

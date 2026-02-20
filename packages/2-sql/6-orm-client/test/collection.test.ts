@@ -178,6 +178,21 @@ describe('Collection', () => {
       });
       expect(inc.nested.limit).toBe(5);
     });
+
+    it('include() captures to-one relation metadata', () => {
+      const runtime = createMockRuntime();
+      const postCollection = new Collection({ contract, runtime }, 'Post');
+      const withAuthor = postCollection.include('author');
+
+      expect(withAuthor.state.includes[0]).toMatchObject({
+        relationName: 'author',
+        relatedModelName: 'User',
+        relatedTableName: 'users',
+        fkColumn: 'id',
+        parentPkColumn: 'user_id',
+        cardinality: 'N:1',
+      });
+    });
   });
 
   describe('terminal methods', () => {
@@ -406,6 +421,74 @@ describe('Collection', () => {
       expect(results).toMatchObject([
         { id: 1, posts: [{ id: 10 }] },
         { id: 2, posts: [{ id: 12 }] },
+      ]);
+    });
+
+    it('all() with to-one include returns a single object', async () => {
+      const runtime = createMockRuntime();
+      const postCollection = new Collection({ contract, runtime }, 'Post');
+      runtime.setNextResults([
+        [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
+        [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
+      ]);
+
+      const results = await postCollection.include('author').all().toArray();
+
+      expect(results).toEqual([
+        {
+          id: 10,
+          title: 'Post A',
+          userId: 1,
+          views: 100,
+          author: { id: 1, name: 'Alice', email: 'alice@example.com' },
+        },
+      ]);
+    });
+
+    it('all() with to-one include uses null when no related row matches', async () => {
+      const runtime = createMockRuntime();
+      const postCollection = new Collection({ contract, runtime }, 'Post');
+      runtime.setNextResults([[{ id: 10, title: 'Post A', user_id: 999, views: 100 }], []]);
+
+      const results = await postCollection.include('author').all().toArray();
+      expect(results).toEqual([
+        {
+          id: 10,
+          title: 'Post A',
+          userId: 999,
+          views: 100,
+          author: null,
+        },
+      ]);
+    });
+
+    it('all() with one-to-one include returns object or null per parent row', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([
+        [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com' },
+        ],
+        [
+          { id: 100, user_id: 1, bio: 'First profile' },
+          { id: 200, user_id: 1, bio: 'Second profile' },
+        ],
+      ]);
+
+      const results = await collection.include('profile').all().toArray();
+      expect(results).toEqual([
+        {
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          profile: { id: 100, userId: 1, bio: 'First profile' },
+        },
+        {
+          id: 2,
+          name: 'Bob',
+          email: 'bob@example.com',
+          profile: null,
+        },
       ]);
     });
 
