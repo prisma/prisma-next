@@ -1,4 +1,5 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import { executeCompiledQuery } from '@prisma-next/integration-kysely';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { shorthandToWhereExpr } from './filters';
@@ -13,7 +14,6 @@ import {
   compileUpdateCount,
   compileUpdateReturning,
   compileUpsertReturning,
-  createExecutionPlan,
 } from './kysely-compiler';
 import { createModelAccessor } from './model-accessor';
 import type {
@@ -363,10 +363,14 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileInsertReturning(this.tableName, mappedRows, selectedForInsert);
-    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
 
     if (this.state.includes.length === 0) {
-      const source = this.ctx.runtime.execute(plan);
+      const source = executeCompiledQuery<Record<string, unknown>>(
+        this.ctx.runtime,
+        this.ctx.contract,
+        compiled,
+        { lane: 'orm-client' },
+      );
       return mapResultRows(source, (rawRow) => {
         const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, rawRow);
         if (hiddenColumns.length > 0) {
@@ -383,7 +387,12 @@ export class Collection<
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       const { scope, release } = await acquireRuntimeScope(runtime);
       try {
-        const insertedRowsRaw = await scope.execute(plan).toArray();
+        const insertedRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
+          scope,
+          contract,
+          compiled,
+          { lane: 'orm-client' },
+        ).toArray();
         if (insertedRowsRaw.length === 0) {
           return;
         }
@@ -421,8 +430,9 @@ export class Collection<
       mapModelDataToStorageRow(this.ctx.contract, this.modelName, row),
     );
     const compiled = compileInsertCount(this.tableName, mappedRows);
-    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
-    await this.ctx.runtime.execute(plan).toArray();
+    await executeCompiledQuery<Record<string, unknown>>(this.ctx.runtime, this.ctx.contract, compiled, {
+      lane: 'orm-client',
+    }).toArray();
     return data.length;
   }
 
@@ -456,10 +466,14 @@ export class Collection<
       conflictColumns,
       selectedForUpsert,
     );
-    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
 
     if (this.state.includes.length === 0) {
-      const rows = await this.ctx.runtime.execute(plan).toArray();
+      const rows = await executeCompiledQuery<Record<string, unknown>>(
+        this.ctx.runtime,
+        this.ctx.contract,
+        compiled,
+        { lane: 'orm-client' },
+      ).toArray();
       const first = rows[0];
       if (!first) {
         throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
@@ -473,7 +487,12 @@ export class Collection<
 
     const { scope, release } = await acquireRuntimeScope(this.ctx.runtime);
     try {
-      const rows = await scope.execute(plan).toArray();
+      const rows = await executeCompiledQuery<Record<string, unknown>>(
+        scope,
+        this.ctx.contract,
+        compiled,
+        { lane: 'orm-client' },
+      ).toArray();
       const first = rows[0];
       if (!first) {
         throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
@@ -528,10 +547,14 @@ export class Collection<
       this.state.filters,
       selectedForUpdate,
     );
-    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
 
     if (this.state.includes.length === 0) {
-      const source = this.ctx.runtime.execute(plan);
+      const source = executeCompiledQuery<Record<string, unknown>>(
+        this.ctx.runtime,
+        this.ctx.contract,
+        compiled,
+        { lane: 'orm-client' },
+      );
       return mapResultRows(source, (rawRow) => {
         const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, rawRow);
         if (hiddenColumns.length > 0) {
@@ -548,7 +571,12 @@ export class Collection<
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       const { scope, release } = await acquireRuntimeScope(runtime);
       try {
-        const updatedRowsRaw = await scope.execute(plan).toArray();
+        const updatedRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
+          scope,
+          contract,
+          compiled,
+          { lane: 'orm-client' },
+        ).toArray();
         if (updatedRowsRaw.length === 0) {
           return;
         }
@@ -592,15 +620,17 @@ export class Collection<
       selectedFields: [primaryKeyColumn],
     };
     const countCompiled = compileSelect(this.tableName, countState);
-    const countPlan = createExecutionPlan<Record<string, unknown>>(
-      countCompiled,
+    const matchingRows = await executeCompiledQuery<Record<string, unknown>>(
+      this.ctx.runtime,
       this.ctx.contract,
-    );
-    const matchingRows = await this.ctx.runtime.execute(countPlan).toArray();
+      countCompiled,
+      { lane: 'orm-client' },
+    ).toArray();
 
     const compiled = compileUpdateCount(this.tableName, mappedData, this.state.filters);
-    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
-    await this.ctx.runtime.execute(plan).toArray();
+    await executeCompiledQuery<Record<string, unknown>>(this.ctx.runtime, this.ctx.contract, compiled, {
+      lane: 'orm-client',
+    }).toArray();
 
     return matchingRows.length;
   }
@@ -624,10 +654,14 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileDeleteReturning(this.tableName, this.state.filters, selectedForDelete);
-    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
 
     if (this.state.includes.length === 0) {
-      const source = this.ctx.runtime.execute(plan);
+      const source = executeCompiledQuery<Record<string, unknown>>(
+        this.ctx.runtime,
+        this.ctx.contract,
+        compiled,
+        { lane: 'orm-client' },
+      );
       return mapResultRows(source, (rawRow) => {
         const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, rawRow);
         if (hiddenColumns.length > 0) {
@@ -644,7 +678,12 @@ export class Collection<
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       const { scope, release } = await acquireRuntimeScope(runtime);
       try {
-        const deletedRowsRaw = await scope.execute(plan).toArray();
+        const deletedRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
+          scope,
+          contract,
+          compiled,
+          { lane: 'orm-client' },
+        ).toArray();
         if (deletedRowsRaw.length === 0) {
           return;
         }
@@ -683,15 +722,17 @@ export class Collection<
       selectedFields: [primaryKeyColumn],
     };
     const countCompiled = compileSelect(this.tableName, countState);
-    const countPlan = createExecutionPlan<Record<string, unknown>>(
-      countCompiled,
+    const matchingRows = await executeCompiledQuery<Record<string, unknown>>(
+      this.ctx.runtime,
       this.ctx.contract,
-    );
-    const matchingRows = await this.ctx.runtime.execute(countPlan).toArray();
+      countCompiled,
+      { lane: 'orm-client' },
+    ).toArray();
 
     const compiled = compileDeleteCount(this.tableName, this.state.filters);
-    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
-    await this.ctx.runtime.execute(plan).toArray();
+    await executeCompiledQuery<Record<string, unknown>>(this.ctx.runtime, this.ctx.contract, compiled, {
+      lane: 'orm-client',
+    }).toArray();
 
     return matchingRows.length;
   }
@@ -752,8 +793,9 @@ export class Collection<
 
     if (state.includes.length === 0) {
       const compiled = compileSelect(tableName, state);
-      const plan = createExecutionPlan<Record<string, unknown>>(compiled, contract);
-      const source = runtime.execute(plan);
+      const source = executeCompiledQuery<Record<string, unknown>>(runtime, contract, compiled, {
+        lane: 'orm-client',
+      });
       return mapResultRows(
         source,
         (rawRow) => mapStorageRowToModelFields(contract, tableName, rawRow) as Row,
@@ -807,8 +849,12 @@ function dispatchWithMultiQueryIncludes<Row>(options: {
         includes: [],
         selectedFields: parentSelectedForQuery,
       });
-      const parentPlan = createExecutionPlan<Record<string, unknown>>(parentCompiled, contract);
-      const parentRowsRaw = await scope.execute(parentPlan).toArray();
+      const parentRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
+        scope,
+        contract,
+        parentCompiled,
+        { lane: 'orm-client' },
+      ).toArray();
       if (parentRowsRaw.length === 0) {
         return;
       }
@@ -867,8 +913,12 @@ async function stitchIncludes(
         selectedFields: childSelectedForQuery,
       },
     );
-    const childPlan = createExecutionPlan<Record<string, unknown>>(childCompiled, contract);
-    const childRowsRaw = await scope.execute(childPlan).toArray();
+    const childRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
+      scope,
+      contract,
+      childCompiled,
+      { lane: 'orm-client' },
+    ).toArray();
     const childRows = childRowsRaw.map((row) =>
       createRowEnvelope(contract, include.relatedTableName, row),
     );

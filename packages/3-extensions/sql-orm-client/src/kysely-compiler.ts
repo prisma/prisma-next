@@ -1,4 +1,3 @@
-import type { ContractBase, ExecutionPlan } from '@prisma-next/contract/types';
 import type {
   Expression as AstExpression,
   BinaryExpr,
@@ -228,23 +227,6 @@ export function compileDeleteCount(
   }
 
   return queryCompiler.deleteFrom(tableName).compile();
-}
-
-export function createExecutionPlan<Row>(
-  compiled: CompiledQuery,
-  contract: ContractBase,
-): ExecutionPlan<Row> {
-  return {
-    sql: compiled.sql,
-    params: [...compiled.parameters],
-    meta: {
-      target: contract.target,
-      targetFamily: contract.targetFamily,
-      storageHash: contract.storageHash,
-      lane: 'orm-client',
-      paramDescriptors: [],
-    },
-  };
 }
 
 function applyWhereFilters<QueryBuilder extends AnySelectQueryBuilder>(

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This task breakdown covers the full implementation of the ORM Client spec for `@prisma-next/sql-orm-client` (`/Users/aqrln/prisma/prisma-next/packages/2-sql/6-orm-client/`). The work builds incrementally on the existing prototype, which already has: `Collection` with `where()`/`include()`/`orderBy()`/`take()`/`skip()`/`all()`/`find()`, `createColumnAccessor()`, Kysely-based compilation, `orm()` factory with model aliasing, multi-query include stitching, and unit tests.
+This task breakdown covers the full implementation of the ORM Client spec for `@prisma-next/sql-orm-client` (`/Users/aqrln/prisma/prisma-next/packages/3-extensions/sql-orm-client/`). The work builds incrementally on the existing prototype, which already has: `Collection` with `where()`/`include()`/`orderBy()`/`take()`/`skip()`/`all()`/`find()`, `createColumnAccessor()`, Kysely-based compilation, `orm()` factory with model aliasing, multi-query include stitching, and unit tests.
 
 The tasks are ordered so that foundational internal refactors come first, followed by incremental feature additions that build on each other. Testing is embedded alongside implementation, not deferred to a separate phase.
 
@@ -26,9 +26,9 @@ The most fundamental internal change. Everything downstream (new operators, rela
 
 - [x] **1.2 Replace FilterExpr with WhereExpr in CollectionState**
   - Change `CollectionState.filters` from `readonly FilterExpr[]` to `readonly WhereExpr[]`
-  - Remove the `FilterExpr`, `ComparisonOp` types from `/Users/aqrln/prisma/prisma-next/packages/2-sql/6-orm-client/src/types.ts`
+  - Remove the `FilterExpr`, `ComparisonOp` types from `/Users/aqrln/prisma/prisma-next/packages/3-extensions/sql-orm-client/src/types.ts`
   - Update the `ComparisonMethods` type to return `WhereExpr` instead of `FilterExpr`
-  - Update exports in `/Users/aqrln/prisma/prisma-next/packages/2-sql/6-orm-client/src/exports/index.ts`
+  - Update exports in `/Users/aqrln/prisma/prisma-next/packages/3-extensions/sql-orm-client/src/exports/index.ts`
   - Files to modify: `src/types.ts`, `src/exports/index.ts`
 
 - [x] **1.3 Rewrite createColumnAccessor to produce WhereExpr nodes**
@@ -604,13 +604,13 @@ Groups that share the same dependency level can be parallelized. For example, af
 
 | File | Role |
 |------|------|
-| `packages/2-sql/6-orm-client/src/collection.ts` | Core Collection class -- most changes land here |
-| `packages/2-sql/6-orm-client/src/types.ts` | All type definitions (CollectionState, ModelAccessor, Row types) |
-| `packages/2-sql/6-orm-client/src/column-accessor.ts` | Proxy-based accessor -- becomes ModelAccessor |
-| `packages/2-sql/6-orm-client/src/kysely-compiler.ts` | Compiles CollectionState to SQL via Kysely |
-| `packages/2-sql/6-orm-client/src/orm.ts` | `orm()` factory, client proxy, model aliasing |
-| `packages/2-sql/6-orm-client/src/exports/index.ts` | Public API surface |
-| `packages/2-sql/6-orm-client/test/helpers.ts` | Test contract and mock runtime |
-| `packages/2-sql/6-orm-client/test/collection.test.ts` | Main test file for Collection |
+| `packages/3-extensions/sql-orm-client/src/collection.ts` | Core Collection class -- most changes land here |
+| `packages/3-extensions/sql-orm-client/src/types.ts` | All type definitions (CollectionState, ModelAccessor, Row types) |
+| `packages/3-extensions/sql-orm-client/src/column-accessor.ts` | Proxy-based accessor -- becomes ModelAccessor |
+| `packages/3-extensions/sql-orm-client/src/kysely-compiler.ts` | Compiles CollectionState to SQL via Kysely |
+| `packages/3-extensions/sql-orm-client/src/orm.ts` | `orm()` factory, client proxy, model aliasing |
+| `packages/3-extensions/sql-orm-client/src/exports/index.ts` | Public API surface |
+| `packages/3-extensions/sql-orm-client/test/helpers.ts` | Test contract and mock runtime |
+| `packages/3-extensions/sql-orm-client/test/collection.test.ts` | Main test file for Collection |
 | `packages/2-sql/4-lanes/relational-core/src/ast/types.ts` | PN AST types (WhereExpr, BinaryExpr, etc.) |
 | `examples/prisma-next-demo/src/orm-client/` | Demo app integration |

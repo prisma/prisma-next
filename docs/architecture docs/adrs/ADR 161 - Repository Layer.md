@@ -16,15 +16,15 @@ The existing ORM lane (ADR 015) will eventually be deprecated and removed; the r
 
 ### 1) Package location and plane
 
-The repository layer lives at `packages/2-sql/6-orm-client/` in the runtime plane. The package slot already exists in the architecture config.
+The repository layer is implemented by `@prisma-next/sql-orm-client` at `packages/3-extensions/sql-orm-client/` in the runtime plane (`extensions` domain, `integrations` layer).
 
 ### 2) Dependency rules
 
-- **May import from**: lanes (layer 4), runtime (layer 5), contract and operations (lower layers)
-- **Must not import**: adapters or drivers (those are consumed by runtime, not by repositories)
-- **Must not be imported by**: lower layers (lanes, runtime core, adapters, drivers)
+- **May import from**: lanes/runtime/core packages needed for query composition and orchestration, plus execution-boundary integrations
+- **Must not own**: adapter/driver internals or target-specific transport logic
+- **Must not be imported by**: lower-level lane/runtime core packages
 
-This preserves the downward-only dependency flow established by ADR 140.
+This preserves the downward-only dependency flow for core SQL layers while allowing extension-domain integration packages to compose the boundary cleanly.
 
 ### 3) Multi-query permission
 
@@ -36,11 +36,11 @@ The repository layer is **not subject to ADR 003**, which scopes to lanes and Pl
 
 ### 4) Execution model
 
-The repository layer uses runtime primitives to dispatch Plans:
+The repository layer composes and compiles queries, then dispatches compiled queries through `@prisma-next/integration-kysely` as the permanent execution boundary:
 
-- `execute(plan)` — run a single Plan
-- `connection(fn)` — pin to a single connection for consistency across related reads
-- `transaction(fn)` — wrap multiple Plans in a transaction for mutation atomicity
+- `createExecutionPlanFromCompiledQuery(...)` — convert Kysely `CompiledQuery` to `ExecutionPlan`
+- `executeCompiledQuery(...)` — dispatch compiled queries through runtime `execute(plan)`
+- `connection()` / `transaction()` runtime primitives — used for scoped multi-query workflows
 
 Repository operations compose these primitives to implement multi-query workflows. The runtime remains unaware of repository-level semantics; it sees individual Plans.
 
@@ -69,7 +69,7 @@ The repository layer is the **successor** to the ORM lane, not an extension of i
 
 - Each Plan retains its own telemetry (timing, EXPLAIN output, row counts) per existing runtime hooks (ADR 014)
 - The repository layer aggregates Plan-level telemetry into an **operation-level summary** (total time, Plan count, statement list)
-- Plans produced for repository operations use `meta.lane = 'repository'` to distinguish them from direct lane usage
+- Plans produced for repository operations use `meta.lane = 'orm-client'` to distinguish them from direct lane usage
 - Operation-level tracing connects individual Plan spans under a parent repository-operation span
 
 ### 9) Capability-driven strategy selection

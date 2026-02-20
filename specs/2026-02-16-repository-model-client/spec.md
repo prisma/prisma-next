@@ -1,7 +1,7 @@
 # ORM Client
 
-**Package:** `@prisma-next/sql-orm-client` (`packages/2-sql/6-orm-client/`)
-**Layer:** 6 (ORM Client), Runtime Plane
+**Package:** `@prisma-next/sql-orm-client` (`packages/3-extensions/sql-orm-client/`)
+**Layer:** Extensions Domain, Integrations Layer, Runtime Plane
 **Status:** Draft
 **Date:** 2026-02-16
 **References:** ADR 161 (Repository Layer), ADR 015 (ORM as Optional Extension), PR #152 (AST expansion)
@@ -43,7 +43,7 @@ This spec takes that prototype, fills in the gaps (mutations, aggregations, proj
 
 6. **Capability-driven execution.** The same API call may compile to different SQL depending on what the target supports. Lateral joins when available, correlated subqueries as a fallback, multi-query stitching as a last resort. The strategy is deterministic from the contract — no runtime feature detection.
 
-7. **Kysely is an implementation detail.** Internally, the package uses Kysely as a query builder via `@prisma-next/integration-kysely`. That integration package handles AST conversion and SQL compilation. No Kysely type leaks into the public API, and the internal query builder is replaceable.
+7. **Kysely is an implementation detail.** Internally, the package uses Kysely for query composition and SQL compilation. `@prisma-next/integration-kysely` is the permanent execution boundary for `CompiledQuery -> ExecutionPlan` conversion and compiled-query dispatch. No Kysely type leaks into the public API, and the internal query builder is replaceable.
 
 ### Non-Goals
 
@@ -143,11 +143,11 @@ The PN AST node type for filter expressions. All filters — whether built by th
 
 ### 3.1 Where It Lives
 
-The ORM client layer occupies `packages/2-sql/6-orm-client/` in the **runtime plane**, layer 6 in the package layering model. It sits above lanes (layer 4) and the SQL runtime (layer 5). Per ADR 161:
+The ORM client package occupies `packages/3-extensions/sql-orm-client/` in the **runtime plane** (`extensions` domain, `integrations` layer). It sits above lanes and SQL runtime while preserving repository-level orchestration boundaries from ADR 161:
 
 | Direction | Allowed |
 |-----------|---------|
-| **May import from** | Lanes (layer 4), SQL runtime (layer 5), contract, operations, `runtime-executor` |
+| **May import from** | Lanes, SQL runtime, contract, operations, `runtime-executor`, integration boundaries |
 | **Must not import** | Adapters, drivers (consumed by runtime, not by this layer) |
 | **Must not be imported by** | Lower layers (lanes, runtime core, adapters, drivers) |
 
@@ -158,25 +158,26 @@ The ORM client layer occupies `packages/2-sql/6-orm-client/` in the **runtime pl
 - `@prisma-next/sql-contract` — `SqlContract`, `SqlStorage`, `StorageColumn` types
 - `@prisma-next/sql-relational-core` — `ComputeColumnJsType`, PN AST types (`WhereExpr`, etc.)
 - `@prisma-next/sql-runtime` — `Runtime` type
-- `@prisma-next/integration-kysely` — Kysely-based query building, AST conversion, and plan execution
+- `@prisma-next/integration-kysely` — `CompiledQuery -> ExecutionPlan` conversion and compiled-query dispatch helpers
 
 ### 3.3 How Queries Are Built and Executed
 
-The ORM client layer builds Kysely queries from `CollectionState`, then delegates to `@prisma-next/integration-kysely` for everything downstream:
+The ORM client layer builds Kysely queries from `CollectionState` and compiles SQL internally, then delegates compiled-query execution to `@prisma-next/integration-kysely`:
 
 ```
 CollectionState (internal)
     |
     v
-Kysely query builder (internal) --> @prisma-next/integration-kysely
-    |                                   |
-    |                                   v
-    |                               PN QueryAst --> SQL compilation --> ExecutionPlan
+Kysely query builder + SQL compilation (internal)
+    |
     v
-RuntimeQueryable.execute(plan)
+CompiledQuery --> @prisma-next/integration-kysely (execution boundary)
+                     |
+                     v
+                 ExecutionPlan --> RuntimeQueryable.execute(plan)
 ```
 
-The ORM client layer does **not** perform SQL lowering or compilation — that is the integration package's job. This separation means we can replace Kysely in the future without changing the ORM client API.
+The ORM client layer performs query composition and SQL compilation. `@prisma-next/integration-kysely` owns execution-plan conversion and dispatch. This boundary is intentional and permanent.
 
 ### 3.4 Filter Expressions as PN AST Nodes
 
@@ -205,7 +206,7 @@ interface OrExpr { kind: 'or'; exprs: ReadonlyArray<WhereExpr>; }
 type WhereExpr = BinaryExpr | ExistsExpr | NullCheckExpr | AndExpr | OrExpr;
 ```
 
-The ORM client layer translates `WhereExpr` nodes to Kysely `where()` calls when building queries. The integration package then converts back to the PN AST for compilation. Filters are composable, serializable, and inspectable as data.
+The ORM client layer translates `WhereExpr` nodes to Kysely `where()` calls when building queries. Filters are composable, serializable, and inspectable as data.
 
 ### 3.5 Capability-Based Include Strategy
 

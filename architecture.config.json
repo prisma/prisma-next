@@ -103,9 +103,15 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/2-sql/6-orm-client/**",
-      "domain": "sql",
-      "layer": "orm-client",
+      "glob": "packages/3-extensions/integration-kysely/**",
+      "domain": "extensions",
+      "layer": "integrations",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-extensions/sql-orm-client/**",
+      "domain": "extensions",
+      "layer": "integrations",
       "plane": "runtime"
     },
     {
@@ -249,6 +255,6 @@
   "crossDomainExceptions": [],
   "layerOrder": {
     "framework": ["core", "authoring", "tooling", "runtime-executor"],
-    "sql": ["core", "authoring", "tooling", "lanes", "runtime", "orm-client", "adapters", "drivers"]
+    "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers"]
   }
 }
