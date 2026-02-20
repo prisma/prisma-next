@@ -24,9 +24,11 @@
     "kysely": "catalog:"
   },
   "devDependencies": {
+    "@types/pg": "catalog:",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
+    "pg": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
