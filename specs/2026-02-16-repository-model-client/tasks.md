@@ -1,8 +1,17 @@
 # Tasks: ORM Client
 
+Note to agents: before starting to work on these tasks, read the following documents:
+
+1. [Specification](./spec.md)
+2. [Comparison document](./prisma-orm-comparison.md) which contains good usage examples with succinct explanations and comparison with Prisma queries, which helps clarify semantics
+
+Be smart and critical, call out any inconsistencies between the documents and raise them, and expand the task list as you go when you find something missing or new unknown unknowns arise.
+
+After completing each task, mark it as done in the document and commit the result. Leave implementation notes and create new documents if necessary. It should always be possible for a fresh agent session to pick up where you left and immediately continue.
+
 ## Overview
 
-This task breakdown covers the full implementation of the ORM Client spec for `@prisma-next/sql-orm-client` (`/Users/aqrln/prisma/prisma-next/packages/3-extensions/sql-orm-client/`). The work builds incrementally on the existing prototype, which already has: `Collection` with `where()`/`include()`/`orderBy()`/`take()`/`skip()`/`all()`/`find()`, `createColumnAccessor()`, Kysely-based compilation, `orm()` factory with model aliasing, multi-query include stitching, and unit tests.
+This task breakdown covers the full implementation of the ORM Client spec for `@prisma-next/sql-orm-client` (`/Users/aqrln/prisma/prisma-next/packages/3-extensions/sql-orm-client/`). The work builds incrementally on the existing prototype, which already has: `Collection` with `where()`/`include()`/`orderBy()`/`take()`/`skip()`/`all()`/`find()`, `createColumnAccessor()`, Kysely-based compilation, `orm()` factory with model aliasing, multi-query include stitching, and unit tests
 
 The tasks are ordered so that foundational internal refactors come first, followed by incremental feature additions that build on each other. Testing is embedded alongside implementation, not deferred to a separate phase.
 
