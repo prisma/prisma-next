@@ -168,6 +168,49 @@ export function compileUpdateCount(
   return queryCompiler.updateTable(tableName).set(setValues).compile();
 }
 
+export function compileDeleteReturning(
+  tableName: string,
+  filters: readonly WhereExpr[],
+  returningColumns: readonly string[] | undefined,
+): CompiledQuery {
+  const whereExpr = combineWhereFilters(filters);
+
+  if (whereExpr) {
+    const qb = queryCompiler
+      .deleteFrom(tableName)
+      .where((eb) => whereExprToKysely(eb as ExpressionBuilder<AnyDB, string>, whereExpr));
+
+    if (returningColumns && returningColumns.length > 0) {
+      return qb.returning(returningColumns).compile();
+    }
+
+    return qb.returningAll().compile();
+  }
+
+  const qb = queryCompiler.deleteFrom(tableName);
+
+  if (returningColumns && returningColumns.length > 0) {
+    return qb.returning(returningColumns).compile();
+  }
+
+  return qb.returningAll().compile();
+}
+
+export function compileDeleteCount(
+  tableName: string,
+  filters: readonly WhereExpr[],
+): CompiledQuery {
+  const whereExpr = combineWhereFilters(filters);
+  if (whereExpr) {
+    return queryCompiler
+      .deleteFrom(tableName)
+      .where((eb) => whereExprToKysely(eb as ExpressionBuilder<AnyDB, string>, whereExpr))
+      .compile();
+  }
+
+  return queryCompiler.deleteFrom(tableName).compile();
+}
+
 export function createExecutionPlan<Row>(
   compiled: CompiledQuery,
   contract: ContractBase,

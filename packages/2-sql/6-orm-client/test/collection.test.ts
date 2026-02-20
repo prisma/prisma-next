@@ -524,6 +524,74 @@ describe('Collection', () => {
       }
     });
 
+    it('delete() returns first deleted row', async () => {
+      const { collection, runtime } = createReturningCollection('User');
+      runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
+
+      const deleted = await collection.where({ id: 1 }).delete();
+
+      expect(deleted).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
+      expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('delete');
+      expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('returning');
+    });
+
+    it('deleteAll() returns all deleted rows', async () => {
+      const { collection, runtime } = createReturningCollection('User');
+      runtime.setNextResults([
+        [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com' },
+        ],
+      ]);
+
+      const deleted = await collection.where({ name: 'Old' }).deleteAll().toArray();
+
+      expect(deleted).toEqual([
+        { id: 1, name: 'Alice', email: 'alice@example.com' },
+        { id: 2, name: 'Bob', email: 'bob@example.com' },
+      ]);
+    });
+
+    it('deleteCount() returns matched row count without requiring returning', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[{ id: 1 }, { id: 2 }], []]);
+
+      const count = await collection.where({ name: 'Old' }).deleteCount();
+
+      expect(count).toBe(2);
+      expect(runtime.executions).toHaveLength(2);
+      expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('select');
+      expect(runtime.executions[1]!.plan.sql.toLowerCase()).toContain('delete');
+    });
+
+    it('delete() and deleteAll() require returning capability', async () => {
+      const { collection } = createCollection();
+      const filtered = collection.where({ id: 1 });
+
+      await expect(filtered.delete()).rejects.toThrow(/requires contract capability "returning"/);
+
+      expect(() => filtered.deleteAll()).toThrow(/requires contract capability "returning"/);
+    });
+
+    it('delete() respects select() and include() result shaping', async () => {
+      const { collection, runtime } = createReturningCollection('User');
+      runtime.setNextResults([
+        [{ id: 1, name: 'Alice' }],
+        [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
+      ]);
+
+      const deleted = await collection.where({ id: 1 }).select('name').include('posts').delete();
+
+      expect(deleted).toEqual({
+        name: 'Alice',
+        posts: [{ id: 10, title: 'Post A', userId: 1, views: 100 }],
+      });
+      expect(deleted).not.toBeNull();
+      if (deleted) {
+        expect('id' in deleted).toBe(false);
+      }
+    });
+
     it('all() with include executes multiple queries and stitches results', async () => {
       const { collection, runtime } = createCollection();
       runtime.setNextResults([

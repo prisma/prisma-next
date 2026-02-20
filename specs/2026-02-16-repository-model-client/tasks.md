@@ -345,7 +345,7 @@ Depends on: Group 8 (create mutations), Group 4 (type-state with hasWhere)
   - Files to modify: `src/collection.ts`, `src/kysely-compiler.ts`, `src/types.ts`
   - Write 4-5 tests: basic update with where, updateAll, updateCount, type error without where, whole-table with `where(all)`
 
-- [ ] **9.2 Implement delete(), deleteAll(), deleteCount()**
+- [x] **9.2 Implement delete(), deleteAll(), deleteCount()**
   - All variants require `hasWhere: true` (type-state gated)
   - `delete()` -- `DELETE ... WHERE ... LIMIT 1 RETURNING *`, returns `Promise<Row | null>`
   - `deleteAll()` -- `DELETE ... WHERE ... RETURNING *`, returns `AsyncIterableResult<Row>`
