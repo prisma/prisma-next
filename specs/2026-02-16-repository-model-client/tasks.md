@@ -200,7 +200,7 @@ Depends on: Group 4 (type-state tracking)
   - Files to modify: `src/collection.ts`, `src/types.ts`, `src/kysely-compiler.ts`
   - Write 3 tests: basic cursor with orderBy, compound cursor, type error without orderBy (type test)
 
-- [ ] **5.2 Implement distinct() and distinctOn()**
+- [x] **5.2 Implement distinct() and distinctOn()**
   - `distinct(...fields)` -- compiles to `SELECT DISTINCT`
   - `distinctOn(...fields)` -- compiles to `DISTINCT ON` (Postgres); gated by `hasOrderBy: true` at type level
   - Add `distinct` and `distinctOn` fields to `CollectionState`

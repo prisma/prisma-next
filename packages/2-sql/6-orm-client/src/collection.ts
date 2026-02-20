@@ -245,6 +245,40 @@ export class Collection<
     });
   }
 
+  distinct<
+    Fields extends readonly [
+      keyof DefaultModelRow<TContract, ModelName> & string,
+      ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
+    ],
+  >(...fields: Fields): Collection<TContract, ModelName, Row, State> {
+    const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
+    const distinctFields = fields.map((fieldName) => fieldToColumn[fieldName] ?? fieldName);
+
+    return this.#clone({
+      distinct: distinctFields,
+      distinctOn: undefined,
+    });
+  }
+
+  distinctOn<
+    Fields extends readonly [
+      keyof DefaultModelRow<TContract, ModelName> & string,
+      ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
+    ],
+  >(
+    ...fields: State['hasOrderBy'] extends true ? Fields : never
+  ): Collection<TContract, ModelName, Row, State> {
+    const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
+    const distinctOnFields = (fields as readonly string[]).map(
+      (fieldName) => fieldToColumn[fieldName] ?? fieldName,
+    );
+
+    return this.#clone({
+      distinct: undefined,
+      distinctOn: distinctOnFields,
+    });
+  }
+
   take(n: number): Collection<TContract, ModelName, Row, State> {
     return this.#clone({ limit: n });
   }

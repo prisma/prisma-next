@@ -38,6 +38,8 @@ export interface CollectionState {
   readonly includes: readonly IncludeExpr[];
   readonly orderBy: readonly OrderExpr[] | undefined;
   readonly cursor: Readonly<Record<string, unknown>> | undefined;
+  readonly distinct: readonly string[] | undefined;
+  readonly distinctOn: readonly string[] | undefined;
   readonly selectedFields: readonly string[] | undefined;
   readonly limit: number | undefined;
   readonly offset: number | undefined;
@@ -49,6 +51,8 @@ export function emptyState(): CollectionState {
     includes: [],
     orderBy: undefined,
     cursor: undefined,
+    distinct: undefined,
+    distinctOn: undefined,
     selectedFields: undefined,
     limit: undefined,
     offset: undefined,

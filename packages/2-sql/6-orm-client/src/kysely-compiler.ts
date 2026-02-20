@@ -57,6 +57,7 @@ const comparisonOpToSql: Record<BinaryExpr['op'], string> = {
 
 export function compileSelect(tableName: string, state: CollectionState): CompiledQuery {
   let qb = queryCompiler.selectFrom(tableName);
+  qb = applyDistinct(qb, tableName, state.distinct, state.distinctOn);
   qb = applyProjection(qb, tableName, state.selectedFields);
   qb = applyWhereFilters(qb, state.filters);
   qb = applyCursorPagination(qb, tableName, state.orderBy, state.cursor);
@@ -85,6 +86,7 @@ export function compileRelationSelect(
   nestedState: CollectionState,
 ): CompiledQuery {
   let qb = queryCompiler.selectFrom(relatedTableName).where(fkColumn, 'in', [...parentPks]);
+  qb = applyDistinct(qb, relatedTableName, nestedState.distinct, nestedState.distinctOn);
   qb = applyProjection(qb, relatedTableName, nestedState.selectedFields);
   qb = applyWhereFilters(qb, nestedState.filters);
   qb = applyCursorPagination(qb, relatedTableName, nestedState.orderBy, nestedState.cursor);
@@ -145,6 +147,24 @@ function applyProjection<QueryBuilder extends AnySelectQueryBuilder>(
 
   const qualified = selectedFields.map((column) => `${tableName}.${column}`);
   return qb.select(qualified) as QueryBuilder;
+}
+
+function applyDistinct<QueryBuilder extends AnySelectQueryBuilder>(
+  qb: QueryBuilder,
+  tableName: string,
+  distinct: readonly string[] | undefined,
+  distinctOn: readonly string[] | undefined,
+): QueryBuilder {
+  if (distinctOn && distinctOn.length > 0) {
+    const qualified = distinctOn.map((column) => `${tableName}.${column}`);
+    return qb.distinctOn(qualified) as QueryBuilder;
+  }
+
+  if (distinct && distinct.length > 0) {
+    return qb.distinct() as QueryBuilder;
+  }
+
+  return qb;
 }
 
 function applyCursorPagination<QueryBuilder extends AnySelectQueryBuilder>(

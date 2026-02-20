@@ -143,14 +143,20 @@ const selectedUsersWithPosts = userCollection.select('name').include('posts');
 const filteredUsers = userCollection.where({ email: 'alice@example.com' });
 const orderedUsers = userCollection.orderBy((user) => user.id.asc());
 const cursorPagedUsers = orderedUsers.cursor({ id: 'user_001' });
+const distinctUsers = userCollection.distinct('email');
+const distinctOnUsers = orderedUsers.distinctOn('email');
 // @ts-expect-error cursor() requires orderBy() first
 userCollection.cursor({ id: 'user_001' });
+// @ts-expect-error distinctOn() requires orderBy() first
+userCollection.distinctOn('email');
 
 type SelectedUserRow = RowOf<typeof selectedUsers>;
 type SelectedUserWithPostsRow = RowOf<typeof selectedUsersWithPosts>;
 type FilteredUsersState = StateOf<typeof filteredUsers>;
 type OrderedUsersState = StateOf<typeof orderedUsers>;
 type CursorPagedUsersState = StateOf<typeof cursorPagedUsers>;
+type DistinctUsersState = StateOf<typeof distinctUsers>;
+type DistinctOnUsersState = StateOf<typeof distinctOnUsers>;
 
 export type GeneratedContractTypeAssertions = [
   Assert<Equal<keyof SelectedUserRow, 'name' | 'email'>>,
@@ -165,4 +171,6 @@ export type GeneratedContractTypeAssertions = [
   Assert<Equal<FilteredUsersState['hasWhere'], true>>,
   Assert<Equal<OrderedUsersState['hasOrderBy'], true>>,
   Assert<Equal<CursorPagedUsersState['hasOrderBy'], true>>,
+  Assert<Equal<DistinctUsersState['hasOrderBy'], false>>,
+  Assert<Equal<DistinctOnUsersState['hasOrderBy'], true>>,
 ];

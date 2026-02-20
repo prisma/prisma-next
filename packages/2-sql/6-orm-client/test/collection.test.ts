@@ -126,6 +126,19 @@ describe('Collection', () => {
       expect(paged.state.cursor).toEqual({ user_id: 7 });
     });
 
+    it('distinct() and distinctOn() map fields to storage columns', () => {
+      const runtime = createMockRuntime();
+      const postCollection = new Collection({ contract, runtime }, 'Post');
+
+      const distinctCollection = postCollection.distinct('userId');
+      expect(distinctCollection.state.distinct).toEqual(['user_id']);
+
+      const distinctOnCollection = postCollection
+        .orderBy((p) => p.userId.asc())
+        .distinctOn('userId');
+      expect(distinctOnCollection.state.distinctOn).toEqual(['user_id']);
+    });
+
     it('select() stores mapped selected fields and replaces previous selections', () => {
       const { collection } = createCollection();
       const selected = collection.select('name', 'email');
@@ -251,6 +264,31 @@ describe('Collection', () => {
 
       const sql = runtime.executions[0]!.plan.sql.toLowerCase();
       expect(sql).toContain('("users"."name", "users"."email") >');
+    });
+
+    it('all() with distinct() compiles SELECT DISTINCT', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[]]);
+
+      await collection.distinct('email').all().toArray();
+
+      const sql = runtime.executions[0]!.plan.sql.toLowerCase();
+      expect(sql).toContain('select distinct');
+    });
+
+    it('all() with distinctOn() compiles DISTINCT ON', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[]]);
+
+      await collection
+        .orderBy((u) => u.email.asc())
+        .distinctOn('email')
+        .all()
+        .toArray();
+
+      const sql = runtime.executions[0]!.plan.sql.toLowerCase();
+      expect(sql).toContain('distinct on');
+      expect(sql).toContain('("users"."email")');
     });
 
     it('select() compiles to an explicit projection instead of selectAll()', async () => {
