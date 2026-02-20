@@ -282,7 +282,7 @@ Depends on: Group 6 (include cardinality)
   - Files to modify: `src/kysely-compiler.ts`, `src/collection.ts`
   - Write 1-2 tests with only jsonAgg capability
 
-- [ ] **7.4 Refactor multi-query stitching as explicit Strategy 3**
+- [x] **7.4 Refactor multi-query stitching as explicit Strategy 3**
   - The current `stitchIncludes` in `src/collection.ts` IS the multi-query strategy
   - Refactor it to fit the strategy pattern alongside lateral and correlated strategies
   - This should be a cleanup/reorganization, not a rewrite

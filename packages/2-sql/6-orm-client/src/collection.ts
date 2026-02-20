@@ -2,7 +2,7 @@ import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { shorthandToWhereExpr } from './filters';
-import { selectIncludeStrategy } from './include-strategy';
+import { type IncludeStrategy, selectIncludeStrategy } from './include-strategy';
 import { compileRelationSelect, compileSelect, createExecutionPlan } from './kysely-compiler';
 import { createModelAccessor } from './model-accessor';
 import type {
@@ -388,49 +388,78 @@ export class Collection<
     }
 
     const includeStrategy = selectIncludeStrategy(contract);
-    if (includeStrategy !== 'multiQuery') {
-      // Single-query include strategies are implemented in later tasks.
-      // Until then, use the existing multi-query stitching path.
-    }
+    return dispatchWithIncludeStrategy<Row>({
+      strategy: includeStrategy,
+      contract,
+      runtime,
+      state,
+      tableName,
+    });
+  }
+}
 
-    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
-      const { scope, release } = await acquireRuntimeScope(runtime);
-      try {
-        const parentJoinColumns = state.includes.map((include) => include.parentPkColumn);
-        const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
-          augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
-        const parentCompiled = compileSelect(tableName, {
-          ...state,
-          includes: [],
-          selectedFields: parentSelectedForQuery,
-        });
-        const parentPlan = createExecutionPlan<Record<string, unknown>>(parentCompiled, contract);
-        const parentRowsRaw = await scope.execute(parentPlan).toArray();
-        if (parentRowsRaw.length === 0) {
-          return;
-        }
+function dispatchWithIncludeStrategy<Row>(options: {
+  strategy: IncludeStrategy;
+  contract: SqlContract<SqlStorage>;
+  runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
+  state: CollectionState;
+  tableName: string;
+}): AsyncIterableResult<Row> {
+  switch (options.strategy) {
+    case 'lateral':
+    case 'correlated':
+      // Single-query include strategies are implemented in follow-up tasks.
+      return dispatchWithMultiQueryIncludes<Row>(options);
+    case 'multiQuery':
+    default:
+      return dispatchWithMultiQueryIncludes<Row>(options);
+  }
+}
 
-        const parentRows = parentRowsRaw.map((row) => createRowEnvelope(contract, tableName, row));
-        await stitchIncludes(scope, contract, parentRows, state.includes);
+function dispatchWithMultiQueryIncludes<Row>(options: {
+  contract: SqlContract<SqlStorage>;
+  runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
+  state: CollectionState;
+  tableName: string;
+}): AsyncIterableResult<Row> {
+  const { contract, runtime, state, tableName } = options;
+  const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+    const { scope, release } = await acquireRuntimeScope(runtime);
+    try {
+      const parentJoinColumns = state.includes.map((include) => include.parentPkColumn);
+      const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
+        augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
+      const parentCompiled = compileSelect(tableName, {
+        ...state,
+        includes: [],
+        selectedFields: parentSelectedForQuery,
+      });
+      const parentPlan = createExecutionPlan<Record<string, unknown>>(parentCompiled, contract);
+      const parentRowsRaw = await scope.execute(parentPlan).toArray();
+      if (parentRowsRaw.length === 0) {
+        return;
+      }
 
-        if (hiddenParentColumns.length > 0) {
-          for (const row of parentRows) {
-            stripHiddenMappedFields(contract, tableName, row.mapped, hiddenParentColumns);
-          }
-        }
+      const parentRows = parentRowsRaw.map((row) => createRowEnvelope(contract, tableName, row));
+      await stitchIncludes(scope, contract, parentRows, state.includes);
 
+      if (hiddenParentColumns.length > 0) {
         for (const row of parentRows) {
-          yield row.mapped as Row;
-        }
-      } finally {
-        if (release) {
-          await release();
+          stripHiddenMappedFields(contract, tableName, row.mapped, hiddenParentColumns);
         }
       }
-    };
 
-    return new AsyncIterableResult(generator());
-  }
+      for (const row of parentRows) {
+        yield row.mapped as Row;
+      }
+    } finally {
+      if (release) {
+        await release();
+      }
+    }
+  };
+
+  return new AsyncIterableResult(generator());
 }
 
 async function stitchIncludes(
