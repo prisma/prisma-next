@@ -1,9 +1,9 @@
-import { orm, Collection } from '@prisma-next/sql-orm-client';
+import { Collection, orm } from '@prisma-next/sql-orm-client';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import type { Contract } from '../prisma/contract.d';
-import contractJson from '../prisma/contract.json' with { type: 'json' };
+import { db } from '../prisma/db';
 
-const contract = contractJson as unknown as Contract;
+const contract = db.context.contract as Contract;
 
 class UserCollection extends Collection<Contract, 'User'> {
   admins() {
@@ -13,11 +13,31 @@ class UserCollection extends Collection<Contract, 'User'> {
   byEmail(email: string) {
     return this.where((user) => user.email.eq(email));
   }
+
+  emailDomain(domain: string) {
+    return this.where((user) => user.email.ilike(`%@${domain}`));
+  }
+
+  withPostTitle(titleTerm: string) {
+    return this.where((user) => user.posts.some((post) => post.title.ilike(`%${titleTerm}%`)));
+  }
+
+  newestFirst() {
+    return this.orderBy((user) => user.createdAt.desc());
+  }
 }
 
 class PostCollection extends Collection<Contract, 'Post'> {
   forUser(userId: string) {
     return this.where((post) => post.userId.eq(userId));
+  }
+
+  withTitle(titleTerm: string) {
+    return this.where((post) => post.title.ilike(`%${titleTerm}%`));
+  }
+
+  newestFirst() {
+    return this.orderBy((post) => post.createdAt.desc());
   }
 }
 

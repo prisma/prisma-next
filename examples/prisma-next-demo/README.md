@@ -85,14 +85,24 @@ The demo includes ORM client examples under `src/orm-client/`:
 
 - `ormClientGetUsers(limit, runtime)` — list users using ORM client API
 - `ormClientGetAdminUsers(limit, runtime)` — filter through a custom collection scope
+- `ormClientFindUserByEmail(email, runtime)` — `find()` with collection helpers
 - `ormClientGetUserPosts(userId, limit, runtime)` — fetch user posts with collection filters + ordering
+- `ormClientGetDashboardUsers(emailDomain, postTitleTerm, limit, postsPerUser, runtime)` — compound `and/or/not` filters + relation filters + `select()` and `include()` composition
+- `ormClientGetPostFeed(postTitleTerm, limit, runtime)` — to-one include (`post -> user`) with projected fields
+- `ormClientGetUsersByIdCursor(cursor, limit, runtime)` — cursor pagination with `orderBy()` + `cursor()`
+- `ormClientGetLatestUserPerKind(runtime)` — `distinctOn()` with deterministic ordering
 
 Run from the CLI:
 
 ```bash
 pnpm start -- repo-users 5
 pnpm start -- repo-admins 5
+pnpm start -- repo-user admin@example.com
 pnpm start -- repo-posts user_001 10
+pnpm start -- repo-dashboard example.com post 10 2
+pnpm start -- repo-post-feed post 10
+pnpm start -- repo-users-cursor user_001 5
+pnpm start -- repo-latest-per-kind
 ```
 
 ## Setup

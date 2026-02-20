@@ -15,7 +15,15 @@
  * - users-with-posts [limit]   Users with nested posts (includeMany)
  * - repo-users [limit]         Users via ORM client API
  * - repo-admins [limit]        Admin users via custom collection scope
+ * - repo-user <email>          Find a user by email via ORM client find()
  * - repo-posts <userId> [limit] Posts for a user via ORM client API
+ * - repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser]
+ *                              Compound filters + select/include via ORM client
+ * - repo-post-feed <postTitleTerm> [limit]
+ *                              Posts with to-one include via ORM client
+ * - repo-users-cursor [cursor] [limit]
+ *                              Cursor pagination via ORM client
+ * - repo-latest-per-kind       DISTINCT ON example via ORM client
  * - users-paginate [cursor]    Cursor-based pagination
  * - similarity-search <vec>    Vector similarity search (pgvector)
  * - budget-violation           Demo budget enforcement error
@@ -28,6 +36,14 @@ import 'dotenv/config';
 import { type as arktype } from 'arktype';
 import { getUserById as getUserByIdKysely } from './kysely/get-user-by-id';
 import { insertUserTransaction as insertUserTransactionKysely } from './kysely/insert-user-transaction';
+import { ormClientFindUserByEmail } from './orm-client/find-user-by-email';
+import { ormClientGetAdminUsers } from './orm-client/get-admin-users';
+import { ormClientGetDashboardUsers } from './orm-client/get-dashboard-users';
+import { ormClientGetLatestUserPerKind } from './orm-client/get-latest-user-per-kind';
+import { ormClientGetPostFeed } from './orm-client/get-post-feed';
+import { ormClientGetUserPosts } from './orm-client/get-user-posts';
+import { ormClientGetUsers } from './orm-client/get-users';
+import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor';
 import { db } from './prisma/db';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
@@ -35,9 +51,6 @@ import { getUserPosts } from './queries/get-user-posts';
 import { getUsers } from './queries/get-users';
 import { getUsersWithPosts } from './queries/get-users-with-posts';
 import { ormGetUsersBackward, ormGetUsersByIdCursor } from './queries/orm-pagination';
-import { ormClientGetAdminUsers } from './orm-client/get-admin-users';
-import { ormClientGetUserPosts } from './orm-client/get-user-posts';
-import { ormClientGetUsers } from './orm-client/get-users';
 import { similaritySearch } from './queries/similarity-search';
 
 const appConfigSchema = arktype({
@@ -96,6 +109,14 @@ async function main() {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await ormClientGetAdminUsers(limit, runtime);
       console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'repo-user') {
+      const [email] = args;
+      if (!email) {
+        console.error('Usage: pnpm start -- repo-user <email>');
+        process.exit(1);
+      }
+      const user = await ormClientFindUserByEmail(email, runtime);
+      console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'repo-posts') {
       const [userIdStr, limitStr] = args;
       if (!userIdStr) {
@@ -105,6 +126,42 @@ async function main() {
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const posts = await ormClientGetUserPosts(userIdStr, limit, runtime);
       console.log(JSON.stringify(posts, null, 2));
+    } else if (cmd === 'repo-dashboard') {
+      const [emailDomain, postTitleTerm, limitStr, postsPerUserStr] = args;
+      if (!emailDomain || !postTitleTerm) {
+        console.error(
+          'Usage: pnpm start -- repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser]',
+        );
+        process.exit(1);
+      }
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const postsPerUser = postsPerUserStr ? Number.parseInt(postsPerUserStr, 10) : 2;
+      const users = await ormClientGetDashboardUsers(
+        emailDomain,
+        postTitleTerm,
+        limit,
+        postsPerUser,
+        runtime,
+      );
+      console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'repo-post-feed') {
+      const [postTitleTerm, limitStr] = args;
+      if (!postTitleTerm) {
+        console.error('Usage: pnpm start -- repo-post-feed <postTitleTerm> [limit]');
+        process.exit(1);
+      }
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const posts = await ormClientGetPostFeed(postTitleTerm, limit, runtime);
+      console.log(JSON.stringify(posts, null, 2));
+    } else if (cmd === 'repo-users-cursor') {
+      const [cursorStr, limitStr] = args;
+      const cursor = cursorStr ?? null;
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const users = await ormClientGetUsersByIdCursor(cursor, limit, runtime);
+      console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'repo-latest-per-kind') {
+      const users = await ormClientGetLatestUserPerKind(runtime);
+      console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'similarity-search') {
       const [queryVectorStr, limitStr] = args;
       if (!queryVectorStr) {
@@ -180,7 +237,10 @@ async function main() {
       console.log(
         'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | ' +
           'users-with-posts [limit] | repo-users [limit] | repo-admins [limit] | ' +
-          'repo-posts <userId> [limit] | users-paginate [cursor] [limit] | ' +
+          'repo-user <email> | repo-posts <userId> [limit] | ' +
+          'repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser] | ' +
+          'repo-post-feed <postTitleTerm> [limit] | repo-users-cursor [cursor] [limit] | ' +
+          'repo-latest-per-kind | users-paginate [cursor] [limit] | ' +
           'users-paginate-back <cursor> [limit] | similarity-search <queryVector> [limit] | ' +
           'budget-violation | user-kysely <userId> | user-transaction-kysely]',
       );
