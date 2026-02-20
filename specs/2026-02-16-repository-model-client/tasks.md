@@ -73,7 +73,7 @@ Depends on: Group 1 (WhereExpr integration)
   - Export from `src/exports/index.ts`
   - Write 3-5 unit tests in `test/filters.test.ts` covering composition: `and(a, b)`, `or(a, b)`, `not(a)`, nested `and(a, or(b, c))`
 
-- [ ] **2.2 Expand ColumnAccessor into full ModelAccessor with additional operators**
+- [x] **2.2 Expand ColumnAccessor into full ModelAccessor with additional operators**
   - Rename `src/column-accessor.ts` to `src/model-accessor.ts` (or refactor in place)
   - Add string operators: `like(pattern: string)`, `ilike(pattern: string)` -- only available when field type extends string
   - Add list operators: `in(values: T[])`, `notIn(values: T[])` -- produce `BinaryExpr` with `ListLiteralExpr` right-hand side

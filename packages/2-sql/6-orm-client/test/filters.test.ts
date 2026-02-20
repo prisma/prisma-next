@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createColumnAccessor } from '../src/column-accessor';
 import { all, and, not, or } from '../src/filters';
+import { createModelAccessor } from '../src/model-accessor';
 import { createTestContract } from './helpers';
 
 describe('filters', () => {
   const contract = createTestContract();
 
   it('and() composes multiple expressions', () => {
-    const user = createColumnAccessor(contract, 'User');
+    const user = createModelAccessor(contract, 'User');
     const expr = and(user['name']!.eq('Alice'), user['email']!.neq('bob@example.com'));
 
     expect(expr).toMatchObject({
@@ -20,7 +20,7 @@ describe('filters', () => {
   });
 
   it('or() composes multiple expressions', () => {
-    const user = createColumnAccessor(contract, 'User');
+    const user = createModelAccessor(contract, 'User');
     const expr = or(user['name']!.eq('Alice'), user['name']!.eq('Bob'));
 
     expect(expr).toMatchObject({
@@ -33,7 +33,7 @@ describe('filters', () => {
   });
 
   it('not() negates binary expressions', () => {
-    const user = createColumnAccessor(contract, 'User');
+    const user = createModelAccessor(contract, 'User');
     const expr = not(user['name']!.eq('Alice'));
 
     expect(expr).toMatchObject({
@@ -45,7 +45,7 @@ describe('filters', () => {
   });
 
   it('not() applies De Morgan for and/or expressions', () => {
-    const user = createColumnAccessor(contract, 'User');
+    const user = createModelAccessor(contract, 'User');
     const expr = not(
       and(user['name']!.eq('Alice'), or(user['email']!.eq('a'), user['email']!.eq('b'))),
     );

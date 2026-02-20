@@ -18,6 +18,8 @@ export interface OrderExpr {
   readonly direction: 'asc' | 'desc';
 }
 
+export type OrderByDirective = OrderExpr;
+
 export interface IncludeExpr {
   readonly relationName: string;
   readonly relatedModelName: string;
@@ -88,6 +90,14 @@ export type ComparisonMethods<T> = {
   lt(value: T): WhereExpr;
   gte(value: T): WhereExpr;
   lte(value: T): WhereExpr;
+  like(pattern: string): WhereExpr;
+  ilike(pattern: string): WhereExpr;
+  in(values: readonly T[]): WhereExpr;
+  notIn(values: readonly T[]): WhereExpr;
+  isNull(): WhereExpr;
+  isNotNull(): WhereExpr;
+  asc(): OrderByDirective;
+  desc(): OrderByDirective;
 };
 
 export type ModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {

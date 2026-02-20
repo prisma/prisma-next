@@ -10,6 +10,7 @@ export type {
   DefaultModelRow,
   IncludeExpr,
   ModelAccessor,
+  OrderByDirective,
   OrderExpr,
   RelatedModelName,
   RelationNames,
