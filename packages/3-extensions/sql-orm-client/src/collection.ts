@@ -1,5 +1,5 @@
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import { executeCompiledQuery } from '@prisma-next/integration-kysely';
+import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { shorthandToWhereExpr } from './filters';
@@ -430,9 +430,14 @@ export class Collection<
       mapModelDataToStorageRow(this.ctx.contract, this.modelName, row),
     );
     const compiled = compileInsertCount(this.tableName, mappedRows);
-    await executeCompiledQuery<Record<string, unknown>>(this.ctx.runtime, this.ctx.contract, compiled, {
-      lane: 'orm-client',
-    }).toArray();
+    await executeCompiledQuery<Record<string, unknown>>(
+      this.ctx.runtime,
+      this.ctx.contract,
+      compiled,
+      {
+        lane: 'orm-client',
+      },
+    ).toArray();
     return data.length;
   }
 
@@ -628,9 +633,14 @@ export class Collection<
     ).toArray();
 
     const compiled = compileUpdateCount(this.tableName, mappedData, this.state.filters);
-    await executeCompiledQuery<Record<string, unknown>>(this.ctx.runtime, this.ctx.contract, compiled, {
-      lane: 'orm-client',
-    }).toArray();
+    await executeCompiledQuery<Record<string, unknown>>(
+      this.ctx.runtime,
+      this.ctx.contract,
+      compiled,
+      {
+        lane: 'orm-client',
+      },
+    ).toArray();
 
     return matchingRows.length;
   }
@@ -730,9 +740,14 @@ export class Collection<
     ).toArray();
 
     const compiled = compileDeleteCount(this.tableName, this.state.filters);
-    await executeCompiledQuery<Record<string, unknown>>(this.ctx.runtime, this.ctx.contract, compiled, {
-      lane: 'orm-client',
-    }).toArray();
+    await executeCompiledQuery<Record<string, unknown>>(
+      this.ctx.runtime,
+      this.ctx.contract,
+      compiled,
+      {
+        lane: 'orm-client',
+      },
+    ).toArray();
 
     return matchingRows.length;
   }
@@ -825,7 +840,6 @@ function dispatchWithIncludeStrategy<Row>(options: {
     case 'correlated':
       // Single-query include strategies are implemented in follow-up tasks.
       return dispatchWithMultiQueryIncludes<Row>(options);
-    case 'multiQuery':
     default:
       return dispatchWithMultiQueryIncludes<Row>(options);
   }

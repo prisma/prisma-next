@@ -101,7 +101,7 @@ type CreateInputContract = SqlContract<
 type Input = CreateInput<CreateInputContract, 'User'>;
 
 type RequiredKeys<T> = {
-  [K in keyof T]-?: {} extends Pick<T, K> ? never : K;
+  [K in keyof T]-?: Record<never, never> extends Pick<T, K> ? never : K;
 }[keyof T];
 
 type OptionalKeys<T> = Exclude<keyof T, RequiredKeys<T>>;
