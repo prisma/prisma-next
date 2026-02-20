@@ -37,6 +37,7 @@ export interface CollectionState {
   readonly filters: readonly WhereExpr[];
   readonly includes: readonly IncludeExpr[];
   readonly orderBy: readonly OrderExpr[] | undefined;
+  readonly selectedFields: readonly string[] | undefined;
   readonly limit: number | undefined;
   readonly offset: number | undefined;
 }
@@ -46,10 +47,23 @@ export function emptyState(): CollectionState {
     filters: [],
     includes: [],
     orderBy: undefined,
+    selectedFields: undefined,
     limit: undefined,
     offset: undefined,
   };
 }
+
+export interface CollectionTypeState {
+  readonly hasOrderBy: boolean;
+  readonly hasWhere: boolean;
+  readonly hasUniqueFilter: boolean;
+}
+
+export type DefaultCollectionTypeState = {
+  readonly hasOrderBy: false;
+  readonly hasWhere: false;
+  readonly hasUniqueFilter: false;
+};
 
 // ---------------------------------------------------------------------------
 // CollectionContext — bundles lane context + runtime

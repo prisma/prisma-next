@@ -152,7 +152,7 @@ Depends on: Group 2 (expanded ModelAccessor, logical combinators)
 
 Depends on: Group 2 (ModelAccessor)
 
-- [ ] **4.1 Add CollectionTypeState generic parameter to Collection**
+- [x] **4.1 Add CollectionTypeState generic parameter to Collection**
   - Introduce `CollectionTypeState` interface: `{ hasOrderBy: boolean; hasWhere: boolean; hasUniqueFilter: boolean }`
   - Add a fourth generic parameter `State extends CollectionTypeState` to `Collection` class with default `{ hasOrderBy: false; hasWhere: false; hasUniqueFilter: false }`
   - Update `where()` to flip `hasWhere: true` in the returned type
