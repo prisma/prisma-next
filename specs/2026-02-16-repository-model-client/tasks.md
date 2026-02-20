@@ -83,7 +83,7 @@ Depends on: Group 1 (WhereExpr integration)
   - Files to modify: `src/column-accessor.ts` (or new `src/model-accessor.ts`), `src/types.ts`
   - Write 4-6 tests in `test/model-accessor.test.ts` covering: `like`, `in`, `isNull`, `asc/desc`, plus basic eq/neq still work
 
-- [ ] **2.3 Add relation accessors to ModelAccessor (some/every/none)**
+- [x] **2.3 Add relation accessors to ModelAccessor (some/every/none)**
   - Extend the Proxy in the model accessor to detect relation names from the contract
   - When a relation name is accessed, return a `RelationFilterAccessor` with `some(predicate?)`, `every(predicate)`, `none(predicate?)` methods
   - `some(pred)` produces `ExistsExpr { kind: 'exists', not: false, subquery: ... }`

@@ -129,4 +129,80 @@ describe('createModelAccessor', () => {
     expect(accessor['id']!.asc()).toEqual({ column: 'id', direction: 'asc' });
     expect(accessor['id']!.desc()).toEqual({ column: 'id', direction: 'desc' });
   });
+
+  it('creates some() relation filters as EXISTS subqueries', () => {
+    const accessor = createModelAccessor(contract, 'User');
+    expect(accessor['posts']!.some()).toEqual({
+      kind: 'exists',
+      not: false,
+      subquery: {
+        kind: 'select',
+        from: { kind: 'table', name: 'posts' },
+        project: [{ alias: '_exists', expr: { kind: 'col', table: 'posts', column: 'user_id' } }],
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'posts', column: 'user_id' },
+          right: { kind: 'col', table: 'users', column: 'id' },
+        },
+      },
+    });
+  });
+
+  it('creates none() and every() relation filters with NOT EXISTS semantics', () => {
+    const accessor = createModelAccessor(contract, 'User');
+
+    expect(accessor['posts']!.none({ views: 10 })).toMatchObject({
+      kind: 'exists',
+      not: true,
+      subquery: {
+        where: {
+          kind: 'and',
+          exprs: [
+            { kind: 'bin', op: 'eq' },
+            { kind: 'bin', op: 'eq' },
+          ],
+        },
+      },
+    });
+
+    expect(accessor['posts']!.every((post) => post['views']!.gt(10))).toMatchObject({
+      kind: 'exists',
+      not: true,
+      subquery: {
+        where: {
+          kind: 'and',
+          exprs: [
+            { kind: 'bin', op: 'eq' },
+            { kind: 'bin', op: 'lte' },
+          ],
+        },
+      },
+    });
+  });
+
+  it('supports nested relation filters', () => {
+    const accessor = createModelAccessor(contract, 'User');
+
+    expect(
+      accessor['posts']!.some((post) =>
+        post['comments']!.some((comment) => comment['body']!.like('%urgent%')),
+      ),
+    ).toMatchObject({
+      kind: 'exists',
+      not: false,
+      subquery: {
+        where: {
+          kind: 'and',
+          exprs: [
+            { kind: 'bin', op: 'eq' },
+            {
+              kind: 'exists',
+              not: false,
+            },
+          ],
+        },
+      },
+    });
+  });
 });

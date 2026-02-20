@@ -100,11 +100,42 @@ export type ComparisonMethods<T> = {
   desc(): OrderByDirective;
 };
 
-export type ModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {
+export type RelationPredicate<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = (model: ModelAccessor<TContract, ModelName>) => WhereExpr;
+
+export type RelationPredicateInput<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = RelationPredicate<TContract, ModelName> | Record<string, unknown>;
+
+export type RelationFilterAccessor<
+  TContract extends SqlContract<SqlStorage>,
+  RelatedModelName extends string,
+> = {
+  some(predicate?: RelationPredicateInput<TContract, RelatedModelName>): WhereExpr;
+  every(predicate: RelationPredicateInput<TContract, RelatedModelName>): WhereExpr;
+  none(predicate?: RelationPredicateInput<TContract, RelatedModelName>): WhereExpr;
+};
+
+type ScalarModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {
   [K in keyof FieldsOf<TContract, ModelName> & string]: ComparisonMethods<
     FieldJsType<TContract, ModelName, K>
   >;
 };
+
+type RelationModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {
+  [K in RelationNames<TContract, ModelName>]: RelationFilterAccessor<
+    TContract,
+    RelatedModelName<TContract, ModelName, K> & string
+  >;
+};
+
+export type ModelAccessor<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ScalarModelAccessor<TContract, ModelName> & RelationModelAccessor<TContract, ModelName>;
 
 // ---------------------------------------------------------------------------
 // DefaultModelRow — all scalar fields with JS types

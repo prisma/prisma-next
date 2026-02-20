@@ -13,7 +13,10 @@ export type {
   OrderByDirective,
   OrderExpr,
   RelatedModelName,
+  RelationFilterAccessor,
   RelationNames,
+  RelationPredicate,
+  RelationPredicateInput,
   RelationsOf,
   RuntimeQueryable,
 } from '../types';
