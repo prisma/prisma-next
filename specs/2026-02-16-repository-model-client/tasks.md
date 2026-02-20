@@ -94,7 +94,7 @@ Depends on: Group 1 (WhereExpr integration)
   - Write 3-5 tests covering: `u.posts.some()`, `u.posts.some(p => p.published.eq(true))`, `u.posts.none()`, `u.posts.every(p => ...)`, nested `u.posts.some(p => p.comments.some(c => ...))`
   - Files to modify: `src/model-accessor.ts` (or `src/column-accessor.ts`), `src/types.ts`
 
-- [ ] **2.4 Update orderBy to use typed accessor with asc/desc methods**
+- [x] **2.4 Update orderBy to use typed accessor with asc/desc methods**
   - The current `orderBy()` callback returns `{ column, direction }` manually
   - Change to use the ModelAccessor's `.asc()` / `.desc()` methods
   - Update `Collection.orderBy()` signature and implementation

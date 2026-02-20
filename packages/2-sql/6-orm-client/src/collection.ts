@@ -9,6 +9,7 @@ import type {
   DefaultModelRow,
   IncludeExpr,
   ModelAccessor,
+  OrderByDirective,
   OrderExpr,
   RelatedModelName,
   RelationNames,
@@ -131,20 +132,22 @@ export class Collection<
   }
 
   orderBy(
-    fn: (model: ModelAccessor<TContract, ModelName>) => {
-      column: string;
-      direction: 'asc' | 'desc';
-    },
+    selection:
+      | ((model: ModelAccessor<TContract, ModelName>) => OrderByDirective)
+      | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => OrderByDirective>,
   ): this {
     const accessor = createModelAccessor(this.ctx.contract, this.modelName);
-    const order = fn(accessor as ModelAccessor<TContract, ModelName>);
-    const orderExpr: OrderExpr = {
-      column: order.column,
-      direction: order.direction,
-    };
+    const selectors = Array.isArray(selection) ? selection : [selection];
+    const nextOrders: OrderExpr[] = selectors.map((selector) => {
+      const order = selector(accessor as ModelAccessor<TContract, ModelName>);
+      return {
+        column: order.column,
+        direction: order.direction,
+      };
+    });
     const existing = this.state.orderBy ?? [];
     return this.#clone({
-      orderBy: [...existing, orderExpr],
+      orderBy: [...existing, ...nextOrders],
     });
   }
 

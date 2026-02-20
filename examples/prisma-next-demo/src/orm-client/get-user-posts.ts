@@ -5,7 +5,7 @@ export async function ormClientGetUserPosts(userId: string, limit: number, runti
   const db = createOrmClient(runtime);
   return db.posts
     .forUser(userId)
-    .orderBy(() => ({ column: 'createdAt', direction: 'desc' }))
+    .orderBy((post) => post.createdAt.desc())
     .take(limit)
     .all()
     .toArray();

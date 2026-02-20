@@ -48,6 +48,30 @@ describe('Collection', () => {
       expect(collection.state.offset).toBeUndefined();
     });
 
+    it('orderBy() accepts typed accessor directives', () => {
+      const { collection } = createCollection();
+      const ordered = collection.orderBy((u) => u.name.desc());
+      expect(ordered.state.orderBy).toEqual([{ column: 'name', direction: 'desc' }]);
+    });
+
+    it('orderBy() accepts an array of accessor directives', () => {
+      const { collection } = createCollection();
+      const ordered = collection.orderBy([(u) => u.name.asc(), (u) => u.email.asc()]);
+      expect(ordered.state.orderBy).toEqual([
+        { column: 'name', direction: 'asc' },
+        { column: 'email', direction: 'asc' },
+      ]);
+    });
+
+    it('chained orderBy() appends directives', () => {
+      const { collection } = createCollection();
+      const ordered = collection.orderBy((u) => u.name.asc()).orderBy((u) => u.email.desc());
+      expect(ordered.state.orderBy).toEqual([
+        { column: 'name', direction: 'asc' },
+        { column: 'email', direction: 'desc' },
+      ]);
+    });
+
     it('include() appends an include expression', () => {
       const { collection } = createCollection();
       const withPosts = collection.include('posts');
@@ -188,9 +212,7 @@ describe('Collection', () => {
       ]);
 
       const results = await collection
-        .include('posts', (post) =>
-          post.orderBy(() => ({ column: 'id', direction: 'asc' })).take(1),
-        )
+        .include('posts', (post) => post.orderBy((p) => p.id.asc()).take(1))
         .all()
         .toArray();
 
@@ -212,9 +234,7 @@ describe('Collection', () => {
       ]);
 
       const results = await postCollection
-        .include('comments', (comment) =>
-          comment.orderBy(() => ({ column: 'id', direction: 'asc' })),
-        )
+        .include('comments', (comment) => comment.orderBy((c) => c.id.asc()))
         .all()
         .toArray();
 
