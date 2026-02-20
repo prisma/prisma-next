@@ -238,7 +238,7 @@ Depends on: Group 1 (WhereExpr integration)
   - This supports testing cardinality-aware include types
   - Files to modify: `test/helpers.ts`
 
-- [ ] **6.3 Propagate collection registry through include refinements**
+- [x] **6.3 Propagate collection registry through include refinements**
   - The `include()` refinement callback should receive an instance of the **registered collection class** for the related model
   - Already partially implemented: `#createCollection` checks `this.registry`
   - Verify that custom collection methods (e.g. `PostCollection.published()`) are available inside include refinement callbacks

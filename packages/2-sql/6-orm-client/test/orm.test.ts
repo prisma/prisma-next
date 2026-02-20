@@ -10,6 +10,12 @@ class PostCollection extends Collection<TestContract, 'Post'> {
   }
 }
 
+class CommentCollection extends Collection<TestContract, 'Comment'> {
+  withBody(body: string) {
+    return this.where((comment) => comment.body.eq(body));
+  }
+}
+
 describe('orm()', () => {
   const contract = createTestContract();
 
@@ -89,5 +95,45 @@ describe('orm()', () => {
     type DbClient = typeof db;
     // @ts-expect-error unknown collection key should not exist on typed client
     type _UnknownCollection = DbClient['unknown'];
+  });
+
+  it('uses registered collection classes in include refinements', () => {
+    const runtime = createMockRuntime();
+    const db = orm({
+      contract,
+      runtime,
+      collections: { posts: PostCollection },
+    });
+
+    const withPosts = db.users.include('posts', (posts) => {
+      expect(posts).toBeInstanceOf(PostCollection);
+      return (posts as PostCollection).popular();
+    });
+
+    const include = withPosts.state.includes[0]!;
+    expect(include.nested.filters).toHaveLength(1);
+  });
+
+  it('propagates registered collection classes through nested include refinements', () => {
+    const runtime = createMockRuntime();
+    const db = orm({
+      contract,
+      runtime,
+      collections: {
+        posts: PostCollection,
+        comments: CommentCollection,
+      },
+    });
+
+    const withNested = db.users.include('posts', (posts) =>
+      (posts as PostCollection).include('comments', (comments) => {
+        expect(comments).toBeInstanceOf(CommentCollection);
+        return (comments as CommentCollection).withBody('approved');
+      }),
+    );
+
+    const postInclude = withNested.state.includes[0]!;
+    const commentInclude = postInclude.nested.includes[0]!;
+    expect(commentInclude.nested.filters).toHaveLength(1);
   });
 });

@@ -55,6 +55,13 @@ type IncludedRelationsForRow<
   Row,
 > = Omit<Row, keyof DefaultModelRow<TContract, ModelName>>;
 
+type IncludeRefinementCollection<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  Row,
+  State extends CollectionTypeState,
+> = Omit<Collection<TContract, ModelName, Row, State>, 'all' | 'find'>;
+
 export class Collection<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
@@ -121,13 +128,13 @@ export class Collection<
   >(
     relationName: RelName,
     refineFn?: (
-      collection: Collection<
+      collection: IncludeRefinementCollection<
         TContract,
         RelatedName,
         DefaultModelRow<TContract, RelatedName>,
         DefaultCollectionTypeState
       >,
-    ) => Collection<TContract, RelatedName, IncludedRow, CollectionTypeState>,
+    ) => IncludeRefinementCollection<TContract, RelatedName, IncludedRow, CollectionTypeState>,
   ): Collection<
     TContract,
     ModelName,

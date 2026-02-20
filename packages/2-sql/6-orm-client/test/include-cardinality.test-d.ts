@@ -27,6 +27,14 @@ const usersWithPosts = userCollection.include('posts');
 const usersWithProfile = userCollection.include('profile');
 const postsWithAuthor = postCollection.include('author');
 
+userCollection.include('posts', (posts) => {
+  // @ts-expect-error include refinement collection does not expose all()
+  posts.all();
+  // @ts-expect-error include refinement collection does not expose find()
+  posts.find();
+  return posts.take(1);
+});
+
 type UsersWithPostsRow = RowOf<typeof usersWithPosts>;
 type UsersWithProfileRow = RowOf<typeof usersWithProfile>;
 type PostsWithAuthorRow = RowOf<typeof postsWithAuthor>;
