@@ -1,13 +1,21 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ComparisonMethods, ComparisonOp, FilterExpr } from './types';
+import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import type { ComparisonMethods } from './types';
 
-const OPS: readonly ComparisonOp[] = ['eq', 'neq', 'gt', 'lt', 'gte', 'lte'];
+const OPS: ReadonlyArray<keyof ComparisonMethods<unknown>> = [
+  'eq',
+  'neq',
+  'gt',
+  'lt',
+  'gte',
+  'lte',
+];
 
 /**
  * Creates a Proxy-based column accessor for use inside `where()` callbacks.
  *
  * Accessing a field name returns an object with comparison methods (eq, neq, etc.)
- * that produce FilterExpr values. Field names are resolved to storage column names
+ * that produce WhereExpr values. Field names are resolved to storage column names
  * via the contract's `mappings.fieldToColumn`.
  */
 export function createColumnAccessor<
@@ -23,13 +31,14 @@ export function createColumnAccessor<
       }
       const columnName = fieldToColumn[prop] ?? prop;
 
-      const methods: Record<string, (value: unknown) => FilterExpr> = {};
+      const methods: Record<string, (value: unknown) => WhereExpr> = {};
       for (const op of OPS) {
-        methods[op] = (value: unknown): FilterExpr => ({
-          column: columnName,
-          op,
-          value,
-        });
+        methods[op] = (value: unknown): WhereExpr =>
+          ({
+            column: columnName,
+            op,
+            value,
+          }) as unknown as WhereExpr;
       }
       return methods as ComparisonMethods<unknown>;
     },

@@ -6,19 +6,12 @@ import type {
   SqlStorage,
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
+import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
 
 // ---------------------------------------------------------------------------
 // Comparison / Filter / Order / Include
 // ---------------------------------------------------------------------------
-
-export type ComparisonOp = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte';
-
-export interface FilterExpr {
-  readonly column: string;
-  readonly op: ComparisonOp;
-  readonly value: unknown;
-}
 
 export interface OrderExpr {
   readonly column: string;
@@ -39,7 +32,7 @@ export interface IncludeExpr {
 // ---------------------------------------------------------------------------
 
 export interface CollectionState {
-  readonly filters: readonly FilterExpr[];
+  readonly filters: readonly WhereExpr[];
   readonly includes: readonly IncludeExpr[];
   readonly orderBy: readonly OrderExpr[] | undefined;
   readonly limit: number | undefined;
@@ -89,12 +82,12 @@ export interface CollectionContext<TContract extends SqlContract<SqlStorage>> {
 // ---------------------------------------------------------------------------
 
 export type ComparisonMethods<T> = {
-  eq(value: T): FilterExpr;
-  neq(value: T): FilterExpr;
-  gt(value: T): FilterExpr;
-  lt(value: T): FilterExpr;
-  gte(value: T): FilterExpr;
-  lte(value: T): FilterExpr;
+  eq(value: T): WhereExpr;
+  neq(value: T): WhereExpr;
+  gt(value: T): WhereExpr;
+  lt(value: T): WhereExpr;
+  gte(value: T): WhereExpr;
+  lte(value: T): WhereExpr;
 };
 
 export type ModelAccessor<TContract extends SqlContract<SqlStorage>, ModelName extends string> = {

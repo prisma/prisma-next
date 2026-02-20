@@ -1,12 +1,12 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { createColumnAccessor } from './column-accessor';
 import { compileRelationSelect, compileSelect, createExecutionPlan } from './kysely-compiler';
 import type {
   CollectionContext,
   CollectionState,
   DefaultModelRow,
-  FilterExpr,
   IncludeExpr,
   ModelAccessor,
   OrderExpr,
@@ -62,7 +62,7 @@ export class Collection<
     this.registry = options.registry ?? new Map<string, CollectionConstructor<TContract>>();
   }
 
-  where(fn: (model: ModelAccessor<TContract, ModelName>) => FilterExpr): this {
+  where(fn: (model: ModelAccessor<TContract, ModelName>) => WhereExpr): this {
     const accessor = createColumnAccessor(this.ctx.contract, this.modelName);
     const filter = fn(accessor as ModelAccessor<TContract, ModelName>);
     return this.#clone({
@@ -161,7 +161,7 @@ export class Collection<
   }
 
   async find(
-    filter?: (model: ModelAccessor<TContract, ModelName>) => FilterExpr,
+    filter?: (model: ModelAccessor<TContract, ModelName>) => WhereExpr,
   ): Promise<Row | null> {
     const scoped = filter ? this.where(filter) : this;
     const limited = scoped.take(1);

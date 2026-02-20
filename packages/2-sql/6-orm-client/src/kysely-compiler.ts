@@ -7,9 +7,15 @@ import {
   PostgresIntrospector,
   PostgresQueryCompiler,
 } from 'kysely';
-import type { CollectionState, ComparisonOp } from './types';
+import type { CollectionState } from './types';
 
 type AnyDB = Record<string, Record<string, unknown>>;
+type LegacyComparisonOp = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte';
+type LegacyFilterExpr = {
+  readonly column: string;
+  readonly op: LegacyComparisonOp;
+  readonly value: unknown;
+};
 
 const queryCompiler = new Kysely<AnyDB>({
   dialect: {
@@ -22,7 +28,7 @@ const queryCompiler = new Kysely<AnyDB>({
 
 type SqlComparisonOp = '=' | '!=' | '>' | '<' | '>=' | '<=';
 
-const comparisonOpToSql: Record<ComparisonOp, SqlComparisonOp> = {
+const comparisonOpToSql: Record<LegacyComparisonOp, SqlComparisonOp> = {
   eq: '=',
   neq: '!=',
   gt: '>',
@@ -34,7 +40,7 @@ const comparisonOpToSql: Record<ComparisonOp, SqlComparisonOp> = {
 export function compileSelect(tableName: string, state: CollectionState): CompiledQuery {
   let qb = queryCompiler.selectFrom(tableName).selectAll();
 
-  for (const f of state.filters) {
+  for (const f of state.filters as readonly LegacyFilterExpr[]) {
     qb = qb.where(f.column, comparisonOpToSql[f.op], f.value);
   }
 
@@ -66,7 +72,7 @@ export function compileRelationSelect(
     .selectAll()
     .where(fkColumn, 'in', [...parentPks]);
 
-  for (const f of nestedState.filters) {
+  for (const f of nestedState.filters as readonly LegacyFilterExpr[]) {
     qb = qb.where(f.column, comparisonOpToSql[f.op], f.value);
   }
 

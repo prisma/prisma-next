@@ -24,7 +24,7 @@ The most fundamental internal change. Everything downstream (new operators, rela
   - Files to modify: `/Users/aqrln/prisma/prisma-next/packages/2-sql/4-lanes/relational-core/src/ast/types.ts`
   - Acceptance: `pnpm typecheck` passes across the monorepo; existing lane/adapter tests still pass
 
-- [ ] **1.2 Replace FilterExpr with WhereExpr in CollectionState**
+- [x] **1.2 Replace FilterExpr with WhereExpr in CollectionState**
   - Change `CollectionState.filters` from `readonly FilterExpr[]` to `readonly WhereExpr[]`
   - Remove the `FilterExpr`, `ComparisonOp` types from `/Users/aqrln/prisma/prisma-next/packages/2-sql/6-orm-client/src/types.ts`
   - Update the `ComparisonMethods` type to return `WhereExpr` instead of `FilterExpr`
