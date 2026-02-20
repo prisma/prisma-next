@@ -145,10 +145,20 @@ const orderedUsers = userCollection.orderBy((user) => user.id.asc());
 const cursorPagedUsers = orderedUsers.cursor({ id: 'user_001' });
 const distinctUsers = userCollection.distinct('email');
 const distinctOnUsers = orderedUsers.distinctOn('email');
+const updatableUsers = userCollection.where({ email: 'alice@example.com' });
+updatableUsers.update({ name: 'Alice' });
+updatableUsers.updateAll({ name: 'Alice' });
+updatableUsers.updateCount({ name: 'Alice' });
 // @ts-expect-error cursor() requires orderBy() first
 userCollection.cursor({ id: 'user_001' });
 // @ts-expect-error distinctOn() requires orderBy() first
 userCollection.distinctOn('email');
+// @ts-expect-error update() requires where() first
+userCollection.update({ name: 'Alice' });
+// @ts-expect-error updateAll() requires where() first
+userCollection.updateAll({ name: 'Alice' });
+// @ts-expect-error updateCount() requires where() first
+userCollection.updateCount({ name: 'Alice' });
 
 type SelectedUserRow = RowOf<typeof selectedUsers>;
 type SelectedUserWithPostsRow = RowOf<typeof selectedUsersWithPosts>;

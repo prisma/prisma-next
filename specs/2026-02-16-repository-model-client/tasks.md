@@ -334,7 +334,7 @@ Depends on: Group 4 (type-state, select), Group 1 (WhereExpr)
 
 Depends on: Group 8 (create mutations), Group 4 (type-state with hasWhere)
 
-- [ ] **9.1 Implement update(), updateAll(), updateCount()**
+- [x] **9.1 Implement update(), updateAll(), updateCount()**
   - All variants require `hasWhere: true` (type-state gated)
   - `update(data)` -- `UPDATE ... WHERE ... LIMIT 1 RETURNING *`, returns `Promise<Row | null>`
   - `updateAll(data)` -- `UPDATE ... WHERE ... RETURNING *`, returns `AsyncIterableResult<Row>`

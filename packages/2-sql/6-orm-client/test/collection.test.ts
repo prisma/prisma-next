@@ -445,6 +445,85 @@ describe('Collection', () => {
       expect('id' in created).toBe(false);
     });
 
+    it('update() returns first updated row', async () => {
+      const { collection, runtime } = createReturningCollection('User');
+      runtime.setNextResults([[{ id: 1, name: 'Alice Updated', email: 'alice@example.com' }]]);
+
+      const updated = await collection.where({ id: 1 }).update({ name: 'Alice Updated' });
+
+      expect(updated).toEqual({ id: 1, name: 'Alice Updated', email: 'alice@example.com' });
+      expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('update');
+      expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('returning');
+    });
+
+    it('updateAll() returns all updated rows', async () => {
+      const { collection, runtime } = createReturningCollection('User');
+      runtime.setNextResults([
+        [
+          { id: 1, name: 'Updated', email: 'alice@example.com' },
+          { id: 2, name: 'Updated', email: 'bob@example.com' },
+        ],
+      ]);
+
+      const updated = await collection
+        .where({ name: 'Old' })
+        .updateAll({ name: 'Updated' })
+        .toArray();
+
+      expect(updated).toEqual([
+        { id: 1, name: 'Updated', email: 'alice@example.com' },
+        { id: 2, name: 'Updated', email: 'bob@example.com' },
+      ]);
+    });
+
+    it('updateCount() returns matched row count without requiring returning', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[{ id: 1 }, { id: 2 }], []]);
+
+      const count = await collection.where({ name: 'Old' }).updateCount({ name: 'Updated' });
+
+      expect(count).toBe(2);
+      expect(runtime.executions).toHaveLength(2);
+      expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('select');
+      expect(runtime.executions[1]!.plan.sql.toLowerCase()).toContain('update');
+    });
+
+    it('update() and updateAll() require returning capability', async () => {
+      const { collection } = createCollection();
+      const filtered = collection.where({ id: 1 });
+
+      await expect(filtered.update({ name: 'Updated' })).rejects.toThrow(
+        /requires contract capability "returning"/,
+      );
+
+      expect(() => filtered.updateAll({ name: 'Updated' })).toThrow(
+        /requires contract capability "returning"/,
+      );
+    });
+
+    it('update() respects select() and include() result shaping', async () => {
+      const { collection, runtime } = createReturningCollection('User');
+      runtime.setNextResults([
+        [{ id: 1, name: 'Alice' }],
+        [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
+      ]);
+
+      const updated = await collection
+        .where({ id: 1 })
+        .select('name')
+        .include('posts')
+        .update({ name: 'Alice' });
+
+      expect(updated).toEqual({
+        name: 'Alice',
+        posts: [{ id: 10, title: 'Post A', userId: 1, views: 100 }],
+      });
+      expect(updated).not.toBeNull();
+      if (updated) {
+        expect('id' in updated).toBe(false);
+      }
+    });
+
     it('all() with include executes multiple queries and stitches results', async () => {
       const { collection, runtime } = createCollection();
       runtime.setNextResults([

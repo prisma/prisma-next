@@ -8,6 +8,8 @@ import {
   compileInsertReturning,
   compileRelationSelect,
   compileSelect,
+  compileUpdateCount,
+  compileUpdateReturning,
   createExecutionPlan,
 } from './kysely-compiler';
 import { createModelAccessor } from './model-accessor';
@@ -349,7 +351,7 @@ export class Collection<
     assertReturningCapability(this.ctx.contract, 'createAll()');
 
     const mappedRows = data.map((row) =>
-      mapCreateInputToStorageRow(this.ctx.contract, this.modelName, row),
+      mapModelDataToStorageRow(this.ctx.contract, this.modelName, row),
     );
     const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
     const { selectedForQuery: selectedForInsert, hiddenColumns } = augmentSelectionForJoinColumns(
@@ -412,12 +414,119 @@ export class Collection<
     }
 
     const mappedRows = data.map((row) =>
-      mapCreateInputToStorageRow(this.ctx.contract, this.modelName, row),
+      mapModelDataToStorageRow(this.ctx.contract, this.modelName, row),
     );
     const compiled = compileInsertCount(this.tableName, mappedRows);
     const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
     await this.ctx.runtime.execute(plan).toArray();
     return data.length;
+  }
+
+  async update(
+    data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+  ): Promise<Row | null> {
+    assertReturningCapability(this.ctx.contract, 'update()');
+    const rows = await this.updateAll(data).toArray();
+    return rows[0] ?? null;
+  }
+
+  updateAll(
+    data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+  ): AsyncIterableResult<Row> {
+    assertReturningCapability(this.ctx.contract, 'updateAll()');
+
+    const mappedData = mapModelDataToStorageRow(this.ctx.contract, this.modelName, data);
+    if (Object.keys(mappedData).length === 0) {
+      const generator = async function* (): AsyncGenerator<Row, void, unknown> {};
+      return new AsyncIterableResult(generator());
+    }
+
+    const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
+    const { selectedForQuery: selectedForUpdate, hiddenColumns } = augmentSelectionForJoinColumns(
+      this.state.selectedFields,
+      parentJoinColumns,
+    );
+    const compiled = compileUpdateReturning(
+      this.tableName,
+      mappedData,
+      this.state.filters,
+      selectedForUpdate,
+    );
+    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
+
+    if (this.state.includes.length === 0) {
+      const source = this.ctx.runtime.execute(plan);
+      return mapResultRows(source, (rawRow) => {
+        const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, rawRow);
+        if (hiddenColumns.length > 0) {
+          stripHiddenMappedFields(this.ctx.contract, this.tableName, mapped, hiddenColumns);
+        }
+        return mapped as Row;
+      });
+    }
+
+    const contract = this.ctx.contract;
+    const runtime = this.ctx.runtime;
+    const state = this.state;
+    const tableName = this.tableName;
+    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+      const { scope, release } = await acquireRuntimeScope(runtime);
+      try {
+        const updatedRowsRaw = await scope.execute(plan).toArray();
+        if (updatedRowsRaw.length === 0) {
+          return;
+        }
+
+        const updatedRows = updatedRowsRaw.map((row) =>
+          createRowEnvelope(contract, tableName, row),
+        );
+        await stitchIncludes(scope, contract, updatedRows, state.includes);
+
+        if (hiddenColumns.length > 0) {
+          for (const row of updatedRows) {
+            stripHiddenMappedFields(contract, tableName, row.mapped, hiddenColumns);
+          }
+        }
+
+        for (const row of updatedRows) {
+          yield row.mapped as Row;
+        }
+      } finally {
+        if (release) {
+          await release();
+        }
+      }
+    };
+
+    return new AsyncIterableResult(generator());
+  }
+
+  async updateCount(
+    data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+  ): Promise<number> {
+    const mappedData = mapModelDataToStorageRow(this.ctx.contract, this.modelName, data);
+    if (Object.keys(mappedData).length === 0) {
+      return 0;
+    }
+
+    const primaryKeyColumn = resolvePrimaryKeyColumn(this.ctx.contract, this.tableName);
+    const countState: CollectionState = {
+      ...emptyState(),
+      filters: this.state.filters,
+      selectedFields: [primaryKeyColumn],
+    };
+    const countCompiled = compileSelect(this.tableName, countState);
+    const countPlan = createExecutionPlan<Record<string, unknown>>(
+      countCompiled,
+      this.ctx.contract,
+    );
+    const matchingRows = await this.ctx.runtime.execute(countPlan).toArray();
+
+    const compiled = compileUpdateCount(this.tableName, mappedData, this.state.filters);
+    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
+    await this.ctx.runtime.execute(plan).toArray();
+
+    return matchingRows.length;
   }
 
   #clone<NextState extends CollectionTypeState = State>(
@@ -707,7 +816,7 @@ function mapStorageRowToModelFields(
   return mapped;
 }
 
-function mapCreateInputToStorageRow(
+function mapModelDataToStorageRow(
   contract: SqlContract<SqlStorage>,
   modelName: string,
   row: Record<string, unknown>,
@@ -959,4 +1068,8 @@ function resolveModelTableName(contract: SqlContract<SqlStorage>, modelName: str
   }
 
   return modelName.toLowerCase();
+}
+
+function resolvePrimaryKeyColumn(contract: SqlContract<SqlStorage>, tableName: string): string {
+  return contract.storage.tables[tableName]?.primaryKey?.columns[0] ?? 'id';
 }
