@@ -407,6 +407,92 @@ export type CreateInput<TContract extends SqlContract<SqlStorage>, ModelName ext
     Pick<DefaultModelRow<TContract, ModelName>, OptionalCreateFieldNames<TContract, ModelName>>
   >;
 
+type ModelStorageTableDef<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelTableName<TContract, ModelName> extends infer TableName extends string
+  ? TContract['storage']['tables'] extends Record<string, unknown>
+    ? TableName extends keyof TContract['storage']['tables']
+      ? TContract['storage']['tables'][TableName]
+      : never
+    : never
+  : never;
+
+type PrimaryKeyConstraintColumns<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelStorageTableDef<TContract, ModelName> extends {
+  readonly primaryKey: { readonly columns: infer Columns extends readonly string[] };
+}
+  ? Columns
+  : never;
+
+type UniqueConstraintColumns<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ModelStorageTableDef<TContract, ModelName> extends {
+  readonly uniques: infer Uniques;
+}
+  ? Uniques extends ReadonlyArray<infer Unique>
+    ? Unique extends { readonly columns: infer Columns extends readonly string[] }
+      ? Columns
+      : never
+    : never
+  : never;
+
+type FieldNameForColumn<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  ColumnName extends string,
+> = {
+  [K in keyof DefaultModelRow<TContract, ModelName> & string]: FieldColumnName<
+    TContract,
+    ModelName,
+    K
+  > extends ColumnName
+    ? K
+    : never;
+}[keyof DefaultModelRow<TContract, ModelName> & string] extends infer Matched
+  ? Matched extends string
+    ? Matched
+    : ColumnName
+  : ColumnName;
+
+type RowValueForField<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = FieldName extends keyof DefaultModelRow<TContract, ModelName>
+  ? DefaultModelRow<TContract, ModelName>[FieldName]
+  : unknown;
+
+type CriterionFromConstraintColumns<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  Columns extends readonly string[],
+> = string extends Columns[number]
+  ? Record<string, unknown>
+  : {
+      [C in Columns[number] as FieldNameForColumn<TContract, ModelName, C>]: RowValueForField<
+        TContract,
+        ModelName,
+        FieldNameForColumn<TContract, ModelName, C>
+      >;
+    };
+
+type ConstraintColumnsUnion<TContract extends SqlContract<SqlStorage>, ModelName extends string> =
+  | PrimaryKeyConstraintColumns<TContract, ModelName>
+  | UniqueConstraintColumns<TContract, ModelName>;
+
+export type UniqueConstraintCriterion<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = ConstraintColumnsUnion<TContract, ModelName> extends infer Columns
+  ? Columns extends readonly string[]
+    ? CriterionFromConstraintColumns<TContract, ModelName, Columns>
+    : never
+  : never;
+
 // ---------------------------------------------------------------------------
 // Relation helpers
 // ---------------------------------------------------------------------------

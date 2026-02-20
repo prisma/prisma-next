@@ -356,7 +356,7 @@ Depends on: Group 8 (create mutations), Group 4 (type-state with hasWhere)
   - Files to modify: `src/collection.ts`, `src/kysely-compiler.ts`, `src/types.ts`
   - Write 3-4 tests: basic delete with where, deleteCount, type error without where
 
-- [ ] **9.3 Implement upsert()**
+- [x] **9.3 Implement upsert()**
   - `upsert({ create, update, conflictOn? })` -- `INSERT ... ON CONFLICT DO UPDATE`, returns `Promise<Row>`
   - `conflictOn` specifies which unique constraint to use (optional when model has a single PK)
   - Define `UniqueConstraintCriterion` type from contract PK + unique indexes

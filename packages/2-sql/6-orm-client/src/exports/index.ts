@@ -23,5 +23,6 @@ export type {
   RelationsOf,
   RuntimeQueryable,
   ShorthandWhereFilter,
+  UniqueConstraintCriterion,
 } from '../types';
 export { emptyState } from '../types';

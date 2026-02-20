@@ -12,6 +12,7 @@ import {
   compileSelect,
   compileUpdateCount,
   compileUpdateReturning,
+  compileUpsertReturning,
   createExecutionPlan,
 } from './kysely-compiler';
 import { createModelAccessor } from './model-accessor';
@@ -33,6 +34,7 @@ import type {
   RuntimeConnection,
   RuntimeScope,
   ShorthandWhereFilter,
+  UniqueConstraintCriterion,
 } from './types';
 import { emptyState } from './types';
 
@@ -422,6 +424,78 @@ export class Collection<
     const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
     await this.ctx.runtime.execute(plan).toArray();
     return data.length;
+  }
+
+  async upsert(input: {
+    create: CreateInput<TContract, ModelName>;
+    update: Partial<DefaultModelRow<TContract, ModelName>>;
+    conflictOn?: UniqueConstraintCriterion<TContract, ModelName>;
+  }): Promise<Row> {
+    assertReturningCapability(this.ctx.contract, 'upsert()');
+
+    const createValues = mapModelDataToStorageRow(this.ctx.contract, this.modelName, input.create);
+    const updateValues = mapModelDataToStorageRow(this.ctx.contract, this.modelName, input.update);
+    const conflictColumns = resolveUpsertConflictColumns(
+      this.ctx.contract,
+      this.modelName,
+      input.conflictOn as Record<string, unknown> | undefined,
+    );
+    if (conflictColumns.length === 0) {
+      throw new Error(`upsert() for model "${this.modelName}" requires conflict columns`);
+    }
+
+    const parentJoinColumns = this.state.includes.map((include) => include.parentPkColumn);
+    const { selectedForQuery: selectedForUpsert, hiddenColumns } = augmentSelectionForJoinColumns(
+      this.state.selectedFields,
+      parentJoinColumns,
+    );
+    const compiled = compileUpsertReturning(
+      this.tableName,
+      createValues,
+      updateValues,
+      conflictColumns,
+      selectedForUpsert,
+    );
+    const plan = createExecutionPlan<Record<string, unknown>>(compiled, this.ctx.contract);
+
+    if (this.state.includes.length === 0) {
+      const rows = await this.ctx.runtime.execute(plan).toArray();
+      const first = rows[0];
+      if (!first) {
+        throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
+      }
+      const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, first);
+      if (hiddenColumns.length > 0) {
+        stripHiddenMappedFields(this.ctx.contract, this.tableName, mapped, hiddenColumns);
+      }
+      return mapped as Row;
+    }
+
+    const { scope, release } = await acquireRuntimeScope(this.ctx.runtime);
+    try {
+      const rows = await scope.execute(plan).toArray();
+      const first = rows[0];
+      if (!first) {
+        throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
+      }
+
+      const wrappedRows = [createRowEnvelope(this.ctx.contract, this.tableName, first)];
+      await stitchIncludes(scope, this.ctx.contract, wrappedRows, this.state.includes);
+
+      const result = wrappedRows[0];
+      if (!result) {
+        throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
+      }
+
+      if (hiddenColumns.length > 0) {
+        stripHiddenMappedFields(this.ctx.contract, this.tableName, result.mapped, hiddenColumns);
+      }
+      return result.mapped as Row;
+    } finally {
+      if (release) {
+        await release();
+      }
+    }
   }
 
   async update(
@@ -1145,6 +1219,27 @@ function resolveLegacyModelRelation(
     model: relation.model,
     foreignKey: relation.foreignKey,
   };
+}
+
+function resolveUpsertConflictColumns(
+  contract: SqlContract<SqlStorage>,
+  modelName: string,
+  conflictOn: Record<string, unknown> | undefined,
+): string[] {
+  const fieldToColumn = contract.mappings.fieldToColumn?.[modelName] ?? {};
+
+  if (conflictOn && typeof conflictOn === 'object') {
+    const columns = Object.keys(conflictOn).map(
+      (fieldName) => fieldToColumn[fieldName] ?? fieldName,
+    );
+    if (columns.length > 0) {
+      return columns;
+    }
+  }
+
+  const tableName = resolveModelTableName(contract, modelName);
+  const primaryKeyColumns = contract.storage.tables[tableName]?.primaryKey?.columns ?? [];
+  return [...primaryKeyColumns];
 }
 
 function resolveModelTableName(contract: SqlContract<SqlStorage>, modelName: string): string {

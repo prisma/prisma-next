@@ -145,6 +145,21 @@ const orderedUsers = userCollection.orderBy((user) => user.id.asc());
 const cursorPagedUsers = orderedUsers.cursor({ id: 'user_001' });
 const distinctUsers = userCollection.distinct('email');
 const distinctOnUsers = orderedUsers.distinctOn('email');
+userCollection.upsert({
+  create: { id: 'user_001', name: 'Alice', email: 'alice@example.com' },
+  update: { name: 'Alice Updated' },
+  conflictOn: { id: 'user_001' },
+});
+userCollection.upsert({
+  create: { id: 'user_001', name: 'Alice', email: 'alice@example.com' },
+  update: { name: 'Alice Updated' },
+});
+userCollection.upsert({
+  create: { id: 'user_001', name: 'Alice', email: 'alice@example.com' },
+  update: { name: 'Alice Updated' },
+  // @ts-expect-error invalid conflict key for upsert()
+  conflictOn: { unknown: 'value' },
+});
 const updatableUsers = userCollection.where({ email: 'alice@example.com' });
 updatableUsers.update({ name: 'Alice' });
 updatableUsers.updateAll({ name: 'Alice' });

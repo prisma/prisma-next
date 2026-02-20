@@ -445,6 +445,68 @@ describe('Collection', () => {
       expect('id' in created).toBe(false);
     });
 
+    it('upsert() inserts or updates and returns a row', async () => {
+      const { collection, runtime } = createReturningCollection('User');
+      runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
+
+      const upserted = await collection.upsert({
+        create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+        update: { name: 'Alice Updated' },
+        conflictOn: { id: 1 },
+      });
+
+      expect(upserted).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
+      const sql = runtime.executions[0]!.plan.sql.toLowerCase();
+      expect(sql).toContain('on conflict');
+      expect(sql).toContain('do update');
+      expect(sql).toContain('returning');
+    });
+
+    it('upsert() defaults conflict columns to primary key', async () => {
+      const { collection, runtime } = createReturningCollection('User');
+      runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
+
+      await collection.upsert({
+        create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+        update: { name: 'Alice Updated' },
+      });
+
+      expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('on conflict ("id")');
+    });
+
+    it('upsert() requires returning capability', async () => {
+      const { collection } = createCollection();
+
+      await expect(
+        collection.upsert({
+          create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+          update: { name: 'Alice Updated' },
+        }),
+      ).rejects.toThrow(/requires contract capability "returning"/);
+    });
+
+    it('upsert() respects select() and include() result shaping', async () => {
+      const { collection, runtime } = createReturningCollection('User');
+      runtime.setNextResults([
+        [{ id: 1, name: 'Alice' }],
+        [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
+      ]);
+
+      const upserted = await collection
+        .select('name')
+        .include('posts')
+        .upsert({
+          create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+          update: { name: 'Alice Updated' },
+        });
+
+      expect(upserted).toEqual({
+        name: 'Alice',
+        posts: [{ id: 10, title: 'Post A', userId: 1, views: 100 }],
+      });
+      expect('id' in upserted).toBe(false);
+    });
+
     it('update() returns first updated row', async () => {
       const { collection, runtime } = createReturningCollection('User');
       runtime.setNextResults([[{ id: 1, name: 'Alice Updated', email: 'alice@example.com' }]]);

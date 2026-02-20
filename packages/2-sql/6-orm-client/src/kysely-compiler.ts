@@ -121,6 +121,25 @@ export function compileInsertCount(
   return queryCompiler.insertInto(tableName).values(values).compile();
 }
 
+export function compileUpsertReturning(
+  tableName: string,
+  createValues: Record<string, unknown>,
+  updateValues: Record<string, unknown>,
+  conflictColumns: readonly string[],
+  returningColumns: readonly string[] | undefined,
+): CompiledQuery {
+  const base = queryCompiler
+    .insertInto(tableName)
+    .values(createValues)
+    .onConflict((conflict) => conflict.columns(conflictColumns).doUpdateSet(updateValues));
+
+  if (returningColumns && returningColumns.length > 0) {
+    return base.returning(returningColumns).compile();
+  }
+
+  return base.returningAll().compile();
+}
+
 export function compileUpdateReturning(
   tableName: string,
   setValues: Record<string, unknown>,
