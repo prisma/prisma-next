@@ -37,9 +37,9 @@ This spec takes that prototype, fills in the gaps (mutations, aggregations, proj
 
 3. **Contract-derived type safety.** Every type — row shapes, field accessors, relation names, unique constraints, create inputs — is derived from the contract artifact. The contract is the single source of truth.
 
-4. **Filters are data.** Filter expressions are plain PN AST nodes (`WhereExpr`). They can be built with the ergonomic callback API, composed with `and()`/`or()`/`not()`, or constructed externally (e.g. via the Kysely integration). The ORM client doesn't care how a filter was built.
+4. **Filters are data.** Filter expressions are plain PN AST nodes (`WhereExpr`). They can be built with the ergonomic callback API, composed with `and()`/`or()`/`not()`, or constructed externally (e.g. via the Kysely integration). `where()` and `find()` consume them via callback overloads (not raw `WhereExpr` arguments), which avoids ambiguity with shorthand object filters.
 
-5. **Safe by default.** `update()` and `delete()` refuse to compile without a `where()` clause. If you really want to affect every record, you write `where(all())` to make that intention explicit.
+5. **Safe by default.** `update()` and `delete()` refuse to compile without a `where()` clause. If you really want to affect every record, you write `where(all)` to make that intention explicit.
 
 6. **Capability-driven execution.** The same API call may compile to different SQL depending on what the target supports. Lateral joins when available, correlated subqueries as a fallback, multi-query stitching as a last resort. The strategy is deterministic from the contract — no runtime feature detection.
 
@@ -334,18 +334,18 @@ class UserCollection extends Collection<Contract, 'User'> {
 
 Filters are the core of query building. The design centers on one idea: **all filters produce `WhereExpr` AST nodes**, regardless of how they were built.
 
-### 5.1 Three Ways to Write `where()`
+### 5.1 Two Overloads for `where()`
 
 ```typescript
-// 1. Callback with typed ModelAccessor (most common)
-db.users.where(u => u.email.eq('alice@example.com'))
-
-// 2. Direct AST node (for externally-built or programmatic filters)
-db.users.where(someWhereExprNode)
-
-// 3. Shorthand equality object (for the simplest case)
+// 1. Shorthand equality object (same shape as Prisma ORM's simple where)
 db.users.where({ role: 'admin' })
+
+// 2. Callback with typed ModelAccessor (returns WhereExpr)
+db.users.where(u => u.email.eq('alice@example.com'))
+db.users.where(u => and(u.role.eq('admin'), u.active.eq(true)))
 ```
+
+All built-in filter methods/functions (`.eq()`, `.gt()`, `and()`, `or()`, `not()`, `all()`, etc.) return `WhereExpr` and are used through the callback-style overload.
 
 Multiple `where()` calls are combined with AND:
 
@@ -456,7 +456,7 @@ db.users.where(u =>
 )
 ```
 
-The nested predicate accepts all three `where()` overloads (callback, AST, shorthand object).
+The nested predicate accepts the same two filter overload styles used by `where()` (callback returning `WhereExpr`, or shorthand object).
 
 ---
 
@@ -466,7 +466,7 @@ The nested predicate accepts all three `where()` overloads (callback, AST, short
 
 All of these methods return a new Collection — they're chainable and composable.
 
-#### `where(fn | expr | object)`
+#### `where(filters | callback)`
 
 See section 5.1 above.
 
@@ -631,16 +631,27 @@ This distinction matters for two reasons:
 
 2. **Compatibility with effect systems.** Libraries like Effect's `tryPromise` expect to receive a function that initiates work. With eager execution, the terminal method is that function — the returned thenable is a straightforward value, not a lazy thunk that re-executes on each `.then()` call.
 
-#### `find(filter?)`
+#### `find()`
 
 Returns the first matching record or `null`. Compiles to `LIMIT 1`.
 
-`find()` accepts the same filter argument as `where()` — callback, AST node, or shorthand object. If provided, it is ANDed with any existing `where()` filters on the collection. This is a convenience so that common lookups don't require a separate `.where()` call:
+`find()` supports three call forms:
+
+- `find()` — no additional filter
+- `find(filters: SimpleFilters)` — shorthand equality object
+- `find(callback: (c: ModelAccessor<...>) => WhereExpr)` — callback filter
+
+The filter overloads match `where()`. Raw `WhereExpr` is not accepted directly as an argument. When a filter is provided, it is ANDed with any existing `where()` filters on the collection:
 
 ```typescript
 // Inline filter (most common for unique lookups)
 const user = await db.users.find({ id: 42 });
 const user = await db.users.find({ email: 'alice@example.com' });
+
+// Callback filter
+const activeAlice = await db.users.find(u =>
+  and(u.active.eq(true), u.email.eq('alice@example.com'))
+);
 
 // Composes with prior where() — filters are ANDed
 const activeAlice = await db.users
@@ -796,7 +807,7 @@ const count = await db.users
 await db.users.update({ name: 'oops' });
 
 // Whole-table update requires explicit intent:
-await db.users.where(all()).updateCount({ active: false });
+await db.users.where(all).updateCount({ active: false });
 ```
 
 ### 7.3 Delete
@@ -823,7 +834,7 @@ const count = await db.users
 // → Promise<number>
 
 // Whole-table
-await db.users.where(all()).deleteCount();
+await db.users.where(all).deleteCount();
 ```
 
 ### 7.4 Upsert
@@ -1219,7 +1230,7 @@ import {
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `where(fn \| expr \| object)` | `Collection` | Append filter (AND with existing) |
+| `where(filters \| callback)` | `Collection` | Append filter (AND with existing) |
 | `include(relation, refine?)` | `Collection` | Load related records |
 | `select(...fields)` | `Collection` | Project scalar fields |
 | `orderBy(fn \| array)` | `Collection` | Order results |
@@ -1235,7 +1246,7 @@ import {
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `all()` | `AsyncIterableResult<Row>` | All matches; async iterable + thenable (`await` → `Row[]`) |
-| `find(filter?)` | `Promise<Row \| null>` | First match or null (LIMIT 1); filter ANDed with existing `where()` |
+| `find()` / `find(filters \| callback)` | `Promise<Row \| null>` | First match or null (LIMIT 1); optional filter ANDed with existing `where()` |
 | `aggregate(fn)` | `Promise<object>` | Compute one or more aggregations in a single query |
 
 ### Terminal Methods — Mutations (Single, requires `returning`)
@@ -1424,7 +1435,7 @@ Changes needed from the current prototype to match this specification:
 | `Repository` class | Separate subclass of Collection | Removed; users extend `Collection` directly |
 | `FilterExpr` | Internal `{ column, op, value }` | PN AST `WhereExpr` |
 | `ColumnAccessor` | Scalar comparisons only (eq, neq, gt, lt, gte, lte) | Full `ModelAccessor` with relation accessors and additional operators |
-| `where()` overloads | Callback only | Callback + direct AST + shorthand object |
+| `where()` overloads | Callback only | Callback returning `WhereExpr` + shorthand object |
 | `findFirst()` → `find()` | `AsyncIterableResult<Row>` | `Promise<Row \| null>` |
 | `findMany()` → `all()` | `AsyncIterableResult<Row>` (iterable only) | `AsyncIterableResult<Row>` (iterable + thenable) |
 | `findUnique()` | Does not exist | Removed; use `where()` + `find()` |

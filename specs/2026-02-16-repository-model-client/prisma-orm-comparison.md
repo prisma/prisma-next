@@ -76,7 +76,7 @@ const firstAdmin = await db.users
   .find()
 ```
 
-Prisma Next has a single `find()` method that returns `Promise<Row | null>` (LIMIT 1). It optionally accepts a filter argument (same types as `where()`), ANDed with any existing filters. There is no separate `findUnique` — the database optimizer uses the unique index regardless.
+Prisma Next has a single `find()` method that returns `Promise<Row | null>` (LIMIT 1). It supports the same two filter overloads as `where()` — shorthand object (`find({ email: 'alice@example.com' })`) and callback (`find(u => u.email.eq('alice@example.com'))`). Raw `WhereExpr` is not accepted directly as an argument. Any provided filter is ANDed with existing filters.
 
 ---
 
@@ -97,6 +97,8 @@ const admins = await db.users.where({ role: 'admin' }).all()
 // Callback with typed accessor
 const admins = await db.users.where(u => u.role.eq('admin')).all()
 ```
+
+`where()` has two overloads only: shorthand object or callback returning `WhereExpr`.
 
 ---
 
@@ -760,7 +762,7 @@ const usersWithRecentPosts = await db.users
 
 In Prisma ORM, filters are plain objects with a specific shape. They can be spread, but can't be inspected, transformed, or passed through generic filter-building infrastructure.
 
-In Prisma Next, filters are PN AST nodes (`WhereExpr`). They can be built with callbacks, constructed externally, composed with `and`/`or`/`not`, or even serialized and sent over a wire.
+In Prisma Next, filters are PN AST nodes (`WhereExpr`). They can be built with callbacks, constructed externally, composed with `and`/`or`/`not`, or even serialized and sent over a wire. `where()`/`find()` accept either a shorthand filter object or a callback that returns `WhereExpr`.
 
 ```typescript
 // Build filters programmatically from external input
@@ -773,10 +775,10 @@ function buildFilters(params: URLSearchParams): WhereExpr[] {
   return filters
 }
 
-// Use externally-built AST nodes directly
+// Use externally-built AST nodes through the callback overload
 const externalFilters = buildFilters(req.query)
 const users = await db.users
-  .where(and(...externalFilters))
+  .where(() => and(...externalFilters))
   .all()
 ```
 
@@ -857,7 +859,7 @@ await db.users.update({ active: false })
 //              ^^^^^^ Type error: update() requires where()
 
 // Explicit whole-table intent:
-await db.users.where(all()).update({ active: false })
+await db.users.where(all).update({ active: false })
 ```
 
 ```typescript
