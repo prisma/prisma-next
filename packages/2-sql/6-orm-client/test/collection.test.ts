@@ -157,6 +157,7 @@ describe('Collection', () => {
         relatedModelName: 'Post',
         relatedTableName: 'posts',
         fkColumn: 'user_id',
+        cardinality: '1:N',
       });
       // Original is not mutated
       expect(collection.state.includes).toHaveLength(0);

@@ -220,7 +220,7 @@ Depends on: Group 4 (type-state tracking)
 
 Depends on: Group 1 (WhereExpr integration)
 
-- [ ] **6.1 Add cardinality-aware include result types**
+- [x] **6.1 Add cardinality-aware include result types**
   - The current `include()` always types the result as `IncludedRow[]`
   - Read relation cardinality from the contract (`1:1`, `N:1`, `1:N`, `M:N`)
   - For `1:1` and `N:1`: type as `Row | null`

@@ -11,10 +11,12 @@ import type {
   DefaultCollectionTypeState,
   DefaultModelRow,
   IncludeExpr,
+  IncludeRelationValue,
   ModelAccessor,
   OrderByDirective,
   OrderExpr,
   RelatedModelName,
+  RelationCardinalityTag,
   RelationNames,
   RuntimeConnection,
   RuntimeScope,
@@ -130,7 +132,7 @@ export class Collection<
     TContract,
     ModelName,
     Row & {
-      [K in RelName]: IncludedRow[];
+      [K in RelName]: IncludeRelationValue<TContract, ModelName, K, IncludedRow>;
     },
     State
   > {
@@ -161,12 +163,13 @@ export class Collection<
       relatedTableName: relation.relatedTableName,
       fkColumn: relation.fkColumn,
       parentPkColumn: relation.parentPkColumn,
+      cardinality: relation.cardinality,
       nested: nestedState,
     };
 
     return this.#cloneWithRow<
       Row & {
-        [K in RelName]: IncludedRow[];
+        [K in RelName]: IncludeRelationValue<TContract, ModelName, K, IncludedRow>;
       },
       State
     >({
@@ -431,7 +434,7 @@ async function stitchIncludes(
 
     if (parentJoinValues.length === 0) {
       for (const parent of parentRows) {
-        parent.mapped[include.relationName] = [];
+        parent.mapped[include.relationName] = emptyIncludeResult(include.cardinality);
       }
       continue;
     }
@@ -482,7 +485,11 @@ async function stitchIncludes(
     for (const parent of parentRows) {
       const parentJoinValue = parent.raw[include.parentPkColumn];
       const relatedRows = childByParentJoin.get(parentJoinValue) ?? [];
-      parent.mapped[include.relationName] = slicePerParent(relatedRows, include.nested);
+      parent.mapped[include.relationName] = coerceIncludeResult(
+        relatedRows,
+        include.nested,
+        include.cardinality,
+      );
     }
   }
 }
@@ -608,8 +615,28 @@ function slicePerParent(
   return rows.slice(offset, offset + state.limit);
 }
 
+function emptyIncludeResult(
+  cardinality: RelationCardinalityTag | undefined,
+): Record<string, unknown>[] | Record<string, unknown> | null {
+  return isToOneCardinality(cardinality) ? null : [];
+}
+
+function coerceIncludeResult(
+  rows: Record<string, unknown>[],
+  state: CollectionState,
+  cardinality: RelationCardinalityTag | undefined,
+): Record<string, unknown>[] | Record<string, unknown> | null {
+  const sliced = slicePerParent(rows, state);
+  return isToOneCardinality(cardinality) ? (sliced[0] ?? null) : sliced;
+}
+
+function isToOneCardinality(cardinality: RelationCardinalityTag | undefined): boolean {
+  return cardinality === '1:1' || cardinality === 'N:1';
+}
+
 interface RelationWithOn {
   readonly to: string;
+  readonly cardinality: RelationCardinalityTag | undefined;
   readonly on: {
     readonly parentCols: readonly string[];
     readonly childCols: readonly string[];
@@ -626,6 +653,7 @@ interface ResolvedIncludeRelation {
   readonly relatedTableName: string;
   readonly fkColumn: string;
   readonly parentPkColumn: string;
+  readonly cardinality: RelationCardinalityTag | undefined;
 }
 
 function resolveIncludeRelation(
@@ -645,6 +673,7 @@ function resolveIncludeRelation(
         relatedTableName,
         fkColumn,
         parentPkColumn,
+        cardinality: relation.cardinality,
       };
     }
   }
@@ -658,6 +687,7 @@ function resolveIncludeRelation(
       relatedTableName: resolveModelTableName(contract, legacy.model),
       fkColumn: legacy.foreignKey,
       parentPkColumn,
+      cardinality: '1:N',
     };
   }
 
@@ -677,6 +707,7 @@ function resolveContractRelation(
 
   const relationObj = relation as {
     to?: unknown;
+    cardinality?: unknown;
     on?: {
       parentCols?: unknown;
       childCols?: unknown;
@@ -695,11 +726,19 @@ function resolveContractRelation(
 
   return {
     to: relationObj.to,
+    cardinality: parseRelationCardinality(relationObj.cardinality),
     on: {
       parentCols: parentCols as readonly string[],
       childCols: childCols as readonly string[],
     },
   };
+}
+
+function parseRelationCardinality(value: unknown): RelationCardinalityTag | undefined {
+  if (value === '1:1' || value === 'N:1' || value === '1:N' || value === 'M:N') {
+    return value;
+  }
+  return undefined;
 }
 
 function resolveLegacyModelRelation(

@@ -26,6 +26,7 @@ export interface IncludeExpr {
   readonly relatedTableName: string;
   readonly fkColumn: string;
   readonly parentPkColumn: string;
+  readonly cardinality: RelationCardinalityTag | undefined;
   readonly nested: CollectionState;
 }
 
@@ -64,6 +65,8 @@ export interface CollectionTypeState {
   readonly hasWhere: boolean;
   readonly hasUniqueFilter: boolean;
 }
+
+export type RelationCardinalityTag = '1:1' | 'N:1' | '1:N' | 'M:N';
 
 export type DefaultCollectionTypeState = {
   readonly hasOrderBy: false;
@@ -361,6 +364,33 @@ export type RelatedModelName<
       : never
     : never
   : never;
+
+type RelationCardinalityFromRelation<Relation> = Relation extends {
+  readonly cardinality: infer Cardinality extends RelationCardinalityTag;
+}
+  ? Cardinality
+  : '1:N';
+
+export type RelationCardinality<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+> = RelationsOf<TContract, ModelName> extends infer Rels
+  ? Rels extends Record<string, unknown>
+    ? RelName extends keyof Rels
+      ? RelationCardinalityFromRelation<Rels[RelName]>
+      : '1:N'
+    : '1:N'
+  : '1:N';
+
+export type IncludeRelationValue<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+  IncludedRow,
+> = RelationCardinality<TContract, ModelName, RelName> extends '1:1' | 'N:1'
+  ? IncludedRow | null
+  : IncludedRow[];
 
 export type CollectionModelName<TContract extends SqlContract<SqlStorage>> =
   keyof ModelsOf<TContract> & string;
