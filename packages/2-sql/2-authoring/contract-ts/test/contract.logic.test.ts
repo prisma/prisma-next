@@ -692,7 +692,7 @@ describe('validateContract logic validation', () => {
       expect(() => validateContract<SqlContract<SqlStorage>>(contract)).not.toThrow();
     });
 
-    it('decodes ISO string defaults to Date for timestamp columns', () => {
+    it('keeps ISO string defaults as strings for timestamp columns', () => {
       const contract = {
         ...baseContract,
         storage: {
@@ -721,8 +721,7 @@ describe('validateContract logic validation', () => {
       if (defaultValue?.kind !== 'literal') {
         throw new Error('Expected literal default');
       }
-      expect(defaultValue.value).toBeInstanceOf(Date);
-      expect((defaultValue.value as Date).toISOString()).toBe('2024-01-01T00:00:00.000Z');
+      expect(defaultValue.value).toBe('2024-01-01T00:00:00.000Z');
     });
 
     it('throws for default with unsupported kind', () => {

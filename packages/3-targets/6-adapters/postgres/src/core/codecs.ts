@@ -264,7 +264,7 @@ const pgFloat8Codec = codec<typeof PG_FLOAT8_CODEC_ID, number, number>({
   },
 });
 
-const pgTimestampCodec = codec<typeof PG_TIMESTAMP_CODEC_ID, string | Date, Date>({
+const pgTimestampCodec = codec<typeof PG_TIMESTAMP_CODEC_ID, string | Date, string>({
   typeId: PG_TIMESTAMP_CODEC_ID,
   targetTypes: ['timestamp'],
   encode: (value: string | Date): string => {
@@ -272,9 +272,9 @@ const pgTimestampCodec = codec<typeof PG_TIMESTAMP_CODEC_ID, string | Date, Date
     if (typeof value === 'string') return value;
     return String(value);
   },
-  decode: (wire: string | Date): Date => {
-    if (wire instanceof Date) return wire;
-    return new Date(wire);
+  decode: (wire: string | Date): string => {
+    if (wire instanceof Date) return wire.toISOString();
+    return wire;
   },
   paramsSchema: precisionParamsSchema,
   meta: {
@@ -288,7 +288,7 @@ const pgTimestampCodec = codec<typeof PG_TIMESTAMP_CODEC_ID, string | Date, Date
   },
 });
 
-const pgTimestamptzCodec = codec<typeof PG_TIMESTAMPTZ_CODEC_ID, string | Date, Date>({
+const pgTimestamptzCodec = codec<typeof PG_TIMESTAMPTZ_CODEC_ID, string | Date, string>({
   typeId: PG_TIMESTAMPTZ_CODEC_ID,
   targetTypes: ['timestamptz'],
   encode: (value: string | Date): string => {
@@ -296,9 +296,9 @@ const pgTimestamptzCodec = codec<typeof PG_TIMESTAMPTZ_CODEC_ID, string | Date, 
     if (typeof value === 'string') return value;
     return String(value);
   },
-  decode: (wire: string | Date): Date => {
-    if (wire instanceof Date) return wire;
-    return new Date(wire);
+  decode: (wire: string | Date): string => {
+    if (wire instanceof Date) return wire.toISOString();
+    return wire;
   },
   paramsSchema: precisionParamsSchema,
   meta: {
@@ -403,11 +403,18 @@ const pgEnumCodec = codec<typeof PG_ENUM_CODEC_ID, string, string>({
   decode: (wire) => wire,
 });
 
-const pgIntervalCodec = codec<typeof PG_INTERVAL_CODEC_ID, string, string>({
+const pgIntervalCodec = codec<
+  typeof PG_INTERVAL_CODEC_ID,
+  string | Record<string, unknown>,
+  string
+>({
   typeId: PG_INTERVAL_CODEC_ID,
   targetTypes: ['interval'],
   encode: (value: string): string => value,
-  decode: (wire: string): string => wire,
+  decode: (wire: string | Record<string, unknown>): string => {
+    if (typeof wire === 'string') return wire;
+    return JSON.stringify(wire);
+  },
   paramsSchema: precisionParamsSchema,
   meta: {
     db: {

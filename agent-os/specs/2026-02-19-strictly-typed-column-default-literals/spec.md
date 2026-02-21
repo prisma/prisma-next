@@ -15,8 +15,8 @@ The change affects authoring builders, contract emission, validation, schema ver
 - **Value-first defaults**: Column literal defaults use typed `value` instead of string `expression`.
 - **Full literal support**: JSON-safe values (`string | number | boolean | null | object | array`), `bigint`, and `Date`.
 - **Deterministic pipeline**: Same authoring input → same contract JSON → same validation output → same migration DDL.
-- **Codec-aware typing**: Non-nullable columns can define defaults; nullable columns cannot (compile-time mutual exclusivity). SQL builder default typing aligns with codec output types.
-- **Round-trip correctness**: Bigint encodes as tagged JSON (`{ "$type": "bigint", "value": "<decimal-string>" }`); Date encodes as ISO string; validation decodes both for runtime use.
+- **Codec-aware typing**: Both nullable and non-nullable columns can define defaults. SQL builder default typing aligns with codec output types.
+- **Round-trip correctness**: Bigint encodes as tagged JSON (`{ "$type": "bigint", "value": "<decimal-string>" }`); Date encodes as ISO string; validation decodes tagged bigint only for bigint-like columns.
 
 ## Non-goals
 
@@ -48,7 +48,7 @@ Literal variant is `{ kind: 'literal', value: ... }`. `ColumnDefaultLiteralInput
 
 ### Authoring
 
-- **Framework table builder** (`packages/1-framework/2-authoring/contract/src/table-builder.ts`): Accepts `ColumnDefaultInput`. Nullable columns cannot have defaults; non-nullable can. Type-check enforced via `type-check-mutual-exclusivity.ts`.
+- **Framework table builder** (`packages/1-framework/2-authoring/contract/src/table-builder.ts`): Accepts `ColumnDefaultInput` for both nullable and non-nullable columns.
 - **SQL contract builder** (`packages/2-sql/2-authoring/contract-ts/src/contract-builder.ts`): Accepts typed literals at build time. `encodeDefaultLiteralValue()` normalizes for JSON: `bigint` → `{ $type: 'bigint', value }`, `Date` → ISO string, JSON-safe values pass through.
 
 ### Emission and canonicalization
@@ -59,8 +59,8 @@ Literal variant is `{ kind: 'literal', value: ... }`. `ColumnDefaultLiteralInput
 ### Validation
 
 - **validateContract** (`packages/2-sql/1-core/contract/src/validate.ts`): `decodeContractDefaults()` decodes literal defaults before returning the contract:
-  - Tagged bigint → `BigInt(value)`
-  - Temporal column + ISO string → `new Date(value)`; invalid strings throw
+  - Tagged bigint → `BigInt(value)` only for bigint-like columns
+  - Temporal/date-like strings remain strings
   - Other literals unchanged
 
 ### Postgres default normalizer
@@ -117,16 +117,16 @@ flowchart LR
 
 **Decoding rules (validateContract):**
 
-- Tagged bigint → runtime `BigInt`
-- Temporal column + string → `Date`; invalid → throw
+- Tagged bigint on bigint-like columns → runtime `BigInt`
+- Temporal/date-like strings → unchanged strings
 - Other literals → unchanged
 
 ## Acceptance criteria
 
 - [x] Core contract types expose `ColumnDefaultLiteralValue`, `ColumnDefaultLiteralInputValue`, `ColumnDefaultInput`; literal variant is `{ kind: 'literal', value }`.
-- [x] Authoring builders accept typed literals; nullable columns cannot have defaults (compile-time mutual exclusivity); SQL builder default typing is codec-aware.
+- [x] Authoring builders accept typed literals on both nullable and non-nullable columns; SQL builder default typing is codec-aware.
 - [x] Emission serializes non-JSON primitives: bigint as tagged object, Date as ISO string.
-- [x] Validation decodes tagged bigint → `BigInt`, temporal ISO → `Date`; invalid temporal throws.
+- [x] Validation decodes tagged bigint → `BigInt` only for bigint-like columns and keeps temporal/date-like strings as strings.
 - [x] Postgres schema/default comparison uses `parsePostgresDefault` to normalize DB defaults to typed literals; string/boolean/numeric comparison works.
 - [x] Migration planner renders typed literals: quoted strings, numeric/boolean literals, `NULL`, JSON/JSONB with casts, tagged bigint as numeric.
 - [x] E2E fixtures (`literal_defaults` table) cover text, int, float, boolean, bigint, json object, json array; insert/select assertions verify runtime values.
@@ -134,14 +134,14 @@ flowchart LR
 ## Risks
 
 - **Bigint precision**: Tagged format avoids JSON number precision loss; validation must decode correctly.
-- **Date/timezone**: ISO strings preserve UTC; column semantics (timestamptz vs timestamp) affect how values are interpreted in DB but not in contract storage.
+- **Date/timezone**: Runtime surfaces temporal and interval values as strings to avoid implicit JS `Date` coercions.
 - **Schema verification**: Unrecognized DB default expressions fall back to `kind: 'function'`; comparison may not match contract literals if DB uses non-standard syntax.
 
 ## Testing plan
 
 - **Unit tests**:
-  - `table-builder.test.ts`: Literal default acceptance, mutual exclusivity.
-  - `type-check-mutual-exclusivity.ts`: Compile-time nullable+default rejection.
+  - `table-builder.test.ts`: Literal default acceptance on nullable and non-nullable columns.
+  - `type-check-mutual-exclusivity.ts`: Compile-time acceptance for nullable+default combinations.
   - `contract.logic.test.ts`: Literal default encoding/validation.
   - `schema-verify.defaults.test.ts`: Normalized default comparison (string, boolean, numeric, escaped quotes).
   - `planner.case1.test.ts`: DDL rendering for literal defaults.

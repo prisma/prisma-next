@@ -17,7 +17,7 @@ export async function insertUserTransaction(runtime: Runtime) {
       id: userId,
       kind: 'user',
       email: 'jane@doe.com',
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
     })
     .execute();
 

@@ -1,1 +1,1 @@
-export { decodeContractDefaults, isTemporalColumn, validateContract } from '../validate';
+export { decodeContractDefaults, isBigIntColumn, validateContract } from '../validate';

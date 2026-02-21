@@ -239,7 +239,7 @@ export type Contract = SqlContract<
             readonly nullable: false;
             readonly default: {
               readonly kind: 'literal';
-              readonly value: DefaultLiteralValue<'pg/timestamptz@1', {}>;
+              readonly value: DefaultLiteralValue<'pg/timestamptz@1', '2024-01-15T10:30:00.000Z'>;
             };
           };
           readonly created_at: {

@@ -448,6 +448,28 @@ describe('column default encoding', () => {
     });
   });
 
+  it('supports literal defaults on nullable columns', () => {
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('user', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('nickname', {
+            type: textColumn,
+            nullable: true,
+            default: { kind: 'literal', value: 'guest' },
+          })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.user.columns.nickname.default).toEqual({
+      kind: 'literal',
+      value: 'guest',
+    });
+    expect(contract.storage.tables.user.columns.nickname.nullable).toBe(true);
+  });
+
   it('encodes bigint literal defaults as tagged bigint', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
@@ -533,7 +555,7 @@ describe('column default encoding', () => {
             .column('id', { type: int4Column })
             .column('meta', {
               type: textColumn,
-              default: { kind: 'literal', value: () => 'nope' },
+              default: { kind: 'literal', value: (() => 'nope') as unknown as never },
             })
             .primaryKey(['id']),
         )

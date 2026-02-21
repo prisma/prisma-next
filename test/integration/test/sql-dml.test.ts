@@ -139,7 +139,7 @@ describe('DML Integration Tests', () => {
       expect(rows[0]).toMatchObject({
         id: expect.any(Number),
         email: 'test@example.com',
-        createdAt: expect.any(Date),
+        createdAt: expect.any(String),
       });
     });
 

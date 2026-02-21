@@ -36,7 +36,7 @@ describe('adapter-postgres codecs', () => {
   describe('timestamp codec', () => {
     const timestampCodec = codecDefinitions.timestamp.codec as {
       encode: (value: string | Date) => string;
-      decode: (wire: string | Date) => Date;
+      decode: (wire: string | Date) => string;
     };
 
     it('encodes Date to ISO string', () => {
@@ -44,15 +44,14 @@ describe('adapter-postgres codecs', () => {
       expect(timestampCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
     });
 
-    it('decodes Date to Date', () => {
+    it('decodes Date to ISO string', () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(timestampCodec.decode(date)).toEqual(new Date('2024-01-15T10:30:00.000Z'));
+      expect(timestampCodec.decode(date)).toBe('2024-01-15T10:30:00.000Z');
     });
 
-    it('decodes string to Date', () => {
+    it('decodes string to string', () => {
       const result = timestampCodec.decode('2024-01-15T10:30:00.000Z');
-      expect(result).toBeInstanceOf(Date);
-      expect(result.toISOString()).toBe('2024-01-15T10:30:00.000Z');
+      expect(result).toBe('2024-01-15T10:30:00.000Z');
     });
   });
 
@@ -265,7 +264,7 @@ describe('adapter-postgres codecs', () => {
   describe('interval codec', () => {
     const intervalCodec = codecDefinitions.interval.codec as {
       encode: (value: string) => string;
-      decode: (wire: string) => string;
+      decode: (wire: string | Record<string, unknown>) => string;
     };
 
     it('encodes string as-is', () => {
@@ -278,6 +277,11 @@ describe('adapter-postgres codecs', () => {
       const value = '2 hours';
       const decoded = intervalCodec.decode(value);
       expect(decoded).toBe(value);
+    });
+
+    it('serializes object wire values to JSON strings', () => {
+      const decoded = intervalCodec.decode({ hours: 2, minutes: 30 });
+      expect(decoded).toBe('{"hours":2,"minutes":30}');
     });
   });
 

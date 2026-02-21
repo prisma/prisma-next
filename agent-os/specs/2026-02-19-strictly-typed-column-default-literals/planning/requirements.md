@@ -21,15 +21,14 @@ The implementation must:
   - `ColumnDefault` literal variant is `{ kind: 'literal', value: ... }`.
 - Authoring builders accept typed literals:
   - Non-nullable columns can define typed defaults.
-  - Nullable columns cannot define defaults (compile-time mutual exclusivity).
+  - Nullable columns can also define typed defaults.
   - SQL builder default typing is codec-aware so literal defaults align with codec output types.
 - Contract emission serializes non-JSON primitives safely:
   - `bigint` is encoded as `{ "$type": "bigint", "value": "<decimal-string>" }`.
   - `Date` is encoded as ISO string.
 - Contract validation decodes typed defaults for runtime use:
-  - Tagged bigint defaults decode to runtime `BigInt`.
-  - Temporal column ISO defaults decode to `Date`.
-  - Invalid temporal strings fail validation with clear errors.
+  - Tagged bigint defaults decode to runtime `BigInt` only for bigint-like columns.
+  - Temporal/date-like defaults stay serialized as strings.
 - Postgres schema/default comparison works with typed defaults:
   - Normalization parses DB defaults into typed literal values.
   - String defaults with casts and escaped quotes compare correctly.
@@ -70,7 +69,7 @@ The implementation must:
 
 1) Literal defaults are value-first, not SQL-string-first.
 2) Bigint JSON representation is tagged to avoid JSON precision loss.
-3) Temporal defaults round-trip through ISO strings in emitted JSON and decode to `Date` in validation/runtime flows.
+3) Temporal defaults round-trip through ISO strings in emitted JSON and stay strings in validation/runtime flows.
 4) Schema verification compares normalized typed defaults rather than raw expression strings where normalizers are available.
 5) No backward-compatibility shim is introduced for `{ kind: 'literal', expression }`.
 
@@ -85,7 +84,7 @@ The implementation must:
 - Contract type updates for typed literal defaults.
 - Authoring and SQL contract-builder support for typed literals and codec-aware typing.
 - Serialization/normalization logic required for deterministic JSON contracts and migration outputs.
-- Validation-time decode for tagged bigint and temporal string defaults.
+- Validation-time decode for tagged bigint defaults while preserving temporal string defaults.
 - Postgres default normalization and planner SQL rendering updates.
 - Test and fixture updates that verify typed default behavior end-to-end.
 

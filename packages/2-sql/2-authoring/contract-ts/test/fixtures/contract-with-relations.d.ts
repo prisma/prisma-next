@@ -5,7 +5,7 @@ import type { SqlContract } from '@prisma-next/sql-contract/types';
 type CodecTypes = {
   readonly 'pg/int4@1': { output: number };
   readonly 'pg/text@1': { output: string };
-  readonly 'pg/timestamptz@1': { output: Date };
+  readonly 'pg/timestamptz@1': { output: string };
 };
 
 // Contract type representing the contract data structure with relations

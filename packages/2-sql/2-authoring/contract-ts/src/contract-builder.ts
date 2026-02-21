@@ -12,7 +12,6 @@ import type {
   ColumnTypeDescriptor,
   ContractBuilderState,
   ModelBuilderState,
-  NullableColumnCannotHaveDefault,
   RelationDefinition,
   TableBuilderState,
 } from '@prisma-next/contract-authoring';
@@ -49,11 +48,14 @@ type ColumnDefaultForCodec<
     }
   | { readonly kind: 'function'; readonly expression: string };
 
-type SqlNullableColumnOptions<Descriptor extends ColumnTypeDescriptor> = {
+type SqlNullableColumnOptions<
+  Descriptor extends ColumnTypeDescriptor,
+  CodecTypes extends Record<string, { output: unknown }>,
+> = {
   readonly type: Descriptor;
   readonly nullable: true;
   readonly typeParams?: Record<string, unknown>;
-  readonly default?: NullableColumnCannotHaveDefault;
+  readonly default?: ColumnDefaultForCodec<CodecTypes, Descriptor['codecId']>;
 };
 
 type SqlNonNullableColumnOptions<
@@ -77,7 +79,9 @@ type SqlGeneratedColumnOptions<
 type SqlColumnOptions<
   Descriptor extends ColumnTypeDescriptor,
   CodecTypes extends Record<string, { output: unknown }>,
-> = SqlNullableColumnOptions<Descriptor> | SqlNonNullableColumnOptions<Descriptor, CodecTypes>;
+> =
+  | SqlNullableColumnOptions<Descriptor, CodecTypes>
+  | SqlNonNullableColumnOptions<Descriptor, CodecTypes>;
 
 export interface SqlTableBuilder<
   Name extends string,
@@ -90,7 +94,7 @@ export interface SqlTableBuilder<
 > extends Omit<TableBuilder<Name, Columns, PrimaryKey>, 'column' | 'generated'> {
   column<ColName extends string, Descriptor extends ColumnTypeDescriptor>(
     name: ColName,
-    options: SqlNullableColumnOptions<Descriptor>,
+    options: SqlNullableColumnOptions<Descriptor, CodecTypes>,
   ): TableBuilder<
     Name,
     Columns & Record<ColName, ColumnBuilderState<ColName, true, Descriptor['codecId']>>,
@@ -741,7 +745,10 @@ class SqlContractBuilder<
   > {
     const tableBuilder = createTable(name);
     const result = callback(
-      tableBuilder as unknown as SqlTableBuilder<TableName, CodecTypes> as TableBuilder<TableName>,
+      tableBuilder as unknown as SqlTableBuilder<
+        TableName,
+        CodecTypes
+      > as unknown as TableBuilder<TableName>,
     );
     const finalBuilder = result instanceof TableBuilder ? result : tableBuilder;
     const tableState = finalBuilder.build();

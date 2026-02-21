@@ -142,14 +142,14 @@ describe('Codecs Integration Tests', () => {
 
       const row = rows[0]!;
       expect(row).toMatchObject({
-        created_at: expect.any(Date),
+        created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
       });
     },
     timeouts.databaseOperation,
   );
 
   it(
-    'decodes timestamptz to Date',
+    'decodes timestamptz to ISO string',
     async () => {
       const runtime = await createTestRuntime(
         fixtureContract,
@@ -187,9 +187,9 @@ describe('Codecs Integration Tests', () => {
 
       const row = rows[0]!;
       expect(row).toMatchObject({
-        created_at: new Date('2024-01-15T10:30:00.000Z'),
+        created_at: '2024-01-15T10:30:00.000Z',
       });
-      expect(row['created_at']).toBeInstanceOf(Date);
+      expect(typeof row['created_at']).toBe('string');
     },
     timeouts.databaseOperation,
   );
@@ -332,7 +332,7 @@ describe('Codecs Integration Tests', () => {
       expect(row).toMatchObject({
         created_at: expect.anything(),
       });
-      expect(row['created_at']).toBeInstanceOf(Date);
+      expect(typeof row['created_at']).toBe('string');
     },
     timeouts.databaseOperation,
   );
@@ -420,11 +420,11 @@ describe('Codecs Integration Tests', () => {
       expect(row).toMatchObject({
         name: 'Test User',
         score: 95.5,
-        created_at: expect.any(Date),
+        created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
       });
       expect(typeof row['name']).toBe('string');
       expect(typeof row['score']).toBe('number');
-      expect(row['created_at']).toBeInstanceOf(Date);
+      expect(typeof row['created_at']).toBe('string');
     },
     timeouts.databaseOperation,
   );
@@ -473,10 +473,10 @@ describe('Codecs Integration Tests', () => {
       const row = rows[0]!;
       expect(row).toMatchObject({
         name: 'Test User',
-        created_at: expect.any(Date),
+        created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
       });
       expect(typeof row['name']).toBe('string');
-      expect(row['created_at']).toBeInstanceOf(Date);
+      expect(typeof row['created_at']).toBe('string');
     },
     timeouts.databaseOperation,
   );

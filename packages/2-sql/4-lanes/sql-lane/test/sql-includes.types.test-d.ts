@@ -222,7 +222,7 @@ const testContractWithCapabilities = validateContract<TestContractWithCapabiliti
 type CodecTypes = {
   readonly 'pg/int4@1': { readonly output: number };
   readonly 'pg/text@1': { readonly output: string };
-  readonly 'pg/timestamptz@1': { readonly output: Date };
+  readonly 'pg/timestamptz@1': { readonly output: string };
 };
 
 // Type tests for includeMany result types
@@ -295,7 +295,7 @@ test('Array element types match child projection types', () => {
   type PostElement = Row['posts'] extends Array<infer E> ? E : never;
   expectTypeOf<PostElement['id']>().toEqualTypeOf<number>();
   expectTypeOf<PostElement['title']>().toEqualTypeOf<string>();
-  expectTypeOf<PostElement['createdAt']>().toEqualTypeOf<Date>();
+  expectTypeOf<PostElement['createdAt']>().toEqualTypeOf<string>();
 });
 
 test('Empty array type when no children', () => {
@@ -629,7 +629,7 @@ test('includeMany with nested child projection infers nested array element types
       id: number;
       metadata: {
         title: string;
-        createdAt: Date;
+        createdAt: string;
       };
     }>
   >();
@@ -638,10 +638,10 @@ test('includeMany with nested child projection infers nested array element types
   expectTypeOf<Row['posts'][number]['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['posts'][number]['metadata']>().toEqualTypeOf<{
     title: string;
-    createdAt: Date;
+    createdAt: string;
   }>();
   expectTypeOf<Row['posts'][number]['metadata']['title']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['posts'][number]['metadata']['createdAt']>().toEqualTypeOf<Date>();
+  expectTypeOf<Row['posts'][number]['metadata']['createdAt']>().toEqualTypeOf<string>();
 });
 
 test('InferNestedProjectionRow correctly infers include types from Includes map', () => {

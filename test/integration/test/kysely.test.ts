@@ -85,7 +85,7 @@ describe('Kysely integration', () => {
         const newUser = {
           id: userId,
           email: 'test@example.com',
-          createdAt: new Date(),
+          createdAt: new Date().toISOString(),
         };
 
         const result = await kysely.insertInto('user').values(newUser).returningAll().execute();
@@ -140,7 +140,7 @@ describe('Kysely integration', () => {
           .values({
             id: userId,
             email: 'old@example.com',
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
           })
           .returningAll()
           .execute();
@@ -178,7 +178,7 @@ describe('Kysely integration', () => {
           .values({
             id: userId,
             email: 'delete@example.com',
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
           })
           .execute();
 
@@ -223,7 +223,7 @@ describe('Kysely integration', () => {
             .values({
               id: userId,
               email: 'transaction@example.com',
-              createdAt: new Date(),
+              createdAt: new Date().toISOString(),
             })
             .execute();
 
@@ -232,7 +232,7 @@ describe('Kysely integration', () => {
             .values({
               id: userId + 1,
               email: 'transaction2@example.com',
-              createdAt: new Date(),
+              createdAt: new Date().toISOString(),
             })
             .execute();
         });
@@ -269,7 +269,7 @@ describe('Kysely integration', () => {
               .values({
                 id: userId,
                 email: 'rollback@example.com',
-                createdAt: new Date(),
+                createdAt: new Date().toISOString(),
               })
               .execute();
 
@@ -278,7 +278,7 @@ describe('Kysely integration', () => {
               .values({
                 id: userId + 1,
                 email: 'rollback2@example.com',
-                createdAt: new Date(),
+                createdAt: new Date().toISOString(),
               })
               .execute();
 

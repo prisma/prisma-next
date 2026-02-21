@@ -10,7 +10,7 @@ import type { SqlContract } from '@prisma-next/sql-contract/types';
 export type CodecTypes = {
   readonly 'pg/int4@1': { readonly output: number };
   readonly 'pg/text@1': { readonly output: string };
-  readonly 'pg/timestamptz@1': { readonly output: Date };
+  readonly 'pg/timestamptz@1': { readonly output: string };
 };
 
 export type StorageHash = StorageHashBase<'sha256:test-core'>;

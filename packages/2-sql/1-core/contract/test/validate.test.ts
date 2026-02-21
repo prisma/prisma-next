@@ -479,7 +479,7 @@ describe('validateContract', () => {
     expect(col.default).toEqual({ kind: 'literal', value: 9007199254740993n });
   });
 
-  it('decodes ISO date string to Date on temporal column', () => {
+  it('keeps ISO date string defaults unchanged on temporal column', () => {
     const contract = makeContract({
       User: {
         columns: {
@@ -499,10 +499,10 @@ describe('validateContract', () => {
     });
     const result = validateContract<SqlContract<SqlStorage>>(contract);
     const col = result.storage.tables.User.columns.created_at;
-    expect(col.default).toEqual({ kind: 'literal', value: new Date('2025-01-01T00:00:00.000Z') });
+    expect(col.default).toEqual({ kind: 'literal', value: '2025-01-01T00:00:00.000Z' });
   });
 
-  it('decodes ISO date string to Date on temporal codec id', () => {
+  it('keeps ISO date string defaults unchanged on temporal-like codec ids', () => {
     const contract = makeContract({
       User: {
         columns: {
@@ -522,7 +522,7 @@ describe('validateContract', () => {
     });
     const result = validateContract<SqlContract<SqlStorage>>(contract);
     const col = result.storage.tables.User.columns.created_at;
-    expect(col.default).toEqual({ kind: 'literal', value: new Date('2025-02-03T10:20:30.000Z') });
+    expect(col.default).toEqual({ kind: 'literal', value: '2025-02-03T10:20:30.000Z' });
   });
 
   it('keeps Date literal defaults unchanged', () => {
@@ -599,7 +599,7 @@ describe('validateContract', () => {
     );
   });
 
-  it('throws on invalid ISO date string for temporal column default', () => {
+  it('keeps invalid temporal-like strings unchanged', () => {
     const contract = makeContract({
       User: {
         columns: {
@@ -617,9 +617,37 @@ describe('validateContract', () => {
         foreignKeys: [],
       },
     });
-    expect(() => validateContract<SqlContract<SqlStorage>>(contract)).toThrow(
-      /Invalid ISO date string/,
-    );
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    expect(result.storage.tables.User.columns.created_at.default).toEqual({
+      kind: 'literal',
+      value: 'not-a-date',
+    });
+  });
+
+  it('keeps tagged bigint literals unchanged for non-bigint columns', () => {
+    const tagged = { $type: 'bigint', value: '42' } as const;
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          payload: {
+            codecId: 'pg/jsonb@1',
+            nativeType: 'jsonb',
+            nullable: false,
+            default: { kind: 'literal', value: tagged },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    expect(result.storage.tables.User.columns.payload.default).toEqual({
+      kind: 'literal',
+      value: tagged,
+    });
   });
 
   it('throws on NOT NULL column with literal null default', () => {

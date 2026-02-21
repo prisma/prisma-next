@@ -6,7 +6,6 @@ export type {
   ForeignKeyDef,
   IndexDef,
   ModelBuilderState,
-  NullableColumnCannotHaveDefault,
   RelationDefinition,
   TableBuilderState,
   UniqueConstraintDef,

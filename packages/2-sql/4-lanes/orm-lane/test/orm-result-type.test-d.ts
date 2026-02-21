@@ -23,7 +23,7 @@ test('ResultType extracts Row type from ORM findMany plan', () => {
         ast: unknown;
         params: readonly unknown[];
         meta: unknown;
-        _Row?: { id: number; email: string; createdAt: Date };
+        _Row?: { id: number; email: string; createdAt: string };
       };
     };
   };
@@ -41,13 +41,13 @@ test('ResultType extracts Row type from ORM findMany plan', () => {
   // This test would have failed before the fix - Row['email'] would be 'unknown'
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['createdAt']>().toEqualTypeOf<Date>();
+  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
 
   // Verify the complete row structure
   expectTypeOf<Row>().toExtend<{
     id: number;
     email: string;
-    createdAt: Date;
+    createdAt: string;
   }>();
 });
 
@@ -82,12 +82,12 @@ test('ResultType extracts Row type from ORM findMany plan with includes', () => 
   // This test would have failed before the fix - Row['email'] would be 'unknown' and Row['posts'] would be 'never[]'
   expectTypeOf<Row['id']>().toEqualTypeOf<number>();
   expectTypeOf<Row['email']>().toEqualTypeOf<string>();
-  expectTypeOf<Row['createdAt']>().toEqualTypeOf<Date>();
+  expectTypeOf<Row['createdAt']>().toEqualTypeOf<string>();
   expectTypeOf<Row['posts']>().toEqualTypeOf<
     Array<{
       id: number;
       title: string;
-      createdAt: Date;
+      createdAt: string;
     }>
   >();
 
@@ -95,11 +95,11 @@ test('ResultType extracts Row type from ORM findMany plan with includes', () => 
   expectTypeOf<Row>().toExtend<{
     id: number;
     email: string;
-    createdAt: Date;
+    createdAt: string;
     posts: Array<{
       id: number;
       title: string;
-      createdAt: Date;
+      createdAt: string;
     }>;
   }>();
 });
@@ -136,7 +136,7 @@ test('ResultType keeps include result types after filtering and ordering child r
     Array<{
       id: number;
       title: string;
-      createdAt: Date;
+      createdAt: string;
     }>
   >();
 });
@@ -172,7 +172,7 @@ test('ResultType infers nested include element shape', () => {
   expectTypeOf<Row['posts'][number]>().toEqualTypeOf<{
     id: number;
     title: string;
-    createdAt: Date;
+    createdAt: string;
   }>();
   expectTypeOf<Row['posts'][0]['title']>().toEqualTypeOf<string>();
 });
@@ -181,7 +181,7 @@ test('IncludeAccumulator feeds include references into projection inference', ()
   type ChildRow = {
     id: number;
     title: string;
-    createdAt: Date;
+    createdAt: string;
   };
   type Includes = IncludeAccumulator<Record<string, never>, 'posts', ChildRow>;
   type Projection = {

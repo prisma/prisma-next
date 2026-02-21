@@ -46,7 +46,7 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
         expect(insertRows[0]).toMatchObject({
           id: expect.any(Number),
           email: 'e2e@example.com',
-          created_at: expect.any(Date),
+          created_at: expect.any(String),
           update_at: null,
         });
 
@@ -136,14 +136,9 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
       expect(insertRows[0]).toMatchObject({
         id: expect.stringMatching(UUIDV7_REGEX),
         name: 'uuidv7-test-event',
-        created_at: expect.any(Date),
-        scheduled_at: expect.any(Date),
+        created_at: expect.any(String),
+        scheduled_at: '2024-01-15T10:30:00.000Z',
       });
-      const scheduledAt = insertRows[0]?.scheduled_at as Date | undefined;
-      if (!scheduledAt) {
-        throw new Error('Expected scheduled_at to be returned');
-      }
-      expect(scheduledAt.toISOString()).toBe('2024-01-15T10:30:00.000Z');
     });
   });
 

@@ -272,7 +272,7 @@ describe('builder integration', () => {
     type ContractCodecTypes = ExtractCodecTypes<typeof contract>;
     expectTypeOf<ContractCodecTypes['pg/int4@1']['output']>().toEqualTypeOf<number>();
     expectTypeOf<ContractCodecTypes['pg/text@1']['output']>().toEqualTypeOf<string>();
-    expectTypeOf<ContractCodecTypes['pg/timestamptz@1']['output']>().toEqualTypeOf<Date>();
+    expectTypeOf<ContractCodecTypes['pg/timestamptz@1']['output']>().toEqualTypeOf<string>();
   });
 
   it('contract structure matches fixture contract', () => {

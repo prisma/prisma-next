@@ -248,19 +248,13 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
   }
 }
 
-const TEMPORAL_NATIVE_TYPES = new Set([
-  'timestamp',
-  'timestamptz',
-  'timestamp without time zone',
-  'timestamp with time zone',
-  'date',
-]);
+const BIGINT_NATIVE_TYPES = new Set(['bigint', 'int8']);
 
-export function isTemporalColumn(column: StorageColumn): boolean {
+export function isBigIntColumn(column: StorageColumn): boolean {
   const nativeType = column.nativeType?.toLowerCase() ?? '';
-  if (TEMPORAL_NATIVE_TYPES.has(nativeType)) return true;
+  if (BIGINT_NATIVE_TYPES.has(nativeType)) return true;
   const codecId = column.codecId?.toLowerCase() ?? '';
-  return codecId.includes('timestamp') || codecId.includes('timestamptz') || codecId === 'date';
+  return codecId.includes('int8') || codecId.includes('bigint');
 }
 
 export function decodeDefaultLiteralValue(
@@ -273,6 +267,9 @@ export function decodeDefaultLiteralValue(
     return value;
   }
   if (isTaggedBigInt(value)) {
+    if (!isBigIntColumn(column)) {
+      return value;
+    }
     try {
       return BigInt(value.value);
     } catch {
@@ -280,15 +277,6 @@ export function decodeDefaultLiteralValue(
         `Invalid tagged bigint for default value on "${tableName}.${columnName}": "${value.value}" is not a valid integer`,
       );
     }
-  }
-  if (isTemporalColumn(column) && typeof value === 'string') {
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new Error(
-        `Invalid ISO date string for default value on "${tableName}.${columnName}": "${value}"`,
-      );
-    }
-    return parsed;
   }
   return value;
 }
@@ -335,8 +323,8 @@ export function decodeContractDefaults<T extends SqlContract<SqlStorage>>(contra
   }
 
   // The spread widens to SqlContract<SqlStorage>, but this transformation only
-  // decodes default literal values (tagged bigint → BigInt, ISO string → Date)
-  // and preserves all other properties of T.
+  // decodes tagged bigint defaults for bigint-like columns and preserves all
+  // other properties of T.
   return {
     ...contract,
     storage: {
