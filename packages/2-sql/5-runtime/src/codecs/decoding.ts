@@ -68,7 +68,7 @@ function resolveColumnRefForAlias(
   fallbackColumnRefIndex: ColumnRefIndex | null,
 ): { table: string; column: string } | undefined {
   if (projection && !Array.isArray(projection)) {
-    const mappedRef = projection[alias];
+    const mappedRef = (projection as Record<string, string>)[alias];
     if (typeof mappedRef !== 'string') {
       return undefined;
     }
