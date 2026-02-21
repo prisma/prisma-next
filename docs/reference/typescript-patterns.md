@@ -136,7 +136,7 @@ export class CodecRegistry {
 - `CodecRegistry` → `createCodecRegistry()`
 - `CodecDefBuilder` → `defineCodecs()`
 - `Runtime` → `createRuntime()`
-- `PostgresDriver` → `createPostgresDriverFromOptions()`
+- `PostgresDriver` → `postgresRuntimeDriverDescriptor.create()` + `connect(binding)`
 - `PostgresAdapter` → `createPostgresAdapter()`
 
 ### Internal Use

@@ -148,7 +148,7 @@ export interface TestRuntimeContext<TContract extends SqlContract<SqlStorage>> {
   /** The SQL query context for building queries */
   readonly context: ReturnType<typeof createTestContext>;
   /** The test runtime for executing queries */
-  readonly runtime: ReturnType<typeof createTestRuntimeFromClient>;
+  readonly runtime: Awaited<ReturnType<typeof createTestRuntimeFromClient>>;
   /** The schema tables extracted from the contract */
   readonly tables: ReturnType<typeof schema<TContract>>['tables'];
   /** The raw pg client for direct SQL queries */
@@ -192,7 +192,7 @@ export async function withTestRuntime<TContract extends SqlContract<SqlStorage>>
     await withClient(connectionString, async (client: Client) => {
       const adapter = createStubAdapter();
       const context = createTestContext(contract, adapter);
-      const runtime = createTestRuntimeFromClient(contract, client);
+      const runtime = await createTestRuntimeFromClient(contract, client);
 
       try {
         const tables = schema<TContract>(context).tables;

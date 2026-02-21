@@ -127,20 +127,23 @@ export interface RuntimeAdapterDescriptor<
 
 /**
  * Descriptor for an execution/runtime-plane driver component (e.g., Postgres driver).
+ * create() accepts optional driver-specific options; connection binding happens at connect time.
  *
  * @template TFamilyId - The family ID (e.g., 'sql', 'document')
  * @template TTargetId - The target ID (e.g., 'postgres', 'mysql')
+ * @template TCreateOptions - Optional options for create (no connection); default void
  * @template TDriverInstance - The driver instance type
  */
 export interface RuntimeDriverDescriptor<
   TFamilyId extends string,
   TTargetId extends string,
+  TCreateOptions = void,
   TDriverInstance extends RuntimeDriverInstance<TFamilyId, TTargetId> = RuntimeDriverInstance<
     TFamilyId,
     TTargetId
   >,
 > extends DriverDescriptor<TFamilyId, TTargetId> {
-  create(options: unknown): TDriverInstance;
+  create(options?: TCreateOptions): TDriverInstance;
 }
 
 /**

@@ -6,9 +6,10 @@ const mocks = vi.hoisted(() => ({
   createRuntime: vi.fn(),
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
+  driverConnect: vi.fn(),
+  driverClose: vi.fn(),
   driverCreate: vi.fn(),
   validateContract: vi.fn(),
-  poolCtor: vi.fn(),
 }));
 
 vi.mock('@prisma-next/core-execution-plane/stack', () => ({
@@ -46,15 +47,14 @@ vi.mock('@prisma-next/adapter-postgres/runtime', () => ({
 }));
 
 vi.mock('@prisma-next/driver-postgres/runtime', () => ({
-  default: { id: 'driver-postgres' },
+  default: {
+    id: 'driver-postgres',
+    create: mocks.driverCreate,
+  },
 }));
 
 vi.mock('pg', () => {
-  class Pool {
-    constructor(options: unknown) {
-      mocks.poolCtor(options);
-    }
-  }
+  class Pool {}
 
   class Client {}
 
@@ -88,9 +88,10 @@ describe('postgres', () => {
     mocks.createRuntime.mockReset();
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
+    mocks.driverConnect.mockReset();
+    mocks.driverClose.mockReset();
     mocks.driverCreate.mockReset();
     mocks.validateContract.mockReset();
-    mocks.poolCtor.mockReset();
 
     mocks.createExecutionContext.mockReturnValue({
       contract,
@@ -101,16 +102,23 @@ describe('postgres', () => {
     mocks.createSqlExecutionStack.mockReturnValue({
       target: { id: 'target-postgres' },
       adapter: { id: 'adapter-postgres' },
-      driver: { create: mocks.driverCreate },
+      driver: {},
       extensionPacks: [],
     });
-    mocks.instantiateExecutionStack.mockReturnValue({ adapter: {} });
-    mocks.driverCreate.mockReturnValue({ id: 'driver-instance' });
+    const mockDriver = {
+      id: 'driver-instance',
+      connect: mocks.driverConnect.mockResolvedValue(undefined),
+      close: mocks.driverClose.mockResolvedValue(undefined),
+    };
+    mocks.instantiateExecutionStack.mockReturnValue({
+      adapter: {},
+      driver: mockDriver,
+    });
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.validateContract.mockReturnValue(contract);
   });
 
-  it('defers stack instantiation runtime creation and pool creation until runtime is called', () => {
+  it('defers stack instantiation and runtime creation until runtime is called', async () => {
     const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
@@ -120,16 +128,37 @@ describe('postgres', () => {
     expect(db.orm).toEqual({ lane: 'orm' });
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
-    expect(mocks.poolCtor).not.toHaveBeenCalled();
 
-    db.runtime();
+    await db.runtime();
 
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
     expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
-    expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
   });
 
-  it('memoizes runtime instance', () => {
+  it('memoizes runtime instance', async () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const first = await db.runtime();
+    const second = await db.runtime();
+
+    expect(first).toBe(second);
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  it('shares runtime initialization across concurrent callers', async () => {
+    let resolveConnect: (() => void) | undefined;
+    mocks.driverConnect.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveConnect = resolve;
+        }),
+    );
+
     const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
@@ -137,34 +166,86 @@ describe('postgres', () => {
 
     const first = db.runtime();
     const second = db.runtime();
-
-    expect(first).toBe(second);
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(0);
+
+    resolveConnect?.();
+
+    const [firstRuntime, secondRuntime] = await Promise.all([first, second]);
+    expect(firstRuntime).toBe(secondRuntime);
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
     expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
   });
 
+  it('retries runtime initialization after connect failure', async () => {
+    mocks.driverConnect.mockRejectedValueOnce(new Error('connect failed'));
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    await expect(db.runtime()).rejects.toThrow('connect failed');
+    await expect(db.runtime()).resolves.toEqual({ id: 'runtime-instance' });
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(2);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(2);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes connected driver when createRuntime fails and retries cleanly', async () => {
+    mocks.createRuntime.mockImplementationOnce(() => {
+      throw new Error('runtime creation failed');
+    });
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    await expect(db.runtime()).rejects.toThrow('runtime creation failed');
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+    expect(mocks.driverClose).toHaveBeenCalledTimes(1);
+
+    await expect(db.runtime()).resolves.toEqual({ id: 'runtime-instance' });
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(2);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(2);
+    expect(mocks.driverClose).toHaveBeenCalledTimes(1);
+  });
+
   it('throws for multiple binding inputs during client construction', () => {
-    expect(() =>
+    try {
       postgres({
         contract,
         url: 'postgres://localhost:5432/db',
         binding: { kind: 'url', url: 'postgres://localhost:5432/db2' },
-      } as unknown as Parameters<typeof postgres<typeof contract>>[0]),
-    ).toThrow('Provide one binding input');
+      } as unknown as Parameters<typeof postgres<typeof contract>>[0]);
+      throw new Error('Expected constructor to throw');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'DRIVER.BINDING_INVALID',
+        category: 'RUNTIME',
+      });
+    }
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
-    expect(mocks.poolCtor).not.toHaveBeenCalled();
   });
 
   it('throws for missing binding input during client construction', () => {
-    expect(() =>
+    try {
       postgres({
         contract,
-      } as unknown as Parameters<typeof postgres<typeof contract>>[0]),
-    ).toThrow('Provide one binding input');
+      } as unknown as Parameters<typeof postgres<typeof contract>>[0]);
+      throw new Error('Expected constructor to throw');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'DRIVER.BINDING_INVALID',
+        category: 'RUNTIME',
+      });
+    }
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
-    expect(mocks.poolCtor).not.toHaveBeenCalled();
   });
 
   it('validates contractJson input', () => {
@@ -189,120 +270,199 @@ describe('postgres', () => {
     expect(mocks.validateContract).toHaveBeenCalledWith(contract);
   });
 
-  it('creates pool from url with explicit defaults', () => {
+  it('calls driver.connect with url binding before createRuntime', async () => {
     const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
     });
 
-    db.runtime();
+    await db.runtime();
 
-    expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
-    expect(mocks.poolCtor).toHaveBeenCalledWith({
-      connectionString: 'postgres://localhost:5432/db',
-      connectionTimeoutMillis: 20_000,
-      idleTimeoutMillis: 30_000,
-    });
-  });
-
-  it('allows overriding url pool timeout options', () => {
-    const db = postgres({
-      contract,
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledWith({
+      kind: 'url',
       url: 'postgres://localhost:5432/db',
-      poolOptions: {
-        connectionTimeoutMillis: 5_000,
-        idleTimeoutMillis: 45_000,
-      },
     });
-
-    db.runtime();
-
-    expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
-    expect(mocks.poolCtor).toHaveBeenCalledWith({
-      connectionString: 'postgres://localhost:5432/db',
-      connectionTimeoutMillis: 5_000,
-      idleTimeoutMillis: 45_000,
-    });
+    expect(mocks.createRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        driver: expect.objectContaining({ id: 'driver-instance' }),
+      }),
+    );
   });
 
-  it('accepts postgresql url scheme', () => {
-    postgres({
+  it('accepts postgresql url scheme', async () => {
+    await postgres({
       contract,
       url: 'postgresql://localhost:5432/db',
     }).runtime();
 
-    expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledWith({
+      kind: 'url',
+      url: 'postgresql://localhost:5432/db',
+    });
+  });
+
+  it('calls driver.connect before createRuntime', async () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const callOrder: string[] = [];
+    mocks.driverConnect.mockImplementation(async () => {
+      callOrder.push('connect');
+    });
+    mocks.createRuntime.mockImplementation(() => {
+      callOrder.push('createRuntime');
+      return { id: 'runtime-instance' };
+    });
+
+    await db.runtime();
+
+    expect(callOrder).toEqual(['connect', 'createRuntime']);
+  });
+
+  it('passes driver from stackInstance to createRuntime', async () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    let capturedDriver: unknown;
+    mocks.createRuntime.mockImplementation((opts: { driver: unknown }) => {
+      capturedDriver = opts.driver;
+      return { id: 'runtime-instance' };
+    });
+
+    await db.runtime();
+
+    expect(capturedDriver).toBe(
+      (mocks.instantiateExecutionStack.mock.results[0] as { value: { driver: unknown } }).value
+        .driver,
+    );
+  });
+
+  it('throws clear configuration error when stack has no driver descriptor', async () => {
+    mocks.instantiateExecutionStack.mockReturnValue({
+      adapter: {},
+      driver: undefined,
+    });
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    await expect(db.runtime()).rejects.toThrow(
+      'Relational runtime requires a driver descriptor on the execution stack',
+    );
   });
 
   it('throws for empty url binding', () => {
-    expect(() =>
+    try {
       postgres({
         contract,
         url: '   ',
-      }),
-    ).toThrow('Postgres URL must be a non-empty string');
+      });
+      throw new Error('Expected constructor to throw');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'DRIVER.BINDING_INVALID',
+        category: 'RUNTIME',
+      });
+    }
   });
 
   it('throws for invalid url scheme', () => {
-    expect(() =>
+    try {
       postgres({
         contract,
         url: 'mysql://localhost:5432/db',
-      }),
-    ).toThrow('Postgres URL must use postgres:// or postgresql://');
+      });
+      throw new Error('Expected constructor to throw');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'DRIVER.BINDING_INVALID',
+        category: 'RUNTIME',
+      });
+    }
   });
 
-  it('uses pg pool binding', () => {
+  it('uses pg pool binding', async () => {
     const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
     const db = postgres({
       contract,
       pg: pool,
     });
 
-    db.runtime();
+    await db.runtime();
 
-    expect(mocks.driverCreate).toHaveBeenCalledWith({
-      connect: { pool },
-      cursor: { disabled: true },
+    expect(mocks.driverConnect).toHaveBeenCalledWith({
+      kind: 'pgPool',
+      pool,
     });
   });
 
-  it('uses pg client binding', () => {
+  it('uses pg client binding', async () => {
     const client = new Client();
     const db = postgres({
       contract,
       pg: client,
     });
 
-    db.runtime();
+    await db.runtime();
 
-    expect(mocks.driverCreate).toHaveBeenCalledWith({
-      connect: { client },
-      cursor: { disabled: true },
+    expect(mocks.driverConnect).toHaveBeenCalledWith({
+      kind: 'pgClient',
+      client,
     });
   });
 
-  it('uses explicit binding object', () => {
+  it('uses explicit binding object', async () => {
     const pool = new Pool({ connectionString: 'postgres://localhost:5432/db' });
     const db = postgres({
       contract,
       binding: { kind: 'pgPool', pool },
     });
 
-    db.runtime();
+    await db.runtime();
 
-    expect(mocks.driverCreate).toHaveBeenCalledWith({
-      connect: { pool },
-      cursor: { disabled: true },
+    expect(mocks.driverConnect).toHaveBeenCalledWith({
+      kind: 'pgPool',
+      pool,
     });
   });
 
   it('throws when pg input is neither Pool nor Client', () => {
-    expect(() =>
+    try {
       postgres({
         contract,
         pg: { query: () => {} } as unknown as Client,
-      }),
-    ).toThrow('Unable to determine pg binding type from pg input');
+      });
+      throw new Error('Expected constructor to throw');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'DRIVER.BINDING_INVALID',
+        category: 'RUNTIME',
+      });
+    }
+  });
+
+  it('passes cursor options into driver descriptor create', () => {
+    const cursor = { batchSize: 111 } as const;
+
+    postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+      cursor,
+    });
+
+    const createStackCall = mocks.createSqlExecutionStack.mock.calls[0]?.[0] as {
+      driver: { create: () => unknown };
+    };
+    expect(createStackCall).toBeDefined();
+
+    createStackCall.driver.create();
+    expect(mocks.driverCreate).toHaveBeenCalledWith({ cursor });
   });
 });

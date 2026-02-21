@@ -13,21 +13,27 @@ import { describe, expect, it } from 'vitest';
 import { db } from '../src/prisma/db';
 
 const executionStack = db.stack;
-const executionStackInstance = instantiateExecutionStack(executionStack);
 const context = db.context;
 
 import { initTestDatabase } from './utils/control-client';
 
-function createTestDriver(connectionString: string) {
-  const driverDescriptor = executionStack.driver;
-  if (!driverDescriptor) {
+async function createTestDriver(connectionString: string) {
+  const stackInstance = instantiateExecutionStack(executionStack);
+  const driver = stackInstance.driver;
+  if (!driver) {
     throw new Error('Driver descriptor missing from execution stack');
   }
   const pool = new Pool({ connectionString });
-  return driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+  try {
+    await driver.connect({ kind: 'pgPool', pool });
+    return { stackInstance, driver };
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
 }
 
-function getRuntime(
+async function getRuntime(
   connectionString: string,
   plugins = [
     budgets({
@@ -37,11 +43,12 @@ function getRuntime(
       maxLatencyMs: 1_000,
     }),
   ],
-): Runtime {
+): Promise<Runtime> {
+  const { stackInstance, driver } = await createTestDriver(connectionString);
   return createRuntime({
-    stackInstance: executionStackInstance,
+    stackInstance,
     context,
-    driver: createTestDriver(connectionString),
+    driver,
     verify: { mode: 'onFirstUse', requireMarker: false },
     plugins,
   });
@@ -152,11 +159,12 @@ describe('runtime execute integration', () => {
           annotations: { intent: 'report', limit: 1 },
         });
 
-        const createRuntimeInstance = () => {
+        const createRuntimeInstance = async () => {
+          const { stackInstance, driver } = await createTestDriver(connectionString);
           return createRuntime({
-            stackInstance: executionStackInstance,
+            stackInstance,
             context,
-            driver: createTestDriver(connectionString),
+            driver,
             verify: { mode: 'always', requireMarker: true },
             plugins: [
               budgets({
@@ -169,7 +177,7 @@ describe('runtime execute integration', () => {
         };
 
         // Seed data using a runtime instance
-        const seedRuntime = createRuntimeInstance();
+        const seedRuntime = await createRuntimeInstance();
         try {
           await seedTestData(seedRuntime, {
             users: ['alice@example.com'],
@@ -178,7 +186,7 @@ describe('runtime execute integration', () => {
           await seedRuntime.close();
         }
 
-        const runtime = createRuntimeInstance();
+        const runtime = await createRuntimeInstance();
         try {
           type PlanRow = ResultType<typeof plan>;
           const rows: PlanRow[] = [];
@@ -222,7 +230,7 @@ describe('runtime execute integration', () => {
           connection: connectionString,
           contractIR: contract,
         });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           // Seed data
@@ -294,10 +302,11 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
+        const { stackInstance, driver } = await createTestDriver(connectionString);
         const runtime = createRuntime({
-          stackInstance: executionStackInstance,
+          stackInstance,
           context,
-          driver: createTestDriver(connectionString),
+          driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
@@ -310,7 +319,7 @@ describe('runtime execute integration', () => {
 
         try {
           // Seed 100 users using a separate runtime without strict budgets
-          const seedRuntime = getRuntime(connectionString);
+          const seedRuntime = await getRuntime(connectionString);
           try {
             const emails = Array.from({ length: 100 }, (_, i) => `user${i}@example.com`);
             await seedTestData(seedRuntime, { users: emails });
@@ -370,10 +379,11 @@ describe('runtime execute integration', () => {
           contractIR: contract,
         });
 
+        const { stackInstance, driver } = await createTestDriver(connectionString);
         const runtime = createRuntime({
-          stackInstance: executionStackInstance,
+          stackInstance,
           context,
-          driver: createTestDriver(connectionString),
+          driver,
           verify: { mode: 'onFirstUse', requireMarker: false },
           plugins: [
             budgets({
@@ -386,7 +396,7 @@ describe('runtime execute integration', () => {
 
         try {
           // Seed 50 users using a separate runtime without strict budgets
-          const seedRuntime = getRuntime(connectionString);
+          const seedRuntime = await getRuntime(connectionString);
           try {
             const emails = Array.from({ length: 50 }, (_, i) => `user${i}@example.com`);
             await seedTestData(seedRuntime, { users: emails });
@@ -430,7 +440,7 @@ describe('runtime execute integration', () => {
           connection: connectionString,
           contractIR: contract,
         });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           // Seed users and posts
