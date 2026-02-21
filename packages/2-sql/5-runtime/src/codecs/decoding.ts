@@ -46,6 +46,38 @@ function buildColumnRefIndex(plan: ExecutionPlan): ColumnRefIndex | null {
   return index;
 }
 
+function parseProjectionRef(value: string): { table: string; column: string } | null {
+  if (value.startsWith('include:') || value.startsWith('operation:')) {
+    return null;
+  }
+
+  const separatorIndex = value.indexOf('.');
+  if (separatorIndex <= 0 || separatorIndex === value.length - 1) {
+    return null;
+  }
+
+  return {
+    table: value.slice(0, separatorIndex),
+    column: value.slice(separatorIndex + 1),
+  };
+}
+
+function resolveColumnRefForAlias(
+  alias: string,
+  projection: ExecutionPlan['meta']['projection'],
+  fallbackColumnRefIndex: ColumnRefIndex | null,
+): { table: string; column: string } | undefined {
+  if (projection && !Array.isArray(projection)) {
+    const mappedRef = projection[alias];
+    if (typeof mappedRef !== 'string') {
+      return undefined;
+    }
+    return parseProjectionRef(mappedRef) ?? undefined;
+  }
+
+  return fallbackColumnRefIndex?.get(alias);
+}
+
 export function decodeRow(
   row: Record<string, unknown>,
   plan: ExecutionPlan,
@@ -53,12 +85,13 @@ export function decodeRow(
   jsonValidators?: JsonSchemaValidatorRegistry,
 ): Record<string, unknown> {
   const decoded: Record<string, unknown> = {};
+  const projection = plan.meta.projection;
 
-  // Build column ref index once for O(1) lookups during JSON schema validation
-  const columnRefIndex = jsonValidators ? buildColumnRefIndex(plan) : null;
+  // Fallback for plans that do not provide projection alias -> table.column mapping.
+  const fallbackColumnRefIndex =
+    jsonValidators && (!projection || Array.isArray(projection)) ? buildColumnRefIndex(plan) : null;
 
   let aliases: readonly string[];
-  const projection = plan.meta.projection;
   if (projection && !Array.isArray(projection)) {
     aliases = Object.keys(projection);
   } else if (projection && Array.isArray(projection)) {
@@ -70,7 +103,6 @@ export function decodeRow(
   for (const alias of aliases) {
     const wireValue = row[alias];
 
-    const projection = plan.meta.projection;
     const projectionValue =
       projection && typeof projection === 'object' && !Array.isArray(projection)
         ? (projection as Record<string, string>)[alias]
@@ -137,8 +169,8 @@ export function decodeRow(
       const decodedValue = codec.decode(wireValue);
 
       // Validate decoded JSON value against schema
-      if (jsonValidators && columnRefIndex) {
-        const ref = columnRefIndex.get(alias);
+      if (jsonValidators) {
+        const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
         if (ref) {
           validateJsonValue(
             jsonValidators,

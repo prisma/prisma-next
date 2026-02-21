@@ -59,9 +59,28 @@ const metadataSchema: Record<string, unknown> = {
   required: ['name'],
 };
 
+const userMetadataSchema: Record<string, unknown> = {
+  type: 'object',
+  properties: { userName: { type: 'string' } },
+  required: ['userName'],
+};
+
+const postMetadataSchema: Record<string, unknown> = {
+  type: 'object',
+  properties: { postTitle: { type: 'string' } },
+  required: ['postTitle'],
+};
+
 function createMetadataValidatorRegistry(): JsonSchemaValidatorRegistry {
   const validators = new Map<string, JsonSchemaValidateFn>();
   validators.set('user.metadata', createStubValidator(metadataSchema));
+  return { get: (key) => validators.get(key), size: validators.size };
+}
+
+function createJoinMetadataValidatorRegistry(): JsonSchemaValidatorRegistry {
+  const validators = new Map<string, JsonSchemaValidateFn>();
+  validators.set('user.metadata', createStubValidator(userMetadataSchema));
+  validators.set('post.metadata', createStubValidator(postMetadataSchema));
   return { get: (key) => validators.get(key), size: validators.size };
 }
 
@@ -486,6 +505,74 @@ describe('JSON Schema decoding validation', () => {
           column: 'metadata',
           direction: 'decode',
           codecId: 'pg/jsonb@1',
+        }),
+      }),
+    );
+  });
+
+  it('validates aliased projection columns using projection mapping', () => {
+    const plan = createTestPlan({
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
+        projection: { userMeta: 'user.metadata' },
+        projectionTypes: { userMeta: 'pg/jsonb@1' },
+        refs: { columns: [{ table: 'user', column: 'metadata' }] },
+      },
+    });
+
+    const row = { userMeta: '{"age":30}' };
+    expect(() => decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry())).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+        details: expect.objectContaining({
+          table: 'user',
+          column: 'metadata',
+          direction: 'decode',
+        }),
+      }),
+    );
+  });
+
+  it('resolves join aliases with duplicate column names using projection mapping', () => {
+    const plan = createTestPlan({
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
+        projection: {
+          userMeta: 'user.metadata',
+          postMeta: 'post.metadata',
+        },
+        projectionTypes: {
+          userMeta: 'pg/jsonb@1',
+          postMeta: 'pg/jsonb@1',
+        },
+        refs: {
+          columns: [
+            { table: 'user', column: 'metadata' },
+            { table: 'post', column: 'metadata' },
+          ],
+        },
+      },
+    });
+
+    const row = {
+      userMeta: '{"userName":"Alice"}',
+      postMeta: '{"userName":"Alice"}',
+    };
+    expect(() =>
+      decodeRow(row, plan, codecRegistry, createJoinMetadataValidatorRegistry()),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+        details: expect.objectContaining({
+          table: 'post',
+          column: 'metadata',
+          direction: 'decode',
         }),
       }),
     );
