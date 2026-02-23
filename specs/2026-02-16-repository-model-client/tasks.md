@@ -533,7 +533,7 @@ Depends on: Groups 1-6 (core Collection changes)
 
 Depends on: All previous groups
 
-- [ ] **15.1 Update demo app to use new API patterns**
+- [x] **15.1 Update demo app to use new API patterns**
   - Migrate `/Users/aqrln/prisma/prisma-next/examples/prisma-next-demo/src/orm-client/` files
   - Replace old `orderBy(() => ({ column, direction }))` with new `orderBy(p => p.createdAt.desc())` pattern
   - Add examples using: `select()`, shorthand `where()`, `find({ id: 42 })`, `and()`/`or()`

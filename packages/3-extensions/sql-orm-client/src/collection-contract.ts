@@ -194,6 +194,23 @@ export function hasContractCapability(
   const capabilities = contract.capabilities as Record<string, unknown> | undefined;
   const value = capabilities?.[capability];
 
+  if (capabilityEnabled(value)) {
+    return true;
+  }
+
+  if (!capabilities) {
+    return false;
+  }
+
+  return Object.values(capabilities).some((targetCapabilities) => {
+    if (typeof targetCapabilities !== 'object' || targetCapabilities === null) {
+      return false;
+    }
+    return capabilityEnabled((targetCapabilities as Record<string, unknown>)[capability]);
+  });
+}
+
+function capabilityEnabled(value: unknown): boolean {
   if (value === true) {
     return true;
   }

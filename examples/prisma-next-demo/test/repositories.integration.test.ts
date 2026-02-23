@@ -6,7 +6,10 @@ import { createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
+import { ormClientAggregateUsers } from '../src/orm-client/aggregate-users';
+import { ormClientCreateUser } from '../src/orm-client/create-user';
 import { ormClientFindUserByEmail } from '../src/orm-client/find-user-by-email';
+import { ormClientFindUserById } from '../src/orm-client/find-user-by-id';
 import { ormClientGetAdminUsers } from '../src/orm-client/get-admin-users';
 import { ormClientGetDashboardUsers } from '../src/orm-client/get-dashboard-users';
 import { ormClientGetLatestUserPerKind } from '../src/orm-client/get-latest-user-per-kind';
@@ -14,6 +17,7 @@ import { ormClientGetPostFeed } from '../src/orm-client/get-post-feed';
 import { ormClientGetUserPosts } from '../src/orm-client/get-user-posts';
 import { ormClientGetUsers } from '../src/orm-client/get-users';
 import { ormClientGetUsersByIdCursor } from '../src/orm-client/get-users-by-id-cursor';
+import { ormClientUpdateUserEmail } from '../src/orm-client/update-user-email';
 import { db } from '../src/prisma/db';
 import { initTestDatabase } from './utils/control-client';
 
@@ -232,6 +236,95 @@ describe('ORM client integration examples', () => {
           });
           expect(asId((user as Record<string, unknown>)['id'])).toBe(seededUserIds.member);
           expect(missing).toBeNull();
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientFindUserById uses shorthand find({ id })',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          const user = await ormClientFindUserById(seededUserIds.admin, runtime);
+          const missing = await ormClientFindUserById(
+            '00000000-0000-0000-0000-000000000099',
+            runtime,
+          );
+
+          expect(asId((user as Record<string, unknown>)['id'])).toBe(seededUserIds.admin);
+          expect(missing).toBeNull();
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientCreateUser and ormClientUpdateUserEmail run create()/update() terminal methods',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          const created = await ormClientCreateUser(
+            {
+              id: '00000000-0000-0000-0000-000000000099',
+              email: 'created@example.com',
+              kind: 'user',
+              createdAt: new Date('2024-02-01T00:00:00.000Z'),
+            },
+            runtime,
+          );
+          const updated = await ormClientUpdateUserEmail(
+            '00000000-0000-0000-0000-000000000099',
+            'updated@example.com',
+            runtime,
+          );
+
+          expect(created).toEqual({
+            id: '00000000-0000-0000-0000-000000000099',
+            email: 'created@example.com',
+            kind: 'user',
+          });
+          expect(updated).toEqual({
+            id: '00000000-0000-0000-0000-000000000099',
+            email: 'updated@example.com',
+            kind: 'user',
+          });
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientAggregateUsers computes aggregate() totals',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          const aggregates = await ormClientAggregateUsers(runtime);
+
+          expect(aggregates).toEqual({
+            totalUsers: 4,
+            adminUsers: 2,
+          });
         } finally {
           await runtime.close();
         }

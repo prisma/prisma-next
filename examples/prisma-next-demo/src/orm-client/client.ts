@@ -7,11 +7,11 @@ const contract = db.context.contract as Contract;
 
 class UserCollection extends Collection<Contract, 'User'> {
   admins() {
-    return this.where((user) => user.kind.eq('admin'));
+    return this.where({ kind: 'admin' });
   }
 
   byEmail(email: string) {
-    return this.where((user) => user.email.eq(email));
+    return this.where({ email });
   }
 
   emailDomain(domain: string) {
@@ -29,7 +29,7 @@ class UserCollection extends Collection<Contract, 'User'> {
 
 class PostCollection extends Collection<Contract, 'Post'> {
   forUser(userId: string) {
-    return this.where((post) => post.userId.eq(userId));
+    return this.where({ userId });
   }
 
   withTitle(titleTerm: string) {
