@@ -1,145 +1,174 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  AliasNode,
+  AndNode,
+  BinaryOperationNode,
+  JoinNode,
+  OnNode,
+  type OperationNode,
+  OrderByItemNode,
+  OrderByNode,
+  OrNode,
+  ParensNode,
+  ReferenceNode,
+  SelectAllNode,
+  SelectionNode,
+  SelectQueryNode,
+  WhereNode,
+} from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
-import { getColumnName, getTableName, hasKind } from './kysely-ast-types';
+import { isSelectAllReference, unwrapAliasNode, unwrapSelectionNode } from './kysely-ast-types';
 
-function isMultiTableSelect(node: Record<string, unknown>): boolean {
-  const joins = node['joins'];
-  if (Array.isArray(joins) && joins.length > 0) return true;
-  const fromNode = node['from'];
-  if (typeof fromNode === 'object' && fromNode !== null) {
-    const froms = (fromNode as Record<string, unknown>)['froms'];
-    return Array.isArray(froms) && froms.length > 1;
-  }
-  return false;
+function isMultiTableSelect(node: SelectQueryNode): boolean {
+  const hasJoins = (node.joins?.length ?? 0) > 0;
+  const hasMultiFrom = (node.from?.froms.length ?? 0) > 1;
+  return hasJoins || hasMultiFrom;
 }
 
-function hasExplicitTableRef(node: unknown): boolean {
-  if (typeof node !== 'object' || node === null) return false;
-  const n = node as Record<string, unknown>;
-  const table = n['table'];
-  return typeof table === 'object' && table !== null;
-}
-
-function isColumnRef(node: unknown): boolean {
-  return getColumnName(node) !== undefined;
-}
-
-function checkUnqualifiedColumnRef(node: unknown, multiTable: boolean, path: string): void {
-  if (!multiTable) return;
-  if (typeof node !== 'object' || node === null) return;
-
-  const n = node as Record<string, unknown>;
-
-  if (hasKind(node, 'ReferenceNode')) {
-    const colNode = n['column'] ?? n;
-    if (isColumnRef(colNode) && !hasExplicitTableRef(colNode)) {
-      throw new KyselyTransformError(
-        'Unqualified column reference in multi-table scope; use table.column (e.g. user.id)',
-        KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
-        { path },
-      );
-    }
+function checkUnqualifiedColumnRef(node: OperationNode, multiTable: boolean, path: string): void {
+  if (!multiTable) {
+    return;
   }
 
-  if (hasKind(node, 'ColumnNode')) {
-    if (isColumnRef(node) && !hasExplicitTableRef(node)) {
-      throw new KyselyTransformError(
-        'Unqualified column reference in multi-table scope; use table.column (e.g. user.id)',
-        KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
-        { path },
-      );
-    }
+  if (!ReferenceNode.is(node)) {
+    return;
+  }
+
+  if (SelectAllNode.is(node.column)) {
+    return;
+  }
+
+  if (!node.table) {
+    throw new KyselyTransformError(
+      'Unqualified column reference in multi-table scope; use table.column (e.g. user.id)',
+      KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+      { path },
+    );
   }
 }
 
 function walkForColumnRefs(node: unknown, multiTable: boolean, path: string): void {
   if (!node) return;
-  if (typeof node !== 'object') return;
 
   if (Array.isArray(node)) {
-    for (let i = 0; i < node.length; i++) {
-      walkForColumnRefs(node[i], multiTable, `${path}[${i}]`);
+    for (let index = 0; index < node.length; index++) {
+      walkForColumnRefs(node[index], multiTable, `${path}[${index}]`);
     }
     return;
   }
 
-  checkUnqualifiedColumnRef(node, multiTable, path);
-
-  const n = node as Record<string, unknown>;
-
-  const childPaths: Array<{ key: string; value: unknown }> = [];
-  if (n['left']) childPaths.push({ key: 'left', value: n['left'] });
-  if (n['right']) childPaths.push({ key: 'right', value: n['right'] });
-  if (n['column']) childPaths.push({ key: 'column', value: n['column'] });
-  if (n['selection']) childPaths.push({ key: 'selection', value: n['selection'] });
-  if (n['orderBy']) childPaths.push({ key: 'orderBy', value: n['orderBy'] });
-  if (n['exprs']) {
-    const arr = n['exprs'] as unknown[];
-    for (let i = 0; i < arr.length; i++) {
-      childPaths.push({ key: `exprs[${i}]`, value: arr[i] });
-    }
+  if (typeof node !== 'object' || node === null || !('kind' in node)) {
+    return;
   }
-  if (n['items']) {
-    const arr = n['items'] as unknown[];
-    for (let i = 0; i < arr.length; i++) {
-      childPaths.push({ key: `items[${i}]`, value: arr[i] });
-    }
-  }
-  if (n['node']) childPaths.push({ key: 'node', value: n['node'] });
 
-  for (const { key, value } of childPaths) {
-    walkForColumnRefs(value, multiTable, `${path}.${key}`);
+  const operation = node as OperationNode;
+  checkUnqualifiedColumnRef(operation, multiTable, path);
+
+  if (SelectionNode.is(operation)) {
+    walkForColumnRefs(operation.selection, multiTable, `${path}.selection`);
+    return;
+  }
+
+  if (AliasNode.is(operation)) {
+    walkForColumnRefs(operation.node, multiTable, `${path}.node`);
+    return;
+  }
+
+  if (WhereNode.is(operation)) {
+    walkForColumnRefs(operation.where, multiTable, `${path}.where`);
+    return;
+  }
+
+  if (OnNode.is(operation)) {
+    walkForColumnRefs(operation.on, multiTable, `${path}.on`);
+    return;
+  }
+
+  if (ParensNode.is(operation)) {
+    walkForColumnRefs(operation.node, multiTable, `${path}.node`);
+    return;
+  }
+
+  if (BinaryOperationNode.is(operation)) {
+    walkForColumnRefs(operation.leftOperand, multiTable, `${path}.leftOperand`);
+    walkForColumnRefs(operation.rightOperand, multiTable, `${path}.rightOperand`);
+    return;
+  }
+
+  if (AndNode.is(operation) || OrNode.is(operation)) {
+    walkForColumnRefs(operation.left, multiTable, `${path}.left`);
+    walkForColumnRefs(operation.right, multiTable, `${path}.right`);
+    return;
+  }
+
+  if (OrderByNode.is(operation)) {
+    for (let index = 0; index < operation.items.length; index++) {
+      walkForColumnRefs(operation.items[index], multiTable, `${path}.items[${index}]`);
+    }
+    return;
+  }
+
+  if (OrderByItemNode.is(operation)) {
+    walkForColumnRefs(operation.orderBy, multiTable, `${path}.orderBy`);
+    return;
+  }
+
+  if (JoinNode.is(operation)) {
+    if (operation.on) {
+      walkForColumnRefs(operation.on, multiTable, `${path}.on`);
+    }
   }
 }
 
 function checkSelectAllAmbiguity(
-  selections: unknown,
+  selections: ReadonlyArray<SelectionNode> | undefined,
   multiTable: boolean,
-  _contract: SqlContract<SqlStorage>,
 ): void {
-  if (!multiTable) return;
-  const arr = Array.isArray(selections) ? selections : [];
-  for (const sel of arr) {
-    if (typeof sel !== 'object' || sel === null) continue;
-    if (!hasKind(sel, 'SelectAllNode')) continue;
-    const s = sel as Record<string, unknown>;
-    const tableRef = s['reference'] ?? s['table'];
-    const table = tableRef ? getTableName(tableRef) : undefined;
-    if (!table) {
+  if (!multiTable || !selections) {
+    return;
+  }
+
+  for (const selection of selections) {
+    const unwrappedSelection = unwrapSelectionNode(selection);
+    const { node: selectionNode } = unwrapAliasNode(unwrappedSelection);
+
+    if (SelectAllNode.is(selectionNode)) {
       throw new KyselyTransformError(
-        `Ambiguous selectAll in multi-table scope; qualify with table (e.g. db.selectFrom(u).innerJoin(p).selectAll('user'))`,
+        "Ambiguous selectAll in multi-table scope; qualify with table (e.g. db.selectFrom(u).innerJoin(p).selectAll('user'))",
+        KYSELY_TRANSFORM_ERROR_CODES.AMBIGUOUS_SELECT_ALL,
+      );
+    }
+
+    if (isSelectAllReference(selectionNode) && !selectionNode.table) {
+      throw new KyselyTransformError(
+        "Ambiguous selectAll in multi-table scope; qualify with table (e.g. db.selectFrom(u).innerJoin(p).selectAll('user'))",
         KYSELY_TRANSFORM_ERROR_CODES.AMBIGUOUS_SELECT_ALL,
       );
     }
   }
 }
 
-export function runGuardrails(contract: SqlContract<SqlStorage>, query: unknown): void {
-  if (!query || typeof query !== 'object') return;
-
-  const node = query as Record<string, unknown>;
-  const kind = node['kind'];
-
-  if (kind !== 'SelectQueryNode') return;
-
-  const multiTable = isMultiTableSelect(node);
-
-  walkForColumnRefs(node['selections'], multiTable, 'selections');
-  walkForColumnRefs(
-    (node['where'] as Record<string, unknown> | null)?.['node'] ?? node['where'],
-    multiTable,
-    'where',
-  );
-  walkForColumnRefs(node['orderBy'], multiTable, 'orderBy');
-  const joins = (node['joins'] ?? []) as unknown[];
-  for (let i = 0; i < joins.length; i++) {
-    const j = joins[i] as Record<string, unknown>;
-    walkForColumnRefs(
-      (j['on'] as Record<string, unknown> | null)?.['node'] ?? j['on'],
-      multiTable,
-      `joins[${i}].on`,
-    );
+export function runGuardrails(_contract: SqlContract<SqlStorage>, query: unknown): void {
+  if (!query || typeof query !== 'object' || !('kind' in query)) {
+    return;
   }
 
-  checkSelectAllAmbiguity(node['selections'], multiTable, contract);
+  const operationNode = query as OperationNode;
+  if (!SelectQueryNode.is(operationNode)) {
+    return;
+  }
+  const selectQuery = operationNode;
+
+  const multiTable = isMultiTableSelect(selectQuery);
+
+  walkForColumnRefs(selectQuery.selections, multiTable, 'selections');
+  walkForColumnRefs(selectQuery.where?.where, multiTable, 'where.where');
+  walkForColumnRefs(selectQuery.orderBy?.items, multiTable, 'orderBy.items');
+
+  for (let index = 0; index < (selectQuery.joins?.length ?? 0); index++) {
+    const join = selectQuery.joins?.[index];
+    walkForColumnRefs(join?.on?.on, multiTable, `joins[${index}].on.on`);
+  }
+
+  checkSelectAllAmbiguity(selectQuery.selections, multiTable);
 }
