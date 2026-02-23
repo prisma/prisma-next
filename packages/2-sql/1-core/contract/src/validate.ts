@@ -1,5 +1,5 @@
 import type { ColumnDefaultLiteralInputValue } from '@prisma-next/contract/types';
-import { isTaggedBigInt } from '@prisma-next/contract/types';
+import { isTaggedBigInt, isTaggedRaw } from '@prisma-next/contract/types';
 import type {
   ModelDefinition,
   SqlContract,
@@ -265,6 +265,9 @@ export function decodeDefaultLiteralValue(
 ): ColumnDefaultLiteralInputValue {
   if (value instanceof Date) {
     return value;
+  }
+  if (isTaggedRaw(value)) {
+    return value.value;
   }
   if (isTaggedBigInt(value)) {
     if (!isBigIntColumn(column)) {

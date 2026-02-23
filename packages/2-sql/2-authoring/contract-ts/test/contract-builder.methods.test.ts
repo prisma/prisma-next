@@ -508,7 +508,7 @@ describe('column default encoding', () => {
     });
   });
 
-  it('keeps tagged bigint literal defaults unchanged', () => {
+  it('wraps pre-tagged bigint objects in raw tag', () => {
     const tagged = { $type: 'bigint', value: '9007199254740993' } as const;
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
@@ -522,7 +522,51 @@ describe('column default encoding', () => {
 
     expect(contract.storage.tables.counter.columns.value.default).toEqual({
       kind: 'literal',
-      value: tagged,
+      value: { $type: 'raw', value: tagged },
+    });
+  });
+
+  it('wraps JSON objects with $type key in raw tag', () => {
+    const jsonbColumn = columnDescriptor('pg/jsonb@1');
+    const jsonDefault = { $type: 'custom', data: [1, 2, 3] } as const;
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('event', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('meta', {
+            type: jsonbColumn,
+            default: { kind: 'literal', value: jsonDefault },
+          })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.event.columns.meta.default).toEqual({
+      kind: 'literal',
+      value: { $type: 'raw', value: jsonDefault },
+    });
+  });
+
+  it('does not wrap JSON objects without $type key', () => {
+    const jsonbColumn = columnDescriptor('pg/jsonb@1');
+    const jsonDefault = { role: 'admin', tags: ['a', 'b'] } as const;
+    const contract = defineContract<CodecTypes>()
+      .target(postgresTargetPack)
+      .table('event', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('meta', {
+            type: jsonbColumn,
+            default: { kind: 'literal', value: jsonDefault },
+          })
+          .primaryKey(['id']),
+      )
+      .build();
+
+    expect(contract.storage.tables.event.columns.meta.default).toEqual({
+      kind: 'literal',
+      value: jsonDefault,
     });
   });
 

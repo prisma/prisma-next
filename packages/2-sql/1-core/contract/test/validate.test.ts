@@ -650,6 +650,58 @@ describe('validateContract', () => {
     });
   });
 
+  it('unwraps raw-tagged default to plain JSON value', () => {
+    const rawWrapped = { $type: 'raw', value: { $type: 'bigint', value: '42' } } as const;
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          payload: {
+            codecId: 'pg/jsonb@1',
+            nativeType: 'jsonb',
+            nullable: false,
+            default: { kind: 'literal', value: rawWrapped },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    expect(result.storage.tables.User.columns.payload.default).toEqual({
+      kind: 'literal',
+      value: { $type: 'bigint', value: '42' },
+    });
+  });
+
+  it('unwraps raw-tagged default with nested $type key', () => {
+    const rawWrapped = { $type: 'raw', value: { $type: 'custom', data: [1, 2, 3] } } as const;
+    const contract = makeContract({
+      User: {
+        columns: {
+          id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          meta: {
+            codecId: 'pg/jsonb@1',
+            nativeType: 'jsonb',
+            nullable: false,
+            default: { kind: 'literal', value: rawWrapped },
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+    });
+    const result = validateContract<SqlContract<SqlStorage>>(contract);
+    expect(result.storage.tables.User.columns.meta.default).toEqual({
+      kind: 'literal',
+      value: { $type: 'custom', data: [1, 2, 3] },
+    });
+  });
+
   it('throws on NOT NULL column with literal null default', () => {
     const contract = makeContract({
       User: {

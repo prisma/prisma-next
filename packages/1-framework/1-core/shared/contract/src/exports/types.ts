@@ -32,6 +32,7 @@ export type {
   StorageHashBase,
   TaggedBigInt,
   TaggedLiteralValue,
+  TaggedRaw,
   TargetFamilyHook,
   TypeRenderContext,
   TypeRenderEntry,
@@ -44,5 +45,6 @@ export {
   coreHash,
   isDocumentContract,
   isTaggedBigInt,
+  isTaggedRaw,
   profileHash,
 } from '../types';

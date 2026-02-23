@@ -816,10 +816,12 @@ function buildColumnDefaultSql(
 }
 
 function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
+  const isJsonColumn = column?.nativeType === 'json' || column?.nativeType === 'jsonb';
+
   if (value instanceof Date) {
     return `'${escapeLiteral(value.toISOString())}'`;
   }
-  if (isTaggedBigInt(value)) {
+  if (!isJsonColumn && isTaggedBigInt(value)) {
     if (!/^-?\d+$/.test(value.value)) {
       throw new Error(`Invalid tagged bigint value: "${value.value}" is not a valid integer`);
     }
@@ -838,7 +840,7 @@ function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
     return 'NULL';
   }
   const json = JSON.stringify(value);
-  if (column?.nativeType === 'json' || column?.nativeType === 'jsonb') {
+  if (isJsonColumn) {
     return `'${escapeLiteral(json)}'::${column.nativeType}`;
   }
   return `'${escapeLiteral(json)}'`;

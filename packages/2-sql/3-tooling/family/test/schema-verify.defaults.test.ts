@@ -40,7 +40,12 @@ const testNormalizer: DefaultNormalizer = (rawDefault: string): ColumnDefault | 
   // Strip the ::type cast so the normalized value matches what contract authors write.
   const stringMatch = trimmed.match(/^'((?:[^']|'')*)'(?:::(?:"[^"]+"|[\w\s]+)(?:\(\d+\))?)?$/);
   if (stringMatch?.[1] !== undefined) {
-    return { kind: 'literal', value: stringMatch[1].replace(/''/g, "'") };
+    const unescaped = stringMatch[1].replace(/''/g, "'");
+    try {
+      return { kind: 'literal', value: JSON.parse(unescaped) };
+    } catch {
+      return { kind: 'literal', value: unescaped };
+    }
   }
 
   // Fallback
@@ -188,6 +193,40 @@ describe('verifySqlSchema - defaults', () => {
           nativeType: 'jsonb',
           nullable: false,
           default: '\'{"key": "default"}\'::jsonb',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
+  it('matches JSONB default that looks like a tagged bigint', () => {
+    const contract = createTestContract({
+      literal_defaults: createContractTable({
+        payload: {
+          nativeType: 'jsonb',
+          nullable: false,
+          default: { kind: 'literal', value: { $type: 'bigint', value: '42' } },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      literal_defaults: createSchemaTable('literal_defaults', {
+        payload: {
+          nativeType: 'jsonb',
+          nullable: false,
+          default: '\'{"$type":"bigint","value":"42"}\'::jsonb',
         },
       }),
     });

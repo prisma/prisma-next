@@ -110,7 +110,18 @@ export function bigintJsonReplacer(_key: string, value: unknown): unknown {
   return value;
 }
 
-export type TaggedLiteralValue = TaggedBigInt;
+export type TaggedRaw = { readonly $type: 'raw'; readonly value: JsonValue };
+
+export function isTaggedRaw(value: unknown): value is TaggedRaw {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { $type?: unknown }).$type === 'raw' &&
+    'value' in (value as object)
+  );
+}
+
+export type TaggedLiteralValue = TaggedBigInt | TaggedRaw;
 
 export type ColumnDefaultLiteralValue = JsonValue | TaggedLiteralValue;
 

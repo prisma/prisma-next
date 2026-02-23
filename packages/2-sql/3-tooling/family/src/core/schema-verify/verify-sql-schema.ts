@@ -1003,11 +1003,17 @@ function isTemporalNativeType(nativeType?: string): boolean {
   return normalized.includes('timestamp') || normalized === 'date';
 }
 
+function isBigIntNativeType(nativeType?: string): boolean {
+  if (!nativeType) return false;
+  const normalized = nativeType.toLowerCase();
+  return normalized === 'bigint' || normalized === 'int8';
+}
+
 function normalizeLiteralValue(value: unknown, nativeType?: string): unknown {
   if (value instanceof Date) {
     return value.toISOString();
   }
-  if (isTaggedBigInt(value)) {
+  if (isTaggedBigInt(value) && isBigIntNativeType(nativeType)) {
     return value.value;
   }
   if (typeof value === 'bigint') {

@@ -5,8 +5,8 @@ import type {
   ColumnDefaultLiteralValue,
   ExecutionMutationDefault,
   ExecutionMutationDefaultValue,
+  TaggedRaw,
 } from '@prisma-next/contract/types';
-import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
@@ -243,10 +243,10 @@ function encodeDefaultLiteralValue(
   if (value instanceof Date) {
     return value.toISOString();
   }
-  if (isTaggedBigInt(value)) {
-    return value;
-  }
   if (isJsonValue(value)) {
+    if (isPlainObject(value) && '$type' in value) {
+      return { $type: 'raw', value } satisfies TaggedRaw;
+    }
     return value;
   }
   throw new Error(
