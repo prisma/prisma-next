@@ -234,12 +234,15 @@ function getColumnCastType(
 /**
  * Quotes a SQL type name for use in a `::type` cast if it requires quoting.
  * Mixed-case identifiers (e.g. enum names like "UserRole") must be quoted to
- * preserve case in PostgreSQL. Built-in types with parameters (character varying(255),
- * numeric(10,2)) and array types (int4[]) are always lowercase and don't need quoting.
+ * preserve case in PostgreSQL. Array suffixes are handled separately so that
+ * `UserRole[]` becomes `"UserRole"[]` rather than being left unquoted.
  */
 function quoteCastType(typeName: string): string {
-  if (typeName !== typeName.toLowerCase() && !typeName.includes('(') && !typeName.includes('[')) {
-    return `"${typeName}"`;
+  const arraySuffix = typeName.endsWith('[]') ? '[]' : '';
+  const baseName = arraySuffix ? typeName.slice(0, -2) : typeName;
+
+  if (baseName !== baseName.toLowerCase() && !baseName.includes('(')) {
+    return `"${baseName}"${arraySuffix}`;
   }
   return typeName;
 }

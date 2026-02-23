@@ -1330,6 +1330,113 @@ describe('createPostgresAdapter', () => {
     });
   });
 
+  describe('enum array type casting', () => {
+    const enumArrayContract = Object.freeze(
+      validateContract<PostgresContract>({
+        target: 'postgres',
+        targetFamily: 'sql' as const,
+        storageHash: 'sha256:test-core',
+        profileHash: 'sha256:test-profile',
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                roles: {
+                  codecId: 'pg/array@1',
+                  nativeType: 'UserRole[]',
+                  nullable: false,
+                  typeParams: {
+                    element: { codecId: 'pg/enum@1', nativeType: 'UserRole' },
+                  },
+                },
+                tags: {
+                  codecId: 'pg/array@1',
+                  nativeType: 'status[]',
+                  nullable: false,
+                  typeParams: {
+                    element: { codecId: 'pg/enum@1', nativeType: 'status' },
+                  },
+                },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+          },
+        },
+        models: {},
+        relations: {},
+        mappings: {},
+      }),
+    );
+
+    it('casts camelCase enum array in INSERT', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: InsertAst = {
+        kind: 'insert',
+        table: { kind: 'table', name: 'user' },
+        values: {
+          id: { kind: 'param', index: 1, name: 'id' },
+          roles: { kind: 'param', index: 2, name: 'roles' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: enumArrayContract,
+        params: [1, ['ADMIN', 'MODERATOR']],
+      });
+
+      expect(lowered.body.sql).toContain('$2::"UserRole"[]');
+    });
+
+    it('casts lowercase enum array in INSERT without quoting', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: InsertAst = {
+        kind: 'insert',
+        table: { kind: 'table', name: 'user' },
+        values: {
+          id: { kind: 'param', index: 1, name: 'id' },
+          tags: { kind: 'param', index: 2, name: 'tags' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: enumArrayContract,
+        params: [1, ['active', 'pending']],
+      });
+
+      expect(lowered.body.sql).toContain('$2::status[]');
+    });
+
+    it('casts camelCase enum array in UPDATE', () => {
+      const adapter = createPostgresAdapter();
+
+      const ast: UpdateAst = {
+        kind: 'update',
+        table: { kind: 'table', name: 'user' },
+        set: {
+          roles: { kind: 'param', index: 1, name: 'roles' },
+        },
+        where: {
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'user', column: 'id' },
+          right: { kind: 'param', index: 2, name: 'userId' },
+        },
+      };
+
+      const lowered = adapter.lower(ast, {
+        contract: enumArrayContract,
+        params: [['ADMIN'], 1],
+      });
+
+      expect(lowered.body.sql).toContain('$1::"UserRole"[]');
+    });
+  });
+
   describe('literal rendering', () => {
     it('renders array literals', () => {
       const adapter = createPostgresAdapter();
