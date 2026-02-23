@@ -146,4 +146,24 @@ describe('expandParameterizedNativeType', () => {
 
     expect(result).toBe('timestamp[]');
   });
+
+  it('expands camelCase enum array from element nativeType', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'UserRole[]',
+      codecId: PG_ARRAY_CODEC_ID,
+      typeParams: { element: { codecId: 'pg/enum@1', nativeType: 'UserRole' } },
+    });
+
+    expect(result).toBe('UserRole[]');
+  });
+
+  it('expands lowercase enum array from element nativeType', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'status[]',
+      codecId: PG_ARRAY_CODEC_ID,
+      typeParams: { element: { codecId: 'pg/enum@1', nativeType: 'status' } },
+    });
+
+    expect(result).toBe('status[]');
+  });
 });

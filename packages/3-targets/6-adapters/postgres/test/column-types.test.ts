@@ -1,7 +1,13 @@
 import { type as arktype } from 'arktype';
 import { describe, expect, it } from 'vitest';
-import { PG_ARRAY_CODEC_ID, PG_INT4_CODEC_ID, PG_TIMESTAMP_CODEC_ID } from '../src/core/codec-ids';
 import {
+  PG_ARRAY_CODEC_ID,
+  PG_ENUM_CODEC_ID,
+  PG_INT4_CODEC_ID,
+  PG_TIMESTAMP_CODEC_ID,
+} from '../src/core/codec-ids';
+import {
+  enumColumn,
   int4Column,
   json,
   jsonb,
@@ -190,5 +196,37 @@ describe('listOf', () => {
     const element = result.typeParams?.['element'] as Record<string, unknown>;
 
     expect(element).not.toHaveProperty('typeParams');
+  });
+
+  it('wraps a camelCase enum column', () => {
+    const role = enumColumn('UserRole', 'UserRole');
+    const result = listOf(role);
+
+    expect(result.codecId).toBe(PG_ARRAY_CODEC_ID);
+    expect(result.nativeType).toBe('UserRole[]');
+    expect(result.typeParams).toEqual({
+      element: { codecId: PG_ENUM_CODEC_ID, nativeType: 'UserRole' },
+    });
+  });
+
+  it('wraps a lowercase enum column', () => {
+    const status = enumColumn('status', 'status');
+    const result = listOf(status);
+
+    expect(result.codecId).toBe(PG_ARRAY_CODEC_ID);
+    expect(result.nativeType).toBe('status[]');
+    expect(result.typeParams).toEqual({
+      element: { codecId: PG_ENUM_CODEC_ID, nativeType: 'status' },
+    });
+  });
+
+  it('wraps a camelCase enum column with nullableElement', () => {
+    const role = enumColumn('UserRole', 'UserRole');
+    const result = listOf(role, { nullableElement: true });
+
+    expect(result.typeParams).toEqual({
+      element: { codecId: PG_ENUM_CODEC_ID, nativeType: 'UserRole' },
+      nullableElement: true,
+    });
   });
 });

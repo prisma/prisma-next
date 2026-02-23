@@ -59,6 +59,26 @@ describe('array storage type entry', () => {
   });
 });
 
+describe('array type renderer with enum element', () => {
+  it('renders Array<EnumType> for a camelCase enum element', () => {
+    const result = arrayRenderer.render(
+      { element: { codecId: 'pg/enum@1', nativeType: 'UserRole' } },
+      ctx,
+    );
+
+    expect(result).toBe("Array<CodecTypes['pg/enum@1']['output']>");
+  });
+
+  it('renders Array<EnumType | null> for nullable enum element', () => {
+    const result = arrayRenderer.render(
+      { element: { codecId: 'pg/enum@1', nativeType: 'status' }, nullableElement: true },
+      ctx,
+    );
+
+    expect(result).toBe("Array<CodecTypes['pg/enum@1']['output'] | null>");
+  });
+});
+
 describe('array codec control hooks', () => {
   it('registers control hooks for pg/array@1', () => {
     const hooks = postgresAdapterDescriptorMeta.types.codecTypes.controlPlaneHooks;
