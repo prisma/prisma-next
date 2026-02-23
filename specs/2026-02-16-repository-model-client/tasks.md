@@ -555,7 +555,7 @@ Depends on: All previous groups
   - Files to delete: `packages/2-sql/4-lanes/orm-lane/` (or equivalent path)
   - Files to modify: root `pnpm-workspace.yaml` or `turbo.json` if needed
 
-- [ ] **15.4 Run full test suite and typecheck**
+- [x] **15.4 Run full test suite and typecheck**
   - `pnpm test` -- all tests across monorepo
   - `pnpm typecheck` -- type checking across monorepo
   - `pnpm lint:deps` -- architectural boundary validation
