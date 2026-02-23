@@ -122,9 +122,6 @@ importers:
       '@prisma-next/sql-orm-client':
         specifier: workspace:*
         version: link:../../packages/3-extensions/sql-orm-client
-      '@prisma-next/sql-orm-lane':
-        specifier: workspace:*
-        version: link:../../packages/2-sql/4-lanes/orm-lane
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../packages/2-sql/4-lanes/relational-core
@@ -1011,52 +1008,6 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/2-sql/4-lanes/orm-lane:
-    dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/shared/contract
-      '@prisma-next/plan':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/shared/plan
-      '@prisma-next/sql-contract':
-        specifier: workspace:*
-        version: link:../../1-core/contract
-      '@prisma-next/sql-lane':
-        specifier: workspace:*
-        version: link:../sql-lane
-      '@prisma-next/sql-relational-core':
-        specifier: workspace:*
-        version: link:../relational-core
-    devDependencies:
-      '@prisma-next/operations':
-        specifier: workspace:*
-        version: link:../../../1-framework/1-core/shared/operations
-      '@prisma-next/sql-contract-ts':
-        specifier: workspace:*
-        version: link:../../2-authoring/contract-ts
-      '@prisma-next/sql-runtime':
-        specifier: workspace:*
-        version: link:../../5-runtime
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../../../../test/utils
-      '@prisma-next/tsconfig':
-        specifier: workspace:*
-        version: link:../../../0-config/tsconfig
-      '@prisma-next/tsdown':
-        specifier: workspace:*
-        version: link:../../../0-config/tsdown
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.18.4(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
-
   packages/2-sql/4-lanes/query-builder:
     devDependencies:
       '@prisma-next/contract':
@@ -1631,9 +1582,6 @@ importers:
       '@prisma-next/sql-lane':
         specifier: workspace:*
         version: link:../../../2-sql/4-lanes/sql-lane
-      '@prisma-next/sql-orm-lane':
-        specifier: workspace:*
-        version: link:../../../2-sql/4-lanes/orm-lane
       '@prisma-next/sql-relational-core':
         specifier: workspace:*
         version: link:../../../2-sql/4-lanes/relational-core

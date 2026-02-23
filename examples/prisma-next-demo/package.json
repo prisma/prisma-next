@@ -28,7 +28,6 @@
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
-    "@prisma-next/sql-orm-lane": "workspace:*",
     "@prisma-next/postgres": "workspace:*",
     "@prisma-next/sql-orm-client": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",

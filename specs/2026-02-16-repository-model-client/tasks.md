@@ -548,7 +548,7 @@ Depends on: All previous groups
   - Note: `prisma-next-demo` currently has no `build` script; `typecheck` was used as the compile verification step
   - Acceptance: Demo app compiles and integration tests pass
 
-- [ ] **15.3 Delete deprecated ORM lane package**
+- [x] **15.3 Delete deprecated ORM lane package**
   - Per spec section 12: `@prisma-next/sql-orm-lane` is replaced by the ORM client
   - Remove the package directory and references from the monorepo
   - Update any imports or references in other packages/examples
