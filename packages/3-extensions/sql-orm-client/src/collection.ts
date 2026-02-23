@@ -2,6 +2,7 @@ import { executeCompiledQuery } from '@prisma-next/integration-kysely';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
+import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import {
   assertReturningCapability,
   resolveIncludeRelation,
@@ -21,6 +22,7 @@ import {
 } from './collection-runtime';
 import { shorthandToWhereExpr } from './filters';
 import {
+  compileAggregate,
   compileDeleteCount,
   compileDeleteReturning,
   compileInsertCount,
@@ -38,6 +40,9 @@ import {
   hasNestedMutationCallbacks,
 } from './mutation-executor';
 import type {
+  AggregateBuilder,
+  AggregateResult,
+  AggregateSpec,
   CollectionContext,
   CollectionState,
   CollectionTypeState,
@@ -90,7 +95,7 @@ type IncludeRefinementCollection<
   ModelName extends string,
   Row,
   State extends CollectionTypeState,
-> = Omit<Collection<TContract, ModelName, Row, State>, 'all' | 'find'>;
+> = Omit<Collection<TContract, ModelName, Row, State>, 'all' | 'find' | 'aggregate'>;
 
 export class Collection<
   TContract extends SqlContract<SqlStorage>,
@@ -350,6 +355,65 @@ export class Collection<
     const limited = scoped.take(1);
     const rows = await limited.#dispatch().toArray();
     return rows[0] ?? null;
+  }
+
+  async aggregate<Spec extends AggregateSpec>(
+    fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
+  ): Promise<AggregateResult<Spec>> {
+    const aggregateSpec = fn(createAggregateBuilder(this.ctx.contract, this.modelName));
+    const entries = Object.entries(aggregateSpec);
+    if (entries.length === 0) {
+      throw new Error('aggregate() requires at least one aggregation selector');
+    }
+
+    for (const [alias, selector] of entries) {
+      if (!isAggregateSelector(selector)) {
+        throw new Error(`aggregate() selector "${alias}" is invalid`);
+      }
+    }
+
+    const compiled = compileAggregate(this.tableName, this.state.filters, aggregateSpec);
+    const rows = await executeCompiledQuery<Record<string, unknown>>(
+      this.ctx.runtime,
+      this.ctx.contract,
+      compiled,
+      { lane: 'orm-client' },
+    ).toArray();
+    const row = rows[0] ?? {};
+
+    const result: Record<string, unknown> = {};
+    for (const [alias, selector] of entries) {
+      const value = row[alias];
+      if (value === null) {
+        result[alias] = null;
+        continue;
+      }
+
+      if (value === undefined) {
+        result[alias] = selector.fn === 'count' ? 0 : null;
+        continue;
+      }
+
+      if (typeof value === 'number') {
+        result[alias] = value;
+        continue;
+      }
+
+      if (typeof value === 'bigint') {
+        result[alias] = Number(value);
+        continue;
+      }
+
+      if (typeof value === 'string') {
+        const numeric = Number(value);
+        result[alias] = Number.isNaN(numeric) ? value : numeric;
+        continue;
+      }
+
+      result[alias] = value;
+    }
+
+    return result as AggregateResult<Spec>;
   }
 
   async create(data: CreateInput<TContract, ModelName>): Promise<Row>;

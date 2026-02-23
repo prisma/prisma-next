@@ -419,7 +419,7 @@ Depends on: Group 8 (create), Group 9 (update/delete)
 
 Depends on: Group 1 (WhereExpr)
 
-- [ ] **11.1 Implement aggregate() terminal method**
+- [x] **11.1 Implement aggregate() terminal method**
   - `aggregate(fn: (a: AggregateBuilder) => AggregateSpec)` -- returns `Promise<AggregateResult>`
   - `AggregateBuilder` provides: `count()`, `sum(field)`, `avg(field)`, `min(field)`, `max(field)`
   - `sum`/`avg` typed to accept only numeric fields

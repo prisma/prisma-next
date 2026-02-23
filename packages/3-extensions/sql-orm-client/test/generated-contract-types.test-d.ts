@@ -147,6 +147,13 @@ const orderedUsers = userCollection.orderBy((user) => user.id.asc());
 const cursorPagedUsers = orderedUsers.cursor({ id: 'user_001' });
 const distinctUsers = userCollection.distinct('email');
 const distinctOnUsers = orderedUsers.distinctOn('email');
+const userAggregate = userCollection.aggregate((aggregate) => ({
+  count: aggregate.count(),
+}));
+postCollection.aggregate((aggregate) => ({
+  // @ts-expect-error sum() is restricted to numeric fields only
+  total: aggregate.sum('title'),
+}));
 userCollection.create({
   id: 'user_001',
   name: 'Alice',
@@ -210,6 +217,7 @@ type OrderedUsersState = StateOf<typeof orderedUsers>;
 type CursorPagedUsersState = StateOf<typeof cursorPagedUsers>;
 type DistinctUsersState = StateOf<typeof distinctUsers>;
 type DistinctOnUsersState = StateOf<typeof distinctOnUsers>;
+type UserAggregateResult = Awaited<typeof userAggregate>;
 
 export type GeneratedContractTypeAssertions = [
   Assert<Equal<keyof SelectedUserRow, 'name' | 'email'>>,
@@ -226,4 +234,5 @@ export type GeneratedContractTypeAssertions = [
   Assert<Equal<CursorPagedUsersState['hasOrderBy'], true>>,
   Assert<Equal<DistinctUsersState['hasOrderBy'], false>>,
   Assert<Equal<DistinctOnUsersState['hasOrderBy'], true>>,
+  Assert<Equal<UserAggregateResult, { count: number }>>,
 ];

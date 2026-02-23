@@ -1,9 +1,9 @@
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
-import type { CompiledQuery, ExpressionBuilder } from 'kysely';
+import { type CompiledQuery, type ExpressionBuilder, sql } from 'kysely';
 import { applyCursorPagination } from './kysely-compiler-cursor';
 import { type AnyDB, type AnySelectQueryBuilder, queryCompiler } from './kysely-compiler-shared';
 import { combineWhereFilters, whereExprToKysely } from './kysely-compiler-where';
-import type { CollectionState, IncludeExpr } from './types';
+import type { AggregateSelector, CollectionState, IncludeExpr } from './types';
 
 export function compileSelect(tableName: string, state: CollectionState): CompiledQuery {
   let qb = queryCompiler.selectFrom(tableName);
@@ -48,6 +48,44 @@ export function compileRelationSelect(
   }
 
   return qb.compile();
+}
+
+export function compileAggregate(
+  tableName: string,
+  filters: readonly WhereExpr[],
+  aggregateSpec: Record<string, AggregateSelector<unknown>>,
+): CompiledQuery<Record<string, unknown>> {
+  const entries = Object.entries(aggregateSpec);
+  if (entries.length === 0) {
+    throw new Error('aggregate() requires at least one aggregation selector');
+  }
+
+  let qb = queryCompiler.selectFrom(tableName);
+  qb = applyWhereFilters(qb, filters);
+  const selections = entries.map(([alias, selector]) => {
+    if (selector.fn === 'count') {
+      return sql<number>`count(*)`.as(alias);
+    }
+
+    const column = selector.column;
+    if (!column) {
+      throw new Error(`Aggregate selector "${selector.fn}" requires a field`);
+    }
+
+    const qualifiedColumn = sql.ref(`${tableName}.${column}`);
+    if (selector.fn === 'sum') {
+      return sql<number | null>`sum(${qualifiedColumn})`.as(alias);
+    }
+    if (selector.fn === 'avg') {
+      return sql<number | null>`avg(${qualifiedColumn})`.as(alias);
+    }
+    if (selector.fn === 'min') {
+      return sql<number | null>`min(${qualifiedColumn})`.as(alias);
+    }
+    return sql<number | null>`max(${qualifiedColumn})`.as(alias);
+  });
+
+  return qb.select(selections as never).compile() as CompiledQuery<Record<string, unknown>>;
 }
 
 export function compileSelectWithIncludeStrategy(

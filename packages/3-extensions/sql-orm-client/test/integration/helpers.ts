@@ -15,6 +15,11 @@ export function createUsersCollection(runtime: PgIntegrationRuntime) {
   return new Collection({ contract, runtime }, 'User');
 }
 
+export function createPostsCollection(runtime: PgIntegrationRuntime) {
+  const contract = createTestContract();
+  return new Collection({ contract, runtime }, 'Post');
+}
+
 export function createReturningUsersCollection(runtime: PgIntegrationRuntime) {
   const contract = withReturningCapability(createTestContract());
   return new Collection({ contract, runtime }, 'User');

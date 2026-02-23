@@ -168,6 +168,42 @@ export type DefaultModelRow<TContract extends SqlContract<SqlStorage>, ModelName
   [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
 };
 
+declare const aggregateResultBrand: unique symbol;
+
+export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
+
+export interface AggregateSelector<Result> {
+  readonly kind: 'aggregate';
+  readonly fn: AggregateFn;
+  readonly column?: string;
+  readonly [aggregateResultBrand]?: Result;
+}
+
+export type AggregateSpec = Record<string, AggregateSelector<unknown>>;
+
+export type AggregateResult<Spec extends AggregateSpec> = {
+  [K in keyof Spec]: Spec[K] extends AggregateSelector<infer Result> ? Result : never;
+};
+
+export interface AggregateBuilder<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> {
+  count(): AggregateSelector<number>;
+  sum<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): AggregateSelector<number | null>;
+  avg<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): AggregateSelector<number | null>;
+  min<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): AggregateSelector<number | null>;
+  max<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): AggregateSelector<number | null>;
+}
+
 export type ShorthandWhereFilter<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
@@ -323,6 +359,61 @@ type FieldStorageColumn<
       : never
     : never
   : never;
+
+type NumericNativeType =
+  | 'smallint'
+  | 'int2'
+  | 'integer'
+  | 'int4'
+  | 'bigint'
+  | 'int8'
+  | 'real'
+  | 'float4'
+  | 'double precision'
+  | 'float8'
+  | 'numeric'
+  | 'decimal'
+  | 'smallserial'
+  | 'serial'
+  | 'bigserial';
+
+type IsNumericStorageColumn<Column> = Column extends {
+  readonly nativeType: infer Native extends string;
+}
+  ? Native extends NumericNativeType
+    ? true
+    : false
+  : false;
+
+type StrictNumericFieldNames<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = {
+  [K in keyof DefaultModelRow<TContract, ModelName> & string]: IsNumericStorageColumn<
+    FieldStorageColumn<TContract, ModelName, K>
+  > extends true
+    ? K
+    : never;
+}[keyof DefaultModelRow<TContract, ModelName> & string];
+
+type NumericFieldNamesFromRowType<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = {
+  [K in keyof DefaultModelRow<TContract, ModelName> & string]: DefaultModelRow<
+    TContract,
+    ModelName
+  >[K] extends number
+    ? K
+    : never;
+}[keyof DefaultModelRow<TContract, ModelName> & string];
+
+export type NumericFieldNames<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> = [StrictNumericFieldNames<TContract, ModelName>] extends [never]
+  ? NumericFieldNamesFromRowType<TContract, ModelName>
+  : StrictNumericFieldNames<TContract, ModelName>;
 
 type ExecutionDefaultEntry<TContract extends SqlContract<SqlStorage>> =
   TContract['execution'] extends {
