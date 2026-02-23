@@ -19,9 +19,7 @@ describe('sql-compilation/find', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
-    await collection
-      .where((user) => user.name.eq('Alice'))
-      .all();
+    await collection.where((user) => user.name.eq('Alice')).all();
 
     const sqlText = runtime.executions[0]!.plan.sql;
     expect(sqlText).toContain('where');

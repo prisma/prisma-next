@@ -108,8 +108,7 @@ describe('sql-compilation/pagination', () => {
       collection
         .orderBy([(user) => user.name.asc(), (user) => user.email.asc()])
         .cursor({ name: 'Alice' })
-        .all()
-        ,
+        .all(),
     ).toThrow(/Missing cursor value for orderBy column "email"/);
   });
 });

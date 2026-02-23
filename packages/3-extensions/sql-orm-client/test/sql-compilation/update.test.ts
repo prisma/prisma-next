@@ -23,9 +23,7 @@ describe('sql-compilation/update', () => {
       ],
     ]);
 
-    const updated = await collection
-      .where({ name: 'Old' })
-      .updateAll({ name: 'Updated' });
+    const updated = await collection.where({ name: 'Old' }).updateAll({ name: 'Updated' });
 
     expect(updated).toEqual([
       { id: 1, name: 'Updated', email: 'alice@example.com' },
