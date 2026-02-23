@@ -3,6 +3,12 @@ import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
+import { normalizeAggregateResult } from './collection-aggregate-result';
+import {
+  mapCursorValuesToColumns,
+  mapFieldsToColumns,
+  mapFieldToColumn,
+} from './collection-column-mapping';
 import {
   assertReturningCapability,
   isToOneCardinality,
@@ -11,16 +17,23 @@ import {
   resolvePrimaryKeyColumn,
   resolveUpsertConflictColumns,
 } from './collection-contract';
-import { dispatchCollectionRows, stitchIncludes } from './collection-dispatch';
+import { dispatchCollectionRows } from './collection-dispatch';
+import type {
+  CollectionConstructor,
+  CollectionInit,
+  IncludedRelationsForRow,
+  IncludeRefinementCollection,
+  IncludeRefinementResult,
+  IncludeRefinementValue,
+  IsToManyRelation,
+  WithOrderByState,
+  WithWhereState,
+} from './collection-internal-types';
 import {
-  acquireRuntimeScope,
-  augmentSelectionForJoinColumns,
-  createRowEnvelope,
-  mapModelDataToStorageRow,
-  mapResultRows,
-  mapStorageRowToModelFields,
-  stripHiddenMappedFields,
-} from './collection-runtime';
+  dispatchMutationRows,
+  executeMutationReturningSingleRow,
+} from './collection-mutation-dispatch';
+import { augmentSelectionForJoinColumns, mapModelDataToStorageRow } from './collection-runtime';
 import { shorthandToWhereExpr } from './filters';
 import { GroupedCollection } from './grouped-collection';
 import {
@@ -61,7 +74,6 @@ import type {
   IncludeCombine,
   IncludeCombineBranch,
   IncludeExpr,
-  IncludeRelationValue,
   IncludeScalar,
   ModelAccessor,
   MutationCreateInput,
@@ -71,98 +83,11 @@ import type {
   OrderByDirective,
   OrderExpr,
   RelatedModelName,
-  RelationCardinality,
   RelationNames,
   ShorthandWhereFilter,
   UniqueConstraintCriterion,
 } from './types';
 import { emptyState } from './types';
-
-interface CollectionInit<TContract extends SqlContract<SqlStorage>> {
-  readonly tableName?: string | undefined;
-  readonly state?: CollectionState | undefined;
-  readonly registry?: ReadonlyMap<string, CollectionConstructor<TContract>> | undefined;
-  readonly includeRefinementMode?: boolean | undefined;
-}
-
-type CollectionConstructor<TContract extends SqlContract<SqlStorage>> = new (
-  ctx: CollectionContext<TContract>,
-  modelName: string,
-  options?: CollectionInit<TContract>,
-) => Collection<TContract, string, unknown, CollectionTypeState>;
-
-type WithWhereState<State extends CollectionTypeState> = Omit<State, 'hasWhere'> & {
-  readonly hasWhere: true;
-};
-
-type WithOrderByState<State extends CollectionTypeState> = Omit<State, 'hasOrderBy'> & {
-  readonly hasOrderBy: true;
-};
-
-type IncludedRelationsForRow<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-  Row,
-> = Omit<Row, keyof DefaultModelRow<TContract, ModelName>>;
-
-type IncludeRefinementTerminals =
-  | 'all'
-  | 'find'
-  | 'aggregate'
-  | 'groupBy'
-  | 'create'
-  | 'createAll'
-  | 'createCount'
-  | 'update'
-  | 'updateAll'
-  | 'updateCount'
-  | 'delete'
-  | 'deleteAll'
-  | 'deleteCount'
-  | 'upsert';
-
-type IncludeRefinementScalarMethods = 'count' | 'sum' | 'avg' | 'min' | 'max' | 'combine';
-
-type IncludeRefinementCollection<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-  Row,
-  State extends CollectionTypeState,
-  IsToMany extends boolean,
-> = Omit<
-  Collection<TContract, ModelName, Row, State>,
-  IncludeRefinementTerminals | (IsToMany extends true ? never : IncludeRefinementScalarMethods)
->;
-
-type IsToManyRelation<
-  TContract extends SqlContract<SqlStorage>,
-  ModelName extends string,
-  RelName extends string,
-> = RelationCardinality<TContract, ModelName, RelName> extends '1:N' | 'M:N' ? true : false;
-
-type IncludeRefinementResult<
-  TContract extends SqlContract<SqlStorage>,
-  RelatedName extends string,
-  IsToMany extends boolean,
-> =
-  | IncludeRefinementCollection<TContract, RelatedName, unknown, CollectionTypeState, IsToMany>
-  | (IsToMany extends true
-      ? IncludeScalar<unknown> | IncludeCombine<Record<string, unknown>>
-      : never);
-
-type IncludeRefinementValue<
-  TContract extends SqlContract<SqlStorage>,
-  ParentModelName extends string,
-  RelName extends string,
-  DefaultIncludedRow,
-  RefinedResult,
-> = RefinedResult extends IncludeScalar<infer ScalarResult>
-  ? ScalarResult
-  : RefinedResult extends IncludeCombine<infer CombinedResult>
-    ? CombinedResult
-    : RefinedResult extends Collection<TContract, string, infer IncludedRow, CollectionTypeState>
-      ? IncludeRelationValue<TContract, ParentModelName, RelName, IncludedRow>
-      : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow>;
 
 export class Collection<
   TContract extends SqlContract<SqlStorage>,
@@ -362,8 +287,7 @@ export class Collection<
       IncludedRelationsForRow<TContract, ModelName, Row>,
     State
   > {
-    const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
-    const selectedFields = fields.map((fieldName) => fieldToColumn[fieldName] ?? fieldName);
+    const selectedFields = mapFieldsToColumns(this.ctx.contract, this.modelName, fields);
 
     return this.#cloneWithRow<
       Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> &
@@ -400,8 +324,7 @@ export class Collection<
       ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
     ],
   >(...fields: Fields): GroupedCollection<TContract, ModelName, Fields> {
-    const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
-    const groupByColumns = fields.map((fieldName) => fieldToColumn[fieldName] ?? fieldName);
+    const groupByColumns = mapFieldsToColumns(this.ctx.contract, this.modelName, fields);
 
     return new GroupedCollection(this.ctx, this.modelName, {
       tableName: this.tableName,
@@ -421,9 +344,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('sum()');
-    const fieldName = field as string;
-    const columnName =
-      this.ctx.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ?? fieldName;
+    const columnName = mapFieldToColumn(this.ctx.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('sum', this.state, columnName);
   }
 
@@ -431,9 +352,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('avg()');
-    const fieldName = field as string;
-    const columnName =
-      this.ctx.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ?? fieldName;
+    const columnName = mapFieldToColumn(this.ctx.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('avg', this.state, columnName);
   }
 
@@ -441,9 +360,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('min()');
-    const fieldName = field as string;
-    const columnName =
-      this.ctx.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ?? fieldName;
+    const columnName = mapFieldToColumn(this.ctx.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('min', this.state, columnName);
   }
 
@@ -451,9 +368,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('max()');
-    const fieldName = field as string;
-    const columnName =
-      this.ctx.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ?? fieldName;
+    const columnName = mapFieldToColumn(this.ctx.contract, this.modelName, field as string);
     return createIncludeScalar<number | null>('max', this.state, columnName);
   }
 
@@ -508,16 +423,11 @@ export class Collection<
       ? Partial<Record<keyof DefaultModelRow<TContract, ModelName> & string, unknown>>
       : never,
   ): Collection<TContract, ModelName, Row, State> {
-    const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
-    const mappedCursor: Record<string, unknown> = {};
-
-    for (const [fieldName, value] of Object.entries(cursorValues as Record<string, unknown>)) {
-      if (value === undefined) {
-        continue;
-      }
-      const columnName = fieldToColumn[fieldName] ?? fieldName;
-      mappedCursor[columnName] = value;
-    }
+    const mappedCursor = mapCursorValuesToColumns(
+      this.ctx.contract,
+      this.modelName,
+      cursorValues as Readonly<Record<string, unknown>>,
+    );
 
     if (Object.keys(mappedCursor).length === 0) {
       return this;
@@ -534,8 +444,7 @@ export class Collection<
       ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
     ],
   >(...fields: Fields): Collection<TContract, ModelName, Row, State> {
-    const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
-    const distinctFields = fields.map((fieldName) => fieldToColumn[fieldName] ?? fieldName);
+    const distinctFields = mapFieldsToColumns(this.ctx.contract, this.modelName, fields);
 
     return this.#clone({
       distinct: distinctFields,
@@ -551,9 +460,10 @@ export class Collection<
   >(
     ...fields: State['hasOrderBy'] extends true ? Fields : never
   ): Collection<TContract, ModelName, Row, State> {
-    const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
-    const distinctOnFields = (fields as readonly string[]).map(
-      (fieldName) => fieldToColumn[fieldName] ?? fieldName,
+    const distinctOnFields = mapFieldsToColumns(
+      this.ctx.contract,
+      this.modelName,
+      fields as readonly string[],
     );
 
     return this.#clone({
@@ -617,41 +527,7 @@ export class Collection<
       compiled,
       { lane: 'orm-client' },
     ).toArray();
-    const row = rows[0] ?? {};
-
-    const result: Record<string, unknown> = {};
-    for (const [alias, selector] of entries) {
-      const value = row[alias];
-      if (value === null) {
-        result[alias] = null;
-        continue;
-      }
-
-      if (value === undefined) {
-        result[alias] = selector.fn === 'count' ? 0 : null;
-        continue;
-      }
-
-      if (typeof value === 'number') {
-        result[alias] = value;
-        continue;
-      }
-
-      if (typeof value === 'bigint') {
-        result[alias] = Number(value);
-        continue;
-      }
-
-      if (typeof value === 'string') {
-        const numeric = Number(value);
-        result[alias] = Number.isNaN(numeric) ? value : numeric;
-        continue;
-      }
-
-      result[alias] = value;
-    }
-
-    return result as AggregateResult<Spec>;
+    return normalizeAggregateResult(aggregateSpec, rows[0] ?? {});
   }
 
   async create(data: CreateInput<TContract, ModelName>): Promise<Row>;
@@ -711,62 +587,15 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileInsertReturning(this.tableName, mappedRows, selectedForInsert);
-
-    if (this.state.includes.length === 0) {
-      const source = executeCompiledQuery<Record<string, unknown>>(
-        this.ctx.runtime,
-        this.ctx.contract,
-        compiled,
-        { lane: 'orm-client' },
-      );
-      return mapResultRows(source, (rawRow) => {
-        const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, rawRow);
-        if (hiddenColumns.length > 0) {
-          stripHiddenMappedFields(this.ctx.contract, this.tableName, mapped, hiddenColumns);
-        }
-        return mapped as Row;
-      });
-    }
-
-    const contract = this.ctx.contract;
-    const runtime = this.ctx.runtime;
-    const state = this.state;
-    const tableName = this.tableName;
-    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
-      const { scope, release } = await acquireRuntimeScope(runtime);
-      try {
-        const insertedRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
-          scope,
-          contract,
-          compiled,
-          { lane: 'orm-client' },
-        ).toArray();
-        if (insertedRowsRaw.length === 0) {
-          return;
-        }
-
-        const insertedRows = insertedRowsRaw.map((row) =>
-          createRowEnvelope(contract, tableName, row),
-        );
-        await stitchIncludes(scope, contract, insertedRows, state.includes);
-
-        if (hiddenColumns.length > 0) {
-          for (const row of insertedRows) {
-            stripHiddenMappedFields(contract, tableName, row.mapped, hiddenColumns);
-          }
-        }
-
-        for (const row of insertedRows) {
-          yield row.mapped as Row;
-        }
-      } finally {
-        if (release) {
-          await release();
-        }
-      }
-    };
-
-    return new AsyncIterableResult(generator());
+    return dispatchMutationRows<Row>({
+      contract: this.ctx.contract,
+      runtime: this.ctx.runtime,
+      compiled,
+      tableName: this.tableName,
+      includes: this.state.includes,
+      hiddenColumns,
+      mapRow: (mapped) => mapped as Row,
+    });
   }
 
   async createCount(data: readonly CreateInput<TContract, ModelName>[]): Promise<number> {
@@ -819,55 +648,21 @@ export class Collection<
       conflictColumns,
       selectedForUpsert,
     );
-
-    if (this.state.includes.length === 0) {
-      const rows = await executeCompiledQuery<Record<string, unknown>>(
-        this.ctx.runtime,
-        this.ctx.contract,
-        compiled,
-        { lane: 'orm-client' },
-      ).toArray();
-      const first = rows[0];
-      if (!first) {
-        throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
-      }
-      const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, first);
-      if (hiddenColumns.length > 0) {
-        stripHiddenMappedFields(this.ctx.contract, this.tableName, mapped, hiddenColumns);
-      }
-      return mapped as Row;
+    const row = await executeMutationReturningSingleRow<Row>({
+      contract: this.ctx.contract,
+      runtime: this.ctx.runtime,
+      compiled,
+      tableName: this.tableName,
+      includes: this.state.includes,
+      hiddenColumns,
+      mapRow: (mapped) => mapped as Row,
+      onMissingRowMessage: `upsert() for model "${this.modelName}" did not return a row`,
+    });
+    if (row) {
+      return row;
     }
 
-    const { scope, release } = await acquireRuntimeScope(this.ctx.runtime);
-    try {
-      const rows = await executeCompiledQuery<Record<string, unknown>>(
-        scope,
-        this.ctx.contract,
-        compiled,
-        { lane: 'orm-client' },
-      ).toArray();
-      const first = rows[0];
-      if (!first) {
-        throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
-      }
-
-      const wrappedRows = [createRowEnvelope(this.ctx.contract, this.tableName, first)];
-      await stitchIncludes(scope, this.ctx.contract, wrappedRows, this.state.includes);
-
-      const result = wrappedRows[0];
-      if (!result) {
-        throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
-      }
-
-      if (hiddenColumns.length > 0) {
-        stripHiddenMappedFields(this.ctx.contract, this.tableName, result.mapped, hiddenColumns);
-      }
-      return result.mapped as Row;
-    } finally {
-      if (release) {
-        await release();
-      }
-    }
+    throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
   }
 
   async update(
@@ -927,62 +722,15 @@ export class Collection<
       this.state.filters,
       selectedForUpdate,
     );
-
-    if (this.state.includes.length === 0) {
-      const source = executeCompiledQuery<Record<string, unknown>>(
-        this.ctx.runtime,
-        this.ctx.contract,
-        compiled,
-        { lane: 'orm-client' },
-      );
-      return mapResultRows(source, (rawRow) => {
-        const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, rawRow);
-        if (hiddenColumns.length > 0) {
-          stripHiddenMappedFields(this.ctx.contract, this.tableName, mapped, hiddenColumns);
-        }
-        return mapped as Row;
-      });
-    }
-
-    const contract = this.ctx.contract;
-    const runtime = this.ctx.runtime;
-    const state = this.state;
-    const tableName = this.tableName;
-    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
-      const { scope, release } = await acquireRuntimeScope(runtime);
-      try {
-        const updatedRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
-          scope,
-          contract,
-          compiled,
-          { lane: 'orm-client' },
-        ).toArray();
-        if (updatedRowsRaw.length === 0) {
-          return;
-        }
-
-        const updatedRows = updatedRowsRaw.map((row) =>
-          createRowEnvelope(contract, tableName, row),
-        );
-        await stitchIncludes(scope, contract, updatedRows, state.includes);
-
-        if (hiddenColumns.length > 0) {
-          for (const row of updatedRows) {
-            stripHiddenMappedFields(contract, tableName, row.mapped, hiddenColumns);
-          }
-        }
-
-        for (const row of updatedRows) {
-          yield row.mapped as Row;
-        }
-      } finally {
-        if (release) {
-          await release();
-        }
-      }
-    };
-
-    return new AsyncIterableResult(generator());
+    return dispatchMutationRows<Row>({
+      contract: this.ctx.contract,
+      runtime: this.ctx.runtime,
+      compiled,
+      tableName: this.tableName,
+      includes: this.state.includes,
+      hiddenColumns,
+      mapRow: (mapped) => mapped as Row,
+    });
   }
 
   async updateCount(
@@ -1039,62 +787,15 @@ export class Collection<
       parentJoinColumns,
     );
     const compiled = compileDeleteReturning(this.tableName, this.state.filters, selectedForDelete);
-
-    if (this.state.includes.length === 0) {
-      const source = executeCompiledQuery<Record<string, unknown>>(
-        this.ctx.runtime,
-        this.ctx.contract,
-        compiled,
-        { lane: 'orm-client' },
-      );
-      return mapResultRows(source, (rawRow) => {
-        const mapped = mapStorageRowToModelFields(this.ctx.contract, this.tableName, rawRow);
-        if (hiddenColumns.length > 0) {
-          stripHiddenMappedFields(this.ctx.contract, this.tableName, mapped, hiddenColumns);
-        }
-        return mapped as Row;
-      });
-    }
-
-    const contract = this.ctx.contract;
-    const runtime = this.ctx.runtime;
-    const state = this.state;
-    const tableName = this.tableName;
-    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
-      const { scope, release } = await acquireRuntimeScope(runtime);
-      try {
-        const deletedRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
-          scope,
-          contract,
-          compiled,
-          { lane: 'orm-client' },
-        ).toArray();
-        if (deletedRowsRaw.length === 0) {
-          return;
-        }
-
-        const deletedRows = deletedRowsRaw.map((row) =>
-          createRowEnvelope(contract, tableName, row),
-        );
-        await stitchIncludes(scope, contract, deletedRows, state.includes);
-
-        if (hiddenColumns.length > 0) {
-          for (const row of deletedRows) {
-            stripHiddenMappedFields(contract, tableName, row.mapped, hiddenColumns);
-          }
-        }
-
-        for (const row of deletedRows) {
-          yield row.mapped as Row;
-        }
-      } finally {
-        if (release) {
-          await release();
-        }
-      }
-    };
-
-    return new AsyncIterableResult(generator());
+    return dispatchMutationRows<Row>({
+      contract: this.ctx.contract,
+      runtime: this.ctx.runtime,
+      compiled,
+      tableName: this.tableName,
+      includes: this.state.includes,
+      hiddenColumns,
+      mapRow: (mapped) => mapped as Row,
+    });
   }
 
   async deleteCount(
