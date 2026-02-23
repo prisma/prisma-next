@@ -15,7 +15,7 @@ This task breakdown covers the full implementation of the ORM Client spec for `@
 
 The tasks are ordered so that foundational internal refactors come first, followed by incremental feature additions that build on each other. Testing is embedded alongside implementation, not deferred to a separate phase.
 
-Total estimated tasks: 15 task groups, ~65 sub-tasks.
+Total estimated tasks: 16 task groups, ~70 sub-tasks.
 
 ---
 
@@ -568,6 +568,59 @@ Depends on: All previous groups
 
 ---
 
+## Group 16: Runtime-Executor AsyncIterableResult Thenable Semantics
+
+Depends on: None (can start immediately). Required for spec-compliant `all()` / `*All()` streaming terminal behavior.
+
+- [ ] **16.1 Make AsyncIterableResult thenable with toArray-equivalent semantics**
+  - Update `packages/1-framework/4-runtime-executor/src/async-iterable-result.ts` so `AsyncIterableResult<Row>` also implements thenable behavior (`PromiseLike<Row[]>`)
+  - Add `then(...)` that is behaviorally equivalent to `toArray()` for fulfillment/rejection source, while allowing tailored error copy/suggestions if needed
+  - Ensure `await result` and `result.toArray()` read from the same buffered-array pipeline (not separate executions)
+  - Keep iterator exclusivity semantics: once consumed by `for await`, `then()` / `toArray()` remain disallowed
+
+- [ ] **16.2 Cache buffered-array promise and share it across toArray()/then()**
+  - Add a private cached promise field on `AsyncIterableResult` for buffered materialization (e.g. `#bufferedArrayPromise`)
+  - First call to `toArray()` or `then()` initializes and stores the promise
+  - Subsequent `toArray()` calls return the same cached promise object
+  - `then()` delegates to the same cached promise so `toArray()` and `then()` are mutually compatible and can be called repeatedly when iterator consumption has not started
+  - Preserve mutual exclusivity with direct iterator consumption in both directions:
+    - iterator first -> `toArray()`/`then()` fail with consumed error
+    - `toArray()`/`then()` first -> iterator access fails with consumed error
+
+- [ ] **16.3 Expand runtime-executor tests for mixed consumption modes**
+  - Update `packages/1-framework/4-runtime-executor/test/async-iterable-result.test.ts`
+  - Add tests for:
+    - `await result` parity with `await result.toArray()`
+    - repeated `toArray()` returns the same promise instance
+    - interleaving `toArray()` and `then()` works (same underlying buffered result, no duplicate execution)
+    - iterator exclusivity still enforced after `toArray()` / `then()`
+    - `toArray()` / `then()` still fail after iterator consumption
+  - Keep error assertions resilient to message wording where only suggestions differ
+
+- [ ] **16.4 Migrate ORM client tests/examples to implicit thenable-await style**
+  - Update ORM client tests to prefer `await <AsyncIterableResult>` over explicit `.toArray()`:
+    - `packages/3-extensions/sql-orm-client/test/**/*.test.ts`
+    - `packages/3-extensions/sql-orm-client/test/sql-compilation/**/*.test.ts`
+    - `packages/3-extensions/sql-orm-client/test/integration/**/*.test.ts`
+  - Update demo ORM client examples:
+    - `examples/prisma-next-demo/src/orm-client/**/*.ts`
+  - Update package-level example snippets where applicable:
+    - `packages/3-extensions/sql-orm-client/README.md`
+  - Keep direct `.toArray()` coverage only in runtime-executor package tests where it is explicitly under test
+  - Add a verification step:
+    - `rg -n "\\.toArray\\(" packages/3-extensions/sql-orm-client/test examples/prisma-next-demo/src/orm-client packages/3-extensions/sql-orm-client/README.md`
+    - Acceptance for this check: no matches
+
+**Acceptance Criteria for Group 16:**
+- `AsyncIterableResult` supports both async iteration and thenable consumption
+- `then()` is functionally aligned with `toArray()` on data/error behavior
+- Buffered array promise is cached and reused (no duplicate materialization)
+- `toArray()` and `then()` can be mixed/repeated unless iterator mode was already used
+- Iterator exclusivity invariants remain enforced
+- ORM client tests and examples use implicit thenable-await style (`await result`) instead of explicit `.toArray()`
+
+---
+
 ## Execution Order
 
 The recommended implementation sequence, accounting for dependencies:
@@ -603,6 +656,7 @@ Group 1:  AST Integration (FilterExpr -> WhereExpr)
 
 Group 14: ORM Client Factory Refinements (after Groups 1-6)
 Group 15: Demo App Migration + Integration Validation (after all)
+Group 16: Runtime-Executor AsyncIterableResult semantics (can run in parallel; complete before final integration validation)
 ```
 
 Groups that share the same dependency level can be parallelized. For example, after Group 1, Groups 2, 6, and 11 can proceed concurrently if different people work on them.
@@ -621,5 +675,7 @@ Groups that share the same dependency level can be parallelized. For example, af
 | `packages/3-extensions/sql-orm-client/src/exports/index.ts` | Public API surface |
 | `packages/3-extensions/sql-orm-client/test/helpers.ts` | Test contract and mock runtime |
 | `packages/3-extensions/sql-orm-client/test/collection.test.ts` | Main test file for Collection |
+| `packages/1-framework/4-runtime-executor/src/async-iterable-result.ts` | `AsyncIterableResult` implementation (`toArray`, thenable behavior, iteration guards) |
+| `packages/1-framework/4-runtime-executor/test/async-iterable-result.test.ts` | Runtime-executor tests for async iteration, thenable parity, and consumption invariants |
 | `packages/2-sql/4-lanes/relational-core/src/ast/types.ts` | PN AST types (WhereExpr, BinaryExpr, etc.) |
 | `examples/prisma-next-demo/src/orm-client/` | Demo app integration |
