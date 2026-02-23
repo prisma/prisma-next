@@ -386,7 +386,7 @@ Depends on: Group 8 (create mutations), Group 4 (type-state with hasWhere)
 
 Depends on: Group 8 (create), Group 9 (update/delete)
 
-- [ ] **10.1 Define RelationMutator type and RelationMutation data structure**
+- [x] **10.1 Define RelationMutator type and RelationMutation data structure**
   - `RelationMutator<TContract, ModelName>` has methods: `create(data)`, `create(data[])`, `connect(criterion)`, `connect(criterion[])`, `disconnect()`, `disconnect(criterion[])`
   - Each method returns a `RelationMutation` -- an opaque descriptor `{ kind: 'create' | 'connect' | 'disconnect', data: ... }`
   - Create `src/relation-mutator.ts`
@@ -394,7 +394,7 @@ Depends on: Group 8 (create), Group 9 (update/delete)
   - Files to create: `src/relation-mutator.ts`
   - Files to modify: `src/types.ts`
 
-- [ ] **10.2 Implement nested mutation execution orchestration**
+- [x] **10.2 Implement nested mutation execution orchestration**
   - When `create()` receives data with relation callbacks, execute in a transaction:
     1. Insert parent record, capture generated PK
     2. For each relation callback: invoke the mutator, get the RelationMutation descriptor

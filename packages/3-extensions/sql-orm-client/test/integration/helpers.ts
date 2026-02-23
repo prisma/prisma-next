@@ -20,6 +20,11 @@ export function createReturningUsersCollection(runtime: PgIntegrationRuntime) {
   return new Collection({ contract, runtime }, 'User');
 }
 
+export function createReturningPostsCollection(runtime: PgIntegrationRuntime) {
+  const contract = withReturningCapability(createTestContract());
+  return new Collection({ contract, runtime }, 'Post');
+}
+
 export async function withCollectionRuntime(
   fn: (runtime: PgIntegrationRuntime) => Promise<void>,
 ): Promise<void> {

@@ -287,12 +287,22 @@ describe('createModelAccessor', () => {
       },
     };
 
-    expect(() => createModelAccessor(missingToContract as never, 'User')['posts']!.some()).toThrow(
-      /missing the "to" model reference/,
-    );
-    expect(() => createModelAccessor(brokenJoinContract as never, 'User')['posts']!.some()).toThrow(
-      /missing join columns/,
-    );
+    expect(() =>
+      (
+        createModelAccessor(missingToContract as never, 'User') as unknown as Record<
+          string,
+          { some: () => unknown }
+        >
+      )['posts']!.some(),
+    ).toThrow(/missing the "to" model reference/);
+    expect(() =>
+      (
+        createModelAccessor(brokenJoinContract as never, 'User') as unknown as Record<
+          string,
+          { some: () => unknown }
+        >
+      )['posts']!.some(),
+    ).toThrow(/missing join columns/);
   });
 
   it('supports composite relation joins and firstChild fallback projection', () => {
@@ -329,7 +339,14 @@ describe('createModelAccessor', () => {
       },
     };
 
-    expect(createModelAccessor(compositeContract as never, 'User')['posts']!.some()).toMatchObject({
+    expect(
+      (
+        createModelAccessor(compositeContract as never, 'User') as unknown as Record<
+          string,
+          { some: () => unknown }
+        >
+      )['posts']!.some(),
+    ).toMatchObject({
       kind: 'exists',
       subquery: {
         project: [
@@ -366,7 +383,12 @@ describe('createModelAccessor', () => {
     };
 
     expect(
-      createModelAccessor(noChildColsContract as never, 'User')['posts']!.some(),
+      (
+        createModelAccessor(noChildColsContract as never, 'User') as unknown as Record<
+          string,
+          { some: () => unknown }
+        >
+      )['posts']!.some(),
     ).toMatchObject({
       kind: 'exists',
       subquery: {

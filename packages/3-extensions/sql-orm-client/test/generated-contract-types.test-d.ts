@@ -1,5 +1,6 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { Collection } from '../src/collection';
+import type { RelationMutator } from '../src/types';
 import { createMockRuntime } from './helpers';
 
 type GeneratedLikeContract = SqlContract<
@@ -132,6 +133,7 @@ const collection = new PostCollection({ contract, runtime }, 'Post');
 collection.forUser('user_001');
 
 const userCollection = new Collection({ contract, runtime }, 'User');
+const postCollection = new Collection({ contract, runtime }, 'Post');
 
 type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
@@ -145,6 +147,22 @@ const orderedUsers = userCollection.orderBy((user) => user.id.asc());
 const cursorPagedUsers = orderedUsers.cursor({ id: 'user_001' });
 const distinctUsers = userCollection.distinct('email');
 const distinctOnUsers = orderedUsers.distinctOn('email');
+userCollection.create({
+  id: 'user_001',
+  name: 'Alice',
+  email: 'alice@example.com',
+  posts: (posts: RelationMutator<GeneratedLikeContract, 'Post'>) =>
+    posts.create([
+      {
+        id: 'post_001',
+        title: 'Nested',
+      },
+    ]),
+});
+// @ts-expect-error missing required create fields without relation mutations
+userCollection.create({ id: 'user_only_id' });
+// @ts-expect-error Post has no relation callbacks to satisfy required userId in create()
+postCollection.create({ id: 'post_missing_user', title: 'Missing owner' });
 userCollection.upsert({
   create: { id: 'user_001', name: 'Alice', email: 'alice@example.com' },
   update: { name: 'Alice Updated' },

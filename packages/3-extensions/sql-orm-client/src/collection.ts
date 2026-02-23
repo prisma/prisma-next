@@ -31,6 +31,12 @@ import {
   compileUpsertReturning,
 } from './kysely-compiler';
 import { createModelAccessor } from './model-accessor';
+import {
+  buildPrimaryKeyFilterFromRow,
+  executeNestedCreateMutation,
+  executeNestedUpdateMutation,
+  hasNestedMutationCallbacks,
+} from './mutation-executor';
 import type {
   CollectionContext,
   CollectionState,
@@ -41,6 +47,9 @@ import type {
   IncludeExpr,
   IncludeRelationValue,
   ModelAccessor,
+  MutationCreateInput,
+  MutationCreateInputWithRelations,
+  MutationUpdateInput,
   OrderByDirective,
   OrderExpr,
   RelatedModelName,
@@ -343,14 +352,44 @@ export class Collection<
     return rows[0] ?? null;
   }
 
-  async create(data: CreateInput<TContract, ModelName>): Promise<Row> {
+  async create(data: CreateInput<TContract, ModelName>): Promise<Row>;
+  async create(data: MutationCreateInputWithRelations<TContract, ModelName>): Promise<Row>;
+  async create(
+    data:
+      | CreateInput<TContract, ModelName>
+      | MutationCreateInputWithRelations<TContract, ModelName>,
+  ): Promise<Row> {
     assertReturningCapability(this.ctx.contract, 'create()');
-    const rows = await this.createAll([data]).toArray();
-    const created = rows[0];
-    if (!created) {
-      throw new Error(`create() for model "${this.modelName}" did not return a row`);
+
+    if (
+      hasNestedMutationCallbacks(this.ctx.contract, this.modelName, data as Record<string, unknown>)
+    ) {
+      const createdRow = await executeNestedCreateMutation({
+        contract: this.ctx.contract,
+        runtime: this.ctx.runtime,
+        modelName: this.modelName,
+        data: data as MutationCreateInput<SqlContract<SqlStorage>, string>,
+      });
+
+      const pkCriterion = buildPrimaryKeyFilterFromRow(
+        this.ctx.contract,
+        this.modelName,
+        createdRow,
+      );
+      const reloaded = await this.#reloadMutationRowByPrimaryKey(pkCriterion);
+      if (!reloaded) {
+        throw new Error(`create() for model "${this.modelName}" did not return a row`);
+      }
+      return reloaded;
     }
-    return created;
+
+    const rows = await this.createAll([data as CreateInput<TContract, ModelName>]);
+    const created = rows[0];
+    if (created) {
+      return created;
+    }
+
+    throw new Error(`create() for model "${this.modelName}" did not return a row`);
   }
 
   createAll(data: readonly CreateInput<TContract, ModelName>[]): AsyncIterableResult<Row> {
@@ -530,10 +569,37 @@ export class Collection<
   }
 
   async update(
-    data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+    data: State['hasWhere'] extends true ? MutationUpdateInput<TContract, ModelName> : never,
   ): Promise<Row | null> {
     assertReturningCapability(this.ctx.contract, 'update()');
-    const rows = await this.updateAll(data).toArray();
+
+    if (
+      hasNestedMutationCallbacks(this.ctx.contract, this.modelName, data as Record<string, unknown>)
+    ) {
+      const updatedRow = await executeNestedUpdateMutation({
+        contract: this.ctx.contract,
+        runtime: this.ctx.runtime,
+        modelName: this.modelName,
+        filters: this.state.filters,
+        data: data as MutationUpdateInput<SqlContract<SqlStorage>, string>,
+      });
+      if (!updatedRow) {
+        return null;
+      }
+
+      const pkCriterion = buildPrimaryKeyFilterFromRow(
+        this.ctx.contract,
+        this.modelName,
+        updatedRow,
+      );
+      return this.#reloadMutationRowByPrimaryKey(pkCriterion);
+    }
+
+    const rows = await this.updateAll(
+      data as State['hasWhere'] extends true
+        ? Partial<DefaultModelRow<TContract, ModelName>>
+        : never,
+    );
     return rows[0] ?? null;
   }
 
@@ -757,6 +823,35 @@ export class Collection<
     ).toArray();
 
     return matchingRows.length;
+  }
+
+  async #reloadMutationRowByPrimaryKey(criterion: Record<string, unknown>): Promise<Row | null> {
+    const whereExpr = shorthandToWhereExpr(
+      this.ctx.contract,
+      this.modelName,
+      criterion as ShorthandWhereFilter<TContract, ModelName>,
+    );
+    if (!whereExpr) {
+      throw new Error(
+        `Failed to build primary key filter for mutation result on model "${this.modelName}"`,
+      );
+    }
+
+    const resultState: CollectionState = {
+      ...emptyState(),
+      filters: [whereExpr],
+      includes: this.state.includes,
+      selectedFields: this.state.selectedFields,
+      limit: 1,
+    };
+
+    const rows = await dispatchCollectionRows<Row>({
+      contract: this.ctx.contract,
+      runtime: this.ctx.runtime,
+      state: resultState,
+      tableName: this.tableName,
+    });
+    return rows[0] ?? null;
   }
 
   #clone<NextState extends CollectionTypeState = State>(

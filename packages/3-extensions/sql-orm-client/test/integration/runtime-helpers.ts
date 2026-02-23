@@ -12,14 +12,20 @@ interface SeedUser {
 interface SeedPost {
   id: number;
   title: string;
-  userId: number;
+  userId: number | null;
   views: number;
 }
 
 interface SeedProfile {
   id: number;
-  userId: number;
+  userId: number | null;
   bio: string;
+}
+
+interface SeedComment {
+  id: number;
+  body: string;
+  postId: number;
 }
 
 export interface PgIntegrationRuntime extends RuntimeQueryable {
@@ -91,7 +97,7 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
     create table posts (
       id integer primary key,
       title text not null,
-      user_id integer not null,
+      user_id integer,
       views integer not null
     )
   `);
@@ -107,7 +113,7 @@ export async function setupTestSchema(runtime: PgIntegrationRuntime): Promise<vo
   await runtime.query(`
     create table profiles (
       id integer primary key,
-      user_id integer not null,
+      user_id integer,
       bio text not null
     )
   `);
@@ -149,6 +155,19 @@ export async function seedProfiles(
       profile.id,
       profile.userId,
       profile.bio,
+    ]);
+  }
+}
+
+export async function seedComments(
+  runtime: PgIntegrationRuntime,
+  comments: readonly SeedComment[],
+): Promise<void> {
+  for (const comment of comments) {
+    await runtime.query('insert into comments (id, body, post_id) values ($1, $2, $3)', [
+      comment.id,
+      comment.body,
+      comment.postId,
     ]);
   }
 }
