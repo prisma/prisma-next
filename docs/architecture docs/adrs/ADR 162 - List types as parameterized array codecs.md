@@ -275,7 +275,7 @@ The runtime resolves codecs by doing a flat `registry.get(codecId)` lookup per c
 
 **Path forward**: Resolve per-column codecs upfront during `createExecutionContext` instead of at decode/encode time. For each column with `typeParams`, compose the appropriate codec (e.g. `createArrayCodec(elementCodec)`) and store it in a per-column map. The decode/encode paths would check this map first, falling back to the registry for non-composed codecs. See `codec-composition-gap.md` in the repo root for a detailed analysis.
 
-Tests exposing this gap exist in `packages/2-sql/5-runtime/test/array-codec-composition.test.ts`.
+Failing tests (`it.fails`) that assert the correct element-level behavior exist in `packages/2-sql/5-runtime/test/array-codec-composition.test.ts`. These tests will pass once per-column codec composition is implemented — remove the `.fails` modifier to promote them to standard assertions.
 
 ### Out of scope
 
