@@ -24,8 +24,7 @@ describe('integration/include', () => {
           .orderBy((user) => user.id.asc())
           .include('posts', (posts) => posts.orderBy((post) => post.id.asc()))
           .include('profile')
-          .all()
-          .toArray();
+          .all();
 
         expect(rows).toEqual([
           {

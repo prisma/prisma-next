@@ -27,6 +27,5 @@ export async function ormClientGetDashboardUsers(
     )
     .orderBy([(user) => user.kind.asc(), (user) => user.createdAt.desc()])
     .take(limit)
-    .all()
-    .toArray();
+    .all();
 }

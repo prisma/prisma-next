@@ -9,6 +9,5 @@ export async function ormClientGetPostFeed(titleTerm: string, limit: number, run
     .include('user', (user) => user.select('id', 'email', 'kind'))
     .orderBy([(post) => post.createdAt.desc(), (post) => post.id.asc()])
     .take(limit)
-    .all()
-    .toArray();
+    .all();
 }

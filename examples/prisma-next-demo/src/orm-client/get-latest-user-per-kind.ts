@@ -7,6 +7,5 @@ export async function ormClientGetLatestUserPerKind(runtime: Runtime) {
     .orderBy([(user) => user.kind.asc(), (user) => user.createdAt.desc(), (user) => user.id.asc()])
     .distinctOn('kind')
     .select('id', 'email', 'kind', 'createdAt')
-    .all()
-    .toArray();
+    .all();
 }

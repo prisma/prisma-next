@@ -23,7 +23,7 @@ describe('sql-compilation/delete', () => {
       ],
     ]);
 
-    const deleted = await collection.where({ name: 'Old' }).deleteAll().toArray();
+    const deleted = await collection.where({ name: 'Old' }).deleteAll();
 
     expect(deleted).toEqual([
       { id: 1, name: 'Alice', email: 'alice@example.com' },

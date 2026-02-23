@@ -27,8 +27,7 @@ describe('sql-compilation/create', () => {
       .createAll([
         { id: 1, name: 'Alice', email: 'alice@example.com' },
         { id: 2, name: 'Bob', email: 'bob@example.com' },
-      ])
-      .toArray();
+      ]);
 
     expect(created).toEqual([
       { id: 1, name: 'Alice', email: 'alice@example.com' },
@@ -84,7 +83,7 @@ describe('sql-compilation/create', () => {
   it('createAll([]) returns no rows and emits no execution plans', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
 
-    const created = await collection.createAll([]).toArray();
+    const created = await collection.createAll([]);
 
     expect(created).toEqual([]);
     expect(runtime.executions).toHaveLength(0);

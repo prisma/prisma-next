@@ -33,7 +33,7 @@ describe('orm()', () => {
     const runtime = createMockRuntime();
     const db = orm({ contract, runtime });
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
-    const results = await db.users.all().toArray();
+    const results = await db.users.all();
     expect(results).toHaveLength(1);
   });
 

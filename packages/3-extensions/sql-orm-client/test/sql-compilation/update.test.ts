@@ -25,8 +25,7 @@ describe('sql-compilation/update', () => {
 
     const updated = await collection
       .where({ name: 'Old' })
-      .updateAll({ name: 'Updated' })
-      .toArray();
+      .updateAll({ name: 'Updated' });
 
     expect(updated).toEqual([
       { id: 1, name: 'Updated', email: 'alice@example.com' },
@@ -85,7 +84,7 @@ describe('sql-compilation/update', () => {
   it('updateAll({}) returns no rows and emits no execution plans', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
 
-    const updated = await collection.where({ id: 1 }).updateAll({}).toArray();
+    const updated = await collection.where({ id: 1 }).updateAll({});
 
     expect(updated).toEqual([]);
     expect(runtime.executions).toHaveLength(0);

@@ -12,7 +12,7 @@ describe('sql-compilation/include', () => {
       [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
     ]);
 
-    const results = await collection.select('name').include('posts').all().toArray();
+    const results = await collection.select('name').include('posts').all();
 
     expect(results).toEqual([
       {
@@ -37,7 +37,7 @@ describe('sql-compilation/include', () => {
       ],
     ]);
 
-    const results = await collection.include('posts').all().toArray();
+    const results = await collection.include('posts').all();
 
     expect(results).toHaveLength(2);
     expect(results[0]).toMatchObject({
@@ -60,7 +60,7 @@ describe('sql-compilation/include', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }], []]);
 
-    const results = await collection.include('posts').all().toArray();
+    const results = await collection.include('posts').all();
 
     expect(results[0]).toMatchObject({ id: 1, posts: [] });
   });
@@ -82,8 +82,7 @@ describe('sql-compilation/include', () => {
 
     const results = await collection
       .include('posts', (post) => post.orderBy((p) => p.id.asc()).take(1))
-      .all()
-      .toArray();
+      .all();
 
     expect(results).toMatchObject([
       { id: 1, posts: [{ id: 10 }] },
@@ -98,7 +97,7 @@ describe('sql-compilation/include', () => {
       [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
     ]);
 
-    const results = await postCollection.include('author').all().toArray();
+    const results = await postCollection.include('author').all();
 
     expect(results).toEqual([
       {
@@ -115,7 +114,7 @@ describe('sql-compilation/include', () => {
     const { collection: postCollection, runtime } = createCollectionFor('Post', baseContract);
     runtime.setNextResults([[{ id: 10, title: 'Post A', user_id: 999, views: 100 }], []]);
 
-    const results = await postCollection.include('author').all().toArray();
+    const results = await postCollection.include('author').all();
 
     expect(results).toEqual([
       {
@@ -141,7 +140,7 @@ describe('sql-compilation/include', () => {
       ],
     ]);
 
-    const results = await collection.include('profile').all().toArray();
+    const results = await collection.include('profile').all();
 
     expect(results).toEqual([
       {
@@ -171,8 +170,7 @@ describe('sql-compilation/include', () => {
 
     const results = await postCollection
       .include('comments', (comment) => comment.orderBy((c) => c.id.asc()))
-      .all()
-      .toArray();
+      .all();
 
     expect(results).toMatchObject([
       {
@@ -193,7 +191,7 @@ describe('sql-compilation/include', () => {
       [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
     ]);
 
-    const results = await collection.select('name', 'email').include('posts').all().toArray();
+    const results = await collection.select('name', 'email').include('posts').all();
 
     expect(results).toEqual([{ name: 'Alice', email: 'alice@example.com', posts: [] }]);
   });
@@ -224,7 +222,7 @@ describe('sql-compilation/include', () => {
       [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
     ]);
 
-    const results = await collection.include('posts').all().toArray();
+    const results = await collection.include('posts').all();
 
     expect(results).toHaveLength(1);
     expect(released).toBe(true);
@@ -234,7 +232,7 @@ describe('sql-compilation/include', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }], []]);
 
-    await collection.select('name').include('posts').all().toArray();
+    await collection.select('name').include('posts').all();
 
     expect(serializePlans(runtime)).toMatchInlineSnapshot(`
       [

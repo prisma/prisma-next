@@ -7,6 +7,5 @@ export async function ormClientGetUserPosts(userId: string, limit: number, runti
     .forUser(userId)
     .orderBy((post) => post.createdAt.desc())
     .take(limit)
-    .all()
-    .toArray();
+    .all();
 }

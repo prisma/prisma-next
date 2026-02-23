@@ -572,13 +572,13 @@ Depends on: All previous groups
 
 Depends on: None (can start immediately). Required for spec-compliant `all()` / `*All()` streaming terminal behavior.
 
-- [ ] **16.1 Make AsyncIterableResult thenable with toArray-equivalent semantics**
+- [x] **16.1 Make AsyncIterableResult thenable with toArray-equivalent semantics**
   - Update `packages/1-framework/4-runtime-executor/src/async-iterable-result.ts` so `AsyncIterableResult<Row>` also implements thenable behavior (`PromiseLike<Row[]>`)
   - Add `then(...)` that is behaviorally equivalent to `toArray()` for fulfillment/rejection source, while allowing tailored error copy/suggestions if needed
   - Ensure `await result` and `result.toArray()` read from the same buffered-array pipeline (not separate executions)
   - Keep iterator exclusivity semantics: once consumed by `for await`, `then()` / `toArray()` remain disallowed
 
-- [ ] **16.2 Cache buffered-array promise and share it across toArray()/then()**
+- [x] **16.2 Cache buffered-array promise and share it across toArray()/then()**
   - Add a private cached promise field on `AsyncIterableResult` for buffered materialization (e.g. `#bufferedArrayPromise`)
   - First call to `toArray()` or `then()` initializes and stores the promise
   - Subsequent `toArray()` calls return the same cached promise object
@@ -587,7 +587,7 @@ Depends on: None (can start immediately). Required for spec-compliant `all()` / 
     - iterator first -> `toArray()`/`then()` fail with consumed error
     - `toArray()`/`then()` first -> iterator access fails with consumed error
 
-- [ ] **16.3 Expand runtime-executor tests for mixed consumption modes**
+- [x] **16.3 Expand runtime-executor tests for mixed consumption modes**
   - Update `packages/1-framework/4-runtime-executor/test/async-iterable-result.test.ts`
   - Add tests for:
     - `await result` parity with `await result.toArray()`
@@ -597,7 +597,7 @@ Depends on: None (can start immediately). Required for spec-compliant `all()` / 
     - `toArray()` / `then()` still fail after iterator consumption
   - Keep error assertions resilient to message wording where only suggestions differ
 
-- [ ] **16.4 Migrate ORM client tests/examples to implicit thenable-await style**
+- [x] **16.4 Migrate ORM client tests/examples to implicit thenable-await style**
   - Update ORM client tests to prefer `await <AsyncIterableResult>` over explicit `.toArray()`:
     - `packages/3-extensions/sql-orm-client/test/**/*.test.ts`
     - `packages/3-extensions/sql-orm-client/test/sql-compilation/**/*.test.ts`

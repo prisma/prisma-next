@@ -7,7 +7,7 @@ describe('sql-compilation/pagination', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    await collection.take(10).skip(5).all().toArray();
+    await collection.take(10).skip(5).all();
 
     const sqlText = runtime.executions[0]!.plan.sql;
     expect(sqlText).toContain('limit');
@@ -22,8 +22,7 @@ describe('sql-compilation/pagination', () => {
       .orderBy((user) => user.id.asc())
       .cursor({ id: 42 })
       .take(10)
-      .all()
-      .toArray();
+      .all();
 
     const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
     expect(sqlText).toContain('"users"."id" >');
@@ -36,8 +35,7 @@ describe('sql-compilation/pagination', () => {
     await collection
       .orderBy([(user) => user.name.asc(), (user) => user.email.asc()])
       .cursor({ name: 'Alice', email: 'alice@example.com' })
-      .all()
-      .toArray();
+      .all();
 
     const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
     expect(sqlText).toContain('("users"."name", "users"."email") >');
@@ -47,7 +45,7 @@ describe('sql-compilation/pagination', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    await collection.distinct('email').all().toArray();
+    await collection.distinct('email').all();
 
     const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
     expect(sqlText).toContain('select distinct');
@@ -60,8 +58,7 @@ describe('sql-compilation/pagination', () => {
     await collection
       .orderBy((user) => user.email.asc())
       .distinctOn('email')
-      .all()
-      .toArray();
+      .all();
 
     const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
     expect(sqlText).toContain('distinct on');
@@ -72,7 +69,7 @@ describe('sql-compilation/pagination', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    await collection.select('name', 'email').all().toArray();
+    await collection.select('name', 'email').all();
 
     const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
     expect(sqlText).toContain('"users"."name"');
@@ -87,8 +84,7 @@ describe('sql-compilation/pagination', () => {
     await collection
       .orderBy([(user) => user.name.asc(), (user) => user.email.desc()])
       .cursor({ name: 'Alice', email: 'z@example.com' })
-      .all()
-      .toArray();
+      .all();
 
     expect(serializePlans(runtime)).toMatchInlineSnapshot(`
       [
@@ -113,7 +109,7 @@ describe('sql-compilation/pagination', () => {
         .orderBy([(user) => user.name.asc(), (user) => user.email.asc()])
         .cursor({ name: 'Alice' })
         .all()
-        .toArray(),
+        ,
     ).toThrow(/Missing cursor value for orderBy column "email"/);
   });
 });

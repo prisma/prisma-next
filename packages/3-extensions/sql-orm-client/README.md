@@ -45,8 +45,7 @@ const db = orm({ contract, runtime });
 const posts = await db.posts
   .where((post) => post.userId.eq(userId))
   .take(10)
-  .all()
-  .toArray();
+  .all();
 ```
 
 ## Related Docs

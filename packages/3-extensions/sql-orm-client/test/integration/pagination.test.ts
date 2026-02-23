@@ -19,15 +19,13 @@ describe('integration/pagination', () => {
         const afterAscendingCursor = await users
           .orderBy((user) => user.id.asc())
           .cursor({ id: 2 })
-          .all()
-          .toArray();
+          .all();
         expect(afterAscendingCursor.map((row) => row.id)).toEqual([3, 4]);
 
         const afterDescendingCursor = await users
           .orderBy((user) => user.id.desc())
           .cursor({ id: 3 })
-          .all()
-          .toArray();
+          .all();
         expect(afterDescendingCursor.map((row) => row.id)).toEqual([2, 1]);
       });
     },
