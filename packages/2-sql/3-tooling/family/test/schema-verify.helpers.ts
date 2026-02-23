@@ -29,12 +29,12 @@ export function createTestContract(
     storage: { tables, ...ifDefined('types', storageTypes) },
     models: {},
     relations: {},
-    mappings: {
-      codecTypes: {},
-      operationTypes: {},
-    },
+    mappings: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
     extensionPacks,
-  } as SqlContract<SqlStorage>;
+  };
 }
 
 /**

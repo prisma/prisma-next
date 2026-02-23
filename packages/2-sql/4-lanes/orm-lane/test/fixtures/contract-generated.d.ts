@@ -58,13 +58,14 @@ export type GeneratedContract = SqlContract<
         readonly email: 'email';
       };
     };
-    readonly codecTypes: CodecTypes;
-    readonly operationTypes: OperationTypes;
   },
   StorageHash,
   ExecutionHash,
   ProfileHash
->;
+> & {
+  readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
+  readonly '__@prisma-next/sql-contract/operationTypes@__': OperationTypes;
+};
 
 export type { CodecTypes };
 

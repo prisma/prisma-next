@@ -84,16 +84,19 @@ export type Contract = SqlContract<
         readonly deletedAt: 'deletedAt';
       };
     };
-    readonly codecTypes: CodecTypes;
-    readonly operationTypes: OperationTypes;
   },
   StorageHash,
   ExecutionHash,
   ProfileHash
->;
+> & { readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes; readonly '__@prisma-next/sql-contract/operationTypes@__': OperationTypes };
 
 // Operation types (empty for now, can be extended by extension packs)
 export type OperationTypes = Record<string, never>;
+
+export type TypeMaps = {
+  readonly codecTypes: CodecTypes;
+  readonly operationTypes: OperationTypes;
+};
 
 // Direct model exports for easy importing: import type { User } from './contract.d'
 export type User = Contract['models']['User'];

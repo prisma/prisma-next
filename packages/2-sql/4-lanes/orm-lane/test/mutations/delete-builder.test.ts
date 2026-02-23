@@ -46,8 +46,6 @@ describe('delete builder', () => {
       tableToModel: { user: 'User' },
       fieldToColumn: { User: { id: 'id' } },
       columnToField: { user: { id: 'id' } },
-      codecTypes: {},
-      operationTypes: {},
     },
     capabilities: {},
     extensionPacks: {},

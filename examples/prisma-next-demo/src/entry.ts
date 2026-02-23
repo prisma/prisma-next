@@ -1,52 +1,35 @@
 /**
  * Browser Application Entry Point (Contract Visualization)
  *
- * This is a Vite-powered browser application that renders the emitted
- * contract.json as an interactive HTML visualization. It demonstrates:
+ * Renders the constructed Contract directly from the runtime value.
+ * Demonstrates: validate contract first, render from constructed Contract,
+ * HMR with re-emit for live updates.
  *
- * - Machine-readable contracts: The JSON structure can be consumed by tools
- * - Hot Module Replacement: Edit contract.ts, re-emit, and watch it update live
- * - Contract introspection: Models, tables, relations, capabilities, extensions
+ * Spec: agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md
  *
  * Run with: pnpm dev (starts Vite dev server with HMR)
- *
- * See also:
- * - main.ts: CLI app using the same emitted contract
- * - main-no-emit.ts: CLI app using inline contract definition
  */
-import type { ModelDefinition, SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
-import contractJson from './prisma/contract.json';
+import { validateContract } from '@prisma-next/sql-contract/validate';
+import type { Contract } from './prisma/contract.d';
+import contractJson from './prisma/contract.json' with { type: 'json' };
 
-type Relation = {
-  readonly cardinality: string;
-  readonly to: string;
-  readonly on: { readonly parentCols: readonly string[]; readonly childCols: readonly string[] };
-};
+type RelationView = { readonly cardinality: string; readonly to: string };
 
-// Temporary demo-only shim: today the validated Contract type doesn't fully reflect the
-// traversable IR shape we visualize here (target/relations/capabilities/extensionPacks).
-// TML-1831 will make this redundant by aligning Contract with validateContract() output and
-// moving derived mappings onto ExecutionContext:
-// https://linear.app/prisma-company/issue/TML-1831/runtime-dx-ir-shaped-contract-mappings-on-executioncontext
-type ContractIR = SqlContract<SqlStorage, Record<string, ModelDefinition>> & {
-  target: string;
-  relations: Record<string, Record<string, Relation>>;
-  capabilities: Record<string, Record<string, boolean>>;
-  extensionPacks: Record<string, unknown>;
-};
-
-function renderContract(c: ContractIR): string {
+function renderContract(c: Contract): string {
+  const relationsByTable = c.relations as Record<string, Record<string, RelationView>>;
   const models = Object.entries(c.models)
     .map(([name, model]) => {
       const tableName = model.storage.table;
-      const tableRelations = c.relations[tableName] ?? {};
+      const tableRelations = relationsByTable[tableName] ?? {};
+      const fieldToColumn = c.mappings.fieldToColumn?.[tableName] ?? {};
 
-      const fields = Object.entries(model.fields)
-        .map(([fieldName, field]) => {
+      const fields = Object.keys(model.fields)
+        .map((fieldName) => {
+          const col = fieldToColumn[fieldName] ?? fieldName;
           return `
             <div class="column">
               <span class="col-name">${fieldName}</span>
-              <span class="col-type">→ ${field?.column}</span>
+              <span class="col-type">→ ${col}</span>
             </div>
           `;
         })
@@ -81,7 +64,7 @@ function renderContract(c: ContractIR): string {
 
   const tables = Object.entries(c.storage.tables)
     .map(([name, table]) => {
-      const pk = table.primaryKey?.columns ?? [];
+      const pk = (table.primaryKey?.columns ?? []) as readonly string[];
       const columns = Object.entries(table.columns)
         .map(([colName, col]) => {
           const isPk = pk.includes(colName);
@@ -154,15 +137,19 @@ function renderContract(c: ContractIR): string {
   `;
 }
 
+function renderFromContractJson(json: unknown): void {
+  const c = validateContract<Contract>(json);
+  if (app) app.innerHTML = renderContract(c);
+}
+
 const app = document.getElementById('contract-view');
 if (app) {
-  app.innerHTML = renderContract(contractJson as unknown as ContractIR);
+  renderFromContractJson(contractJson);
 }
 
 if (import.meta.hot) {
-  import.meta.hot.accept('./prisma/contract.json', (newContract) => {
-    if (app && newContract) {
-      app.innerHTML = renderContract(newContract as unknown as ContractIR);
-    }
+  import.meta.hot.accept('./prisma/contract.json', (mod) => {
+    const data = mod ? (mod as unknown as Record<string, unknown>)['default'] : undefined;
+    if (data !== undefined) renderFromContractJson(data);
   });
 }

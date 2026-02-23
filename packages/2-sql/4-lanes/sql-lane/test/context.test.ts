@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import { schema } from '@prisma-next/sql-relational-core/schema';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import { describe, expect, it } from 'vitest';
+import { sql } from '../src/sql/builder';
 import { createSqlContext } from '../src/sql/context';
 import type { Contract } from './fixtures/contract.d';
 
@@ -51,5 +53,31 @@ describe('createSqlContext', () => {
 
     expect(sqlContext.operations).toBe(runtimeContext.operations);
     expect(sqlContext.codecs).toBe(runtimeContext.codecs);
+  });
+
+  it('builds plan when contract has no runtime codecTypes or operationTypes', () => {
+    const contract = loadContract('contract');
+    expect(contract.mappings).not.toHaveProperty('codecTypes');
+    expect(contract.mappings).not.toHaveProperty('operationTypes');
+
+    const adapter = createStubAdapter();
+    const runtimeContext = createTestContext(contract, adapter);
+    createSqlContext(runtimeContext);
+
+    const tables = schema(runtimeContext).tables;
+    const userTable = tables.user;
+    if (!userTable) throw new Error('user table not found');
+
+    const plan = sql({ context: runtimeContext })
+      .from(userTable)
+      .select({
+        id: userTable.columns.id!,
+        email: userTable.columns.email!,
+      })
+      .build();
+
+    expect(plan).toHaveProperty('ast');
+    expect(plan).toHaveProperty('params');
+    expect(plan).toHaveProperty('meta');
   });
 });

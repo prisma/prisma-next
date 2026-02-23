@@ -81,11 +81,11 @@ type ContractWithPosts = SqlContract<
   },
   Record<string, never>,
   Record<string, never>,
-  {
-    readonly codecTypes: CodecTypes;
-    readonly operationTypes: Record<string, Record<string, unknown>>;
-  }
->;
+  Record<string, never>
+> & {
+  readonly '__@prisma-next/sql-contract/codecTypes@__': CodecTypes;
+  readonly '__@prisma-next/sql-contract/operationTypes@__': Record<string, Record<string, unknown>>;
+};
 
 const contractWithPosts = validateContract<ContractWithPosts>({
   target: 'postgres',
@@ -130,10 +130,7 @@ const contractWithPosts = validateContract<ContractWithPosts>({
   },
   models: {},
   relations: {},
-  mappings: {
-    codecTypes: {} as CodecTypes,
-    operationTypes: {},
-  },
+  mappings: {},
 });
 
 function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, LoweredStatement> {

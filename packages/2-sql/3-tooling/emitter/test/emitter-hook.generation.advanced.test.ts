@@ -214,8 +214,9 @@ describe('sql-target-family-hook', () => {
 
     const types = sqlTargetFamilyHook.generateContractTypes(ir, [], [], testHashes);
     expect(types).toContain('SqlMappings');
-    expect(types).toContain('codecTypes: Record<string, never>');
-    expect(types).toContain('operationTypes: Record<string, never>');
+    expect(types).toContain('export type TypeMaps');
+    expect(types).not.toContain("'__@prisma-next/sql-contract/codecTypes@__'");
+    expect(types).not.toContain("'__@prisma-next/sql-contract/operationTypes@__'");
   });
 
   it('generates mappings type with explicitly empty models and codecTypes', () => {
@@ -264,8 +265,8 @@ describe('sql-target-family-hook', () => {
       testHashes,
     );
     expect(types).toContain('SqlMappings');
-    expect(types).toContain('codecTypes: TestTypes');
-    expect(types).toContain('operationTypes: Record<string, never>');
+    expect(types).toContain('CodecTypes');
+    expect(types).toContain('export type TypeMaps');
   });
 
   it('generates mappings type with default models and codecTypes from descriptors', () => {
@@ -313,8 +314,8 @@ describe('sql-target-family-hook', () => {
       testHashes,
     );
     expect(types).toContain('SqlMappings');
-    expect(types).toContain('codecTypes: TestTypes');
-    expect(types).toContain('operationTypes: Record<string, never>');
+    expect(types).toContain('CodecTypes');
+    expect(types).toContain('export type TypeMaps');
   });
 
   it('generates relations type with non-object table relations value', () => {

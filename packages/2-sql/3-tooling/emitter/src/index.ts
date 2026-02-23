@@ -287,7 +287,7 @@ export const sqlTargetFamilyHook = {
     const storageType = this.generateStorageType(storage);
     const modelsType = this.generateModelsType(models, storage, parameterizedRenderers);
     const relationsType = this.generateRelationsType(ir.relations);
-    const mappingsType = this.generateMappingsType(models, storage, codecTypes, operationTypes);
+    const mappingsType = this.generateMappingsType(models, storage);
 
     const executionHashType = hashes.executionHash
       ? `ExecutionHashBase<'${hashes.executionHash}'>`
@@ -308,6 +308,11 @@ export const sqlTargetFamilyHook = {
   export type CodecTypes = ${codecTypes || 'Record<string, never>'};
   export type LaneCodecTypes = CodecTypes;
   export type OperationTypes = ${operationTypes || 'Record<string, never>'};
+
+  export type TypeMaps = {
+    readonly codecTypes: CodecTypes;
+    readonly operationTypes: OperationTypes;
+  };
 
   export type Contract = SqlContract<
   ${storageType},
@@ -613,11 +618,9 @@ export const sqlTargetFamilyHook = {
   generateMappingsType(
     models: Record<string, ModelDefinition> | undefined,
     storage: SqlStorage,
-    codecTypes: string,
-    operationTypes: string,
   ): string {
     if (!models) {
-      return `SqlMappings & { readonly codecTypes: ${codecTypes || 'Record<string, never>'}; readonly operationTypes: ${operationTypes || 'Record<string, never>'}; }`;
+      return 'SqlMappings';
     }
 
     const modelToTable: string[] = [];
@@ -664,9 +667,7 @@ export const sqlTargetFamilyHook = {
     if (columnToField.length > 0) {
       parts.push(`columnToField: { ${columnToField.join('; ')} }`);
     }
-    parts.push(`codecTypes: ${codecTypes || 'Record<string, never>'}`);
-    parts.push(`operationTypes: ${operationTypes || 'Record<string, never>'}`);
 
-    return `{ ${parts.join('; ')} }`;
+    return parts.length > 0 ? `{ ${parts.join('; ')} }` : 'SqlMappings';
   },
 } as const;

@@ -120,8 +120,6 @@ describe('validateContract', () => {
       tableToModel: { CustomUser: 'User' },
       fieldToColumn: { User: { id: 'identifier', email: 'mail' } },
       columnToField: { CustomUser: { identifier: 'id', mail: 'email' } },
-      codecTypes: { custom: { output: 'x' } as unknown },
-      operationTypes: { customOp: { output: 'y' } as unknown },
     };
 
     const result = validateContract<SqlContract<SqlStorage>>(contract);
@@ -131,8 +129,8 @@ describe('validateContract', () => {
       fieldToColumn: { User: { id: 'identifier' } },
       columnToField: { CustomUser: { identifier: 'id' } },
     });
-    expect(result.mappings.codecTypes.custom).toBeDefined();
-    expect(result.mappings.operationTypes.customOp).toBeDefined();
+    expect(result.mappings).not.toHaveProperty('codecTypes');
+    expect(result.mappings).not.toHaveProperty('operationTypes');
   });
 
   it('throws when only one side of model/table override is provided', () => {

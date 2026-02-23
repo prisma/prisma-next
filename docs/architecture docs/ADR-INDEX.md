@@ -26,6 +26,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 021 | Contract Marker Storage | Defines database storage for contract identity verification and alignment checks | [ADR 021 - Contract Marker Storage.md](adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md) |
 | 042 | Contract Marker Evolution | Specifies marker table schema evolution and forward-compatible field additions | [ADR 042 - Contract Marker Evolution.md](adrs/ADR%20042%20-%20Contract%20Marker%20Evolution.md) |
 | 156 | Storage sets and check constraints | Adds `storage.sets` and a minimal `checks[]` shape to express “column value is in this set” explicitly in storage | [ADR 156 - Storage sets and check constraints.md](adrs/ADR%20156%20-%20Storage%20sets%20and%20check%20constraints.md) |
+| 159 | Definition-only contracts and separate TypeMaps for lane typing | Keeps contracts stack-independent and traversable; keeps runtime-real structural mappings on the runtime contract value; exports codec/operation type maps as a separate `TypeMaps` type (not part of `Contract`) | [ADR 159 - Definition-only contracts and type-only codec-operation maps.md](adrs/ADR%20159%20-%20Definition-only%20contracts%20and%20type-only%20codec-operation%20maps.md) |
 
 ## Query System
 

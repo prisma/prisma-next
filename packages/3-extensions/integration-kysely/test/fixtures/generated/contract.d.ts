@@ -39,6 +39,11 @@ export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = PgVectorOperationTypes;
 
+export type TypeMaps = {
+  readonly codecTypes: CodecTypes;
+  readonly operationTypes: OperationTypes;
+};
+
 export type Contract = SqlContract<
   {
     readonly tables: {
@@ -180,8 +185,6 @@ export type Contract = SqlContract<
         readonly createdAt: 'createdAt';
       };
     };
-    codecTypes: PgTypes & PgVectorTypes;
-    operationTypes: PgVectorOperationTypes;
   },
   StorageHash,
   ExecutionHash,

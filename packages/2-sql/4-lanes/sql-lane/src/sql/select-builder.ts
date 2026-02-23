@@ -70,7 +70,7 @@ export class SelectBuilderImpl<
   constructor(options: SqlBuilderOptions<TContract>, state?: BuilderState) {
     this.context = options.context;
     this.contract = options.context.contract;
-    this.codecTypes = options.context.contract.mappings.codecTypes as CodecTypes;
+    this.codecTypes = {} as CodecTypes;
     if (state) {
       this.state = state;
     }

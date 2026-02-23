@@ -56,8 +56,6 @@ describe('plan assembly', () => {
       tableToModel: {},
       fieldToColumn: {},
       columnToField: {},
-      codecTypes: {},
-      operationTypes: {},
     },
     capabilities: {},
     extensionPacks: {},

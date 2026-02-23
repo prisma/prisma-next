@@ -114,9 +114,45 @@ export type SqlMappings = {
   readonly tableToModel?: Record<string, string>;
   readonly fieldToColumn?: Record<string, Record<string, string>>;
   readonly columnToField?: Record<string, Record<string, string>>;
-  readonly codecTypes: Record<string, { readonly output: unknown }>;
-  readonly operationTypes: Record<string, Record<string, unknown>>;
 };
+
+/**
+ * Type-only maps for lane inference. Not runtime properties on Contract.
+ * Emitted from contract.d.ts; carried via phantom for no-emit.
+ */
+export type TypeMaps<
+  TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
+  TOperationTypes extends Record<string, unknown> = Record<string, never>,
+> = {
+  readonly codecTypes: TCodecTypes;
+  readonly operationTypes: TOperationTypes;
+};
+
+export type CodecTypesOf<T> = T extends { readonly codecTypes: infer C }
+  ? C extends Record<string, { output: unknown }>
+    ? C
+    : Record<string, never>
+  : Record<string, never>;
+
+export type OperationTypesOf<T> = T extends { readonly operationTypes: infer O }
+  ? O extends Record<string, unknown>
+    ? O
+    : Record<string, never>
+  : Record<string, never>;
+
+declare const TYPE_MAPS: unique symbol;
+export type TypeMapsPhantomKey = typeof TYPE_MAPS;
+
+/**
+ * Phantom type for no-emit: carries TypeMaps for inference without runtime keys.
+ * Must not introduce runtime properties.
+ */
+export type ContractWithTypeMaps<TContract, TTypeMaps> = TContract & {
+  readonly [TYPE_MAPS]?: TTypeMaps;
+};
+
+export type SqlCodecTypesKey = '__@prisma-next/sql-contract/codecTypes@__';
+export type SqlOperationTypesKey = '__@prisma-next/sql-contract/operationTypes@__';
 
 export type SqlContract<
   S extends SqlStorage = SqlStorage,
@@ -135,8 +171,38 @@ export type SqlContract<
   readonly execution?: ExecutionSection;
 };
 
-export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> =
-  TContract['mappings']['codecTypes'];
+/**
+ * Extracts TypeMaps from a contract for lane typing.
+ * Handles: phantom typeMaps (no-emit), legacy phantom keys (codecTypes/operationTypes), or never (emitted requires explicit TypeMaps).
+ */
+export type ExtractTypeMapsFromContract<T> = T extends {
+  readonly [K in TypeMapsPhantomKey]?: infer TM;
+}
+  ? TM
+  : T extends { readonly [K in SqlCodecTypesKey]: infer C }
+    ? T extends { readonly [K in SqlOperationTypesKey]: infer O }
+      ? TypeMaps<
+          C extends Record<string, { output: unknown }> ? C : Record<string, never>,
+          O extends Record<string, unknown> ? O : Record<string, never>
+        >
+      : never
+    : never;
 
-export type ExtractOperationTypes<TContract extends SqlContract<SqlStorage>> =
-  TContract['mappings']['operationTypes'];
+export type ResolvedTypeMaps<TContract, TTypeMaps = ExtractTypeMapsFromContract<TContract>> = [
+  TTypeMaps,
+] extends [never]
+  ? ExtractTypeMapsFromContract<TContract>
+  : TTypeMaps;
+
+export type ResolvedCodecTypes<
+  TContract,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
+> = CodecTypesOf<ResolvedTypeMaps<TContract, TTypeMaps>>;
+
+export type ResolvedOperationTypes<
+  TContract,
+  TTypeMaps = ExtractTypeMapsFromContract<TContract>,
+> = OperationTypesOf<ResolvedTypeMaps<TContract, TTypeMaps>>;
+
+export type ExtractCodecTypes<T> = ResolvedCodecTypes<T, never>;
+export type ExtractOperationTypes<T> = ResolvedOperationTypes<T, never>;
