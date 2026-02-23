@@ -12,7 +12,7 @@ describe('sql-compilation/delete', () => {
     expect(deleted).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
     expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('delete');
     expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('returning');
-  });
+  }, 1_000);
 
   it('deleteAll() returns all deleted rows', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');

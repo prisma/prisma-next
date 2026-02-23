@@ -1,9 +1,6 @@
 import type { ContractBase, ExecutionPlan } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import {
-  createExecutionPlanFromCompiledQuery,
-  executeCompiledQuery,
-} from '../src/execution-plan';
+import { createExecutionPlanFromCompiledQuery, executeCompiledQuery } from '../src/execution-plan';
 import { createAsyncResult, createCompiledQuery, createTestContract } from './helpers';
 
 describe('execution-plan helpers', () => {
@@ -34,7 +31,9 @@ describe('execution-plan helpers', () => {
     const contract = createTestContract();
     const compiledQuery = createCompiledQuery('select 1');
 
-    const plan = createExecutionPlanFromCompiledQuery(contract, compiledQuery, { lane: 'orm-client' });
+    const plan = createExecutionPlanFromCompiledQuery(contract, compiledQuery, {
+      lane: 'orm-client',
+    });
 
     expect(plan.meta.lane).toBe('orm-client');
   });

@@ -218,7 +218,7 @@ describe('sql-compilation/compiler-core', () => {
     expect(() => compileSelect('users', operationOrderByState)).toThrow(
       /Operation expressions are not supported in subquery orderBy clauses/,
     );
-  });
+  }, 1_000);
 
   it('compileSelect supports all join types in EXISTS subqueries', () => {
     for (const joinType of ['inner', 'left', 'right', 'full'] as const) {

@@ -10,9 +10,7 @@ interface CapturedExecution<Row = unknown> {
   readonly rows: readonly Row[];
 }
 
-function createRuntimeConnection(
-  rowsByExecution: readonly Record<string, unknown>[][],
-): {
+function createRuntimeConnection(rowsByExecution: readonly Record<string, unknown>[][]): {
   readonly connection: RuntimeConnection;
   readonly executions: CapturedExecution[];
 } {
@@ -88,10 +86,7 @@ describe('KyselyPrismaConnection', () => {
       chunks.push(chunk);
     }
 
-    expect(chunks).toEqual([
-      { rows: [{ id: 1 }, { id: 2 }] },
-      { rows: [{ id: 3 }] },
-    ]);
+    expect(chunks).toEqual([{ rows: [{ id: 1 }, { id: 2 }] }, { rows: [{ id: 3 }] }]);
     expect(runtimeConnection.executions).toHaveLength(1);
     expect(runtimeConnection.executions[0]?.plan.meta.lane).toBe('raw');
   });

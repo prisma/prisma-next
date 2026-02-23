@@ -4,9 +4,7 @@ import { runtimeError } from './errors';
  * Custom async iterable result that extends AsyncIterable with a toArray() method.
  * This provides a convenient way to collect all results from an async iterator.
  */
-export class AsyncIterableResult<Row>
-  implements AsyncIterable<Row>, PromiseLike<Row[]>
-{
+export class AsyncIterableResult<Row> implements AsyncIterable<Row>, PromiseLike<Row[]> {
   private readonly generator: AsyncGenerator<Row, void, unknown>;
   private consumed = false;
   private consumedBy: 'bufferedArray' | 'iterator' | undefined;
@@ -70,15 +68,10 @@ export class AsyncIterableResult<Row>
     return this.bufferedArrayPromise;
   }
 
+  // biome-ignore lint/suspicious/noThenProperty: PromiseLike implementation is intentional for await support.
   then<TResult1 = Row[], TResult2 = never>(
-    onfulfilled?:
-      | ((value: Row[]) => TResult1 | PromiseLike<TResult1>)
-      | undefined
-      | null,
-    onrejected?:
-      | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
-      | undefined
-      | null,
+    onfulfilled?: ((value: Row[]) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | undefined | null,
   ): PromiseLike<TResult1 | TResult2> {
     return this.toArray().then(onfulfilled, onrejected);
   }

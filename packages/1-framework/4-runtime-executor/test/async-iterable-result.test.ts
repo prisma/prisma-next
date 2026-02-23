@@ -254,8 +254,6 @@ describe('AsyncIterableResult', () => {
     }
     expect(items).toEqual([1, 2, 3]);
 
-    await expect(result).rejects.toThrow(
-      'AsyncIterableResult iterator has already been consumed',
-    );
+    await expect(result).rejects.toThrow('AsyncIterableResult iterator has already been consumed');
   });
 });
