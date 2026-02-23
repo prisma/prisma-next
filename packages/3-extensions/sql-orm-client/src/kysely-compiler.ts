@@ -127,6 +127,14 @@ export function compileSelectWithIncludeStrategy(
   state: CollectionState,
   strategy: 'lateral' | 'correlated',
 ): CompiledQuery<Record<string, unknown>> {
+  if (
+    state.includes.some((include) => include.scalar !== undefined || include.combine !== undefined)
+  ) {
+    throw new Error(
+      'single-query include strategy does not support scalar include selectors or combine()',
+    );
+  }
+
   const parentAlias = '__orm_parent';
   const parentCompiled = compileSelect(tableName, {
     ...state,

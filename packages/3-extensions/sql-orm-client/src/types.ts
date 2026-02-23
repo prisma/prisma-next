@@ -20,6 +20,37 @@ export interface OrderExpr {
 
 export type OrderByDirective = OrderExpr;
 
+declare const includeScalarResultBrand: unique symbol;
+declare const includeCombineResultBrand: unique symbol;
+
+export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
+
+export interface IncludeScalar<Result> {
+  readonly kind: 'includeScalar';
+  readonly fn: AggregateFn;
+  readonly column?: string;
+  readonly state: CollectionState;
+  readonly [includeScalarResultBrand]?: Result;
+}
+
+export interface IncludeRowsBranch {
+  readonly kind: 'rows';
+  readonly state: CollectionState;
+}
+
+export interface IncludeScalarBranch {
+  readonly kind: 'scalar';
+  readonly selector: IncludeScalar<unknown>;
+}
+
+export type IncludeCombineBranch = IncludeRowsBranch | IncludeScalarBranch;
+
+export interface IncludeCombine<ResultShape extends Record<string, unknown>> {
+  readonly kind: 'includeCombine';
+  readonly branches: Readonly<Record<string, IncludeCombineBranch>>;
+  readonly [includeCombineResultBrand]?: ResultShape;
+}
+
 export interface IncludeExpr {
   readonly relationName: string;
   readonly relatedModelName: string;
@@ -28,6 +59,8 @@ export interface IncludeExpr {
   readonly parentPkColumn: string;
   readonly cardinality: RelationCardinalityTag | undefined;
   readonly nested: CollectionState;
+  readonly scalar: IncludeScalar<unknown> | undefined;
+  readonly combine: Readonly<Record<string, IncludeCombineBranch>> | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,8 +202,6 @@ export type DefaultModelRow<TContract extends SqlContract<SqlStorage>, ModelName
 };
 
 declare const aggregateResultBrand: unique symbol;
-
-export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
 export interface AggregateSelector<Result> {
   readonly kind: 'aggregate';

@@ -144,7 +144,7 @@ describe('orm()', () => {
 
     const withPosts = db.users.include('posts', (posts) => {
       expect(posts).toBeInstanceOf(PostCollection);
-      return (posts as PostCollection).popular();
+      return (posts as unknown as PostCollection).popular();
     });
 
     const include = withPosts.state.includes[0]!;
@@ -163,9 +163,9 @@ describe('orm()', () => {
     });
 
     const withNested = db.users.include('posts', (posts) =>
-      (posts as PostCollection).include('comments', (comments) => {
+      (posts as unknown as PostCollection).include('comments', (comments) => {
         expect(comments).toBeInstanceOf(CommentCollection);
-        return (comments as CommentCollection).withBody('approved');
+        return (comments as unknown as CommentCollection).withBody('approved');
       }),
     );
 

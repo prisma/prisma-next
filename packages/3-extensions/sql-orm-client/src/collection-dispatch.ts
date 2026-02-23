@@ -21,6 +21,7 @@ import type {
   CollectionContext,
   CollectionState,
   IncludeExpr,
+  IncludeScalar,
   RelationCardinalityTag,
   RuntimeScope,
 } from './types';
@@ -55,7 +56,10 @@ function dispatchWithIncludeStrategy<Row>(options: {
 }): AsyncIterableResult<Row> {
   const strategy = selectIncludeStrategy(options.contract);
 
-  if (hasNestedIncludes(options.state.includes)) {
+  if (
+    hasNestedIncludes(options.state.includes) ||
+    hasComplexIncludeDescriptors(options.state.includes)
+  ) {
     return dispatchWithMultiQueryIncludes<Row>(options);
   }
 
@@ -112,6 +116,11 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
 
       for (const parent of parentRows) {
         for (const include of state.includes) {
+          if (include.scalar || include.combine) {
+            throw new Error(
+              'single-query include strategy does not support scalar include selectors or combine()',
+            );
+          }
           const rawChildren = parseIncludedRows(parent.raw[include.relationName]);
           const mappedChildren = rawChildren.map((childRow) =>
             mapStorageRowToModelFields(contract, include.relatedTableName, childRow),
@@ -204,69 +213,224 @@ export async function stitchIncludes(
     );
 
     if (parentJoinValues.length === 0) {
+      assignEmptyIncludeResult(parentRows, include);
+      continue;
+    }
+
+    if (include.combine) {
+      await stitchCombinedInclude(scope, contract, parentRows, include, parentJoinValues);
+      continue;
+    }
+
+    if (include.scalar) {
+      await stitchScalarInclude(
+        scope,
+        contract,
+        parentRows,
+        include,
+        include.scalar,
+        parentJoinValues,
+      );
+      continue;
+    }
+
+    await stitchRowInclude(scope, contract, parentRows, include, include.nested, parentJoinValues);
+  }
+}
+
+async function stitchCombinedInclude(
+  scope: RuntimeScope,
+  contract: SqlContract<SqlStorage>,
+  parentRows: RowEnvelope[],
+  include: IncludeExpr,
+  parentJoinValues: readonly unknown[],
+): Promise<void> {
+  const branches = include.combine ?? {};
+
+  for (const parent of parentRows) {
+    parent.mapped[include.relationName] = {};
+  }
+
+  for (const [branchName, branch] of Object.entries(branches)) {
+    if (branch.kind === 'rows') {
+      const rowsByParent = await resolveRowsByParent(
+        scope,
+        contract,
+        include,
+        branch.state,
+        parentJoinValues,
+      );
       for (const parent of parentRows) {
-        parent.mapped[include.relationName] = emptyIncludeResult(include.cardinality);
+        const parentJoinValue = parent.raw[include.parentPkColumn];
+        const relatedRows = rowsByParent.get(parentJoinValue) ?? [];
+        const combined = parent.mapped[include.relationName] as Record<string, unknown>;
+        combined[branchName] = coerceIncludeResult(relatedRows, branch.state, include.cardinality);
       }
       continue;
     }
 
-    const { selectedForQuery: childSelectedForQuery, hiddenColumns: hiddenChildColumns } =
-      augmentSelectionForJoinColumns(include.nested.selectedFields, [include.fkColumn]);
-
-    const childCompiled = compileRelationSelect(
-      include.relatedTableName,
-      include.fkColumn,
-      parentJoinValues,
-      {
-        ...include.nested,
-        selectedFields: childSelectedForQuery,
-      },
-    );
-    const childRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
+    const scalarByParent = await resolveScalarByParent(
       scope,
       contract,
-      childCompiled,
-      { lane: 'orm-client' },
-    ).toArray();
-    const childRows = childRowsRaw.map((row) =>
-      createRowEnvelope(contract, include.relatedTableName, row),
+      include,
+      branch.selector,
+      parentJoinValues,
     );
-
-    if (include.nested.includes.length > 0) {
-      await stitchIncludes(scope, contract, childRows, include.nested.includes);
-    }
-
-    const childByParentJoin = new Map<unknown, Record<string, unknown>[]>();
-    for (const child of childRows) {
-      const joinValue = child.raw[include.fkColumn];
-
-      if (hiddenChildColumns.length > 0) {
-        stripHiddenMappedFields(
-          contract,
-          include.relatedTableName,
-          child.mapped,
-          hiddenChildColumns,
-        );
-      }
-
-      let bucket = childByParentJoin.get(joinValue);
-      if (!bucket) {
-        bucket = [];
-        childByParentJoin.set(joinValue, bucket);
-      }
-      bucket.push(child.mapped);
-    }
-
     for (const parent of parentRows) {
       const parentJoinValue = parent.raw[include.parentPkColumn];
-      const relatedRows = childByParentJoin.get(parentJoinValue) ?? [];
-      parent.mapped[include.relationName] = coerceIncludeResult(
-        relatedRows,
-        include.nested,
-        include.cardinality,
-      );
+      const combined = parent.mapped[include.relationName] as Record<string, unknown>;
+      combined[branchName] =
+        scalarByParent.get(parentJoinValue) ?? emptyScalarResult(branch.selector.fn);
     }
   }
+}
+
+async function stitchScalarInclude(
+  scope: RuntimeScope,
+  contract: SqlContract<SqlStorage>,
+  parentRows: RowEnvelope[],
+  include: IncludeExpr,
+  selector: IncludeScalar<unknown>,
+  parentJoinValues: readonly unknown[],
+): Promise<void> {
+  const scalarByParent = await resolveScalarByParent(
+    scope,
+    contract,
+    include,
+    selector,
+    parentJoinValues,
+  );
+
+  for (const parent of parentRows) {
+    const parentJoinValue = parent.raw[include.parentPkColumn];
+    parent.mapped[include.relationName] =
+      scalarByParent.get(parentJoinValue) ?? emptyScalarResult(selector.fn);
+  }
+}
+
+async function stitchRowInclude(
+  scope: RuntimeScope,
+  contract: SqlContract<SqlStorage>,
+  parentRows: RowEnvelope[],
+  include: IncludeExpr,
+  state: CollectionState,
+  parentJoinValues: readonly unknown[],
+): Promise<void> {
+  const rowsByParent = await resolveRowsByParent(scope, contract, include, state, parentJoinValues);
+
+  for (const parent of parentRows) {
+    const parentJoinValue = parent.raw[include.parentPkColumn];
+    const relatedRows = rowsByParent.get(parentJoinValue) ?? [];
+    parent.mapped[include.relationName] = coerceIncludeResult(
+      relatedRows,
+      state,
+      include.cardinality,
+    );
+  }
+}
+
+async function resolveRowsByParent(
+  scope: RuntimeScope,
+  contract: SqlContract<SqlStorage>,
+  include: IncludeExpr,
+  state: CollectionState,
+  parentJoinValues: readonly unknown[],
+): Promise<Map<unknown, Record<string, unknown>[]>> {
+  const { selectedForQuery: childSelectedForQuery, hiddenColumns: hiddenChildColumns } =
+    augmentSelectionForJoinColumns(state.selectedFields, [include.fkColumn]);
+
+  const childCompiled = compileRelationSelect(
+    include.relatedTableName,
+    include.fkColumn,
+    parentJoinValues,
+    {
+      ...state,
+      selectedFields: childSelectedForQuery,
+    },
+  );
+  const childRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
+    scope,
+    contract,
+    childCompiled,
+    { lane: 'orm-client' },
+  ).toArray();
+  const childRows = childRowsRaw.map((row) =>
+    createRowEnvelope(contract, include.relatedTableName, row),
+  );
+
+  if (state.includes.length > 0) {
+    await stitchIncludes(scope, contract, childRows, state.includes);
+  }
+
+  const childByParentJoin = new Map<unknown, Record<string, unknown>[]>();
+  for (const child of childRows) {
+    const joinValue = child.raw[include.fkColumn];
+
+    if (hiddenChildColumns.length > 0) {
+      stripHiddenMappedFields(contract, include.relatedTableName, child.mapped, hiddenChildColumns);
+    }
+
+    let bucket = childByParentJoin.get(joinValue);
+    if (!bucket) {
+      bucket = [];
+      childByParentJoin.set(joinValue, bucket);
+    }
+    bucket.push(child.mapped);
+  }
+
+  return childByParentJoin;
+}
+
+async function resolveScalarByParent(
+  scope: RuntimeScope,
+  contract: SqlContract<SqlStorage>,
+  include: IncludeExpr,
+  selector: IncludeScalar<unknown>,
+  parentJoinValues: readonly unknown[],
+): Promise<Map<unknown, unknown>> {
+  const requiredColumns = selector.column
+    ? [include.fkColumn, selector.column]
+    : [include.fkColumn];
+  const { selectedForQuery } = augmentSelectionForJoinColumns(
+    selector.state.selectedFields,
+    requiredColumns,
+  );
+
+  const childCompiled = compileRelationSelect(
+    include.relatedTableName,
+    include.fkColumn,
+    parentJoinValues,
+    {
+      ...selector.state,
+      selectedFields: selectedForQuery,
+      includes: [],
+    },
+  );
+  const childRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
+    scope,
+    contract,
+    childCompiled,
+    { lane: 'orm-client' },
+  ).toArray();
+
+  const rowsByParent = new Map<unknown, Record<string, unknown>[]>();
+  for (const row of childRowsRaw) {
+    const joinValue = row[include.fkColumn];
+    let bucket = rowsByParent.get(joinValue);
+    if (!bucket) {
+      bucket = [];
+      rowsByParent.set(joinValue, bucket);
+    }
+    bucket.push(row);
+  }
+
+  const scalarByParent = new Map<unknown, unknown>();
+  for (const [joinValue, rows] of rowsByParent) {
+    const scopedRows = slicePerParent(rows, selector.state);
+    scalarByParent.set(joinValue, computeScalarValue(selector, scopedRows));
+  }
+
+  return scalarByParent;
 }
 
 function uniqueValues(values: unknown[]): unknown[] {
@@ -275,6 +439,37 @@ function uniqueValues(values: unknown[]): unknown[] {
 
 function hasNestedIncludes(includes: readonly IncludeExpr[]): boolean {
   return includes.some((include) => include.nested.includes.length > 0);
+}
+
+function hasComplexIncludeDescriptors(includes: readonly IncludeExpr[]): boolean {
+  return includes.some((include) => include.scalar !== undefined || include.combine !== undefined);
+}
+
+function assignEmptyIncludeResult(parentRows: RowEnvelope[], include: IncludeExpr): void {
+  if (include.combine) {
+    for (const parent of parentRows) {
+      const combined: Record<string, unknown> = {};
+      for (const [branchName, branch] of Object.entries(include.combine)) {
+        combined[branchName] =
+          branch.kind === 'rows'
+            ? emptyIncludeResult(include.cardinality)
+            : emptyScalarResult(branch.selector.fn);
+      }
+      parent.mapped[include.relationName] = combined;
+    }
+    return;
+  }
+
+  if (include.scalar) {
+    for (const parent of parentRows) {
+      parent.mapped[include.relationName] = emptyScalarResult(include.scalar.fn);
+    }
+    return;
+  }
+
+  for (const parent of parentRows) {
+    parent.mapped[include.relationName] = emptyIncludeResult(include.cardinality);
+  }
 }
 
 function parseIncludedRows(value: unknown): Record<string, unknown>[] {
@@ -341,4 +536,70 @@ function coerceIncludeResult(
 ): Record<string, unknown>[] | Record<string, unknown> | null {
   const sliced = slicePerParent(rows, state);
   return isToOneCardinality(cardinality) ? (sliced[0] ?? null) : sliced;
+}
+
+function emptyScalarResult(fn: IncludeScalar<unknown>['fn']): number | null {
+  return fn === 'count' ? 0 : null;
+}
+
+function computeScalarValue(
+  selector: IncludeScalar<unknown>,
+  rows: readonly Record<string, unknown>[],
+): number | null {
+  if (selector.fn === 'count') {
+    return rows.length;
+  }
+
+  const column = selector.column;
+  if (!column) {
+    return null;
+  }
+
+  const numericValues = rows
+    .map((row) => coerceNumericValue(row[column]))
+    .filter((value): value is number => value !== null);
+
+  if (numericValues.length === 0) {
+    return null;
+  }
+
+  if (selector.fn === 'sum') {
+    return numericValues.reduce((total, value) => total + value, 0);
+  }
+
+  if (selector.fn === 'avg') {
+    const total = numericValues.reduce((sum, value) => sum + value, 0);
+    return total / numericValues.length;
+  }
+
+  if (selector.fn === 'min') {
+    return Math.min(...numericValues);
+  }
+
+  if (selector.fn === 'max') {
+    return Math.max(...numericValues);
+  }
+
+  return null;
+}
+
+function coerceNumericValue(value: unknown): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'bigint') {
+    return Number(value);
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    return Number.isNaN(numeric) ? null : numeric;
+  }
+
+  return null;
 }

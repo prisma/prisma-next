@@ -208,6 +208,84 @@ describe('sql-compilation/include', () => {
     expect(results).toEqual([{ name: 'Alice', email: 'alice@example.com', posts: [] }]);
   });
 
+  it('include() supports scalar count selectors for to-many relations', async () => {
+    const { collection, runtime } = createCollection();
+    runtime.setNextResults([
+      [
+        { id: 1, name: 'Alice', email: 'alice@example.com' },
+        { id: 2, name: 'Bob', email: 'bob@example.com' },
+      ],
+      [
+        { id: 10, title: 'Post A', user_id: 1, views: 100 },
+        { id: 11, title: 'Post B', user_id: 1, views: 200 },
+        { id: 12, title: 'Post C', user_id: 2, views: 300 },
+      ],
+    ]);
+
+    const results = await collection
+      .orderBy((user) => user.id.asc())
+      .include('posts', (posts) => posts.count())
+      .all();
+
+    expect(results).toEqual([
+      { id: 1, name: 'Alice', email: 'alice@example.com', posts: 2 },
+      { id: 2, name: 'Bob', email: 'bob@example.com', posts: 1 },
+    ]);
+    expect(runtime.executions).toHaveLength(2);
+  });
+
+  it('include() supports combine() with row and scalar branches', async () => {
+    const { collection, runtime } = createCollection();
+    runtime.setNextResults([
+      [
+        { id: 1, name: 'Alice', email: 'alice@example.com' },
+        { id: 2, name: 'Bob', email: 'bob@example.com' },
+      ],
+      [
+        { id: 11, title: 'Post B', user_id: 1, views: 200 },
+        { id: 12, title: 'Post C', user_id: 2, views: 300 },
+      ],
+      [
+        { id: 10, title: 'Post A', user_id: 1, views: 100 },
+        { id: 11, title: 'Post B', user_id: 1, views: 200 },
+        { id: 12, title: 'Post C', user_id: 2, views: 300 },
+      ],
+    ]);
+
+    const results = await collection
+      .orderBy((user) => user.id.asc())
+      .include('posts', (posts) =>
+        posts.combine({
+          popular: posts.where((post) => post.views.gt(150)).orderBy((post) => post.id.asc()),
+          totalCount: posts.count(),
+        }),
+      )
+      .all();
+
+    expect(results).toEqual([
+      {
+        id: 1,
+        name: 'Alice',
+        email: 'alice@example.com',
+        posts: {
+          popular: [{ id: 11, title: 'Post B', userId: 1, views: 200 }],
+          totalCount: 2,
+        },
+      },
+      {
+        id: 2,
+        name: 'Bob',
+        email: 'bob@example.com',
+        posts: {
+          popular: [{ id: 12, title: 'Post C', userId: 2, views: 300 }],
+          totalCount: 1,
+        },
+      },
+    ]);
+    expect(runtime.executions).toHaveLength(3);
+    expect(runtime.executions[1]?.plan.sql.toLowerCase()).toContain('"views" >');
+  });
+
   it('supports include flow when runtime exposes connection() and release()', async () => {
     const base = createMockRuntime();
     let released = false;

@@ -169,6 +169,48 @@ describe('Collection', () => {
       expect(inc.nested.limit).toBe(5);
     });
 
+    it('include() supports scalar selectors for to-many relations', () => {
+      const { collection } = createCollection();
+      const withPostCount = collection.include('posts', (posts) =>
+        posts.where((post) => post.views.gt(100)).count(),
+      );
+
+      const include = withPostCount.state.includes[0]!;
+      expect(include.scalar).toMatchObject({
+        kind: 'includeScalar',
+        fn: 'count',
+      });
+      expect(include.scalar?.state.filters).toHaveLength(1);
+      expect(include.combine).toBeUndefined();
+    });
+
+    it('include() supports combine() branches with independent states', () => {
+      const { collection } = createCollection();
+      const combined = collection.include('posts', (posts) =>
+        posts.combine({
+          recent: posts.orderBy((post) => post.id.desc()).take(1),
+          totalCount: posts.count(),
+        }),
+      );
+
+      const include = combined.state.includes[0]!;
+      expect(include.combine).toBeDefined();
+      expect(include.scalar).toBeUndefined();
+      expect(include.nested.filters).toHaveLength(0);
+
+      const recentBranch = include.combine?.['recent'];
+      expect(recentBranch?.kind).toBe('rows');
+      if (recentBranch?.kind === 'rows') {
+        expect(recentBranch.state.limit).toBe(1);
+      }
+
+      const totalCountBranch = include.combine?.['totalCount'];
+      expect(totalCountBranch?.kind).toBe('scalar');
+      if (totalCountBranch?.kind === 'scalar') {
+        expect(totalCountBranch.selector.fn).toBe('count');
+      }
+    });
+
     it('include() captures to-one relation metadata', () => {
       const { collection: postCollection } = createCollectionFor('Post', contract);
       const withAuthor = postCollection.include('author');

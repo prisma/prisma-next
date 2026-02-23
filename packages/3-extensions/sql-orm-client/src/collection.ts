@@ -5,6 +5,7 @@ import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import {
   assertReturningCapability,
+  isToOneCardinality,
   resolveIncludeRelation,
   resolveModelTableName,
   resolvePrimaryKeyColumn,
@@ -22,6 +23,13 @@ import {
 } from './collection-runtime';
 import { shorthandToWhereExpr } from './filters';
 import { GroupedCollection } from './grouped-collection';
+import {
+  createIncludeCombine,
+  createIncludeScalar,
+  isCollectionStateCarrier,
+  isIncludeCombine,
+  isIncludeScalar,
+} from './include-descriptors';
 import {
   compileAggregate,
   compileDeleteCount,
@@ -50,15 +58,20 @@ import type {
   CreateInput,
   DefaultCollectionTypeState,
   DefaultModelRow,
+  IncludeCombine,
+  IncludeCombineBranch,
   IncludeExpr,
   IncludeRelationValue,
+  IncludeScalar,
   ModelAccessor,
   MutationCreateInput,
   MutationCreateInputWithRelations,
   MutationUpdateInput,
+  NumericFieldNames,
   OrderByDirective,
   OrderExpr,
   RelatedModelName,
+  RelationCardinality,
   RelationNames,
   ShorthandWhereFilter,
   UniqueConstraintCriterion,
@@ -69,6 +82,7 @@ interface CollectionInit<TContract extends SqlContract<SqlStorage>> {
   readonly tableName?: string | undefined;
   readonly state?: CollectionState | undefined;
   readonly registry?: ReadonlyMap<string, CollectionConstructor<TContract>> | undefined;
+  readonly includeRefinementMode?: boolean | undefined;
 }
 
 type CollectionConstructor<TContract extends SqlContract<SqlStorage>> = new (
@@ -91,12 +105,64 @@ type IncludedRelationsForRow<
   Row,
 > = Omit<Row, keyof DefaultModelRow<TContract, ModelName>>;
 
+type IncludeRefinementTerminals =
+  | 'all'
+  | 'find'
+  | 'aggregate'
+  | 'groupBy'
+  | 'create'
+  | 'createAll'
+  | 'createCount'
+  | 'update'
+  | 'updateAll'
+  | 'updateCount'
+  | 'delete'
+  | 'deleteAll'
+  | 'deleteCount'
+  | 'upsert';
+
+type IncludeRefinementScalarMethods = 'count' | 'sum' | 'avg' | 'min' | 'max' | 'combine';
+
 type IncludeRefinementCollection<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,
   Row,
   State extends CollectionTypeState,
-> = Omit<Collection<TContract, ModelName, Row, State>, 'all' | 'find' | 'aggregate' | 'groupBy'>;
+  IsToMany extends boolean,
+> = Omit<
+  Collection<TContract, ModelName, Row, State>,
+  IncludeRefinementTerminals | (IsToMany extends true ? never : IncludeRefinementScalarMethods)
+>;
+
+type IsToManyRelation<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+  RelName extends string,
+> = RelationCardinality<TContract, ModelName, RelName> extends '1:N' | 'M:N' ? true : false;
+
+type IncludeRefinementResult<
+  TContract extends SqlContract<SqlStorage>,
+  RelatedName extends string,
+  IsToMany extends boolean,
+> =
+  | IncludeRefinementCollection<TContract, RelatedName, unknown, CollectionTypeState, IsToMany>
+  | (IsToMany extends true
+      ? IncludeScalar<unknown> | IncludeCombine<Record<string, unknown>>
+      : never);
+
+type IncludeRefinementValue<
+  TContract extends SqlContract<SqlStorage>,
+  ParentModelName extends string,
+  RelName extends string,
+  DefaultIncludedRow,
+  RefinedResult,
+> = RefinedResult extends IncludeScalar<infer ScalarResult>
+  ? ScalarResult
+  : RefinedResult extends IncludeCombine<infer CombinedResult>
+    ? CombinedResult
+    : RefinedResult extends Collection<TContract, string, infer IncludedRow, CollectionTypeState>
+      ? IncludeRelationValue<TContract, ParentModelName, RelName, IncludedRow>
+      : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow>;
 
 export class Collection<
   TContract extends SqlContract<SqlStorage>,
@@ -114,6 +180,8 @@ export class Collection<
   readonly state: CollectionState;
   /** @internal */
   readonly registry: ReadonlyMap<string, CollectionConstructor<TContract>>;
+  /** @internal */
+  readonly includeRefinementMode: boolean;
 
   constructor(
     ctx: CollectionContext<TContract>,
@@ -125,6 +193,7 @@ export class Collection<
     this.tableName = options.tableName ?? resolveModelTableName(ctx.contract, modelName);
     this.state = options.state ?? emptyState();
     this.registry = options.registry ?? new Map<string, CollectionConstructor<TContract>>();
+    this.includeRefinementMode = options.includeRefinementMode ?? false;
   }
 
   where(
@@ -160,7 +229,18 @@ export class Collection<
       RelName
     > &
       string,
-    IncludedRow = DefaultModelRow<TContract, RelatedName>,
+    IsToMany extends boolean = IsToManyRelation<TContract, ModelName, RelName>,
+    RefinedResult extends IncludeRefinementResult<
+      TContract,
+      RelatedName,
+      IsToMany
+    > = IncludeRefinementCollection<
+      TContract,
+      RelatedName,
+      DefaultModelRow<TContract, RelatedName>,
+      CollectionTypeState,
+      IsToMany
+    >,
   >(
     relationName: RelName,
     refineFn?: (
@@ -168,14 +248,21 @@ export class Collection<
         TContract,
         RelatedName,
         DefaultModelRow<TContract, RelatedName>,
-        DefaultCollectionTypeState
+        DefaultCollectionTypeState,
+        IsToMany
       >,
-    ) => IncludeRefinementCollection<TContract, RelatedName, IncludedRow, CollectionTypeState>,
+    ) => RefinedResult,
   ): Collection<
     TContract,
     ModelName,
     Row & {
-      [K in RelName]: IncludeRelationValue<TContract, ModelName, K, IncludedRow>;
+      [K in RelName]: IncludeRefinementValue<
+        TContract,
+        ModelName,
+        K,
+        DefaultModelRow<TContract, RelatedName>,
+        RefinedResult
+      >;
     },
     State
   > {
@@ -185,8 +272,10 @@ export class Collection<
       relationName as string,
     );
 
-    // Build nested state from refine callback
     let nestedState = emptyState();
+    let scalarSelector: IncludeScalar<unknown> | undefined;
+    let combineBranches: Readonly<Record<string, IncludeCombineBranch>> | undefined;
+
     if (refineFn) {
       const nestedCollection = this.#createCollection<
         RelatedName,
@@ -195,9 +284,40 @@ export class Collection<
       >(relation.relatedModelName as RelatedName, {
         tableName: relation.relatedTableName,
         state: emptyState(),
+        includeRefinementMode: true,
       });
-      const refined = refineFn(nestedCollection);
-      nestedState = refined.state;
+      const refined = refineFn(
+        nestedCollection as unknown as IncludeRefinementCollection<
+          TContract,
+          RelatedName,
+          DefaultModelRow<TContract, RelatedName>,
+          DefaultCollectionTypeState,
+          IsToMany
+        >,
+      );
+
+      if (isIncludeScalar(refined)) {
+        if (isToOneCardinality(relation.cardinality)) {
+          throw new Error(
+            `include('${relationName as string}') scalar aggregations are only supported for to-many relations`,
+          );
+        }
+        scalarSelector = refined;
+        nestedState = refined.state;
+      } else if (isIncludeCombine(refined)) {
+        if (isToOneCardinality(relation.cardinality)) {
+          throw new Error(
+            `include('${relationName as string}') combine() is only supported for to-many relations`,
+          );
+        }
+        combineBranches = refined.branches;
+      } else if (isCollectionStateCarrier(refined)) {
+        nestedState = refined.state;
+      } else {
+        throw new Error(
+          `include('${relationName as string}') refinement must return a collection, include scalar selector, or combine() descriptor`,
+        );
+      }
     }
 
     const includeExpr: IncludeExpr = {
@@ -208,11 +328,19 @@ export class Collection<
       parentPkColumn: relation.parentPkColumn,
       cardinality: relation.cardinality,
       nested: nestedState,
+      scalar: scalarSelector,
+      combine: combineBranches,
     };
 
     return this.#cloneWithRow<
       Row & {
-        [K in RelName]: IncludeRelationValue<TContract, ModelName, K, IncludedRow>;
+        [K in RelName]: IncludeRefinementValue<
+          TContract,
+          ModelName,
+          K,
+          DefaultModelRow<TContract, RelatedName>,
+          RefinedResult
+        >;
       },
       State
     >({
@@ -282,6 +410,97 @@ export class Collection<
       groupByColumns,
       havingFilters: [],
     });
+  }
+
+  count(): IncludeScalar<number> {
+    this.#assertIncludeRefinementMode('count()');
+    return createIncludeScalar<number>('count', this.state);
+  }
+
+  sum<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): IncludeScalar<number | null> {
+    this.#assertIncludeRefinementMode('sum()');
+    const fieldName = field as string;
+    const columnName =
+      this.ctx.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ?? fieldName;
+    return createIncludeScalar<number | null>('sum', this.state, columnName);
+  }
+
+  avg<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): IncludeScalar<number | null> {
+    this.#assertIncludeRefinementMode('avg()');
+    const fieldName = field as string;
+    const columnName =
+      this.ctx.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ?? fieldName;
+    return createIncludeScalar<number | null>('avg', this.state, columnName);
+  }
+
+  min<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): IncludeScalar<number | null> {
+    this.#assertIncludeRefinementMode('min()');
+    const fieldName = field as string;
+    const columnName =
+      this.ctx.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ?? fieldName;
+    return createIncludeScalar<number | null>('min', this.state, columnName);
+  }
+
+  max<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): IncludeScalar<number | null> {
+    this.#assertIncludeRefinementMode('max()');
+    const fieldName = field as string;
+    const columnName =
+      this.ctx.contract.mappings.fieldToColumn?.[this.modelName]?.[fieldName] ?? fieldName;
+    return createIncludeScalar<number | null>('max', this.state, columnName);
+  }
+
+  combine<
+    Spec extends Record<
+      string,
+      Collection<TContract, ModelName, unknown, CollectionTypeState> | IncludeScalar<unknown>
+    >,
+  >(
+    spec: Spec,
+  ): IncludeCombine<{
+    [K in keyof Spec]: Spec[K] extends IncludeScalar<infer ScalarResult>
+      ? ScalarResult
+      : Spec[K] extends Collection<TContract, ModelName, infer BranchRow, CollectionTypeState>
+        ? BranchRow[]
+        : never;
+  }> {
+    this.#assertIncludeRefinementMode('combine()');
+
+    const branches: Record<string, IncludeCombineBranch> = {};
+    for (const [name, value] of Object.entries(spec)) {
+      if (isIncludeScalar(value)) {
+        branches[name] = {
+          kind: 'scalar',
+          selector: value,
+        };
+        continue;
+      }
+
+      if (isCollectionStateCarrier(value)) {
+        branches[name] = {
+          kind: 'rows',
+          state: value.state,
+        };
+        continue;
+      }
+
+      throw new Error(`include().combine() branch "${name}" is invalid`);
+    }
+
+    return createIncludeCombine(branches) as IncludeCombine<{
+      [K in keyof Spec]: Spec[K] extends IncludeScalar<infer ScalarResult>
+        ? ScalarResult
+        : Spec[K] extends Collection<TContract, ModelName, infer BranchRow, CollectionTypeState>
+          ? BranchRow[]
+          : never;
+    }>;
   }
 
   cursor(
@@ -937,6 +1156,14 @@ export class Collection<
     return rows[0] ?? null;
   }
 
+  #assertIncludeRefinementMode(action: string): void {
+    if (this.includeRefinementMode) {
+      return;
+    }
+
+    throw new Error(`${action} is only available inside include() refinement callbacks`);
+  }
+
   #clone<NextState extends CollectionTypeState = State>(
     overrides: Partial<CollectionState>,
   ): Collection<TContract, ModelName, Row, NextState> {
@@ -963,6 +1190,7 @@ export class Collection<
       tableName: this.tableName,
       state,
       registry: this.registry,
+      includeRefinementMode: this.includeRefinementMode,
     }) as unknown as Collection<TContract, ModelName, NextRow, NextState>;
   }
 
@@ -983,6 +1211,7 @@ export class Collection<
       registry:
         options.registry ??
         (this.registry as ReadonlyMap<string, CollectionConstructor<TContract>>),
+      includeRefinementMode: options.includeRefinementMode ?? this.includeRefinementMode,
     }) as unknown as Collection<TContract, ModelNameInner, RowInner, StateInner>;
   }
 

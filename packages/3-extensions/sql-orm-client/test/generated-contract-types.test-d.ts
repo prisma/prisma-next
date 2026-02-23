@@ -142,6 +142,13 @@ type Assert<T extends true> = T;
 
 const selectedUsers = userCollection.select('name', 'email');
 const selectedUsersWithPosts = userCollection.select('name').include('posts');
+const usersWithPostCount = userCollection.include('posts', (posts) => posts.count());
+const usersWithPostSummary = userCollection.include('posts', (posts) =>
+  posts.combine({
+    allPosts: posts.orderBy((post) => post.id.asc()),
+    totalCount: posts.count(),
+  }),
+);
 const filteredUsers = userCollection.where({ email: 'alice@example.com' });
 const orderedUsers = userCollection.orderBy((user) => user.id.asc());
 const cursorPagedUsers = orderedUsers.cursor({ id: 'user_001' });
@@ -156,6 +163,11 @@ groupedUsers.having((having) => having.count().gt(1));
 groupedUsers.all();
 // @ts-expect-error GroupedCollection does not expose include()
 groupedUsers.include('posts');
+userCollection.include('posts', (posts) => {
+  // @ts-expect-error include refinement collection does not expose create()
+  posts.create({} as never);
+  return posts;
+});
 const userAggregate = userCollection.aggregate((aggregate) => ({
   count: aggregate.count(),
 }));
@@ -221,6 +233,8 @@ userCollection.deleteCount();
 
 type SelectedUserRow = RowOf<typeof selectedUsers>;
 type SelectedUserWithPostsRow = RowOf<typeof selectedUsersWithPosts>;
+type UsersWithPostCountRow = RowOf<typeof usersWithPostCount>;
+type UsersWithPostSummaryRow = RowOf<typeof usersWithPostSummary>;
 type FilteredUsersState = StateOf<typeof filteredUsers>;
 type OrderedUsersState = StateOf<typeof orderedUsers>;
 type CursorPagedUsersState = StateOf<typeof cursorPagedUsers>;
@@ -240,6 +254,12 @@ export type GeneratedContractTypeAssertions = [
   Assert<Equal<SelectedUserWithPostsRow['posts'][number]['id'], string>>,
   Assert<Equal<SelectedUserWithPostsRow['posts'][number]['userId'], string>>,
   Assert<Equal<SelectedUserWithPostsRow['posts'][number]['title'], string>>,
+  Assert<Equal<UsersWithPostCountRow['posts'], number>>,
+  Assert<Equal<keyof UsersWithPostSummaryRow['posts'], 'allPosts' | 'totalCount'>>,
+  Assert<Equal<UsersWithPostSummaryRow['posts']['totalCount'], number>>,
+  Assert<
+    Equal<keyof UsersWithPostSummaryRow['posts']['allPosts'][number], 'id' | 'userId' | 'title'>
+  >,
   Assert<Equal<FilteredUsersState['hasWhere'], true>>,
   Assert<Equal<OrderedUsersState['hasOrderBy'], true>>,
   Assert<Equal<CursorPagedUsersState['hasOrderBy'], true>>,

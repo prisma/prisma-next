@@ -473,7 +473,7 @@ Depends on: Group 11 (root aggregations)
 
 Depends on: Group 11 (aggregations), Group 6 (include cardinality)
 
-- [ ] **13.1 Add scalar aggregation selectors to include refinement collections**
+- [x] **13.1 Add scalar aggregation selectors to include refinement collections**
   - For to-many includes, the refinement collection exposes: `count()`, `sum(field)`, `avg(field)`, `min(field)`, `max(field)`
   - These return `IncludeScalar<T>` nodes (not query results)
   - When returned directly from the refinement callback, the include result type becomes the scalar type instead of row array
@@ -481,7 +481,7 @@ Depends on: Group 11 (aggregations), Group 6 (include cardinality)
   - Files to modify: `src/collection.ts`, `src/types.ts`
   - Write 2-3 tests: include with count, include with sum
 
-- [ ] **13.2 Implement combine() for multi-branch includes**
+- [x] **13.2 Implement combine() for multi-branch includes**
   - `combine(spec: { [name]: Collection | IncludeScalar })` -- returns a composite include descriptor
   - Each branch is evaluated independently (different where/orderBy/take can apply)
   - Result type: `{ [name]: Row[] | number | null }`
