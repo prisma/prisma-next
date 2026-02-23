@@ -147,6 +147,15 @@ const orderedUsers = userCollection.orderBy((user) => user.id.asc());
 const cursorPagedUsers = orderedUsers.cursor({ id: 'user_001' });
 const distinctUsers = userCollection.distinct('email');
 const distinctOnUsers = orderedUsers.distinctOn('email');
+const groupedUsers = userCollection.groupBy('email');
+const groupedUserStats = groupedUsers.aggregate((aggregate) => ({
+  count: aggregate.count(),
+}));
+groupedUsers.having((having) => having.count().gt(1));
+// @ts-expect-error GroupedCollection does not expose all()
+groupedUsers.all();
+// @ts-expect-error GroupedCollection does not expose include()
+groupedUsers.include('posts');
 const userAggregate = userCollection.aggregate((aggregate) => ({
   count: aggregate.count(),
 }));
@@ -218,6 +227,8 @@ type CursorPagedUsersState = StateOf<typeof cursorPagedUsers>;
 type DistinctUsersState = StateOf<typeof distinctUsers>;
 type DistinctOnUsersState = StateOf<typeof distinctOnUsers>;
 type UserAggregateResult = Awaited<typeof userAggregate>;
+type GroupedUserStatsResult = Awaited<typeof groupedUserStats>;
+type GroupedUserStatsRow = GroupedUserStatsResult[number];
 
 export type GeneratedContractTypeAssertions = [
   Assert<Equal<keyof SelectedUserRow, 'name' | 'email'>>,
@@ -235,4 +246,7 @@ export type GeneratedContractTypeAssertions = [
   Assert<Equal<DistinctUsersState['hasOrderBy'], false>>,
   Assert<Equal<DistinctOnUsersState['hasOrderBy'], true>>,
   Assert<Equal<UserAggregateResult, { count: number }>>,
+  Assert<Equal<keyof GroupedUserStatsRow, 'email' | 'count'>>,
+  Assert<Equal<GroupedUserStatsRow['email'], string>>,
+  Assert<Equal<GroupedUserStatsRow['count'], number>>,
 ];

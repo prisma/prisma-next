@@ -444,7 +444,7 @@ Depends on: Group 1 (WhereExpr)
 
 Depends on: Group 11 (root aggregations)
 
-- [ ] **12.1 Implement groupBy() returning GroupedCollection**
+- [x] **12.1 Implement groupBy() returning GroupedCollection**
   - `groupBy(...fields)` returns a `GroupedCollection` -- a new class or restricted Collection surface
   - `GroupedCollection` has: `having(predicate)`, `aggregate(fn)` -- but NOT `all()`, `find()`, `select()`, `include()`, mutations
   - The `aggregate()` on GroupedCollection returns `Promise<Array<{ [groupField]: value; [aggField]: value }>>`
@@ -452,13 +452,13 @@ Depends on: Group 11 (root aggregations)
   - Files to create: `src/grouped-collection.ts`
   - Files to modify: `src/collection.ts`, `src/kysely-compiler.ts`, `src/types.ts`
 
-- [ ] **12.2 Implement having() on GroupedCollection**
+- [x] **12.2 Implement having() on GroupedCollection**
   - `having(predicate: (h: HavingBuilder) => WhereExpr)` -- filter groups
   - `HavingBuilder` provides aggregate comparison methods: `h.count().gt(5)`, `h.sum('amount').gt(1000)`
   - Compiles to `HAVING count(*) > 5`
   - Files to modify: `src/grouped-collection.ts`, `src/kysely-compiler.ts`
 
-- [ ] **12.3 Write tests for groupBy + having + aggregate**
+- [x] **12.3 Write tests for groupBy + having + aggregate**
   - Write 3-5 tests: basic groupBy with count, multi-column groupBy, having filter, groupBy with sum/avg, groupBy preserving where filters
   - Files to create: `test/grouped-collection.test.ts`
 

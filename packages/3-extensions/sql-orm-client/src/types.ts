@@ -204,6 +204,30 @@ export interface AggregateBuilder<
   ): AggregateSelector<number | null>;
 }
 
+export type HavingComparisonMethods<T> = Pick<
+  ComparisonMethods<T>,
+  'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte'
+>;
+
+export interface HavingBuilder<
+  TContract extends SqlContract<SqlStorage>,
+  ModelName extends string,
+> {
+  count(): HavingComparisonMethods<number>;
+  sum<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): HavingComparisonMethods<number | null>;
+  avg<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): HavingComparisonMethods<number | null>;
+  min<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): HavingComparisonMethods<number | null>;
+  max<FieldName extends NumericFieldNames<TContract, ModelName>>(
+    field: FieldName,
+  ): HavingComparisonMethods<number | null>;
+}
+
 export type ShorthandWhereFilter<
   TContract extends SqlContract<SqlStorage>,
   ModelName extends string,

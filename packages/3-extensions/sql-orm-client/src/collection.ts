@@ -21,6 +21,7 @@ import {
   stripHiddenMappedFields,
 } from './collection-runtime';
 import { shorthandToWhereExpr } from './filters';
+import { GroupedCollection } from './grouped-collection';
 import {
   compileAggregate,
   compileDeleteCount,
@@ -95,7 +96,7 @@ type IncludeRefinementCollection<
   ModelName extends string,
   Row,
   State extends CollectionTypeState,
-> = Omit<Collection<TContract, ModelName, Row, State>, 'all' | 'find' | 'aggregate'>;
+> = Omit<Collection<TContract, ModelName, Row, State>, 'all' | 'find' | 'aggregate' | 'groupBy'>;
 
 export class Collection<
   TContract extends SqlContract<SqlStorage>,
@@ -262,6 +263,24 @@ export class Collection<
     const existing = this.state.orderBy ?? [];
     return this.#clone<WithOrderByState<State>>({
       orderBy: [...existing, ...nextOrders],
+    });
+  }
+
+  groupBy<
+    Fields extends readonly [
+      keyof DefaultModelRow<TContract, ModelName> & string,
+      ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
+    ],
+  >(...fields: Fields): GroupedCollection<TContract, ModelName, Fields> {
+    const fieldToColumn = this.ctx.contract.mappings.fieldToColumn?.[this.modelName] ?? {};
+    const groupByColumns = fields.map((fieldName) => fieldToColumn[fieldName] ?? fieldName);
+
+    return new GroupedCollection(this.ctx, this.modelName, {
+      tableName: this.tableName,
+      baseFilters: this.state.filters,
+      groupByFields: [...fields],
+      groupByColumns,
+      havingFilters: [],
     });
   }
 
