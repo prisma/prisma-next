@@ -20,29 +20,10 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
+
 import { codecDefinitions } from './codecs';
+import { expandParameterizedNativeType } from './parameterized-types';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
-
-const VECTOR_CODEC_ID = 'pg/vector@1' as const;
-
-function getCodecParamCast(codecId: string | undefined): string | undefined {
-  if (codecId === VECTOR_CODEC_ID) {
-    return 'vector';
-  }
-  if (codecId === PG_JSON_CODEC_ID) {
-    return 'json';
-  }
-  if (codecId === PG_JSONB_CODEC_ID) {
-    return 'jsonb';
-  }
-  return undefined;
-}
-
-function renderTypedParam(index: number, codecId: string | undefined): string {
-  const cast = getCodecParamCast(codecId);
-  return cast ? `$${index}::${cast}` : `$${index}`;
-}
 
 const defaultCapabilities = Object.freeze({
   postgres: {
@@ -198,6 +179,11 @@ function renderNullCheck(expr: NullCheckExpr, contract?: PostgresContract): stri
   return expr.isNull ? `${renderedExpr} IS NULL` : `${renderedExpr} IS NOT NULL`;
 }
 
+/**
+ * WHERE clause parameters intentionally omit ::nativeType casts — Postgres infers the
+ * type from the comparison column. INSERT/UPDATE params are cast explicitly because they
+ * lack that inference context.
+ */
 function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   const leftExpr = expr.left as ColumnRef | OperationExpr;
   const left = renderExpr(leftExpr, contract);
@@ -235,6 +221,32 @@ function renderExpr(expr: ColumnRef | OperationExpr, contract?: PostgresContract
   return renderColumn(expr);
 }
 
+function getColumnCastType(
+  contract: PostgresContract,
+  tableName: string,
+  columnName: string,
+): string | undefined {
+  const col = contract.storage.tables[tableName]?.columns[columnName];
+  if (!col) return undefined;
+  return quoteCastType(expandParameterizedNativeType(col));
+}
+
+/**
+ * Quotes a SQL type name for use in a `::type` cast if it requires quoting.
+ * Mixed-case identifiers (e.g. enum names like "UserRole") must be quoted to
+ * preserve case in PostgreSQL. Array suffixes are handled separately so that
+ * `UserRole[]` becomes `"UserRole"[]` rather than being left unquoted.
+ */
+function quoteCastType(typeName: string): string {
+  const arraySuffix = typeName.endsWith('[]') ? '[]' : '';
+  const baseName = arraySuffix ? typeName.slice(0, -2) : typeName;
+
+  if (baseName !== baseName.toLowerCase() && !baseName.includes('(')) {
+    return `"${baseName}"${arraySuffix}`;
+  }
+  return typeName;
+}
+
 function renderParam(
   ref: ParamRef,
   contract?: PostgresContract,
@@ -242,9 +254,10 @@ function renderParam(
   columnName?: string,
 ): string {
   if (contract && tableName && columnName) {
-    const tableMeta = contract.storage.tables[tableName];
-    const columnMeta = tableMeta?.columns[columnName];
-    return renderTypedParam(ref.index, columnMeta?.codecId);
+    const castType = getColumnCastType(contract, tableName, columnName);
+    if (castType) {
+      return `$${ref.index}::${castType}`;
+    }
   }
   return `$${ref.index}`;
 }
@@ -267,15 +280,12 @@ function renderLiteral(expr: LiteralExpr): string {
 
 function renderOperation(expr: OperationExpr, contract?: PostgresContract): string {
   const self = renderExpr(expr.self, contract);
-  // For vector operations, cast param arguments to vector type
-  const isVectorOperation = expr.forTypeId === VECTOR_CODEC_ID;
   const args = expr.args.map((arg: ColumnRef | ParamRef | LiteralExpr | OperationExpr) => {
     if (arg.kind === 'col') {
       return renderColumn(arg);
     }
     if (arg.kind === 'param') {
-      // Cast vector operation parameters to vector type
-      return isVectorOperation ? `$${arg.index}::vector` : renderParam(arg, contract);
+      return renderParam(arg, contract);
     }
     if (arg.kind === 'literal') {
       return renderLiteral(arg);
@@ -291,10 +301,6 @@ function renderOperation(expr: OperationExpr, contract?: PostgresContract): stri
   result = result.replace(/\$\{self\}/g, self);
   for (let i = 0; i < args.length; i++) {
     result = result.replace(new RegExp(`\\$\\{arg${i}\\}`, 'g'), args[i] ?? '');
-  }
-
-  if (expr.lowering.strategy === 'function') {
-    return result;
   }
 
   return result;
@@ -419,11 +425,10 @@ function quoteIdentifier(identifier: string): string {
 function renderInsert(ast: InsertAst, contract: PostgresContract): string {
   const table = quoteIdentifier(ast.table.name);
   const columns = Object.keys(ast.values).map((col) => quoteIdentifier(col));
-  const tableMeta = contract.storage.tables[ast.table.name];
   const values = Object.entries(ast.values).map(([colName, val]) => {
     if (val.kind === 'param') {
-      const columnMeta = tableMeta?.columns[colName];
-      return renderTypedParam(val.index, columnMeta?.codecId);
+      const castType = getColumnCastType(contract, ast.table.name, colName);
+      return castType ? `$${val.index}::${castType}` : `$${val.index}`;
     }
     if (val.kind === 'col') {
       return `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
@@ -441,13 +446,12 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
 
 function renderUpdate(ast: UpdateAst, contract: PostgresContract): string {
   const table = quoteIdentifier(ast.table.name);
-  const tableMeta = contract.storage.tables[ast.table.name];
   const setClauses = Object.entries(ast.set).map(([col, val]) => {
     const column = quoteIdentifier(col);
     let value: string;
     if (val.kind === 'param') {
-      const columnMeta = tableMeta?.columns[col];
-      value = renderTypedParam(val.index, columnMeta?.codecId);
+      const castType = getColumnCastType(contract, ast.table.name, col);
+      value = castType ? `$${val.index}::${castType}` : `$${val.index}`;
     } else if (val.kind === 'col') {
       value = `${quoteIdentifier(val.table)}.${quoteIdentifier(val.column)}`;
     } else {

@@ -15,6 +15,7 @@ import type { Codec, CodecMeta } from '@prisma-next/sql-relational-core/ast';
 import { codec, defineCodecs, sqlCodecDefinitions } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type as arktype } from 'arktype';
+import { pgArrayCodec } from './array-codec';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
@@ -481,7 +482,8 @@ const codecs = defineCodecs()
   .add('interval', pgIntervalCodec)
   .add('enum', pgEnumCodec)
   .add('json', pgJsonCodec)
-  .add('jsonb', pgJsonbCodec);
+  .add('jsonb', pgJsonbCodec)
+  .add('array', pgArrayCodec);
 
 // Export derived structures directly from codecs builder
 export const codecDefinitions = codecs.codecDefinitions;

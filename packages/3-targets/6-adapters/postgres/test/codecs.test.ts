@@ -4,6 +4,7 @@ import { codecDefinitions } from '../src/core/codecs';
 describe('adapter-postgres codecs', () => {
   it('exports expected codec scalars', () => {
     expect(Object.keys(codecDefinitions).sort()).toEqual([
+      'array',
       'bit',
       'bit varying',
       'bool',

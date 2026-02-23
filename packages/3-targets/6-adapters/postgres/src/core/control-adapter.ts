@@ -439,9 +439,19 @@ const TYPE_PREFIX_MAP: ReadonlyMap<string, string> = new Map([
  *
  * Uses a pre-computed lookup map for simple prefix replacements (O(1))
  * and handles complex temporal type normalization separately.
+ *
+ * TODO: Introspected SqlColumnIR only carries nativeType — it does not populate codecId
+ * or typeParams for array columns, so schema verification for arrays operates at the
+ * nativeType string level only.
  */
 export function normalizeSchemaNativeType(nativeType: string): string {
   const trimmed = nativeType.trim();
+
+  // Handle array types: normalize the base type, keep '[]' suffix
+  if (trimmed.endsWith('[]')) {
+    const base = trimmed.slice(0, -2);
+    return `${normalizeSchemaNativeType(base)}[]`;
+  }
 
   // Fast path: check simple prefix replacements using the lookup map
   for (const [prefix, replacement] of TYPE_PREFIX_MAP) {
@@ -470,6 +480,15 @@ export function normalizeSchemaNativeType(nativeType: string): string {
 }
 
 function normalizeFormattedType(formattedType: string, dataType: string, udtName: string): string {
+  // Handle array types: strip '[]' suffix, normalize base type, re-append '[]'
+  if (formattedType.endsWith('[]')) {
+    const baseFormatted = formattedType.slice(0, -2);
+    // For array types, data_type is 'ARRAY' and udt_name starts with '_'
+    const baseUdtName = udtName.startsWith('_') ? udtName.slice(1) : udtName;
+    const baseNormalized = normalizeFormattedType(baseFormatted, baseFormatted, baseUdtName);
+    return `${baseNormalized}[]`;
+  }
+
   if (formattedType === 'integer') {
     return 'int4';
   }

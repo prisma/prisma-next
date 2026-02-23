@@ -1610,6 +1610,53 @@ describe('PostgresControlAdapter', () => {
       // Lowercase enum names are not quoted by format_type(), should pass through unchanged
       expect(result.tables['user']?.columns['role']?.nativeType).toBe('role');
     });
+
+    it('introspects array columns via formatted_type', async () => {
+      const adapter = new PostgresControlAdapter();
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'post' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'post',
+              column_name: 'tags',
+              data_type: 'ARRAY',
+              udt_name: '_text',
+              is_nullable: 'NO',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'text[]',
+            },
+            {
+              table_name: 'post',
+              column_name: 'scores',
+              data_type: 'ARRAY',
+              udt_name: '_int4',
+              is_nullable: 'YES',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+              formatted_type: 'integer[]',
+            },
+          ],
+        },
+        { match: includes('PRIMARY KEY'), rows: [] },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('pg_enum'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+
+      expect(result.tables['post']?.columns['tags']?.nativeType).toBe('text[]');
+      expect(result.tables['post']?.columns['scores']?.nativeType).toBe('int4[]');
+      expect(result.tables['post']?.columns['scores']?.nullable).toBe(true);
+    });
   });
 
   describe('normalizeSchemaNativeType', () => {
@@ -1624,6 +1671,10 @@ describe('PostgresControlAdapter', () => {
       { input: 'timestamp without time zone', expected: 'timestamp' },
       { input: 'time without time zone', expected: 'time' },
       { input: 'numeric(10,2)', expected: 'numeric(10,2)' },
+      { input: 'integer[]', expected: 'integer[]' },
+      { input: 'varchar(255)[]', expected: 'character varying(255)[]' },
+      { input: 'timestamp with time zone[]', expected: 'timestamptz[]' },
+      { input: 'text[]', expected: 'text[]' },
     ])('normalizes $input -> $expected', ({ input, expected }) => {
       expect(normalizeSchemaNativeType(input)).toBe(expected);
     });

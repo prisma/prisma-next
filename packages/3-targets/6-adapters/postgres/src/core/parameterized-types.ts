@@ -9,6 +9,7 @@
  */
 
 import {
+  PG_ARRAY_CODEC_ID,
   PG_BIT_CODEC_ID,
   PG_CHAR_CODEC_ID,
   PG_INTERVAL_CODEC_ID,
@@ -110,6 +111,14 @@ export function expandParameterizedNativeType(input: ExpandNativeTypeInput): str
     const precision = typeParams['precision'];
     if (isValidTypeParamNumber(precision)) {
       return `${nativeType}(${precision})`;
+    }
+    return nativeType;
+  }
+
+  if (codecId === PG_ARRAY_CODEC_ID) {
+    const element = typeParams['element'] as { nativeType: string } | undefined;
+    if (element?.nativeType) {
+      return `${element.nativeType}[]`;
     }
     return nativeType;
   }

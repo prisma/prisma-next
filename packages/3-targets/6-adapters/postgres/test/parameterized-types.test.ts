@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PG_ARRAY_CODEC_ID,
   PG_CHAR_CODEC_ID,
   PG_INTERVAL_CODEC_ID,
   PG_NUMERIC_CODEC_ID,
@@ -114,5 +115,55 @@ describe('expandParameterizedNativeType', () => {
     });
 
     expect(result).toBe('custom');
+  });
+
+  it('expands array type from nested element nativeType', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'int4[]',
+      codecId: PG_ARRAY_CODEC_ID,
+      typeParams: { element: { codecId: 'pg/int4@1', nativeType: 'int4' } },
+    });
+
+    expect(result).toBe('int4[]');
+  });
+
+  it('returns nativeType for array when element has no nativeType', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'text[]',
+      codecId: PG_ARRAY_CODEC_ID,
+      typeParams: { element: { codecId: 'pg/text@1' } },
+    });
+
+    expect(result).toBe('text[]');
+  });
+
+  it('constructs array nativeType from element when nativeType lacks suffix', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'timestamp',
+      codecId: PG_ARRAY_CODEC_ID,
+      typeParams: { element: { codecId: 'pg/timestamp@1', nativeType: 'timestamp' } },
+    });
+
+    expect(result).toBe('timestamp[]');
+  });
+
+  it('expands camelCase enum array from element nativeType', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'UserRole[]',
+      codecId: PG_ARRAY_CODEC_ID,
+      typeParams: { element: { codecId: 'pg/enum@1', nativeType: 'UserRole' } },
+    });
+
+    expect(result).toBe('UserRole[]');
+  });
+
+  it('expands lowercase enum array from element nativeType', () => {
+    const result = expandParameterizedNativeType({
+      nativeType: 'status[]',
+      codecId: PG_ARRAY_CODEC_ID,
+      typeParams: { element: { codecId: 'pg/enum@1', nativeType: 'status' } },
+    });
+
+    expect(result).toBe('status[]');
   });
 });
