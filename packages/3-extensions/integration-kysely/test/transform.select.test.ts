@@ -1,29 +1,35 @@
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { transformKyselyToPnAst } from '../src/transform/transform';
-import { binaryWhere, contract, selectQueryFixture } from './transform.fixtures';
+import { compileQuery, compilerDb, contract } from './transform.fixtures';
 
 describe('transformKyselyToPnAst — SelectQueryNode', () => {
-  it('transforms simple select all', () => {
-    const result = transformKyselyToPnAst(contract, selectQueryFixture(), []);
+  it('transforms simple selectAll query compiled by Kysely', () => {
+    const compiled = compileQuery(compilerDb.selectFrom('user').selectAll());
+
+    const result = transformKyselyToPnAst(contract, compiled.query, compiled.parameters);
     const selectAst = result.ast as SelectAst;
+
     expect(selectAst.kind).toBe('select');
     expect(selectAst.from).toEqual({ kind: 'table', name: 'user' });
     expect(selectAst.project).toHaveLength(3);
+    expect(selectAst.selectAllIntent).toEqual({ table: 'user' });
     expect(result.metaAdditions.refs.tables).toContain('user');
   });
 
-  it('transforms where with param', () => {
-    const query = selectQueryFixture({
-      where: binaryWhere('id', 'placeholder'),
-    });
-    const result = transformKyselyToPnAst(contract, query, ['user_123']);
-    const selectWithWhere = result.ast as SelectAst;
-    expect(selectWithWhere.where?.kind).toBe('bin');
-    expect(selectWithWhere.where).toMatchObject({
+  it('transforms where with parameter descriptors from compiled query', () => {
+    const compiled = compileQuery(
+      compilerDb.selectFrom('user').selectAll().where('id', '=', 'user_123'),
+    );
+
+    const result = transformKyselyToPnAst(contract, compiled.query, compiled.parameters);
+    const selectAst = result.ast as SelectAst;
+
+    expect(selectAst.where).toMatchObject({
       kind: 'bin',
       op: 'eq',
       left: { kind: 'col', table: 'user', column: 'id' },
+      right: { kind: 'param', index: 1 },
     });
     expect(result.metaAdditions.paramDescriptors).toHaveLength(1);
     expect(result.metaAdditions.paramDescriptors[0]).toMatchObject({
@@ -32,221 +38,175 @@ describe('transformKyselyToPnAst — SelectQueryNode', () => {
     });
   });
 
-  it('transforms limit', () => {
-    const query = selectQueryFixture({
-      limit: {
-        kind: 'LimitNode',
-        limit: { kind: 'ValueNode', value: 10 },
-      },
-    });
-    const result = transformKyselyToPnAst(contract, query, [10]);
-    const selectWithLimit = result.ast as SelectAst;
-    expect(selectWithLimit.limit).toBe(10);
-  });
+  it('transforms LIKE and IN predicates from compiled query', () => {
+    const likeCompiled = compileQuery(
+      compilerDb.selectFrom('user').selectAll().where('email', 'like', '%@test.com'),
+    );
+    const likeResult = transformKyselyToPnAst(
+      contract,
+      likeCompiled.query,
+      likeCompiled.parameters,
+    );
 
-  it('transforms like predicate', () => {
-    const query = selectQueryFixture({
-      where: {
-        kind: 'WhereNode',
-        node: {
-          kind: 'BinaryOperationNode',
-          left: {
-            kind: 'ReferenceNode',
-            column: {
-              kind: 'ColumnNode',
-              column: { kind: 'IdentifierNode', name: 'email' },
-              table: { kind: 'IdentifierNode', name: 'user' },
-            },
-          },
-          operator: { kind: 'OperatorNode', operator: 'like' },
-          right: { kind: 'ValueNode', value: '%@test.com' },
-        },
-      },
-    });
-    const result = transformKyselyToPnAst(contract, query, ['%@test.com']);
-    const selectAst = result.ast as SelectAst;
-    expect(selectAst.where?.kind).toBe('bin');
-    expect(selectAst.where).toMatchObject({
+    expect((likeResult.ast as SelectAst).where).toMatchObject({
       kind: 'bin',
       op: 'like',
       left: { kind: 'col', table: 'user', column: 'email' },
     });
-  });
 
-  it('transforms in predicate', () => {
-    const query = selectQueryFixture({
-      where: {
-        kind: 'WhereNode',
-        node: {
-          kind: 'BinaryOperationNode',
-          left: {
-            kind: 'ReferenceNode',
-            column: {
-              kind: 'ColumnNode',
-              column: { kind: 'IdentifierNode', name: 'id' },
-              table: { kind: 'IdentifierNode', name: 'user' },
-            },
-          },
-          operator: { kind: 'OperatorNode', operator: 'in' },
-          right: {
-            kind: 'PrimitiveValueListNode',
-            values: [
-              { kind: 'ValueNode', value: 'a' },
-              { kind: 'ValueNode', value: 'b' },
-              { kind: 'ValueNode', value: 'c' },
-            ],
-          },
-        },
-      },
-    });
-    const result = transformKyselyToPnAst(contract, query, ['a', 'b', 'c']);
-    const selectAst = result.ast as SelectAst;
-    expect(selectAst.where?.kind).toBe('bin');
-    expect(selectAst.where).toMatchObject({
+    const inCompiled = compileQuery(
+      compilerDb.selectFrom('user').selectAll().where('id', 'in', ['a', 'b', 'c']),
+    );
+    const inResult = transformKyselyToPnAst(contract, inCompiled.query, inCompiled.parameters);
+    const inAst = inResult.ast as SelectAst;
+
+    expect(inAst.where).toMatchObject({
       kind: 'bin',
       op: 'in',
       left: { kind: 'col', table: 'user', column: 'id' },
       right: { kind: 'listLiteral', values: expect.any(Array) },
     });
-    const whereRight = (selectAst.where as { right?: { values?: unknown[] } })?.right;
-    expect(whereRight?.values).toHaveLength(3);
+    const listValues = ((inAst.where as { right?: { values?: unknown[] } })?.right?.values ??
+      []) as unknown[];
+    expect(listValues).toHaveLength(3);
   });
 
-  it('transforms AND composition', () => {
-    const query = selectQueryFixture({
-      where: {
-        kind: 'WhereNode',
-        node: {
-          kind: 'AndNode',
-          exprs: [
-            {
-              kind: 'BinaryOperationNode',
-              left: {
-                kind: 'ReferenceNode',
-                column: {
-                  kind: 'ColumnNode',
-                  column: { kind: 'IdentifierNode', name: 'id' },
-                  table: { kind: 'IdentifierNode', name: 'user' },
-                },
-              },
-              operator: { kind: 'OperatorNode', operator: '=' },
-              right: { kind: 'ValueNode', value: 'x' },
-            },
-            {
-              kind: 'BinaryOperationNode',
-              left: {
-                kind: 'ReferenceNode',
-                column: {
-                  kind: 'ColumnNode',
-                  column: { kind: 'IdentifierNode', name: 'email' },
-                  table: { kind: 'IdentifierNode', name: 'user' },
-                },
-              },
-              operator: { kind: 'OperatorNode', operator: 'like' },
-              right: { kind: 'ValueNode', value: '%@x.com' },
-            },
-          ],
-        },
-      },
+  it('maps `not in` operator from real Kysely operator spelling', () => {
+    const compiled = compileQuery(
+      compilerDb.selectFrom('user as u').select(['u.id']).where('u.id', 'not in', ['a', 'b']),
+    );
+
+    const result = transformKyselyToPnAst(contract, compiled.query, compiled.parameters);
+    const selectAst = result.ast as SelectAst;
+
+    expect(selectAst.where).toMatchObject({
+      kind: 'bin',
+      op: 'notIn',
+      left: { kind: 'col', table: 'user', column: 'id' },
     });
-    const result = transformKyselyToPnAst(contract, query, ['x', '%@x.com']);
-    const selectAst = result.ast as SelectAst;
-    expect(selectAst.where?.kind).toBe('and');
-    const andExprs = (selectAst.where as { exprs?: readonly unknown[] } | undefined)?.exprs;
-    expect(andExprs).toHaveLength(2);
   });
 
-  it('transforms join with ON', () => {
-    const query = {
-      kind: 'SelectQueryNode',
-      from: {
-        kind: 'FromNode',
-        froms: [
-          {
-            kind: 'TableNode',
-            table: { kind: 'IdentifierNode', name: 'user' },
-          },
-        ],
-      },
-      selections: [
-        {
-          kind: 'SelectAllNode',
-          reference: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
-        },
-      ],
-      joins: [
-        {
-          kind: 'JoinNode',
-          joinType: 'LeftJoinNode',
-          table: {
-            kind: 'TableNode',
-            table: { kind: 'IdentifierNode', name: 'post' },
-          },
-          on: {
-            kind: 'OnNode',
-            node: {
-              kind: 'BinaryOperationNode',
-              left: {
-                kind: 'ReferenceNode',
-                column: {
-                  kind: 'ColumnNode',
-                  column: { kind: 'IdentifierNode', name: 'id' },
-                  table: { kind: 'IdentifierNode', name: 'user' },
-                },
-              },
-              operator: { kind: 'OperatorNode', operator: '=' },
-              right: {
-                kind: 'ReferenceNode',
-                column: {
-                  kind: 'ColumnNode',
-                  column: { kind: 'IdentifierNode', name: 'userId' },
-                  table: { kind: 'IdentifierNode', name: 'post' },
-                },
-              },
-            },
-          },
-        },
-      ],
-    };
-    const result = transformKyselyToPnAst(contract, query, []);
+  it('normalizes binary-tree AND/OR into PN arrays', () => {
+    const compiled = compileQuery(
+      compilerDb
+        .selectFrom('user')
+        .select(['id'])
+        .where((eb) =>
+          eb.and([
+            eb('id', '=', 'u1'),
+            eb('email', 'like', '%@x.com'),
+            eb.or([eb('id', '=', 'u2'), eb('id', '=', 'u3')]),
+          ]),
+        ),
+    );
+
+    const result = transformKyselyToPnAst(contract, compiled.query, compiled.parameters);
     const selectAst = result.ast as SelectAst;
+
+    expect(selectAst.where?.kind).toBe('and');
+    const andExprs = ((selectAst.where as { exprs?: unknown[] })?.exprs ?? []) as unknown[];
+    expect(andExprs).toHaveLength(3);
+    expect((andExprs[2] as { kind?: string }).kind).toBe('or');
+  });
+
+  it('handles ON.on shape, alias resolution, and left join mapping', () => {
+    const compiled = compileQuery(
+      compilerDb
+        .selectFrom('user as u')
+        .leftJoin('post as p', 'u.id', 'p.userId')
+        .select(['u.id as userId', 'p.userId as postUserId'])
+        .where('u.id', '=', 'u_1'),
+    );
+
+    const result = transformKyselyToPnAst(contract, compiled.query, compiled.parameters);
+    const selectAst = result.ast as SelectAst;
+
     expect(selectAst.joins).toHaveLength(1);
     expect(selectAst.joins?.[0]).toMatchObject({
       kind: 'join',
       joinType: 'left',
       table: { kind: 'table', name: 'post' },
     });
-    const firstJoin = selectAst.joins?.[0];
-    expect(firstJoin).toBeDefined();
-    expect(firstJoin!.on.kind).toBe('eqCol');
+    expect(selectAst.joins?.[0]?.on).toMatchObject({
+      kind: 'eqCol',
+      left: { kind: 'col', table: 'user', column: 'id' },
+      right: { kind: 'col', table: 'post', column: 'userId' },
+    });
+
+    expect(selectAst.project).toEqual(
+      expect.arrayContaining([
+        {
+          alias: 'userId',
+          expr: { kind: 'col', table: 'user', column: 'id' },
+        },
+        {
+          alias: 'postUserId',
+          expr: { kind: 'col', table: 'post', column: 'userId' },
+        },
+      ]),
+    );
+
+    expect(selectAst.where).toMatchObject({
+      kind: 'bin',
+      left: { kind: 'col', table: 'user', column: 'id' },
+    });
   });
 
-  it('transforms orderBy', () => {
-    const query = selectQueryFixture({
-      orderBy: {
-        kind: 'OrderByNode',
-        items: [
-          {
-            kind: 'OrderByItemNode',
-            orderBy: {
-              kind: 'ReferenceNode',
-              column: {
-                kind: 'ColumnNode',
-                column: { kind: 'IdentifierNode', name: 'email' },
-                table: { kind: 'IdentifierNode', name: 'user' },
-              },
-            },
-            direction: 'asc',
-          },
-        ],
-      },
+  it('maps real joinType values for right/full joins', () => {
+    const rightCompiled = compileQuery(
+      compilerDb.selectFrom('user').rightJoin('post', 'user.id', 'post.userId').selectAll('user'),
+    );
+    const rightResult = transformKyselyToPnAst(
+      contract,
+      rightCompiled.query,
+      rightCompiled.parameters,
+    );
+    expect((rightResult.ast as SelectAst).joins?.[0]?.joinType).toBe('right');
+
+    const fullCompiled = compileQuery(
+      compilerDb.selectFrom('user').fullJoin('post', 'user.id', 'post.userId').selectAll('user'),
+    );
+    const fullResult = transformKyselyToPnAst(
+      contract,
+      fullCompiled.query,
+      fullCompiled.parameters,
+    );
+    expect((fullResult.ast as SelectAst).joins?.[0]?.joinType).toBe('full');
+  });
+
+  it('expands SelectionNode-wrapped ReferenceNode(column: SelectAllNode)', () => {
+    const compiled = compileQuery(
+      compilerDb
+        .selectFrom('user as u')
+        .innerJoin('post as p', 'u.id', 'p.userId')
+        .selectAll('u')
+        .orderBy('p.createdAt', 'desc'),
+    );
+
+    const result = transformKyselyToPnAst(contract, compiled.query, compiled.parameters);
+    const selectAst = result.ast as SelectAst;
+
+    expect(selectAst.project).toEqual([
+      { alias: 'createdAt', expr: { kind: 'col', table: 'user', column: 'createdAt' } },
+      { alias: 'email', expr: { kind: 'col', table: 'user', column: 'email' } },
+      { alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } },
+    ]);
+    expect(selectAst.selectAllIntent).toEqual({ table: 'user' });
+    expect(selectAst.orderBy?.[0]).toMatchObject({
+      expr: { kind: 'col', table: 'post', column: 'createdAt' },
+      dir: 'desc',
     });
-    const result = transformKyselyToPnAst(contract, query, []);
-    const selectWithOrder = result.ast as SelectAst;
-    expect(selectWithOrder.orderBy).toHaveLength(1);
-    expect(selectWithOrder.orderBy?.[0]).toMatchObject({
-      expr: { kind: 'col', table: 'user', column: 'email' },
-      dir: 'asc',
-    });
+  });
+
+  it('transforms numeric limit node from compiled query', () => {
+    const compiled = compileQuery(
+      compilerDb.selectFrom('user').select(['id', 'email']).where('id', '=', 'u_1').limit(10),
+    );
+
+    const result = transformKyselyToPnAst(contract, compiled.query, compiled.parameters);
+    const selectAst = result.ast as SelectAst;
+
+    expect(selectAst.limit).toBe(10);
+    expect(result.metaAdditions.paramDescriptors).toHaveLength(1);
   });
 });

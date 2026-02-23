@@ -1,7 +1,13 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ColumnRef, TableRef } from '@prisma-next/sql-relational-core/ast';
+import { ReferenceNode, SelectAllNode } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
-import { getColumnName, getTableName } from './kysely-ast-types';
+import {
+  getColumnName,
+  getTableName,
+  getTableReferenceInfo,
+  isOperationNode,
+} from './kysely-ast-types';
 import type { TransformContext } from './transform-context';
 
 export function validateTable(contract: SqlContract<SqlStorage>, table: string): void {
@@ -32,12 +38,14 @@ export function validateColumn(
 
 export function resolveTable(node: unknown, ctx: TransformContext, defaultTable?: string): string {
   const explicitTable = getTableName(node);
+
   if (ctx.multiTableScope && explicitTable === undefined && defaultTable !== undefined) {
     throw new KyselyTransformError(
       'Unqualified column reference in multi-table scope; use table.column (e.g. user.id)',
       KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
     );
   }
+
   const table = explicitTable ?? defaultTable;
   if (!table) {
     throw new KyselyTransformError(
@@ -45,6 +53,7 @@ export function resolveTable(node: unknown, ctx: TransformContext, defaultTable?
       KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
     );
   }
+
   const resolved = ctx.tableAliases.get(table) ?? table;
   validateTable(ctx.contract, resolved);
   return resolved;
@@ -55,43 +64,48 @@ export function resolveColumnRef(
   ctx: TransformContext,
   tableOverride?: string,
 ): ColumnRef {
-  if (ctx.multiTableScope && tableOverride !== undefined && getTableName(node) === undefined) {
+  const operationNode = isOperationNode(node) ? node : undefined;
+
+  if (operationNode && ReferenceNode.is(operationNode) && SelectAllNode.is(operationNode.column)) {
     throw new KyselyTransformError(
-      'Unqualified column reference in multi-table scope; use table.column (e.g. user.id)',
-      KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+      'selectAll references cannot be used as scalar column expressions',
+      KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
     );
   }
-  const table = tableOverride ?? resolveTable(node, ctx);
-  let column = getColumnName(node);
-  if (!column && typeof node === 'object' && node !== null) {
-    const n = node as Record<string, unknown>;
-    const col = n['column'];
-    if (col && typeof col === 'object') {
-      column = getColumnName(col);
-    }
-  }
+
+  const table = resolveTable(node, ctx, tableOverride);
+  const column = getColumnName(node);
+
   if (!column) {
     throw new KyselyTransformError(
       'Could not resolve column reference',
       KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
     );
   }
+
   validateColumn(ctx.contract, table, column);
   ctx.refsTables.add(table);
   ctx.refsColumns.set(`${table}.${column}`, { table, column });
+
   return { kind: 'col', table, column };
 }
 
 export function transformTableRef(node: unknown, ctx: TransformContext): TableRef {
-  const name = getTableName(node);
-  if (!name) {
+  const info = getTableReferenceInfo(node);
+  if (!info) {
     throw new KyselyTransformError(
       'Could not resolve table from FROM node',
       KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
     );
   }
-  const resolved = ctx.tableAliases.get(name) ?? name;
+
+  const resolved = ctx.tableAliases.get(info.table) ?? info.table;
   validateTable(ctx.contract, resolved);
+
+  if (info.alias) {
+    ctx.tableAliases.set(info.alias, resolved);
+  }
+
   ctx.refsTables.add(resolved);
   return { kind: 'table', name: resolved };
 }

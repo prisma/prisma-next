@@ -6,131 +6,153 @@ import type {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
+import {
+  type DeleteQueryNode,
+  type InsertQueryNode,
+  PrimitiveValueListNode,
+  ReferenceNode,
+  type ReturningNode,
+  SelectAllNode,
+  type UpdateQueryNode,
+  ValueListNode,
+  ValuesNode,
+} from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
-import { getColumnName, hasKind } from './kysely-ast-types';
+import {
+  getColumnName,
+  isSelectAllReference,
+  unwrapAliasNode,
+  unwrapSelectionNode,
+} from './kysely-ast-types';
 import type { TransformContext } from './transform-context';
 import { transformValue, transformWhereExpr } from './transform-expr';
 import { expandSelectAll } from './transform-select';
 import { resolveColumnRef, transformTableRef, validateColumn } from './transform-validate';
 
+function assertParamRef(value: ReturnType<typeof transformValue>): ParamRef {
+  if (value.kind !== 'param') {
+    throw new KyselyTransformError(
+      'Only parameterized VALUES are supported in Kysely transform lane',
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+    );
+  }
+  return value;
+}
+
 function transformReturning(
-  returningNode: unknown,
+  returningNode: ReturningNode | undefined,
   ctx: TransformContext,
   tableName: string,
 ): ColumnRef[] | undefined {
-  if (!returningNode) return undefined;
-  const returningRec = returningNode as Record<string, unknown>;
-  const items = returningRec['selections'] as unknown[] | undefined;
-  if (!Array.isArray(items)) return undefined;
+  if (!returningNode) {
+    return undefined;
+  }
 
   const refs: ColumnRef[] = [];
-  for (const item of items) {
-    const exprNode =
-      (item as Record<string, unknown>)?.['selection'] ??
-      (item as Record<string, unknown>)?.['column'] ??
-      item;
-    if (hasKind(exprNode, 'SelectAllNode') || hasKind(item, 'SelectAllNode')) {
+  for (const selection of returningNode.selections) {
+    const unwrappedSelection = unwrapSelectionNode(selection);
+    const { node: selectionNode } = unwrapAliasNode(unwrappedSelection);
+
+    if (SelectAllNode.is(selectionNode) || isSelectAllReference(selectionNode)) {
       const expanded = expandSelectAll(tableName, ctx.contract);
       for (const { expr } of expanded) {
-        if (expr.kind === 'col') refs.push(expr);
+        refs.push(expr);
       }
-    } else {
-      const colNode = (item as Record<string, unknown>)?.['column'] ?? exprNode;
-      const exprCol = (exprNode as Record<string, unknown>)?.['column'];
-      const toResolve = colNode ?? exprCol ?? item;
-      const colName = getColumnName(toResolve);
-      if (colName) {
-        refs.push(resolveColumnRef(toResolve, ctx, tableName));
-      } else {
-        const expanded = expandSelectAll(tableName, ctx.contract);
-        for (const { expr } of expanded) {
-          if (expr.kind === 'col') refs.push(expr);
-        }
-      }
+      continue;
     }
+
+    if (ReferenceNode.is(selectionNode)) {
+      refs.push(resolveColumnRef(selectionNode, ctx, tableName));
+      continue;
+    }
+
+    refs.push(resolveColumnRef(selectionNode, ctx, tableName));
   }
+
   return refs.length > 0 ? refs : undefined;
 }
 
-export function transformInsert(node: Record<string, unknown>, ctx: TransformContext): InsertAst {
-  const intoNode = node['into'] ?? node['table'];
-  const tableRef = transformTableRef(intoNode, ctx);
+export function transformInsert(node: InsertQueryNode, ctx: TransformContext): InsertAst {
+  if (!node.into) {
+    throw new KyselyTransformError(
+      'INSERT query requires INTO clause',
+      KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
+    );
+  }
 
-  const valuesNode = node['values'];
-  if (!valuesNode) {
+  const tableRef = transformTableRef(node.into, ctx);
+
+  if (!node.values || !ValuesNode.is(node.values)) {
     throw new KyselyTransformError(
       'INSERT query requires VALUES',
       KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
     );
   }
 
-  const valuesRecord: Record<string, ColumnRef | ParamRef> = {};
-  const valuesRec = valuesNode as Record<string, unknown>;
-  const valueEntries = valuesRec['values'] as unknown[] | undefined;
-
-  const columns = node['columns'] as unknown[] | undefined;
-  const firstEntry = Array.isArray(valueEntries) ? valueEntries[0] : undefined;
-  const isRowFormat =
-    Array.isArray(columns) &&
-    columns.length > 0 &&
-    firstEntry !== undefined &&
-    (hasKind(firstEntry, 'PrimitiveValueListNode') ||
-      (Array.isArray(firstEntry) && firstEntry.length > 0));
-  if (isRowFormat && Array.isArray(valueEntries) && valueEntries.length > 1) {
+  if (node.values.values.length > 1) {
     throw new KyselyTransformError(
       'Multi-row INSERT values are not supported; use single-row INSERT or batch via separate plans',
       KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
-      { rowCount: valueEntries.length },
+      { rowCount: node.values.values.length },
     );
   }
-  if (
-    Array.isArray(columns) &&
-    columns.length > 0 &&
-    Array.isArray(valueEntries) &&
-    valueEntries.length > 0
-  ) {
-    const firstRow = valueEntries[0];
-    const rowValues =
-      hasKind(firstRow, 'PrimitiveValueListNode') &&
-      Array.isArray((firstRow as Record<string, unknown>)['values'])
-        ? ((firstRow as Record<string, unknown>)['values'] as unknown[])
-        : [firstRow];
-    const tableDef = ctx.contract.storage.tables[tableRef.name];
-    const tableCols = tableDef?.columns ? Object.keys(tableDef.columns).sort() : [];
-    for (let i = 0; i < rowValues.length; i++) {
-      const colName =
-        i < columns.length
-          ? (getColumnName(columns[i]) ?? (i < tableCols.length ? tableCols[i] : undefined))
-          : i < tableCols.length
-            ? tableCols[i]
-            : undefined;
-      if (!colName) continue;
-      validateColumn(ctx.contract, tableRef.name, colName);
-      ctx.refsTables.add(tableRef.name);
-      ctx.refsColumns.set(`${tableRef.name}.${colName}`, { table: tableRef.name, column: colName });
-      const val = transformValue(rowValues[i], ctx, {
-        table: tableRef.name,
-        column: colName,
-      });
-      valuesRecord[colName] = val as ParamRef;
+
+  const valuesRecord: Record<string, ColumnRef | ParamRef> = {};
+  const firstRow = node.values.values[0];
+
+  if (firstRow && (!node.columns || node.columns.length === 0)) {
+    throw new KyselyTransformError(
+      'INSERT query requires column list for VALUES transformation',
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+    );
+  }
+
+  if (firstRow && node.columns && node.columns.length > 0) {
+    const rowValues = PrimitiveValueListNode.is(firstRow)
+      ? firstRow.values
+      : ValueListNode.is(firstRow)
+        ? firstRow.values
+        : undefined;
+
+    if (!rowValues) {
+      throw new KyselyTransformError(
+        `Unsupported insert row node: ${firstRow.kind}`,
+        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+        { nodeKind: firstRow.kind },
+      );
     }
-  } else if (Array.isArray(valueEntries)) {
-    for (const entry of valueEntries) {
-      if (
-        hasKind(entry, 'PrimitiveValueListNode') ||
-        (typeof entry === 'object' && entry !== null && !('column' in entry) && !('value' in entry))
-      ) {
+
+    for (let index = 0; index < node.columns.length; index++) {
+      const columnNode = node.columns[index];
+      const columnName = getColumnName(columnNode);
+      if (!columnName) {
+        throw new KyselyTransformError(
+          'Could not resolve INSERT column name',
+          KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
+        );
+      }
+
+      const valueNode = rowValues[index];
+      if (valueNode === undefined) {
         continue;
       }
-      const colNode = (entry as { column?: unknown; value?: unknown }).column ?? entry;
-      const colRef = resolveColumnRef(colNode, ctx, tableRef.name);
-      const valueNode = (entry as { column?: unknown; value?: unknown }).value ?? entry;
-      const val = transformValue(valueNode, ctx, { table: tableRef.name, column: colRef.column });
-      valuesRecord[colRef.column] = val as ParamRef;
+
+      validateColumn(ctx.contract, tableRef.name, columnName);
+      ctx.refsTables.add(tableRef.name);
+      ctx.refsColumns.set(`${tableRef.name}.${columnName}`, {
+        table: tableRef.name,
+        column: columnName,
+      });
+
+      const transformed = transformValue(valueNode, ctx, {
+        table: tableRef.name,
+        column: columnName,
+      });
+      valuesRecord[columnName] = assertParamRef(transformed);
     }
   }
 
-  const insertReturning = transformReturning(node['returning'], ctx, tableRef.name);
+  const insertReturning = transformReturning(node.returning, ctx, tableRef.name);
 
   return {
     kind: 'insert',
@@ -140,35 +162,31 @@ export function transformInsert(node: Record<string, unknown>, ctx: TransformCon
       'returning',
       insertReturning && insertReturning.length > 0 ? insertReturning : undefined,
     ),
-  } as InsertAst;
+  };
 }
 
-export function transformUpdate(node: Record<string, unknown>, ctx: TransformContext): UpdateAst {
-  const tableNode = node['table'] ?? node['update'];
-  const tableRef = transformTableRef(tableNode, ctx);
-
-  const updates = node['updates'] ?? node['set'];
-  const setRecord: Record<string, ColumnRef | ParamRef> = {};
-  const updateEntries = Array.isArray(updates) ? updates : [];
-  for (const entry of updateEntries) {
-    const e = entry as Record<string, unknown>;
-    const colNode = e['column'] ?? e['key'] ?? entry;
-    const colRef = resolveColumnRef(colNode, ctx, tableRef.name);
-    const valueNode = e['value'] ?? entry;
-    const val = transformValue(valueNode, ctx, { table: tableRef.name, column: colRef.column });
-    setRecord[colRef.column] = val as ParamRef;
+export function transformUpdate(node: UpdateQueryNode, ctx: TransformContext): UpdateAst {
+  if (!node.table) {
+    throw new KyselyTransformError(
+      'UPDATE query requires table clause',
+      KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
+    );
   }
 
-  const updateWhereNode = node['where'];
-  const where = transformWhereExpr(
-    (updateWhereNode as Record<string, unknown> | null)?.['node'] ??
-      (updateWhereNode as Record<string, unknown> | null)?.['where'] ??
-      updateWhereNode,
-    ctx,
-    tableRef.name,
-  );
+  const tableRef = transformTableRef(node.table, ctx);
 
-  const updateReturning = transformReturning(node['returning'], ctx, tableRef.name);
+  const setRecord: Record<string, ColumnRef | ParamRef> = {};
+  for (const update of node.updates ?? []) {
+    const colRef = resolveColumnRef(update.column, ctx, tableRef.name);
+    const transformed = transformValue(update.value, ctx, {
+      table: tableRef.name,
+      column: colRef.column,
+    });
+    setRecord[colRef.column] = assertParamRef(transformed);
+  }
+
+  const where = transformWhereExpr(node.where?.where, ctx, tableRef.name);
+  const updateReturning = transformReturning(node.returning, ctx, tableRef.name);
 
   return {
     kind: 'update',
@@ -179,23 +197,13 @@ export function transformUpdate(node: Record<string, unknown>, ctx: TransformCon
       'returning',
       updateReturning && updateReturning.length > 0 ? updateReturning : undefined,
     ),
-  } as UpdateAst;
+  };
 }
 
-export function transformDelete(node: Record<string, unknown>, ctx: TransformContext): DeleteAst {
-  const fromNode = node['from'] ?? node['delete'];
-  const tableRef = transformTableRef(fromNode, ctx);
-
-  const deleteWhereNode = node['where'];
-  const where = transformWhereExpr(
-    (deleteWhereNode as Record<string, unknown> | null)?.['node'] ??
-      (deleteWhereNode as Record<string, unknown> | null)?.['where'] ??
-      deleteWhereNode,
-    ctx,
-    tableRef.name,
-  );
-
-  const deleteReturning = transformReturning(node['returning'], ctx, tableRef.name);
+export function transformDelete(node: DeleteQueryNode, ctx: TransformContext): DeleteAst {
+  const tableRef = transformTableRef(node.from, ctx);
+  const where = transformWhereExpr(node.where?.where, ctx, tableRef.name);
+  const deleteReturning = transformReturning(node.returning, ctx, tableRef.name);
 
   return {
     kind: 'delete',
@@ -205,5 +213,5 @@ export function transformDelete(node: Record<string, unknown>, ctx: TransformCon
       'returning',
       deleteReturning && deleteReturning.length > 0 ? deleteReturning : undefined,
     ),
-  } as DeleteAst;
+  };
 }
