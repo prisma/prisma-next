@@ -135,7 +135,9 @@ function createModelAliases<TContract extends SqlContract<SqlStorage>>(
     const tableName = modelToTable[modelName];
     if (tableName) {
       aliases.set(tableName, modelName);
-      aliases.set(`${tableName}s`, modelName);
+      if (!tableName.endsWith('s')) {
+        aliases.set(`${tableName}s`, modelName);
+      }
     }
   }
 
@@ -159,6 +161,11 @@ function createCollectionRegistry<
     if (!collectionClass) {
       continue;
     }
+    if (!isCollectionClass(collectionClass)) {
+      throw new Error(
+        `Custom collection '${key}' must be a Collection class (constructor), not an instance`,
+      );
+    }
     const modelName = resolveModelName(key, aliases);
     if (!modelName) {
       throw new Error(
@@ -169,6 +176,17 @@ function createCollectionRegistry<
   }
 
   return registry;
+}
+
+function isCollectionClass(value: unknown): value is AnyCollectionClass {
+  if (typeof value !== 'function') {
+    return false;
+  }
+  const candidate = value as { prototype?: unknown };
+  if (!candidate.prototype || typeof candidate.prototype !== 'object') {
+    return false;
+  }
+  return candidate.prototype instanceof Collection;
 }
 
 function resolveModelName<ModelName extends string>(

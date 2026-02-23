@@ -4,6 +4,12 @@ import { orm } from '../src/orm';
 import type { TestContract } from './helpers';
 import { createMockRuntime, createTestContract } from './helpers';
 
+class UserCollection extends Collection<TestContract, 'User'> {
+  named(name: string) {
+    return this.where((user) => user.name.eq(name));
+  }
+}
+
 class PostCollection extends Collection<TestContract, 'Post'> {
   popular() {
     return this.where((p) => p.views.gt(1000));
@@ -14,6 +20,14 @@ class CommentCollection extends Collection<TestContract, 'Comment'> {
   withBody(body: string) {
     return this.where((comment) => comment.body.eq(body));
   }
+}
+
+function expectPostCollection(value: unknown): asserts value is PostCollection {
+  expect(value).toBeInstanceOf(PostCollection);
+}
+
+function expectCommentCollection(value: unknown): asserts value is CommentCollection {
+  expect(value).toBeInstanceOf(CommentCollection);
 }
 
 describe('orm()', () => {
@@ -101,6 +115,42 @@ describe('orm()', () => {
     expect(db.posts).toBeInstanceOf(PostCollection);
   });
 
+  it('resolves User/user/users aliases to one custom collection instance', () => {
+    const runtime = createMockRuntime();
+    const db = orm({
+      contract,
+      runtime,
+      collections: { User: UserCollection },
+    });
+
+    expect(db.User).toBeInstanceOf(UserCollection);
+    expect(db.user).toBe(db.User);
+    expect(db.users).toBe(db.User);
+  });
+
+  it('instantiates custom collections lazily and caches by model', () => {
+    const runtime = createMockRuntime();
+    let constructions = 0;
+    class LazyPostCollection extends Collection<TestContract, 'Post'> {
+      readonly instanceMarker = ++constructions;
+    }
+
+    const db = orm({
+      contract,
+      runtime,
+      collections: { posts: LazyPostCollection },
+    });
+
+    expect(constructions).toBe(0);
+    void db.users;
+    expect(constructions).toBe(0);
+    const postsFirst = db.posts;
+    expect(constructions).toBe(1);
+    const postsSecond = db.Post;
+    expect(postsSecond).toBe(postsFirst);
+    expect(constructions).toBe(1);
+  });
+
   it('ignores undefined custom collection entries and falls back to default collection', () => {
     const runtime = createMockRuntime();
     const db = orm({
@@ -125,6 +175,40 @@ describe('orm()', () => {
     ).toThrow(/No model found for custom collection 'unknownCollection'/);
   });
 
+  it('throws when custom collection values are instances instead of classes', () => {
+    const runtime = createMockRuntime();
+    const postCollectionInstance = new PostCollection({ contract, runtime }, 'Post');
+
+    expect(() =>
+      orm({
+        contract,
+        runtime,
+        collections: {
+          posts: postCollectionInstance as unknown as typeof PostCollection,
+        },
+      }),
+    ).toThrow(/must be a Collection class/);
+  });
+
+  it('throws when custom collection values do not extend Collection', () => {
+    const runtime = createMockRuntime();
+    class NotACollection {
+      noop() {
+        return undefined;
+      }
+    }
+
+    expect(() =>
+      orm({
+        contract,
+        runtime,
+        collections: {
+          posts: NotACollection as unknown as typeof PostCollection,
+        },
+      }),
+    ).toThrow(/must be a Collection class/);
+  });
+
   it('does not type unknown keys on the client', () => {
     const runtime = createMockRuntime();
     const db = orm({ contract, runtime });
@@ -143,8 +227,8 @@ describe('orm()', () => {
     });
 
     const withPosts = db.users.include('posts', (posts) => {
-      expect(posts).toBeInstanceOf(PostCollection);
-      return (posts as unknown as PostCollection).popular();
+      expectPostCollection(posts);
+      return posts.popular();
     });
 
     const include = withPosts.state.includes[0]!;
@@ -162,12 +246,13 @@ describe('orm()', () => {
       },
     });
 
-    const withNested = db.users.include('posts', (posts) =>
-      (posts as unknown as PostCollection).include('comments', (comments) => {
-        expect(comments).toBeInstanceOf(CommentCollection);
-        return (comments as unknown as CommentCollection).withBody('approved');
-      }),
-    );
+    const withNested = db.users.include('posts', (posts) => {
+      expectPostCollection(posts);
+      return posts.include('comments', (comments) => {
+        expectCommentCollection(comments);
+        return comments.withBody('approved');
+      });
+    });
 
     const postInclude = withNested.state.includes[0]!;
     const commentInclude = postInclude.nested.includes[0]!;

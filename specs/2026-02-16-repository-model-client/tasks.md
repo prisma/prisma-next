@@ -502,7 +502,7 @@ Depends on: Group 11 (aggregations), Group 6 (include cardinality)
 
 Depends on: Groups 1-6 (core Collection changes)
 
-- [ ] **14.1 Update orm() factory for spec compliance**
+- [x] **14.1 Update orm() factory for spec compliance**
   - Verify the `collections` option key (already renamed from `repositories` to `collections`)
   - Ensure collection classes (not instances) are passed and instantiated lazily
   - Verify model name aliasing: `User`, `user`, `users` all resolve correctly
@@ -510,13 +510,13 @@ Depends on: Groups 1-6 (core Collection changes)
   - Update `OrmOptions` type if needed
   - Files to modify: `src/orm.ts`
 
-- [ ] **14.2 Verify custom collection methods propagate through include refinements**
+- [x] **14.2 Verify custom collection methods propagate through include refinements**
   - End-to-end test: register `PostCollection` with `published()` method, then verify `db.users.include('posts', p => p.published())` works
   - Verify registry propagation through nested includes
   - Files to modify: `test/orm.test.ts`
   - Write 2-3 tests
 
-- [ ] **14.3 Update public exports**
+- [x] **14.3 Update public exports**
   - Export new functions and types: `and`, `or`, `not`, `all`, `GroupedCollection`, `AggregateBuilder`
   - Export new type helpers: `CreateInput`, `UniqueConstraintCriterion`, `RelationMutator`, `CollectionTypeState`
   - Remove deprecated exports (`FilterExpr`, `ComparisonOp` if still exported)
