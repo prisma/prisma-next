@@ -21,7 +21,7 @@ import {
   type SqlBool,
   sql,
 } from 'kysely';
-import type { CollectionState, OrderExpr } from './types';
+import type { CollectionState, IncludeExpr, OrderExpr } from './types';
 
 type AnyDB = Record<string, Record<string, unknown>>;
 type AnySelectQueryBuilder = SelectQueryBuilder<AnyDB, string, Record<string, unknown>>;
@@ -97,6 +97,52 @@ export function compileRelationSelect(
   }
 
   return qb.compile();
+}
+
+export function compileSelectWithIncludeStrategy(
+  tableName: string,
+  state: CollectionState,
+  strategy: 'lateral' | 'correlated',
+): CompiledQuery<Record<string, unknown>> {
+  const parentAlias = '__orm_parent';
+  const parentCompiled = compileSelect(tableName, {
+    ...state,
+    includes: [],
+  });
+
+  const sqlParameters = [...parentCompiled.parameters];
+  const projectionItems = [`${quoteIdentifier(parentAlias)}.*`];
+  const lateralJoins: string[] = [];
+
+  for (const [includeIndex, include] of state.includes.entries()) {
+    const includeSubquery = buildIncludeAggregateSubquery(
+      include,
+      parentAlias,
+      includeIndex,
+      sqlParameters.length,
+    );
+    sqlParameters.push(...includeSubquery.parameters);
+
+    if (strategy === 'lateral') {
+      const includeTableAlias = `__orm_include_${includeIndex}`;
+      lateralJoins.push(
+        `left join lateral (${includeSubquery.sql}) as ${quoteIdentifier(includeTableAlias)} on true`,
+      );
+      projectionItems.push(
+        `${quoteIdentifier(includeTableAlias)}.${quoteIdentifier(include.relationName)} as ${quoteIdentifier(include.relationName)}`,
+      );
+      continue;
+    }
+
+    projectionItems.push(`(${includeSubquery.sql}) as ${quoteIdentifier(include.relationName)}`);
+  }
+
+  const fromClause = `from (${parentCompiled.sql}) as ${quoteIdentifier(parentAlias)}`;
+  const joinsClause = lateralJoins.length > 0 ? ` ${lateralJoins.join(' ')}` : '';
+  return toRawCompiledQuery<Record<string, unknown>>(
+    `select ${projectionItems.join(', ')} ${fromClause}${joinsClause}`,
+    sqlParameters,
+  );
 }
 
 export function compileInsertReturning(
@@ -532,4 +578,72 @@ function toListValues(right: SqlComparable): ReadonlyArray<AstExpression | Param
   }
 
   return [right];
+}
+
+function buildIncludeAggregateSubquery(
+  include: IncludeExpr,
+  parentAlias: string,
+  includeIndex: number,
+  parameterOffset: number,
+): {
+  sql: string;
+  parameters: readonly unknown[];
+} {
+  const joinFilter: WhereExpr = {
+    kind: 'bin',
+    op: 'eq',
+    left: {
+      kind: 'col',
+      table: include.relatedTableName,
+      column: include.fkColumn,
+    },
+    right: {
+      kind: 'col',
+      table: parentAlias,
+      column: include.parentPkColumn,
+    },
+  };
+
+  const childCompiled = compileSelect(include.relatedTableName, {
+    ...include.nested,
+    includes: [],
+    filters: [joinFilter, ...include.nested.filters],
+  });
+
+  const childAlias = `__orm_child_${includeIndex}`;
+  const shiftedChildSql = shiftParameterPlaceholders(childCompiled.sql, parameterOffset);
+  const aggregateSql =
+    `select coalesce(json_agg(row_to_json(${quoteIdentifier(childAlias)}.*)), '[]'::json) ` +
+    `as ${quoteIdentifier(include.relationName)} from (${shiftedChildSql}) ` +
+    `as ${quoteIdentifier(childAlias)}`;
+
+  return {
+    sql: aggregateSql,
+    parameters: childCompiled.parameters,
+  };
+}
+
+function shiftParameterPlaceholders(sqlText: string, parameterOffset: number): string {
+  if (parameterOffset === 0) {
+    return sqlText;
+  }
+
+  return sqlText.replace(/\$(\d+)/g, (_full, group) => {
+    const index = Number(group);
+    return `$${index + parameterOffset}`;
+  });
+}
+
+function quoteIdentifier(identifier: string): string {
+  return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+function toRawCompiledQuery<Row>(
+  sqlText: string,
+  parameters: readonly unknown[],
+): CompiledQuery<Row> {
+  return {
+    sql: sqlText,
+    parameters: [...parameters],
+  } as unknown as CompiledQuery<Row>;
 }

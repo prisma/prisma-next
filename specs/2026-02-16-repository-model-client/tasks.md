@@ -278,14 +278,14 @@ Depends on: Group 6 (include cardinality)
   - Files to create: `src/include-strategy.ts`
   - Files to modify: `src/collection.ts`
 
-- [ ] **7.2 Implement lateral join include strategy**
+- [x] **7.2 Implement lateral join include strategy**
   - When lateral joins are available, compile includes into a single Kysely query using `LATERAL` subqueries with `json_agg`
   - Produce SQL matching the pattern in spec section 6.3 Strategy 1
   - Handle per-parent limit/offset in the lateral subquery
   - Files to modify: `src/kysely-compiler.ts`, `src/collection.ts`
   - Write 2-3 tests with lateral capability enabled: single include, include with take/skip, nested include
 
-- [ ] **7.3 Implement correlated subquery include strategy**
+- [x] **7.3 Implement correlated subquery include strategy**
   - Fallback when `jsonAgg` is available but `lateral` is not
   - Compile includes into correlated subqueries referencing the outer table
   - Files to modify: `src/kysely-compiler.ts`, `src/collection.ts`

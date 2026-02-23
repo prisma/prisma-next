@@ -11,6 +11,7 @@ import {
   compileInsertReturning,
   compileRelationSelect,
   compileSelect,
+  compileSelectWithIncludeStrategy,
   compileUpdateCount,
   compileUpdateReturning,
   compileUpsertReturning,
@@ -835,14 +836,89 @@ function dispatchWithIncludeStrategy<Row>(options: {
   state: CollectionState;
   tableName: string;
 }): AsyncIterableResult<Row> {
+  if (hasNestedIncludes(options.state.includes)) {
+    return dispatchWithMultiQueryIncludes<Row>(options);
+  }
+
   switch (options.strategy) {
     case 'lateral':
+      return dispatchWithSingleQueryIncludes<Row>({
+        ...options,
+        strategy: 'lateral',
+      });
     case 'correlated':
-      // Single-query include strategies are implemented in follow-up tasks.
-      return dispatchWithMultiQueryIncludes<Row>(options);
+      return dispatchWithSingleQueryIncludes<Row>({
+        ...options,
+        strategy: 'correlated',
+      });
     default:
       return dispatchWithMultiQueryIncludes<Row>(options);
   }
+}
+
+function dispatchWithSingleQueryIncludes<Row>(options: {
+  strategy: 'lateral' | 'correlated';
+  contract: SqlContract<SqlStorage>;
+  runtime: CollectionContext<SqlContract<SqlStorage>>['runtime'];
+  state: CollectionState;
+  tableName: string;
+}): AsyncIterableResult<Row> {
+  const { contract, runtime, state, tableName, strategy } = options;
+  const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+    const { scope, release } = await acquireRuntimeScope(runtime);
+    try {
+      const parentJoinColumns = state.includes.map((include) => include.parentPkColumn);
+      const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
+        augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
+      const compiled = compileSelectWithIncludeStrategy(
+        tableName,
+        {
+          ...state,
+          selectedFields: parentSelectedForQuery,
+        },
+        strategy,
+      );
+
+      const parentRowsRaw = await executeCompiledQuery<Record<string, unknown>>(
+        scope,
+        contract,
+        compiled,
+        { lane: 'orm-client' },
+      ).toArray();
+      if (parentRowsRaw.length === 0) {
+        return;
+      }
+
+      const parentRows = parentRowsRaw.map((row) => createRowEnvelope(contract, tableName, row));
+
+      for (const parent of parentRows) {
+        for (const include of state.includes) {
+          const rawChildren = parseIncludedRows(parent.raw[include.relationName]);
+          const mappedChildren = rawChildren.map((childRow) =>
+            mapStorageRowToModelFields(contract, include.relatedTableName, childRow),
+          );
+          parent.mapped[include.relationName] = coerceSingleQueryIncludeResult(
+            mappedChildren,
+            include.cardinality,
+          );
+        }
+
+        if (hiddenParentColumns.length > 0) {
+          stripHiddenMappedFields(contract, tableName, parent.mapped, hiddenParentColumns);
+        }
+      }
+
+      for (const row of parentRows) {
+        yield row.mapped as Row;
+      }
+    } finally {
+      if (release) {
+        await release();
+      }
+    }
+  };
+
+  return new AsyncIterableResult(generator());
 }
 
 function dispatchWithMultiQueryIncludes<Row>(options: {
@@ -1122,6 +1198,50 @@ async function acquireRuntimeScope(
 
 function uniqueValues(values: unknown[]): unknown[] {
   return [...new Set(values)];
+}
+
+function hasNestedIncludes(includes: readonly IncludeExpr[]): boolean {
+  return includes.some((include) => include.nested.includes.length > 0);
+}
+
+function parseIncludedRows(value: unknown): Record<string, unknown>[] {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  const parsed = parseIncludePayload(value);
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  const rows: Record<string, unknown>[] = [];
+  for (const item of parsed) {
+    if (typeof item !== 'object' || item === null) {
+      continue;
+    }
+    rows.push({ ...(item as Record<string, unknown>) });
+  }
+
+  return rows;
+}
+
+function parseIncludePayload(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return [];
+  }
+}
+
+function coerceSingleQueryIncludeResult(
+  rows: Record<string, unknown>[],
+  cardinality: RelationCardinalityTag | undefined,
+): Record<string, unknown>[] | Record<string, unknown> | null {
+  return isToOneCardinality(cardinality) ? (rows[0] ?? null) : rows;
 }
 
 function slicePerParent(

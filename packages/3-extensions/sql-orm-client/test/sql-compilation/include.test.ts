@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { baseContract, createCollection, createCollectionFor } from '../collection-fixtures';
-import { createMockRuntime } from '../helpers';
+import { createMockRuntime, type TestContract } from '../helpers';
 import { serializePlans } from './helpers';
+
+function withIncludeCapabilities(
+  capabilities: Record<string, Record<string, boolean>>,
+): TestContract {
+  return {
+    ...baseContract,
+    capabilities: {
+      ...baseContract.capabilities,
+      ...capabilities,
+    },
+  } as TestContract;
+}
 
 describe('sql-compilation/include', () => {
   it('select() with include() keeps selected scalars and relation payloads', async () => {
@@ -250,5 +262,145 @@ describe('sql-compilation/include', () => {
         },
       ]
     `);
+  });
+
+  it('uses lateral single-query include strategy when lateral and jsonAgg are enabled', async () => {
+    const contract = withIncludeCapabilities({
+      lateral: { enabled: true },
+      jsonAgg: { enabled: true },
+    });
+    const { collection, runtime } = createCollectionFor('User', contract);
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          posts: [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
+        },
+      ],
+    ]);
+
+    const results = await collection.include('posts').all();
+
+    expect(results).toEqual([
+      {
+        id: 1,
+        name: 'Alice',
+        email: 'alice@example.com',
+        posts: [{ id: 10, title: 'Post A', userId: 1, views: 100 }],
+      },
+    ]);
+    expect(runtime.executions).toHaveLength(1);
+    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('left join lateral');
+    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('json_agg');
+  });
+
+  it('lateral include strategy pushes per-parent skip/take into child SQL', async () => {
+    const contract = withIncludeCapabilities({
+      lateral: { enabled: true },
+      jsonAgg: { enabled: true },
+    });
+    const { collection, runtime } = createCollectionFor('User', contract);
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          posts: '[{"id":11,"title":"Post B","user_id":1,"views":200}]',
+        },
+      ],
+    ]);
+
+    const results = await collection
+      .include('posts', (post) =>
+        post
+          .orderBy((p) => p.id.asc())
+          .skip(1)
+          .take(1),
+      )
+      .all();
+
+    expect(results).toEqual([
+      {
+        id: 1,
+        name: 'Alice',
+        email: 'alice@example.com',
+        posts: [{ id: 11, title: 'Post B', userId: 1, views: 200 }],
+      },
+    ]);
+    expect(runtime.executions).toHaveLength(1);
+    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('limit');
+    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('offset');
+  });
+
+  it('uses correlated single-query include strategy when only jsonAgg is enabled', async () => {
+    const contract = withIncludeCapabilities({
+      jsonAgg: { enabled: true },
+    });
+    const { collection, runtime } = createCollectionFor('User', contract);
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          posts: [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
+        },
+      ],
+    ]);
+
+    const results = await collection.include('posts').all();
+
+    expect(results).toEqual([
+      {
+        id: 1,
+        name: 'Alice',
+        email: 'alice@example.com',
+        posts: [{ id: 10, title: 'Post A', userId: 1, views: 100 }],
+      },
+    ]);
+    expect(runtime.executions).toHaveLength(1);
+    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('(select coalesce(json_agg');
+    expect(runtime.executions[0]?.plan.sql.toLowerCase()).not.toContain('join lateral');
+  });
+
+  it('falls back to multi-query strategy for nested includes even when lateral is enabled', async () => {
+    const contract = withIncludeCapabilities({
+      lateral: { enabled: true },
+      jsonAgg: { enabled: true },
+    });
+    const { collection, runtime } = createCollectionFor('User', contract);
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
+      [{ id: 10, title: 'Post A', user_id: 1, views: 100 }],
+      [{ id: 100, body: 'Comment A', post_id: 10 }],
+    ]);
+
+    const results = await collection
+      .include('posts', (post) =>
+        post.include('comments', (comment) => comment.orderBy((c) => c.id.asc())),
+      )
+      .all();
+
+    expect(results).toEqual([
+      {
+        id: 1,
+        name: 'Alice',
+        email: 'alice@example.com',
+        posts: [
+          {
+            id: 10,
+            title: 'Post A',
+            userId: 1,
+            views: 100,
+            comments: [{ id: 100, body: 'Comment A', postId: 10 }],
+          },
+        ],
+      },
+    ]);
+    expect(runtime.executions).toHaveLength(3);
+    expect(runtime.executions[0]?.plan.sql.toLowerCase()).not.toContain('join lateral');
   });
 });
