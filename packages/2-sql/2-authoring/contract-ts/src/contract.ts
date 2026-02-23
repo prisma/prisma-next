@@ -1,6 +1,5 @@
 import {
   DEFAULT_FOREIGN_KEYS_CONFIG,
-  type ForeignKey,
   type Index,
   type ModelDefinition,
   type ModelField,
@@ -16,10 +15,8 @@ import {
 } from '@prisma-next/sql-contract/types';
 import {
   ColumnDefaultSchema,
-  ForeignKeyReferencesSchema,
   ForeignKeySchema,
   ForeignKeysConfigSchema,
-  ReferentialActionSchema,
 } from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
@@ -58,9 +55,6 @@ const IndexSchema = type.declare<Index>().type({
   columns: type.string.array().readonly(),
   'name?': 'string',
 });
-
-// ForeignKeyReferencesSchema, ReferentialActionSchema, and ForeignKeySchema
-// are imported from @prisma-next/sql-contract/validators to avoid duplication.
 
 const StorageTableSchema = type.declare<StorageTable>().type({
   columns: type({ '[string]': StorageColumnSchema }),
