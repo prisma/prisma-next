@@ -541,10 +541,11 @@ Depends on: All previous groups
   - Add aggregation example: `aggregate()`
   - Files to modify: all files in `examples/prisma-next-demo/src/orm-client/`
 
-- [ ] **15.2 Verify demo app builds and runs**
+- [x] **15.2 Verify demo app builds and runs**
   - Run `pnpm --filter prisma-next-demo build` and `pnpm --filter prisma-next-demo test` (if applicable)
   - Verify no TypeScript errors
   - Verify queries execute correctly against the test database
+  - Note: `prisma-next-demo` currently has no `build` script; `typecheck` was used as the compile verification step
   - Acceptance: Demo app compiles and integration tests pass
 
 - [ ] **15.3 Delete deprecated ORM lane package**
