@@ -169,14 +169,12 @@ describe('executeDbUpdate', () => {
       contractIR: dummyContractIR,
       mode: 'apply',
       migrations: createMockMigrations({
-        runnerResult: {
-          ...notOk({
-            code: 'ORIGIN_MISMATCH',
-            summary: 'Origin mismatch',
-            why: 'Marker drifted',
-            meta: { drift: true },
-          }),
-        },
+        runnerResult: notOk({
+          code: 'ORIGIN_MISMATCH',
+          summary: 'Origin mismatch',
+          why: 'Marker drifted',
+          meta: { drift: true },
+        }),
       }),
       frameworkComponents: [],
     });
@@ -202,9 +200,7 @@ describe('executeDbUpdate', () => {
       contractIR: dummyContractIR,
       mode: 'apply',
       migrations: createMockMigrations({
-        runnerResult: {
-          ...ok({ operationsPlanned: 2, operationsExecuted: 2 }),
-        },
+        runnerResult: ok({ operationsPlanned: 2, operationsExecuted: 2 }),
       }),
       frameworkComponents: [],
     });
@@ -243,9 +239,7 @@ describe('executeDbUpdate', () => {
             operations: [],
           },
         },
-        runnerResult: {
-          ...ok({ operationsPlanned: 0, operationsExecuted: 0 }),
-        },
+        runnerResult: ok({ operationsPlanned: 0, operationsExecuted: 0 }),
       }),
       frameworkComponents: [],
     });
@@ -490,9 +484,7 @@ describe('executeDbUpdate', () => {
         contractIR: dummyContractIR,
         mode: 'apply',
         migrations: createMockMigrations({
-          runnerResult: {
-            ...notOk({ code: 'RUNNER_ERROR', summary: 'Failed', why: 'Error' }),
-          },
+          runnerResult: notOk({ code: 'RUNNER_ERROR', summary: 'Failed', why: 'Error' }),
         }),
         frameworkComponents: [],
         onProgress: (event) => events.push(event),
