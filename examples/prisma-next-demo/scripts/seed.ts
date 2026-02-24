@@ -12,7 +12,7 @@
  *
  * Prerequisites:
  * - DATABASE_URL environment variable set
- * - Database schema already applied (run pnpm db:push first)
+ * - Database schema and marker applied (run `pnpm emit` then `pnpm db:init`)
  */
 import 'dotenv/config';
 
