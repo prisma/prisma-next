@@ -58,4 +58,6 @@ jobs:
 
       - name: Publish to pkg.pr.new
         # Use https://github.com/stackblitz-labs/pkg.pr.new/tags to see the latest version available
-        run: pnpm dlx pkg-pr-new@0.0.62 publish --pnpm --compact --comment=update ${{ steps.packages.outputs.list }}
+        # --compact requires repository field in the *published* npm manifest;
+        # add it back after the next npm publish includes the repository field.
+        run: pnpm dlx pkg-pr-new@0.0.62 publish --pnpm --comment=update ${{ steps.packages.outputs.list }}
