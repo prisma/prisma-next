@@ -125,6 +125,62 @@ describe('integration/include', () => {
   );
 
   it(
+    'include() supports scalar avg(), min(), and max() on to-many relations',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Alice', email: 'alice@example.com' },
+          { id: 2, name: 'Bob', email: 'bob@example.com' },
+          { id: 3, name: 'Cara', email: 'cara@example.com' },
+        ]);
+        await seedPosts(runtime, [
+          { id: 10, title: 'Post A', userId: 1, views: 100 },
+          { id: 11, title: 'Post B', userId: 1, views: 200 },
+          { id: 12, title: 'Post C', userId: 2, views: 300 },
+        ]);
+
+        runtime.resetExecutions();
+        const numericField = 'views' as never;
+        const rows = await users
+          .orderBy((user) => user.id.asc())
+          .include('posts', (posts) =>
+            posts.combine({
+              avgViews: posts.avg(numericField),
+              minViews: posts.min(numericField),
+              maxViews: posts.max(numericField),
+            }),
+          )
+          .all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            posts: { avgViews: 150, minViews: 100, maxViews: 200 },
+          },
+          {
+            id: 2,
+            name: 'Bob',
+            email: 'bob@example.com',
+            posts: { avgViews: 300, minViews: 300, maxViews: 300 },
+          },
+          {
+            id: 3,
+            name: 'Cara',
+            email: 'cara@example.com',
+            posts: { avgViews: null, minViews: null, maxViews: null },
+          },
+        ]);
+        expect(runtime.executions).toHaveLength(4);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
     'include() combine() evaluates branches independently',
     async () => {
       await withCollectionRuntime(async (runtime) => {

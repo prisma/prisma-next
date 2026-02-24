@@ -37,6 +37,40 @@ describe('integration/update', () => {
   );
 
   it(
+    'updateAll() returns all updated rows',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Draft', email: 'a@example.com' },
+          { id: 2, name: 'Draft', email: 'b@example.com' },
+          { id: 3, name: 'Published', email: 'c@example.com' },
+        ]);
+
+        const updated = await users.where({ name: 'Draft' }).updateAll({ name: 'Ready' });
+        expect(updated).toHaveLength(2);
+        expect(updated).toEqual(
+          expect.arrayContaining([
+            { id: 1, name: 'Ready', email: 'a@example.com' },
+            { id: 2, name: 'Ready', email: 'b@example.com' },
+          ]),
+        );
+
+        const rows = await runtime.query<{ id: number; name: string }>(
+          'select id, name from users order by id',
+        );
+        expect(rows).toEqual([
+          { id: 1, name: 'Ready' },
+          { id: 2, name: 'Ready' },
+          { id: 3, name: 'Published' },
+        ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
     'update() with include() and select() keeps selected scalars and relation rows',
     async () => {
       await withCollectionRuntime(async (runtime) => {

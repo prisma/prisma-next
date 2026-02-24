@@ -26,4 +26,27 @@ describe('integration/find', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it(
+    'find() respects existing orderBy() modifiers',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        await seedUsers(runtime, [
+          { id: 1, name: 'Bob', email: 'bob-1@example.com' },
+          { id: 2, name: 'Bob', email: 'bob-2@example.com' },
+          { id: 3, name: 'Cara', email: 'cara@example.com' },
+        ]);
+
+        const found = await users
+          .where({ name: 'Bob' })
+          .orderBy((user) => user.id.desc())
+          .find();
+
+        expect(found).toEqual({ id: 2, name: 'Bob', email: 'bob-2@example.com' });
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
