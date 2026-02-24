@@ -24,3 +24,32 @@ export function setCommandDescriptions(
 export function getLongDescription(command: Command): string | undefined {
   return (command as Command & { _longDescription?: string })._longDescription;
 }
+
+/**
+ * Shared CLI options interface for migration commands (db init, db update).
+ * These are the Commander.js parsed options common to both commands.
+ */
+export interface MigrationCommandOptions {
+  readonly db?: string;
+  readonly config?: string;
+  readonly plan?: boolean;
+  readonly json?: string | boolean;
+  readonly quiet?: boolean;
+  readonly q?: boolean;
+  readonly verbose?: boolean;
+  readonly v?: boolean;
+  readonly vv?: boolean;
+  readonly trace?: boolean;
+  readonly timestamps?: boolean;
+  readonly color?: boolean;
+  readonly 'no-color'?: boolean;
+}
+
+/**
+ * Masks the password portion of a database connection URL.
+ * Replaces the password between `:` and `@` with `****`.
+ * Safe to call with non-URL strings (returns them unchanged).
+ */
+export function maskConnectionUrl(url: string): string {
+  return url.replace(/:([^:@]+)@/, ':****@');
+}

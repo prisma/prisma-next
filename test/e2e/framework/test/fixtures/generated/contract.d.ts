@@ -27,7 +27,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:2757b7954c4cdf19fbd72a0db818c34b2e342ce63e756d546c8bd907d302b7f4'>;
+  StorageHashBase<'sha256:b922c09c275ff8f659dc6ab91cd859a46a7e659870d47028dc7389f1330c43da'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:85956a9f00255c416d8ff9e361479b6c16978ad6df8f2139ca5f1d1b6f859589'>;
 export type ProfileHash =
@@ -210,8 +210,8 @@ export type Contract = SqlContract<
       readonly event: {
         columns: {
           readonly id: {
-            readonly nativeType: 'text';
-            readonly codecId: 'pg/text@1';
+            readonly nativeType: 'character';
+            readonly codecId: 'sql/char@1';
             readonly nullable: false;
           };
           readonly name: {
@@ -268,7 +268,7 @@ export type Contract = SqlContract<
     readonly Event: {
       storage: { readonly table: 'event' };
       fields: {
-        readonly id: CodecTypes['pg/text@1']['output'];
+        readonly id: Char<36>;
         readonly name: CodecTypes['pg/text@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       };

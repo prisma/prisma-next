@@ -5,16 +5,27 @@
 Most teams today assume that **versioned migrations in source control** are the only safe way to evolve a production schema. Historically, “db push”‑style commands have been positioned as dev‑only conveniences. This design proposes a new path:
 
 - The **contract** is the source of truth for application expectations.
-- A **planner** can synthesize a **deterministic, lossless change plan** from the database’s current contract to the desired contract.
+- A **planner** can synthesize a **deterministic reconciliation plan** from live database schema to the desired contract.
 - A **runner** can execute that plan safely, with full verification and audit, **without requiring hand-authored migration files on disk**.
 
 The core idea: **`prisma-next db update`** becomes “update this database to match the current contract” under strict safety, determinism, and auditability guarantees.
 
-The goal is to make `db update` a **production‑grade, contract‑driven alternative to file‑based migrations**, not just a dev‑only tool. The planning behavior is identical to migration planning: the same planner diffs a “from” contract and a “to” contract and produces a single edge with operations and pre/post checks. The difference is lifecycle: migration planning writes that edge to disk for later execution, while `db update` asks the planner and runner to synthesize and apply a safe edge immediately for a specific database, without a migration file checked in for that change.
+The goal is to make `db update` a **production‑grade, contract‑driven alternative to file‑based migrations**, not just a dev‑only tool. The planning behavior is aligned with migration planning and reuses the same planner/runner safety rails, but `db update` synthesizes and applies an edge directly for the target database instead of requiring a migration file checked into source control.
+
+### MVP implementation status (2026-02-23)
+
+Current implementation intentionally scopes the strategy to:
+
+- **Marker required**: `db update` fails if no marker exists and instructs users to run `prisma-next db init`.
+- **No lifecycle hints**: planner does not depend on `@deprecated` / `@deleted` metadata in this phase.
+- **Lossy policy enabled**: planner is allowed to emit additive, widening, and destructive operations where supported.
+- **Origin-anchored execution**: runner executes with plan origin derived from marker hashes and keeps full execution checks enabled.
 
 ---
 
 ## Authoring States: Active, Deprecated, Deleted
+
+> Status: conceptual future direction. The current `db update` implementation does not consume these lifecycle hints yet.
 
 From the author’s perspective, a field/table can be in three logical states in the **authoring surface** (PSL or TS builder). Each state describes constraints that must be satisfied for the database to meet the expectations of the contract (and therefore the application).
 

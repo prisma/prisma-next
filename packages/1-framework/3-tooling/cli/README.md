@@ -35,6 +35,7 @@ Commands that enforce wiring validation:
 - **`db introspect`** (when a contract is provided)
 - **`db sign`**
 - **`db init`**
+- **`db update`**
 
 If you hit a wiring validation error: add the required descriptors to `config.extensionPacks` (matched by descriptor `id`) and re-run the command.
 
@@ -789,6 +790,26 @@ Applying migration plan and verifying schema...
 - If the database already has a marker that matches the destination contract, `db init` succeeds as a noop (0 operations planned/executed).
 - If the database has a marker that does **not** match the destination contract, `db init` fails (including in `--plan` mode). Use `db init` for bootstrapping; use your migration workflow to reconcile existing databases.
 
+### `prisma-next db update`
+
+Reconcile a **marker-managed** database to the currently emitted contract.
+
+`db update` differs from `db init`:
+
+- Requires an existing marker (fails fast with guidance to run `db init` when missing)
+- Uses a lossy-capable policy (`additive`, `widening`, `destructive`) where supported by planner/runner
+- Anchors plan origin to the marker hashes before runner execution
+- Keeps full runner execution checks enabled
+
+**Command:**
+```bash
+prisma-next db update [--db <url>] [--config <path>] [--plan] [--json] [-v] [-q] [--timestamps] [--color/--no-color]
+```
+
+**Error codes (additional to shared CLI/runtime codes):**
+- `MARKER_REQUIRED`: marker missing for `db update` (run `prisma-next db init` first)
+- `RUNNER_FAILED`: runner rejected apply (origin mismatch, failed checks, policy failures, or execution errors)
+
 **Config File (`prisma-next.config.ts`):**
 
 The CLI uses a config file to specify the target family, target, adapter, extensionPacks, and contract.
@@ -1097,6 +1118,7 @@ try {
   // Run operations
   const verifyResult = await client.verify({ contractIR });
   const initResult = await client.dbInit({ contractIR, mode: 'apply' });
+  const updateResult = await client.dbUpdate({ contractIR, mode: 'apply' });
   const introspectResult = await client.introspect();
 } finally {
   // Clean up
@@ -1114,6 +1136,7 @@ try {
 | `schemaVerify(options)` | Verifies database schema satisfies contract |
 | `sign(options)` | Writes contract marker to database |
 | `dbInit(options)` | Initializes database schema from contract |
+| `dbUpdate(options)` | Reconciles marker-managed database to contract |
 | `introspect(options)` | Introspects database schema |
 
 ### Result Types
@@ -1124,6 +1147,7 @@ Operations return structured result types:
 - `schemaVerify()` → `VerifyDatabaseSchemaResult`
 - `sign()` → `SignDatabaseResult`
 - `dbInit()` → `Result<DbInitSuccess, DbInitFailure>` (uses Result pattern)
+- `dbUpdate()` → `Result<DbUpdateSuccess, DbUpdateFailure>` (uses Result pattern)
 - `introspect()` → Schema IR (family-specific)
 
 ### Error Handling
@@ -1150,6 +1174,7 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/config-types`**: Exports `defineConfig` and config types
 - **`@prisma-next/cli/control-api`**: Exports `createControlClient` and control API types
 - **`@prisma-next/cli/commands/db-init`**: Exports `createDbInitCommand`
+- **`@prisma-next/cli/commands/db-update`**: Exports `createDbUpdateCommand`
 - **`@prisma-next/cli/commands/db-introspect`**: Exports `createDbIntrospectCommand`
 - **`@prisma-next/cli/commands/db-schema-verify`**: Exports `createDbSchemaVerifyCommand`
 - **`@prisma-next/cli/commands/db-sign`**: Exports `createDbSignCommand`

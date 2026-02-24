@@ -37,7 +37,15 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
 
-type OperationClass = 'extension' | 'type' | 'table' | 'unique' | 'index' | 'foreignKey';
+type OperationClass =
+  | 'extension'
+  | 'type'
+  | 'table'
+  | 'column'
+  | 'primaryKey'
+  | 'unique'
+  | 'index'
+  | 'foreignKey';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -71,6 +79,12 @@ interface PlannerConfig {
   readonly defaultSchema: string;
 }
 
+interface PlanningMode {
+  readonly includeExtraObjects: boolean;
+  readonly allowWidening: boolean;
+  readonly allowDestructive: boolean;
+}
+
 const DEFAULT_PLANNER_CONFIG: PlannerConfig = {
   defaultSchema: 'public',
 };
@@ -94,10 +108,8 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       return policyResult;
     }
 
-    const classification = this.classifySchema(options);
-    if (classification.kind === 'conflict') {
-      return plannerFailure(classification.conflicts);
-    }
+    const planningMode = this.resolvePlanningMode(options.policy);
+    const schemaIssues = this.collectSchemaIssues(options, planningMode.includeExtraObjects);
 
     // Extract codec control hooks once at entry point for reuse across all operations.
     // This avoids repeated iteration over frameworkComponents for each method that needs hooks.
@@ -105,29 +117,36 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
 
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
+    const lossyPlan = this.buildLossyOperations({
+      contract: options.contract,
+      issues: schemaIssues,
+      schemaName,
+      mode: planningMode,
+      policy: options.policy,
+    });
+    if (lossyPlan.conflicts.length > 0) {
+      return plannerFailure(lossyPlan.conflicts);
+    }
+
     const storageTypePlan = this.buildStorageTypeOperations(options, schemaName, codecHooks);
     if (storageTypePlan.conflicts.length > 0) {
       return plannerFailure(storageTypePlan.conflicts);
     }
 
+    // Sort table entries once for reuse across all additive operation builders.
+    const sortedTables = sortedEntries(options.contract.storage.tables);
+
     // Build extension operations from component-owned database dependencies
     operations.push(
       ...this.buildDatabaseDependencyOperations(options),
       ...storageTypePlan.operations,
-      ...this.buildTableOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildColumnOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildPrimaryKeyOperations(
-        options.contract.storage.tables,
-        options.schema,
-        schemaName,
-      ),
-      ...this.buildUniqueOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildIndexOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildForeignKeyOperations(
-        options.contract.storage.tables,
-        options.schema,
-        schemaName,
-      ),
+      ...lossyPlan.operations,
+      ...this.buildTableOperations(sortedTables, options.schema, schemaName),
+      ...this.buildColumnOperations(sortedTables, options.schema, schemaName),
+      ...this.buildPrimaryKeyOperations(sortedTables, options.schema, schemaName),
+      ...this.buildUniqueOperations(sortedTables, options.schema, schemaName),
+      ...this.buildIndexOperations(sortedTables, options.schema, schemaName),
+      ...this.buildForeignKeyOperations(sortedTables, options.schema, schemaName),
     );
 
     const plan = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -148,8 +167,8 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       return plannerFailure([
         {
           kind: 'unsupportedOperation',
-          summary: 'Init planner requires additive operations be allowed',
-          why: 'The init planner only emits additive operations. Update the policy to include "additive".',
+          summary: 'Migration planner requires additive operations be allowed',
+          why: 'The planner requires the "additive" operation class to be allowed in the policy.',
         },
       ]);
     }
@@ -262,12 +281,12 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   }
 
   private buildTableOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
+    tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
+    for (const [tableName, table] of tables) {
       if (schema.tables[tableName]) {
         continue;
       }
@@ -305,12 +324,12 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   }
 
   private buildColumnOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
+    tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
+    for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
       if (!schemaTable) {
         continue;
@@ -389,12 +408,12 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
   }
 
   private buildPrimaryKeyOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
+    tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
+    for (const [tableName, table] of tables) {
       if (!table.primaryKey) {
         continue;
       }
@@ -438,12 +457,12 @@ PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
   }
 
   private buildUniqueOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
+    tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
+    for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
       for (const unique of table.uniques) {
         if (schemaTable && hasUniqueConstraint(schemaTable, unique.columns)) {
@@ -486,12 +505,12 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   }
 
   private buildIndexOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
+    tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
+    for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
       for (const index of table.indexes) {
         if (schemaTable && hasIndex(schemaTable, index.columns)) {
@@ -535,12 +554,12 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
   }
 
   private buildForeignKeyOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
+    tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
+    for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
       for (const foreignKey of table.foreignKeys) {
         if (schemaTable && hasForeignKey(schemaTable, foreignKey)) {
@@ -589,6 +608,290 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
     return operations;
   }
 
+  private getContractColumn(
+    contract: SqlContract<SqlStorage>,
+    tableName: string,
+    columnName: string,
+  ): StorageColumn | null {
+    const table = contract.storage.tables[tableName];
+    if (!table) {
+      return null;
+    }
+    return table.columns[columnName] ?? null;
+  }
+
+  private buildDropTableOperation(
+    schemaName: string,
+    tableName: string,
+  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    return {
+      id: `dropTable.${tableName}`,
+      label: `Drop table ${tableName}`,
+      summary: `Drops extra table ${tableName}`,
+      operationClass: 'destructive',
+      target: {
+        id: 'postgres',
+        details: this.buildTargetDetails('table', tableName, schemaName),
+      },
+      precheck: [
+        {
+          description: `ensure table "${tableName}" exists`,
+          sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NOT NULL`,
+        },
+      ],
+      execute: [
+        {
+          description: `drop table "${tableName}"`,
+          sql: `DROP TABLE ${qualifyTableName(schemaName, tableName)}`,
+        },
+      ],
+      postcheck: [
+        {
+          description: `verify table "${tableName}" is removed`,
+          sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NULL`,
+        },
+      ],
+    };
+  }
+
+  private buildDropColumnOperation(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    return {
+      id: `dropColumn.${tableName}.${columnName}`,
+      label: `Drop column ${columnName} from ${tableName}`,
+      summary: `Drops extra column ${columnName} from table ${tableName}`,
+      operationClass: 'destructive',
+      target: {
+        id: 'postgres',
+        details: this.buildTargetDetails('column', columnName, schemaName, tableName),
+      },
+      precheck: [
+        {
+          description: `ensure column "${columnName}" exists`,
+          sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+        },
+      ],
+      execute: [
+        {
+          description: `drop column "${columnName}"`,
+          sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)} DROP COLUMN ${quoteIdentifier(columnName)}`,
+        },
+      ],
+      postcheck: [
+        {
+          description: `verify column "${columnName}" is removed`,
+          sql: columnExistsCheck({
+            schema: schemaName,
+            table: tableName,
+            column: columnName,
+            exists: false,
+          }),
+        },
+      ],
+    };
+  }
+
+  private buildDropIndexOperation(
+    schemaName: string,
+    tableName: string,
+    indexName: string,
+  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    return {
+      id: `dropIndex.${tableName}.${indexName}`,
+      label: `Drop index ${indexName} on ${tableName}`,
+      summary: `Drops extra index ${indexName} on table ${tableName}`,
+      operationClass: 'destructive',
+      target: {
+        id: 'postgres',
+        details: this.buildTargetDetails('index', indexName, schemaName, tableName),
+      },
+      precheck: [
+        {
+          description: `ensure index "${indexName}" exists`,
+          sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NOT NULL`,
+        },
+      ],
+      execute: [
+        {
+          description: `drop index "${indexName}"`,
+          sql: `DROP INDEX ${qualifyTableName(schemaName, indexName)}`,
+        },
+      ],
+      postcheck: [
+        {
+          description: `verify index "${indexName}" is removed`,
+          sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NULL`,
+        },
+      ],
+    };
+  }
+
+  private buildDropConstraintOperation(
+    schemaName: string,
+    tableName: string,
+    constraintName: string,
+  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    return {
+      id: `dropConstraint.${tableName}.${constraintName}`,
+      label: `Drop constraint ${constraintName} on ${tableName}`,
+      summary: `Drops extra constraint ${constraintName} on table ${tableName}`,
+      operationClass: 'destructive',
+      target: {
+        id: 'postgres',
+        details: this.buildTargetDetails('foreignKey', constraintName, schemaName, tableName),
+      },
+      precheck: [
+        {
+          description: `ensure constraint "${constraintName}" exists`,
+          sql: constraintExistsCheck({ constraintName, schema: schemaName }),
+        },
+      ],
+      execute: [
+        {
+          description: `drop constraint "${constraintName}"`,
+          sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
+DROP CONSTRAINT ${quoteIdentifier(constraintName)}`,
+        },
+      ],
+      postcheck: [
+        {
+          description: `verify constraint "${constraintName}" is removed`,
+          sql: constraintExistsCheck({ constraintName, schema: schemaName, exists: false }),
+        },
+      ],
+    };
+  }
+
+  private buildDropNotNullOperation(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    return {
+      id: `alterNullability.${tableName}.${columnName}`,
+      label: `Relax nullability for ${columnName} on ${tableName}`,
+      summary: `Drops NOT NULL constraint for ${columnName} on table ${tableName}`,
+      operationClass: 'widening',
+      target: {
+        id: 'postgres',
+        details: this.buildTargetDetails('column', columnName, schemaName, tableName),
+      },
+      precheck: [
+        {
+          description: `ensure column "${columnName}" exists`,
+          sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+        },
+      ],
+      execute: [
+        {
+          description: `drop NOT NULL from "${columnName}"`,
+          sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
+ALTER COLUMN ${quoteIdentifier(columnName)} DROP NOT NULL`,
+        },
+      ],
+      postcheck: [
+        {
+          description: `verify "${columnName}" is nullable`,
+          sql: columnIsNullableCheck({ schema: schemaName, table: tableName, column: columnName }),
+        },
+      ],
+    };
+  }
+
+  private buildSetNotNullOperation(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    const qualified = qualifyTableName(schemaName, tableName);
+    return {
+      id: `alterNullability.${tableName}.${columnName}`,
+      label: `Enforce NOT NULL for ${columnName} on ${tableName}`,
+      summary: `Sets NOT NULL on ${columnName} for table ${tableName}`,
+      operationClass: 'destructive',
+      target: {
+        id: 'postgres',
+        details: this.buildTargetDetails('column', columnName, schemaName, tableName),
+      },
+      precheck: [
+        {
+          description: `ensure column "${columnName}" exists`,
+          sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+        },
+        {
+          description: `ensure "${columnName}" has no NULL values`,
+          sql: `SELECT NOT EXISTS (
+  SELECT 1 FROM ${qualified}
+  WHERE ${quoteIdentifier(columnName)} IS NULL
+  LIMIT 1
+)`,
+        },
+      ],
+      execute: [
+        {
+          description: `set NOT NULL on "${columnName}"`,
+          sql: `ALTER TABLE ${qualified}
+ALTER COLUMN ${quoteIdentifier(columnName)} SET NOT NULL`,
+        },
+      ],
+      postcheck: [
+        {
+          description: `verify "${columnName}" is NOT NULL`,
+          sql: columnIsNotNullCheck({ schema: schemaName, table: tableName, column: columnName }),
+        },
+      ],
+    };
+  }
+
+  private buildAlterColumnTypeOperation(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+    column: StorageColumn,
+  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    const qualified = qualifyTableName(schemaName, tableName);
+    const expectedType = buildColumnTypeSql(column);
+    return {
+      id: `alterType.${tableName}.${columnName}`,
+      label: `Alter type for ${columnName} on ${tableName}`,
+      summary: `Changes type of ${columnName} to ${expectedType}`,
+      operationClass: 'destructive',
+      target: {
+        id: 'postgres',
+        details: this.buildTargetDetails('column', columnName, schemaName, tableName),
+      },
+      meta: {
+        warning: 'TABLE_REWRITE',
+        detail:
+          'ALTER COLUMN TYPE requires a full table rewrite and acquires an ACCESS EXCLUSIVE lock. On large tables, this can cause significant downtime.',
+      },
+      precheck: [
+        {
+          description: `ensure column "${columnName}" exists`,
+          sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+        },
+      ],
+      execute: [
+        {
+          description: `alter type of "${columnName}"`,
+          sql: `ALTER TABLE ${qualified}
+ALTER COLUMN ${quoteIdentifier(columnName)}
+TYPE ${expectedType}
+USING ${quoteIdentifier(columnName)}::${expectedType}`,
+        },
+      ],
+      postcheck: [
+        {
+          description: `verify column "${columnName}" exists after type change`,
+          sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
+        },
+      ],
+    };
+  }
+
   private buildTargetDetails(
     objectType: OperationClass,
     name: string,
@@ -603,42 +906,181 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
     };
   }
 
-  private classifySchema(options: PlannerOptionsWithComponents):
-    | { kind: 'ok' }
-    | {
-        kind: 'conflict';
-        conflicts: SqlPlannerConflict[];
-      } {
+  private resolvePlanningMode(policy: MigrationOperationPolicy): PlanningMode {
+    const allowWidening = policy.allowedOperationClasses.includes('widening');
+    const allowDestructive = policy.allowedOperationClasses.includes('destructive');
+    // `db init` uses additive-only policy and intentionally ignores extras.
+    // Any lossy-capable policy should inspect extras to reconcile strict equality.
+    const includeExtraObjects = allowWidening || allowDestructive;
+    return { includeExtraObjects, allowWidening, allowDestructive };
+  }
+
+  private collectSchemaIssues(
+    options: PlannerOptionsWithComponents,
+    strict: boolean,
+  ): readonly SchemaIssue[] {
     const verifyOptions: VerifySqlSchemaOptionsWithComponents = {
       contract: options.contract,
       schema: options.schema,
-      strict: false,
+      strict,
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
       normalizeNativeType: normalizeSchemaNativeType,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
-
-    const conflicts = this.extractConflicts(verifyResult.schema.issues);
-    if (conflicts.length > 0) {
-      return { kind: 'conflict', conflicts };
-    }
-    return { kind: 'ok' };
+    return verifyResult.schema.issues;
   }
 
-  private extractConflicts(issues: readonly SchemaIssue[]): SqlPlannerConflict[] {
+  private buildLossyOperations(options: {
+    contract: SqlContract<SqlStorage>;
+    issues: readonly SchemaIssue[];
+    schemaName: string;
+    mode: PlanningMode;
+    policy: MigrationOperationPolicy;
+  }): {
+    readonly operations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+    readonly conflicts: readonly SqlPlannerConflict[];
+  } {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     const conflicts: SqlPlannerConflict[] = [];
-    for (const issue of issues) {
+    const { mode } = options;
+    const seenOperationIds = new Set<string>();
+
+    for (const issue of sortSchemaIssues(options.issues)) {
       if (isAdditiveIssue(issue)) {
         continue;
       }
-      const conflict = this.convertIssueToConflict(issue);
-      if (conflict) {
-        conflicts.push(conflict);
+
+      const operation = this.buildLossyOperationFromIssue({
+        issue,
+        contract: options.contract,
+        schemaName: options.schemaName,
+        mode,
+      });
+      if (!operation) {
+        conflicts.push(
+          this.convertIssueToConflict(issue) ?? {
+            kind: 'missingButNonAdditive',
+            summary: issue.message,
+            ...ifDefined('location', buildConflictLocation(issue)),
+          },
+        );
+        continue;
       }
+
+      if (!options.policy.allowedOperationClasses.includes(operation.operationClass)) {
+        conflicts.push({
+          kind: 'missingButNonAdditive',
+          summary: `Issue "${issue.kind}" requires "${operation.operationClass}" operation "${operation.id}"`,
+          ...ifDefined('location', buildConflictLocation(issue)),
+        });
+        continue;
+      }
+
+      if (seenOperationIds.has(operation.id)) {
+        continue;
+      }
+      seenOperationIds.add(operation.id);
+      operations.push(operation);
     }
-    return conflicts.sort(conflictComparator);
+
+    return {
+      operations: operations.sort((a, b) => a.id.localeCompare(b.id)),
+      conflicts: conflicts.sort(conflictComparator),
+    };
+  }
+
+  private buildLossyOperationFromIssue(options: {
+    issue: SchemaIssue;
+    contract: SqlContract<SqlStorage>;
+    schemaName: string;
+    mode: PlanningMode;
+  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> | null {
+    const { issue, contract, schemaName, mode } = options;
+    switch (issue.kind) {
+      case 'extra_table':
+        if (!mode.allowDestructive || !issue.table) {
+          return null;
+        }
+        return this.buildDropTableOperation(schemaName, issue.table);
+
+      case 'extra_column':
+        if (!mode.allowDestructive || !issue.table || !issue.column) {
+          return null;
+        }
+        return this.buildDropColumnOperation(schemaName, issue.table, issue.column);
+
+      case 'extra_index':
+        if (!mode.allowDestructive || !issue.table || !issue.indexOrConstraint) {
+          return null;
+        }
+        return this.buildDropIndexOperation(schemaName, issue.table, issue.indexOrConstraint);
+
+      case 'extra_foreign_key':
+      case 'extra_unique_constraint': {
+        if (!mode.allowDestructive || !issue.table || !issue.indexOrConstraint) {
+          return null;
+        }
+        return this.buildDropConstraintOperation(schemaName, issue.table, issue.indexOrConstraint);
+      }
+
+      case 'extra_primary_key': {
+        if (!mode.allowDestructive || !issue.table) {
+          return null;
+        }
+        const constraintName = issue.indexOrConstraint ?? `${issue.table}_pkey`;
+        return this.buildDropConstraintOperation(schemaName, issue.table, constraintName);
+      }
+
+      case 'nullability_mismatch': {
+        if (!issue.table || !issue.column) {
+          return null;
+        }
+        const expectedNullable = issue.expected === 'true';
+        const actualNullable = issue.actual === 'true';
+        if (expectedNullable === actualNullable) {
+          return null;
+        }
+        if (expectedNullable && !actualNullable) {
+          if (!mode.allowWidening) {
+            return null;
+          }
+          return this.buildDropNotNullOperation(schemaName, issue.table, issue.column);
+        }
+        if (!expectedNullable && actualNullable) {
+          if (!mode.allowDestructive) {
+            return null;
+          }
+          return this.buildSetNotNullOperation(schemaName, issue.table, issue.column);
+        }
+        return null;
+      }
+
+      case 'type_mismatch': {
+        if (!mode.allowDestructive || !issue.table || !issue.column) {
+          return null;
+        }
+        const contractColumn = this.getContractColumn(contract, issue.table, issue.column);
+        if (!contractColumn) {
+          return null;
+        }
+        return this.buildAlterColumnTypeOperation(
+          schemaName,
+          issue.table,
+          issue.column,
+          contractColumn,
+        );
+      }
+
+      // Remaining issue kinds (default_missing, default_mismatch, primary_key_mismatch,
+      // unique_constraint_mismatch, index_mismatch, foreign_key_mismatch) do not yet have
+      // lossy operation builders. They fall through to the caller, which converts them to
+      // conflicts via convertIssueToConflict. When a new SchemaIssue kind is added, add a
+      // case here if the planner can emit an operation for it; otherwise it becomes a conflict.
+      default:
+        return null;
+    }
   }
 
   private convertIssueToConflict(issue: SchemaIssue): SqlPlannerConflict | null {
@@ -647,14 +1089,25 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
         return this.buildConflict('typeMismatch', issue);
       case 'nullability_mismatch':
         return this.buildConflict('nullabilityConflict', issue);
+      case 'default_missing':
+      case 'default_mismatch':
+      case 'extra_table':
+      case 'extra_column':
+      case 'extra_primary_key':
+      case 'extra_foreign_key':
+      case 'extra_unique_constraint':
+      case 'extra_index':
+        return this.buildConflict('missingButNonAdditive', issue);
       case 'primary_key_mismatch':
-        return this.buildConflict('indexIncompatible', issue);
       case 'unique_constraint_mismatch':
-        return this.buildConflict('indexIncompatible', issue);
       case 'index_mismatch':
         return this.buildConflict('indexIncompatible', issue);
       case 'foreign_key_mismatch':
         return this.buildConflict('foreignKeyConflict', issue);
+      // Additive issue kinds (missing_table, missing_column, type_missing, type_values_mismatch,
+      // extension_missing) are filtered by isAdditiveIssue before reaching this method.
+      // If a new SchemaIssue kind is introduced, add a mapping here so it becomes a conflict
+      // rather than being silently ignored.
       default:
         return null;
     }
@@ -882,6 +1335,25 @@ function columnIsNotNullCheck({
 )`;
 }
 
+function columnIsNullableCheck({
+  schema,
+  table,
+  column,
+}: {
+  schema: string;
+  table: string;
+  column: string;
+}): string {
+  return `SELECT EXISTS (
+  SELECT 1
+  FROM information_schema.columns
+  WHERE table_schema = '${escapeLiteral(schema)}'
+    AND table_name = '${escapeLiteral(table)}'
+    AND column_name = '${escapeLiteral(column)}'
+    AND is_nullable = 'YES'
+)`;
+}
+
 function tableIsEmptyCheck(qualifiedTableName: string): string {
   return `SELECT NOT EXISTS (SELECT 1 FROM ${qualifiedTableName} LIMIT 1)`;
 }
@@ -970,6 +1442,27 @@ function isAdditiveIssue(issue: SchemaIssue): boolean {
     default:
       return false;
   }
+}
+
+function sortSchemaIssues(issues: readonly SchemaIssue[]): readonly SchemaIssue[] {
+  if (issues.length <= 1) {
+    return issues;
+  }
+  return [...issues].sort((a, b) => {
+    const kindCompare = a.kind.localeCompare(b.kind);
+    if (kindCompare !== 0) {
+      return kindCompare;
+    }
+    const tableCompare = compareStrings(a.table, b.table);
+    if (tableCompare !== 0) {
+      return tableCompare;
+    }
+    const columnCompare = compareStrings(a.column, b.column);
+    if (columnCompare !== 0) {
+      return columnCompare;
+    }
+    return compareStrings(a.indexOrConstraint, b.indexOrConstraint);
+  });
 }
 
 function buildConflictLocation(issue: SchemaIssue) {

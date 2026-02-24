@@ -1,4 +1,5 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type {
@@ -12,15 +13,21 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
+import { ContractValidationError } from './errors';
 import { executeDbInit } from './operations/db-init';
+import { executeDbUpdate } from './operations/db-update';
 import type {
+  ControlActionName,
   ControlClient,
   ControlClientOptions,
   DbInitOptions,
   DbInitResult,
+  DbUpdateOptions,
+  DbUpdateResult,
   EmitOptions,
   EmitResult,
   IntrospectOptions,
+  OnControlProgress,
   SchemaVerifyOptions,
   SignOptions,
   VerifyOptions,
@@ -152,40 +159,40 @@ class ControlClientImpl implements ControlClient {
     };
   }
 
+  private async connectWithProgress(
+    connection: unknown | undefined,
+    action: ControlActionName,
+    onProgress?: OnControlProgress,
+  ): Promise<void> {
+    if (connection === undefined) return;
+    onProgress?.({
+      action,
+      kind: 'spanStart',
+      spanId: 'connect',
+      label: 'Connecting to database...',
+    });
+    try {
+      await this.connect(connection);
+      onProgress?.({ action, kind: 'spanEnd', spanId: 'connect', outcome: 'ok' });
+    } catch (error) {
+      onProgress?.({ action, kind: 'spanEnd', spanId: 'connect', outcome: 'error' });
+      throw error;
+    }
+  }
+
   async verify(options: VerifyOptions): Promise<VerifyDatabaseResult> {
     const { onProgress } = options;
-
-    // Connect with progress span if connection provided
-    if (options.connection !== undefined) {
-      onProgress?.({
-        action: 'verify',
-        kind: 'spanStart',
-        spanId: 'connect',
-        label: 'Connecting to database...',
-      });
-      try {
-        await this.connect(options.connection);
-        onProgress?.({
-          action: 'verify',
-          kind: 'spanEnd',
-          spanId: 'connect',
-          outcome: 'ok',
-        });
-      } catch (error) {
-        onProgress?.({
-          action: 'verify',
-          kind: 'spanEnd',
-          spanId: 'connect',
-          outcome: 'error',
-        });
-        throw error;
-      }
-    }
-
+    await this.connectWithProgress(options.connection, 'verify', onProgress);
     const { driver, familyInstance } = await this.ensureConnected();
 
     // Validate contract using family instance
-    const contractIR = familyInstance.validateContractIR(options.contractIR);
+    let contractIR: ContractIR;
+    try {
+      contractIR = familyInstance.validateContractIR(options.contractIR);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContractValidationError(message, error);
+    }
 
     // Emit verify span
     onProgress?.({
@@ -228,38 +235,17 @@ class ControlClientImpl implements ControlClient {
 
   async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
     const { onProgress } = options;
-
-    // Connect with progress span if connection provided
-    if (options.connection !== undefined) {
-      onProgress?.({
-        action: 'schemaVerify',
-        kind: 'spanStart',
-        spanId: 'connect',
-        label: 'Connecting to database...',
-      });
-      try {
-        await this.connect(options.connection);
-        onProgress?.({
-          action: 'schemaVerify',
-          kind: 'spanEnd',
-          spanId: 'connect',
-          outcome: 'ok',
-        });
-      } catch (error) {
-        onProgress?.({
-          action: 'schemaVerify',
-          kind: 'spanEnd',
-          spanId: 'connect',
-          outcome: 'error',
-        });
-        throw error;
-      }
-    }
-
+    await this.connectWithProgress(options.connection, 'schemaVerify', onProgress);
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
     // Validate contract using family instance
-    const contractIR = familyInstance.validateContractIR(options.contractIR);
+    let contractIR: ContractIR;
+    try {
+      contractIR = familyInstance.validateContractIR(options.contractIR);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContractValidationError(message, error);
+    }
 
     // Emit schemaVerify span
     onProgress?.({
@@ -300,38 +286,17 @@ class ControlClientImpl implements ControlClient {
 
   async sign(options: SignOptions): Promise<SignDatabaseResult> {
     const { onProgress } = options;
-
-    // Connect with progress span if connection provided
-    if (options.connection !== undefined) {
-      onProgress?.({
-        action: 'sign',
-        kind: 'spanStart',
-        spanId: 'connect',
-        label: 'Connecting to database...',
-      });
-      try {
-        await this.connect(options.connection);
-        onProgress?.({
-          action: 'sign',
-          kind: 'spanEnd',
-          spanId: 'connect',
-          outcome: 'ok',
-        });
-      } catch (error) {
-        onProgress?.({
-          action: 'sign',
-          kind: 'spanEnd',
-          spanId: 'connect',
-          outcome: 'error',
-        });
-        throw error;
-      }
-    }
-
+    await this.connectWithProgress(options.connection, 'sign', onProgress);
     const { driver, familyInstance } = await this.ensureConnected();
 
     // Validate contract using family instance
-    const contractIR = familyInstance.validateContractIR(options.contractIR);
+    let contractIR: ContractIR;
+    try {
+      contractIR = familyInstance.validateContractIR(options.contractIR);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContractValidationError(message, error);
+    }
 
     // Emit sign span
     onProgress?.({
@@ -371,34 +336,7 @@ class ControlClientImpl implements ControlClient {
 
   async dbInit(options: DbInitOptions): Promise<DbInitResult> {
     const { onProgress } = options;
-
-    // Connect with progress span if connection provided
-    if (options.connection !== undefined) {
-      onProgress?.({
-        action: 'dbInit',
-        kind: 'spanStart',
-        spanId: 'connect',
-        label: 'Connecting to database...',
-      });
-      try {
-        await this.connect(options.connection);
-        onProgress?.({
-          action: 'dbInit',
-          kind: 'spanEnd',
-          spanId: 'connect',
-          outcome: 'ok',
-        });
-      } catch (error) {
-        onProgress?.({
-          action: 'dbInit',
-          kind: 'spanEnd',
-          spanId: 'connect',
-          outcome: 'error',
-        });
-        throw error;
-      }
-    }
-
+    await this.connectWithProgress(options.connection, 'dbInit', onProgress);
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
     // Check target supports migrations
@@ -407,7 +345,13 @@ class ControlClientImpl implements ControlClient {
     }
 
     // Validate contract using family instance
-    const contractIR = familyInstance.validateContractIR(options.contractIR);
+    let contractIR: ContractIR;
+    try {
+      contractIR = familyInstance.validateContractIR(options.contractIR);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContractValidationError(message, error);
+    }
 
     // Delegate to extracted dbInit operation
     return executeDbInit({
@@ -421,36 +365,37 @@ class ControlClientImpl implements ControlClient {
     });
   }
 
-  async introspect(options?: IntrospectOptions): Promise<unknown> {
-    const onProgress = options?.onProgress;
+  async dbUpdate(options: DbUpdateOptions): Promise<DbUpdateResult> {
+    const { onProgress } = options;
+    await this.connectWithProgress(options.connection, 'dbUpdate', onProgress);
+    const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
-    // Connect with progress span if connection provided
-    if (options?.connection !== undefined) {
-      onProgress?.({
-        action: 'introspect',
-        kind: 'spanStart',
-        spanId: 'connect',
-        label: 'Connecting to database...',
-      });
-      try {
-        await this.connect(options.connection);
-        onProgress?.({
-          action: 'introspect',
-          kind: 'spanEnd',
-          spanId: 'connect',
-          outcome: 'ok',
-        });
-      } catch (error) {
-        onProgress?.({
-          action: 'introspect',
-          kind: 'spanEnd',
-          spanId: 'connect',
-          outcome: 'error',
-        });
-        throw error;
-      }
+    if (!this.options.target.migrations) {
+      throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
+    let contractIR: ContractIR;
+    try {
+      contractIR = familyInstance.validateContractIR(options.contractIR);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContractValidationError(message, error);
+    }
+
+    return executeDbUpdate({
+      driver,
+      familyInstance,
+      contractIR,
+      mode: options.mode,
+      migrations: this.options.target.migrations,
+      frameworkComponents,
+      ...(onProgress ? { onProgress } : {}),
+    });
+  }
+
+  async introspect(options?: IntrospectOptions): Promise<unknown> {
+    const onProgress = options?.onProgress;
+    await this.connectWithProgress(options?.connection, 'introspect', onProgress);
     const { driver, familyInstance } = await this.ensureConnected();
 
     // TODO: Pass schema option to familyInstance.introspect when schema filtering is implemented
@@ -556,6 +501,24 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
+      try {
+        this.familyInstance.validateContractIR(contractRaw);
+      } catch (error) {
+        onProgress?.({
+          action: 'emit',
+          kind: 'spanEnd',
+          spanId: 'emit',
+          outcome: 'error',
+        });
+        const message = error instanceof Error ? error.message : String(error);
+        return notOk({
+          code: 'CONTRACT_VALIDATION_FAILED',
+          summary: 'Contract validation failed',
+          why: message,
+          meta: undefined,
+        });
+      }
+
       const emitResult = await this.familyInstance.emitContract({ contractIR: contractRaw });
 
       onProgress?.({
