@@ -55,5 +55,10 @@
   },
   "main": "./dist/runtime.mjs",
   "module": "./dist/runtime.mjs",
-  "types": "./dist/runtime.d.mts"
+  "types": "./dist/runtime.d.mts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-targets/8-clients/postgres"
+  }
 }

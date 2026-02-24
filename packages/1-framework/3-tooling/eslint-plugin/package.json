@@ -56,5 +56,10 @@
     "eslint": "^9.0.0",
     "typescript": "*"
   },
-  "module": "./dist/index.mjs"
+  "module": "./dist/index.mjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/1-framework/3-tooling/eslint-plugin"
+  }
 }
