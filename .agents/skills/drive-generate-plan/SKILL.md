@@ -114,6 +114,18 @@ After writing the initial plan, enter a refinement loop:
 
 ## Linear Integration
 
+### Tooling note (important)
+
+Linear MCP tool names and parameters are **server-specific**. In this repo, the available Linear tools come from the `user-linear` MCP server and include:
+
+- `list_teams`
+- `save_project` (create/update)
+- `save_milestone` (create/update)
+- `create_issue` (uses `milestone`: milestone name or ID)
+- `update_issue`
+
+Do not rely on web-enumerated tool names from other MCP server implementations; use the connected server’s tools/schemas.
+
 After the plan is finalised, offer to create a project in Linear:
 
 *"Want me to create this as a project in Linear? If so, which team should it go under?"*
