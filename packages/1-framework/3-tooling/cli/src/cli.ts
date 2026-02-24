@@ -4,6 +4,7 @@ import { createDbInitCommand } from './commands/db-init';
 import { createDbIntrospectCommand } from './commands/db-introspect';
 import { createDbSchemaVerifyCommand } from './commands/db-schema-verify';
 import { createDbSignCommand } from './commands/db-sign';
+import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { parseGlobalFlags } from './utils/global-flags';
@@ -174,6 +175,10 @@ dbCommand.addCommand(dbVerifyCommand);
 // Add init subcommand to db
 const dbInitCommand = createDbInitCommand();
 dbCommand.addCommand(dbInitCommand);
+
+// Add update subcommand to db
+const dbUpdateCommand = createDbUpdateCommand();
+dbCommand.addCommand(dbUpdateCommand);
 
 // Add introspect subcommand to db
 const dbIntrospectCommand = createDbIntrospectCommand();

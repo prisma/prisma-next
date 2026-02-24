@@ -7,7 +7,7 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
 - Deterministic behavior: stable exit codes, PN error codes, and JSON schemas.
 - Actionable feedback: every error tells the user why it happened and what to do next.
 - Respect boundaries: migration vs runtime plane, and family hooks for family‑specific logic.
-- Minimal ceremony: tasteful color/symbols; banners only for `init`.
+- Minimal ceremony: tasteful color/symbols; clack-like decorations are ok; banners only for `init`.
 
 ## Command Taxonomy
 - Group commands by domain/plane with noun → verb phrasing.

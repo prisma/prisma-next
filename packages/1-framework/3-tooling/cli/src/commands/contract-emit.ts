@@ -6,7 +6,12 @@ import { dirname, isAbsolute, join, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type { EmitFailure } from '../control-api/types';
-import { CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
+import {
+  CliStructuredError,
+  errorContractValidationFailed,
+  errorRuntime,
+  errorUnexpected,
+} from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -55,7 +60,10 @@ function mapDiagnosticsToIssues(
 /**
  * Maps an EmitFailure to a CliStructuredError for consistent error handling.
  */
-function mapEmitFailure(failure: EmitFailure): CliStructuredError {
+function mapEmitFailure(
+  failure: EmitFailure,
+  context?: { readonly configPath?: string },
+): CliStructuredError {
   if (failure.code === 'CONTRACT_SOURCE_INVALID') {
     const issues = mapDiagnosticsToIssues(failure);
     return errorRuntime(failure.summary, {
@@ -63,6 +71,13 @@ function mapEmitFailure(failure: EmitFailure): CliStructuredError {
       fix: 'Check your contract source provider in prisma-next.config.ts and ensure it returns Result<ContractIR, Diagnostics>',
       ...(issues.length > 0 ? { meta: { issues } } : {}),
     });
+  }
+
+  if (failure.code === 'CONTRACT_VALIDATION_FAILED') {
+    return errorContractValidationFailed(
+      failure.why ?? 'Contract validation failed while emitting',
+      context?.configPath ? { where: { path: context.configPath } } : undefined,
+    );
   }
 
   if (failure.code === 'EMIT_FAILED') {
@@ -101,6 +116,10 @@ async function executeContractEmitCommand(
     );
   }
 
+  const configPath = options.config
+    ? relative(process.cwd(), resolve(options.config))
+    : 'prisma-next.config.ts';
+
   // Resolve contract from config
   if (!config.contract) {
     return notOk(
@@ -138,9 +157,6 @@ async function executeContractEmitCommand(
   // Output header (only for human-readable output)
   if (flags.json !== 'object' && !flags.quiet) {
     // Normalize config path for display (match contract path format - no ./ prefix)
-    const configPath = options.config
-      ? relative(process.cwd(), resolve(options.config))
-      : 'prisma-next.config.ts';
     // Convert absolute paths to relative paths for display
     const contractPath = relative(process.cwd(), outputJsonPath);
     const typesPath = relative(process.cwd(), outputDtsPath);
@@ -181,7 +197,7 @@ async function executeContractEmitCommand(
 
     // Handle failures by mapping to CLI structured error
     if (!result.ok) {
-      return notOk(mapEmitFailure(result.failure));
+      return notOk(mapEmitFailure(result.failure, { configPath }));
     }
 
     // Create directories if needed

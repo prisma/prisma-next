@@ -5,6 +5,7 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
+import { ContractValidationError } from '../control-api/errors';
 import type { DbInitFailure } from '../control-api/types';
 import {
   CliStructuredError,
@@ -18,34 +19,24 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import {
+  type MigrationCommandOptions,
+  maskConnectionUrl,
+  setCommandDescriptions,
+} from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
-  type DbInitResult,
   formatCommandHelp,
-  formatDbInitApplyOutput,
-  formatDbInitJson,
-  formatDbInitPlanOutput,
+  formatMigrationApplyOutput,
+  formatMigrationJson,
+  formatMigrationPlanOutput,
   formatStyledHeader,
+  type MigrationCommandResult,
 } from '../utils/output';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 
-interface DbInitOptions {
-  readonly db?: string;
-  readonly config?: string;
-  readonly plan?: boolean;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly vv?: boolean;
-  readonly trace?: boolean;
-  readonly timestamps?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-}
+type DbInitOptions = MigrationCommandOptions;
 
 /**
  * Maps a DbInitFailure to a CliStructuredError for consistent error handling.
@@ -115,7 +106,7 @@ async function executeDbInitCommand(
   options: DbInitOptions,
   flags: GlobalFlags,
   startTime: number,
-): Promise<Result<DbInitResult, CliStructuredError>> {
+): Promise<Result<MigrationCommandResult, CliStructuredError>> {
   // Load config
   const config = await loadConfig(options.config);
   const configPath = options.config
@@ -133,7 +124,7 @@ async function executeDbInitCommand(
       { label: 'contract', value: contractPath },
     ];
     if (options.db) {
-      details.push({ label: 'database', value: options.db });
+      details.push({ label: 'database', value: maskConnectionUrl(options.db) });
     }
     if (options.plan) {
       details.push({ label: 'mode', value: 'plan (dry run)' });
@@ -233,7 +224,7 @@ async function executeDbInitCommand(
 
     // Convert success result to CLI output format
     const profileHash = result.value.marker?.profileHash;
-    const dbInitResult: DbInitResult = {
+    const dbInitResult: MigrationCommandResult = {
       ok: true,
       mode: result.value.mode,
       plan: {
@@ -274,6 +265,14 @@ async function executeDbInitCommand(
     // Use static type guard to work across module boundaries
     if (CliStructuredError.is(error)) {
       return notOk(error);
+    }
+
+    if (error instanceof ContractValidationError) {
+      return notOk(
+        errorContractValidationFailed(`Contract validation failed: ${error.message}`, {
+          where: { path: contractPathAbsolute },
+        }),
+      );
     }
 
     // Wrap unexpected errors
@@ -336,12 +335,12 @@ export function createDbInitCommand(): Command {
 
       const exitCode = handleResult(result, flags, (dbInitResult) => {
         if (flags.json === 'object') {
-          console.log(formatDbInitJson(dbInitResult));
+          console.log(formatMigrationJson(dbInitResult));
         } else {
           const output =
             dbInitResult.mode === 'plan'
-              ? formatDbInitPlanOutput(dbInitResult, flags)
-              : formatDbInitApplyOutput(dbInitResult, flags);
+              ? formatMigrationPlanOutput(dbInitResult, flags)
+              : formatMigrationApplyOutput(dbInitResult, flags);
           if (output) {
             console.log(output);
           }

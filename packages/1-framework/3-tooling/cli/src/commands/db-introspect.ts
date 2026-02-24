@@ -12,7 +12,7 @@ import {
   errorJsonFormatNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { setCommandDescriptions } from '../utils/command-helpers';
+import { maskConnectionUrl, setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
@@ -63,13 +63,9 @@ async function executeDbIntrospectCommand(
       { label: 'config', value: configPath },
     ];
     if (options.db) {
-      // Mask password in URL for security
-      const maskedUrl = options.db.replace(/:([^:@]+)@/, ':****@');
-      details.push({ label: 'database', value: maskedUrl });
+      details.push({ label: 'database', value: maskConnectionUrl(options.db) });
     } else if (config.db?.connection && typeof config.db.connection === 'string') {
-      // Mask password in URL for security
-      const maskedUrl = config.db.connection.replace(/:([^:@]+)@/, ':****@');
-      details.push({ label: 'database', value: maskedUrl });
+      details.push({ label: 'database', value: maskConnectionUrl(config.db.connection) });
     }
     const header = formatStyledHeader({
       command: 'db introspect',
@@ -127,7 +123,7 @@ async function executeDbIntrospectCommand(
 
     // Get masked connection URL for meta (only for string connections)
     const connectionForMeta =
-      typeof dbConnection === 'string' ? dbConnection.replace(/:([^:@]+)@/, ':****@') : undefined;
+      typeof dbConnection === 'string' ? maskConnectionUrl(dbConnection) : undefined;
 
     const introspectResult: IntrospectSchemaResult<unknown> = {
       ok: true,
