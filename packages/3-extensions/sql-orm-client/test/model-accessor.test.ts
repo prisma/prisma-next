@@ -181,6 +181,26 @@ describe('createModelAccessor', () => {
     });
   });
 
+  it('creates none() and every() filters without child predicates', () => {
+    const accessor = createModelAccessor(contract, 'User');
+
+    expect(accessor['posts']!.every({})).toMatchObject({
+      kind: 'exists',
+      not: true,
+      subquery: {
+        where: { kind: 'bin', op: 'eq' },
+      },
+    });
+
+    expect(accessor['posts']!.none()).toMatchObject({
+      kind: 'exists',
+      not: true,
+      subquery: {
+        where: { kind: 'bin', op: 'eq' },
+      },
+    });
+  });
+
   it('supports nested relation filters', () => {
     const accessor = createModelAccessor(contract, 'User');
 
@@ -395,5 +415,104 @@ describe('createModelAccessor', () => {
         project: [{ expr: { column: 'id' } }],
       },
     });
+  });
+
+  it('resolves model tables from storage metadata when modelToTable mappings are missing', () => {
+    const base = createTestContract();
+    const storageFallbackContract = {
+      ...base,
+      mappings: {
+        ...base.mappings,
+        modelToTable: {},
+      },
+      models: {
+        ...base.models,
+        User: {
+          ...base.models.User,
+          storage: {
+            table: 'users_storage',
+          },
+        },
+      },
+    };
+
+    const accessor = createModelAccessor(storageFallbackContract as never, 'User');
+    expect(accessor['name']!.eq('Alice')).toMatchObject({
+      left: { table: 'users_storage', column: 'name' },
+    });
+  });
+
+  it('falls back to the model name when table mappings are unavailable', () => {
+    const base = createTestContract();
+    const modelNameFallbackContract = {
+      ...base,
+      mappings: {
+        ...base.mappings,
+        modelToTable: {},
+        fieldToColumn: {},
+      },
+      models: {
+        ...base.models,
+        User: {
+          ...base.models.User,
+          storage: {},
+        },
+      },
+      relations: {},
+    };
+
+    const accessor = createModelAccessor(modelNameFallbackContract as never, 'User');
+    expect(accessor['name']!.eq('Alice')).toMatchObject({
+      left: { table: 'User', column: 'name' },
+    });
+  });
+
+  it('relation shorthand combines multiple fields with and()', () => {
+    const accessor = createModelAccessor(contract, 'User');
+    const predicate = accessor['posts']!.some({ title: 'A', views: 1 });
+
+    expect(predicate).toMatchObject({
+      kind: 'exists',
+      subquery: {
+        where: {
+          kind: 'and',
+          exprs: [
+            { kind: 'bin', op: 'eq' },
+            {
+              kind: 'and',
+              exprs: [
+                { kind: 'bin', op: 'eq' },
+                { kind: 'bin', op: 'eq' },
+              ],
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it('throws when relation metadata omits join arrays', () => {
+    const base = createTestContract();
+    const contractWithoutJoinArrays = {
+      ...base,
+      relations: {
+        ...base.relations,
+        users: {
+          posts: {
+            to: 'Post',
+            cardinality: '1:N',
+          },
+        },
+      },
+    };
+
+    expect(() =>
+      (
+        createModelAccessor(contractWithoutJoinArrays as never, 'User') as unknown as Record<
+          string,
+          { some: () => unknown }
+        >
+      )['posts']!.some(),
+    ).toThrow(/missing join columns/);
   });
 });

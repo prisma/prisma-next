@@ -104,6 +104,46 @@ describe('orm()', () => {
     expect((db as Record<string, Collection<TestContract, string>>)['Users']).toBe(db.User);
   });
 
+  it('resolves aliases when modelToTable mappings are absent', () => {
+    const runtime = createMockRuntime();
+    const withoutModelToTable = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        modelToTable: undefined,
+      },
+    } as unknown as TestContract;
+
+    const db = orm({ contract: withoutModelToTable, runtime });
+    expect(db.users.modelName).toBe('User');
+  });
+
+  it('adds plural table aliases when mapped table names are singular', () => {
+    const runtime = createMockRuntime();
+    const withSingularTable = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        modelToTable: {
+          ...contract.mappings.modelToTable,
+          User: 'account',
+        },
+      },
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          storage: {
+            table: 'account',
+          },
+        },
+      },
+    } as unknown as TestContract;
+
+    const db = orm({ contract: withSingularTable, runtime });
+    expect((db as Record<string, Collection<TestContract, string>>)['accounts']).toBe(db.User);
+  });
+
   it('custom collection overrides default for same key', () => {
     const runtime = createMockRuntime();
     const db = orm({
@@ -209,6 +249,20 @@ describe('orm()', () => {
     ).toThrow(/must be a Collection class/);
   });
 
+  it('throws when custom collection values are functions without Collection prototypes', () => {
+    const runtime = createMockRuntime();
+
+    expect(() =>
+      orm({
+        contract,
+        runtime,
+        collections: {
+          posts: (() => ({ ok: true })) as unknown as typeof PostCollection,
+        },
+      }),
+    ).toThrow(/must be a Collection class/);
+  });
+
   it('does not type unknown keys on the client', () => {
     const runtime = createMockRuntime();
     const db = orm({ contract, runtime });
@@ -257,5 +311,58 @@ describe('orm()', () => {
     const postInclude = withNested.state.includes[0]!;
     const commentInclude = postInclude.nested.includes[0]!;
     expect(commentInclude.nested.filters).toHaveLength(1);
+  });
+
+  it('handles empty model names in alias generation', () => {
+    const runtime = createMockRuntime();
+    const withEmptyModelName = {
+      ...contract,
+      models: {
+        ...contract.models,
+        '': {
+          storage: { table: 'empty_models' },
+          fields: {
+            id: { column: 'id' },
+          },
+          relations: {},
+        },
+      },
+      mappings: {
+        ...contract.mappings,
+        modelToTable: {
+          ...contract.mappings.modelToTable,
+          '': 'empty_models',
+        },
+        tableToModel: {
+          ...contract.mappings.tableToModel,
+          empty_models: '',
+        },
+        fieldToColumn: {
+          ...contract.mappings.fieldToColumn,
+          '': { id: 'id' },
+        },
+        columnToField: {
+          ...contract.mappings.columnToField,
+          empty_models: { id: 'id' },
+        },
+      },
+      storage: {
+        ...contract.storage,
+        tables: {
+          ...contract.storage.tables,
+          empty_models: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    } as unknown as TestContract;
+
+    expect(() => orm({ contract: withEmptyModelName, runtime })).not.toThrow();
   });
 });

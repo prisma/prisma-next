@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { all, and, not, or } from '../src/filters';
+import { all, and, not, or, shorthandToWhereExpr } from '../src/filters';
 import { createModelAccessor } from '../src/model-accessor';
 import { createTestContract } from './helpers';
 
@@ -116,5 +116,82 @@ describe('filters', () => {
         right: { kind: 'literal', value: 1 },
       } as never),
     ).toThrow(/Unknown binary operator/);
+  });
+
+  it('shorthandToWhereExpr() maps nulls, skips undefined, and combines multiple fields', () => {
+    const expr = shorthandToWhereExpr(contract, 'Post', {
+      id: 1,
+      userId: null,
+      views: undefined,
+    });
+
+    expect(expr).toEqual({
+      kind: 'and',
+      exprs: [
+        {
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'posts', column: 'id' },
+          right: { kind: 'literal', value: 1 },
+        },
+        {
+          kind: 'nullCheck',
+          expr: { kind: 'col', table: 'posts', column: 'user_id' },
+          isNull: true,
+        },
+      ],
+    });
+  });
+
+  it('shorthandToWhereExpr() returns undefined for empty filters and supports storage fallback', () => {
+    expect(shorthandToWhereExpr(contract, 'User', {})).toBeUndefined();
+
+    const withoutModelToTable = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        modelToTable: {},
+      },
+    } as typeof contract;
+
+    const expr = shorthandToWhereExpr(withoutModelToTable, 'User', {
+      email: 'alice@example.com',
+    });
+
+    expect(expr).toEqual({
+      kind: 'bin',
+      op: 'eq',
+      left: { kind: 'col', table: 'users', column: 'email' },
+      right: { kind: 'literal', value: 'alice@example.com' },
+    });
+  });
+
+  it('shorthandToWhereExpr() falls back to model name and raw field names when mappings are missing', () => {
+    const withoutMappings = {
+      ...contract,
+      mappings: {
+        ...contract.mappings,
+        modelToTable: {},
+        fieldToColumn: {},
+      },
+      models: {
+        ...contract.models,
+        User: {
+          ...contract.models.User,
+          storage: {},
+        },
+      },
+    } as typeof contract;
+
+    const expr = shorthandToWhereExpr(withoutMappings, 'User', {
+      unknownField: 123,
+    } as never);
+
+    expect(expr).toEqual({
+      kind: 'bin',
+      op: 'eq',
+      left: { kind: 'col', table: 'User', column: 'unknownField' },
+      right: { kind: 'literal', value: 123 },
+    });
   });
 });

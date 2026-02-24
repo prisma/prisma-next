@@ -53,4 +53,30 @@ describe('selectIncludeStrategy', () => {
     const strategy = selectIncludeStrategy(contract);
     expect(strategy).toBe('lateral');
   });
+
+  it('accepts top-level boolean capability flags', () => {
+    const contract = {
+      ...createTestContract(),
+      capabilities: {
+        lateral: true,
+        jsonAgg: true,
+      },
+    } as unknown as ReturnType<typeof createTestContract>;
+
+    const strategy = selectIncludeStrategy(contract);
+    expect(strategy).toBe('lateral');
+  });
+
+  it('ignores non-boolean, non-object capability values', () => {
+    const contract = {
+      ...createTestContract(),
+      capabilities: {
+        lateral: 'yes',
+        jsonAgg: true,
+      },
+    } as unknown as ReturnType<typeof createTestContract>;
+
+    const strategy = selectIncludeStrategy(contract);
+    expect(strategy).toBe('correlated');
+  });
 });

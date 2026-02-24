@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { baseContract, createCollection, createCollectionFor } from './collection-fixtures';
+import {
+  baseContract,
+  createCollection,
+  createCollectionFor,
+  createReturningCollectionFor,
+} from './collection-fixtures';
 
 describe('Collection', () => {
   const contract = baseContract;
@@ -223,6 +228,135 @@ describe('Collection', () => {
         parentPkColumn: 'user_id',
         cardinality: 'N:1',
       });
+    });
+
+    it('include() rejects scalar and combine refinements on to-one relations', () => {
+      const { collection: postCollection } = createCollectionFor('Post', contract);
+
+      expect(() =>
+        postCollection.include(
+          'author',
+          (author) => (author as unknown as { count: () => unknown }).count() as never,
+        ),
+      ).toThrow(/scalar aggregations are only supported for to-many relations/);
+
+      expect(() =>
+        postCollection.include(
+          'author',
+          (author) =>
+            (author as unknown as { combine: (spec: Record<string, unknown>) => unknown }).combine({
+              count: (author as unknown as { count: () => unknown }).count(),
+            }) as never,
+        ),
+      ).toThrow(/combine\(\) is only supported for to-many relations/);
+    });
+
+    it('include() rejects invalid refinement return values', () => {
+      const { collection } = createCollection();
+
+      expect(() => collection.include('posts', () => ({ invalid: true }) as never)).toThrow(
+        /refinement must return a collection/,
+      );
+    });
+
+    it('combine() rejects invalid branches and include scalar helpers are refinement-only', () => {
+      const { collection } = createCollection();
+
+      expect(() =>
+        collection.include('posts', (posts) =>
+          posts.combine({
+            invalid: { nope: true } as never,
+          }),
+        ),
+      ).toThrow(/branch "invalid" is invalid/);
+
+      expect(() => collection.count()).toThrow(
+        /only available inside include\(\) refinement callbacks/,
+      );
+      expect(() => collection.sum('id' as never)).toThrow(
+        /only available inside include\(\) refinement callbacks/,
+      );
+      expect(() => collection.combine({} as never)).toThrow(
+        /only available inside include\(\) refinement callbacks/,
+      );
+    });
+
+    it('cursor() is identity when mapped cursor values are empty', () => {
+      const { collection } = createCollection();
+      const ordered = collection.orderBy((user) => user.id.asc());
+      const same = ordered.cursor({ id: undefined } as never);
+
+      expect(same).toBe(ordered);
+    });
+  });
+
+  describe('operation guards', () => {
+    it('aggregate() validates selector shape and handles empty runtime rows', async () => {
+      const { collection, runtime } = createCollection();
+      runtime.setNextResults([[]]);
+
+      await expect(collection.aggregate(() => ({}))).rejects.toThrow(
+        /requires at least one aggregation selector/,
+      );
+      await expect(
+        collection.aggregate(() => ({ invalid: { kind: 'nope' } as never })),
+      ).rejects.toThrow(/selector "invalid" is invalid/);
+
+      await expect(
+        collection.aggregate((aggregate) => ({
+          count: aggregate.count(),
+        })),
+      ).resolves.toEqual({ count: 0 });
+    });
+
+    it('createCount() returns 0 for empty payloads', async () => {
+      const { collection } = createCollection();
+      await expect(collection.createCount([])).resolves.toBe(0);
+    });
+
+    it('create() nested mutation throws when reload by primary key returns no row', async () => {
+      const { collection, runtime } = createReturningCollectionFor('User');
+      runtime.setNextResults([
+        [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
+        [{ id: 10, title: 'Post', user_id: 1, views: 1 }],
+        [],
+      ]);
+
+      await expect(
+        collection.create({
+          id: 1,
+          name: 'Alice',
+          email: 'alice@example.com',
+          posts: (posts: { create: (rows: readonly Record<string, unknown>[]) => unknown }) =>
+            posts.create([
+              {
+                id: 10,
+                title: 'Post',
+                views: 1,
+              },
+            ]),
+        } as never),
+      ).rejects.toThrow(/did not return a row/);
+    });
+
+    it('update() returns null when nested mutation target is missing', async () => {
+      const { collection, runtime } = createReturningCollectionFor('User');
+      runtime.setNextResults([[]]);
+
+      const updated = await collection.where({ id: 1 }).update({
+        posts: (posts: { connect: (criterion: Record<string, unknown>) => unknown }) =>
+          posts.connect({ id: 10 }),
+      } as never);
+
+      expect(updated).toBeNull();
+    });
+
+    it('update() returns null when non-nested updateAll() returns no rows', async () => {
+      const { collection, runtime } = createReturningCollectionFor('User');
+      runtime.setNextResults([[]]);
+
+      const updated = await collection.where({ id: 1 }).update({ name: 'Updated' });
+      expect(updated).toBeNull();
     });
   });
 });

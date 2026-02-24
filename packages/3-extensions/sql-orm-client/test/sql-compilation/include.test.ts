@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
+import { compileSelectWithIncludeStrategy } from '../../src/kysely-compiler';
 import { baseContract, createCollection, createCollectionFor } from '../collection-fixtures';
 import { createMockRuntime, type TestContract } from '../helpers';
 import { normalizeSql, serializePlans } from './helpers';
@@ -485,5 +486,22 @@ describe('sql-compilation/include', () => {
     ]);
     expect(runtime.executions).toHaveLength(3);
     expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe('select * from "users"');
+  });
+
+  it('compileSelectWithIncludeStrategy() rejects scalar and combine include descriptors', () => {
+    const { collection } = createCollection();
+    const scalarState = collection.include('posts', (posts) => posts.count()).state;
+    const combineState = collection.include('posts', (posts) =>
+      posts.combine({
+        totalCount: posts.count(),
+      }),
+    ).state;
+
+    expect(() => compileSelectWithIncludeStrategy('users', scalarState, 'lateral')).toThrow(
+      /does not support scalar include selectors or combine/,
+    );
+    expect(() => compileSelectWithIncludeStrategy('users', combineState, 'correlated')).toThrow(
+      /does not support scalar include selectors or combine/,
+    );
   });
 });

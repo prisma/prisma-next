@@ -81,6 +81,44 @@ describe('sql-compilation/compiler-core', () => {
     );
   });
 
+  it('compileSelect compiles OR filters, is-null checks, and scalar IN literals', () => {
+    const orState = stateWithFilters([
+      {
+        kind: 'or',
+        exprs: [
+          {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'users', column: 'id' },
+            right: { kind: 'literal', value: 1 },
+          },
+          {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'users', column: 'id' },
+            right: { kind: 'literal', value: 2 },
+          },
+        ],
+      },
+      {
+        kind: 'nullCheck',
+        expr: { kind: 'col', table: 'users', column: 'email' },
+        isNull: true,
+      },
+      {
+        kind: 'bin',
+        op: 'in',
+        left: { kind: 'col', table: 'users', column: 'id' },
+        right: { kind: 'literal', value: 3 },
+      },
+    ]);
+
+    const compiled = compileSelect('users', orState);
+    expect(normalizeSql(compiled.sql)).toContain('("users"."id" = $1 or "users"."id" = $2)');
+    expect(normalizeSql(compiled.sql)).toContain('"users"."email" is null');
+    expect(normalizeSql(compiled.sql)).toContain('"users"."id" in ($3)');
+  });
+
   it('compileSelect supports list literals and array literals for in/not in', () => {
     const listLiteralState = stateWithFilters([
       {
@@ -227,6 +265,46 @@ describe('sql-compilation/compiler-core', () => {
     );
   }, 1_000);
 
+  it('compileSelect supports subquery projection defaults, column projections, and limits', () => {
+    const projectedColumnState = stateWithFilters([
+      {
+        kind: 'exists',
+        not: false,
+        subquery: {
+          kind: 'select',
+          from: { kind: 'table', name: 'posts' },
+          project: [{ expr: { kind: 'col', table: 'posts', column: 'id' } }],
+          orderBy: [{ expr: { kind: 'col', table: 'posts', column: 'id' }, dir: 'asc' }],
+          limit: 1,
+        },
+      } as unknown as WhereExpr,
+    ]);
+
+    const emptyProjectionState = stateWithFilters([
+      {
+        kind: 'exists',
+        not: false,
+        subquery: {
+          kind: 'select',
+          from: { kind: 'table', name: 'posts' },
+          project: [],
+        },
+      },
+    ]);
+
+    const projectedColumn = compileSelect('users', projectedColumnState);
+    const emptyProjection = compileSelect('users', emptyProjectionState);
+
+    expect(normalizeSql(projectedColumn.sql)).toContain(
+      'exists ((select "posts"."id" as "_p0" from "posts" order by "posts"."id" asc limit $1))',
+    );
+    expect(projectedColumn.parameters).toEqual([1]);
+
+    expect(normalizeSql(emptyProjection.sql)).toContain(
+      'exists ((select 1 as "_exists" from "posts"))',
+    );
+  });
+
   it('compileSelect supports all join types in EXISTS subqueries', () => {
     for (const joinType of ['inner', 'left', 'right', 'full'] as const) {
       const joinState = stateWithFilters([
@@ -293,6 +371,45 @@ describe('sql-compilation/compiler-core', () => {
     expect(() => compileSelect('users', badJoinState)).toThrow(/Unsupported join type/);
     expect(() => compileSelect('users', badWhereState)).toThrow(
       /Unsupported where expression kind/,
+    );
+  });
+
+  it('compileSelect throws for unsupported expression and SQL comparable kinds', () => {
+    const unsupportedExpressionState = stateWithFilters([
+      {
+        kind: 'bin',
+        op: 'eq',
+        left: { kind: 'unknown' } as never,
+        right: { kind: 'literal', value: 1 },
+      } as never,
+    ]);
+
+    const unsupportedComparableState = stateWithFilters([
+      {
+        kind: 'bin',
+        op: 'eq',
+        left: { kind: 'col', table: 'users', column: 'id' },
+        right: { kind: 'unknown' } as never,
+      } as never,
+    ]);
+
+    const unnamedParamState = stateWithFilters([
+      {
+        kind: 'bin',
+        op: 'eq',
+        left: { kind: 'col', table: 'users', column: 'id' },
+        right: { kind: 'param', index: 3 },
+      } as never,
+    ]);
+
+    expect(() => compileSelect('users', unsupportedExpressionState)).toThrow(
+      /Unsupported expression kind/,
+    );
+    expect(() => compileSelect('users', unsupportedComparableState)).toThrow(
+      /Unsupported SQL comparable kind/,
+    );
+    expect(() => compileSelect('users', unnamedParamState)).toThrow(
+      /ParamRef "3" is not supported/,
     );
   });
 
