@@ -13,7 +13,9 @@ Create the standard `projects/<project>/` structure so shaping work can start im
 
 ## When to use
 
-Use when a developer wants to:
+Use at the start of every new project. This is the expected first step before writing the project spec and plan.
+
+It’s also useful when a developer wants to:
 
 - Start a new project and needs the `projects/<project>/` directory scaffolded
 - Create the canonical spec/plan file locations before shaping begins

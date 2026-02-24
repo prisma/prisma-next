@@ -145,6 +145,14 @@ If the engineer accepts:
 5. **Confirm creation.** Report what was created:
    *"Created project [name] in Linear with [N] milestones and [M] issues. [link if available]"*
 
+## Linear upkeep (after changes)
+
+Linear is an observability mechanism for execution health. If the plan changes after Linear has been created (re-sequencing tasks, splitting work, new constraints), keep Linear in sync:
+
+- Update the Linear project using `save_project` (use `id` to update) to reflect the latest summary and to link to the current spec/plan paths.
+- Update milestones using `save_milestone` (use `id` to update) if milestone names/descriptions/order change.
+- Update issues using `update_issue` as tasks change (title/description/milestone/project), and move issue `state` as work progresses.
+
 ## Plan Template
 
 Use this structure for every plan. Remove placeholder guidance when filling in real content.

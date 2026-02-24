@@ -15,8 +15,13 @@ Anything in `projects/` is **transient**: once the project is complete, migrate 
 
 ### Workflow
 
-- Optionally create the project workspace first with `drive-create-project`.
-- Shape new work as **spec → plan → implement** (see `.agents/rules/drive-project-workflow.mdc`).
-- Open an initial PR containing the project spec. Later task PRs should reference the project spec.
-- Finalize ADRs / long-lived docs into `docs/`, verify acceptance criteria, then delete `projects/<project>/`.
+- Create the project workspace with `drive-create-project`, then shape the work as **spec → plan → implement** (see `.agents/rules/drive-project-workflow.mdc`).
+
+### Project lifecycle
+
+1. **Shaping**: Create the initial spec + plan under `projects/<project>/` and open the first PR containing these artifacts.
+   - Validate the spec with the PM/stakeholders and the plan with the team.
+2. **Execution**: Implement tasks via as many follow-on branches/PRs as needed. Keep project docs and Linear up to date.
+3. **Stakeholder verification**: Confirm objectives/acceptance criteria are met.
+4. **Close-out**: Finalize long-lived docs into `docs/`, then the last PR deletes `projects/<project>/`.
 
