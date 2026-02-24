@@ -74,7 +74,6 @@ Planes (shared, migration, runtime) appear as subdirectories only when a layer c
 | `packages/2-sql/3-tooling/family/` | `@prisma-next/family-sql` |
 | `packages/2-sql/4-lanes/relational-core/` | `@prisma-next/sql-relational-core` |
 | `packages/2-sql/4-lanes/sql-lane/` | `@prisma-next/sql-lane` |
-| `packages/2-sql/4-lanes/orm-lane/` | `@prisma-next/sql-orm-lane` |
 | `packages/2-sql/5-runtime/` | `@prisma-next/sql-runtime` |
 
 **Targets Domain:**

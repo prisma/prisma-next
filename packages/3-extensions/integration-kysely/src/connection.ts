@@ -1,6 +1,7 @@
-import type { ContractBase, ExecutionPlan } from '@prisma-next/contract/types';
+import type { ContractBase } from '@prisma-next/contract/types';
 import type { RuntimeConnection, RuntimeTransaction } from '@prisma-next/runtime-executor';
 import type { CompiledQuery, DatabaseConnection, QueryResult, TransactionSettings } from 'kysely';
+import { createExecutionPlanFromCompiledQuery } from './execution-plan';
 
 export class KyselyPrismaConnection implements DatabaseConnection {
   #contract: ContractBase;
@@ -32,8 +33,13 @@ export class KyselyPrismaConnection implements DatabaseConnection {
     if (!this.#connection) {
       throw new Error('Invoked executeQuery on released connection');
     }
+    const plan = createExecutionPlanFromCompiledQuery<R>(
+      this.#contract,
+      compiledQuery as CompiledQuery<R>,
+      { lane: 'raw' },
+    );
     return {
-      rows: await this.#connection.execute(this.#createExecutionPlan<R>(compiledQuery)).toArray(),
+      rows: await this.#connection.execute(plan).toArray(),
     };
   }
 
@@ -57,7 +63,12 @@ export class KyselyPrismaConnection implements DatabaseConnection {
     if (!this.#connection) {
       throw new Error('Invoked streamQuery on released connection');
     }
-    const results = this.#connection.execute(this.#createExecutionPlan<R>(compiledQuery));
+    const plan = createExecutionPlanFromCompiledQuery<R>(
+      this.#contract,
+      compiledQuery as CompiledQuery<R>,
+      { lane: 'raw' },
+    );
+    const results = this.#connection.execute(plan);
 
     const generator = async function* (): AsyncIterableIterator<QueryResult<R>> {
       let chunk: R[] = [];
@@ -74,25 +85,5 @@ export class KyselyPrismaConnection implements DatabaseConnection {
     };
 
     return generator();
-  }
-
-  #createExecutionPlan<R>(compiledQuery: CompiledQuery<R>): ExecutionPlan<R, unknown> {
-    return {
-      // TODO: convert the Kysely AST into Prisma AST
-      ast: undefined,
-      sql: compiledQuery.sql,
-      params: compiledQuery.parameters,
-      meta: {
-        target: this.#contract.target,
-        targetFamily: this.#contract.targetFamily,
-        storageHash: this.#contract.storageHash,
-        ...(this.#contract.profileHash !== undefined
-          ? { profileHash: this.#contract.profileHash }
-          : {}),
-        lane: 'raw',
-        // TODO: fill in the parameter descriptors
-        paramDescriptors: [],
-      },
-    };
   }
 }

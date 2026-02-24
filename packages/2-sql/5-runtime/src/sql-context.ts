@@ -28,6 +28,8 @@ import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   AppliedMutationDefault,
   ExecutionContext,
+  JsonSchemaValidateFn,
+  JsonSchemaValidatorRegistry,
   MutationDefaultsOptions,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -138,7 +140,7 @@ export function createSqlExecutionStack<TTargetId extends string>(options: {
   });
 }
 
-export type { ExecutionContext, TypeHelperRegistry };
+export type { ExecutionContext, JsonSchemaValidatorRegistry, TypeHelperRegistry };
 
 export function assertExecutionStackContractRequirements(
   contract: SqlContract<SqlStorage>,
@@ -278,6 +280,70 @@ function validateColumnTypeParams(
   }
 }
 
+/**
+ * Builds a registry of compiled JSON Schema validators by scanning the contract
+ * for columns whose codec descriptor provides an `init` hook returning `{ validate }`.
+ *
+ * Handles both:
+ * - Inline `typeParams.schema` on columns
+ * - `typeRef` → `storage.types[ref]` with init hook results already in `types` registry
+ */
+function buildJsonSchemaValidatorRegistry(
+  contract: SqlContract<SqlStorage>,
+  types: TypeHelperRegistry,
+  codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
+): JsonSchemaValidatorRegistry | undefined {
+  const validators = new Map<string, JsonSchemaValidateFn>();
+
+  // Collect codec IDs that have init hooks (these produce { validate } helpers)
+  const codecIdsWithInit = new Set<string>();
+  for (const [codecId, descriptor] of codecDescriptors) {
+    if (descriptor.init) {
+      codecIdsWithInit.add(codecId);
+    }
+  }
+
+  if (codecIdsWithInit.size === 0) {
+    return undefined;
+  }
+
+  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+    for (const [columnName, column] of Object.entries(table.columns)) {
+      if (!codecIdsWithInit.has(column.codecId)) continue;
+
+      const key = `${tableName}.${columnName}`;
+
+      // Case 1: column references a named type → validator already compiled via init hook
+      if (column.typeRef) {
+        const helper = types[column.typeRef] as { validate?: JsonSchemaValidateFn } | undefined;
+        if (helper?.validate) {
+          validators.set(key, helper.validate);
+        }
+        continue;
+      }
+
+      // Case 2: inline typeParams with schema → compile via init hook
+      if (column.typeParams) {
+        const descriptor = codecDescriptors.get(column.codecId);
+        if (descriptor?.init) {
+          const helper = descriptor.init(column.typeParams) as
+            | { validate?: JsonSchemaValidateFn }
+            | undefined;
+          if (helper?.validate) {
+            validators.set(key, helper.validate);
+          }
+        }
+      }
+    }
+  }
+
+  if (validators.size === 0) return undefined;
+  return {
+    get: (key: string) => validators.get(key),
+    size: validators.size,
+  };
+}
+
 function computeExecutionDefaultValue(spec: ExecutionMutationDefaultValue): unknown {
   switch (spec.kind) {
     case 'generator':
@@ -360,11 +426,18 @@ export function createExecutionContext<
 
   const types = initializeTypeHelpers(contract.storage.types, parameterizedCodecDescriptors);
 
+  const jsonSchemaValidators = buildJsonSchemaValidatorRegistry(
+    contract,
+    types,
+    parameterizedCodecDescriptors,
+  );
+
   return {
     contract,
     operations: operationRegistry,
     codecs: codecRegistry,
     types,
+    ...(jsonSchemaValidators ? { jsonSchemaValidators } : {}),
     applyMutationDefaults: (options) => applyMutationDefaults(contract, options),
   };
 }

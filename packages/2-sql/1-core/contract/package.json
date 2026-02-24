@@ -38,5 +38,10 @@
     "./validate": "./dist/validate.mjs",
     "./validators": "./dist/validators.mjs",
     "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/2-sql/1-core/contract"
   }
 }

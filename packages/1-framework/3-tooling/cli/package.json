@@ -91,5 +91,10 @@
       "types": "./dist/exports/control-api.d.mts",
       "import": "./dist/exports/control-api.mjs"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/1-framework/3-tooling/cli"
   }
 }

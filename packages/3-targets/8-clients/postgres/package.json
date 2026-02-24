@@ -20,7 +20,6 @@
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
-    "@prisma-next/sql-orm-lane": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
@@ -56,5 +55,10 @@
   },
   "main": "./dist/runtime.mjs",
   "module": "./dist/runtime.mjs",
-  "types": "./dist/runtime.d.mts"
+  "types": "./dist/runtime.d.mts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-targets/8-clients/postgres"
+  }
 }

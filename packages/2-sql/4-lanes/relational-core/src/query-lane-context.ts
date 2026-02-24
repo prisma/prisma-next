@@ -10,6 +10,46 @@ import type { CodecRegistry } from './ast/codec-types';
  */
 export type TypeHelperRegistry = Record<string, unknown>;
 
+// =============================================================================
+// JSON Schema Validation Types
+// =============================================================================
+
+/**
+ * A single validation error from JSON Schema validation.
+ */
+export interface JsonSchemaValidationError {
+  readonly path: string;
+  readonly message: string;
+  readonly keyword: string;
+}
+
+/**
+ * Result of a JSON Schema validation.
+ */
+export type JsonSchemaValidationResult =
+  | { readonly valid: true }
+  | { readonly valid: false; readonly errors: ReadonlyArray<JsonSchemaValidationError> };
+
+/**
+ * A compiled JSON Schema validate function.
+ * Returns a structured result indicating whether the value conforms to the schema.
+ */
+export type JsonSchemaValidateFn = (value: unknown) => JsonSchemaValidationResult;
+
+/**
+ * Registry of compiled JSON Schema validators for columns with typed JSON/JSONB.
+ *
+ * Built during context creation by scanning the contract for columns whose codec
+ * descriptor provides an `init` hook that returns a `{ validate }` helper.
+ * Keys are `"table.column"` (e.g., `"user.metadata"`).
+ */
+export interface JsonSchemaValidatorRegistry {
+  /** Get the compiled validator for a column. Key format: "table.column". */
+  get(key: string): JsonSchemaValidateFn | undefined;
+  /** Number of registered validators. */
+  readonly size: number;
+}
+
 export type MutationDefaultsOp = 'create' | 'update';
 
 export type AppliedMutationDefault = {
@@ -41,6 +81,11 @@ export interface ExecutionContext<
    * Schema builders expose these helpers via schema.types.
    */
   readonly types: TypeHelperRegistry;
+  /**
+   * Compiled JSON Schema validators for typed JSON/JSONB columns.
+   * Present only when the contract declares columns with JSON Schema typeParams.
+   */
+  readonly jsonSchemaValidators?: JsonSchemaValidatorRegistry;
   /**
    * Applies execution-time mutation defaults for the given table.
    * Returns the applied defaults (caller-provided values always win).
