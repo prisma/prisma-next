@@ -1,7 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
-import { orm as ormBuilder } from '@prisma-next/sql-orm-lane';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
@@ -23,4 +22,3 @@ export const context = createExecutionContext({
 export const schema = schemaBuilder(context);
 export const tables = schema.tables;
 export const sql = sqlBuilder({ context });
-export const orm = ormBuilder({ context });

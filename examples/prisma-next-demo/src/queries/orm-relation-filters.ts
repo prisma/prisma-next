@@ -3,53 +3,104 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 import { collect } from './utils';
 
+interface UserWithPosts {
+  id: unknown;
+  email: unknown;
+  createdAt: unknown;
+  posts: unknown[];
+}
+
 export async function ormGetUsersWithPosts(runtime: Runtime) {
-  const plan = db.orm
-    .user()
-    .where.related.posts.some((p) => p.where((m) => m.id.eq(param('postId'))))
-    .select((u) => ({
-      id: u.id,
-      email: u.email,
-      createdAt: u.createdAt,
-    }))
-    .take(100)
-    .findMany({
+  const userTable = db.schema.tables.user;
+  const postTable = db.schema.tables.post;
+
+  const plan = db.sql
+    .from(userTable)
+    .includeMany(
+      postTable,
+      (on) => on.eqCol(userTable.columns.id, postTable.columns.userId),
+      (child) =>
+        child.where(postTable.columns.id.eq(param('postId'))).select({
+          id: postTable.columns.id,
+        }),
+      { alias: 'posts' },
+    )
+    .select({
+      id: userTable.columns.id,
+      email: userTable.columns.email,
+      createdAt: userTable.columns.createdAt,
+      posts: true,
+    })
+    .limit(100)
+    .build({
       params: { postId: 'post_001' },
     });
 
-  return collect(runtime.execute(plan));
+  const users = (await collect(runtime.execute(plan))) as UserWithPosts[];
+  return users.filter((user) => user.posts.length > 0).map(stripPostsField);
 }
 
 export async function ormGetUsersWithoutPosts(runtime: Runtime) {
-  const plan = db.orm
-    .user()
-    .where.related.posts.none((p) => p.where((m) => m.id.eq(param('postId'))))
-    .select((u) => ({
-      id: u.id,
-      email: u.email,
-      createdAt: u.createdAt,
-    }))
-    .take(100)
-    .findMany({
+  const userTable = db.schema.tables.user;
+  const postTable = db.schema.tables.post;
+
+  const plan = db.sql
+    .from(userTable)
+    .includeMany(
+      postTable,
+      (on) => on.eqCol(userTable.columns.id, postTable.columns.userId),
+      (child) =>
+        child.where(postTable.columns.id.eq(param('postId'))).select({
+          id: postTable.columns.id,
+        }),
+      { alias: 'posts' },
+    )
+    .select({
+      id: userTable.columns.id,
+      email: userTable.columns.email,
+      createdAt: userTable.columns.createdAt,
+      posts: true,
+    })
+    .limit(100)
+    .build({
       params: { postId: 'post_001' },
     });
 
-  return collect(runtime.execute(plan));
+  const users = (await collect(runtime.execute(plan))) as UserWithPosts[];
+  return users.filter((user) => user.posts.length === 0).map(stripPostsField);
 }
 
 export async function ormGetUsersWhereAllPostsMatch(runtime: Runtime) {
-  const plan = db.orm
-    .user()
-    .where.related.posts.every((p) => p.where((m) => m.userId.eq(param('userId'))))
-    .select((u) => ({
-      id: u.id,
-      email: u.email,
-      createdAt: u.createdAt,
-    }))
-    .take(100)
-    .findMany({
+  const userTable = db.schema.tables.user;
+  const postTable = db.schema.tables.post;
+
+  const plan = db.sql
+    .from(userTable)
+    .includeMany(
+      postTable,
+      (on) => on.eqCol(userTable.columns.id, postTable.columns.userId),
+      (child) =>
+        child.where(postTable.columns.userId.neq(param('userId'))).select({
+          id: postTable.columns.id,
+        }),
+      { alias: 'posts' },
+    )
+    .select({
+      id: userTable.columns.id,
+      email: userTable.columns.email,
+      createdAt: userTable.columns.createdAt,
+      posts: true,
+    })
+    .limit(100)
+    .build({
       params: { userId: 'user_001' },
     });
 
-  return collect(runtime.execute(plan));
+  const users = (await collect(runtime.execute(plan))) as UserWithPosts[];
+  return users.filter((user) => user.posts.length === 0).map(stripPostsField);
+}
+
+function stripPostsField(user: UserWithPosts): Record<string, unknown> {
+  const { posts: _posts, ...rest } = user;
+  return rest;
 }

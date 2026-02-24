@@ -235,7 +235,6 @@ For detailed information about package layering, see:
 - **`@prisma-next/sql-contract-emitter`** - SQL emitter hook implementation
 - **`@prisma-next/sql-relational-core`** - Schema and column builders, operation attachment, and AST types
 - **`@prisma-next/sql-lane`** - Relational DSL and raw SQL helpers
-- **`@prisma-next/sql-orm-lane`** - ORM builder that compiles model-based queries to SQL lane primitives
 - **`@prisma-next/sql-lane-query-builder`** - Query builder lane
 - **`@prisma-next/sql-runtime`** - SQL family runtime that composes runtime-executor with SQL adapters
 - **`@prisma-next/adapter-postgres`** - Postgres adapter implementation
