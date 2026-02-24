@@ -15,6 +15,7 @@ Anything in `projects/` is **transient**: once the project is complete, migrate 
 
 ### Workflow
 
+- Optionally create the project workspace first with `drive-create-project`.
 - Shape new work as **spec → plan → implement** (see `.agents/rules/drive-project-workflow.mdc`).
 - Open an initial PR containing the project spec. Later task PRs should reference the project spec.
 - Finalize ADRs / long-lived docs into `docs/`, verify acceptance criteria, then delete `projects/<project>/`.

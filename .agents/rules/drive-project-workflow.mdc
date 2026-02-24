@@ -5,13 +5,23 @@ alwaysApply: true
 
 # Drive project workflow
 
-Use this workflow when shaping and delivering new work.
+Use this workflow when shaping and delivering a **new project**.
 
 ## Shape a project (spec first)
 
+- Optionally run `drive-create-project` to scaffold `projects/<project>/` (and stub docs) before shaping.
 - Start by running `drive-create-spec` to produce the **project spec** at `projects/<project>/spec.md`.
 - Then run `drive-generate-plan` to produce the **project plan** at `projects/<project>/plans/plan.md` (and task plans under `projects/<project>/plans/`).
 - The agent should guide a short, targeted conversation to resolve ambiguity and document decisions in the spec/plan format; optionally sync milestones/tasks to Linear.
+
+## Keep project docs current during execution
+
+As you implement, keep project documentation up to date:
+
+- If you change the approach, sequencing, or discover new constraints, update `projects/<project>/plans/plan.md` (and any supporting docs in `projects/<project>/**`).
+- If you need to change the **project spec** (`projects/<project>/spec.md`), treat it as a major assumption change:
+  - Stop and inform the user you’ve hit a constraint that requires their permission to update the spec
+  - Recommend validating the change with external stakeholders (e.g. Product) before proceeding
 
 ## Keep project artifacts under `projects/<project>/`
 
