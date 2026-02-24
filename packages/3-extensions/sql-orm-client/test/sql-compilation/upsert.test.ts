@@ -6,7 +6,7 @@ import {
   withReturningCapability,
 } from '../collection-fixtures';
 import { createMockRuntime, createTestContract } from '../helpers';
-import { serializePlans } from './helpers';
+import { normalizeSql, serializePlans } from './helpers';
 
 describe('sql-compilation/upsert', () => {
   it('upsert() inserts or updates and returns a row', async () => {
@@ -20,10 +20,9 @@ describe('sql-compilation/upsert', () => {
     });
 
     expect(upserted).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
-    const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
-    expect(sqlText).toContain('on conflict');
-    expect(sqlText).toContain('do update');
-    expect(sqlText).toContain('returning');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'insert into "users" ("id", "name", "email") values ($1, $2, $3) on conflict ("id") do update set "name" = $4 returning *',
+    );
   });
 
   it('upsert() defaults conflict columns to primary key', async () => {
@@ -35,7 +34,9 @@ describe('sql-compilation/upsert', () => {
       update: { name: 'Alice Updated' },
     });
 
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('on conflict ("id")');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'insert into "users" ("id", "name", "email") values ($1, $2, $3) on conflict ("id") do update set "name" = $4 returning *',
+    );
   });
 
   it('upsert() requires returning capability', async () => {

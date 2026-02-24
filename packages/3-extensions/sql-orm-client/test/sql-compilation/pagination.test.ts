@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCollection } from '../collection-fixtures';
-import { serializePlans } from './helpers';
+import { normalizeSql, serializePlans } from './helpers';
 
 describe('sql-compilation/pagination', () => {
   it('all() with take/skip adds LIMIT/OFFSET', async () => {
@@ -10,8 +10,7 @@ describe('sql-compilation/pagination', () => {
     await collection.take(10).skip(5).all();
 
     const sqlText = runtime.executions[0]!.plan.sql;
-    expect(sqlText).toContain('limit');
-    expect(sqlText).toContain('offset');
+    expect(normalizeSql(sqlText)).toBe('select * from "users" limit $1 offset $2');
   });
 
   it('all() with cursor() applies a single-column cursor boundary', async () => {
@@ -24,8 +23,9 @@ describe('sql-compilation/pagination', () => {
       .take(10)
       .all();
 
-    const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
-    expect(sqlText).toContain('"users"."id" >');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select * from "users" where "users"."id" > $1 order by "id" asc limit $2',
+    );
   });
 
   it('all() with compound cursor() compiles tuple comparison', async () => {
@@ -37,8 +37,9 @@ describe('sql-compilation/pagination', () => {
       .cursor({ name: 'Alice', email: 'alice@example.com' })
       .all();
 
-    const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
-    expect(sqlText).toContain('("users"."name", "users"."email") >');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select * from "users" where ("users"."name", "users"."email") > ($1, $2) order by "name" asc, "email" asc',
+    );
   });
 
   it('all() with distinct() compiles SELECT DISTINCT', async () => {
@@ -47,8 +48,7 @@ describe('sql-compilation/pagination', () => {
 
     await collection.distinct('email').all();
 
-    const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
-    expect(sqlText).toContain('select distinct');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe('select distinct * from "users"');
   });
 
   it('all() with distinctOn() compiles DISTINCT ON', async () => {
@@ -60,9 +60,9 @@ describe('sql-compilation/pagination', () => {
       .distinctOn('email')
       .all();
 
-    const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
-    expect(sqlText).toContain('distinct on');
-    expect(sqlText).toContain('("users"."email")');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select distinct on ("users"."email") * from "users" order by "email" asc',
+    );
   });
 
   it('select() compiles to explicit projection instead of selectAll()', async () => {
@@ -71,10 +71,9 @@ describe('sql-compilation/pagination', () => {
 
     await collection.select('name', 'email').all();
 
-    const sqlText = runtime.executions[0]!.plan.sql.toLowerCase();
-    expect(sqlText).toContain('"users"."name"');
-    expect(sqlText).toContain('"users"."email"');
-    expect(sqlText).not.toContain('*');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select "users"."name", "users"."email" from "users"',
+    );
   });
 
   it('mixed-direction cursor compiles lexicographic pagination branches', async () => {

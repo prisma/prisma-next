@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCollection, createReturningCollectionFor } from '../collection-fixtures';
-import { serializePlans } from './helpers';
+import { normalizeSql, serializePlans } from './helpers';
 
 describe('sql-compilation/create', () => {
   it('create() inserts a row and returns mapped model fields', async () => {
@@ -10,8 +10,9 @@ describe('sql-compilation/create', () => {
     const created = await collection.create({ id: 5, name: 'Eve', email: 'eve@example.com' });
 
     expect(created).toEqual({ id: 5, name: 'Eve', email: 'eve@example.com' });
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('insert');
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('returning');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'insert into "users" ("id", "name", "email") values ($1, $2, $3) returning *',
+    );
   });
 
   it('createAll() inserts many rows and streams returning rows', async () => {
@@ -44,8 +45,9 @@ describe('sql-compilation/create', () => {
     ]);
 
     expect(count).toBe(2);
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('insert');
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).not.toContain('returning');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'insert into "users" ("id", "name", "email") values ($1, $2, $3), ($4, $5, $6)',
+    );
   });
 
   it('create() and createAll() require returning capability', async () => {

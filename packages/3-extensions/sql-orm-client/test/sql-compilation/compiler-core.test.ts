@@ -9,6 +9,7 @@ import {
   compileUpdateReturning,
 } from '../../src/kysely-compiler';
 import { emptyState } from '../../src/types';
+import { normalizeSql } from './helpers';
 
 function stateWithFilters(filters: readonly WhereExpr[]) {
   return {
@@ -24,13 +25,11 @@ describe('sql-compilation/compiler-core', () => {
     const deleteCompiled = compileDeleteReturning('users', [], ['id']);
     const deleteReturningAll = compileDeleteReturning('users', [], undefined);
 
-    expect(updateCompiled.sql.toLowerCase()).toContain('update "users" set');
-    expect(updateCompiled.sql.toLowerCase()).toContain('returning "id"');
-    expect(updateReturningAll.sql.toLowerCase()).toContain('returning *');
+    expect(normalizeSql(updateCompiled.sql)).toBe('update "users" set "name" = $1 returning "id"');
+    expect(normalizeSql(updateReturningAll.sql)).toBe('update "users" set "name" = $1 returning *');
 
-    expect(deleteCompiled.sql.toLowerCase()).toContain('delete from "users"');
-    expect(deleteCompiled.sql.toLowerCase()).toContain('returning "id"');
-    expect(deleteReturningAll.sql.toLowerCase()).toContain('returning *');
+    expect(normalizeSql(deleteCompiled.sql)).toBe('delete from "users" returning "id"');
+    expect(normalizeSql(deleteReturningAll.sql)).toBe('delete from "users" returning *');
   });
 
   it('compileUpdateCount and compileDeleteCount support no-filter mutations', () => {
@@ -74,8 +73,12 @@ describe('sql-compilation/compiler-core', () => {
     const nullCheck = compileSelect('users', nullCheckState);
     const exists = compileSelect('users', existsState);
 
-    expect(nullCheck.sql.toLowerCase()).toContain('is not null');
-    expect(exists.sql.toLowerCase()).toContain('not (exists');
+    expect(normalizeSql(nullCheck.sql)).toBe(
+      'select * from "users" where "users"."email" is not null',
+    );
+    expect(normalizeSql(exists.sql)).toBe(
+      'select * from "users" where not (exists ((select $1 as "_exists" from "posts" where "posts"."user_id" = "users"."id")))',
+    );
   });
 
   it('compileSelect supports list literals and array literals for in/not in', () => {
@@ -106,10 +109,14 @@ describe('sql-compilation/compiler-core', () => {
     const listLiteral = compileSelect('users', listLiteralState);
     const arrayLiteral = compileSelect('users', arrayLiteralState);
 
-    expect(listLiteral.sql.toLowerCase()).toContain(' in ($1, $2)');
+    expect(normalizeSql(listLiteral.sql)).toBe(
+      'select * from "users" where "users"."id" in ($1, $2)',
+    );
     expect(listLiteral.parameters).toEqual([1, 2]);
 
-    expect(arrayLiteral.sql.toLowerCase()).toContain(' not in ($1, $2)');
+    expect(normalizeSql(arrayLiteral.sql)).toBe(
+      'select * from "users" where "users"."id" not in ($1, $2)',
+    );
     expect(arrayLiteral.parameters).toEqual([3, 4]);
   });
 
@@ -247,7 +254,9 @@ describe('sql-compilation/compiler-core', () => {
       ]);
 
       const compiled = compileSelect('users', joinState);
-      expect(compiled.sql.toLowerCase()).toContain('exists');
+      expect(normalizeSql(compiled.sql)).toBe(
+        `select * from "users" where exists ((select $1 as "_exists" from "posts" ${joinType} join "users" on "posts"."user_id" = "users"."id"))`,
+      );
     }
   });
 
@@ -304,10 +313,9 @@ describe('sql-compilation/compiler-core', () => {
       cursor: { id: 10 },
     });
 
-    expect(compiled.sql.toLowerCase()).toContain('distinct on');
-    expect(compiled.sql.toLowerCase()).toContain('where "user_id" in ($1, $2)');
-    expect(compiled.sql.toLowerCase()).toContain('"posts"."id" < $4');
-    expect(compiled.sql.toLowerCase()).toContain('order by "id" desc');
+    expect(normalizeSql(compiled.sql)).toBe(
+      'select distinct on ("posts"."user_id") "posts"."id", "posts"."user_id" from "posts" where "user_id" in ($1, $2) and "posts"."views" > $3 and "posts"."id" < $4 order by "id" desc',
+    );
     expect(compiled.parameters).toEqual([1, 2, 100, 10]);
   });
 });

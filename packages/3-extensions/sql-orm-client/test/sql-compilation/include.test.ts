@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { baseContract, createCollection, createCollectionFor } from '../collection-fixtures';
 import { createMockRuntime, type TestContract } from '../helpers';
-import { serializePlans } from './helpers';
+import { normalizeSql, serializePlans } from './helpers';
 
 function withIncludeCapabilities(
   capabilities: Record<string, Record<string, boolean>>,
@@ -283,7 +283,9 @@ describe('sql-compilation/include', () => {
       },
     ]);
     expect(runtime.executions).toHaveLength(3);
-    expect(runtime.executions[1]?.plan.sql.toLowerCase()).toContain('"views" >');
+    expect(normalizeSql(runtime.executions[1]!.plan.sql)).toBe(
+      'select * from "posts" where "user_id" in ($1, $2) and "posts"."views" > $3 order by "id" asc',
+    );
   });
 
   it('supports include flow when runtime exposes connection() and release()', async () => {
@@ -370,8 +372,9 @@ describe('sql-compilation/include', () => {
       },
     ]);
     expect(runtime.executions).toHaveLength(1);
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('left join lateral');
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('json_agg');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select "__orm_parent".*, "__orm_include_0"."posts" as "posts" from (select * from "users") as "__orm_parent" left join lateral (select coalesce(json_agg(row_to_json("__orm_child_0".*)), \'[]\'::json) as "posts" from (select * from "posts" where "posts"."user_id" = "__orm_parent"."id") as "__orm_child_0") as "__orm_include_0" on true',
+    );
   });
 
   it('lateral include strategy pushes per-parent skip/take into child SQL', async () => {
@@ -409,8 +412,9 @@ describe('sql-compilation/include', () => {
       },
     ]);
     expect(runtime.executions).toHaveLength(1);
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('limit');
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('offset');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select "__orm_parent".*, "__orm_include_0"."posts" as "posts" from (select * from "users") as "__orm_parent" left join lateral (select coalesce(json_agg(row_to_json("__orm_child_0".*)), \'[]\'::json) as "posts" from (select * from "posts" where "posts"."user_id" = "__orm_parent"."id" order by "id" asc limit $1 offset $2) as "__orm_child_0") as "__orm_include_0" on true',
+    );
   });
 
   it('uses correlated single-query include strategy when only jsonAgg is enabled', async () => {
@@ -440,8 +444,9 @@ describe('sql-compilation/include', () => {
       },
     ]);
     expect(runtime.executions).toHaveLength(1);
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('(select coalesce(json_agg');
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).not.toContain('join lateral');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select "__orm_parent".*, (select coalesce(json_agg(row_to_json("__orm_child_0".*)), \'[]\'::json) as "posts" from (select * from "posts" where "posts"."user_id" = "__orm_parent"."id") as "__orm_child_0") as "posts" from (select * from "users") as "__orm_parent"',
+    );
   });
 
   it('falls back to multi-query strategy for nested includes even when lateral is enabled', async () => {
@@ -479,6 +484,6 @@ describe('sql-compilation/include', () => {
       },
     ]);
     expect(runtime.executions).toHaveLength(3);
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).not.toContain('join lateral');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe('select * from "users"');
   });
 });

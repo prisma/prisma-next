@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCollection } from '../collection-fixtures';
+import { normalizeSql } from './helpers';
 
 describe('sql-compilation/find', () => {
   it('all() compiles and executes a SELECT query', async () => {
@@ -10,8 +11,7 @@ describe('sql-compilation/find', () => {
 
     expect(results).toEqual([{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
     expect(runtime.executions).toHaveLength(1);
-    expect(runtime.executions[0]!.plan.sql).toContain('select');
-    expect(runtime.executions[0]!.plan.sql).toContain('"users"');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe('select * from "users"');
     expect(runtime.executions[0]!.plan.meta.lane).toBe('orm-client');
   });
 
@@ -22,8 +22,7 @@ describe('sql-compilation/find', () => {
     await collection.where((user) => user.name.eq('Alice')).all();
 
     const sqlText = runtime.executions[0]!.plan.sql;
-    expect(sqlText).toContain('where');
-    expect(sqlText).toContain('"name"');
+    expect(normalizeSql(sqlText)).toBe('select * from "users" where "users"."name" = $1');
   });
 
   it('find() adds limit 1', async () => {
@@ -33,7 +32,7 @@ describe('sql-compilation/find', () => {
     const result = await collection.find();
 
     expect(result).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
-    expect(runtime.executions[0]!.plan.sql).toContain('limit');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe('select * from "users" limit $1');
   });
 
   it('find() accepts shorthand object filters', async () => {
@@ -43,8 +42,9 @@ describe('sql-compilation/find', () => {
     const result = await collection.find({ id: 42 });
 
     expect(result).toEqual({ id: 42, name: 'Alice', email: 'alice@example.com' });
-    expect(runtime.executions[0]!.plan.sql).toContain('"id"');
-    expect(runtime.executions[0]!.plan.sql).toContain('limit');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select * from "users" where "users"."id" = $1 limit $2',
+    );
   });
 
   it('find() combines inline filters with pre-existing where() filters', async () => {
@@ -54,7 +54,8 @@ describe('sql-compilation/find', () => {
     await collection.where({ name: 'Alice' }).find((user) => user.id.eq(42));
 
     const sqlText = runtime.executions[0]!.plan.sql;
-    expect(sqlText).toContain('"name"');
-    expect(sqlText).toContain('"id"');
+    expect(normalizeSql(sqlText)).toBe(
+      'select * from "users" where ("users"."name" = $1 and "users"."id" = $2) limit $3',
+    );
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCollection, createReturningCollectionFor } from '../collection-fixtures';
-import { serializePlans } from './helpers';
+import { normalizeSql, serializePlans } from './helpers';
 
 describe('sql-compilation/update', () => {
   it('update() returns first updated row', async () => {
@@ -10,8 +10,9 @@ describe('sql-compilation/update', () => {
     const updated = await collection.where({ id: 1 }).update({ name: 'Alice Updated' });
 
     expect(updated).toEqual({ id: 1, name: 'Alice Updated', email: 'alice@example.com' });
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('update');
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('returning');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'update "users" set "name" = $1 where "users"."id" = $2 returning *',
+    );
   });
 
   it('updateAll() returns all updated rows', async () => {
@@ -39,8 +40,12 @@ describe('sql-compilation/update', () => {
 
     expect(count).toBe(2);
     expect(runtime.executions).toHaveLength(2);
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('select');
-    expect(runtime.executions[1]!.plan.sql.toLowerCase()).toContain('update');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select "users"."id" from "users" where "users"."name" = $1',
+    );
+    expect(normalizeSql(runtime.executions[1]!.plan.sql)).toBe(
+      'update "users" set "name" = $1 where "users"."name" = $2',
+    );
   });
 
   it('update() and updateAll() require returning capability', async () => {

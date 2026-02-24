@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCollectionFor } from '../collection-fixtures';
+import { normalizeSql } from './helpers';
 
 describe('sql-compilation/aggregate', () => {
   it('aggregate() compiles count(*) with where filters', async () => {
@@ -11,8 +12,9 @@ describe('sql-compilation/aggregate', () => {
     }));
 
     expect(stats).toEqual({ count: 2 });
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('count(*)');
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('where');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select count(*) as "count" from "users" where "users"."name" = $1',
+    );
   });
 
   it('aggregate() compiles sum/avg/min/max selectors against mapped columns', async () => {
@@ -33,9 +35,8 @@ describe('sql-compilation/aggregate', () => {
       min: 10,
       max: 30,
     });
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('sum("posts"."views")');
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('avg("posts"."views")');
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('min("posts"."views")');
-    expect(runtime.executions[0]?.plan.sql.toLowerCase()).toContain('max("posts"."views")');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select sum("posts"."views") as "total", avg("posts"."views") as "avg", min("posts"."views") as "min", max("posts"."views") as "max" from "posts"',
+    );
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCollection, createReturningCollectionFor } from '../collection-fixtures';
-import { serializePlans } from './helpers';
+import { normalizeSql, serializePlans } from './helpers';
 
 describe('sql-compilation/delete', () => {
   it('delete() returns first deleted row', async () => {
@@ -10,8 +10,9 @@ describe('sql-compilation/delete', () => {
     const deleted = await collection.where({ id: 1 }).delete();
 
     expect(deleted).toEqual({ id: 1, name: 'Alice', email: 'alice@example.com' });
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('delete');
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('returning');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'delete from "users" where "users"."id" = $1 returning *',
+    );
   }, 1_000);
 
   it('deleteAll() returns all deleted rows', async () => {
@@ -39,8 +40,12 @@ describe('sql-compilation/delete', () => {
 
     expect(count).toBe(2);
     expect(runtime.executions).toHaveLength(2);
-    expect(runtime.executions[0]!.plan.sql.toLowerCase()).toContain('select');
-    expect(runtime.executions[1]!.plan.sql.toLowerCase()).toContain('delete');
+    expect(normalizeSql(runtime.executions[0]!.plan.sql)).toBe(
+      'select "users"."id" from "users" where "users"."name" = $1',
+    );
+    expect(normalizeSql(runtime.executions[1]!.plan.sql)).toBe(
+      'delete from "users" where "users"."name" = $1',
+    );
   });
 
   it('delete() and deleteAll() require returning capability', async () => {
