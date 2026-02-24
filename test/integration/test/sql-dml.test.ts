@@ -255,50 +255,54 @@ describe('DML Integration Tests', () => {
       timeouts.databaseOperation,
     );
 
-    it('updates a row without returning clause', async () => {
-      const runtime = await createTestRuntime(
-        fixtureContract,
-        {
-          binding: { kind: 'pgClient', client },
-          cursor: { disabled: true },
-        },
-        {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        },
-      );
-
-      const context = createTestContext(fixtureContract, adapter);
-      const tables = schema(context).tables;
-      const builder = sql({ context });
-      const userTable = tables['user'];
-      if (!userTable) {
-        throw new Error('user table not found');
-      }
-      const userColumns = userTable.columns;
-      const idCol = userColumns['id'];
-      if (!idCol) {
-        throw new Error('Required column not found');
-      }
-
-      const updatePlan = builder
-        .update(userTable, {
-          email: param('newEmail'),
-        })
-        .where(idCol.eq(param('userId')))
-        .build({
-          params: {
-            newEmail: 'updated2@example.com',
-            userId: 1,
+    it(
+      'updates a row without returning clause',
+      async () => {
+        const runtime = await createTestRuntime(
+          fixtureContract,
+          {
+            binding: { kind: 'pgClient', client },
+            cursor: { disabled: true },
           },
-        });
+          {
+            verify: { mode: 'onFirstUse', requireMarker: true },
+          },
+        );
 
-      const rows = await executePlanAndCollect(runtime, updatePlan);
+        const context = createTestContext(fixtureContract, adapter);
+        const tables = schema(context).tables;
+        const builder = sql({ context });
+        const userTable = tables['user'];
+        if (!userTable) {
+          throw new Error('user table not found');
+        }
+        const userColumns = userTable.columns;
+        const idCol = userColumns['id'];
+        if (!idCol) {
+          throw new Error('Required column not found');
+        }
 
-      expect(rows.length).toBe(0);
+        const updatePlan = builder
+          .update(userTable, {
+            email: param('newEmail'),
+          })
+          .where(idCol.eq(param('userId')))
+          .build({
+            params: {
+              newEmail: 'updated2@example.com',
+              userId: 1,
+            },
+          });
 
-      const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [1]);
-      expect(selectResult.rows[0].email).toBe('updated2@example.com');
-    });
+        const rows = await executePlanAndCollect(runtime, updatePlan);
+
+        expect(rows.length).toBe(0);
+
+        const selectResult = await client.query('SELECT * FROM "user" WHERE id = $1', [1]);
+        expect(selectResult.rows[0].email).toBe('updated2@example.com');
+      },
+      timeouts.databaseOperation,
+    );
   });
 
   describe('delete', () => {

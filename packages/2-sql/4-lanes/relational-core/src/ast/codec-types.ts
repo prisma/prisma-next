@@ -88,6 +88,12 @@ export interface Codec<
    *
    * Example:
    *   { length: 255 } -> { kind: 'variable', maxLength: 255 }
+   *
+   * **Convention for JSON/JSONB codecs**: When the helper includes a `validate`
+   * property of type `JsonSchemaValidateFn`, the runtime will use it to enforce
+   * JSON Schema conformance during encoding and decoding. The property is
+   * discovered via duck typing (`helper?.validate`) for flexibility across
+   * different codec types.
    */
   readonly init?: (params: TParams) => THelper;
 
