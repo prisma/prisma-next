@@ -48,5 +48,10 @@
     },
     "./schema-sql": "./schemas/data-contract-sql-v1.json",
     "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/2-sql/2-authoring/contract-ts"
   }
 }
