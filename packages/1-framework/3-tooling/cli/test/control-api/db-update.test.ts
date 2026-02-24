@@ -6,6 +6,7 @@ import type {
   MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/core-control-plane/types';
+import { notOk, ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 import { executeDbUpdate } from '../../src/control-api/operations/db-update';
 import type { ControlProgressEvent } from '../../src/control-api/types';
@@ -34,24 +35,20 @@ function createMockMigrations(overrides?: {
   const planResult: MigrationPlannerResult = overrides?.planResult ?? {
     kind: 'success',
     plan: {
+      targetId: 'postgres',
       destination: { storageHash: 'sha256:new-hash', profileHash: 'sha256:new-profile' },
       operations: [
         {
           id: 'column.user.nickname',
           label: 'Add column nickname on user',
           operationClass: 'additive',
-          sql: [],
-          prechecks: [],
-          postchecks: [],
         },
       ],
     },
   };
 
-  const runnerResult: MigrationRunnerResult = overrides?.runnerResult ?? {
-    ok: true,
-    value: { operationsPlanned: 1, operationsExecuted: 1 },
-  };
+  const runnerResult: MigrationRunnerResult =
+    overrides?.runnerResult ?? ok({ operationsPlanned: 1, operationsExecuted: 1 });
 
   return {
     createPlanner: () => ({
@@ -97,7 +94,6 @@ describe('executeDbUpdate', () => {
           conflicts: [
             {
               kind: 'typeMismatch',
-              location: { table: 'user', column: 'email' },
               summary: 'Type mismatch',
             },
           ],
@@ -121,15 +117,13 @@ describe('executeDbUpdate', () => {
         plan: vi.fn().mockReturnValue({
           kind: 'success',
           plan: {
+            targetId: 'postgres',
             destination: { storageHash: 'sha256:dest', profileHash: 'sha256:dest-profile' },
             operations: [
               {
                 id: 'column.user.nickname',
                 label: 'Add column nickname on user',
                 operationClass: 'additive',
-                sql: [],
-                prechecks: [],
-                postchecks: [],
               },
             ],
           },
@@ -176,8 +170,12 @@ describe('executeDbUpdate', () => {
       mode: 'apply',
       migrations: createMockMigrations({
         runnerResult: {
-          ok: false,
-          failure: { summary: 'Origin mismatch', why: 'Marker drifted', meta: { drift: true } },
+          ...notOk({
+            code: 'ORIGIN_MISMATCH',
+            summary: 'Origin mismatch',
+            why: 'Marker drifted',
+            meta: { drift: true },
+          }),
         },
       }),
       frameworkComponents: [],
@@ -205,8 +203,7 @@ describe('executeDbUpdate', () => {
       mode: 'apply',
       migrations: createMockMigrations({
         runnerResult: {
-          ok: true,
-          value: { operationsPlanned: 2, operationsExecuted: 2 },
+          ...ok({ operationsPlanned: 2, operationsExecuted: 2 }),
         },
       }),
       frameworkComponents: [],
@@ -241,13 +238,13 @@ describe('executeDbUpdate', () => {
         planResult: {
           kind: 'success',
           plan: {
+            targetId: 'postgres',
             destination: { storageHash: 'sha256:current', profileHash: 'sha256:current-profile' },
             operations: [],
           },
         },
         runnerResult: {
-          ok: true,
-          value: { operationsPlanned: 0, operationsExecuted: 0 },
+          ...ok({ operationsPlanned: 0, operationsExecuted: 0 }),
         },
       }),
       frameworkComponents: [],
@@ -274,6 +271,7 @@ describe('executeDbUpdate', () => {
         plan: vi.fn().mockReturnValue({
           kind: 'success',
           plan: {
+            targetId: 'postgres',
             destination: { storageHash: 'sha256:same', profileHash: 'sha256:same-profile' },
             operations: [],
           },
@@ -311,6 +309,7 @@ describe('executeDbUpdate', () => {
     const planFn = vi.fn().mockReturnValue({
       kind: 'success',
       plan: {
+        targetId: 'postgres',
         destination: { storageHash: 'sha256:dest' },
         operations: [],
       },
@@ -340,25 +339,22 @@ describe('executeDbUpdate', () => {
   });
 
   it('attaches marker hashes as plan origin before runner execution', async () => {
-    const runnerExecute = vi.fn().mockResolvedValue({
-      ok: true,
-      value: { operationsPlanned: 1, operationsExecuted: 1 },
-    });
+    const runnerExecute = vi
+      .fn()
+      .mockResolvedValue(ok({ operationsPlanned: 1, operationsExecuted: 1 }));
 
     const migrations = {
       createPlanner: () => ({
         plan: vi.fn().mockReturnValue({
           kind: 'success',
           plan: {
+            targetId: 'postgres',
             destination: { storageHash: 'sha256:dest', profileHash: 'sha256:dest-profile' },
             operations: [
               {
                 id: 'op1',
                 label: 'Test op',
                 operationClass: 'additive',
-                sql: [],
-                prechecks: [],
-                postchecks: [],
               },
             ],
           },
@@ -495,8 +491,7 @@ describe('executeDbUpdate', () => {
         mode: 'apply',
         migrations: createMockMigrations({
           runnerResult: {
-            ok: false,
-            failure: { summary: 'Failed', why: 'Error' },
+            ...notOk({ code: 'RUNNER_ERROR', summary: 'Failed', why: 'Error' }),
           },
         }),
         frameworkComponents: [],
