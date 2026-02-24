@@ -3,7 +3,6 @@ export type {
   ExtractOperationTypes,
   ForeignKey,
   ForeignKeyReferences,
-  ForeignKeysConfig,
   Index,
   ModelDefinition,
   ModelField,
@@ -18,4 +17,4 @@ export type {
   UniqueConstraint,
 } from '../types';
 
-export { DEFAULT_FOREIGN_KEYS_CONFIG } from '../types';
+export { DEFAULT_FK_CONSTRAINT, DEFAULT_FK_INDEX } from '../types';

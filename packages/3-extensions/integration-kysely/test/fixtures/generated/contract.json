@@ -83,7 +83,9 @@
                 "id"
               ],
               "table": "user"
-            }
+            },
+            "constraint": true,
+            "index": true
           }
         ],
         "indexes": [],
@@ -119,10 +121,6 @@
         "uniques": []
       }
     }
-  },
-  "foreignKeys": {
-    "constraints": true,
-    "indexes": true
   },
   "capabilities": {
     "postgres": {

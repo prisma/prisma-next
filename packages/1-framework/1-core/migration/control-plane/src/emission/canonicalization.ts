@@ -17,7 +17,6 @@ type NormalizedContract = {
   capabilities: Record<string, Record<string, boolean>>;
   meta: Record<string, unknown>;
   sources: Record<string, unknown>;
-  foreignKeys?: Record<string, unknown>;
 };
 
 const TOP_LEVEL_ORDER = [
@@ -31,7 +30,6 @@ const TOP_LEVEL_ORDER = [
   'models',
   'storage',
   'execution',
-  'foreignKeys',
   'capabilities',
   'extensionPacks',
   'meta',
@@ -256,12 +254,6 @@ export function canonicalizeContract(
     relations: ir.relations,
     storage: ir.storage,
     ...ifDefined('execution', ir.execution),
-    ...ifDefined(
-      'foreignKeys',
-      (ir as unknown as Record<string, unknown>)['foreignKeys'] as
-        | Record<string, unknown>
-        | undefined,
-    ),
     extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
     meta: ir.meta,

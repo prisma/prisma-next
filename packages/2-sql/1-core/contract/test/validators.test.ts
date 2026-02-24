@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { col, contract, model, storage, table } from '../src/factories';
+import { col, contract, fk, model, pk, storage, table } from '../src/factories';
 import { validateModel, validateSqlContract, validateStorage } from '../src/validators';
 
 describe('SQL contract validators', () => {
@@ -307,75 +307,58 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContract(c)).not.toThrow();
     });
 
-    it('accepts optional foreignKeys config', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
+    it('validates FK with per-FK constraint and index fields', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
+      const postTable = table(
+        { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+        {
+          pk: pk('id'),
+          fks: [fk(['userId'], 'user', ['id'], { constraint: true, index: true })],
+        },
+      );
+      const s = storage({ user: userTable, post: postTable });
       const c = contract({
         target: 'postgres',
         storageHash: 'sha256:abc123',
         storage: s,
-        foreignKeys: { constraints: true, indexes: true },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
     });
 
-    it('accepts foreignKeys with constraints disabled', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
+    it('validates FK with constraint disabled', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
+      const postTable = table(
+        { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+        {
+          pk: pk('id'),
+          fks: [fk(['userId'], 'user', ['id'], { constraint: false, index: true })],
+        },
+      );
+      const s = storage({ user: userTable, post: postTable });
       const c = contract({
         target: 'postgres',
         storageHash: 'sha256:abc123',
         storage: s,
-        foreignKeys: { constraints: false, indexes: true },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
     });
 
-    it('accepts foreignKeys with indexes disabled', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
+    it('validates FK with both disabled', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
+      const postTable = table(
+        { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+        {
+          pk: pk('id'),
+          fks: [fk(['userId'], 'user', ['id'], { constraint: false, index: false })],
+        },
+      );
+      const s = storage({ user: userTable, post: postTable });
       const c = contract({
         target: 'postgres',
         storageHash: 'sha256:abc123',
         storage: s,
-        foreignKeys: { constraints: true, indexes: false },
       });
       expect(() => validateSqlContract(c)).not.toThrow();
-    });
-
-    it('accepts foreignKeys with both disabled', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
-        foreignKeys: { constraints: false, indexes: false },
-      });
-      expect(() => validateSqlContract(c)).not.toThrow();
-    });
-
-    it('throws on invalid foreignKeys config (string instead of boolean)', () => {
-      const userTable = table({
-        id: col('int4', 'pg/int4@1'),
-      });
-      const s = storage({ user: userTable });
-      const c = contract({
-        target: 'postgres',
-        storageHash: 'sha256:abc123',
-        storage: s,
-      });
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
-      const invalid = { ...c, foreignKeys: { constraints: 'yes', indexes: true } } as any;
-      expect(() => validateSqlContract(invalid)).toThrow();
     });
   });
 });

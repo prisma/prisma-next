@@ -3,7 +3,7 @@ import type { ExecutionMutationDefault } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
   ContractBuilderState,
-  ForeignKeysConfigState,
+  ForeignKeyDefaultsState,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
@@ -21,8 +21,8 @@ import {
   TableBuilder,
 } from '@prisma-next/contract-authoring';
 import {
-  DEFAULT_FOREIGN_KEYS_CONFIG,
-  type ForeignKeysConfig,
+  DEFAULT_FK_CONSTRAINT,
+  DEFAULT_FK_INDEX,
   type ModelDefinition,
   type ModelField,
   type SqlContract,
@@ -73,6 +73,8 @@ type BuildStorageTable<
     readonly columns: readonly string[];
     readonly references: { readonly table: string; readonly columns: readonly string[] };
     readonly name?: string;
+    readonly constraint: boolean;
+    readonly index: boolean;
   }>;
 } & (PK extends readonly string[]
   ? { readonly primaryKey: { readonly columns: PK; readonly name?: string } }
@@ -271,10 +273,13 @@ class SqlContractBuilder<
         ...(i.name ? { name: i.name } : {}),
       }));
 
-      // Build foreign keys from table state
+      // Build foreign keys from table state, materializing defaults
+      const fkDefaults = this.state.foreignKeyDefaults;
       const foreignKeys = (tableState.foreignKeys ?? []).map((fk) => ({
         columns: fk.columns,
         references: fk.references,
+        constraint: fk.constraint ?? fkDefaults?.constraint ?? DEFAULT_FK_CONSTRAINT,
+        index: fk.index ?? fkDefaults?.index ?? DEFAULT_FK_INDEX,
         ...(fk.name ? { name: fk.name } : {}),
       }));
 
@@ -417,8 +422,6 @@ class SqlContractBuilder<
       }
     }
 
-    const foreignKeys: ForeignKeysConfig = this.state.foreignKeys ?? DEFAULT_FOREIGN_KEYS_CONFIG;
-
     // Construct contract with explicit type that matches the generic parameters
     // This ensures TypeScript infers literal types from the generics, not runtime values
     // Always include relations, even if empty (normalized to empty object)
@@ -436,7 +439,6 @@ class SqlContractBuilder<
       capabilities: this.state.capabilities || {},
       meta: {},
       sources: {},
-      foreignKeys,
     } as unknown as BuiltContract;
 
     return contract as unknown as ReturnType<
@@ -669,8 +671,8 @@ class SqlContractBuilder<
     });
   }
 
-  override foreignKeys(
-    config: ForeignKeysConfigState,
+  override foreignKeyDefaults(
+    config: ForeignKeyDefaultsState,
   ): SqlContractBuilder<
     CodecTypes,
     Target,
@@ -692,7 +694,7 @@ class SqlContractBuilder<
       Capabilities
     >({
       ...this.state,
-      foreignKeys: config,
+      foreignKeyDefaults: config,
     });
   }
 

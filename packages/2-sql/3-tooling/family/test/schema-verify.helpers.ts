@@ -61,6 +61,8 @@ export function createContractTable(
       columns: readonly string[];
       references: { table: string; columns: readonly string[] };
       name?: string;
+      constraint?: boolean;
+      index?: boolean;
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
     indexes?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
@@ -78,7 +80,11 @@ export function createContractTable(
         },
       ]),
     ),
-    foreignKeys: options?.foreignKeys ?? [],
+    foreignKeys: (options?.foreignKeys ?? []).map((fk) => ({
+      ...fk,
+      constraint: fk.constraint ?? true,
+      index: fk.index ?? true,
+    })),
     uniques: options?.uniques ?? [],
     indexes: options?.indexes ?? [],
   };

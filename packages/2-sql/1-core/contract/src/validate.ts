@@ -1,4 +1,5 @@
 import type { ModelDefinition, SqlContract, SqlMappings, SqlStorage } from './types';
+import { DEFAULT_FK_CONSTRAINT, DEFAULT_FK_INDEX } from './types';
 import { validateSqlContract } from './validators';
 
 type ResolvedMappings = {
@@ -259,12 +260,20 @@ function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
             };
           }
 
+          // Normalize foreign keys: add constraint/index defaults if missing
+          const rawForeignKeys = (tableObj['foreignKeys'] ?? []) as Array<Record<string, unknown>>;
+          const normalizedForeignKeys = rawForeignKeys.map((fk) => ({
+            ...fk,
+            constraint: fk['constraint'] ?? DEFAULT_FK_CONSTRAINT,
+            index: fk['index'] ?? DEFAULT_FK_INDEX,
+          }));
+
           normalizedTables[tableName] = {
             ...tableObj,
             columns: normalizedColumns,
             uniques: tableObj['uniques'] ?? [],
             indexes: tableObj['indexes'] ?? [],
-            foreignKeys: tableObj['foreignKeys'] ?? [],
+            foreignKeys: normalizedForeignKeys,
           };
         } else {
           normalizedTables[tableName] = tableObj;

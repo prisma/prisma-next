@@ -95,10 +95,6 @@
       },
       "required": ["tables"]
     },
-    "foreignKeys": {
-      "$ref": "#/$defs/ForeignKeysConfig",
-      "description": "Global foreign key constraint and index configuration"
-    },
     "execution": {
       "type": "object",
       "description": "Execution-only behavior not satisfied by the database",
@@ -121,22 +117,6 @@
   },
   "required": ["schemaVersion", "target", "targetFamily", "storageHash", "models", "storage"],
   "$defs": {
-    "ForeignKeysConfig": {
-      "type": "object",
-      "description": "Global foreign key constraint and index configuration. Controls whether FK constraints and FK-supporting indexes are emitted in migration DDL.",
-      "additionalProperties": false,
-      "properties": {
-        "constraints": {
-          "type": "boolean",
-          "description": "Emit FOREIGN KEY constraint DDL (default: true)"
-        },
-        "indexes": {
-          "type": "boolean",
-          "description": "Emit supporting indexes for FK columns (default: true)"
-        }
-      },
-      "required": ["constraints", "indexes"]
-    },
     "StorageTable": {
       "type": "object",
       "description": "Table definition with columns, constraints, and indexes",
@@ -399,9 +379,17 @@
         "name": {
           "type": "string",
           "description": "Foreign key constraint name"
+        },
+        "constraint": {
+          "type": "boolean",
+          "description": "Whether to emit FK constraint DDL (ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY)"
+        },
+        "index": {
+          "type": "boolean",
+          "description": "Whether to emit a backing index for the FK columns"
         }
       },
-      "required": ["columns", "references"]
+      "required": ["columns", "references", "constraint", "index"]
     },
     "FieldType": {
       "type": "object",

@@ -29,7 +29,7 @@ export const contract = defineContract<CodecTypes>()
       .column('createdAt', { type: timestamptzColumn, nullable: false })
       .column('embedding', { type: vectorColumn, nullable: true })
       .primaryKey(['id'])
-      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey'),
+      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, { name: 'post_userId_fkey' }),
   )
   .model('User', 'user', (m) =>
     m

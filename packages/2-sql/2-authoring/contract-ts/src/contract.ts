@@ -1,5 +1,6 @@
 import {
-  DEFAULT_FOREIGN_KEYS_CONFIG,
+  DEFAULT_FK_CONSTRAINT,
+  DEFAULT_FK_INDEX,
   type ForeignKey,
   type ForeignKeyReferences,
   type Index,
@@ -15,7 +16,7 @@ import {
   type StorageTypeInstance,
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import { ColumnDefaultSchema, ForeignKeysConfigSchema } from '@prisma-next/sql-contract/validators';
+import { ColumnDefaultSchema } from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
@@ -63,6 +64,8 @@ const ForeignKeySchema = type.declare<ForeignKey>().type({
   columns: type.string.array().readonly(),
   references: ForeignKeyReferencesSchema,
   'name?': 'string',
+  constraint: 'boolean',
+  index: 'boolean',
 });
 
 const StorageTableSchema = type.declare<StorageTable>().type({
@@ -131,7 +134,6 @@ const SqlContractSchema = type({
   models: type({ '[string]': ModelSchema }),
   storage: StorageSchema,
   'execution?': ExecutionSchema,
-  'foreignKeys?': ForeignKeysConfigSchema,
 });
 
 /**
@@ -505,13 +507,21 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
             normalizedColumns[columnName] = normalizedColumn;
           }
 
+          // Normalize foreign keys: add constraint/index defaults if missing
+          const rawForeignKeys = (tableObj['foreignKeys'] ?? []) as Array<Record<string, unknown>>;
+          const normalizedForeignKeys = rawForeignKeys.map((fk) => ({
+            ...fk,
+            constraint: fk['constraint'] ?? DEFAULT_FK_CONSTRAINT,
+            index: fk['index'] ?? DEFAULT_FK_INDEX,
+          }));
+
           // Normalize table arrays: add empty arrays if missing
           normalizedTables[tableName] = {
             ...tableObj,
             columns: normalizedColumns,
             uniques: tableObj['uniques'] ?? [],
             indexes: tableObj['indexes'] ?? [],
-            foreignKeys: tableObj['foreignKeys'] ?? [],
+            foreignKeys: normalizedForeignKeys,
           };
         } else {
           normalizedTables[tableName] = tableObj;
@@ -540,12 +550,6 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
     normalizedModels = normalizedModelsObj;
   }
 
-  // Normalize foreignKeys config: default to { constraints: true, indexes: true }
-  let normalizedForeignKeys = contractObj['foreignKeys'];
-  if (normalizedForeignKeys === undefined) {
-    normalizedForeignKeys = DEFAULT_FOREIGN_KEYS_CONFIG;
-  }
-
   // Normalize top-level fields: add empty objects if missing
   return {
     ...contractObj,
@@ -556,7 +560,6 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
     capabilities: contractObj['capabilities'] ?? {},
     meta: contractObj['meta'] ?? {},
     sources: contractObj['sources'] ?? {},
-    foreignKeys: normalizedForeignKeys,
   } as SqlContract<SqlStorage>;
 }
 
