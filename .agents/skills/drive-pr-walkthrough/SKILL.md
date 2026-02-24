@@ -23,7 +23,7 @@ Avoid:
 - Process narration (“tests first, then implementation”)
 - Treating tests as their own purpose
 
-## Instructions
+# Instructions
 
 ## Default scope (PR-style)
 
@@ -49,7 +49,7 @@ After writing the file, respond in chat with a short confirmation like:
 ```
 Walkthrough written.
 
-✅ `docs/plans/pr-157/walkthrough.md`
+✅ `docs/reviews/pr-157/walkthrough.md`
 ```
 
 If the user asked for both:
