@@ -31,6 +31,9 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/omit-should-in-tests.mdc` — Test descriptions omit "should"
 - `.cursor/rules/drive-project-workflow.mdc` — Project workflow (spec → plan → implement) + `projects/` layout (symlink to `.agents/rules/drive-project-workflow.mdc`)
 
+## Agent workflows
+- `.cursor/rules/canonical-spec-must-be-in-repo.mdc` — “Canonical spec” for artifact placement must be an in-repo file on the current branch (external specs are expectation sources only)
+
 ## Testing
 - `.cursor/rules/test-import-patterns.mdc` — Test import patterns (source files, relative paths, don't export for tests)
 - `.cursor/rules/test-file-organization.mdc` — Test file organization (max 500 lines, split by functionality)

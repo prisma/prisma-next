@@ -1,17 +1,23 @@
 ---
 name: drive-pr-local-review
-description: Reviews the current branch against its base with an expectations-first workflow. Uses an author-provided spec when available; otherwise writes an inferred review spec, then writes system-design review, code review, and a walkthrough to disk side-by-side.
+description: >
+  Generate local PR/branch review artifacts for the current branch vs its base: an in-repo canonical
+  spec (if present) or an inferred review `spec.md`, plus `system-design-review.md`, `code-review.md`,
+  and `walkthrough.md` (via `.agents/skills/drive-pr-walkthrough/SKILL.md`). Writes artifacts to disk
+  (next to the in-repo spec when present, otherwise under `wip/`). Use when the user asks for a local
+  PR/branch review, a code review, a system design review, to "review this branch", or to produce
+  written review docs. Do not modify implementation code.
 metadata:
-  version: "2026.2.24"
+  version: "2026.2.24.4"
 ---
 
-# Review Code Skill (Expectations-First)
+# Local PR Review
 
 ## Premise
 
 A code review must be anchored to **expectations**. Those expectations come from:
 - Explicit intent sources (PR description, linked tickets, design docs) when available, plus
-- A canonical spec (author-provided when available, otherwise a review `spec.md` you write) to make expectations explicit and reviewable.
+- A canonical spec file (author-provided in-repo on the branch when available, otherwise a review `spec.md` you write) to make expectations explicit and reviewable.
 
 You do not change implementation code. You only write review artifacts.
 
@@ -20,13 +26,13 @@ You do not change implementation code. You only write review artifacts.
 Every run must produce these artifacts **side-by-side**:
 - `system-design-review.md`
 - `code-review.md`
-- `walkthrough.md` (must use the `/walkthrough` workflow; override its output path to land next to the other artifacts)
+- `walkthrough.md` (must use the `/walkthrough` workflow from `.agents/skills/drive-pr-walkthrough/SKILL.md`; override its output path to land next to the other artifacts)
 
-`spec.md` is only written when the branch does not already contain a canonical spec. If a spec exists, do not duplicate it in the review outputs; reference it.
+`spec.md` is only written when the branch does not already contain an in-repo canonical spec file. If a spec exists, do not duplicate it in the review outputs; reference it.
 
 Output location rule:
-- If a canonical spec exists on the branch, write review artifacts next to it (see 2.1).
-- Otherwise write review artifacts under `wip/` (local-only scratch; never commit).
+- If a canonical spec **file exists in-repo on the current branch**, write review artifacts next to it (see 2.1).
+- Otherwise (including when the only spec is external/off-branch), write review artifacts under `wip/` (local-only scratch; never commit).
 
 ## 1) Establish the review scope (branch + base)
 
@@ -55,44 +61,49 @@ PR discovery hints:
 
 ## 2) Establish expectations (use canonical spec or infer one)
 
-### 2.1) Choose an artifact directory (prefer next to an existing spec)
+### 2.1) Choose an artifact directory (prefer next to an existing in-repo spec)
 
-First, locate a canonical spec on the branch (preferred inputs first):
-1. If the user provided a spec path in the conversation, treat it as canonical.
-2. Else, if the GitHub PR body links to or mentions a spec path, treat it as canonical.
+First, locate a canonical spec **file in-repo on the current branch** (preferred inputs first).
+
+Important:
+- A “canonical spec” in this step means a spec **file** that exists in this repo on this branch.
+- If the user/PR links an external spec (URL, other repo, or a file not present on this branch), treat it as an expectation source (2.2), but it does **not** control artifact placement.
+
+Preferred inputs:
+1. If the user provided an **in-repo** spec file path (repo-relative or workspace-absolute) and it exists on this branch, treat it as canonical.
+2. Else, if the GitHub PR body links to or mentions an **in-repo** spec file path that exists on this branch, treat it as canonical.
 3. Else, search the branch for spec-like docs and pick the best match:
    - Prefer: `agent-os/specs/**/spec.md`, `specs/**/spec.md`, `projects/**/spec.md`
    - Also consider: `**/spec.md`, `**/requirements.md`, `**/design.md` (especially if added/changed in the diff)
 
 Then choose where artifacts go:
-- If a canonical spec exists:
+- If an in-repo canonical spec exists:
   - Let `SPEC_DIR` be the folder containing the spec file.
   - If PR number is available: write to `SPEC_DIR/reviews/pr-<PR_NUMBER>/`
   - Else: write to `SPEC_DIR/reviews/`
-- Otherwise (no canonical spec):
+- Otherwise (no in-repo canonical spec):
   - If PR number is available: write to `wip/review-code/pr-<PR_NUMBER>/`
   - Else: write to `wip/review-code/branch-<BRANCH_NAME>/`
-
-`wip/` is local-only scratch and must never be committed.
 
 ### 2.2) Gather expectation sources (inputs to your expectations model)
 
 Prefer explicit intent sources over inference from the diff:
-1. Canonical spec (if present from 2.1)
-2. GitHub PR title/body
-3. Linear ticket linked in the PR body (preferred), otherwise inferable from branch name (e.g. `ABC-123`), otherwise absent
-4. New/changed documentation on the branch that clarifies intent/constraints (ADRs, READMEs, `docs/**`)
-5. The diff itself (last resort for intent)
+1. Canonical spec file (if present from 2.1)
+2. External/off-branch spec (if provided by the user or linked in the PR body)
+3. GitHub PR title/body
+4. Linear ticket linked in the PR body (preferred), otherwise inferable from branch name (e.g. `ABC-123`), otherwise absent
+5. New/changed documentation on the branch that clarifies intent/constraints (ADRs, READMEs, `docs/**`)
+6. The diff itself (last resort for intent)
 
-If the branch includes additional spec-like docs beyond the canonical spec, treat them as supporting intent sources (not a required format), for example:
+If the branch includes additional spec-like docs beyond the canonical spec file, treat them as supporting intent sources (not a required format), for example:
 - `**/requirements.md`, `**/design.md`
 - Relevant ADRs under `docs/architecture docs/adrs/`
 
 ### 2.3) Ensure a review spec exists (required)
 
-If a canonical spec exists (from 2.1), **use it** as the review spec input and do **not** write a new one.
+If an in-repo canonical spec exists (from 2.1), **use it** as the review spec input and do **not** write a new one.
 
-If the author has not provided a spec, infer one and write a review `spec.md` into the artifact directory.
+If the author has not provided an in-repo canonical spec, infer one and write a review `spec.md` into the artifact directory (even if an external/off-branch spec exists; treat it as a primary source and link it).
 
 If the spec is inferred, it must begin with a highly visible notice stating:
 - that it was constructed by you (the reviewer), and
@@ -121,7 +132,7 @@ Minimum coverage:
 - What problem is being solved; what new guarantees/invariants are introduced
 - Subsystem fit (contracts, plans, runtime, adapters/plugins, capability gating)
 - Boundary correctness (domain/layer/plane imports; deterministic artifacts)
-- ADRs: if the branch adds/changes ADRs (for example ADR 161), treat them as design-intent sources and explicitly review their reasoning/trade-offs
+- ADRs: if the branch adds/changes ADRs under `docs/architecture docs/adrs/`, treat them as design-intent sources and explicitly review their reasoning/trade-offs
 - Test strategy adequacy at the architectural level (what must be proven, where)
 
 ## 4) Write the code review
@@ -190,5 +201,5 @@ Do not:
 Write `walkthrough.md` as a semantic narrative of the change set.
 
 Requirement:
-- Use the `/walkthrough` workflow and **override its output path** so the file lands next to the review artifacts.
+- Use the `/walkthrough` workflow from `.agents/skills/drive-pr-walkthrough/SKILL.md` and **override its output path** so the file lands next to the review artifacts.
 
