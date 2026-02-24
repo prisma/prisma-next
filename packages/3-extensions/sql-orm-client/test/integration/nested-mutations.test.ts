@@ -22,6 +22,7 @@ describe('integration/nested-mutations', () => {
             id: 1,
             name: 'Nested User',
             email: 'nested@example.com',
+            // TODO: why do we need the explicit type annotation? we don't want it
             posts: (posts: RelationMutator<TestContract, 'Post'>) =>
               posts.create([
                 { id: 10, title: 'First nested post', views: 100 },
