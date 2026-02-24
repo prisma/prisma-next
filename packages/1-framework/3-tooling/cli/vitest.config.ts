@@ -38,6 +38,7 @@ export default defineConfig({
         'src/commands/db-introspect.ts',
         'src/commands/db-schema-verify.ts',
         'src/commands/db-sign.ts',
+        'src/commands/db-update.ts',
         'src/commands/db-verify.ts',
         // Exclude error factory functions - just constructors
         'src/utils/cli-errors.ts',
