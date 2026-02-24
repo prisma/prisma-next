@@ -141,7 +141,7 @@ _Derive testable criteria from the functional and non-functional requirements. E
 - [ ] _Criterion derived from a non-functional requirement_
 - [ ] _Criterion covering an edge case or failure mode_
 
-### Other Considerations
+# Other Considerations
 
 ## Security
 

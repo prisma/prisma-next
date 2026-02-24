@@ -2,8 +2,7 @@
 name: drive-pr-local-review
 description: Performs comprehensive code review by analyzing git diffs between the current branch and the default branch (or a specified target). Use when the user requests a code review, diff analysis, PR review, or wants feedback on their changes before submitting. Evaluates code for idiomaticity, best practices, clarity, performance, security, edge cases, and documentation.
 metadata:
-  author: Tyler Benfield
-  version: "2026.2.3"
+  version: "2026.2.23"
 ---
 
 # Code Review Agent
@@ -165,7 +164,7 @@ Before reviewing, check for project-specific guidelines:
 
 ```bash
 # Find project conventions
-find . -maxdepth 2 -name "*.md" | xargs grep -l -i "guideline\|convention\|style\|coding" 2>/dev/null | head -5
+find . -maxdepth 2 -name "*.md" -print0 | xargs -0 grep -l -i "guideline\|convention\|style\|coding" 2>/dev/null | head -5
 ```
 
 Read any relevant guidelines to ensure review aligns with project standards.
