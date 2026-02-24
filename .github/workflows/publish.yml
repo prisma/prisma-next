@@ -1,6 +1,9 @@
 name: Publish to npm
 
 on:
+  push:
+    branches: [main]
+    tags: ["!**"]
   workflow_dispatch:
     inputs:
       version:
@@ -21,10 +24,11 @@ jobs:
   publish:
     name: Publish packages to npm
     runs-on: ubuntu-latest
+    # Safety net: only publish from main, even though push trigger is already constrained
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Required for npm OIDC Trusted Publishing
 
     steps:
       - name: Checkout
@@ -82,5 +86,10 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      # NODE_AUTH_TOKEN is intentionally NOT set. npm detects the OIDC environment
+      # (id-token: write) and authenticates via Trusted Publishing automatically.
+      # Setting NODE_AUTH_TOKEN to any value -- even empty string -- would block OIDC.
       - name: Publish packages
         run: pnpm -r publish --access public --tag "${{ steps.version.outputs.tag }}" --no-git-checks
+        env:
+          NPM_CONFIG_PROVENANCE: true

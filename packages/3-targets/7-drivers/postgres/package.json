@@ -45,5 +45,10 @@
     "./control": "./dist/control.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-targets/7-drivers/postgres"
   }
 }

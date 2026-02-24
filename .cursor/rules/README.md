@@ -29,6 +29,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/read-agents-md.mdc` — Read AGENTS.md (onboarding deep dive is optional)
 - `.cursor/rules/schema-driven-architecture.mdc` — Read architecture overview before writing code
 - `.cursor/rules/omit-should-in-tests.mdc` — Test descriptions omit "should"
+- `.cursor/rules/drive-project-workflow.mdc` — Project workflow (spec → plan → implement) + `projects/` layout (symlink to `.agents/rules/drive-project-workflow.mdc`)
 
 ## Testing
 - `.cursor/rules/test-import-patterns.mdc` — Test import patterns (source files, relative paths, don't export for tests)
