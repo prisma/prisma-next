@@ -1,84 +1,76 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import type { VerifyDatabaseResult } from '@prisma-next/core-control-plane/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import { ContractValidationError } from '../control-api/errors';
+import type { DbUpdateFailure } from '../control-api/types';
 import {
   CliStructuredError,
   errorContractValidationFailed,
   errorDatabaseConnectionRequired,
   errorDriverRequired,
   errorFileNotFound,
-  errorHashMismatch,
   errorJsonFormatNotSupported,
-  errorMarkerMissing,
+  errorMigrationPlanningFailed,
   errorRuntime,
-  errorTargetMismatch,
+  errorTargetMigrationNotSupported,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { maskConnectionUrl, setCommandDescriptions } from '../utils/command-helpers';
+import {
+  type MigrationCommandOptions,
+  maskConnectionUrl,
+  setCommandDescriptions,
+} from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
   formatCommandHelp,
+  formatMigrationApplyOutput,
+  formatMigrationJson,
+  formatMigrationPlanOutput,
   formatStyledHeader,
-  formatVerifyJson,
-  formatVerifyOutput,
+  type MigrationCommandResult,
 } from '../utils/output';
 import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 
-interface DbVerifyOptions {
-  readonly db?: string;
-  readonly config?: string;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly vv?: boolean;
-  readonly trace?: boolean;
-  readonly timestamps?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-}
+type DbUpdateOptions = MigrationCommandOptions;
 
-/**
- * Maps a VerifyDatabaseResult failure to a CliStructuredError.
- */
-function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredError {
-  if (!verifyResult.ok && verifyResult.code) {
-    if (verifyResult.code === 'PN-RTM-3001') {
-      return errorMarkerMissing();
-    }
-    if (verifyResult.code === 'PN-RTM-3002') {
-      return errorHashMismatch({
-        expected: verifyResult.contract.storageHash,
-        ...ifDefined('actual', verifyResult.marker?.storageHash),
-      });
-    }
-    if (verifyResult.code === 'PN-RTM-3003') {
-      return errorTargetMismatch(
-        verifyResult.target.expected,
-        verifyResult.target.actual ?? 'unknown',
-      );
-    }
-    // Unknown code - fall through to runtime error
+function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
+  if (failure.code === 'PLANNING_FAILED') {
+    return errorMigrationPlanningFailed({ conflicts: failure.conflicts ?? [] });
   }
-  return errorRuntime(verifyResult.summary);
+
+  if (failure.code === 'MARKER_REQUIRED') {
+    return errorRuntime('Database marker is required before db update', {
+      why: failure.why ?? 'Contract marker not found in database',
+      fix: 'Run `prisma-next db init` first to adopt the database, then re-run `prisma-next db update`',
+      meta: { code: 'MARKER_REQUIRED' },
+    });
+  }
+
+  if (failure.code === 'RUNNER_FAILED') {
+    return errorRuntime(failure.summary, {
+      why: failure.why ?? 'Migration runner failed',
+      fix: 'Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`',
+      meta: {
+        code: 'RUNNER_FAILED',
+        ...(failure.meta ?? {}),
+      },
+    });
+  }
+
+  const exhaustive: never = failure.code;
+  throw new Error(`Unhandled DbUpdateFailure code: ${exhaustive}`);
 }
 
-/**
- * Executes the db verify command and returns a structured Result.
- */
-async function executeDbVerifyCommand(
-  options: DbVerifyOptions,
+async function executeDbUpdateCommand(
+  options: DbUpdateOptions,
   flags: GlobalFlags,
-): Promise<Result<VerifyDatabaseResult, CliStructuredError>> {
-  // Load config
+  startTime: number,
+): Promise<Result<MigrationCommandResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
   const configPath = options.config
     ? relative(process.cwd(), resolve(options.config))
@@ -88,7 +80,6 @@ async function executeDbVerifyCommand(
     : resolve('src/prisma/contract.json');
   const contractPath = relative(process.cwd(), contractPathAbsolute);
 
-  // Output header
   if (flags.json !== 'object' && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
@@ -97,17 +88,19 @@ async function executeDbVerifyCommand(
     if (options.db) {
       details.push({ label: 'database', value: maskConnectionUrl(options.db) });
     }
+    if (options.plan) {
+      details.push({ label: 'mode', value: 'plan (dry run)' });
+    }
     const header = formatStyledHeader({
-      command: 'db verify',
-      description: 'Check whether the database has been signed with your contract',
-      url: 'https://pris.ly/db-verify',
+      command: 'db update',
+      description: 'Reconcile a marker-managed database to the current contract',
+      url: 'https://pris.ly/db-update',
       details,
       flags,
     });
     console.log(header);
   }
 
-  // Load contract file
   let contractJsonContent: string;
   try {
     contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
@@ -139,22 +132,27 @@ async function executeDbVerifyCommand(
     );
   }
 
-  // Resolve database connection (--db flag or config.db.connection)
   const dbConnection = options.db ?? config.db?.connection;
   if (!dbConnection) {
     return notOk(
       errorDatabaseConnectionRequired({
-        why: `Database connection is required for db verify (set db.connection in ${configPath}, or pass --db <url>)`,
+        why: `Database connection is required for db update (set db.connection in ${configPath}, or pass --db <url>)`,
       }),
     );
   }
 
-  // Check for driver
   if (!config.driver) {
-    return notOk(errorDriverRequired({ why: 'Config.driver is required for db verify' }));
+    return notOk(errorDriverRequired({ why: 'Config.driver is required for db update' }));
   }
 
-  // Create control client
+  if (!config.target.migrations) {
+    return notOk(
+      errorTargetMigrationNotSupported({
+        why: `Target "${config.target.id}" does not support migrations`,
+      }),
+    );
+  }
+
   const client = createControlClient({
     family: config.family,
     target: config.target,
@@ -162,31 +160,62 @@ async function executeDbVerifyCommand(
     driver: config.driver,
     extensionPacks: config.extensionPacks ?? [],
   });
-
-  // Create progress adapter
   const onProgress = createProgressAdapter({ flags });
 
   try {
-    const verifyResult = await client.verify({
+    const result = await client.dbUpdate({
       contractIR: contractJson,
+      mode: options.plan ? 'plan' : 'apply',
       connection: dbConnection,
       onProgress,
     });
 
-    // Add blank line after all async operations if spinners were shown
-    if (!flags.quiet && flags.json !== 'object' && process.stdout.isTTY) {
-      console.log('');
+    if (!result.ok) {
+      return notOk(mapDbUpdateFailure(result.failure));
     }
 
-    // If verification failed, map to CLI structured error
-    if (!verifyResult.ok) {
-      return notOk(mapVerifyFailure(verifyResult));
-    }
+    const dbUpdateResult: MigrationCommandResult = {
+      ok: true,
+      mode: result.value.mode,
+      plan: {
+        targetId: config.target.targetId,
+        destination: {
+          storageHash: result.value.destination.storageHash,
+          ...ifDefined('profileHash', result.value.destination.profileHash),
+        },
+        operations: result.value.plan.operations.map((op) => ({
+          id: op.id,
+          label: op.label,
+          operationClass: op.operationClass,
+        })),
+      },
+      origin: {
+        storageHash: result.value.origin.storageHash,
+        ...ifDefined('profileHash', result.value.origin.profileHash),
+      },
+      ...(result.value.execution
+        ? {
+            execution: {
+              operationsPlanned: result.value.execution.operationsPlanned,
+              operationsExecuted: result.value.execution.operationsExecuted,
+            },
+          }
+        : {}),
+      ...(result.value.marker
+        ? {
+            marker: {
+              storageHash: result.value.marker.storageHash,
+              ...ifDefined('profileHash', result.value.marker.profileHash),
+            },
+          }
+        : {}),
+      summary: result.value.summary,
+      timings: { total: Date.now() - startTime },
+    };
 
-    return ok(verifyResult);
+    return ok(dbUpdateResult);
   } catch (error) {
-    // Driver already throws CliStructuredError for connection failures
-    if (error instanceof CliStructuredError) {
+    if (CliStructuredError.is(error)) {
       return notOk(error);
     }
 
@@ -198,10 +227,9 @@ async function executeDbVerifyCommand(
       );
     }
 
-    // Wrap unexpected errors
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Unexpected error during db verify: ${error instanceof Error ? error.message : String(error)}`,
+        why: `Unexpected error during db update: ${error instanceof Error ? error.message : String(error)}`,
       }),
     );
   } finally {
@@ -209,13 +237,14 @@ async function executeDbVerifyCommand(
   }
 }
 
-export function createDbVerifyCommand(): Command {
-  const command = new Command('verify');
+export function createDbUpdateCommand(): Command {
+  const command = new Command('update');
   setCommandDescriptions(
     command,
-    'Check whether the database has been signed with your contract',
-    'Verifies that your database schema matches the emitted contract. Checks table structures,\n' +
-      'column types, constraints, and codec coverage. Reports any mismatches or missing codecs.',
+    'Reconcile a marker-managed database to the current contract',
+    'Updates a marker-managed database to match your emitted contract using additive,\n' +
+      'widening, and destructive operations when required. Requires an existing contract marker.\n' +
+      'Use --plan to preview operations before applying.',
   );
   command
     .configureHelp({
@@ -226,6 +255,7 @@ export function createDbVerifyCommand(): Command {
     })
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
+    .option('--plan', 'Preview planned operations without applying', false)
     .option('--json [format]', 'Output as JSON (object)', false)
     .option('-q, --quiet', 'Quiet mode: errors only')
     .option('-v, --verbose', 'Verbose output: debug info, timings')
@@ -233,14 +263,14 @@ export function createDbVerifyCommand(): Command {
     .option('--timestamps', 'Add timestamps to output')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
-    .action(async (options: DbVerifyOptions) => {
+    .action(async (options: DbUpdateOptions) => {
       const flags = parseGlobalFlags(options);
+      const startTime = Date.now();
 
-      // Validate JSON format option
       if (flags.json === 'ndjson') {
         const result = notOk(
           errorJsonFormatNotSupported({
-            command: 'db verify',
+            command: 'db update',
             format: 'ndjson',
             supportedFormats: ['object'],
           }),
@@ -249,13 +279,15 @@ export function createDbVerifyCommand(): Command {
         process.exit(exitCode);
       }
 
-      const result = await executeDbVerifyCommand(options, flags);
-
-      const exitCode = handleResult(result, flags, (verifyResult) => {
+      const result = await executeDbUpdateCommand(options, flags, startTime);
+      const exitCode = handleResult(result, flags, (dbUpdateResult) => {
         if (flags.json === 'object') {
-          console.log(formatVerifyJson(verifyResult));
+          console.log(formatMigrationJson(dbUpdateResult));
         } else {
-          const output = formatVerifyOutput(verifyResult, flags);
+          const output =
+            dbUpdateResult.mode === 'plan'
+              ? formatMigrationPlanOutput(dbUpdateResult, flags)
+              : formatMigrationApplyOutput(dbUpdateResult, flags);
           if (output) {
             console.log(output);
           }

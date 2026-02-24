@@ -56,6 +56,14 @@ export interface MigrationPlanOperation {
 export interface MigrationPlan {
   /** The target ID this plan is for (e.g., 'postgres'). */
   readonly targetId: string;
+  /**
+   * Origin contract identity that the plan expects the database to currently be at.
+   * If omitted, the runner treats the origin as "no marker present" (empty database).
+   */
+  readonly origin?: {
+    readonly storageHash: string;
+    readonly profileHash?: string;
+  } | null;
   /** Destination contract identity that the plan intends to reach. */
   readonly destination: {
     readonly storageHash: string;

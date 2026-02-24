@@ -573,6 +573,173 @@ describe('ControlClient progress emission', () => {
     });
   });
 
+  describe('dbUpdate()', () => {
+    function createMockComponentsWithMigrations() {
+      const { mockDriver, mockAdapter, mockDriverDescriptor } = createMockComponents();
+
+      // Override family instance to return a marker (required by executeDbUpdate)
+      const mockFamilyInstance = {
+        introspect: async () => ({ tables: {}, extensions: [] }),
+        validateContractIR: (ir: unknown) => ir as ContractIR,
+        readMarker: async () => ({ storageHash: 'sha256:origin' }),
+      } as unknown as ControlFamilyInstance<string>;
+
+      const mockFamilyWithMarker = {
+        familyId: 'sql',
+        create: () => mockFamilyInstance,
+        // biome-ignore lint/suspicious/noExplicitAny: required for mock flexibility
+      } as unknown as ControlFamilyDescriptor<any, any>;
+
+      const mockMigrations = {
+        createPlanner: () => ({
+          plan: () => ({
+            kind: 'success',
+            plan: {
+              destination: { storageHash: 'sha256:dest' },
+              operations: [
+                {
+                  id: 'op1',
+                  label: 'Test op',
+                  operationClass: 'additive',
+                  sql: [],
+                  prechecks: [],
+                  postchecks: [],
+                },
+              ],
+            },
+          }),
+        }),
+        createRunner: () => ({
+          execute: async () => ({
+            ok: true,
+            value: { operationsPlanned: 1, operationsExecuted: 1 },
+          }),
+        }),
+      };
+
+      const mockTargetWithMigrations = {
+        kind: 'target',
+        targetId: 'postgres',
+        familyId: 'sql',
+        migrations: mockMigrations,
+        // biome-ignore lint/suspicious/noExplicitAny: required for mock flexibility
+      } as unknown as ControlTargetDescriptor<any, any, any, any>;
+
+      return {
+        mockDriver,
+        mockFamilyInstance,
+        mockFamilyWithMarker,
+        mockTargetWithMigrations,
+        mockAdapter,
+        mockDriverDescriptor,
+      };
+    }
+
+    it('emits connect, readMarker, introspect, plan, apply spans when connection provided', async () => {
+      const events: ControlProgressEvent[] = [];
+      const { mockFamilyWithMarker, mockTargetWithMigrations, mockAdapter, mockDriverDescriptor } =
+        createMockComponentsWithMigrations();
+
+      const client = createControlClient({
+        family: mockFamilyWithMarker,
+        target: mockTargetWithMigrations,
+        adapter: mockAdapter,
+        driver: mockDriverDescriptor,
+      });
+
+      const result = await client.dbUpdate({
+        contractIR: {},
+        mode: 'apply',
+        connection: 'postgres://test',
+        onProgress: (event) => events.push(event),
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(true);
+
+      const connectStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'connect');
+      const connectEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'connect');
+      expect(connectStart).toBeDefined();
+      expect(connectEnd).toMatchObject({ outcome: 'ok' });
+
+      const readMarkerStart = events.find(
+        (e) => e.kind === 'spanStart' && e.spanId === 'readMarker',
+      );
+      expect(readMarkerStart).toBeDefined();
+
+      const planStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'plan');
+      expect(planStart).toBeDefined();
+
+      const applyEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'apply');
+      expect(applyEnd).toMatchObject({ outcome: 'ok' });
+
+      for (const event of events) {
+        expect(event.action).toBe('dbUpdate');
+      }
+    });
+
+    it('returns MARKER_REQUIRED failure when marker is missing', async () => {
+      const { mockTargetWithMigrations, mockAdapter, mockDriverDescriptor } =
+        createMockComponentsWithMigrations();
+
+      // Override to return null marker
+      const noMarkerFamilyInstance = {
+        introspect: async () => ({ tables: {}, extensions: [] }),
+        validateContractIR: (ir: unknown) => ir as ContractIR,
+        readMarker: async () => null,
+      } as unknown as ControlFamilyInstance<string>;
+
+      const noMarkerFamily = {
+        familyId: 'sql',
+        create: () => noMarkerFamilyInstance,
+        // biome-ignore lint/suspicious/noExplicitAny: required for mock flexibility
+      } as unknown as ControlFamilyDescriptor<any, any>;
+
+      const client = createControlClient({
+        family: noMarkerFamily,
+        target: mockTargetWithMigrations,
+        adapter: mockAdapter,
+        driver: mockDriverDescriptor,
+      });
+
+      const result = await client.dbUpdate({
+        contractIR: {},
+        mode: 'apply',
+        connection: 'postgres://test',
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('MARKER_REQUIRED');
+      }
+    });
+
+    it('does not throw when onProgress is omitted from dbUpdate', async () => {
+      const { mockFamilyWithMarker, mockTargetWithMigrations, mockAdapter, mockDriverDescriptor } =
+        createMockComponentsWithMigrations();
+
+      const client = createControlClient({
+        family: mockFamilyWithMarker,
+        target: mockTargetWithMigrations,
+        adapter: mockAdapter,
+        driver: mockDriverDescriptor,
+      });
+
+      const result = await client.dbUpdate({
+        contractIR: {},
+        mode: 'plan',
+        connection: 'postgres://test',
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(true);
+    });
+  });
+
   describe('no onProgress callback', () => {
     it('does not throw when onProgress is omitted from verify', async () => {
       const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor } = createMockComponents();

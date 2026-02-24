@@ -808,13 +808,13 @@ export function formatSignJson(result: SignDatabaseResult): string {
 }
 
 // ============================================================================
-// DB Init Output Formatters
+// Migration Command Output Formatters (shared by db init and db update)
 // ============================================================================
 
 /**
- * Result type for db init command.
+ * Shared CLI output type for migration commands (db init, db update).
  */
-export interface DbInitResult {
+export interface MigrationCommandResult {
   readonly ok: boolean;
   readonly mode: 'plan' | 'apply';
   readonly plan?: {
@@ -828,6 +828,11 @@ export interface DbInitResult {
       readonly label: string;
       readonly operationClass: string;
     }[];
+  };
+  /** Origin contract identity (present in db-update results, absent in db-init). */
+  readonly origin?: {
+    readonly storageHash: string;
+    readonly profileHash?: string;
   };
   readonly execution?: {
     readonly operationsPlanned: number;
@@ -846,7 +851,10 @@ export interface DbInitResult {
 /**
  * Formats human-readable output for db init plan mode.
  */
-export function formatDbInitPlanOutput(result: DbInitResult, flags: GlobalFlags): string {
+export function formatMigrationPlanOutput(
+  result: MigrationCommandResult,
+  flags: GlobalFlags,
+): string {
   if (flags.quiet) {
     return '';
   }
@@ -898,7 +906,10 @@ export function formatDbInitPlanOutput(result: DbInitResult, flags: GlobalFlags)
 /**
  * Formats human-readable output for db init apply mode.
  */
-export function formatDbInitApplyOutput(result: DbInitResult, flags: GlobalFlags): string {
+export function formatMigrationApplyOutput(
+  result: MigrationCommandResult,
+  flags: GlobalFlags,
+): string {
   if (flags.quiet) {
     return '';
   }
@@ -934,7 +945,7 @@ export function formatDbInitApplyOutput(result: DbInitResult, flags: GlobalFlags
 /**
  * Formats JSON output for db init command.
  */
-export function formatDbInitJson(result: DbInitResult): string {
+export function formatMigrationJson(result: MigrationCommandResult): string {
   return JSON.stringify(result, null, 2);
 }
 
@@ -1247,6 +1258,7 @@ function getCommandDocsUrl(commandPath: string): string | undefined {
   const docsMap: Record<string, string> = {
     'contract emit': 'https://pris.ly/contract-emit',
     'db verify': 'https://pris.ly/db-verify',
+    'db update': 'https://pris.ly/db-update',
   };
   return docsMap[commandPath];
 }

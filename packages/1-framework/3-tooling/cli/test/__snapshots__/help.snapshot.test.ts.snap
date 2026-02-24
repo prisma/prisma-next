@@ -67,6 +67,31 @@ exports[`help text snapshots > formats db introspect help 1`] = `
 "
 `;
 
+exports[`help text snapshots > formats db update help 1`] = `
+"prisma-next update → Reconcile a marker-managed database to the current contract
+│
+│ --db <url>            Database connection string
+│ --config <path>       Path to prisma-next.config.ts
+│ --plan                Preview planned operations without applying
+│                       default: false
+│ --json [format]       Output as JSON (object)
+│                       default: false
+│ -q, --quiet           Quiet mode: errors only
+│ -v, --verbose         Verbose output: debug info, timings
+│ -vv, --trace          Trace output: deep internals, stack traces
+│ --timestamps          Add timestamps to output
+│ --color               Force color output
+│ --no-color            Disable color output
+│
+│ Updates a marker-managed database to match your emitted contract using
+│ additive,
+│ widening, and destructive operations when required. Requires an existing
+│ contract marker.
+│ Use --plan to preview operations before applying.
+└
+"
+`;
+
 exports[`help text snapshots > formats db verify help 1`] = `
 "prisma-next verify → Check whether the database has been signed with your contract
 │

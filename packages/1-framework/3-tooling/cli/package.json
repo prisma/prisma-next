@@ -63,6 +63,10 @@
       "types": "./dist/commands/db-init.d.mts",
       "import": "./dist/commands/db-init.mjs"
     },
+    "./commands/db-update": {
+      "types": "./dist/commands/db-update.d.mts",
+      "import": "./dist/commands/db-update.mjs"
+    },
     "./commands/db-introspect": {
       "types": "./dist/commands/db-introspect.d.mts",
       "import": "./dist/commands/db-introspect.mjs"

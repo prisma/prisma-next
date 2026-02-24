@@ -60,6 +60,7 @@ export interface ControlClientOptions {
  */
 export type ControlActionName =
   | 'dbInit'
+  | 'dbUpdate'
   | 'verify'
   | 'schemaVerify'
   | 'sign'
@@ -190,6 +191,28 @@ export interface DbInitOptions {
 }
 
 /**
+ * Options for the dbUpdate operation.
+ */
+export interface DbUpdateOptions {
+  /** Contract IR or unvalidated JSON - validated at runtime via familyInstance.validateContractIR() */
+  readonly contractIR: unknown;
+  /**
+   * Mode for the dbUpdate operation.
+   * - 'plan': Returns planned operations without applying
+   * - 'apply': Applies operations and writes marker/ledger
+   */
+  readonly mode: 'plan' | 'apply';
+  /**
+   * Database connection. If provided, dbUpdate will connect before executing.
+   * If omitted, the client must already be connected.
+   * The type is driver-specific (e.g., string URL for Postgres).
+   */
+  readonly connection?: unknown;
+  /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
+}
+
+/**
  * Options for the introspect operation.
  */
 export interface IntrospectOptions {
@@ -292,6 +315,59 @@ export interface DbInitFailure {
 export type DbInitResult = Result<DbInitSuccess, DbInitFailure>;
 
 /**
+ * Successful dbUpdate result.
+ */
+export interface DbUpdateSuccess {
+  readonly mode: 'plan' | 'apply';
+  readonly plan: {
+    readonly operations: ReadonlyArray<{
+      readonly id: string;
+      readonly label: string;
+      readonly operationClass: string;
+    }>;
+  };
+  readonly destination: {
+    readonly storageHash: string;
+    readonly profileHash?: string;
+  };
+  readonly origin: {
+    readonly storageHash: string;
+    readonly profileHash?: string;
+  };
+  readonly execution?: {
+    readonly operationsPlanned: number;
+    readonly operationsExecuted: number;
+  };
+  readonly marker?: {
+    readonly storageHash: string;
+    readonly profileHash?: string;
+  };
+  readonly summary: string;
+}
+
+/**
+ * Failure codes for dbUpdate operation.
+ */
+export type DbUpdateFailureCode = 'PLANNING_FAILED' | 'MARKER_REQUIRED' | 'RUNNER_FAILED';
+
+/**
+ * Failure details for dbUpdate operation.
+ */
+export interface DbUpdateFailure {
+  readonly code: DbUpdateFailureCode;
+  readonly summary: string;
+  readonly why: string | undefined;
+  readonly conflicts: ReadonlyArray<MigrationPlannerConflict> | undefined;
+  readonly meta: Record<string, unknown> | undefined;
+}
+
+/**
+ * Result type for dbUpdate operation.
+ * Uses Result pattern: success returns DbUpdateSuccess, failure returns DbUpdateFailure.
+ */
+export type DbUpdateResult = Result<DbUpdateSuccess, DbUpdateFailure>;
+
+/**
  * Successful emit result.
  * Contains the hashes and paths of emitted files.
  */
@@ -311,7 +387,10 @@ export interface EmitSuccess {
 /**
  * Failure codes for emit operation.
  */
-export type EmitFailureCode = 'CONTRACT_SOURCE_INVALID' | 'EMIT_FAILED';
+export type EmitFailureCode =
+  | 'CONTRACT_SOURCE_INVALID'
+  | 'CONTRACT_VALIDATION_FAILED'
+  | 'EMIT_FAILED';
 
 /**
  * Failure details for emit operation.
@@ -446,6 +525,16 @@ export interface ControlClient {
    * @throws If not connected, target doesn't support migrations, or infrastructure failure
    */
   dbInit(options: DbInitOptions): Promise<DbInitResult>;
+
+  /**
+   * Reconciles an adopted database to match the current contract.
+   * Requires an existing marker and supports lossy operation classes.
+   *
+   * @param options.mode - 'plan' to preview, 'apply' to execute
+   * @returns Result pattern: Ok with planned/executed operations, NotOk with failure details
+   * @throws If not connected, target doesn't support migrations, or infrastructure failure
+   */
+  dbUpdate(options: DbUpdateOptions): Promise<DbUpdateResult>;
 
   /**
    * Introspects the database schema.
