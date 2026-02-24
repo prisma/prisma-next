@@ -123,6 +123,7 @@ const contract = validateContract<Contract>(contractJson);
 - Add SQL operation: `docs/briefs/complete` and `.cursor/plans/add-sql-operation.md`
 - Split monolith into modules: `.cursor/plans/split-into-modules.md`
 - Fix import violation: `.cursor/plans/fix-import-violation.md`
+- Shape and deliver a project (spec → plan → implement): `.agents/rules/drive-project-workflow.mdc` (artifacts live under `projects/`, see `projects/README.md`)
 
 ## Subsystem Deep Dives
 

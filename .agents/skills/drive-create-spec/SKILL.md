@@ -14,8 +14,10 @@ Produce a complete engineering spec by combining an engineer's input with senior
 
 ## File Naming
 
-- Spec files use the naming convention `{name}.spec.md` where `{name}` is a kebab-case identifier for the feature or project (e.g. `pdf-export.spec.md`, `webhook-retry.spec.md`).
-- If the engineer does not specify a folder, store specs in `docs/plans/`.
+- **Project spec (shaping stage output)**: `projects/{project}/spec.md`
+- **Task/feature spec (within a project)**: `projects/{project}/specs/{name}.spec.md` where `{name}` is kebab-case (e.g. `pdf-export.spec.md`, `webhook-retry.spec.md`)
+- If the engineer does not specify a project, ask for a `{project}` slug (kebab-case) and create the directory structure under `projects/{project}/`.
+- Note: `projects/{project}/` is **transient**. At project close-out, long-lived docs (ADRs, subsystem docs) should be migrated into `docs/` and the `projects/{project}/` folder deleted.
 
 ## Entry Points
 
@@ -47,7 +49,12 @@ After an extended conversation, the engineer (or you) wants to capture decisions
 
 Given a description, generate the full spec:
 
-1. **Determine the file path.** If not already provided, ask for the spec name. Derive the file path as `docs/plans/{name}.spec.md` unless the engineer specifies a different location.
+1. **Determine the file path.** If not already provided, ask:
+   - The `{project}` name (kebab-case)
+   - Whether this is the **project spec** (shaping output) or a **task/feature spec**
+   Then derive:
+   - Project spec: `projects/{project}/spec.md`
+   - Task/feature spec: `projects/{project}/specs/{name}.spec.md`
 2. **Fill every section** of the template below. Apply senior/staff/principal-level engineering judgment:
    - Infer reasonable functional and non-functional requirements from the problem space.
    - Propose sensible defaults for security, observability, cost, and data protection, even if the engineer didn't mention them.
@@ -80,7 +87,7 @@ After writing the initial spec, enter a refinement loop:
 1. **Present open questions in the chat window.** Format them as a numbered list so the engineer can respond by number or inline. Example:
 
    ```
-   I've drafted the spec at docs/plans/feature-x.spec.md. A few things to resolve:
+   I've drafted the spec at projects/my-proj/specs/feature-x.spec.md. A few things to resolve:
 
    1. Should the webhook retry strategy use exponential backoff or fixed intervals? I assumed exponential (1s, 2s, 4s, 8s, max 60s) — does that work?
    2. The description mentions "admin users" — is this the existing RBAC admin role, or does this need a new permission scope?

@@ -1,0 +1,44 @@
+---
+description: Organize work as spec → plan → implement (Drive skills + projects/ layout)
+alwaysApply: true
+---
+
+# Drive project workflow
+
+Use this workflow when shaping and delivering new work.
+
+## Shape a project (spec first)
+
+- Start by running `drive-create-spec` to produce the **project spec** at `projects/<project>/spec.md`.
+- Then run `drive-generate-plan` to produce the **project plan** at `projects/<project>/plans/plan.md` (and task plans under `projects/<project>/plans/`).
+- The agent should guide a short, targeted conversation to resolve ambiguity and document decisions in the spec/plan format; optionally sync milestones/tasks to Linear.
+
+## Keep project artifacts under `projects/<project>/`
+
+- Project home: `projects/<project>/`
+- Canonical project spec: `projects/<project>/spec.md`
+- Task/feature specs: `projects/<project>/specs/<task>.spec.md`
+- Project plan: `projects/<project>/plans/plan.md`
+- Task/feature plans: `projects/<project>/plans/<task>.plan.md`
+- Project-specific reference material/assets: `projects/<project>/**`
+
+When starting work on a **task** from a project, ensure its spec is recorded under `projects/<project>/specs/` before implementation.
+
+## `projects/` is transient (close-out required)
+
+Anything under `projects/` is **temporary** and should be deleted when the work is done.
+
+- The **final task** in a project is to:
+  - Verify all acceptance criteria are met
+  - Finalize ADRs and any long-lived documentation
+  - Migrate finalized ADRs/docs into `docs/` (e.g. `docs/architecture docs/adrs/` or relevant subsystem docs)
+  - Delete `projects/<project>/` (specs, plans, notes, assets)
+
+## Collaboration + PR expectations
+
+- Shaping output is the project spec. This is the best time for team collaboration: share the **spec**, **plan**, and any **ADRs** early and validate decisions.
+- Project specs can change without ADRs. ADRs are for changes to the system architecture/behavior and are recorded under `docs/`.
+- During implementation you may update the plan freely, but keep the project spec stable (it should not change often).
+- Open an initial PR containing the project spec. During the project’s lifetime, later task PRs should reference the project spec (and usually should not modify it).
+- The close-out PR may (and usually will) migrate finalized docs into `docs/` and delete `projects/<project>/`.
+

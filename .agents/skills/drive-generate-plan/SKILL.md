@@ -14,8 +14,9 @@ Transform a spec into an execution plan by structuring milestones, decomposing t
 
 ## File Naming
 
-- Plan files use the naming convention `{name}.plan.md`, matching the spec's name (e.g. if the spec is `pdf-export.spec.md`, the plan is `pdf-export.plan.md`).
-- Store the plan file alongside its spec. If no folder is specified, use `docs/plans/`.
+- **Project plan (from `projects/{project}/spec.md`)**: `projects/{project}/plans/plan.md`
+- **Task/feature plan (from `projects/{project}/specs/{name}.spec.md`)**: `projects/{project}/plans/{name}.plan.md`
+- The plan name `{name}` matches the spec name (e.g. `pdf-export.spec.md` → `pdf-export.plan.md`).
 
 ## Entry Points
 
@@ -41,7 +42,7 @@ The engineer has been working on a spec in the current conversation (e.g. via `d
 The engineer asks to generate a plan but no spec exists.
 
 - Ask: *"I need a spec to build the plan from. Want me to help create one first, or do you have a spec file I can reference?"*
-- If they want to create a spec, hand off to `drive-create-spec`. The spec will be created as `{name}.spec.md` in `docs/plans/` by default.
+- If they want to create a spec, hand off to `drive-create-spec`. By default, project shaping produces `projects/{project}/spec.md`, and task/feature specs go to `projects/{project}/specs/{name}.spec.md`.
 - Once a spec exists, proceed to **Drafting**.
 
 ## Drafting
@@ -73,9 +74,15 @@ Given a spec, generate the full plan:
 5. **Add test tasks for every acceptance criterion.** Review the spec's acceptance criteria and ensure every criterion has at least one corresponding test task in the plan. Add a dedicated section or weave tests into the relevant milestone. If a criterion cannot be tested automatically, note it as requiring manual verification. Flag any acceptance criteria that are ambiguous or untestable:
    *"Acceptance criterion [N] is difficult to verify automatically: [reason]. Should I refine it, or plan for manual verification?"*
 
-6. **Write the plan file** using the template below, saved as `{name}.plan.md` alongside the spec.
+6. **Add a close-out task (required).** The final milestone (or final tasks) must include:
+   - Verify all acceptance criteria are met (and link to the tests/manual checks)
+   - Finalize ADRs / long-lived documentation and migrate it into `docs/`
+   - Delete `projects/{project}/` (everything under it is transient)
+   - If the project spec was merged, the close-out work is often done as a final PR that performs the doc migration + deletion
 
-7. Proceed to **Refinement**.
+7. **Write the plan file** using the template below, saved to the `projects/{project}/` layout described above.
+
+8. Proceed to **Refinement**.
 
 ## Refinement
 
@@ -84,7 +91,7 @@ After writing the initial plan, enter a refinement loop:
 1. **Present gaps and assumptions in the chat window.** Format as a numbered list. Example:
 
    ```
-   I've drafted the plan at docs/plans/feature-x.plan.md. A few things to resolve:
+   I've drafted the plan at projects/my-proj/plans/feature-x.plan.md. A few things to resolve:
 
    1. The spec mentions "admin approval flow" but doesn't detail the approval states. I assumed: pending -> approved/rejected. Does this need a more complex state machine?
    2. I've listed the Platform team as a collaborator since the spec references their auth service. Should anyone specific from that team be named?
