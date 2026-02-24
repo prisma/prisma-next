@@ -24,6 +24,12 @@
  * - repo-users-cursor [cursor] [limit]
  *                              Cursor pagination via ORM client
  * - repo-latest-per-kind       DISTINCT ON example via ORM client
+ * - repo-user-insights [limit]
+ *                              include().combine() metrics + latest related row
+ * - repo-kind-breakdown [minUsers]
+ *                              groupBy().having().aggregate() example
+ * - repo-upsert-user <id> <email> <kind>
+ *                              upsert() example for id conflict
  * - users-paginate [cursor]    Cursor-based pagination
  * - similarity-search <vec>    Vector similarity search (pgvector)
  * - budget-violation           Demo budget enforcement error
@@ -41,9 +47,12 @@ import { ormClientGetAdminUsers } from './orm-client/get-admin-users';
 import { ormClientGetDashboardUsers } from './orm-client/get-dashboard-users';
 import { ormClientGetLatestUserPerKind } from './orm-client/get-latest-user-per-kind';
 import { ormClientGetPostFeed } from './orm-client/get-post-feed';
+import { ormClientGetUserInsights } from './orm-client/get-user-insights';
+import { ormClientGetUserKindBreakdown } from './orm-client/get-user-kind-breakdown';
 import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { ormClientGetUsers } from './orm-client/get-users';
 import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor';
+import { ormClientUpsertUser } from './orm-client/upsert-user';
 import { db } from './prisma/db';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
@@ -162,6 +171,26 @@ async function main() {
     } else if (cmd === 'repo-latest-per-kind') {
       const users = await ormClientGetLatestUserPerKind(runtime);
       console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'repo-user-insights') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const users = await ormClientGetUserInsights(limit, runtime);
+      console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'repo-kind-breakdown') {
+      const minUsers = args[0] ? Number.parseInt(args[0], 10) : 1;
+      const rows = await ormClientGetUserKindBreakdown(minUsers, runtime);
+      console.log(JSON.stringify(rows, null, 2));
+    } else if (cmd === 'repo-upsert-user') {
+      const [id, email, kind] = args;
+      if (!id || !email || !kind) {
+        console.error('Usage: pnpm start -- repo-upsert-user <id> <email> <kind>');
+        process.exit(1);
+      }
+      if (kind !== 'admin' && kind !== 'user') {
+        console.error('repo-upsert-user kind must be "admin" or "user"');
+        process.exit(1);
+      }
+      const user = await ormClientUpsertUser({ id, email, kind }, runtime);
+      console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'similarity-search') {
       const [queryVectorStr, limitStr] = args;
       if (!queryVectorStr) {
@@ -240,7 +269,8 @@ async function main() {
           'repo-user <email> | repo-posts <userId> [limit] | ' +
           'repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser] | ' +
           'repo-post-feed <postTitleTerm> [limit] | repo-users-cursor [cursor] [limit] | ' +
-          'repo-latest-per-kind | users-paginate [cursor] [limit] | ' +
+          'repo-latest-per-kind | repo-user-insights [limit] | repo-kind-breakdown [minUsers] | ' +
+          'repo-upsert-user <id> <email> <kind> | users-paginate [cursor] [limit] | ' +
           'users-paginate-back <cursor> [limit] | similarity-search <queryVector> [limit] | ' +
           'budget-violation | user-kysely <userId> | user-transaction-kysely]',
       );

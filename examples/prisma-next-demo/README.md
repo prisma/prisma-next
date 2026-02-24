@@ -91,6 +91,9 @@ The demo includes ORM client examples under `src/orm-client/`:
 - `ormClientGetPostFeed(postTitleTerm, limit, runtime)` — to-one include (`post -> user`) with projected fields
 - `ormClientGetUsersByIdCursor(cursor, limit, runtime)` — cursor pagination with `orderBy()` + `cursor()`
 - `ormClientGetLatestUserPerKind(runtime)` — `distinctOn()` with deterministic ordering
+- `ormClientGetUserInsights(limit, runtime)` — `include().combine()` metrics and latest related row
+- `ormClientGetUserKindBreakdown(minUsers, runtime)` — `groupBy().having().aggregate()` breakdown
+- `ormClientUpsertUser(data, runtime)` — `upsert()` for create-or-update by primary key
 
 Run from the CLI:
 
@@ -103,6 +106,9 @@ pnpm start -- repo-dashboard example.com post 10 2
 pnpm start -- repo-post-feed post 10
 pnpm start -- repo-users-cursor user_001 5
 pnpm start -- repo-latest-per-kind
+pnpm start -- repo-user-insights 5
+pnpm start -- repo-kind-breakdown 1
+pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example.com user
 ```
 
 ## Setup

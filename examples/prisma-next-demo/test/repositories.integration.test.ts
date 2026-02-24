@@ -14,10 +14,13 @@ import { ormClientGetAdminUsers } from '../src/orm-client/get-admin-users';
 import { ormClientGetDashboardUsers } from '../src/orm-client/get-dashboard-users';
 import { ormClientGetLatestUserPerKind } from '../src/orm-client/get-latest-user-per-kind';
 import { ormClientGetPostFeed } from '../src/orm-client/get-post-feed';
+import { ormClientGetUserInsights } from '../src/orm-client/get-user-insights';
+import { ormClientGetUserKindBreakdown } from '../src/orm-client/get-user-kind-breakdown';
 import { ormClientGetUserPosts } from '../src/orm-client/get-user-posts';
 import { ormClientGetUsers } from '../src/orm-client/get-users';
 import { ormClientGetUsersByIdCursor } from '../src/orm-client/get-users-by-id-cursor';
 import { ormClientUpdateUserEmail } from '../src/orm-client/update-user-email';
+import { ormClientUpsertUser } from '../src/orm-client/upsert-user';
 import { db } from '../src/prisma/db';
 import { initTestDatabase } from './utils/control-client';
 
@@ -463,6 +466,120 @@ describe('ORM client integration examples', () => {
             seededUserIds.reader,
           ]);
           expect(records.map((user) => user['kind'])).toEqual(['admin', 'user']);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientGetUserInsights returns per-user counts with latest related post',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          const users = await ormClientGetUserInsights(4, runtime);
+          const records = users as Array<Record<string, unknown>>;
+
+          expect(records.map((user) => asId(user['id']))).toEqual([
+            seededUserIds.reader,
+            seededUserIds.adminTwo,
+            seededUserIds.member,
+            seededUserIds.admin,
+          ]);
+
+          const postMetrics = records.map(
+            (user) => user['posts'] as { totalPosts: number; latestPost: Array<{ id: string }> },
+          );
+          expect(postMetrics.map((posts) => posts.totalPosts)).toEqual([0, 2, 1, 2]);
+          expect(postMetrics.map((posts) => posts.latestPost.map((post) => asId(post.id)))).toEqual(
+            [[], [seededPostIds.adminZebra], [seededPostIds.memberNote], [seededPostIds.newer]],
+          );
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientGetUserKindBreakdown returns grouped user counts with having filter',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          const atLeastTwo = await ormClientGetUserKindBreakdown(2, runtime);
+          const atLeastThree = await ormClientGetUserKindBreakdown(3, runtime);
+
+          expect(atLeastTwo).toEqual([
+            { kind: 'admin', totalUsers: 2 },
+            { kind: 'user', totalUsers: 2 },
+          ]);
+          expect(atLeastThree).toEqual([]);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientUpsertUser updates existing row and inserts missing row',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contractIR: contract });
+        const runtime = await getRuntime(connectionString);
+
+        try {
+          await seedOrmClientData(runtime);
+          const insertedId = '00000000-0000-0000-0000-000000000099';
+
+          const updated = await ormClientUpsertUser(
+            {
+              id: seededUserIds.admin,
+              email: 'admin-upserted@example.com',
+              kind: 'admin',
+            },
+            runtime,
+          );
+          const inserted = await ormClientUpsertUser(
+            {
+              id: insertedId,
+              email: 'inserted-upsert@example.com',
+              kind: 'user',
+              createdAt: '2024-02-01T00:00:00.000Z',
+            },
+            runtime,
+          );
+
+          expect(updated).toMatchObject({
+            id: seededUserIds.admin,
+            email: 'admin-upserted@example.com',
+            kind: 'admin',
+          });
+          expect(inserted).toMatchObject({
+            id: insertedId,
+            email: 'inserted-upsert@example.com',
+            kind: 'user',
+          });
+          expect((inserted as Record<string, unknown>)['createdAt']).toBeTruthy();
+
+          const insertedUser = await ormClientFindUserById(insertedId, runtime);
+          expect(insertedUser).toMatchObject({
+            id: insertedId,
+            email: 'inserted-upsert@example.com',
+            kind: 'user',
+          });
         } finally {
           await runtime.close();
         }
