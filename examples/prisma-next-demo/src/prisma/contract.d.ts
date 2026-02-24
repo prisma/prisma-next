@@ -106,6 +106,8 @@ export type Contract = SqlContract<
             readonly columns: readonly ['userId'];
             readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
             readonly name: 'post_userId_fkey';
+            readonly constraint: true;
+            readonly index: true;
           },
         ];
       };

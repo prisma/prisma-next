@@ -18,90 +18,117 @@ Users need to control whether FK constraints and FK-supporting indexes are emitt
 
 ## Constraints
 
-- **ADR 003 (explicit over implicit):** behavior must be opt-in and visible in contract config.
-- **ADR 010 (canonicalization):** new FK config fields are part of the canonical contract and affect `storageHash`.
+- **ADR 003 (explicit over implicit):** behavior must be opt-in and visible in the contract.
+- **ADR 010 (canonicalization):** per-FK fields are part of storage and affect `storageHash`.
 - **ADR 009 (deterministic naming):** FK constraint and generated index names follow deterministic naming rules.
 - **ADR 065 / ADR 117 (capability model):** gating uses capability keys, never target-name branching.
 - **ADR 038 (idempotency):** FK/index operations must keep explicit pre/post checks and remain replay-safe.
+- **Self-contained nodes:** Each object in the contract must be interpretable from its own node without global mode flags.
 
 ## Decision
 
-### 1. Contract-level FK configuration
+### 1. Per-FK configuration fields
 
-Add a top-level `foreignKeys` section to `SqlContract` (sibling of `storage`, `models`, etc.):
+Each `ForeignKey` entry in `storage.tables.*.foreignKeys[]` carries explicit boolean fields:
 
 ```ts
-type ForeignKeysConfig = {
-  readonly constraints: boolean;
-  readonly indexes: boolean;
+type ForeignKey = {
+  readonly columns: readonly string[];
+  readonly references: ForeignKeyReferences;
+  readonly name?: string;
+  readonly constraint: boolean; // Emit ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY
+  readonly index: boolean;      // Emit CREATE INDEX for FK columns
 };
 ```
 
-| Field | Default | Meaning |
-|---|---|---|
-| `constraints` | `true` | Emit `ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY` DDL |
-| `indexes` | `true` | Emit `CREATE INDEX` for FK columns when no covering index exists |
+These fields are **required** in the canonical contract JSON — every FK is self-contained and interpretable without consulting any other part of the contract. There is no global mode flag.
 
-Defaults are explicit: `{ constraints: true, indexes: true }`. Omitting the section is equivalent to the defaults.
+### 2. Builder-level defaults (authoring sugar)
 
-### 2. Canonicalization and hashing
+The contract builder provides a `.foreignKeyDefaults()` method as authoring sugar. At `.build()` time, defaults are **materialized** into each FK node:
 
-The `foreignKeys` config is included in the canonical contract representation and contributes to `storageHash`. Changing FK config between contract revisions produces a new hash and a new migration edge.
+```ts
+const contract = defineContract<CodecTypes>()
+  .target(postgresPack)
+  .foreignKeyDefaults({ constraint: false, index: true }) // PlanetScale-style
+  .table('post', (t) =>
+    t.foreignKey(['userId'], { table: 'user', columns: ['id'] })
+    // ^^^ materialized as { constraint: false, index: true }
+  )
+  .build();
+```
 
-### 3. Deterministic planner behavior
+Per-FK overrides take precedence over defaults:
 
-The planner reads `contract.foreignKeys` and emits or omits operations accordingly:
+```ts
+.foreignKey(['userId'], { table: 'user', columns: ['id'] }, { constraint: true })
+// ^^^ constraint: true overrides the default false
+```
 
-| `constraints` | `indexes` | FK constraint DDL | FK-supporting index DDL |
-|---|---|---|---|
-| `true` | `true` | Emitted | Emitted (if no covering index) |
-| `true` | `false` | Emitted | Omitted |
-| `false` | `true` | Omitted | Emitted (if no covering index) |
-| `false` | `false` | Omitted | Omitted |
+### 3. No global config in canonical contract
 
-When `constraints: true`, the adapter must report `sql.foreignKeys: true`. If the capability is missing, the planner fails fast with a structured capability error.
+The emitted `contract.json` contains **no** top-level `foreignKeys` config. All FK behavior is expressed per-node inside `storage.tables.*.foreignKeys[]`.
 
-When `indexes: true` and the adapter reports `sql.autoIndexesForeignKeys: true`, the planner skips explicit index creation for FK columns because the database creates them automatically.
+### 4. Canonicalization and hashing
 
-### 4. Schema verification
+Per-FK fields live inside `storage.tables`, which is already included in `storageHash` computation. Changing FK fields between contract revisions produces a new hash and a new migration edge.
 
-The verifier reads `contract.foreignKeys` to decide what to expect:
+### 5. Deterministic planner behavior
 
-- `constraints: true` → missing FK constraints in the schema IR are reported as `foreign_key_mismatch`.
-- `constraints: false` → FK constraints are not verified (their presence/absence in the DB is irrelevant).
-- `indexes: true` → missing FK-supporting indexes are reported as `index_mismatch`.
-- `indexes: false` → FK-supporting indexes are not verified.
+The planner reads each FK's `constraint` and `index` fields individually:
 
-### 5. Capability keys
+- `fk.constraint === true` → emit `ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY`
+- `fk.constraint === false` → skip FK constraint DDL for this FK
+- `fk.index === true` → emit `CREATE INDEX` for this FK's columns (if no covering index)
+- `fk.index === false` → skip FK-backing index for this FK
+
+This enables **mixed configs** within a single contract (e.g., one FK with constraint, another without).
+
+### 6. Schema verification
+
+The verifier reads each FK's fields individually:
+
+- `fk.constraint === true` → missing FK constraint is reported as `foreign_key_mismatch`
+- `fk.constraint === false` → FK constraint presence/absence is not verified
+- `fk.index === true` → missing FK-backing index is reported as `index_mismatch`
+- `fk.index === false` → FK-backing index is not verified
+
+### 7. Normalization
+
+For backward compatibility with older contract.json files, normalization fills missing `constraint` and `index` fields with defaults (`true`).
+
+### 8. Capability keys
 
 | Key | Type | Reported by | Meaning |
 |---|---|---|---|
 | `sql.foreignKeys` | boolean | adapters that support FK constraints | Database supports `FOREIGN KEY` DDL |
 | `sql.autoIndexesForeignKeys` | boolean | adapters where the DB auto-indexes FKs | Database automatically creates indexes for FKs |
 
-Postgres reports `sql.foreignKeys: true` and `sql.autoIndexesForeignKeys: false` (Postgres does not auto-create FK indexes).
+Postgres reports `sql.foreignKeys: true` and `sql.autoIndexesForeignKeys: false`.
 
 ## Consequences
 
 ### Positive
 
-- FK behavior is fully explicit and deterministic from the contract.
-- No hidden runtime emulation or target-guessing magic.
-- Migration planner output is predictable across all four combinations.
+- FK behavior is fully explicit and deterministic per-node.
+- Each FK entry is self-contained — no global mode flags.
+- Mixed FK configs within a single contract are supported.
+- Migration planner output is predictable per-FK.
 - Capability gating ensures fail-fast diagnostics for unsupported configurations.
 
 ### Negative
 
-- Users must set `foreignKeys.constraints: false` for FK-less environments. This is intentional: explicit over implicit.
+- Users must set `constraint: false` for FK-less environments. This is intentional: explicit over implicit.
 - Changing FK config requires a new migration (hash changes). This is correct: schema intent changed.
+- Every FK entry in the canonical JSON must include `constraint` and `index`, making the JSON slightly more verbose.
 
 ## Scope
 
 **v1 (this ADR):**
-- Contract schema/types for global FK knobs.
-- TS contract builder support.
-- Deterministic planner emission/omission.
-- Schema verification updates.
+- Per-FK `constraint` and `index` fields in the contract IR.
+- TS contract builder support with `foreignKeyDefaults()` sugar.
+- Per-FK planner emission/omission.
+- Schema verification per-FK.
 - Postgres-first implementation and tests.
 
 **v2 (deferred):**
@@ -109,5 +136,4 @@ Postgres reports `sql.foreignKeys: true` and `sql.autoIndexesForeignKeys: false`
 
 **Out of scope:**
 - Runtime emulated referential integrity.
-- Per-FK or per-table overrides.
 - Cross-target rollout beyond Postgres.

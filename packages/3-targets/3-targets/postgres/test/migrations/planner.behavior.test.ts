@@ -150,6 +150,8 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
             {
               columns: ['userId'],
               references: { table: 'user', columns: ['id'] },
+              constraint: true,
+              index: true,
             },
           ],
         },

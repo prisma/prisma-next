@@ -26,13 +26,12 @@ import {
   isUniqueConstraintSatisfied,
   verifySqlSchema,
 } from '@prisma-next/family-sql/schema-verify';
-import {
-  DEFAULT_FOREIGN_KEYS_CONFIG,
-  type ForeignKey,
-  type SqlContract,
-  type SqlStorage,
-  type StorageColumn,
-  type StorageTable,
+import type {
+  ForeignKey,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -111,11 +110,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       return plannerFailure(storageTypePlan.conflicts);
     }
 
-    const fkConfig = options.contract.foreignKeys ?? DEFAULT_FOREIGN_KEYS_CONFIG;
-    const fkColumnSets =
-      fkConfig.indexes === false
-        ? this.collectForeignKeyColumnSets(options.contract.storage.tables)
-        : new Set<string>();
+    const skipFkIndexes = this.collectSkippedFkIndexColumnSets(options.contract.storage.tables);
 
     // Build extension operations from component-owned database dependencies
     operations.push(
@@ -133,15 +128,13 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         options.contract.storage.tables,
         options.schema,
         schemaName,
-        fkColumnSets,
+        skipFkIndexes,
       ),
-      ...(fkConfig.constraints
-        ? this.buildForeignKeyOperations(
-            options.contract.storage.tables,
-            options.schema,
-            schemaName,
-          )
-        : []),
+      ...this.buildForeignKeyOperations(
+        options.contract.storage.tables,
+        options.schema,
+        schemaName,
+      ),
     );
 
     const plan = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -499,16 +492,18 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     return operations;
   }
 
-  private collectForeignKeyColumnSets(
+  private collectSkippedFkIndexColumnSets(
     tables: SqlContract<SqlStorage>['storage']['tables'],
   ): Set<string> {
-    const fkColumnSets = new Set<string>();
+    const skipSets = new Set<string>();
     for (const [tableName, table] of Object.entries(tables)) {
       for (const fk of table.foreignKeys) {
-        fkColumnSets.add(`${tableName}:${fk.columns.join(',')}`);
+        if (fk.index === false) {
+          skipSets.add(`${tableName}:${fk.columns.join(',')}`);
+        }
       }
     }
-    return fkColumnSets;
+    return skipSets;
   }
 
   private buildIndexOperations(
@@ -573,6 +568,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     for (const [tableName, table] of sortedEntries(tables)) {
       const schemaTable = schema.tables[tableName];
       for (const foreignKey of table.foreignKeys) {
+        if (foreignKey.constraint === false) continue;
         if (schemaTable && hasForeignKey(schemaTable, foreignKey)) {
           continue;
         }
@@ -639,7 +635,6 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
         kind: 'conflict';
         conflicts: SqlPlannerConflict[];
       } {
-    const fkConfig = options.contract.foreignKeys ?? DEFAULT_FOREIGN_KEYS_CONFIG;
     const verifyOptions: VerifySqlSchemaOptionsWithComponents = {
       contract: options.contract,
       schema: options.schema,
@@ -648,7 +643,6 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
       normalizeNativeType: normalizeSchemaNativeType,
-      foreignKeysConfig: fkConfig,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
 
