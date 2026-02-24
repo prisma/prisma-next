@@ -89,7 +89,9 @@ jobs:
       # NODE_AUTH_TOKEN is intentionally NOT set. npm detects the OIDC environment
       # (id-token: write) and authenticates via Trusted Publishing automatically.
       # Setting NODE_AUTH_TOKEN to any value -- even empty string -- would block OIDC.
+      #
+      # Provenance (NPM_CONFIG_PROVENANCE) is NOT enabled because the repo is private.
+      # npm rejects provenance attestations from private source repositories.
+      # Re-enable when the repo becomes public.
       - name: Publish packages
         run: pnpm -r publish --access public --tag "${{ steps.version.outputs.tag }}" --no-git-checks
-        env:
-          NPM_CONFIG_PROVENANCE: true
