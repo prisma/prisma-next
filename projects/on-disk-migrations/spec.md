@@ -257,6 +257,21 @@ This project implements **attestation** only: computing the content-addressed `e
 
 Terminology note: "attestation" (hashing migration content → `edgeId`), "signing" (cryptographic signature → provenance), and "database signing" (`db sign` → writing marker to DB) are three distinct concepts.
 
+## RD-16: Structured errors with MIGRATION.* stable codes
+
+Migration tooling errors use the `MIGRATION.SUBCODE` format from ADR 027's stable code registry. The `MigrationToolsError` class carries `code`, `category` (always `'MIGRATION'`), `why` (plain-language cause), `fix` (actionable remediation), and `details` (machine-readable structured data for agents).
+
+Tooling-time codes registered in ADR 027:
+- `MIGRATION.DIR_EXISTS` — migration directory already exists on disk
+- `MIGRATION.FILE_MISSING` — expected migration file not found
+- `MIGRATION.INVALID_JSON` — migration file contains malformed JSON
+- `MIGRATION.INVALID_MANIFEST` — manifest missing required fields or has invalid values
+- `MIGRATION.INVALID_NAME` — migration name/slug empty after sanitization
+- `MIGRATION.SELF_LOOP` — migration edge has from === to
+- `MIGRATION.AMBIGUOUS_LEAF` — multiple leaf nodes in DAG (diverged branches)
+
+These are distinct from the existing runtime `MIGRATION.*` codes (PRECHECK_FAILED, POSTCHECK_FAILED, etc.) which are apply-time. The CLI boundary catches `MigrationToolsError.is(e)` and converts to its own envelope format (`CliStructuredError`).
+
 # Open Questions
 
 1. **How does the control plane stack expose contract-to-contract planning?**

@@ -111,6 +111,13 @@ NAMESPACE.SUBCODE where NAMESPACE ∈ { PLAN, RUNTIME, ADAPTER, BUDGET, LINT, MI
 - **MIGRATION.IDEMPOTENT_ALREADY_APPLIED**: safe no-op replay
 - **MIGRATION.CONFLICT**: state differs in conflicting ways
 - **MIGRATION.NON_TRANSACTIONAL_STEP**: requires compensation plan
+- **MIGRATION.DIR_EXISTS**: migration directory already exists on disk
+- **MIGRATION.FILE_MISSING**: expected migration file (migration.json or ops.json) not found
+- **MIGRATION.INVALID_JSON**: migration file contains malformed JSON
+- **MIGRATION.INVALID_MANIFEST**: migration manifest missing required fields or has invalid values
+- **MIGRATION.INVALID_NAME**: migration name/slug empty after sanitization
+- **MIGRATION.SELF_LOOP**: migration edge has from === to (graph invariant violation)
+- **MIGRATION.AMBIGUOUS_LEAF**: multiple leaf nodes in DAG (diverged branches)
 
 #### PREFLIGHT
 - **PREFLIGHT.SHADOW_FAILED**: shadow DB provision or migrate failed
