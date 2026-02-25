@@ -1,4 +1,3 @@
-import { executeCompiledQuery } from '@prisma-next/integration-kysely';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { isToOneCardinality } from './collection-contract';
@@ -17,6 +16,7 @@ import {
   compileSelect,
   compileSelectWithIncludeStrategy,
 } from './kysely-compiler';
+import { executeCompiledQuery } from './raw-compiled-query';
 import type {
   CollectionContext,
   CollectionState,

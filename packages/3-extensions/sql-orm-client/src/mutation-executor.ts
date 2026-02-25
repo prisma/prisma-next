@@ -1,4 +1,3 @@
-import { executeCompiledQuery } from '@prisma-next/integration-kysely';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { resolveModelTableName, resolvePrimaryKeyColumn } from './collection-contract';
@@ -14,6 +13,7 @@ import {
   compileUpdateCount,
   compileUpdateReturning,
 } from './kysely-compiler';
+import { executeCompiledQuery } from './raw-compiled-query';
 import {
   createRelationMutator,
   isRelationMutationCallback,

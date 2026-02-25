@@ -1,4 +1,3 @@
-import { executeCompiledQuery } from '@prisma-next/integration-kysely';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { WhereExpr } from '@prisma-next/sql-relational-core/ast';
@@ -61,6 +60,7 @@ import {
   executeNestedUpdateMutation,
   hasNestedMutationCallbacks,
 } from './mutation-executor';
+import { executeCompiledQuery } from './raw-compiled-query';
 import type {
   AggregateBuilder,
   AggregateResult,
