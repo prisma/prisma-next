@@ -85,10 +85,7 @@ export class KyselyPrismaConnection implements DatabaseConnection {
       throw new Error('Invoked executeQuery on released connection');
     }
     const plan = this.#createExecutionPlan<R>(compiledQuery);
-    const conn = this.#connection as {
-      execute<P>(p: ExecutionPlan<P> | SqlQueryPlan<P>): AsyncIterableResult<P>;
-    };
-    return { rows: await conn.execute(plan).toArray() };
+    return { rows: await this.#executor().execute(plan).toArray() };
   }
 
   async release(): Promise<void> {
@@ -112,10 +109,7 @@ export class KyselyPrismaConnection implements DatabaseConnection {
       throw new Error('Invoked streamQuery on released connection');
     }
     const plan = this.#createExecutionPlan<R>(compiledQuery);
-    const conn = this.#connection as {
-      execute<P>(p: ExecutionPlan<P> | SqlQueryPlan<P>): AsyncIterableResult<P>;
-    };
-    const results = conn.execute(plan);
+    const results = this.#executor().execute(plan);
 
     const generator = async function* (): AsyncIterableIterator<QueryResult<R>> {
       let chunk: R[] = [];
@@ -209,6 +203,22 @@ export class KyselyPrismaConnection implements DatabaseConnection {
         lane: 'raw',
         paramDescriptors: [],
       },
+    };
+  }
+
+  #executor(): {
+    execute<P>(plan: ExecutionPlan<P> | SqlQueryPlan<P>): AsyncIterableResult<P>;
+  } {
+    if (this.#transaction) {
+      return this.#transaction as {
+        execute<P>(plan: ExecutionPlan<P> | SqlQueryPlan<P>): AsyncIterableResult<P>;
+      };
+    }
+    if (!this.#connection) {
+      throw new Error('Invoked executeQuery on released connection');
+    }
+    return this.#connection as {
+      execute<P>(plan: ExecutionPlan<P> | SqlQueryPlan<P>): AsyncIterableResult<P>;
     };
   }
 }

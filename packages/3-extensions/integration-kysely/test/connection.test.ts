@@ -7,6 +7,7 @@ import { createAsyncResult, createCompiledQuery, createTestContract } from './he
 import { contract as sqlContractFixture } from './transform.fixtures';
 
 interface CapturedExecution<Row = unknown> {
+  readonly source: 'connection' | 'transaction';
   readonly plan: ExecutionPlan<Row>;
   readonly rows: readonly Row[];
 }
@@ -22,6 +23,7 @@ function createRuntimeConnection(rowsByExecution: readonly Record<string, unknow
     execute<Row>(plan: ExecutionPlan<Row>) {
       const rows = (executionQueue.shift() ?? []) as Row[];
       executions.push({
+        source: 'transaction',
         plan,
         rows,
       });
@@ -39,6 +41,7 @@ function createRuntimeConnection(rowsByExecution: readonly Record<string, unknow
     execute<Row>(plan: ExecutionPlan<Row>) {
       const rows = (executionQueue.shift() ?? []) as Row[];
       executions.push({
+        source: 'connection',
         plan,
         rows,
       });
@@ -89,7 +92,52 @@ describe('KyselyPrismaConnection', () => {
 
     expect(chunks).toEqual([{ rows: [{ id: 1 }, { id: 2 }] }, { rows: [{ id: 3 }] }]);
     expect(runtimeConnection.executions).toHaveLength(1);
+    expect(runtimeConnection.executions[0]?.source).toBe('connection');
     expect(runtimeConnection.executions[0]?.plan.meta.lane).toBe('raw');
+  });
+
+  it('executeQuery uses transaction executor while transaction is active', async () => {
+    const contract = createTestContract();
+    const compiledQuery = createCompiledQuery<{ id: number }>('select "id" from "users"', []);
+    const runtimeConnection = createRuntimeConnection([[{ id: 10 }]]);
+    const connection = new KyselyPrismaConnection(contract, runtimeConnection.connection);
+
+    await connection.beginTransaction({});
+    const result = await connection.executeQuery<{ id: number }>(compiledQuery);
+
+    expect(result.rows).toEqual([{ id: 10 }]);
+    expect(runtimeConnection.executions).toHaveLength(1);
+    expect(runtimeConnection.executions[0]?.source).toBe('transaction');
+  });
+
+  it('executeQuery returns to connection executor after commit', async () => {
+    const contract = createTestContract();
+    const compiledQuery = createCompiledQuery<{ id: number }>('select "id" from "users"', []);
+    const runtimeConnection = createRuntimeConnection([[{ id: 11 }]]);
+    const connection = new KyselyPrismaConnection(contract, runtimeConnection.connection);
+
+    await connection.beginTransaction({});
+    await connection.commitTransaction();
+    const result = await connection.executeQuery<{ id: number }>(compiledQuery);
+
+    expect(result.rows).toEqual([{ id: 11 }]);
+    expect(runtimeConnection.executions).toHaveLength(1);
+    expect(runtimeConnection.executions[0]?.source).toBe('connection');
+  });
+
+  it('executeQuery returns to connection executor after rollback', async () => {
+    const contract = createTestContract();
+    const compiledQuery = createCompiledQuery<{ id: number }>('select "id" from "users"', []);
+    const runtimeConnection = createRuntimeConnection([[{ id: 12 }]]);
+    const connection = new KyselyPrismaConnection(contract, runtimeConnection.connection);
+
+    await connection.beginTransaction({});
+    await connection.rollbackTransaction();
+    const result = await connection.executeQuery<{ id: number }>(compiledQuery);
+
+    expect(result.rows).toEqual([{ id: 12 }]);
+    expect(runtimeConnection.executions).toHaveLength(1);
+    expect(runtimeConnection.executions[0]?.source).toBe('connection');
   });
 
   it('executeQuery throws after release', async () => {
