@@ -2,6 +2,15 @@
 
 This demo shows how to plan and apply contract-driven schema updates with `prisma-next db update`. It covers success paths, no-ops, and failures with clear recovery steps.
 
+## Demo project
+
+The runnable demo lives in `examples/db-update-demo`.
+
+- Run a scenario: `bun run scripts/scenario.ts <n>`
+- Restore a scenario database: `bun run scripts/scenario.ts <n> --restore`
+
+Scenario database URLs are stored in `examples/db-update-demo/.env`.
+
 ## Prerequisites
 
 - Node version matches `package.json` `engines.node`.
@@ -46,7 +55,7 @@ Expected output:
 ```text
 ✖ Database marker is required before db update (MARKER_REQUIRED)
   Why: Contract marker not found in database
-  Fix: Run `prisma-next db init` first to adopt the database, then re-run `prisma-next db update`
+  Fix: Run `prisma-next db init` first to sign the database, then re-run `prisma-next db update`
 ```
 
 Recovery:
