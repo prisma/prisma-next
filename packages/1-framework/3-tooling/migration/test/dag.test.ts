@@ -1,6 +1,7 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/abstract-ops';
 import { describe, expect, it } from 'vitest';
 import { detectCycles, detectOrphans, findLeaf, findPath, reconstructGraph } from '../src/dag';
+import { MigrationToolsError } from '../src/errors';
 import type { MigrationPackage } from '../src/types';
 import { createTestManifest, createTestOps } from './fixtures';
 
@@ -48,8 +49,19 @@ describe('reconstructGraph', () => {
     expect(graph.edges.get('H2')).toHaveLength(1);
   });
 
-  it('rejects self-loop', () => {
-    expect(() => reconstructGraph([pkg('H1', 'H1', 'm1')])).toThrow(/self-loop/i);
+  it('rejects self-loop with code MIGRATION.SELF_LOOP', () => {
+    try {
+      reconstructGraph([pkg('H1', 'H1', 'm1')]);
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      const mte = e as MigrationToolsError;
+      expect(mte.code).toBe('MIGRATION.SELF_LOOP');
+      expect(mte.category).toBe('MIGRATION');
+      expect(mte.details).toHaveProperty('dirName', 'm1');
+      expect(mte.details).toHaveProperty('hash', 'H1');
+      expect(mte.fix).toBeTruthy();
+    }
   });
 });
 
@@ -73,13 +85,23 @@ describe('findLeaf', () => {
     expect(findLeaf(graph)).toBe('H3');
   });
 
-  it('errors on branching (ambiguous leaves)', () => {
+  it('errors on branching with code MIGRATION.AMBIGUOUS_LEAF', () => {
     const graph = reconstructGraph([
       pkg(E, 'H1', 'm1'),
       pkg('H1', 'H2a', 'm2a'),
       pkg('H1', 'H2b', 'm2b'),
     ]);
-    expect(() => findLeaf(graph)).toThrow(/ambiguous|multiple/i);
+    try {
+      findLeaf(graph);
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      const mte = e as MigrationToolsError;
+      expect(mte.code).toBe('MIGRATION.AMBIGUOUS_LEAF');
+      expect(mte.category).toBe('MIGRATION');
+      expect(mte.details).toHaveProperty('leaves');
+      expect(mte.fix).toContain('--from');
+    }
   });
 });
 

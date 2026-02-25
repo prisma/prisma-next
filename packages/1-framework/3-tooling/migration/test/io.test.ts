@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { MigrationToolsError } from '../src/errors';
 import {
   formatMigrationDirName,
   readMigrationPackage,
@@ -9,6 +10,15 @@ import {
   writeMigrationPackage,
 } from '../src/io';
 import { createTestManifest, createTestOps } from './fixtures';
+
+function expectMigrationError(error: unknown, code: string) {
+  expect(MigrationToolsError.is(error)).toBe(true);
+  const mte = error as MigrationToolsError;
+  expect(mte.code).toBe(code);
+  expect(mte.category).toBe('MIGRATION');
+  expect(mte.why).toBeTruthy();
+  expect(mte.fix).toBeTruthy();
+}
 
 describe('writeMigrationPackage + readMigrationPackage', () => {
   let tmpDir: string;
@@ -44,47 +54,65 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     expect(manifestJson).toContain('  ');
   });
 
-  it('errors on malformed migration.json', async () => {
+  it('errors on malformed migration.json with code MIGRATION.INVALID_JSON', async () => {
     const dir = join(tmpDir, '20260225T1430_bad');
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'migration.json'), 'not json');
     await writeFile(join(dir, 'ops.json'), '[]');
 
-    await expect(readMigrationPackage(dir)).rejects.toThrow(/migration\.json/);
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_JSON');
+      return true;
+    });
   });
 
-  it('errors on missing ops.json', async () => {
+  it('errors on missing ops.json with code MIGRATION.FILE_MISSING', async () => {
     const dir = join(tmpDir, '20260225T1430_no_ops');
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestManifest()));
 
-    await expect(readMigrationPackage(dir)).rejects.toThrow(/ops\.json/);
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.FILE_MISSING');
+      expect((e as MigrationToolsError).details).toHaveProperty('file', 'ops.json');
+      return true;
+    });
   });
 
-  it('errors on missing migration.json', async () => {
+  it('errors on missing migration.json with code MIGRATION.FILE_MISSING', async () => {
     const dir = join(tmpDir, '20260225T1430_no_manifest');
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'ops.json'), '[]');
 
-    await expect(readMigrationPackage(dir)).rejects.toThrow(/migration\.json/);
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.FILE_MISSING');
+      expect((e as MigrationToolsError).details).toHaveProperty('file', 'migration.json');
+      return true;
+    });
   });
 
-  it('errors when manifest is missing required fields', async () => {
+  it('errors when manifest is missing required fields with code MIGRATION.INVALID_MANIFEST', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_manifest');
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'migration.json'), JSON.stringify({ from: 'x' }));
     await writeFile(join(dir, 'ops.json'), '[]');
 
-    await expect(readMigrationPackage(dir)).rejects.toThrow();
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
   });
 
-  it('errors when writing to existing directory', async () => {
+  it('errors when writing to existing directory with code MIGRATION.DIR_EXISTS', async () => {
     const dir = join(tmpDir, '20260225T1430_exists');
     await mkdir(dir, { recursive: true });
 
-    await expect(writeMigrationPackage(dir, createTestManifest(), createTestOps())).rejects.toThrow(
-      /already exists/,
-    );
+    await expect(
+      writeMigrationPackage(dir, createTestManifest(), createTestOps()),
+    ).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.DIR_EXISTS');
+      expect((e as MigrationToolsError).details).toHaveProperty('dir');
+      return true;
+    });
   });
 });
 
@@ -169,11 +197,17 @@ describe('formatMigrationDirName', () => {
     const ts = new Date('2026-02-25T14:30:00Z');
     const longSlug = 'a'.repeat(100);
     const result = formatMigrationDirName(ts, longSlug);
-    expect(result.length).toBeLessThanOrEqual(13 + 1 + 64); // timestamp + _ + max 64
+    expect(result.length).toBeLessThanOrEqual(13 + 1 + 64);
   });
 
-  it('errors on empty slug after sanitization', () => {
+  it('errors on empty slug with code MIGRATION.INVALID_NAME', () => {
     const ts = new Date('2026-02-25T14:30:00Z');
-    expect(() => formatMigrationDirName(ts, '!!!')).toThrow();
+    try {
+      formatMigrationDirName(ts, '!!!');
+      expect.fail('expected error');
+    } catch (e) {
+      expectMigrationError(e, 'MIGRATION.INVALID_NAME');
+      expect((e as MigrationToolsError).details).toHaveProperty('slug', '!!!');
+    }
   });
 });

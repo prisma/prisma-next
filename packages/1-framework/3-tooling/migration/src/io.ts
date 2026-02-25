@@ -1,5 +1,12 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, join } from 'pathe';
+import {
+  errorDirectoryExists,
+  errorInvalidJson,
+  errorInvalidManifest,
+  errorInvalidSlug,
+  errorMissingFile,
+} from './errors';
 import type { MigrationManifest, MigrationOps, MigrationPackage } from './types';
 
 const MANIFEST_FILE = 'migration.json';
@@ -19,9 +26,7 @@ export async function writeMigrationPackage(
     // directory doesn't exist, which is what we want
   }
   if (exists) {
-    throw new Error(
-      `Migration directory already exists: ${dir}. Use --name to pick a different name or delete the existing directory.`,
-    );
+    throw errorDirectoryExists(dir);
   }
 
   await mkdir(dir, { recursive: true });
@@ -37,28 +42,28 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
   try {
     manifestRaw = await readFile(manifestPath, 'utf-8');
   } catch {
-    throw new Error(`Missing ${MANIFEST_FILE} in ${dir}`);
+    throw errorMissingFile(MANIFEST_FILE, dir);
   }
 
   let opsRaw: string;
   try {
     opsRaw = await readFile(opsPath, 'utf-8');
   } catch {
-    throw new Error(`Missing ${OPS_FILE} in ${dir}`);
+    throw errorMissingFile(OPS_FILE, dir);
   }
 
   let manifest: MigrationManifest;
   try {
     manifest = JSON.parse(manifestRaw);
   } catch (e) {
-    throw new Error(`Invalid JSON in ${manifestPath}: ${e instanceof Error ? e.message : e}`);
+    throw errorInvalidJson(manifestPath, e instanceof Error ? e.message : String(e));
   }
 
   let ops: MigrationOps;
   try {
     ops = JSON.parse(opsRaw);
   } catch (e) {
-    throw new Error(`Invalid JSON in ${opsPath}: ${e instanceof Error ? e.message : e}`);
+    throw errorInvalidJson(opsPath, e instanceof Error ? e.message : String(e));
   }
 
   validateManifest(manifest, manifestPath);
@@ -76,23 +81,23 @@ function validateManifest(
   filePath: string,
 ): asserts manifest is MigrationManifest {
   if (!manifest || typeof manifest !== 'object') {
-    throw new Error(`Invalid manifest in ${filePath}: expected an object`);
+    throw errorInvalidManifest(filePath, 'expected an object');
   }
   const m = manifest as Record<string, unknown>;
   const required = ['from', 'to', 'kind', 'toContract'] as const;
   for (const field of required) {
     if (!(field in m)) {
-      throw new Error(`Invalid manifest in ${filePath}: missing required field "${field}"`);
+      throw errorInvalidManifest(filePath, `missing required field "${field}"`);
     }
   }
   if (typeof m['from'] !== 'string') {
-    throw new Error(`Invalid manifest in ${filePath}: "from" must be a string`);
+    throw errorInvalidManifest(filePath, '"from" must be a string');
   }
   if (typeof m['to'] !== 'string') {
-    throw new Error(`Invalid manifest in ${filePath}: "to" must be a string`);
+    throw errorInvalidManifest(filePath, '"to" must be a string');
   }
   if (m['kind'] !== 'regular' && m['kind'] !== 'baseline') {
-    throw new Error(`Invalid manifest in ${filePath}: "kind" must be "regular" or "baseline"`);
+    throw errorInvalidManifest(filePath, '"kind" must be "regular" or "baseline"');
   }
 }
 
@@ -134,7 +139,7 @@ export function formatMigrationDirName(timestamp: Date, slug: string): string {
     .replace(/^_|_$/g, '');
 
   if (sanitized.length === 0) {
-    throw new Error(`Slug "${slug}" results in an empty string after sanitization`);
+    throw errorInvalidSlug(slug);
   }
 
   const truncated = sanitized.slice(0, MAX_SLUG_LENGTH);

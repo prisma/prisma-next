@@ -1,4 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/abstract-ops';
+import { errorAmbiguousLeaf, errorSelfLoop } from './errors';
 import type { MigrationGraph, MigrationGraphEdge, MigrationPackage } from './types';
 
 export function reconstructGraph(packages: readonly MigrationPackage[]): MigrationGraph {
@@ -10,9 +11,7 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
     const { from, to } = pkg.manifest;
 
     if (from === to) {
-      throw new Error(
-        `Self-loop detected in migration "${pkg.dirName}": from === to === "${from}"`,
-      );
+      throw errorSelfLoop(pkg.dirName, from);
     }
 
     nodes.add(from);
@@ -85,10 +84,7 @@ export function findLeaf(graph: MigrationGraph): string {
     return realLeaves[0]!;
   }
 
-  throw new Error(
-    `Ambiguous migration graph: multiple leaves found (${realLeaves.join(', ')}). ` +
-      'Resolve by specifying --from <hash> or squashing branches.',
-  );
+  throw errorAmbiguousLeaf(realLeaves);
 }
 
 export function findPath(
