@@ -11,8 +11,7 @@ import type {
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SelectBuilder } from '@prisma-next/sql-lane';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
-import type { OrmRegistry } from '@prisma-next/sql-orm-lane';
-import { orm as ormBuilder } from '@prisma-next/sql-orm-lane';
+import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type { SchemaHandle } from '@prisma-next/sql-relational-core/schema';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import type {
@@ -48,6 +47,9 @@ type NormalizeOperationTypes<T> = {
 type ToSchemaOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationTypes<T>;
 
 export type PostgresTargetId = 'postgres';
+type OrmClient<TContract extends SqlContract<SqlStorage>> = ReturnType<
+  typeof ormBuilder<TContract>
+>;
 
 export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
   readonly sql: SelectBuilder<
@@ -62,7 +64,7 @@ export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
     ExtractCodecTypes<TContract>,
     ToSchemaOperationTypes<ExtractOperationTypes<TContract>>
   >;
-  readonly orm: OrmRegistry<TContract, ExtractCodecTypes<TContract>>;
+  readonly orm: OrmClient<TContract>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
   runtime(): Runtime;
@@ -138,9 +140,57 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
 
   const schema: PostgresClient<TContract>['schema'] = schemaBuilder(context);
   const sql = sqlBuilder({ context });
-  const orm = ormBuilder({ context });
-
   let runtimeInstance: Runtime | undefined;
+  const getRuntime = (): Runtime => {
+    if (runtimeInstance) {
+      return runtimeInstance;
+    }
+
+    const stackInstance = instantiateExecutionStack(stack);
+    const driverDescriptor = stack.driver;
+    if (!driverDescriptor) {
+      throw new Error('Driver descriptor missing from execution stack');
+    }
+
+    const connect =
+      binding.kind === 'url'
+        ? {
+            pool: new Pool({
+              connectionString: binding.url,
+              connectionTimeoutMillis: options.poolOptions?.connectionTimeoutMillis ?? 20_000,
+              idleTimeoutMillis: options.poolOptions?.idleTimeoutMillis ?? 30_000,
+            }),
+          }
+        : binding.kind === 'pgPool'
+          ? { pool: binding.pool }
+          : { client: binding.client };
+
+    const driver = driverDescriptor.create({
+      connect,
+      cursor: { disabled: true },
+    });
+
+    runtimeInstance = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
+      ...(options.plugins ? { plugins: options.plugins } : {}),
+    });
+
+    return runtimeInstance;
+  };
+  const orm: OrmClient<TContract> = ormBuilder({
+    contract,
+    runtime: {
+      execute(plan) {
+        return getRuntime().execute(plan);
+      },
+      connection() {
+        return getRuntime().connection();
+      },
+    },
+  });
 
   return {
     sql,
@@ -154,43 +204,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     context,
     stack,
     runtime() {
-      if (runtimeInstance) {
-        return runtimeInstance;
-      }
-
-      const stackInstance = instantiateExecutionStack(stack);
-      const driverDescriptor = stack.driver;
-      if (!driverDescriptor) {
-        throw new Error('Driver descriptor missing from execution stack');
-      }
-
-      const connect =
-        binding.kind === 'url'
-          ? {
-              pool: new Pool({
-                connectionString: binding.url,
-                connectionTimeoutMillis: options.poolOptions?.connectionTimeoutMillis ?? 20_000,
-                idleTimeoutMillis: options.poolOptions?.idleTimeoutMillis ?? 30_000,
-              }),
-            }
-          : binding.kind === 'pgPool'
-            ? { pool: binding.pool }
-            : { client: binding.client };
-
-      const driver = driverDescriptor.create({
-        connect,
-        cursor: { disabled: true },
-      });
-
-      runtimeInstance = createRuntime({
-        stackInstance,
-        context,
-        driver,
-        verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-        ...(options.plugins ? { plugins: options.plugins } : {}),
-      });
-
-      return runtimeInstance;
+      return getRuntime();
     },
   };
 }

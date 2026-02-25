@@ -31,7 +31,7 @@ vi.mock('@prisma-next/sql-lane', () => ({
   sql: vi.fn(() => ({ lane: 'sql' })),
 }));
 
-vi.mock('@prisma-next/sql-orm-lane', () => ({
+vi.mock('@prisma-next/sql-orm-client', () => ({
   orm: vi.fn(() => ({ lane: 'orm' })),
 }));
 

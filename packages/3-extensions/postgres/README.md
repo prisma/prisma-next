@@ -45,7 +45,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - `@prisma-next/sql-lane` for `sql(...)`
 - `@prisma-next/integration-kysely` for `KyselyPrismaDialect` and contract-to-Kysely typing
 - `@prisma-next/sql-relational-core` for `schema(...)`
-- `@prisma-next/sql-orm-lane` for `orm(...)`
+- `@prisma-next/sql-orm-client` for `orm(...)`
 - `@prisma-next/sql-contract` for `validateContract(...)` and contract types
 - `kysely` for query-builder API surface
 - `pg` for lazy `Pool` construction when using URL binding
