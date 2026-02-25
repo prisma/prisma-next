@@ -10,7 +10,7 @@ One-liner lazy Postgres client for Prisma Next runtime composition.
 
 ## Overview
 
-`@prisma-next/postgres/runtime` exposes a single `postgres(...)` helper that composes the SQL execution stack for Postgres and returns static query roots immediately:
+`@prisma-next/postgres` (or `@prisma-next/postgres/runtime`) exposes a single `postgres(...)` helper that composes the SQL execution stack for Postgres and returns static query roots immediately:
 
 - `db.sql`
 - `db.schema`

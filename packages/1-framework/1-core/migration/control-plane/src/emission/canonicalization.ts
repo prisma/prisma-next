@@ -115,6 +115,16 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
           ['storage', 'tables', 'foreignKeys'],
         );
 
+      // Preserve per-FK `constraint` and `index` booleans (even when `false`)
+      // so that hash distinguishes `false` from absent.
+      // Path: ['storage', 'tables', <tableName>, 'foreignKeys', 'constraint' | 'index']
+      const isFkBooleanField =
+        currentPath.length === 5 &&
+        currentPath[0] === 'storage' &&
+        currentPath[1] === 'tables' &&
+        currentPath[3] === 'foreignKeys' &&
+        (key === 'constraint' || key === 'index');
+
       if (
         !isRequiredModels &&
         !isRequiredTables &&
@@ -128,7 +138,8 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isModelRelations &&
         !isTableUniques &&
         !isTableIndexes &&
-        !isTableForeignKeys
+        !isTableForeignKeys &&
+        !isFkBooleanField
       ) {
         continue;
       }

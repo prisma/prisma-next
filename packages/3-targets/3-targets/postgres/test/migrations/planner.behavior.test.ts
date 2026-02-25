@@ -74,6 +74,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       'column.user.email',
       'unique.user.user_email_key',
       'index.user.user_email_idx',
+      'index.post.post_userId_idx',
       'foreignKey.post.post_userId_fkey',
     ]);
   });
@@ -150,6 +151,8 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
             {
               columns: ['userId'],
               references: { table: 'user', columns: ['id'] },
+              constraint: true,
+              index: true,
             },
           ],
         },
@@ -201,6 +204,6 @@ function buildPostTableSchema(): SqlSchemaIR['tables'][string] {
         name: 'post_userId_fkey',
       },
     ],
-    indexes: [],
+    indexes: [{ columns: ['userId'], name: 'post_userId_idx', unique: false }],
   };
 }

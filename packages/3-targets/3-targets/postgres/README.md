@@ -34,7 +34,7 @@ This package spans multiple planes:
 
 This package provides the Postgres implementation of the SQL migration planner/runner used by `prisma-next db init`:
 
-- **Planner** (`src/core/migrations/planner.ts`): produces an additive-only `MigrationPlan` to bring the database schema in line with a destination contract. Extra unrelated schema is tolerated; non-additive mismatches (type/nullability/constraint incompatibilities) surface as structured conflicts. Storage type operations (from codec-owned hooks) are emitted before table operations when `storage.types` are present.
+- **Planner** (`src/core/migrations/planner.ts`): produces an additive-only `MigrationPlan` to bring the database schema in line with a destination contract. Extra unrelated schema is tolerated; non-additive mismatches (type/nullability/constraint incompatibilities) surface as structured conflicts. Storage type operations (from codec-owned hooks) are emitted before table operations when `storage.types` are present. The planner respects the contract's `foreignKeys` configuration: when `foreignKeys.constraints` is `false`, FK constraint operations are skipped; when `foreignKeys.indexes` is `false`, FK-backing indexes are omitted. See [ADR 161](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md).
 - **Runner** (`src/core/migrations/runner.ts`): executes a plan under an advisory lock, verifies the post-state schema, then writes the contract marker and appends a ledger entry in the `prisma_contract` schema.
 
 For the CLI orchestration, see `packages/1-framework/3-tooling/cli/src/commands/db-init.ts`.
@@ -153,6 +153,7 @@ This package ships a mix of fast planner unit tests and slower runner integratio
 - **Default (`pnpm --filter @prisma-next/target-postgres test`)**: runs all tests including integration tests
 - **Test files**:
   - `test/migrations/planner.behavior.test.ts`: Planner unit tests (classification, conflicts, dependency ops)
+  - `test/migrations/planner.fk-config.test.ts`: Planner unit tests for FK constraint/index configuration combinations
   - `test/migrations/planner.integration.test.ts`: Planner integration tests
   - `test/migrations/runner.*.integration.test.ts`: Runner integration tests (basic, errors, idempotency, policy)
 

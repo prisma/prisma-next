@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "storageHash": "sha256:c36c9d26c78f8bc59694a743717b94efbeacd71b5e038e9d8f63fb627a4693bb",
+  "storageHash": "sha256:ecd6961acf844e8a19d1e51d9503b244d3a9d5d6bc0cfc5835997dd21ad2a1ee",
   "executionHash": "sha256:8564aae6b2d73c1c37b71bce79fc4222405383e180e042b7596cae01d925804b",
   "profileHash": "sha256:27cf0a2f9718e05d72553d6c0519ba1c2235c04fc96df2255d7a904571f47a57",
   "models": {
@@ -89,6 +89,8 @@
             "columns": [
               "userId"
             ],
+            "constraint": true,
+            "index": true,
             "name": "post_userId_fkey",
             "references": {
               "columns": [

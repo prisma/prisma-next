@@ -16,6 +16,7 @@ This package provides generic builder primitives that can be composed with targe
 - **Type Helpers**: Provides generic type-level helpers for transforming builder states into contract structures
 - **Composition Surface**: Enables target-family specific packages (e.g., `@prisma-next/sql-contract-ts`) to compose generic core with family-specific types
 - **Defaults**: Reuses shared contract `ColumnDefault` for db-agnostic defaults (literal, function, and client-generated descriptors)
+- **Foreign Keys Configuration**: Provides a `foreignKeys()` method on the base `ContractBuilder` to configure FK constraint and index emission behavior
 
 ## Package Status
 
@@ -35,7 +36,7 @@ This package was created in Phase 2 of the contract authoring extraction. It con
 
 ## Exports
 
-- Builder state types: `ColumnBuilderState`, `TableBuilderState`, `ModelBuilderState`, `ContractBuilderState`, `RelationDefinition`, `ColumnBuilder`
+- Builder state types: `ColumnBuilderState`, `TableBuilderState`, `ModelBuilderState`, `ContractBuilderState`, `ForeignKeysConfigState`, `RelationDefinition`, `ColumnBuilder`
 - Builder classes: `TableBuilder`, `ModelBuilder`, `ContractBuilder`
 - Type helpers: `BuildStorageColumn`, `BuildStorage`, `BuildModels`, `BuildRelations`, extract helpers, `Mutable`
 - Factory function: `defineContract()` (generic)

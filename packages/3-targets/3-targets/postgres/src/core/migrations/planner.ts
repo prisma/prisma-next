@@ -123,6 +123,11 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       ),
       ...this.buildUniqueOperations(options.contract.storage.tables, options.schema, schemaName),
       ...this.buildIndexOperations(options.contract.storage.tables, options.schema, schemaName),
+      ...this.buildFkBackingIndexOperations(
+        options.contract.storage.tables,
+        options.schema,
+        schemaName,
+      ),
       ...this.buildForeignKeyOperations(
         options.contract.storage.tables,
         options.schema,
@@ -534,6 +539,65 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     return operations;
   }
 
+  /**
+   * Generates FK-backing index operations for FKs with `index: true`,
+   * but only when no matching user-declared index exists in `contractTable.indexes`.
+   */
+  private buildFkBackingIndexOperations(
+    tables: SqlContract<SqlStorage>['storage']['tables'],
+    schema: SqlSchemaIR,
+    schemaName: string,
+  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    for (const [tableName, table] of sortedEntries(tables)) {
+      const schemaTable = schema.tables[tableName];
+      // Collect column sets of user-declared indexes to avoid duplicates
+      const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
+
+      for (const fk of table.foreignKeys) {
+        if (fk.index === false) continue;
+        // Skip if user already declared an index with these columns
+        if (declaredIndexColumns.has(fk.columns.join(','))) continue;
+        // Skip if the index already exists in the database
+        if (schemaTable && hasIndex(schemaTable, fk.columns)) continue;
+
+        const indexName = `${tableName}_${fk.columns.join('_')}_idx`;
+        operations.push({
+          id: `index.${tableName}.${indexName}`,
+          label: `Create FK-backing index ${indexName} on ${tableName}`,
+          summary: `Creates FK-backing index ${indexName} on ${tableName}`,
+          operationClass: 'additive',
+          target: {
+            id: 'postgres',
+            details: this.buildTargetDetails('index', indexName, schemaName, tableName),
+          },
+          precheck: [
+            {
+              description: `ensure index "${indexName}" is missing`,
+              sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NULL`,
+            },
+          ],
+          execute: [
+            {
+              description: `create FK-backing index "${indexName}"`,
+              sql: `CREATE INDEX ${quoteIdentifier(indexName)} ON ${qualifyTableName(
+                schemaName,
+                tableName,
+              )} (${fk.columns.map(quoteIdentifier).join(', ')})`,
+            },
+          ],
+          postcheck: [
+            {
+              description: `verify index "${indexName}" exists`,
+              sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NOT NULL`,
+            },
+          ],
+        });
+      }
+    }
+    return operations;
+  }
+
   private buildForeignKeyOperations(
     tables: SqlContract<SqlStorage>['storage']['tables'],
     schema: SqlSchemaIR,
@@ -543,6 +607,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     for (const [tableName, table] of sortedEntries(tables)) {
       const schemaTable = schema.tables[tableName];
       for (const foreignKey of table.foreignKeys) {
+        if (foreignKey.constraint === false) continue;
         if (schemaTable && hasForeignKey(schemaTable, foreignKey)) {
           continue;
         }

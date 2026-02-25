@@ -96,17 +96,21 @@ describe('SQL contract factories', () => {
           table: 'user',
           columns: ['id'],
         },
+        constraint: true,
+        index: true,
       });
     });
 
     it('creates foreign key with name', () => {
-      const foreignKey = fk(['userId'], 'user', ['id'], 'user_posts_fkey');
+      const foreignKey = fk(['userId'], 'user', ['id'], { name: 'user_posts_fkey' });
       expect(foreignKey).toEqual({
         columns: ['userId'],
         references: {
           table: 'user',
           columns: ['id'],
         },
+        constraint: true,
+        index: true,
         name: 'user_posts_fkey',
       });
     });
@@ -119,6 +123,8 @@ describe('SQL contract factories', () => {
           table: 'user',
           columns: ['tenantId', 'id'],
         },
+        constraint: true,
+        index: true,
       });
     });
   });
@@ -183,6 +189,8 @@ describe('SQL contract factories', () => {
         {
           columns: ['userId'],
           references: { table: 'user', columns: ['id'] },
+          constraint: true,
+          index: true,
         },
       ]);
     });
@@ -208,6 +216,8 @@ describe('SQL contract factories', () => {
         {
           columns: ['userId'],
           references: { table: 'user', columns: ['id'] },
+          constraint: true,
+          index: true,
         },
       ]);
     });

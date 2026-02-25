@@ -104,6 +104,8 @@ function createTestContract(overrides?: Partial<SqlContract<SqlStorage>>): SqlCo
             {
               columns: ['userId'],
               references: { table: 'user', columns: ['id'] },
+              constraint: true,
+              index: true,
             },
           ],
         },
@@ -156,6 +158,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       'table.user',
       'unique.user.user_email_key',
       'index.user.user_email_idx',
+      'index.post.post_userId_idx',
       'foreignKey.post.post_userId_fkey',
     ]);
     expect(operations[0]).toMatchObject({
@@ -342,6 +345,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       'table.user',
       'unique.user.user_email_key',
       'index.user.user_email_idx',
+      'index.post.post_userId_idx',
       'foreignKey.post.post_userId_fkey',
     ]);
   });
@@ -382,6 +386,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       'table.user',
       'unique.user.user_email_key',
       'index.user.user_email_idx',
+      'index.post.post_userId_idx',
       'foreignKey.post.post_userId_fkey',
     ]);
   });
@@ -442,6 +447,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       'table.user',
       'unique.user.user_email_key',
       'index.user.user_email_idx',
+      'index.post.post_userId_idx',
       'foreignKey.post.post_userId_fkey',
     ]);
   });

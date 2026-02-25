@@ -98,6 +98,8 @@ const ForeignKeySchema = type.declare<ForeignKey>().type({
   columns: type.string.array().readonly(),
   references: ForeignKeyReferencesSchema,
   'name?': 'string',
+  constraint: 'boolean',
+  index: 'boolean',
 });
 
 const StorageTableSchema = type.declare<StorageTable>().type({
