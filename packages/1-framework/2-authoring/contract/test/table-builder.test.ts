@@ -302,17 +302,17 @@ describe('TableBuilder', () => {
       });
     });
 
-    it('rejects nullable column with default at compile time', () => {
-      // This test verifies the type constraint works.
-      // The @ts-expect-error directive asserts that the next line produces a type error.
-      // If the type system ever allows nullable + default, this test will fail to compile.
-      createTable('user')
-        // @ts-expect-error - nullable columns cannot have default values
-        .column('bad', {
+    it('allows nullable column with default', () => {
+      const table = createTable('user')
+        .column('bio', {
           type: textColumn,
           nullable: true,
           default: { kind: 'literal', value: 'foo' },
-        });
+        })
+        .build();
+
+      expect(table.columns.bio.nullable).toBe(true);
+      expect(table.columns.bio.default).toEqual({ kind: 'literal', value: 'foo' });
     });
   });
 });
