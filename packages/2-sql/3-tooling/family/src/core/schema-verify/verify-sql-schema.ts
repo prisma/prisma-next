@@ -1028,21 +1028,39 @@ function normalizeLiteralValue(value: unknown, nativeType?: string): unknown {
   return value;
 }
 
+/**
+ * Recursively sorts object keys for deterministic JSON comparison.
+ * Postgres jsonb may canonicalize key order, so two semantically equal
+ * objects can have different key insertion order.
+ */
+function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, val) => {
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      const sorted: Record<string, unknown> = {};
+      for (const k of Object.keys(val as Record<string, unknown>).sort()) {
+        sorted[k] = (val as Record<string, unknown>)[k];
+      }
+      return sorted;
+    }
+    return val;
+  });
+}
+
 function literalValuesEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
-    return JSON.stringify(a) === JSON.stringify(b);
+    return stableStringify(a) === stableStringify(b);
   }
   if (typeof a === 'object' && a !== null && typeof b === 'string') {
     try {
-      return JSON.stringify(a) === JSON.stringify(JSON.parse(b));
+      return stableStringify(a) === stableStringify(JSON.parse(b));
     } catch {
       return false;
     }
   }
   if (typeof a === 'string' && typeof b === 'object' && b !== null) {
     try {
-      return JSON.stringify(JSON.parse(a)) === JSON.stringify(b);
+      return stableStringify(JSON.parse(a)) === stableStringify(b);
     } catch {
       return false;
     }
