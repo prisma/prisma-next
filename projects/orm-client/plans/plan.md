@@ -13,6 +13,53 @@ Transition the `@prisma-next/sql-orm-client` from "feature-complete prototype" t
 | Maker | Alexey Orlenko | Project lead, drives execution |
 | Reviewer | Terminal team | Architectural review |
 
+## Progress Log (2026-02-25)
+
+### Latest status
+
+- ✅ Review sweep across `sql-orm-client/src/**` and `sql-orm-client/test/**` completed.
+- ✅ Review artifact created: `projects/orm-client/assets/code-review-notes.md`.
+- ✅ User decisions captured:
+  - `upsert({ update: {} })` must fail at both type-level and runtime.
+  - Nested `connect` should match Prisma strictness: throw when any criterion misses.
+- 🚧 Fix execution started with one-issue-per-commit policy and validation gates.
+
+### Active implementation sequence (commit-scoped)
+
+1. **Fix-01:** `upsert({ update: {} })` guardrails
+   - Type-level: make empty `update` invalid in `Collection.upsert()` input type.
+   - Runtime: reject empty mapped update payload before compilation.
+   - Tests:
+     - Runtime/unit: `test/sql-compilation/upsert.test.ts`
+     - Type-level: `test/generated-contract-types.test-d.ts`
+2. **Fix-02:** nested `connect` strictness
+   - Child-owned `connect`: throw when any criterion has no matching row.
+   - Parent-owned `connect/create`: enforce single-target cardinality and throw on ambiguous arrays.
+   - Tests:
+     - Integration: `test/integration/nested-mutations.test.ts`
+     - Unit where applicable.
+3. **Fix-03:** empty list predicate handling
+   - `in([])` and `notIn([])` must not compile to invalid SQL.
+   - Tests:
+     - SQL compilation: `test/sql-compilation/**`
+     - Unit: `test/model-accessor.test.ts` / `test/filters.test.ts` if needed.
+4. **Fix-04:** close loop on docs/plan traceability
+   - Update this plan with completed items, file references, and carry-forward backlog.
+
+### Validation gate (required per commit)
+
+```bash
+pnpm --filter @prisma-next/sql-orm-client test
+pnpm --filter @prisma-next/sql-orm-client lint
+pnpm --filter @prisma-next/sql-orm-client typecheck
+```
+
+### Carry-forward backlog (not in current fix batch)
+
+- `combine()` support for lateral/correlated single-query strategies (Tasks 1.2–1.5).
+- `db.$transaction()` API on orm client (Task 3.9).
+- Include strategy integration capability toggling matrix (Task 2.1 and dependent tests).
+
 ## Milestones
 
 ### Milestone 1: Code Review, Prisma Audit & Critical Fixes
@@ -23,7 +70,7 @@ Systematic review of the entire `sql-orm-client` codebase, fix the critical `com
 
 **Tasks:**
 
-- [ ] **1.1** Review all source files in `src/` for correctness, consistency, and adherence to project patterns (FR-1.1 through FR-1.5). Document all issues found in a review notes file at `projects/orm-client/assets/code-review-notes.md`
+- [x] **1.1** Review all source files in `src/` for correctness, consistency, and adherence to project patterns (FR-1.1 through FR-1.5). Document all issues found in a review notes file at `projects/orm-client/assets/code-review-notes.md`
 - [ ] **1.2** Fix `combine()` to work with lateral join include strategy — currently `combine()` only works with multi-query; implement lateral join compilation for combine branches where each branch becomes a separate LATERAL subquery with its own filters/ordering/aggregation (FR-7.3, Resolved Q4)
 - [ ] **1.3** Fix `combine()` to work with correlated subquery include strategy — implement correlated subquery compilation for combine branches (FR-7.3, Resolved Q4)
 - [ ] **1.4** Add SQL compilation tests for `combine()` with lateral and correlated strategies — verify correct SQL output for combine branches with mixed row and scalar selectors under each strategy
