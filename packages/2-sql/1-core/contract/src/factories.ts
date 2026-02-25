@@ -18,7 +18,7 @@ import type {
   StorageTable,
   UniqueConstraint,
 } from './types';
-import { DEFAULT_FK_CONSTRAINT, DEFAULT_FK_INDEX } from './types';
+import { applyFkDefaults } from './types';
 
 /**
  * Creates a StorageColumn with nativeType and codecId.
@@ -67,8 +67,7 @@ export function fk(
   return {
     columns,
     references,
-    constraint: opts?.constraint ?? DEFAULT_FK_CONSTRAINT,
-    index: opts?.index ?? DEFAULT_FK_INDEX,
+    ...applyFkDefaults({ constraint: opts?.constraint, index: opts?.index }),
     ...(opts?.name !== undefined && { name: opts.name }),
   };
 }

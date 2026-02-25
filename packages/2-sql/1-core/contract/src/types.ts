@@ -125,6 +125,20 @@ export type SqlMappings = {
 export const DEFAULT_FK_CONSTRAINT = true;
 export const DEFAULT_FK_INDEX = true;
 
+/**
+ * Resolves foreign key `constraint` and `index` fields to their effective boolean values,
+ * falling back through optional override defaults, then to the global defaults.
+ */
+export function applyFkDefaults(
+  fk: { constraint?: boolean | undefined; index?: boolean | undefined },
+  overrideDefaults?: { constraint?: boolean | undefined; index?: boolean | undefined },
+): { constraint: boolean; index: boolean } {
+  return {
+    constraint: fk.constraint ?? overrideDefaults?.constraint ?? DEFAULT_FK_CONSTRAINT,
+    index: fk.index ?? overrideDefaults?.index ?? DEFAULT_FK_INDEX,
+  };
+}
+
 export type SqlContract<
   S extends SqlStorage = SqlStorage,
   M extends Record<string, unknown> = Record<string, unknown>,

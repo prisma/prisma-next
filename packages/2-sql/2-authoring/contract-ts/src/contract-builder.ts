@@ -21,8 +21,7 @@ import {
   TableBuilder,
 } from '@prisma-next/contract-authoring';
 import {
-  DEFAULT_FK_CONSTRAINT,
-  DEFAULT_FK_INDEX,
+  applyFkDefaults,
   type ModelDefinition,
   type ModelField,
   type SqlContract,
@@ -274,12 +273,10 @@ class SqlContractBuilder<
       }));
 
       // Build foreign keys from table state, materializing defaults
-      const fkDefaults = this.state.foreignKeyDefaults;
       const foreignKeys = (tableState.foreignKeys ?? []).map((fk) => ({
         columns: fk.columns,
         references: fk.references,
-        constraint: fk.constraint ?? fkDefaults?.constraint ?? DEFAULT_FK_CONSTRAINT,
-        index: fk.index ?? fkDefaults?.index ?? DEFAULT_FK_INDEX,
+        ...applyFkDefaults(fk, this.state.foreignKeyDefaults),
         ...(fk.name ? { name: fk.name } : {}),
       }));
 

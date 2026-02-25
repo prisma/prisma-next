@@ -1,6 +1,5 @@
 import {
-  DEFAULT_FK_CONSTRAINT,
-  DEFAULT_FK_INDEX,
+  applyFkDefaults,
   type ForeignKey,
   type ForeignKeyReferences,
   type Index,
@@ -511,8 +510,7 @@ export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
           const rawForeignKeys = (tableObj['foreignKeys'] ?? []) as Array<Record<string, unknown>>;
           const normalizedForeignKeys = rawForeignKeys.map((fk) => ({
             ...fk,
-            constraint: fk['constraint'] ?? DEFAULT_FK_CONSTRAINT,
-            index: fk['index'] ?? DEFAULT_FK_INDEX,
+            ...applyFkDefaults(fk as { constraint?: boolean; index?: boolean }),
           }));
 
           // Normalize table arrays: add empty arrays if missing

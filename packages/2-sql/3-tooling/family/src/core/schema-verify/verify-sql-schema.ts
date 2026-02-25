@@ -444,13 +444,13 @@ function verifyTableChildren(options: {
   tableChildren.push(...uniqueStatuses);
 
   // Filter out FK-backing indexes for FKs with index: false
-  const fkColumnsToSkip = new Set(
+  const disabledFkIndexColumns = new Set(
     contractTable.foreignKeys.filter((fk) => fk.index === false).map((fk) => fk.columns.join(',')),
   );
   let indexesToVerify = contractTable.indexes;
-  if (fkColumnsToSkip.size > 0) {
+  if (disabledFkIndexColumns.size > 0) {
     indexesToVerify = contractTable.indexes.filter(
-      (index) => !fkColumnsToSkip.has(index.columns.join(',')),
+      (index) => !disabledFkIndexColumns.has(index.columns.join(',')),
     );
   }
 
