@@ -17,17 +17,19 @@ describe('ParamDescriptor', () => {
       const d: ParamDescriptor = { index: 1, source: 'lane' };
       expect(d.source).toBe('lane');
     });
+  });
+});
 
-    it('paramDescriptors with lane source in PlanMeta', () => {
-      const meta: PlanMeta = {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'kysely',
-        paramDescriptors: [{ index: 1, source: 'lane', refs: { table: 'user', column: 'id' } }],
-      };
-      expect(meta.paramDescriptors).toEqual([
-        { index: 1, source: 'lane', refs: { table: 'user', column: 'id' } },
-      ]);
-    });
+describe('PlanMeta', () => {
+  it('preserves lane-sourced paramDescriptors with refs', () => {
+    const meta: PlanMeta = {
+      target: 'postgres',
+      storageHash: 'sha256:test',
+      lane: 'kysely',
+      paramDescriptors: [{ index: 1, source: 'lane', refs: { table: 'user', column: 'id' } }],
+    };
+    expect(meta.paramDescriptors).toEqual([
+      { index: 1, source: 'lane', refs: { table: 'user', column: 'id' } },
+    ]);
   });
 });

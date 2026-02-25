@@ -73,12 +73,12 @@ const core = createRuntimeCore({
 - `createRuntimeCore` - Create a target-neutral runtime instance
 - `RuntimeFamilyAdapter` - Interface for family runtimes
 - `MarkerReader` - Interface for marker reading
-- `budgets` - Target-neutral budget plugin
+- `budgets` - Target-neutral budgets plugin
 - `runtimeError` - Error envelope utilities
 - `computeSqlFingerprint` - SQL fingerprint computation
 - `parseContractMarkerRow` - Marker parsing utilities
 
-**Note:** The `lints` plugin has been migrated to the SQL domain. Import `lints` and `LintsOptions` from `@prisma-next/sql-runtime` instead.
+**Note:** The `lints` plugin has been migrated to the SQL domain. Import `lints` and `LintsOptions` from `@prisma-next/sql-runtime` instead. See [ADR 162](../../../docs/architecture%20docs/adrs/ADR%20162%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md) for rationale.
 
 ## Testing
 

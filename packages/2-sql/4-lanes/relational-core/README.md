@@ -44,6 +44,7 @@ flowchart TD
         PARAM[Parameter Helpers]
         OPS[Operations Registry]
         TYPES[Type Definitions]
+        AST[AST Types]
     end
 
     subgraph "Consumers"
@@ -61,6 +62,8 @@ flowchart TD
     OPS --> ORM
     TYPES --> SQL
     TYPES --> ORM
+    AST --> SQL
+    AST --> ORM
 ```
 
 ## Components
@@ -123,6 +126,7 @@ This package follows the standard `exports/` directory pattern:
 - `src/exports/types.ts` - Re-exports type definitions
 - `src/exports/operations-registry.ts` - Re-exports operations registry
 - `src/exports/plan.ts` - Re-exports plan types and helpers
+- `src/exports/ast.ts` - Re-exports SQL AST types
 - `src/exports/errors.ts` - Re-exports error helpers (from `@prisma-next/plan`)
 - `src/index.ts` - Main entry point that re-exports from `exports/`
 
