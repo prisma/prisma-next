@@ -20,6 +20,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
 import type { CodecControlHooks, ComponentDatabaseDependency } from '../migrations/types';
 import {
+  arraysEqual,
   computeCounts,
   verifyDatabaseDependencies,
   verifyForeignKeys,
@@ -443,10 +444,20 @@ function verifyTableChildren(options: {
   );
   tableChildren.push(...uniqueStatuses);
 
-  // Verify all declared indexes unconditionally.
-  // FK `index` flag controls FK-backing index generation, not user-declared indexes.
+  // Combine user-declared indexes with FK-backing indexes (from FKs with index: true)
+  // so the verifier treats FK-backing indexes as expected, not "extra".
+  // Deduplicate: skip FK-backing indexes already covered by a user-declared index.
+  const fkBackingIndexes = contractTable.foreignKeys
+    .filter(
+      (fk) =>
+        fk.index === true &&
+        !contractTable.indexes.some((idx) => arraysEqual(idx.columns, fk.columns)),
+    )
+    .map((fk) => ({ columns: fk.columns }));
+  const allExpectedIndexes = [...contractTable.indexes, ...fkBackingIndexes];
+
   const indexStatuses = verifyIndexes(
-    contractTable.indexes,
+    allExpectedIndexes,
     schemaTable.indexes,
     schemaTable.uniques,
     tableName,
