@@ -419,7 +419,7 @@ function verifyTableChildren(options: {
   }
 
   // Verify FK constraints only for FKs with constraint: true
-  const constraintFks = contractTable.foreignKeys.filter((fk) => fk.constraint !== false);
+  const constraintFks = contractTable.foreignKeys.filter((fk) => fk.constraint === true);
   if (constraintFks.length > 0) {
     const fkStatuses = verifyForeignKeys(
       constraintFks,

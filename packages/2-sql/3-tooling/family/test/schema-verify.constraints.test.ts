@@ -199,6 +199,144 @@ describe('verifySqlSchema - constraints', () => {
     });
   });
 
+  describe('FK with constraint: false', () => {
+    it('skips FK constraint verification when constraint=false', () => {
+      const contract = createTestContract({
+        user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
+        post: createContractTable(
+          {
+            id: { nativeType: 'int4', nullable: false },
+            author_id: { nativeType: 'int4', nullable: false },
+          },
+          {
+            foreignKeys: [
+              {
+                columns: ['author_id'],
+                references: { table: 'user', columns: ['id'] },
+                constraint: false,
+                index: true,
+              },
+            ],
+          },
+        ),
+      });
+
+      const schema = createTestSchemaIR({
+        user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
+        post: createSchemaTable('post', {
+          id: { nativeType: 'int4', nullable: false },
+          author_id: { nativeType: 'int4', nullable: false },
+        }),
+        // No FK in schema — should pass because constraint=false
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.schema.issues.filter((i) => i.kind === 'foreign_key_mismatch')).toHaveLength(0);
+    });
+
+    it('still reports FK constraint mismatch when constraint=true', () => {
+      const contract = createTestContract({
+        user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
+        post: createContractTable(
+          {
+            id: { nativeType: 'int4', nullable: false },
+            author_id: { nativeType: 'int4', nullable: false },
+          },
+          {
+            foreignKeys: [
+              {
+                columns: ['author_id'],
+                references: { table: 'user', columns: ['id'] },
+                constraint: true,
+                index: false,
+              },
+            ],
+          },
+        ),
+      });
+
+      const schema = createTestSchemaIR({
+        user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
+        post: createSchemaTable('post', {
+          id: { nativeType: 'int4', nullable: false },
+          author_id: { nativeType: 'int4', nullable: false },
+        }),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.schema.issues).toContainEqual(
+        expect.objectContaining({
+          kind: 'foreign_key_mismatch',
+          table: 'post',
+        }),
+      );
+    });
+
+    it('verifies user-declared indexes regardless of FK index flag', () => {
+      const contract = createTestContract({
+        user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
+        post: createContractTable(
+          {
+            id: { nativeType: 'int4', nullable: false },
+            author_id: { nativeType: 'int4', nullable: false },
+          },
+          {
+            foreignKeys: [
+              {
+                columns: ['author_id'],
+                references: { table: 'user', columns: ['id'] },
+                constraint: false,
+                index: false,
+              },
+            ],
+            indexes: [{ columns: ['author_id'] }],
+          },
+        ),
+      });
+
+      const schema = createTestSchemaIR({
+        user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
+        post: createSchemaTable('post', {
+          id: { nativeType: 'int4', nullable: false },
+          author_id: { nativeType: 'int4', nullable: false },
+        }),
+        // No index in schema — should fail because user declared the index
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: false,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.schema.issues).toContainEqual(
+        expect.objectContaining({
+          kind: 'index_mismatch',
+          table: 'post',
+        }),
+      );
+    });
+  });
+
   describe('index mismatch', () => {
     it('returns index_mismatch issue when index is missing in schema', () => {
       const contract = createTestContract({

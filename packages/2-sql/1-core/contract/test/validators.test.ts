@@ -343,6 +343,52 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContract(c)).not.toThrow();
     });
 
+    it('rejects FK missing constraint field', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
+      const s = storage({
+        user: userTable,
+        post: table(
+          { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+          {
+            pk: pk('id'),
+            fks: [fk(['userId'], 'user', ['id'])],
+          },
+        ),
+      });
+      // Remove constraint field to simulate non-normalized FK
+      const rawContract = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+      });
+      const postFk = rawContract.storage.tables['post']?.foreignKeys[0] as Record<string, unknown>;
+      delete postFk['constraint'];
+      expect(() => validateSqlContract(rawContract)).toThrow();
+    });
+
+    it('rejects FK missing index field', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
+      const s = storage({
+        user: userTable,
+        post: table(
+          { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+          {
+            pk: pk('id'),
+            fks: [fk(['userId'], 'user', ['id'])],
+          },
+        ),
+      });
+      // Remove index field to simulate non-normalized FK
+      const rawContract = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+      });
+      const postFk = rawContract.storage.tables['post']?.foreignKeys[0] as Record<string, unknown>;
+      delete postFk['index'];
+      expect(() => validateSqlContract(rawContract)).toThrow();
+    });
+
     it('validates FK with both disabled', () => {
       const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
       const postTable = table(
