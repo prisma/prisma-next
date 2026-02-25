@@ -77,10 +77,10 @@ This project coordinates:
 
 ## Phase 2 (architectural lane extraction)
 
-- [ ] `@prisma-next/sql-kysely-lane` exists under `packages/2-sql/4-lanes/` and owns build-only Kysely authoring + transform + guardrails.
-- [ ] `@prisma-next/sql-kysely-lane` does **not** depend on `@prisma-next/sql-runtime` and passes `pnpm lint:deps`.
-- [ ] Any runtime-attached Kysely execution surface is clearly separated (kept in extensions) and delegates lane responsibilities to the lane package.
-- [ ] Public Postgres client surface provides a build-only `db.kysely` (no runtime argument) per the Phase 2 spec.
+- [x] `@prisma-next/sql-kysely-lane` exists under `packages/2-sql/4-lanes/` and owns build-only Kysely authoring + transform + guardrails.
+- [x] `@prisma-next/sql-kysely-lane` does **not** depend on `@prisma-next/sql-runtime` and passes `pnpm lint:deps`.
+- [x] Any runtime-attached Kysely execution surface is clearly separated (kept in extensions) and delegates lane responsibilities to the lane package.
+- [x] Public Postgres client surface provides a build-only `db.kysely` (no runtime argument) per the Phase 2 spec.
 
 ## Phase 3 (optional)
 

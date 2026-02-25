@@ -81,19 +81,19 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
 
 # Acceptance Criteria
 
-- [ ] **Lane exists**: `@prisma-next/sql-kysely-lane` is present in `packages/2-sql/4-lanes/` with a clear public API for building `SqlQueryPlan<Row>` from build-only Kysely-authored queries.
-- [ ] **No runtime dependency**: `@prisma-next/sql-kysely-lane` does not depend on `@prisma-next/sql-runtime`; `pnpm lint:deps` passes.
-- [ ] **Build-only types**: `db.kysely` (and any exported build-only lane types) do not expose execution entrypoints in their public TypeScript types.
-- [ ] **Execution backstop**: runtime execution via `any` casts throws deterministically (tests cover at least one blocked path).
+- [x] **Lane exists**: `@prisma-next/sql-kysely-lane` is present in `packages/2-sql/4-lanes/` with a clear public API for building `SqlQueryPlan<Row>` from build-only Kysely-authored queries.
+- [x] **No runtime dependency**: `@prisma-next/sql-kysely-lane` does not depend on `@prisma-next/sql-runtime`; `pnpm lint:deps` passes.
+- [x] **Build-only types**: `db.kysely` (and any exported build-only lane types) do not expose execution entrypoints in their public TypeScript types.
+- [x] **Execution backstop**: runtime execution via `any` casts throws deterministically (tests cover at least one blocked path).
 - [ ] **Interop protocol**: `WhereArg`/`ToWhereExpr` exist in `@prisma-next/sql-relational-core`; `ToWhereExpr.toWhereExpr()` is zero-arg and returns `{expr, params, paramDescriptors}` with local param indices starting at 1.
 - [ ] **ORM consumption**: ORM accepts `WhereArg` and handles:
   - param-free bare `WhereExpr`
   - bound `ToWhereExpr` payloads, including param reindexing when composing into a plan
-- [ ] **SQL redaction (Option A)**: compilation (if reachable) yields a stub SQL string while preserving operation tree and parameter ordering/values; tests confirm this.
-- [ ] **Integration re-scope**: `@prisma-next/integration-kysely` no longer owns transformer/guardrail logic (moved to lane or delegated).
-- [ ] **Parity preserved**: existing transformer/guardrail tests continue to pass (or are ported to the new lane package without reducing coverage).
-- [ ] **Refs determinism**: extracted lane emits `meta.refs` deterministically with dedup semantics (tests cover stability across equivalent query shapes).
-- [ ] **Guardrail breadth**: extracted guardrail traversal handles broader supported-node coverage with explicit tests for previously narrow traversal paths.
+- [x] **SQL redaction (Option A)**: compilation (if reachable) yields a stub SQL string while preserving operation tree and parameter ordering/values; tests confirm this.
+- [x] **Integration re-scope**: `@prisma-next/integration-kysely` no longer owns transformer/guardrail logic (moved to lane or delegated).
+- [x] **Parity preserved**: existing transformer/guardrail tests continue to pass (or are ported to the new lane package without reducing coverage).
+- [x] **Refs determinism**: extracted lane emits `meta.refs` deterministically with dedup semantics (tests cover stability across equivalent query shapes).
+- [x] **Guardrail breadth**: extracted guardrail traversal handles broader supported-node coverage with explicit tests for previously narrow traversal paths.
 
 # Other Considerations
 

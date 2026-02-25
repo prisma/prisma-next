@@ -36,10 +36,10 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 - [x] Create `@prisma-next/sql-kysely-lane` package in `packages/2-sql/4-lanes/`.
 - [x] Move transformer, guardrails, build-only lane assembly into lane package.
 - [x] Introduce/complete interop contract (`WhereArg`, `ToWhereExpr`) and ORM consumption path.
-- [ ] Update `@prisma-next/postgres` surface to expose build-only `db.kysely` API.
+- [x] Update `@prisma-next/postgres` surface to expose build-only `db.kysely` API.
 - [x] Re-scope `@prisma-next/integration-kysely` to runtime attachment responsibilities.
-- [ ] Enforce fail-fast behavior for unsupported Kysely kinds in runtime attachment paths (no raw fallback).
-- [ ] Keep Postgres public Kysely API build-only-only for this phase (no execution-capable public Kysely API).
+- [x] Enforce fail-fast behavior for unsupported Kysely kinds in runtime attachment paths (no raw fallback).
+- [x] Keep Postgres public Kysely API build-only-only for this phase (no execution-capable public Kysely API).
 - [x] Update READMEs and architecture docs for touched packages and decisions.
 - [x] Pass `pnpm lint:deps` and targeted test suites.
 

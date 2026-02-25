@@ -43,15 +43,15 @@ Deliverables:
 
 **Tasks:**
 
-- [ ] Add/port failing lane tests first (transform parity, guardrails, refs determinism, SQL redaction, execution backstop) before moving implementation.
+- [x] Add/port failing lane tests first (transform parity, guardrails, refs determinism, SQL redaction, execution backstop) before moving implementation.
 - [x] Scaffold `packages/2-sql/4-lanes/kysely-lane/` (package.json, tsconfig, exports, README with responsibilities + mermaid).
 - [x] Move/port transformer and guardrails from `@prisma-next/integration-kysely` into the lane package.
-- [ ] Implement plan assembly API: build-only Kysely query → `SqlQueryPlan<Row>` with PN `QueryAst`, params, paramDescriptors, refs, etc.
-- [ ] Harden `meta.refs` generation with deterministic ordering + dedup semantics in the extracted transformer path.
-- [ ] Implement SQL redaction (Option A): ensure any compiled SQL string exposed by internal compilation is stubbed, while preserving `query` + `parameters`.
-- [ ] Implement execution backstop behavior for build-only surface (throws deterministically if execution is attempted via casts).
+- [x] Implement plan assembly API: build-only Kysely query → `SqlQueryPlan<Row>` with PN `QueryAst`, params, paramDescriptors, refs, etc.
+- [x] Harden `meta.refs` generation with deterministic ordering + dedup semantics in the extracted transformer path.
+- [x] Implement SQL redaction (Option A): ensure any compiled SQL string exposed by internal compilation is stubbed, while preserving `query` + `parameters`.
+- [x] Implement execution backstop behavior for build-only surface (throws deterministically if execution is attempted via casts).
 - [ ] Expand guardrail traversal to a broader and safer node walk strategy in the extracted lane package.
-- [ ] Port and/or update tests so transformer + guardrails parity is preserved in the lane package, including the new refs/guardrail hardening behavior.
+- [x] Port and/or update tests so transformer + guardrails parity is preserved in the lane package, including the new refs/guardrail hardening behavior.
 - [ ] Add dependency/layering assertions: lane must not import `@prisma-next/sql-runtime` (enforced by `pnpm lint:deps`).
 
 ### Milestone 3: Re-scope extensions and update Postgres public surface
@@ -63,13 +63,13 @@ Deliverables:
 
 **Tasks:**
 
-- [ ] Add/adjust type tests first for Postgres build-only `db.kysely` API and any separated execution-capable attachment API.
+- [x] Add/adjust type tests first for Postgres build-only `db.kysely` API and any separated execution-capable attachment API.
 - [x] Update `@prisma-next/integration-kysely` exports so it no longer owns transformer/guardrails/lane planning logic.
 - [x] If runtime attachment remains: have it delegate lane transforms to `@prisma-next/sql-kysely-lane` (or fail fast for unsupported kinds).
-- [ ] Update `@prisma-next/postgres`:
+- [x] Update `@prisma-next/postgres`:
   - expose build-only `db.kysely` surface (no runtime arg)
   - do not expose an execution-capable public Kysely API in this phase
-- [ ] Update demo/example usage to match the new public surface (and keep execution-capable path explicit if retained).
+- [x] Update demo/example usage to match the new public surface (and keep execution-capable path explicit if retained).
 
 ### Milestone 4: Validation, docs, and close-out
 
@@ -82,7 +82,7 @@ Deliverables:
 - [x] Run and fix `pnpm lint:deps` for the new package boundaries.
 - [x] Update READMEs for any touched packages to reflect new responsibilities (lane vs runtime attachment).
 - [ ] Update architecture docs/ADRs if a new decision is introduced (e.g. unsupported-kinds policy).
-- [ ] Verify every acceptance criterion in the spec has a passing test or explicit manual verification step.
+- [x] Verify every acceptance criterion in the spec has a passing test or explicit manual verification step.
 - [ ] Close-out: migrate any long-lived docs into `docs/` and delete `projects/kysely-lane-rollout/` (when the overall project is complete).
 
 ## Test Coverage
