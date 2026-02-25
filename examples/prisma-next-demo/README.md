@@ -36,10 +36,9 @@ Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-lin
 
 **Setup**:
 ```bash
-# Emit contract artifacts first
 pnpm emit
-
-# Then run the app
+pnpm db:init   # Creates schema + contract marker
+pnpm seed
 pnpm start -- users
 ```
 
@@ -47,7 +46,7 @@ pnpm start -- users
 
 Uses contract directly from TypeScript:
 
-- **Files**: `src/prisma-no-emit/runtime-no-emit.ts`, `src/prisma-no-emit/context-no-emit.ts`, `src/main-no-emit.ts`
+- **Files**: `src/prisma-no-emit/runtime.ts`, `src/prisma-no-emit/context.ts`, `src/main-no-emit.ts`
 - **Contract source**: `prisma/contract.ts` (direct import)
 - **Usage**: `pnpm start:no-emit -- [command]`
 - **Benefits**:
@@ -127,12 +126,18 @@ pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example
      ```
      The seed script will create the extension automatically if it doesn't exist.
 
-3. Seed the database:
+3. Emit contract and initialize database:
+   ```bash
+   pnpm emit
+   pnpm db:init
+   ```
+
+4. Seed the database:
    ```bash
    pnpm seed
    ```
 
-4. Run tests:
+5. Run tests:
    ```bash
    pnpm test
    ```
@@ -143,13 +148,12 @@ pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example
 - `src/prisma/contract.json` - Emitted contract (emit workflow only)
 - `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
 - `src/prisma/db.ts` - One-liner Postgres client + query roots (emit workflow)
-- `src/prisma-no-emit/context-no-emit.ts` - Env-free execution stack/context + query roots (no-emit workflow)
-- `src/prisma-no-emit/runtime-no-emit.ts` - Runtime factory (no-emit workflow)
+- `src/prisma-no-emit/context.ts` - Env-free execution stack/context + query roots (no-emit workflow)
+- `src/prisma-no-emit/runtime.ts` - Runtime factory (no-emit workflow)
 - `src/orm-client/client.ts` - ORM client + custom collection scopes
 - `src/orm-client/*.ts` - End-to-end ORM client query examples
 - `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
 - `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
-- `scripts/stamp-marker.ts` - Contract marker management
 - `scripts/seed.ts` - Database seeding (includes vector embeddings)
 - `src/queries/similarity-search.ts` - Example vector similarity search query
 - `test/` - Integration tests demonstrating Prisma Next usage
