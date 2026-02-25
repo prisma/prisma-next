@@ -1,4 +1,4 @@
-# ADR 160 — Kysely lane emits PN SQL AST for plugin inspection
+# ADR 162 — Kysely lane emits PN SQL AST for plugin inspection
 
 ```mermaid
 sequenceDiagram

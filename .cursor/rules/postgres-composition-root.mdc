@@ -1,6 +1,9 @@
 ---
 description: Placement and responsibilities for @prisma-next/postgres composition root
 globs:
+  - "packages/3-extensions/postgres/**"
+  - "architecture.config.json"
+  - ".cursor/rules/**/*.mdc"
 alwaysApply: false
 ---
 
