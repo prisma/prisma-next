@@ -33,13 +33,15 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 
 **Tasks:**
 
-- [ ] Create `@prisma-next/sql-kysely-lane` package in `packages/2-sql/4-lanes/`.
-- [ ] Move transformer, guardrails, build-only lane assembly into lane package.
-- [ ] Introduce/complete interop contract (`WhereArg`, `ToWhereExpr`) and ORM consumption path.
+- [x] Create `@prisma-next/sql-kysely-lane` package in `packages/2-sql/4-lanes/`.
+- [x] Move transformer, guardrails, build-only lane assembly into lane package.
+- [x] Introduce/complete interop contract (`WhereArg`, `ToWhereExpr`) and ORM consumption path.
 - [ ] Update `@prisma-next/postgres` surface to expose build-only `db.kysely` API.
-- [ ] Re-scope `@prisma-next/integration-kysely` to runtime attachment responsibilities.
-- [ ] Update READMEs and architecture docs for touched packages and decisions.
-- [ ] Pass `pnpm lint:deps` and targeted test suites.
+- [x] Re-scope `@prisma-next/integration-kysely` to runtime attachment responsibilities.
+- [ ] Enforce fail-fast behavior for unsupported Kysely kinds in runtime attachment paths (no raw fallback).
+- [ ] Keep Postgres public Kysely API build-only-only for this phase (no execution-capable public Kysely API).
+- [x] Update READMEs and architecture docs for touched packages and decisions.
+- [x] Pass `pnpm lint:deps` and targeted test suites.
 
 ### Milestone 3: Direct PN AST construction (Phase 3, optional)
 

@@ -49,12 +49,13 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
 ### 3) Postgres convenience client exposes build-only Kysely surface
 
 - Update `@prisma-next/postgres` to expose `db.kysely` as a **build-only** authoring surface (no runtime argument).
-- If an execution-capable Kysely attachment is still required for migration, expose it as a **separate, clearly named** API so `db.kysely` remains build-only (example name: `db.kyselyRuntime(runtime)`).
+- In this phase, do **not** expose a public execution-capable Kysely API from `@prisma-next/postgres`.
 
 ### 4) Re-scope `@prisma-next/integration-kysely`
 
 - `@prisma-next/integration-kysely` becomes “runtime attachment only” (dialect/driver/connection).
 - It must delegate transformer/guardrails/lane planning responsibilities to `@prisma-next/sql-kysely-lane` (or stop exposing them).
+- For unsupported Kysely kinds in runtime attachment paths, fail fast with a stable structured error (no raw SQL fallback behavior in Phase 2).
 
 ### 5) Preserve behavior (no coverage regressions)
 
@@ -123,8 +124,11 @@ No new data handling is expected. Ensure parameter descriptor and param handling
 
 # Open Questions
 
-1. **Unsupported Kysely kinds** in runtime attachment: keep raw fallback behavior or fail fast with stable error codes?
-2. **Public surface naming**: keep `db.kysely` build-only and introduce `db.kyselyRuntime(runtime)` (or similar) for execution-capable attachment—what name best avoids confusion?
-3. **Interop strictness**: should ORM reject paramful bare `WhereExpr` immediately (as proposed) or allow it and normalize later?
-4. **Minimum supported Kysely subset** for the build-only surface in Phase 2: exactly “what exists today”, or do we need to prune/clarify support before extraction?
+1. **Interop strictness**: should ORM reject paramful bare `WhereExpr` immediately (as proposed) or allow it and normalize later?
+2. **Minimum supported Kysely subset** for the build-only surface in Phase 2: exactly “what exists today”, or do we need to prune/clarify support before extraction?
+
+# Decision Log
+
+- Unsupported Kysely kinds in runtime attachment paths: **fail fast** with stable structured errors (no raw fallback).
+- Postgres public API for this phase: `db.kysely` remains **build-only only**; no execution-capable public Kysely API is introduced.
 

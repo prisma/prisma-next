@@ -48,6 +48,8 @@ This project coordinates:
 - Runtime plugins/guardrails can inspect Kysely-authored plans by relying on the AST-backed plan shape.
 - Phase 2 produces a build-only lane package (`@prisma-next/sql-kysely-lane`) in `packages/2-sql/4-lanes/` and moves lane responsibilities there, keeping runtime attachment (dialect/driver/connection) separate.
 - Postgres public surface exposes a build-only `db.kysely` authoring API (no runtime argument) per the Phase 2 spec.
+- In Phase 2, unsupported Kysely kinds fail fast with a stable structured error in runtime attachment paths (no raw fallback).
+- In Phase 2, no execution-capable public Kysely API is exposed from `@prisma-next/postgres`.
 
 ## Non-Functional Requirements
 
@@ -122,5 +124,9 @@ No product analytics changes required. Development analytics are commit/test/CI 
 # Open Questions
 
 1. For Phase 1, what’s the merge gate beyond “tests/typecheck/lint green” (if anything)?
-2. In Phase 2, for unsupported Kysely node kinds in runtime attachment: keep raw fallback, or fail fast with a stable, structured error?
-3. What would trigger Phase 3 work now (vs later): performance ceiling, correctness gap, Kysely internals churn, or maintenance burden?
+2. What would trigger Phase 3 work now (vs later): performance ceiling, correctness gap, Kysely internals churn, or maintenance burden?
+
+# Decision Log
+
+- Phase 2 unsupported-kinds behavior: **fail fast** with stable structured errors in runtime attachment paths.
+- Phase 2 Postgres API shape: `db.kysely` is **build-only only**; no execution-capable public Kysely API.
