@@ -140,7 +140,7 @@ migrations/
   "pre": [{ "check": "tableNotExists", "args": { "table": "user" } }],
   "post": [{ "check": "tableExists", "args": { "table": "user" } }],
   "labels": ["main"],
-  "authorship": { "author": "wmadden", "email": "madden@prisma.io" }
+  "authorship": { "author": "example", "email": "dev@example.com" }
 }
 ```
 

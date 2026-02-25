@@ -127,12 +127,12 @@ This guide defines how Prisma Next’s CLI behaves and looks. It exists to keep 
   - `migration plan/preflight/apply`: `--out <dir>`, `--show-sql`, `--show-diff`, `--max-sql-lines <n>`, `--yes`.
   - `db sign`: `--include-contract-json`, `--app-tag`, `--canonical-version`, `--force`, `--dry-run`.
 
-## Comparisons & Rationale
-- Prisma CLI: predictable, human‑oriented text with clear errors; we mirror determinism and actionable messages but avoid heavy codegen.
-- Drizzle Kit: simple flags and migration UX; we adopt concise help and guardrails but remain contract‑first.
-- Turborepo/Nx: flashy banners; we opt for minimal flair—banners only for `init`.
-- Heroku/Fly: colon commands (`db:…`); we prefer noun → verb (`db sign`, `db verify`) for consistency with our taxonomy.
-- Node CLI best practices: short flags, colored output that respects environment, and robust help/usage.
+## Rationale
+- Predictable, human‑oriented text with clear errors; mirror determinism and actionable messages while avoiding heavy codegen.
+- Simple flags and migration UX; adopt concise help and guardrails while remaining contract‑first.
+- Minimal flair; banners only for `init`.
+- Prefer noun → verb command taxonomy (`db sign`, `db verify`) over colon commands for consistency.
+- Follow established Node CLI best practices: short flags, colored output that respects environment, and robust help/usage.
 
 ## Loading Indicators & Spinners
 - **When to use**: Show spinners for remote operations (database connections, network requests) that may take time.

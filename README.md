@@ -14,6 +14,11 @@ Prisma Next is a new production data access layer that replaces traditional ORMs
 
 **Think of it as**: "An ORM designed for agentic workflows: with guardrails and verifications, tight feedback loops and simple, deterministic operations."
 
+## Docs
+
+- Start here: [`docs/README.md`](docs/README.md)
+- Agent/human onboarding entrypoint: [`AGENTS.md`](AGENTS.md)
+
 ## Quick Demo
 
 ```bash

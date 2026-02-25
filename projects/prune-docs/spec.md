@@ -26,6 +26,16 @@ This project defines the scope and acceptance criteria for a docs overhaul that:
     - Remove (delete from repo history-forward)
   - Record the decisions in a short “Doc inventory” table in the project plan (generated later), not by leaving TODOs scattered through docs.
 
+- **Maintain a “problematic removals” log (local-only)**
+  - As content is removed or rewritten, maintain a running log at `wip/prune-docs/problematic-removals.md`.
+  - Purpose: allow a post-pass assessment of whether any removed content is sensitive enough to justify a history rewrite.
+  - Each entry must include:
+    - File path
+    - Category (e.g. internal strategy/planning, internal identifiers/URLs, competitor framing, exploratory thread)
+    - A brief summary of what was removed and why it was problematic
+    - Severity (low/med/high) and a recommendation (“consider history rewrite” yes/no)
+  - **Constraint:** do not paste raw sensitive content verbatim into this log. If an excerpt is necessary, redact identifiers (names/domains/IDs) and keep it minimal.
+
 - **Remove internal strategy / planning artifacts**
   - Remove docs that expose internal motivations, planning, timelines, resourcing, stage gates, or competitive positioning.
   - Known starting points (non-exhaustive):
@@ -56,14 +66,6 @@ This project defines the scope and acceptance criteria for a docs overhaul that:
   - In particular, update `AGENTS.md` “Start Here” links so they only reference public-safe docs.
   - Provide a stable docs index (e.g. `docs/README.md`) that becomes the canonical entry point for documentation beyond the root `README.md`.
 
-- **Fill public repo documentation gaps**
-  - Add standard public-facing repository docs as needed:
-    - `LICENSE` (exact license text)
-    - `CONTRIBUTING.md`
-    - `SECURITY.md` (even if minimal, describing reporting expectations)
-    - `CODE_OF_CONDUCT.md` (if desired/required by the org)
-  - If the repo’s public posture requires it, add `.github/` issue/PR templates (optional).
-
 ## Non-Functional Requirements
 
 - **Public-safe content**
@@ -71,18 +73,27 @@ This project defines the scope and acceptance criteria for a docs overhaul that:
   - No competitor analysis or disparaging comparisons.
   - No references to the previously-used competitor ORM name(s).
 
+- **Sensitive content checklist**
+  - Docs do not include (unless explicitly intended for public release):
+    - Internal stakeholder names / team names / codenames
+    - Names of private design partners or NDA programs
+    - Internal links (e.g. internal trackers, docs systems, private dashboards)
+    - Internal domains, emails, invite links, or non-public endpoints
+    - Operational details that materially increase risk (e.g. security posture specifics, internal infra topology) beyond what’s necessary for a public OSS audience
+
 - **Coherent, navigable docs**
   - A new contributor can find:
     - What Prisma Next is (technical overview)
     - How to build/test
     - Where architecture and subsystem docs live
-    - How to contribute / report security issues
+    - How to navigate the remaining documentation set (what to read next)
 
 - **Link integrity**
   - Internal links within `docs/**`, root docs, and package READMEs remain valid after removals/renames.
 
 ## Non-goals
 
+- Adding or polishing standard public repo “meta docs” like `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, or `CODE_OF_CONDUCT.md` (track separately).
 - Producing a public roadmap, timelines, resourcing plan, or “MVP plan”.
 - Writing marketing collateral or competitive positioning docs.
 - Reworking the underlying architecture or implementation (this project is documentation-focused).
@@ -106,12 +117,10 @@ This project defines the scope and acceptance criteria for a docs overhaul that:
 - [ ] `AGENTS.md` does not link to removed/internal docs (e.g. it no longer links to `docs/MVP-Spec.md`).
 - [ ] A canonical docs index exists (e.g. `docs/README.md`) and is linked from the root `README.md` and/or `AGENTS.md`.
 
-## Public repo baseline docs
+## Audit artifacts
 
-- [ ] A `LICENSE` file exists at repo root.
-- [ ] `CONTRIBUTING.md` exists and describes contribution workflow at a high level.
-- [ ] `SECURITY.md` exists and describes how to report vulnerabilities.
-- [ ] If required by the org, `CODE_OF_CONDUCT.md` exists (otherwise explicitly out-of-scope and documented as such in the final plan/PR).
+- [ ] `wip/prune-docs/problematic-removals.md` exists locally and is kept up to date as removals/rewrites happen.
+- [ ] The sensitive content checklist is applied to docs that are kept or rewritten, and any violations found are either fixed or captured in `wip/prune-docs/problematic-removals.md`.
 
 # Other Considerations
 
@@ -154,7 +163,7 @@ This project defines the scope and acceptance criteria for a docs overhaul that:
 # Open Questions
 
 1. **License selection:** What license should the public repo use (MIT/Apache-2.0/etc.)?  
-   **Default assumption:** block final public release until a license is selected and committed as `LICENSE`.
+   **Default assumption:** defer to a follow-up project (out of scope here).
 
 2. **Rewrite vs remove for internal docs:** For docs like `docs/Executive Summary.md`, do we want to preserve a public-friendly “Overview” document, or only keep technical overviews in `README.md`/`docs/`?  
    **Default assumption:** remove internal docs and replace with a short, technical `docs/Overview.md` if needed.

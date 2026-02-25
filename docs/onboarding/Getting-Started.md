@@ -1,10 +1,11 @@
-# Getting Started (Agents)
+# Getting Started
 
-- Read Architecture Overview: `docs/Architecture Overview.md`
-- Read MVP Spec: `docs/MVP-Spec.md`
+- Start with the [Docs index](../README.md) and [`AGENTS.md`](../../AGENTS.md) for repo entry points.
+- Read the [Architecture Overview](../Architecture%20Overview.md) for the high-level model.
 - Build and test:
   - `pnpm build`
   - `pnpm test:packages`
-- Run demo: `cd examples/todo-app && pnpm demo`
-- Follow Golden Rules: see `AGENTS.md`
+- Run the demo:
+  - `cd examples/prisma-next-demo`
+  - follow `examples/prisma-next-demo/README.md`
 
