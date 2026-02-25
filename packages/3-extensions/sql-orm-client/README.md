@@ -8,6 +8,7 @@ This package provides a high-level ORM client surface on top of the runtime that
 
 - Expose typed `Collection` primitives for model-level data access
 - Build filter/order/include state from fluent APIs (`where`, `include`, `orderBy`, `take`, `skip`)
+- Accept lane-agnostic `WhereArg` filter inputs (`WhereExpr` or `ToWhereExpr`) and normalize bound payloads inside ORM
 - Compile collection state into executable SQL plans using Kysely compilation
 - Execute and stitch include trees across multiple plan executions
 - Map storage-column rows back to model-field row shapes

@@ -32,6 +32,43 @@ describe('Collection', () => {
       expect(filtered.state.filters).toHaveLength(2);
     });
 
+    it('where() accepts ToWhereExpr payloads', () => {
+      const { collection } = createCollection();
+      const filtered = collection.where(() => ({
+        toWhereExpr: () => ({
+          expr: {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'users', column: 'name' },
+            right: { kind: 'param', index: 1 },
+          },
+          params: ['Alice'],
+          paramDescriptors: [{ source: 'lane' }],
+        }),
+      }));
+
+      expect(filtered.state.filters).toEqual([
+        {
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'users', column: 'name' },
+          right: { kind: 'literal', value: 'Alice' },
+        },
+      ]);
+    });
+
+    it('where() rejects bare WhereExpr with ParamRef', () => {
+      const { collection } = createCollection();
+      expect(() =>
+        collection.where(() => ({
+          kind: 'bin',
+          op: 'eq',
+          left: { kind: 'col', table: 'users', column: 'id' },
+          right: { kind: 'param', index: 1 },
+        })),
+      ).toThrow(/bare WhereExpr.*ParamRef/i);
+    });
+
     it('where() accepts shorthand object filters', () => {
       const { collection } = createCollection();
       const filtered = collection.where({ name: 'Alice', email: 'alice@example.com' });

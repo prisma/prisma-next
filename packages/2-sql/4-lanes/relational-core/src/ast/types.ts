@@ -1,3 +1,4 @@
+import type { ParamDescriptor } from '@prisma-next/contract/types';
 import type { ReturnSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 
@@ -110,6 +111,18 @@ export interface NullCheckExpr {
  * Union type for WHERE clause expressions.
  */
 export type WhereExpr = BinaryExpr | ExistsExpr | NullCheckExpr | AndExpr | OrExpr;
+
+export interface BoundWhereExpr {
+  readonly expr: WhereExpr;
+  readonly params: readonly unknown[];
+  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
+}
+
+export interface ToWhereExpr {
+  toWhereExpr(): BoundWhereExpr;
+}
+
+export type WhereArg = WhereExpr | ToWhereExpr;
 
 export type JoinOnExpr =
   | {
