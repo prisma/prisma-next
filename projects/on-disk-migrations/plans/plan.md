@@ -79,45 +79,206 @@ The planner lives in `packages/2-sql/3-tooling/family/` (sql domain, tooling lay
 
 Build the on-disk migration format, file management, edge attestation, and DAG reconstruction. This takes the planner output from Milestone 1 and makes it persistable and navigable.
 
-Lives in `packages/1-framework/3-tooling/` (framework domain, tooling layer, migration plane). All code here is target-agnostic — it works with the abstract ops IR, not SQL.
+Lives in a new package `packages/1-framework/3-tooling/migration/` (framework domain, tooling layer, migration plane). This is reusable library code, not CLI-specific. All code here is target-agnostic — it works with the abstract ops IR, not SQL.
 
 **Deliverable:** Migrations can be written to disk, read back, attested, and organized into a navigable DAG. Tested with unit tests (no DB needed — this is purely file-based).
 
-**Tasks:**
+#### Package scaffolding
 
-#### On-disk format types and I/O
-- [ ] Define `MigrationManifest` type (`migration.json`): `from`, `to`, `edgeId` (string | null for Draft), `kind` ('regular' | 'baseline'), `fromContract` (full contract JSON or null for Draft), `toContract`, `hints`, `labels`, `authorship`, `createdAt`.
-- [ ] Define `ops.json` type: ordered array of abstract ops (reuses types from M1).
-- [ ] Define `MigrationGraphIndex` type (`graph.index.json`): `version`, `nodes[]`, `edges[]`, `integrity`. Type only — no read/write implementation yet.
-- [ ] Implement `writeMigrationPackage(dir, manifest, ops)` — atomically writes `migration.json` and `ops.json`.
-- [ ] Implement `readMigrationPackage(dir)` — reads and validates both files.
-- [ ] Implement `readMigrationsDir(migrationsRoot)` — scans `migrations/` and returns all valid packages.
-- [ ] Implement `formatMigrationDirName(timestamp, slug)` — produces `YYYYMMDDThhmm_{slug}` with slug sanitization.
-- [ ] Implement collision handling: untouched Draft → noop; non-equivalent collision → suffix (`_2`, `_3`, ...); invalid existing → error.
+- [x] Create `packages/1-framework/3-tooling/migration/` with `package.json` (name: `@prisma-next/migration-tools`), `tsconfig.json`, `tsdown.config.ts`, `vitest.config.ts`.
+  - Dependencies: `@prisma-next/core-control-plane` (for abstract ops types, `EMPTY_CONTRACT_HASH`), `@prisma-next/utils`, `pathe`.
+  - Export subpaths: `./types` (manifest/DAG types), `./io` (read/write), `./attestation` (edgeId), `./dag` (graph operations).
+  - Follow the pattern of `@prisma-next/emitter`: `src/exports/` barrel files, `tsdown` entry map, manual exports.
+- [x] Register the package in the pnpm workspace (`pnpm-workspace.yaml` or existing glob).
+- [x] Add a `packages/1-framework/3-tooling/migration/` entry to `architecture.config.json` under `{ domain: "framework", layer: "tooling", plane: "migration" }`. The existing `packages/1-framework/3-tooling/**` glob already covers this, but verify with `pnpm lint:deps`.
+- [x] Verify `pnpm lint:deps` passes with the new package and its imports.
+
+#### On-disk format types
+
+- [x] Define `MigrationManifest` interface (`migration.json` shape):
+  ```typescript
+  interface MigrationManifest {
+    readonly from: string           // contract hash (or EMPTY_CONTRACT_HASH)
+    readonly to: string             // contract hash
+    readonly edgeId: string | null  // null = Draft, string = Attested
+    readonly kind: 'regular' | 'baseline'
+    readonly fromContract: ContractIR | null  // full contract JSON; null for Draft or empty
+    readonly toContract: ContractIR           // full contract JSON
+    readonly hints: MigrationHints
+    readonly labels: readonly string[]
+    readonly authorship?: { readonly author?: string; readonly email?: string }
+    readonly signature?: { readonly keyId: string; readonly value: string } | null
+    readonly createdAt: string      // ISO-8601 timestamp
+  }
+
+  interface MigrationHints {
+    readonly used: readonly string[]
+    readonly applied: readonly string[]
+    readonly plannerVersion: string
+    readonly planningStrategy: string
+  }
+  ```
+  - `from`/`to` are the `storageHash` values from the contracts (or `EMPTY_CONTRACT_HASH`).
+  - `fromContract`/`toContract` are the complete canonical contract JSON objects, not stringified.
+  - `ContractIR` is imported from `@prisma-next/contract/ir`.
+- [x] Define `MigrationOps` type (`ops.json` shape): `readonly AbstractOp[]` — reuses the union type from M1 (`@prisma-next/core-control-plane/abstract-ops`).
+- [x] Define `MigrationPackage` interface — the in-memory representation of a read migration package:
+  ```typescript
+  interface MigrationPackage {
+    readonly dirName: string        // directory name (e.g., '20260225T1430_add_users')
+    readonly dirPath: string        // full absolute path
+    readonly manifest: MigrationManifest
+    readonly ops: readonly AbstractOp[]
+  }
+  ```
+
+#### File I/O
+
+- [x] Implement `writeMigrationPackage(dir, manifest, ops)`:
+  - Create the directory with `mkdir`.
+  - Write `migration.json` as pretty-printed JSON (`JSON.stringify(manifest, null, 2)`).
+  - Write `ops.json` as pretty-printed JSON (`JSON.stringify(ops, null, 2)`).
+  - Sequential writes, not atomic across both files. If the process crashes mid-write, the user deletes the partial directory and re-runs.
+  - Use `pathe` for path operations (per repo rule).
+  - Use `node:fs/promises` for file I/O (no cross-runtime concern for CLI tooling).
+- [x] Implement `readMigrationPackage(dir)`:
+  - Read `migration.json` and `ops.json`.
+  - Validate both files exist; error with structured message if either is missing.
+  - Parse JSON; error on malformed JSON with file path and parse error.
+  - Validate manifest shape (required fields present, `from`/`to` are strings, `kind` is valid). Use a lightweight check, not a full schema validator — keep the dependency list small.
+  - Return `MigrationPackage`.
+- [x] Implement `readMigrationsDir(migrationsRoot)`:
+  - Read directory entries, filter for subdirectories.
+  - For each subdirectory, call `readMigrationPackage`. Skip directories that don't contain `migration.json` (warn, don't error — allows non-migration files like READMEs in the migrations folder).
+  - Sort results by directory name (which is timestamp-prefixed, so lexicographic sort = chronological sort).
+  - Return `readonly MigrationPackage[]`.
+- [x] Implement `formatMigrationDirName(timestamp, slug)`:
+  - Format: `YYYYMMDDThhmm_{slug}` (e.g., `20260225T1430_add_users`).
+  - Slug sanitization: lowercase, replace non-alphanumeric with `_`, collapse consecutive `_`, trim leading/trailing `_`, truncate to reasonable length (64 chars).
+  - `timestamp` is a `Date` object; format as UTC.
+- [x] Implement collision handling: before `writeMigrationPackage`, check if the directory already exists. If so, error with a clear message suggesting `--name` or manual deletion.
+
+#### Generic JSON canonicalization
+
+- [x] Implement `canonicalizeJson(value: unknown): string`:
+  - Deep lexicographic key sort on objects.
+  - Arrays preserved in order (not sorted).
+  - `JSON.stringify` with no whitespace.
+  - Pure function, no side effects.
+  - Lives in this package (not in `core-control-plane`). It's a utility for edge attestation, not a core contract concept.
+  - Distinct from `canonicalizeContract` which has domain-specific normalization (default omission, top-level key ordering, index sorting). `canonicalizeJson` is generic.
 
 #### Edge attestation
-- [ ] Implement `computeEdgeId(manifest, ops)` — canonicalize and SHA-256 hash per ADR 028. Investigate and reuse existing canonicalization code (ADR 010).
-- [ ] Implement `attestMigration(dir)` — compute `edgeId`, write it. Draft → Attested.
-- [ ] Implement `verifyMigration(dir)` — recompute `edgeId`, compare. Pass/fail.
+
+- [x] Implement `computeEdgeId(manifest, ops)`:
+  - Per ADR 028: `edgeId = sha256(canonicalize(manifest without edgeId/signature) + canonicalize(ops) + canonicalize(fromContract) + canonicalize(toContract))`
+  - Strip `edgeId` and `signature` from the manifest before canonicalizing.
+  - Canonicalize the stripped manifest and ops with `canonicalizeJson`.
+  - Canonicalize `fromContract` and `toContract` with `canonicalizeContract` from `@prisma-next/core-control-plane/emission`.
+  - For `fromContract: null` (empty/Draft), use the string `"null"` as the canonical form.
+  - Concatenate all four canonical strings and SHA-256 hash them. Use `node:crypto.createHash('sha256')`.
+  - Return `sha256:<hex>` format (same prefix convention as `computeStorageHash`).
+- [x] Implement `attestMigration(dir)`:
+  - Read package from `dir`.
+  - Compute `edgeId`.
+  - Write updated `migration.json` with computed `edgeId`.
+  - Return the computed `edgeId`.
+- [x] Implement `verifyMigration(dir)`:
+  - Read package from `dir`.
+  - If `edgeId` is null (Draft), return `{ ok: false, reason: 'draft' }`.
+  - Recompute `edgeId` from content.
+  - Compare stored vs computed.
+  - Return `{ ok: boolean, storedEdgeId: string, computedEdgeId: string }`.
 
 #### DAG reconstruction
-- [ ] Implement `reconstructGraph(packages[])` — build in-memory DAG from migration packages. Nodes = contract hashes, edges = migrations.
-- [ ] Implement `findLeaf(graph)` — return the leaf reachable from `sha256:empty`. This is the "current" contract hash for `migration plan`.
-- [ ] Implement `findPath(graph, fromHash, toHash)` — ordered edge sequence, deterministic tie-breaking.
-- [ ] Implement `detectCycles(graph)`.
-- [ ] Implement `detectOrphans(graph)` — migrations not reachable from `sha256:empty`.
+
+Per ADR 039, the graph is reconstructed from migration file headers. BFS for pathfinding, DFS with coloring for cycle detection. Typical DAGs are small (<50 edges with squash-first hygiene).
+
+- [x] Define `MigrationGraph` interface:
+  ```typescript
+  interface MigrationGraph {
+    readonly nodes: ReadonlySet<string>        // contract hashes
+    readonly edges: ReadonlyMap<string, readonly MigrationGraphEdge[]>  // from → edges[]
+    readonly reverseEdges: ReadonlyMap<string, readonly MigrationGraphEdge[]>  // to → edges[]
+  }
+
+  interface MigrationGraphEdge {
+    readonly from: string
+    readonly to: string
+    readonly edgeId: string | null
+    readonly dirName: string
+    readonly createdAt: string
+    readonly labels: readonly string[]
+  }
+  ```
+- [x] Implement `reconstructGraph(packages)`:
+  - Build adjacency maps `edges[from]` and `reverseEdges[to]`.
+  - Collect all referenced hashes into `nodes`.
+  - Filter out packages with `archived: true` (future-proofing, not used in MVP but the field may appear).
+  - Self-loop check: reject `from === to` with structured error per ADR 039.
+- [x] Implement `findLeaf(graph)`:
+  - Starting from `EMPTY_CONTRACT_HASH`, follow edges forward to find the node with no outgoing edges (the leaf).
+  - If the graph is empty (no edges), return `EMPTY_CONTRACT_HASH` (new project).
+  - If multiple leaves exist (branching DAG), error with a diagnostic listing the ambiguous leaves. The user must resolve with `--from <hash>`.
+  - Uses BFS/DFS from `EMPTY_CONTRACT_HASH`.
+- [x] Implement `findPath(graph, fromHash, toHash)`:
+  - BFS from `fromHash` to `toHash` over the forward adjacency map.
+  - Deterministic tie-breaking per ADR 039: when multiple edges leave a node, sort by `(createdAt ascending, to lexicographic, edgeId lexicographic)`. Label priority (`main < default < feature`) is deferred since labels aren't populated in MVP.
+  - Return `readonly MigrationGraphEdge[]` in order, or `null` if no path exists.
+- [x] Implement `detectCycles(graph)`:
+  - DFS with three-color marking (white/gray/black) starting from all nodes.
+  - Return `readonly string[][]` — each entry is a cycle as a list of hashes.
+  - Empty array means no cycles.
+- [x] Implement `detectOrphans(graph)`:
+  - BFS forward from `EMPTY_CONTRACT_HASH` to find all reachable nodes.
+  - Any edge whose `from` is not in the reachable set is an orphan.
+  - Return `readonly MigrationGraphEdge[]` (orphaned edges).
 
 #### Tests
-- [ ] Round-trip tests: write migration package, read back, verify byte-level equality.
-- [ ] Validation tests: malformed `migration.json`, missing `ops.json`, invalid JSON.
-- [ ] Directory naming tests: slug sanitization, timestamp formatting.
-- [ ] Collision tests: reuse, suffix, error cases.
-- [ ] Attestation tests: compute edgeId, verify, modify ops, verify mismatch.
-- [ ] DAG tests: linear chain, branching, empty graph, single migration.
-- [ ] findLeaf tests: linear chain, branching (error on ambiguity).
-- [ ] findPath tests: path exists, no path, deterministic ordering.
-- [ ] Cycle detection tests.
-- [ ] Orphan detection tests.
+
+All tests are unit tests using vitest. Use `node:fs/promises` with temp directories for I/O tests. No database needed.
+
+**I/O tests:**
+- [x] Round-trip: write migration package, read back, verify `JSON.stringify` equality for both manifest and ops.
+- [x] Validation: malformed `migration.json` (invalid JSON) → structured error.
+- [x] Validation: missing `ops.json` → structured error with file path.
+- [x] Validation: missing `migration.json` → structured error.
+- [x] Validation: manifest missing required fields (`from`, `to`, `kind`, `toContract`) → error.
+- [x] `readMigrationsDir`: directory with two valid packages → returns both sorted by name.
+- [x] `readMigrationsDir`: directory with non-migration subdirectory (no `migration.json`) → skipped, not error.
+- [x] `readMigrationsDir`: empty directory → returns empty array.
+
+**Directory naming tests:**
+- [x] `formatMigrationDirName` with normal slug → correct format.
+- [x] Slug sanitization: special characters replaced with `_`, consecutive `_` collapsed.
+- [x] Slug sanitization: empty slug → reasonable default or error.
+- [x] Timestamp formatting: UTC, zero-padded.
+
+**Collision tests:**
+- [x] Write to existing directory → error.
+
+**Attestation tests:**
+- [x] `computeEdgeId` with known inputs → deterministic output.
+- [x] `computeEdgeId` run twice with same inputs → identical hash.
+- [x] `computeEdgeId` with `fromContract: null` (empty) → valid hash.
+- [x] `verifyMigration` on attested package → pass.
+- [x] `verifyMigration` after modifying ops → mismatch.
+- [x] `verifyMigration` after modifying manifest field (e.g., `labels`) → mismatch.
+- [x] `verifyMigration` on Draft (edgeId: null) → returns draft status.
+- [x] `attestMigration` on Draft → writes edgeId, subsequent verify passes.
+
+**DAG tests:**
+- [x] Empty graph (no packages) → `findLeaf` returns `EMPTY_CONTRACT_HASH`.
+- [x] Single migration (∅ → H1) → graph has 2 nodes, 1 edge. `findLeaf` returns H1.
+- [x] Linear chain (∅ → H1 → H2 → H3) → `findLeaf` returns H3. `findPath(∅, H3)` returns 3 edges in order.
+- [x] Branching (∅ → H1, H1 → H2a, H1 → H2b) → `findLeaf` errors with ambiguity.
+- [x] `findPath` with no path → returns null.
+- [x] `findPath` deterministic tie-breaking: two edges from same node → ordered by `createdAt`.
+- [x] Cycle detection: A → B → C → A → reports cycle.
+- [x] Cycle detection: linear chain → no cycles.
+- [x] Orphan detection: edge D → E where D is not reachable from ∅ → reported as orphan.
+- [x] Orphan detection: all edges reachable → no orphans.
+- [x] Self-loop rejection: edge with `from === to` → error.
 
 ### Milestone 3: CLI commands + end-to-end flows
 
