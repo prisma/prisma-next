@@ -58,7 +58,7 @@ describe('canonicalization', () => {
   it.each([
     { nullable: false },
     { nullable: undefined },
-  ])('keeps nullable false for columns with defaults', ({ nullable }) => {
+  ])('omits nullable:false for columns with defaults (nullable=$nullable)', ({ nullable }) => {
     const ir = createContractIR({
       storage: {
         tables: {
@@ -89,8 +89,37 @@ describe('canonicalization', () => {
     const columns = user['columns'] as Record<string, unknown>;
     const createdAt = columns['created_at'] as Record<string, unknown>;
     const updatedAt = columns['updated_at'] as Record<string, unknown>;
-    expect(createdAt['nullable']).toBe(false);
+    expect(createdAt['nullable']).toBeUndefined();
     expect(updatedAt['nullable']).toBe(true);
+  });
+
+  it('preserves nullable:true for columns with defaults', () => {
+    const ir = createContractIR({
+      storage: {
+        tables: {
+          user: {
+            columns: {
+              bio: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+                nullable: true,
+                default: { kind: 'literal', value: '' },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const result = canonicalizeContract(ir);
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    const storage = parsed['storage'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, unknown>;
+    const user = tables['user'] as Record<string, unknown>;
+    const columns = user['columns'] as Record<string, unknown>;
+    const bio = columns['bio'] as Record<string, unknown>;
+    expect(bio['nullable']).toBe(true);
+    expect(bio['default']).toEqual({ kind: 'literal', value: '' });
   });
 
   it('omits empty arrays and objects except required ones', () => {
