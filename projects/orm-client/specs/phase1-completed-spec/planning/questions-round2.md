@@ -14,7 +14,7 @@ The contract already declares `"lateral": true` as a Postgres capability. The PN
 
 Is the intent that `include()` for reads should **always** produce a single Plan (using the existing `IncludeAst` -> lateral join lowering path), eliminating the multi-query read path entirely? Or should the multi-query path remain as a fallback for targets that lack lateral join support?
 
-**1b.** If we go single-statement for includes, the repository layer for read queries essentially becomes a query builder that produces a single `SelectAst` with `IncludeAst` children, then delegates to the adapter for lowering. This would mean the repository layer's multi-query orchestration privilege (ADR 164) is only exercised for mutations, not reads.
+**1b.** If we go single-statement for includes, the repository layer for read queries essentially becomes a query builder that produces a single `SelectAst` with `IncludeAst` children, then delegates to the adapter for lowering. This would mean the repository layer's multi-query orchestration privilege (ADR 161) is only exercised for mutations, not reads.
 
 Does that match your mental model? The repository layer is the multi-query orchestrator for **mutations** specifically, while reads (even with nested includes) remain single-Plan?
 
@@ -132,7 +132,7 @@ db.posts.where({ id: postId }).findUnique().comments.create(commentInput)
 
 **5a.** For basic CRUD, I am assuming these methods on the repository/collection:
 
-- `create(data)` -- INSERT, returns created row (uses RETURNING when available, INSERT + SELECT otherwise per ADR 164)
+- `create(data)` -- INSERT, returns created row (uses RETURNING when available, INSERT + SELECT otherwise per ADR 161)
 - `update(data)` -- UPDATE matching `where()` filters, returns updated rows
 - `delete()` -- DELETE matching `where()` filters, returns deleted rows
 - `upsert({ create, update })` -- INSERT ON CONFLICT ... DO UPDATE
