@@ -18,6 +18,7 @@ import type {
   StorageTable,
   UniqueConstraint,
 } from './types';
+import { applyFkDefaults } from './types';
 
 /**
  * Creates a StorageColumn with nativeType and codecId.
@@ -57,7 +58,7 @@ export function fk(
   columns: readonly string[],
   refTable: string,
   refColumns: readonly string[],
-  name?: string,
+  opts?: { name?: string; constraint?: boolean; index?: boolean },
 ): ForeignKey {
   const references: ForeignKeyReferences = {
     table: refTable,
@@ -66,7 +67,8 @@ export function fk(
   return {
     columns,
     references,
-    ...(name !== undefined && { name }),
+    ...applyFkDefaults({ constraint: opts?.constraint, index: opts?.index }),
+    ...(opts?.name !== undefined && { name: opts.name }),
   };
 }
 

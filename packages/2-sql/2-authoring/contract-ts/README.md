@@ -79,6 +79,7 @@ const contract = defineContract<CodecTypes>()
   )
   .model('User', 'user', (m) => m.field('id', 'id').field('email', 'email'))
   .model('Post', 'post', (m) => m.field('id', 'id').field('userId', 'userId').field('title', 'title'))
+  .foreignKeys({ constraints: true, indexes: false })  // Optional FK config
   .build();
 ```
 
@@ -92,6 +93,25 @@ The table builder supports the following constraint methods:
 | `.unique(columns, name?)` | Add unique constraint with optional name |
 | `.index(columns, name?)` | Add index with optional name |
 | `.foreignKey(columns, references, name?)` | Add foreign key with optional name |
+
+#### Contract-Level Foreign Key Configuration
+
+The builder supports a `.foreignKeys()` method to control FK constraint and index emission:
+
+```typescript
+const contract = defineContract<CodecTypes>()
+  .target(postgresPack)
+  // ...tables and models...
+  .foreignKeys({ constraints: true, indexes: false })  // Emit FK constraints but skip backing indexes
+  .build();
+```
+
+| Config | Default | Description |
+|--------|---------|-------------|
+| `constraints` | `true` | Emit `FOREIGN KEY` constraints in DDL |
+| `indexes` | `true` | Emit FK-backing indexes (e.g., `CREATE INDEX ... ON post (user_id)`) |
+
+When `.foreignKeys()` is not called, defaults to `{ constraints: true, indexes: true }`. See [ADR 161](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md).
 
 ### Validating Contracts
 

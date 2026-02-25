@@ -60,6 +60,10 @@ export type ForeignKey = {
   readonly columns: readonly string[];
   readonly references: ForeignKeyReferences;
   readonly name?: string;
+  /** Whether to emit FK constraint DDL (ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY). */
+  readonly constraint: boolean;
+  /** Whether to emit a backing index for the FK columns. */
+  readonly index: boolean;
 };
 
 export type StorageTable = {
@@ -117,6 +121,23 @@ export type SqlMappings = {
   readonly codecTypes: Record<string, { readonly output: unknown }>;
   readonly operationTypes: Record<string, Record<string, unknown>>;
 };
+
+export const DEFAULT_FK_CONSTRAINT = true;
+export const DEFAULT_FK_INDEX = true;
+
+/**
+ * Resolves foreign key `constraint` and `index` fields to their effective boolean values,
+ * falling back through optional override defaults, then to the global defaults.
+ */
+export function applyFkDefaults(
+  fk: { constraint?: boolean | undefined; index?: boolean | undefined },
+  overrideDefaults?: { constraint?: boolean | undefined; index?: boolean | undefined },
+): { constraint: boolean; index: boolean } {
+  return {
+    constraint: fk.constraint ?? overrideDefaults?.constraint ?? DEFAULT_FK_CONSTRAINT,
+    index: fk.index ?? overrideDefaults?.index ?? DEFAULT_FK_INDEX,
+  };
+}
 
 export type SqlContract<
   S extends SqlStorage = SqlStorage,

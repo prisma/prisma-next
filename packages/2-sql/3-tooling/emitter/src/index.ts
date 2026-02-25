@@ -384,7 +384,7 @@ export const sqlTargetFamilyHook = {
           const cols = fk.columns.map((c: string) => `'${c}'`).join(', ');
           const refCols = fk.references.columns.map((c: string) => `'${c}'`).join(', ');
           const name = fk.name ? `; readonly name: '${fk.name}'` : '';
-          return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: '${fk.references.table}'; readonly columns: readonly [${refCols}] }${name} }`;
+          return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: '${fk.references.table}'; readonly columns: readonly [${refCols}] }${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
         })
         .join(', ');
       tableParts.push(`foreignKeys: readonly [${fks}]`);

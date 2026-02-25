@@ -259,9 +259,15 @@ export class TableBuilder<
   foreignKey(
     columns: readonly string[],
     references: { table: string; columns: readonly string[] },
-    name?: string,
+    opts?: { name?: string; constraint?: boolean; index?: boolean },
   ): TableBuilder<Name, Columns, PrimaryKey> {
-    const fkDef: ForeignKeyDef = name ? { columns, references, name } : { columns, references };
+    const fkDef: ForeignKeyDef = {
+      columns,
+      references,
+      ...(opts?.name !== undefined && { name: opts.name }),
+      ...(opts?.constraint !== undefined && { constraint: opts.constraint }),
+      ...(opts?.index !== undefined && { index: opts.index }),
+    };
     return new TableBuilder(
       this._state.name,
       this._state.columns,

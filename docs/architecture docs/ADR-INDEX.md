@@ -68,6 +68,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 043 | Advisory lock domain & key strategy | Defines advisory locking strategy for migration coordination and collision prevention | [ADR 043 - Advisory lock domain & key strategy.md](adrs/ADR%20043%20-%20Advisory%20lock%20domain%20&%20key%20strategy.md) |
 | 044 | Pre & post check vocabulary v1 | Establishes vocabulary and patterns for migration operation pre/post checks | [ADR 044 - Pre & post check vocabulary v1.md](adrs/ADR%20044%20-%20Pre%20&%20post%20check%20vocabulary%20v1.md) |
 | 154 | Component-owned database dependencies | Models database-side prerequisites as component-owned dependencies with pure schema-IR verification hooks (no fuzzy matching) | [ADR 154 - Component-owned database dependencies.md](adrs/ADR%20154%20-%20Component-owned%20database%20dependencies.md) |
+| 161 | Explicit foreign key constraint and index configuration | Adds two independent knobs (`foreignKeys.constraints`, `foreignKeys.indexes`) to control FK constraint and FK-backing index emission in migration DDL | [ADR 161 - Explicit foreign key constraint and index configuration.md](adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md) |
 
 ## Preflight & CI
 

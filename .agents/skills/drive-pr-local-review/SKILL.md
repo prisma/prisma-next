@@ -1,170 +1,205 @@
 ---
 name: drive-pr-local-review
-description: Performs comprehensive code review by analyzing git diffs between the current branch and the default branch (or a specified target). Use when the user requests a code review, diff analysis, PR review, or wants feedback on their changes before submitting. Evaluates code for idiomaticity, best practices, clarity, performance, security, edge cases, and documentation.
+description: >
+  Generate local PR/branch review artifacts for the current branch vs its base: an in-repo canonical
+  spec (if present) or an inferred review `spec.md`, plus `system-design-review.md`, `code-review.md`,
+  and `walkthrough.md` (via `.agents/skills/drive-pr-walkthrough/SKILL.md`). Writes artifacts to disk
+  (next to the in-repo spec when present, otherwise under `wip/`). Use when the user asks for a local
+  PR/branch review, a code review, a system design review, to "review this branch", or to produce
+  written review docs. Do not modify implementation code.
 metadata:
-  version: "2026.2.23"
+  version: "2026.2.24.4"
 ---
 
-# Code Review Agent
+# Local PR Review
 
-Analyzes git diffs to provide thorough, actionable code review feedback. Reviews changes against the default branch (typically `origin/main`) unless a specific target is specified.
+## Premise
 
-## Workflow
+A code review must be anchored to **expectations**. Those expectations come from:
+- Explicit intent sources (PR description, linked tickets, design docs) when available, plus
+- A canonical spec file (author-provided in-repo on the branch when available, otherwise a review `spec.md` you write) to make expectations explicit and reviewable.
 
-1. **Identify target branch**: Use `git remote show origin | grep 'HEAD branch'` to find the default branch, or use the user-specified target
-2. **Get the diff**: `git diff origin/<target-branch>...HEAD` for changes, `git diff --stat origin/<target-branch>...HEAD` for overview (use remote ref to avoid stale local copies)
-3. **Read changed files in full** when context is needed beyond the diff
-4. **Analyze against review criteria** (see below)
-5. **Generate structured review** with findings organized by severity and category
+You do not change implementation code. You only write review artifacts.
 
-## Review Criteria
+## Outputs (always written to disk)
 
-Evaluate each change against these criteria:
+Every run must produce these artifacts **side-by-side**:
+- `system-design-review.md`
+- `code-review.md`
+- `walkthrough.md` (must use the `/walkthrough` workflow from `.agents/skills/drive-pr-walkthrough/SKILL.md`; override its output path to land next to the other artifacts)
 
-### 1. Idiomaticity
+`spec.md` is only written when the branch does not already contain an in-repo canonical spec file. If a spec exists, do not duplicate it in the review outputs; reference it.
 
-- Does the code follow language conventions and idioms?
-- Are language-specific features used appropriately?
-- Does naming follow community standards (e.g., `snake_case` vs `camelCase`)?
+Output location rule:
+- If a canonical spec **file exists in-repo on the current branch**, write review artifacts next to it (see 2.1).
+- Otherwise (including when the only spec is external/off-branch), write review artifacts under `wip/` (local-only scratch; never commit).
 
-### 2. Best Practices & Patterns
+## 1) Establish the review scope (branch + base)
 
-- Are established patterns for the language/framework followed?
-- Is error handling appropriate and consistent?
-- Are dependencies used correctly?
-- Does the code follow project-specific conventions (check for CODING_GUIDELINES.md, AGENTS.md, or similar)?
+Defaults:
+- Review the **current branch**.
+- Base is the PR base branch when a GitHub PR exists; otherwise the repo default branch (typically `main`).
 
-### 3. Clarity & Conciseness
+Steps:
+1. Determine current branch name.
+2. Fetch latest refs from origin.
+3. Resolve base branch:
+   - If a PR exists for the current branch, use its `baseRefName`.
+   - Otherwise use the repo default branch (from `origin/HEAD`, typically `main`).
+4. Establish the review range:
+   - Topic branch: `origin/<base>...HEAD`
+   - If already on default branch: infer best-effort scope from git history and clearly state uncertainty in the reports.
 
-- Is the code easy to read and understand?
-- Are variable/function names descriptive and accurate?
-- Is there unnecessary complexity or over-engineering?
-- Could any logic be simplified?
+Evidence to capture (for your own analysis):
+- `git log --oneline origin/<base>..HEAD`
+- `git diff --name-only origin/<base>...HEAD`
+- `git diff origin/<base>...HEAD`
 
-### 4. Comments & Intent
+PR discovery hints:
+- `gh pr view --json number,url,title,body,baseRefName,headRefName`
+- Fallback: `gh pr list --head <branch> --state all --json number,url,title,body,baseRefName,headRefName --limit 1`
 
-- Do comments explain _why_, not _what_?
-- Are complex algorithms or non-obvious decisions documented?
-- Are there misleading or outdated comments?
-- Is the code self-documenting where possible?
+## 2) Establish expectations (use canonical spec or infer one)
 
-### 5. Performance
+### 2.1) Choose an artifact directory (prefer next to an existing in-repo spec)
 
-- Are there obvious performance issues (N+1 queries, unnecessary allocations, blocking calls)?
-- Is the approach appropriate for the expected scale?
-- Are there opportunities for caching or batching?
+First, locate a canonical spec **file in-repo on the current branch** (preferred inputs first).
 
-### 6. Security
+Important:
+- A “canonical spec” in this step means a spec **file** that exists in this repo on this branch.
+- If the user/PR links an external spec (URL, other repo, or a file not present on this branch), treat it as an expectation source (2.2), but it does **not** control artifact placement.
 
-- Is user input validated and sanitized?
-- Are secrets handled securely (not logged, not hardcoded)?
-- Are there injection vulnerabilities (SQL, command, etc.)?
-- Is authentication/authorization properly enforced?
-- Are cryptographic operations done correctly?
+Preferred inputs:
+1. If the user provided an **in-repo** spec file path (repo-relative or workspace-absolute) and it exists on this branch, treat it as canonical.
+2. Else, if the GitHub PR body links to or mentions an **in-repo** spec file path that exists on this branch, treat it as canonical.
+3. Else, search the branch for spec-like docs and pick the best match:
+   - Prefer: `agent-os/specs/**/spec.md`, `specs/**/spec.md`, `projects/**/spec.md`
+   - Also consider: `**/spec.md`, `**/requirements.md`, `**/design.md` (especially if added/changed in the diff)
 
-### 7. Edge Cases
+Then choose where artifacts go:
+- If an in-repo canonical spec exists:
+  - Let `SPEC_DIR` be the folder containing the spec file.
+  - If PR number is available: write to `SPEC_DIR/reviews/pr-<PR_NUMBER>/`
+  - Else: write to `SPEC_DIR/reviews/`
+- Otherwise (no in-repo canonical spec):
+  - If PR number is available: write to `wip/review-code/pr-<PR_NUMBER>/`
+  - Else: write to `wip/review-code/branch-<BRANCH_NAME>/`
 
-- Are boundary conditions handled (empty, null, max values)?
-- Is error handling comprehensive?
-- Are concurrent access scenarios considered?
-- Are failure modes documented or handled gracefully?
+### 2.2) Gather expectation sources (inputs to your expectations model)
 
-### 8. Documentation
+Prefer explicit intent sources over inference from the diff:
+1. Canonical spec file (if present from 2.1)
+2. External/off-branch spec (if provided by the user or linked in the PR body)
+3. GitHub PR title/body
+4. Linear ticket linked in the PR body (preferred), otherwise inferable from branch name (e.g. `ABC-123`), otherwise absent
+5. New/changed documentation on the branch that clarifies intent/constraints (ADRs, READMEs, `docs/**`)
+6. The diff itself (last resort for intent)
 
-- Are public APIs documented?
-- Is README or other documentation updated if behavior changes?
-- Are breaking changes noted?
-- Do new features have usage examples if appropriate?
+If the branch includes additional spec-like docs beyond the canonical spec file, treat them as supporting intent sources (not a required format), for example:
+- `**/requirements.md`, `**/design.md`
+- Relevant ADRs under `docs/architecture docs/adrs/`
 
-## Output Structure
+### 2.3) Ensure a review spec exists (required)
 
-```markdown
-# Code Review: [brief description of changes]
+If an in-repo canonical spec exists (from 2.1), **use it** as the review spec input and do **not** write a new one.
 
-## Summary
+If the author has not provided an in-repo canonical spec, infer one and write a review `spec.md` into the artifact directory (even if an external/off-branch spec exists; treat it as a primary source and link it).
 
-[1-2 sentence overview of the changes and overall assessment]
+If the spec is inferred, it must begin with a highly visible notice stating:
+- that it was constructed by you (the reviewer), and
+- the sources it was inferred from (PR/Linear/docs/diff), with links/paths.
 
-## Critical Issues
+If you are writing an inferred review `spec.md`, it must:
+- State whether expectations are **explicit** (linked docs) vs **inferred** (from PR/Linear/diff)
+- List **sources** (PR/Linear/docs) with links/paths
+- Include:
+  - Intent
+  - Functional requirements
+  - Non-goals / out of scope
+  - Constraints / invariants / compatibility
+  - Acceptance criteria
+  - Risks (migration/perf/security/rollout)
+- If a requirement is ambiguous, record it as an explicit assumption or open question.
 
-[Issues that must be fixed before merging - security vulnerabilities, bugs, data loss risks]
+Linear enrichment:
+- If a Linear ticket link exists and you can fetch it, use it to refine requirements/non-goals/acceptance criteria.
 
-## Recommendations
+## 3) Write the system / solution design review
 
-[Suggested improvements that would significantly improve the code]
+Write `system-design-review.md` focused on architecture and system design, grounded in the spec and any design docs added/changed on the branch.
 
-## Minor Suggestions
+Minimum coverage:
+- What problem is being solved; what new guarantees/invariants are introduced
+- Subsystem fit (contracts, plans, runtime, adapters/plugins, capability gating)
+- Boundary correctness (domain/layer/plane imports; deterministic artifacts)
+- ADRs: if the branch adds/changes ADRs under `docs/architecture docs/adrs/`, treat them as design-intent sources and explicitly review their reasoning/trade-offs
+- Test strategy adequacy at the architectural level (what must be proven, where)
 
-[Style, naming, or small improvements - nice to have but not blocking]
+## 4) Write the code review
 
-## Positive Notes
+Write `code-review.md` grounded in the spec and the established diff range.
 
-[What was done well - reinforces good patterns]
-```
+Minimum inputs:
+- Read the repo conventions relevant to the change (at least `AGENTS.md` + any relevant `.cursor/rules/**` and package `README.md` touched by the diff).
+- Read changed files in full when the diff is insufficient to assess correctness, intent, or invariants.
 
-### Finding Format
+### 4.1) Review criteria (minimum coverage)
 
-For each finding, provide:
+Evaluate changes against:
+- Idiomaticity (language-idiomatic patterns and naming)
+- Best practices & patterns (including project-specific conventions)
+- Clarity & conciseness (readability, naming, unnecessary complexity)
+- Comments & intent (comments explain *why*, not *what*; no misleading/outdated comments)
+- Performance (obvious regressions, unnecessary allocations, avoidable extra work)
+- Security (input validation, secrets handling, injection risks, authz/authn enforcement where applicable)
+- Correctness & edge cases (boundary conditions, failure modes, concurrency/reentrancy where relevant)
+- Documentation (public API docs, READMEs, breaking changes, usage examples when appropriate)
+- Tests as evidence of behavior (call out gaps and mismatches with expectations)
+- Spec traceability (map key requirements → implementation touchpoints + tests)
 
-- **Location**: File and line range (repo-relative paths only)
-- **Issue**: Clear description of the problem
-- **Suggestion**: Concrete fix or improvement
-- **Code example** (when helpful): Show the suggested change
+### 4.2) Output structure (required)
 
-Example:
+`code-review.md` must include these sections at minimum (you may add additional sections as useful):
+- Summary (1–2 sentences)
+- What looks solid (positive notes; can appear near the top)
+- Blocking issues (must fix before merge)
+- Non-blocking concerns (important issues to address or explicitly track; includes maintainability, performance follow-ups, and design/ADR gaps)
+- Nits (optional; safe to ignore unless the author prefers cleanup)
+- Acceptance-criteria traceability (acceptance criteria → implementation → evidence)
 
-```markdown
-### [Category]: [Brief title]
+Guidance:
+- “Blocking issues” is the hard gate (do not merge until addressed).
+- “Non-blocking concerns” are not a merge gate, but they are not “nits”; they should be handled now or captured as explicit follow-up work.
+- “Nits” are optional polish only; avoid mixing maintainability concerns into this section.
 
-**Location**: `src/handler.go:45-52`
+Prioritize findings by impact: security > correctness > performance > maintainability > style.
 
-The error from `db.Query()` is logged but not returned, causing silent failures.
+### 4.3) Finding format (required)
 
-**Suggestion**: Return the error to the caller or handle it explicitly:
-` ``go
-if err != nil {
-    return nil, fmt.Errorf("query failed: %w", err)
-} ` ``
-```
+For each finding, include:
+- **Location**: repo-relative path + line range
+- **Issue**: concise description of the problem and why it matters
+- **Suggestion**: concrete fix or improvement
+- **Code example** (when helpful): suggested change
 
-## What Not to Review
+For acceptance-criteria traceability entries, include:
+- **Acceptance criterion**: a short statement from the spec (or inferred requirement)
+- **Implementation**: the primary code touchpoints
+- **Evidence**: tests, fixtures, or other verification that prove behavior
 
-**Do NOT review:**
+### 4.4) Review boundaries (required)
 
-- **Formatting**: Indentation, line breaks, spacing, alignment - these should be handled by the language formatter (e.g., `gofmt`, `prettier`, `black`)
+Do not:
+- Review formatting-only changes (defer to formatters/linters)
+- Nitpick personal preferences that do not affect readability or maintainability
+- Suggest large rewrites when the current approach is acceptable
+- Flag issues in unchanged code unless directly impacted by the change
+- Use absolute filesystem paths in the review
 
-## Guidelines
+## 5) Write the walkthrough
 
-**Do:**
+Write `walkthrough.md` as a semantic narrative of the change set.
 
-- Read project conventions (CODING_GUIDELINES.md, AGENTS.md, etc.) before reviewing
-- Prioritize findings by impact (security > correctness > performance > style)
-- Provide actionable suggestions with concrete examples
-- Acknowledge good patterns and improvements
-- Consider the context and constraints of the change
-- Use repo-relative paths only
+Requirement:
+- Use the `/walkthrough` workflow from `.agents/skills/drive-pr-walkthrough/SKILL.md` and **override its output path** so the file lands next to the review artifacts.
 
-**Don't:**
-
-- Nitpick style issues that don't affect readability
-- Suggest rewrites when the current approach is acceptable
-- Flag issues in unchanged code (unless directly affected by the change)
-- Be pedantic about personal preferences
-- Use absolute filesystem paths
-
-## Severity Levels
-
-- **Critical**: Must fix - security vulnerabilities, bugs, data corruption risks
-- **Recommendation**: Should fix - significant improvements to maintainability, performance, or correctness
-- **Minor**: Nice to have - style improvements, minor optimizations, suggestions
-
-## Context Gathering
-
-Before reviewing, check for project-specific guidelines:
-
-```bash
-# Find project conventions
-find . -maxdepth 2 -name "*.md" -print0 | xargs -0 grep -l -i "guideline\|convention\|style\|coding" 2>/dev/null | head -5
-```
-
-Read any relevant guidelines to ensure review aligns with project standards.

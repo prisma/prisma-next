@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "emit": "prisma-next contract emit",
+    "db:init": "prisma-next db init",
     "db:drop": "tsx scripts/drop-db.ts",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/main.ts",

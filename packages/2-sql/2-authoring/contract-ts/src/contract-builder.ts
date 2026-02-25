@@ -11,6 +11,7 @@ import type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
   ContractBuilderState,
+  ForeignKeyDefaultsState,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
@@ -27,13 +28,14 @@ import {
   type Mutable,
   TableBuilder,
 } from '@prisma-next/contract-authoring';
-import type {
-  ModelDefinition,
-  ModelField,
-  SqlContract,
-  SqlMappings,
-  SqlStorage,
-  StorageTypeInstance,
+import {
+  applyFkDefaults,
+  type ModelDefinition,
+  type ModelField,
+  type SqlContract,
+  type SqlMappings,
+  type SqlStorage,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { computeMappings } from './contract';
@@ -166,6 +168,8 @@ type BuildStorageTable<
     readonly columns: readonly string[];
     readonly references: { readonly table: string; readonly columns: readonly string[] };
     readonly name?: string;
+    readonly constraint: boolean;
+    readonly index: boolean;
   }>;
 } & (PK extends readonly string[]
   ? { readonly primaryKey: { readonly columns: PK; readonly name?: string } }
@@ -415,10 +419,11 @@ class SqlContractBuilder<
         ...(i.name ? { name: i.name } : {}),
       }));
 
-      // Build foreign keys from table state
+      // Build foreign keys from table state, materializing defaults
       const foreignKeys = (tableState.foreignKeys ?? []).map((fk) => ({
         columns: fk.columns,
         references: fk.references,
+        ...applyFkDefaults(fk, this.state.foreignKeyDefaults),
         ...(fk.name ? { name: fk.name } : {}),
       }));
 
@@ -812,6 +817,33 @@ class SqlContractBuilder<
       ...this.state,
       models: { ...this.state.models, [name]: modelState } as Models &
         Record<ModelName, ReturnType<M['build']>>,
+    });
+  }
+
+  override foreignKeyDefaults(
+    config: ForeignKeyDefaultsState,
+  ): SqlContractBuilder<
+    CodecTypes,
+    Target,
+    Tables,
+    Models,
+    Types,
+    StorageHash,
+    ExtensionPacks,
+    Capabilities
+  > {
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      Types,
+      StorageHash,
+      ExtensionPacks,
+      Capabilities
+    >({
+      ...this.state,
+      foreignKeyDefaults: config,
     });
   }
 

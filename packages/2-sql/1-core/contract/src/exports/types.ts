@@ -16,3 +16,5 @@ export type {
   StorageTypeInstance,
   UniqueConstraint,
 } from '../types';
+
+export { applyFkDefaults, DEFAULT_FK_CONSTRAINT, DEFAULT_FK_INDEX } from '../types';
