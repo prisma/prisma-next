@@ -838,21 +838,72 @@ The `contract.output` field specifies the path to `contract.json`. This is the c
 - `contract.json`: Includes `_generated` metadata field indicating it's a generated artifact (excluded from canonicalization/hashing)
 - `contract.d.ts`: Includes warning header comments indicating it's a generated file
 
+### `prisma-next migration plan`
+
+Plan a migration from contract changes. Compares the emitted contract against the latest on-disk migration state and produces a new migration package with the required operations. No database connection is needed — fully offline.
+
+```bash
+prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>]
+```
+
+**Options:**
+- `--config <path>`: Path to `prisma-next.config.ts`
+- `--name <slug>`: Name slug for the migration directory (default: `migration`)
+- `--from <hash>`: Explicit starting contract hash (overrides DAG leaf detection)
+
+**What it does:**
+1. Loads config and reads `contract.json` (the "to" contract)
+2. Reads existing migrations from `config.migrations.dir` (default: `migrations/`)
+3. Reconstructs the migration DAG and finds the leaf (current state)
+4. Diffs the leaf contract against the new contract via the target's `planContractDiff` capability
+5. Writes a new migration package (`migration.json` + `ops.json`) and attests the `edgeId`
+
+### `prisma-next migration verify`
+
+Verify a migration package's integrity by recomputing the content-addressed `edgeId`.
+
+```bash
+prisma-next migration verify --dir <path>
+```
+
+- **Verified**: stored `edgeId` matches recomputed value
+- **Draft**: `edgeId` is null — automatically attests the package
+- **Mismatch**: package has been modified since attestation
+
+### `prisma-next migration new`
+
+Scaffold an empty migration package in Draft state.
+
+```bash
+prisma-next migration new --name <slug> [--config <path>]
+```
+
+Creates a migration directory with placeholder `migration.json` and `ops.json` files. The package has `edgeId: null` (Draft) — run `migration verify` to attest after editing.
+
 ## Architecture
 
 ```mermaid
 flowchart TD
     CLI[CLI Entry Point]
-    CMD[Emit Command]
+    CMD_EMIT[Emit Command]
+    CMD_DB[DB Commands]
+    CMD_MIG[Migration Commands]
     LOAD[TS Contract Loader]
     EMIT[Emitter]
+    CTRL[Control Client]
+    MIG_TOOLS["@prisma-next/migration-tools"]
     FS[File System]
 
-    CLI --> CMD
-    CMD --> LOAD
+    CLI --> CMD_EMIT
+    CLI --> CMD_DB
+    CLI --> CMD_MIG
+    CMD_EMIT --> LOAD
     LOAD --> EMIT
-    EMIT --> CMD
-    CMD --> FS
+    CMD_DB --> CTRL
+    CMD_MIG --> CTRL
+    CMD_MIG --> MIG_TOOLS
+    MIG_TOOLS --> FS
+    CTRL --> FS
 ```
 
 ## Config Validation and Normalization
@@ -1010,6 +1061,8 @@ export default defineConfig({
 - **`commander`**: CLI argument parsing and command routing
 - **`esbuild`**: Bundling TypeScript contract files with import allowlisting
 - **`@prisma-next/emitter`**: Contract emission engine (returns strings)
+- **`@prisma-next/migration-tools`**: On-disk migration I/O, attestation, and DAG reconstruction
+- **`@prisma-next/core-control-plane`**: Config types, abstract ops, error types, control plane stack
 
 ## Design Decisions
 

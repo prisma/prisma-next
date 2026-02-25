@@ -1,3 +1,4 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
   ControlTargetInstance,
   MigrationPlanner,
@@ -7,6 +8,8 @@ import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
+import { planContractDiff } from '@prisma-next/family-sql/control';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
@@ -27,6 +30,12 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
       },
       createRunner(family) {
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
+      },
+      planContractDiff(from: ContractIR | null, to: ContractIR) {
+        return planContractDiff({
+          from: from ? (from.storage as SqlStorage) : null,
+          to: to.storage as SqlStorage,
+        });
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {
