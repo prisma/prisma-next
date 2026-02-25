@@ -5,12 +5,15 @@ import type {
   RuntimeTransaction,
 } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  KYSELY_TRANSFORM_ERROR_CODES,
+  KyselyTransformError,
+  runGuardrails,
+  transformKyselyToPnAst,
+} from '@prisma-next/sql-kysely-lane';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { CompiledQuery, DatabaseConnection, QueryResult, TransactionSettings } from 'kysely';
-import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './transform/errors';
-import { runGuardrails } from './transform/guardrails';
-import { transformKyselyToPnAst } from './transform/transform';
 
 const TRANSFORMABLE_KINDS = new Set([
   'SelectQueryNode',

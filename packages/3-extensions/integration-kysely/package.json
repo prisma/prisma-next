@@ -27,6 +27,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.27.0",
   "dependencies": {
+    "@prisma-next/sql-kysely-lane": "workspace:*",
     "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {

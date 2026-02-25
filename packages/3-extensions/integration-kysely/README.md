@@ -5,7 +5,7 @@ Kysely integration for Prisma Next: connects Kysely query builder output to the 
 ## Responsibilities
 
 - Provide a Kysely-compatible database interface that routes queries through the Prisma Next execution stack
-- Transform Kysely `compiledQuery` AST into Prisma Next SQL AST (`QueryAst`) for lane-agnostic plugin inspection
+- Consume `@prisma-next/sql-kysely-lane` for transform and guardrails (Kysely AST → PN SQL AST)
 - Populate `plan.meta.refs`, `plan.meta.paramDescriptors`, and related metadata for Kysely-authored queries
 - Fail unsupported Kysely-authored query kinds with a stable `PLAN.UNSUPPORTED` runtime envelope (`details.lane = 'kysely'`, `details.kyselyKind`)
 
@@ -21,7 +21,8 @@ flowchart LR
 
   subgraph Transform
     direction TB
-    CQ --> T[transformKyselyToPnAst]
+    CQ --> Lane[@prisma-next/sql-kysely-lane]
+    Lane --> T[transformKyselyToPnAst]
     T --> AST[QueryAst]
     T --> Meta[metaAdditions]
   end
@@ -39,7 +40,7 @@ flowchart LR
 
 ## Transformer
 
-The transformer (`src/transform/`) converts Kysely AST nodes to PN SQL AST:
+The transformer (in `@prisma-next/sql-kysely-lane`) converts Kysely AST nodes to PN SQL AST:
 
 | Kysely Node | PN AST |
 |-------------|--------|
@@ -85,9 +86,10 @@ Transformer tests primarily compile real Kysely query builders (`.compile()`) an
 
 ## Dependencies
 
-- `@prisma-next/contract` — Plan types, ParamDescriptor, PlanRefs
-- `@prisma-next/sql-contract` — SqlContract, SqlStorage
-- `@prisma-next/sql-relational-core` — AST types (SelectAst, InsertAst, etc.)
+- `@prisma-next/sql-kysely-lane` — Transform and guardrails (Kysely AST → PN SQL AST)
+- `@prisma-next/contract` — Plan types, ParamDescriptor, PlanRefs (via kysely-lane)
+- `@prisma-next/sql-contract` — SqlContract, SqlStorage (via kysely-lane)
+- `@prisma-next/sql-relational-core` — AST types (via kysely-lane)
 - `kysely` (peer)
 
 ## See also

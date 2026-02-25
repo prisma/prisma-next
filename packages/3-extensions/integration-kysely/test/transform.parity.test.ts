@@ -1,7 +1,7 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { transformKyselyToPnAst } from '@prisma-next/sql-kysely-lane';
 import { Kysely, PostgresDialect } from 'kysely';
 import { describe, expect, it } from 'vitest';
-import { transformKyselyToPnAst } from '../src/transform/transform';
 import { contract, normalizeSql, postgresContract, type TestDb } from './transform.fixtures';
 
 const adapter = createPostgresAdapter();

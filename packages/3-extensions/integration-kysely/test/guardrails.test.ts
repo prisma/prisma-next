@@ -1,117 +1,257 @@
+import { validateContract } from '@prisma-next/sql-contract/validate';
+import {
+  KYSELY_TRANSFORM_ERROR_CODES,
+  KyselyTransformError,
+  runGuardrails,
+} from '@prisma-next/sql-kysely-lane';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
-import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from '../src/transform/errors';
-import { runGuardrails } from '../src/transform/guardrails';
-import { compileQuery, compilerDb, contract } from './transform.fixtures';
+import type { Contract } from './fixtures/generated/contract';
+import contractJson from './fixtures/generated/contract.json' with { type: 'json' };
 
-function cloneQuery<T>(query: T): T {
-  return JSON.parse(JSON.stringify(query)) as T;
+const contract = validateContract<Contract>(contractJson);
+
+function selectWithJoin(selections: unknown[], where?: unknown) {
+  return {
+    kind: 'SelectQueryNode',
+    from: {
+      kind: 'FromNode',
+      froms: [
+        {
+          kind: 'TableNode',
+          table: { kind: 'IdentifierNode', name: 'user' },
+        },
+      ],
+    },
+    selections,
+    joins: [
+      {
+        kind: 'JoinNode',
+        joinType: 'LeftJoinNode',
+        table: {
+          kind: 'TableNode',
+          table: { kind: 'IdentifierNode', name: 'post' },
+        },
+        on: {
+          kind: 'OnNode',
+          node: {
+            kind: 'BinaryOperationNode',
+            left: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'id' },
+                table: { kind: 'IdentifierNode', name: 'user' },
+              },
+            },
+            operator: { kind: 'OperatorNode', operator: '=' },
+            right: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'userId' },
+                table: { kind: 'IdentifierNode', name: 'post' },
+              },
+            },
+          },
+        },
+      },
+    ],
+    ...ifDefined('where', where != null ? { kind: 'WhereNode', node: where } : undefined),
+  };
 }
 
 describe('runGuardrails', () => {
   describe('qualified-ref check', () => {
     it('rejects unqualified column ref in multi-table selections', () => {
-      const compiled = compileQuery(
-        compilerDb
-          .selectFrom('user as u')
-          .leftJoin('post as p', 'u.id', 'p.userId')
-          .select(['u.id']),
-      );
-      const query = cloneQuery(compiled.query) as unknown as {
-        selections: Array<{ selection: { table?: unknown } }>;
-      };
-      delete query.selections[0]?.selection.table;
+      const query = selectWithJoin([
+        {
+          kind: 'SelectionNode',
+          selection: {
+            kind: 'ReferenceNode',
+            column: {
+              kind: 'ColumnNode',
+              column: { kind: 'IdentifierNode', name: 'id' },
+            },
+          },
+        },
+      ]);
 
       expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
       try {
         runGuardrails(contract, query);
-      } catch (error) {
-        expect((error as KyselyTransformError).code).toBe(
+      } catch (e) {
+        expect(KyselyTransformError.is(e)).toBe(true);
+        expect((e as KyselyTransformError).code).toBe(
           KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
         );
       }
     });
 
-    it('rejects unqualified column ref in multi-table where.where', () => {
-      const compiled = compileQuery(
-        compilerDb
-          .selectFrom('user as u')
-          .leftJoin('post as p', 'u.id', 'p.userId')
-          .selectAll('u')
-          .where('u.id', '=', 'u1'),
+    it('rejects unqualified column ref in multi-table where', () => {
+      const query = selectWithJoin(
+        [
+          {
+            kind: 'SelectAllNode',
+            reference: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+          },
+        ],
+        {
+          kind: 'BinaryOperationNode',
+          left: {
+            kind: 'ReferenceNode',
+            column: {
+              kind: 'ColumnNode',
+              column: { kind: 'IdentifierNode', name: 'id' },
+            },
+          },
+          operator: { kind: 'OperatorNode', operator: '=' },
+          right: { kind: 'ValueNode', value: 1 },
+        },
       );
-      const query = cloneQuery(compiled.query) as unknown as {
-        where?: { where?: { leftOperand?: { table?: unknown } } };
-      };
-      delete query.where?.where?.leftOperand?.table;
 
       expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
       try {
         runGuardrails(contract, query);
-      } catch (error) {
-        expect((error as KyselyTransformError).code).toBe(
+      } catch (e) {
+        expect((e as KyselyTransformError).code).toBe(
           KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
         );
       }
     });
 
-    it('rejects unqualified column ref in multi-table orderBy items', () => {
-      const compiled = compileQuery(
-        compilerDb
-          .selectFrom('user as u')
-          .leftJoin('post as p', 'u.id', 'p.userId')
-          .selectAll('u')
-          .orderBy('u.email', 'asc'),
-      );
-      const query = cloneQuery(compiled.query) as unknown as {
-        orderBy?: { items?: Array<{ orderBy?: { table?: unknown } }> };
+    it('rejects unqualified column ref in multi-table orderBy', () => {
+      const query = selectWithJoin([
+        {
+          kind: 'SelectAllNode',
+          reference: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+        },
+      ]);
+      (query as Record<string, unknown>)['orderBy'] = {
+        kind: 'OrderByNode',
+        items: [
+          {
+            kind: 'OrderByItemNode',
+            orderBy: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'email' },
+              },
+            },
+            direction: 'asc',
+          },
+        ],
       };
-      delete query.orderBy?.items?.[0]?.orderBy?.table;
 
       expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
       try {
         runGuardrails(contract, query);
-      } catch (error) {
-        expect((error as KyselyTransformError).code).toBe(
+      } catch (e) {
+        expect((e as KyselyTransformError).code).toBe(
+          KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
+        );
+      }
+    });
+
+    it('rejects IdentifierNode column ref in multi-table scope (regression: getTableName fallback bug)', () => {
+      const query = selectWithJoin([
+        {
+          kind: 'SelectionNode',
+          selection: {
+            kind: 'ReferenceNode',
+            column: { kind: 'IdentifierNode', name: 'id' },
+          },
+        },
+      ]);
+
+      expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
+      try {
+        runGuardrails(contract, query);
+      } catch (e) {
+        expect(KyselyTransformError.is(e)).toBe(true);
+        expect((e as KyselyTransformError).code).toBe(
           KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
         );
       }
     });
 
     it('allows qualified column refs in multi-table scope', () => {
-      const compiled = compileQuery(
-        compilerDb
-          .selectFrom('user as u')
-          .leftJoin('post as p', 'u.id', 'p.userId')
-          .select(['u.id', 'p.userId']),
-      );
+      const query = selectWithJoin([
+        {
+          kind: 'SelectionNode',
+          selection: {
+            kind: 'ReferenceNode',
+            column: {
+              kind: 'ColumnNode',
+              column: { kind: 'IdentifierNode', name: 'id' },
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
+          },
+        },
+      ]);
 
-      expect(() => runGuardrails(contract, compiled.query)).not.toThrow();
+      expect(() => runGuardrails(contract, query)).not.toThrow();
     });
 
     it('allows unqualified refs in single-table scope', () => {
-      const compiled = compileQuery(compilerDb.selectFrom('user').select(['id']));
+      const query = {
+        kind: 'SelectQueryNode',
+        from: {
+          kind: 'FromNode',
+          froms: [
+            {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
+          ],
+        },
+        selections: [
+          {
+            kind: 'SelectionNode',
+            selection: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'id' },
+              },
+            },
+          },
+        ],
+      };
 
-      expect(() => runGuardrails(contract, compiled.query)).not.toThrow();
+      expect(() => runGuardrails(contract, query)).not.toThrow();
     });
 
     it('rejects unqualified ref in multi-FROM scope (froms.length > 1)', () => {
-      const compiled = compileQuery(compilerDb.selectFrom('user').select(['id']));
-      const query = cloneQuery(compiled.query) as unknown as {
-        from?: { froms?: unknown[] };
-      };
-      query.from?.froms?.push({
-        kind: 'TableNode',
-        table: {
-          kind: 'SchemableIdentifierNode',
-          identifier: { kind: 'IdentifierNode', name: 'post' },
+      const query = {
+        kind: 'SelectQueryNode',
+        from: {
+          kind: 'FromNode',
+          froms: [
+            { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+            { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'post' } },
+          ],
         },
-      });
+        selections: [
+          {
+            kind: 'SelectionNode',
+            selection: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'id' },
+              },
+            },
+          },
+        ],
+      };
 
       expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
       try {
         runGuardrails(contract, query);
-      } catch (error) {
-        expect((error as KyselyTransformError).code).toBe(
+      } catch (e) {
+        expect((e as KyselyTransformError).code).toBe(
           KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
         );
       }
@@ -120,56 +260,77 @@ describe('runGuardrails', () => {
 
   describe('ambiguous selectAll check', () => {
     it('rejects selectAll without table reference in multi-table scope', () => {
-      const compiled = compileQuery(
-        compilerDb.selectFrom('user as u').leftJoin('post as p', 'u.id', 'p.userId').selectAll(),
-      );
+      const query = selectWithJoin([{ kind: 'SelectAllNode' }]);
 
-      expect(() => runGuardrails(contract, compiled.query)).toThrow(KyselyTransformError);
+      expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
       try {
-        runGuardrails(contract, compiled.query);
-      } catch (error) {
-        expect((error as KyselyTransformError).code).toBe(
+        runGuardrails(contract, query);
+      } catch (e) {
+        expect(KyselyTransformError.is(e)).toBe(true);
+        expect((e as KyselyTransformError).code).toBe(
           KYSELY_TRANSFORM_ERROR_CODES.AMBIGUOUS_SELECT_ALL,
         );
       }
     });
 
     it('allows selectAll with explicit table in multi-table scope', () => {
-      const compiled = compileQuery(
-        compilerDb.selectFrom('user as u').leftJoin('post as p', 'u.id', 'p.userId').selectAll('u'),
-      );
+      const query = selectWithJoin([
+        {
+          kind: 'SelectAllNode',
+          reference: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+        },
+      ]);
 
-      expect(() => runGuardrails(contract, compiled.query)).not.toThrow();
+      expect(() => runGuardrails(contract, query)).not.toThrow();
     });
 
     it('allows selectAll in single-table scope', () => {
-      const compiled = compileQuery(compilerDb.selectFrom('user').selectAll());
+      const query = {
+        kind: 'SelectQueryNode',
+        from: {
+          kind: 'FromNode',
+          froms: [
+            {
+              kind: 'TableNode',
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
+          ],
+        },
+        selections: [{ kind: 'SelectAllNode' }],
+      };
 
-      expect(() => runGuardrails(contract, compiled.query)).not.toThrow();
+      expect(() => runGuardrails(contract, query)).not.toThrow();
     });
   });
 
   describe('non-select queries', () => {
     it('passes through InsertQueryNode without guardrail checks', () => {
-      const compiled = compileQuery(
-        compilerDb
-          .insertInto('user')
-          .values({ id: 'u1', email: 'u1@test', createdAt: '2024-01-01' }),
-      );
+      const query = {
+        kind: 'InsertQueryNode',
+        into: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+        values: { kind: 'ValuesNode', values: [] },
+      };
 
-      expect(() => runGuardrails(contract, compiled.query)).not.toThrow();
+      expect(() => runGuardrails(contract, query)).not.toThrow();
     });
 
     it('passes through UpdateQueryNode without guardrail checks', () => {
-      const compiled = compileQuery(compilerDb.updateTable('user').set({ email: 'x' }));
+      const query = {
+        kind: 'UpdateQueryNode',
+        table: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+        updates: [],
+      };
 
-      expect(() => runGuardrails(contract, compiled.query)).not.toThrow();
+      expect(() => runGuardrails(contract, query)).not.toThrow();
     });
 
     it('passes through DeleteQueryNode without guardrail checks', () => {
-      const compiled = compileQuery(compilerDb.deleteFrom('user'));
+      const query = {
+        kind: 'DeleteQueryNode',
+        from: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+      };
 
-      expect(() => runGuardrails(contract, compiled.query)).not.toThrow();
+      expect(() => runGuardrails(contract, query)).not.toThrow();
     });
   });
 });
