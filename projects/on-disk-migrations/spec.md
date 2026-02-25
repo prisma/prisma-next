@@ -231,6 +231,32 @@ Start fresh, using the v2 branch as reference. Key reasons:
 - Starting clean avoids merge conflicts and lets us structure packages properly from the start
 - The v2 `migration new` implementation, config normalization, and ADR 161 are good reference but straightforward to rewrite
 
+## RD-10: On-disk persistence package location
+
+The on-disk I/O, attestation, and DAG logic live in a new package `packages/1-framework/3-tooling/migration/` (framework domain, tooling layer, migration plane). This is library code reusable by the CLI, CI tooling, PPg bundle building, etc. — not CLI-specific. It imports from `1-core/migration/control-plane/` for abstract ops types and the `EMPTY_CONTRACT_HASH` sentinel.
+
+## RD-11: Edge attestation canonicalization strategy
+
+The `edgeId` formula hashes four inputs: the manifest (minus `edgeId`/`signature`), the ops, and the two embedded contracts. Contracts are canonicalized using the existing `canonicalizeContract` function (same function used for `storageHash`). The manifest and ops are canonicalized using a generic `canonicalizeJson` (deep lexicographic key sort + `JSON.stringify`). This keeps contract hashing consistent everywhere while using the simplest correct approach for non-contract data.
+
+## RD-12: Full contracts embedded in migration manifest
+
+`migration.json` embeds the complete `fromContract` and `toContract` JSON (not just hashes). This enables state reconstruction from any migration point, supports migration splitting, and makes migration packages self-contained per ADR 001. Storage overhead is minimal since contracts are small JSON.
+
+## RD-13: Include hints field in manifest (even for additive-only MVP)
+
+The `hints` field is included in the `MigrationManifest` type and populated by `migration plan`, even though the MVP planner is additive-only. For MVP this will be `{ used: [], applied: ["additive_only"], plannerVersion: "...", planningStrategy: "additive" }`. Including it now avoids a format change later when destructive hints are implemented.
+
+## RD-14: Authorship field deferred
+
+The `authorship` field is included in the `MigrationManifest` type as optional (`authorship?: { author?: string; email?: string }`) for forward compatibility, but is not populated by any command in this project. Auto-population from git config or `--author` flags is future work.
+
+## RD-15: Signing deferred, attestation only
+
+This project implements **attestation** only: computing the content-addressed `edgeId` hash via `computeEdgeId` / `verifyEdgeId`. **Signing** (cryptographic signature over `edgeId` for provenance, required by PPg hosted preflight) is a separate project requiring key management infrastructure. The `signature` field is included in the `MigrationManifest` type as `signature?: { keyId: string; value: string } | null` for forward compatibility but is not written by any command.
+
+Terminology note: "attestation" (hashing migration content → `edgeId`), "signing" (cryptographic signature → provenance), and "database signing" (`db sign` → writing marker to DB) are three distinct concepts.
+
 # Open Questions
 
 1. **How does the control plane stack expose contract-to-contract planning?**
