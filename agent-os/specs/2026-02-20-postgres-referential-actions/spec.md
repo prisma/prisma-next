@@ -17,7 +17,7 @@ Add Postgres-specific referential actions (`ON DELETE` and `ON UPDATE`) as a fol
 ### Prerequisites
 
 - **Configurable FK plan** (`plans/feat-configurable-foreign-key-constraints-and-indexes.md`) adds:
-  - Per-FK `constraint`, `index`, `indexName` plus global `foreignKeys.constraints` / `foreignKeys.indexes`
+  - Per-FK `constraint`, `index`, `indexName` plus `.foreignKeyDefaults({ constraint, index })` for global defaults
   - `.foreignKey(columns, references, options?)` builder with optional config
 
 - **Contract IR** (`packages/2-sql/1-core/contract/src/types.ts`): `ForeignKey` currently has `columns`, `references`, `name` (and optionally `constraint`, `index`, `indexName` once the FK config plan lands).
@@ -85,7 +85,9 @@ Extend `.foreignKey()` options in `packages/1-framework/2-authoring/contract/src
 )
 ```
 
-When omitted, both default to `undefined` (Postgres default: `NO ACTION`).
+When omitted, both default to `undefined`. For **verification**, omission means "don't compare" — the verifier skips referential action checks for that FK. The database still applies its own default (`NO ACTION` for Postgres), but the contract makes no assertion about it.
+
+> **`noAction` as authoring alias:** Explicit `noAction` is an authoring convenience. Canonicalization strips it (equivalent to omission for hash stability), so it never appears in canonical `contract.json`. The planner handles `noAction` if encountered pre-canonicalization, but the canonical pipeline treats it as `undefined`.
 
 ### Canonicalization
 
@@ -112,22 +114,25 @@ ON UPDATE NO ACTION
 
 ### Generated DDL Expectations
 
-| Contract `onDelete` | Contract `onUpdate` | Generated DDL (append) |
-|---|---|---|
-| `undefined` | `undefined` | *(none)* |
-| `cascade` | `undefined` | `ON DELETE CASCADE` |
-| `restrict` | `undefined` | `ON DELETE RESTRICT` |
-| `setNull` | `undefined` | `ON DELETE SET NULL` |
-| `setDefault` | `undefined` | `ON DELETE SET DEFAULT` |
-| `noAction` | `undefined` | `ON DELETE NO ACTION` |
-| `undefined` | `cascade` | `ON UPDATE CASCADE` |
-| `cascade` | `cascade` | `ON DELETE CASCADE ON UPDATE CASCADE` |
-| *(any)* | *(any)* | Both clauses when both specified |
+| Contract `onDelete` | Contract `onUpdate` | Generated DDL (append) | Notes |
+|---|---|---|---|
+| `undefined` | `undefined` | *(none)* | DB applies `NO ACTION` by default |
+| `cascade` | `undefined` | `ON DELETE CASCADE` | |
+| `restrict` | `undefined` | `ON DELETE RESTRICT` | |
+| `setNull` | `undefined` | `ON DELETE SET NULL` | |
+| `setDefault` | `undefined` | `ON DELETE SET DEFAULT` | |
+| `noAction` | `undefined` | `ON DELETE NO ACTION` | Authoring-only: stripped by canonicalization |
+| `undefined` | `cascade` | `ON UPDATE CASCADE` | |
+| `cascade` | `cascade` | `ON DELETE CASCADE ON UPDATE CASCADE` | |
+| *(any)* | *(any)* | Both clauses when both specified | |
+
+> **Note:** The `noAction` row above applies only to pre-canonicalization contracts. After canonicalization, `noAction` is stripped to `undefined`, producing no DDL clause (row 1). This is by design — `NO ACTION` is the database default, so emitting it explicitly is redundant.
 
 ### Post-check / Verification
 
 - Extend `foreignKeyMatches` post-check (or equivalent) to include `onDelete` and `onUpdate` in the params when present.
-- Schema verification (`verify-helpers.ts`) should compare introspected referential actions against contract when the Postgres adapter introspects FK metadata (e.g. `information_schema.referential_constraints` or `pg_constraint`).
+- Schema verification (`verify-helpers.ts`) compares introspected referential actions against contract when the contract **explicitly specifies** `onDelete`/`onUpdate`. When omitted (`undefined`), verification skips the comparison — omission means "don't care", not "assert NO ACTION" (see ADR 162, section 7).
+- `noAction` in the contract is normalized to `undefined` before comparison, so explicit `noAction` passes against a database using the default `NO ACTION`.
 
 ### Introspection
 
