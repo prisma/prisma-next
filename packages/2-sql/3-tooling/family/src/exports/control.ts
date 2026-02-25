@@ -14,6 +14,9 @@ export type {
 export type { SqlControlDescriptorWithContributions } from '../core/assembly';
 export { extractCodecControlHooks } from '../core/assembly';
 export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/control-instance';
+export type { ContractPlannerOptions } from '../core/migrations/contract-planner';
+// Contract-to-contract planner
+export { planContractDiff } from '../core/migrations/contract-planner';
 export {
   createMigrationPlan,
   plannerFailure,
