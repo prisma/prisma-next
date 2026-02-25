@@ -36,6 +36,13 @@ export type ProfileHash =
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
 export type OperationTypes = Record<string, never>;
+type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyof CodecTypes
+  ? CodecTypes[CodecId] extends { readonly output: infer O }
+    ? O extends Date | bigint
+      ? O
+      : Encoded
+    : Encoded
+  : Encoded;
 
 export type Contract = SqlContract<
   {
@@ -46,6 +53,7 @@ export type Contract = SqlContract<
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'autoincrement()' };
           };
           readonly email: {
             readonly nativeType: 'character varying';
@@ -56,6 +64,7 @@ export type Contract = SqlContract<
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
           };
           readonly update_at: {
             readonly nativeType: 'timestamptz';
@@ -79,6 +88,7 @@ export type Contract = SqlContract<
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'autoincrement()' };
           };
           readonly userId: {
             readonly nativeType: 'int4';
@@ -94,6 +104,7 @@ export type Contract = SqlContract<
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
           };
           readonly update_at: {
             readonly nativeType: 'timestamptz';
@@ -122,6 +133,7 @@ export type Contract = SqlContract<
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'autoincrement()' };
           };
           readonly postId: {
             readonly nativeType: 'int4';
@@ -137,6 +149,7 @@ export type Contract = SqlContract<
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
           };
           readonly update_at: {
             readonly nativeType: 'timestamptz';
@@ -155,6 +168,7 @@ export type Contract = SqlContract<
             readonly nativeType: 'int4';
             readonly codecId: 'pg/int4@1';
             readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'autoincrement()' };
           };
           readonly name: {
             readonly nativeType: 'character varying';
@@ -219,10 +233,97 @@ export type Contract = SqlContract<
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
+          readonly scheduled_at: {
+            readonly nativeType: 'timestamptz';
+            readonly codecId: 'pg/timestamptz@1';
+            readonly nullable: false;
+            readonly default: {
+              readonly kind: 'literal';
+              readonly value: DefaultLiteralValue<'pg/timestamptz@1', '2024-01-15T10:30:00.000Z'>;
+            };
+          };
           readonly created_at: {
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+          };
+        };
+        primaryKey: { readonly columns: readonly ['id'] };
+        uniques: readonly [];
+        indexes: readonly [];
+        foreignKeys: readonly [];
+      };
+      readonly literal_defaults: {
+        columns: {
+          readonly id: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+            readonly default: { readonly kind: 'function'; readonly expression: 'autoincrement()' };
+          };
+          readonly label: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
+            readonly nullable: false;
+            readonly default: {
+              readonly kind: 'literal';
+              readonly value: DefaultLiteralValue<'pg/text@1', 'draft'>;
+            };
+          };
+          readonly score: {
+            readonly nativeType: 'int4';
+            readonly codecId: 'pg/int4@1';
+            readonly nullable: false;
+            readonly default: {
+              readonly kind: 'literal';
+              readonly value: DefaultLiteralValue<'pg/int4@1', 0>;
+            };
+          };
+          readonly rating: {
+            readonly nativeType: 'float8';
+            readonly codecId: 'pg/float8@1';
+            readonly nullable: false;
+            readonly default: {
+              readonly kind: 'literal';
+              readonly value: DefaultLiteralValue<'pg/float8@1', 3.14>;
+            };
+          };
+          readonly active: {
+            readonly nativeType: 'bool';
+            readonly codecId: 'pg/bool@1';
+            readonly nullable: false;
+            readonly default: {
+              readonly kind: 'literal';
+              readonly value: DefaultLiteralValue<'pg/bool@1', true>;
+            };
+          };
+          readonly big_count: {
+            readonly nativeType: 'int8';
+            readonly codecId: 'pg/int8@1';
+            readonly nullable: false;
+            readonly default: {
+              readonly kind: 'literal';
+              readonly value: DefaultLiteralValue<'pg/int8@1', 9007199254740993n>;
+            };
+          };
+          readonly metadata: {
+            readonly nativeType: 'jsonb';
+            readonly codecId: 'pg/jsonb@1';
+            readonly nullable: false;
+            readonly default: {
+              readonly kind: 'literal';
+              readonly value: DefaultLiteralValue<'pg/jsonb@1', { readonly key: 'default' }>;
+            };
+          };
+          readonly tags: {
+            readonly nativeType: 'jsonb';
+            readonly codecId: 'pg/jsonb@1';
+            readonly nullable: false;
+            readonly default: {
+              readonly kind: 'literal';
+              readonly value: DefaultLiteralValue<'pg/jsonb@1', readonly ['alpha', 'beta']>;
+            };
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
@@ -270,7 +371,21 @@ export type Contract = SqlContract<
       fields: {
         readonly id: Char<36>;
         readonly name: CodecTypes['pg/text@1']['output'];
+        readonly scheduledAt: CodecTypes['pg/timestamptz@1']['output'];
         readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      };
+    };
+    readonly LiteralDefaults: {
+      storage: { readonly table: 'literal_defaults' };
+      fields: {
+        readonly id: CodecTypes['pg/int4@1']['output'];
+        readonly label: CodecTypes['pg/text@1']['output'];
+        readonly score: CodecTypes['pg/int4@1']['output'];
+        readonly rating: CodecTypes['pg/float8@1']['output'];
+        readonly active: CodecTypes['pg/bool@1']['output'];
+        readonly bigCount: CodecTypes['pg/int8@1']['output'];
+        readonly metadata: CodecTypes['pg/jsonb@1']['output'];
+        readonly tags: CodecTypes['pg/jsonb@1']['output'];
       };
     };
   },
@@ -281,12 +396,14 @@ export type Contract = SqlContract<
       readonly Post: 'post';
       readonly Comment: 'comment';
       readonly Event: 'event';
+      readonly LiteralDefaults: 'literal_defaults';
     };
     tableToModel: {
       readonly user: 'User';
       readonly post: 'Post';
       readonly comment: 'Comment';
       readonly event: 'Event';
+      readonly literal_defaults: 'LiteralDefaults';
     };
     fieldToColumn: {
       readonly User: {
@@ -314,7 +431,18 @@ export type Contract = SqlContract<
       readonly Event: {
         readonly id: 'id';
         readonly name: 'name';
+        readonly scheduledAt: 'scheduled_at';
         readonly createdAt: 'created_at';
+      };
+      readonly LiteralDefaults: {
+        readonly id: 'id';
+        readonly label: 'label';
+        readonly score: 'score';
+        readonly rating: 'rating';
+        readonly active: 'active';
+        readonly bigCount: 'big_count';
+        readonly metadata: 'metadata';
+        readonly tags: 'tags';
       };
     };
     columnToField: {
@@ -343,7 +471,18 @@ export type Contract = SqlContract<
       readonly event: {
         readonly id: 'id';
         readonly name: 'name';
+        readonly scheduled_at: 'scheduledAt';
         readonly created_at: 'createdAt';
+      };
+      readonly literal_defaults: {
+        readonly id: 'id';
+        readonly label: 'label';
+        readonly score: 'score';
+        readonly rating: 'rating';
+        readonly active: 'active';
+        readonly big_count: 'bigCount';
+        readonly metadata: 'metadata';
+        readonly tags: 'tags';
       };
     };
     codecTypes: PgTypes;

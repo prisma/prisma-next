@@ -33,19 +33,9 @@ export type StorageTypeInstanceState = {
 };
 
 /**
- * Descriptive error type shown when attempting to use both nullable and default.
- * This string literal appears in TypeScript error messages for better DX.
- */
-export type NullableColumnCannotHaveDefault =
-  "Error: A nullable column cannot have a default value. Remove 'nullable: true' or remove 'default'.";
-
-/**
- * Column builder state with enforced nullable/default mutual exclusivity.
+ * Column builder state.
  *
- * Invariant: A column with a default value is always NOT NULL.
- * This is enforced at the type level via conditional types:
- * - Nullable columns (`nullable: true`) cannot have a `default` property
- * - Non-nullable columns (`nullable: false`) can optionally have a `default` property
+ * Both nullable and non-nullable columns can define defaults to match database behavior.
  */
 export type ColumnBuilderState<
   Name extends string,
@@ -53,7 +43,7 @@ export type ColumnBuilderState<
   Type extends string,
 > = ColumnBuilderStateBase<Name, Type> &
   (Nullable extends true
-    ? { readonly nullable: true; readonly default?: NullableColumnCannotHaveDefault }
+    ? { readonly nullable: true; readonly default?: ColumnDefault }
     : {
         readonly nullable: false;
         readonly default?: ColumnDefault;
@@ -86,6 +76,8 @@ export interface ForeignKeyDef {
     readonly columns: readonly string[];
   };
   readonly name?: string;
+  readonly constraint?: boolean;
+  readonly index?: boolean;
 }
 
 export interface TableBuilderState<
@@ -128,6 +120,11 @@ export interface ModelBuilderState<
   readonly relations: Relations;
 }
 
+export interface ForeignKeyDefaultsState {
+  readonly constraint: boolean;
+  readonly index: boolean;
+}
+
 export interface ContractBuilderState<
   Target extends string | undefined = string | undefined,
   Tables extends Record<
@@ -163,6 +160,7 @@ export interface ContractBuilderState<
   readonly extensionPacks?: ExtensionPacks;
   readonly capabilities?: Capabilities;
   readonly storageTypes?: Record<string, StorageTypeInstanceState>;
+  readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
   /**
    * Array of extension pack namespace identifiers (e.g., ['pgvector', 'postgis']).
    * Populated when extension packs are registered during contract building.

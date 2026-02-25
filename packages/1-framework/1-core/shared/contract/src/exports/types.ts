@@ -2,6 +2,8 @@ export type {
   $,
   Brand,
   ColumnDefault,
+  ColumnDefaultLiteralInputValue,
+  ColumnDefaultLiteralValue,
   ContractBase,
   ContractMarkerRecord,
   DocCollection,
@@ -17,6 +19,8 @@ export type {
   FieldType,
   GenerateContractTypesOptions,
   GeneratedValueSpec,
+  JsonPrimitive,
+  JsonValue,
   ParamDescriptor,
   ParameterizedCodecDescriptor,
   PlanMeta,
@@ -26,6 +30,9 @@ export type {
   ResultType,
   Source,
   StorageHashBase,
+  TaggedBigInt,
+  TaggedLiteralValue,
+  TaggedRaw,
   TargetFamilyHook,
   TypeRenderContext,
   TypeRenderEntry,
@@ -33,4 +40,11 @@ export type {
   TypesImportSpec,
   ValidationContext,
 } from '../types';
-export { coreHash, isDocumentContract, profileHash } from '../types';
+export {
+  bigintJsonReplacer,
+  coreHash,
+  isDocumentContract,
+  isTaggedBigInt,
+  isTaggedRaw,
+  profileHash,
+} from '../types';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { col, contract, model, storage, table } from '../src/factories';
+import { col, contract, fk, model, pk, storage, table } from '../src/factories';
 import { validateModel, validateSqlContract, validateStorage } from '../src/validators';
 
 describe('SQL contract validators', () => {
@@ -303,6 +303,106 @@ describe('SQL contract validators', () => {
             sql: 'SELECT * FROM "user"',
           },
         },
+      });
+      expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
+    it('validates FK with per-FK constraint and index fields', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
+      const postTable = table(
+        { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+        {
+          pk: pk('id'),
+          fks: [fk(['userId'], 'user', ['id'], { constraint: true, index: true })],
+        },
+      );
+      const s = storage({ user: userTable, post: postTable });
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+      });
+      expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
+    it('validates FK with constraint disabled', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
+      const postTable = table(
+        { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+        {
+          pk: pk('id'),
+          fks: [fk(['userId'], 'user', ['id'], { constraint: false, index: true })],
+        },
+      );
+      const s = storage({ user: userTable, post: postTable });
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+      });
+      expect(() => validateSqlContract(c)).not.toThrow();
+    });
+
+    it('rejects FK missing constraint field', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
+      const s = storage({
+        user: userTable,
+        post: table(
+          { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+          {
+            pk: pk('id'),
+            fks: [fk(['userId'], 'user', ['id'])],
+          },
+        ),
+      });
+      // Remove constraint field to simulate non-normalized FK
+      const rawContract = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+      });
+      const postFk = rawContract.storage.tables['post']?.foreignKeys[0] as Record<string, unknown>;
+      delete postFk['constraint'];
+      expect(() => validateSqlContract(rawContract)).toThrow();
+    });
+
+    it('rejects FK missing index field', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
+      const s = storage({
+        user: userTable,
+        post: table(
+          { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+          {
+            pk: pk('id'),
+            fks: [fk(['userId'], 'user', ['id'])],
+          },
+        ),
+      });
+      // Remove index field to simulate non-normalized FK
+      const rawContract = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
+      });
+      const postFk = rawContract.storage.tables['post']?.foreignKeys[0] as Record<string, unknown>;
+      delete postFk['index'];
+      expect(() => validateSqlContract(rawContract)).toThrow();
+    });
+
+    it('validates FK with both disabled', () => {
+      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
+      const postTable = table(
+        { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
+        {
+          pk: pk('id'),
+          fks: [fk(['userId'], 'user', ['id'], { constraint: false, index: false })],
+        },
+      );
+      const s = storage({ user: userTable, post: postTable });
+      const c = contract({
+        target: 'postgres',
+        storageHash: 'sha256:abc123',
+        storage: s,
       });
       expect(() => validateSqlContract(c)).not.toThrow();
     });

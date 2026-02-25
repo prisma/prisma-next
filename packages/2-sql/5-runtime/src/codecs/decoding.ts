@@ -1,5 +1,7 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
+import { validateJsonValue } from './json-schema-validation';
 
 function resolveRowCodec(
   alias: string,
@@ -27,15 +29,69 @@ function resolveRowCodec(
   return null;
 }
 
+type ColumnRefIndex = Map<string, { table: string; column: string }>;
+
+/**
+ * Builds a lookup index from column name → { table, column } ref.
+ * Called once per decodeRow invocation to avoid O(aliases × refs) linear scans.
+ */
+function buildColumnRefIndex(plan: ExecutionPlan): ColumnRefIndex | null {
+  const columns = plan.meta.refs?.columns;
+  if (!columns) return null;
+
+  const index: ColumnRefIndex = new Map();
+  for (const ref of columns) {
+    index.set(ref.column, ref);
+  }
+  return index;
+}
+
+function parseProjectionRef(value: string): { table: string; column: string } | null {
+  if (value.startsWith('include:') || value.startsWith('operation:')) {
+    return null;
+  }
+
+  const separatorIndex = value.indexOf('.');
+  if (separatorIndex <= 0 || separatorIndex === value.length - 1) {
+    return null;
+  }
+
+  return {
+    table: value.slice(0, separatorIndex),
+    column: value.slice(separatorIndex + 1),
+  };
+}
+
+function resolveColumnRefForAlias(
+  alias: string,
+  projection: ExecutionPlan['meta']['projection'],
+  fallbackColumnRefIndex: ColumnRefIndex | null,
+): { table: string; column: string } | undefined {
+  if (projection && !Array.isArray(projection)) {
+    const mappedRef = (projection as Record<string, string>)[alias];
+    if (typeof mappedRef !== 'string') {
+      return undefined;
+    }
+    return parseProjectionRef(mappedRef) ?? undefined;
+  }
+
+  return fallbackColumnRefIndex?.get(alias);
+}
+
 export function decodeRow(
   row: Record<string, unknown>,
   plan: ExecutionPlan,
   registry: CodecRegistry,
+  jsonValidators?: JsonSchemaValidatorRegistry,
 ): Record<string, unknown> {
   const decoded: Record<string, unknown> = {};
+  const projection = plan.meta.projection;
+
+  // Fallback for plans that do not provide projection alias -> table.column mapping.
+  const fallbackColumnRefIndex =
+    jsonValidators && (!projection || Array.isArray(projection)) ? buildColumnRefIndex(plan) : null;
 
   let aliases: readonly string[];
-  const projection = plan.meta.projection;
   if (projection && !Array.isArray(projection)) {
     aliases = Object.keys(projection);
   } else if (projection && Array.isArray(projection)) {
@@ -47,7 +103,6 @@ export function decodeRow(
   for (const alias of aliases) {
     const wireValue = row[alias];
 
-    const projection = plan.meta.projection;
     const projectionValue =
       projection && typeof projection === 'object' && !Array.isArray(projection)
         ? (projection as Record<string, string>)[alias]
@@ -111,8 +166,34 @@ export function decodeRow(
     }
 
     try {
-      decoded[alias] = codec.decode(wireValue);
+      const decodedValue = codec.decode(wireValue);
+
+      // Validate decoded JSON value against schema
+      if (jsonValidators) {
+        const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
+        if (ref) {
+          validateJsonValue(
+            jsonValidators,
+            ref.table,
+            ref.column,
+            decodedValue,
+            'decode',
+            codec.id,
+          );
+        }
+      }
+
+      decoded[alias] = decodedValue;
     } catch (error) {
+      // Re-throw JSON schema validation errors as-is
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as Error & { code: string }).code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED'
+      ) {
+        throw error;
+      }
+
       const decodeError = new Error(
         `Failed to decode row alias '${alias}' with codec '${codec.id}': ${error instanceof Error ? error.message : String(error)}`,
       ) as Error & {

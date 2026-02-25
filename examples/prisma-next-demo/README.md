@@ -9,6 +9,7 @@ This demo shows:
 - Creating Plans and executing them via the Runtime
 - Contract verification and marker management
 - Native Prisma Next patterns and best practices
+- ORM client end-to-end examples using `@prisma-next/sql-orm-client`
 - **Two workflows**: Emit workflow (JSON-based) and No-Emit workflow (TypeScript-based)
 - Client-generated UUID identifiers via `@prisma-next/ids`
 
@@ -35,10 +36,9 @@ Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-lin
 
 **Setup**:
 ```bash
-# Emit contract artifacts first
 pnpm emit
-
-# Then run the app
+pnpm db:init   # Creates schema + contract marker
+pnpm seed
 pnpm start -- users
 ```
 
@@ -46,7 +46,7 @@ pnpm start -- users
 
 Uses contract directly from TypeScript:
 
-- **Files**: `src/prisma-no-emit/runtime-no-emit.ts`, `src/prisma-no-emit/context-no-emit.ts`, `src/main-no-emit.ts`
+- **Files**: `src/prisma-no-emit/runtime.ts`, `src/prisma-no-emit/context.ts`, `src/main-no-emit.ts`
 - **Contract source**: `prisma/contract.ts` (direct import)
 - **Usage**: `pnpm start:no-emit -- [command]`
 - **Benefits**:
@@ -76,6 +76,39 @@ Contract artifacts are `contract.json` and `contract.d.ts`. Static roots are `sq
 
 - **[Query Lanes](../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)** — DSL and ORM authoring surfaces
 - **[Runtime & Plugin Framework](../../docs/architecture%20docs/subsystems/4.%20Runtime%20&%20Plugin%20Framework.md)** — Runtime execution pipeline
+- **[ADR 161 - Repository Layer](../../docs/architecture%20docs/adrs/ADR%20161%20-%20Repository%20Layer.md)** — Multi-query repository orchestration layer
+
+## ORM Client Examples
+
+The demo includes ORM client examples under `src/orm-client/`:
+
+- `ormClientGetUsers(limit, runtime)` — list users using ORM client API
+- `ormClientGetAdminUsers(limit, runtime)` — filter through a custom collection scope
+- `ormClientFindUserByEmail(email, runtime)` — `find()` with collection helpers
+- `ormClientGetUserPosts(userId, limit, runtime)` — fetch user posts with collection filters + ordering
+- `ormClientGetDashboardUsers(emailDomain, postTitleTerm, limit, postsPerUser, runtime)` — compound `and/or/not` filters + relation filters + `select()` and `include()` composition
+- `ormClientGetPostFeed(postTitleTerm, limit, runtime)` — to-one include (`post -> user`) with projected fields
+- `ormClientGetUsersByIdCursor(cursor, limit, runtime)` — cursor pagination with `orderBy()` + `cursor()`
+- `ormClientGetLatestUserPerKind(runtime)` — `distinctOn()` with deterministic ordering
+- `ormClientGetUserInsights(limit, runtime)` — `include().combine()` metrics and latest related row
+- `ormClientGetUserKindBreakdown(minUsers, runtime)` — `groupBy().having().aggregate()` breakdown
+- `ormClientUpsertUser(data, runtime)` — `upsert()` for create-or-update by primary key
+
+Run from the CLI:
+
+```bash
+pnpm start -- repo-users 5
+pnpm start -- repo-admins 5
+pnpm start -- repo-user admin@example.com
+pnpm start -- repo-posts user_001 10
+pnpm start -- repo-dashboard example.com post 10 2
+pnpm start -- repo-post-feed post 10
+pnpm start -- repo-users-cursor user_001 5
+pnpm start -- repo-latest-per-kind
+pnpm start -- repo-user-insights 5
+pnpm start -- repo-kind-breakdown 1
+pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example.com user
+```
 
 ## Setup
 
@@ -93,12 +126,18 @@ Contract artifacts are `contract.json` and `contract.d.ts`. Static roots are `sq
      ```
      The seed script will create the extension automatically if it doesn't exist.
 
-3. Seed the database:
+3. Emit contract and initialize database:
+   ```bash
+   pnpm emit
+   pnpm db:init
+   ```
+
+4. Seed the database:
    ```bash
    pnpm seed
    ```
 
-4. Run tests:
+5. Run tests:
    ```bash
    pnpm test
    ```
@@ -109,11 +148,12 @@ Contract artifacts are `contract.json` and `contract.d.ts`. Static roots are `sq
 - `src/prisma/contract.json` - Emitted contract (emit workflow only)
 - `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
 - `src/prisma/db.ts` - One-liner Postgres client + query roots (emit workflow)
-- `src/prisma-no-emit/context-no-emit.ts` - Env-free execution stack/context + query roots (no-emit workflow)
-- `src/prisma-no-emit/runtime-no-emit.ts` - Runtime factory (no-emit workflow)
+- `src/prisma-no-emit/context.ts` - Env-free execution stack/context + query roots (no-emit workflow)
+- `src/prisma-no-emit/runtime.ts` - Runtime factory (no-emit workflow)
+- `src/orm-client/client.ts` - ORM client + custom collection scopes
+- `src/orm-client/*.ts` - End-to-end ORM client query examples
 - `src/main.ts` - App entrypoint with arktype config validation (emit workflow)
 - `src/main-no-emit.ts` - App entrypoint with arktype config validation (no-emit workflow)
-- `scripts/stamp-marker.ts` - Contract marker management
 - `scripts/seed.ts` - Database seeding (includes vector embeddings)
 - `src/queries/similarity-search.ts` - Example vector similarity search query
 - `test/` - Integration tests demonstrating Prisma Next usage
@@ -122,4 +162,3 @@ Contract artifacts are `contract.json` and `contract.d.ts`. Static roots are `sq
 
 - **Vector Similarity Search**: The demo includes a `similarity-search.ts` query that demonstrates cosine distance operations using the pgvector extension pack.
 - **Extension Packs**: Shows how to configure and use extension packs (pgvector) in `prisma-next.config.ts`.
-

@@ -29,6 +29,8 @@ export function parsePostgresDefault(
   _nativeType?: string,
 ): ColumnDefault | undefined {
   const trimmed = rawDefault.trim();
+  const normalizedType = _nativeType?.toLowerCase();
+  const isBigInt = normalizedType === 'bigint' || normalizedType === 'int8';
 
   // Autoincrement: nextval('tablename_column_seq'::regclass)
   if (NEXTVAL_PATTERN.test(trimmed)) {
@@ -52,15 +54,18 @@ export function parsePostgresDefault(
 
   // Boolean literals
   if (TRUE_PATTERN.test(trimmed)) {
-    return { kind: 'literal', expression: 'true' };
+    return { kind: 'literal', value: true };
   }
   if (FALSE_PATTERN.test(trimmed)) {
-    return { kind: 'literal', expression: 'false' };
+    return { kind: 'literal', value: false };
   }
 
   // Numeric literals (integer or decimal)
   if (NUMERIC_PATTERN.test(trimmed)) {
-    return { kind: 'literal', expression: trimmed };
+    if (isBigInt) {
+      return { kind: 'literal', value: { $type: 'bigint', value: trimmed } };
+    }
+    return { kind: 'literal', value: Number(trimmed) };
   }
 
   // String literals: 'value'::type or just 'value'
@@ -68,7 +73,15 @@ export function parsePostgresDefault(
   // Strip the ::type cast so the normalized expression matches what contract authors write.
   const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);
   if (stringMatch?.[1] !== undefined) {
-    return { kind: 'literal', expression: `'${stringMatch[1]}'` };
+    const unescaped = stringMatch[1].replace(/''/g, "'");
+    if (normalizedType === 'json' || normalizedType === 'jsonb') {
+      try {
+        return { kind: 'literal', value: JSON.parse(unescaped) };
+      } catch {
+        // Keep legacy behavior for malformed/non-JSON string content.
+      }
+    }
+    return { kind: 'literal', value: unescaped };
   }
 
   // Unrecognized expression - return as a function with the raw expression

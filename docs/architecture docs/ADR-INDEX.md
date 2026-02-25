@@ -26,6 +26,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 021 | Contract Marker Storage | Defines database storage for contract identity verification and alignment checks | [ADR 021 - Contract Marker Storage.md](adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md) |
 | 042 | Contract Marker Evolution | Specifies marker table schema evolution and forward-compatible field additions | [ADR 042 - Contract Marker Evolution.md](adrs/ADR%20042%20-%20Contract%20Marker%20Evolution.md) |
 | 156 | Storage sets and check constraints | Adds `storage.sets` and a minimal `checks[]` shape to express “column value is in this set” explicitly in storage | [ADR 156 - Storage sets and check constraints.md](adrs/ADR%20156%20-%20Storage%20sets%20and%20check%20constraints.md) |
+| 162 | Typed default literal pipeline and extensibility | Documents the JSON-first typed-default pipeline (encode → emit → validate → verify → render), its limitations, and outlines a codec-keyed SPI for future extensibility | [ADR 162 - Typed default literal pipeline and extensibility.md](adrs/ADR%20162%20-%20Typed%20default%20literal%20pipeline%20and%20extensibility.md) |
 
 ## Query System
 
@@ -53,6 +54,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 158 | Execution mutation defaults | Defines execution-plane mutation defaults (`execution.mutations.defaults`) and a section-owned hashing model to avoid marker churn | [ADR 158 - Execution mutation defaults.md](adrs/ADR%20158%20-%20Execution%20mutation%20defaults.md) |
 | 159 | Postgres JSON and JSONB typed columns | Adds first-class PostgreSQL `json`/`jsonb` codec and column support with Standard Schema-based typed emission in `contract.d.ts` | [ADR 159 - Postgres JSON and JSONB typed columns.md](adrs/ADR%20159%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md) |
 | 160 | Plan grouping keys for multi-statement orchestration | Adds `meta.groupingKey` to correlate multiple statement executions that serve one higher-level operation | [ADR 160 - Plan grouping keys for multi-statement orchestration.md](adrs/ADR%20160%20-%20Plan%20grouping%20keys%20for%20multi-statement%20orchestration.md) |
+| 161 | Repository Layer | Defines `@prisma-next/sql-orm-client` as a multi-query orchestration surface in the extensions integrations layer | [ADR 161 - Repository Layer.md](adrs/ADR%20161%20-%20Repository%20Layer.md) |
 
 ## Migration System
 
@@ -67,6 +69,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 043 | Advisory lock domain & key strategy | Defines advisory locking strategy for migration coordination and collision prevention | [ADR 043 - Advisory lock domain & key strategy.md](adrs/ADR%20043%20-%20Advisory%20lock%20domain%20&%20key%20strategy.md) |
 | 044 | Pre & post check vocabulary v1 | Establishes vocabulary and patterns for migration operation pre/post checks | [ADR 044 - Pre & post check vocabulary v1.md](adrs/ADR%20044%20-%20Pre%20&%20post%20check%20vocabulary%20v1.md) |
 | 154 | Component-owned database dependencies | Models database-side prerequisites as component-owned dependencies with pure schema-IR verification hooks (no fuzzy matching) | [ADR 154 - Component-owned database dependencies.md](adrs/ADR%20154%20-%20Component-owned%20database%20dependencies.md) |
+| 161 | Explicit foreign key constraint and index configuration | Adds two independent knobs (`foreignKeys.constraints`, `foreignKeys.indexes`) to control FK constraint and FK-backing index emission in migration DDL | [ADR 161 - Explicit foreign key constraint and index configuration.md](adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md) |
 
 ## Preflight & CI
 

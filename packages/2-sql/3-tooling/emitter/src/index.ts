@@ -308,6 +308,12 @@ export const sqlTargetFamilyHook = {
   export type CodecTypes = ${codecTypes || 'Record<string, never>'};
   export type LaneCodecTypes = CodecTypes;
   export type OperationTypes = ${operationTypes || 'Record<string, never>'};
+  type DefaultLiteralValue<CodecId extends string, Encoded> =
+    CodecId extends keyof CodecTypes
+      ? CodecTypes[CodecId] extends { readonly output: infer O }
+        ? O extends Date | bigint ? O : Encoded
+        : Encoded
+      : Encoded;
 
   export type Contract = SqlContract<
   ${storageType},
@@ -333,8 +339,17 @@ export const sqlTargetFamilyHook = {
         const nullable = col.nullable ? 'true' : 'false';
         const nativeType = `'${col.nativeType}'`;
         const codecId = `'${col.codecId}'`;
+        const defaultSpec = col.default
+          ? col.default.kind === 'literal'
+            ? `; readonly default: { readonly kind: 'literal'; readonly value: DefaultLiteralValue<${codecId}, ${this.serializeValue(
+                col.default.value,
+              )}> }`
+            : `; readonly default: { readonly kind: 'function'; readonly expression: ${this.serializeValue(
+                col.default.expression,
+              )} }`
+          : '';
         columns.push(
-          `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable} }`,
+          `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable}${defaultSpec} }`,
         );
       }
 
@@ -369,7 +384,7 @@ export const sqlTargetFamilyHook = {
           const cols = fk.columns.map((c: string) => `'${c}'`).join(', ');
           const refCols = fk.references.columns.map((c: string) => `'${c}'`).join(', ');
           const name = fk.name ? `; readonly name: '${fk.name}'` : '';
-          return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: '${fk.references.table}'; readonly columns: readonly [${refCols}] }${name} }`;
+          return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: '${fk.references.table}'; readonly columns: readonly [${refCols}] }${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
         })
         .join(', ');
       tableParts.push(`foreignKeys: readonly [${fks}]`);

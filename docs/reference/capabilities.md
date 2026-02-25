@@ -17,6 +17,8 @@ Common SQL features reported by adapters using the `sql` namespace. This is a na
 | `returning` | boolean | Supports RETURNING clauses for DML operations (INSERT, UPDATE, DELETE) | Stable |
 | `jsonAgg` | boolean | Supports JSON aggregation functions | Stable |
 | `enums` | boolean | Supports native enum storage types | Stable |
+| `foreignKeys` | boolean | Supports FOREIGN KEY constraint DDL | Stable |
+| `autoIndexesForeignKeys` | boolean | Database automatically creates indexes for foreign keys | Stable |
 
 ### `postgres`
 PostgreSQL-specific capabilities managed by the adapter.
@@ -54,7 +56,7 @@ Postgres adapters should always report `sql.lateral: true` and `sql.returning: t
 Postgres (example):
 ```json
 {
-  "sql": { "lateral": true, "returning": true, "jsonAgg": true, "enums": true },
+  "sql": { "lateral": true, "returning": true, "jsonAgg": true, "enums": true, "foreignKeys": true, "autoIndexesForeignKeys": false },
   "postgres": { "partialIndex": true, "transactionalDDL": true, "explainFormat": "json" }
 }
 ```
@@ -220,6 +222,8 @@ Canonical capability keys with descriptions, typical implementers, and ADR refer
 | sql.lateral | LATERAL join lowering | adapters that support LATERAL | ADR 065 |
 | sql.returning | RETURNING support for DML | adapters that support RETURNING | ADR 065 |
 | sql.jsonAgg | JSON aggregation support | adapters that support JSON aggregation | ADR 065 |
+| sql.foreignKeys | FK constraint DDL support | adapters that support FOREIGN KEY | ADR 161 |
+| sql.autoIndexesForeignKeys | DB auto-indexes FKs | adapters where DB auto-creates FK indexes | ADR 161 |
 | postgres.partialIndex | Partial/filtered index support | postgres adapter | ADR 065 |
 | mysql.generatedColumns | Generated column support | mysql adapter | ADR 065 |
 | sqlite.fts5 | FTS5 support | sqlite adapter | ADR 065 |

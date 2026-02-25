@@ -2,7 +2,7 @@
 
 ## Context
 
-We want to support **execution-time value generation** for columns during mutation operations (for example, generating IDs via `cuid()`), similar to behaviors found in Prisma ORM and competitors like Kysely and Drizzle.
+We want to support **execution-time value generation** for columns during mutation operations (for example, generating IDs via `cuid()`), similar to behaviors found in many existing ORMs and query builders.
 
 Prisma Next already has a clear notion of **database column defaults** under `storage.tables.*.columns.*.default`. That is the right place for defaults the **database** provides (literals, `now()`, `gen_random_uuid()`, sequences, etc.).
 

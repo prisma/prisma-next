@@ -3,17 +3,19 @@ import { db } from '../prisma/db';
 import { collect } from './utils';
 
 export async function ormGetUsers(limit: number, runtime: Runtime) {
-  const plan = db.orm
-    .user()
-    .select((u) => ({
-      id: u.id,
-      email: u.email,
-      createdAt: u.createdAt,
-      kind: u.kind,
-    }))
-    .orderBy((u) => u.createdAt.desc())
-    .take(limit)
-    .findMany();
+  const userTable = db.schema.tables.user;
+
+  const plan = db.sql
+    .from(userTable)
+    .select({
+      id: userTable.columns.id,
+      email: userTable.columns.email,
+      createdAt: userTable.columns.createdAt,
+      kind: userTable.columns.kind,
+    })
+    .orderBy(userTable.columns.createdAt.desc())
+    .limit(limit)
+    .build();
 
   return collect(runtime.execute(plan));
 }

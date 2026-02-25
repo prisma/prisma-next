@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "emit": "prisma-next contract emit",
+    "db:init": "prisma-next db init",
     "db:drop": "tsx scripts/drop-db.ts",
     "seed": "tsx scripts/seed.ts",
     "start": "tsx src/main.ts",
@@ -28,8 +29,8 @@
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-lane": "workspace:*",
-    "@prisma-next/sql-orm-lane": "workspace:*",
     "@prisma-next/postgres": "workspace:*",
+    "@prisma-next/sql-orm-client": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",

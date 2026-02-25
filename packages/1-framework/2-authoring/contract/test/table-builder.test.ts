@@ -78,7 +78,7 @@ describe('TableBuilder', () => {
     const table = builder
       .column('userId', { type: intColumn })
       .foreignKey(['userId'], { table: 'user', columns: ['id'] })
-      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey')
+      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, { name: 'post_userId_fkey' })
       .build();
 
     expect(table.foreignKeys).toHaveLength(2);
@@ -140,7 +140,7 @@ describe('TableBuilder', () => {
       })
       .column('active', {
         type: textColumn,
-        default: { kind: 'literal', expression: 'true' },
+        default: { kind: 'literal', value: 'true' },
       })
       .build();
 
@@ -149,7 +149,7 @@ describe('TableBuilder', () => {
       kind: 'function',
       expression: 'gen_random_uuid()',
     });
-    expect(table.columns.active.default).toEqual({ kind: 'literal', expression: 'true' });
+    expect(table.columns.active.default).toEqual({ kind: 'literal', value: 'true' });
   });
 
   it('stores execution defaults via generated()', () => {
@@ -291,28 +291,28 @@ describe('TableBuilder', () => {
         .column('status', {
           type: textColumn,
           nullable: false,
-          default: { kind: 'literal', expression: "'active'" },
+          default: { kind: 'literal', value: 'active' },
         })
         .build();
 
       expect(table.columns.status.nullable).toBe(false);
       expect(table.columns.status.default).toEqual({
         kind: 'literal',
-        expression: "'active'",
+        value: 'active',
       });
     });
 
-    it('rejects nullable column with default at compile time', () => {
-      // This test verifies the type constraint works.
-      // The @ts-expect-error directive asserts that the next line produces a type error.
-      // If the type system ever allows nullable + default, this test will fail to compile.
-      createTable('user')
-        // @ts-expect-error - nullable columns cannot have default values
-        .column('bad', {
+    it('allows nullable column with default', () => {
+      const table = createTable('user')
+        .column('bio', {
           type: textColumn,
           nullable: true,
-          default: { kind: 'literal', expression: 'foo' },
-        });
+          default: { kind: 'literal', value: 'foo' },
+        })
+        .build();
+
+      expect(table.columns.bio.nullable).toBe(true);
+      expect(table.columns.bio.default).toEqual({ kind: 'literal', value: 'foo' });
     });
   });
 });

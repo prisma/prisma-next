@@ -4,8 +4,8 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 
 ## Start Here
 
+- [Docs Index](docs/README.md) — How the docs are organized and what to read next
 - [Architecture Overview](docs/Architecture%20Overview.md) — High-level design principles
-- [MVP Spec](docs/MVP-Spec.md) — Current goals and acceptance criteria
 - [Testing Guide](docs/Testing%20Guide.md) — Philosophy, patterns, and commands
 - [Rules Index](.cursor/rules/README.md) — All Cursor rules organized by topic
 - [ADRs](docs/architecture%20docs/adrs/) — Architecture Decision Records
@@ -123,6 +123,7 @@ const contract = validateContract<Contract>(contractJson);
 - Add SQL operation: `docs/briefs/complete` and `.cursor/plans/add-sql-operation.md`
 - Split monolith into modules: `.cursor/plans/split-into-modules.md`
 - Fix import violation: `.cursor/plans/fix-import-violation.md`
+- Shape and deliver a project (spec → plan → implement): `.agents/rules/drive-project-workflow.mdc` (artifacts live under `projects/`, see `projects/README.md`)
 
 ## Subsystem Deep Dives
 
@@ -143,4 +144,4 @@ See `docs/architecture docs/subsystems/`:
 
 ---
 
-**Remember**: This is a prototype. Focus on the MVP spec and implemented features.
+**Remember**: This is a prototype. Focus on clear docs that reflect implemented behavior.

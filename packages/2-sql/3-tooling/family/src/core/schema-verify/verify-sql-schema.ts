@@ -8,6 +8,7 @@
 
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
+import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type {
   OperationContext,
   SchemaIssue,
@@ -20,6 +21,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
 import type { CodecControlHooks, ComponentDatabaseDependency } from '../migrations/types';
 import {
+  arraysEqual,
   computeCounts,
   verifyDatabaseDependencies,
   verifyForeignKeys,
@@ -418,15 +420,19 @@ function verifyTableChildren(options: {
     });
   }
 
-  const fkStatuses = verifyForeignKeys(
-    contractTable.foreignKeys,
-    schemaTable.foreignKeys,
-    tableName,
-    tablePath,
-    issues,
-    strict,
-  );
-  tableChildren.push(...fkStatuses);
+  // Verify FK constraints only for FKs with constraint: true
+  const constraintFks = contractTable.foreignKeys.filter((fk) => fk.constraint === true);
+  if (constraintFks.length > 0) {
+    const fkStatuses = verifyForeignKeys(
+      constraintFks,
+      schemaTable.foreignKeys,
+      tableName,
+      tablePath,
+      issues,
+      strict,
+    );
+    tableChildren.push(...fkStatuses);
+  }
 
   const uniqueStatuses = verifyUniqueConstraints(
     contractTable.uniques,
@@ -439,8 +445,20 @@ function verifyTableChildren(options: {
   );
   tableChildren.push(...uniqueStatuses);
 
+  // Combine user-declared indexes with FK-backing indexes (from FKs with index: true)
+  // so the verifier treats FK-backing indexes as expected, not "extra".
+  // Deduplicate: skip FK-backing indexes already covered by a user-declared index.
+  const fkBackingIndexes = contractTable.foreignKeys
+    .filter(
+      (fk) =>
+        fk.index === true &&
+        !contractTable.indexes.some((idx) => arraysEqual(idx.columns, fk.columns)),
+    )
+    .map((fk) => ({ columns: fk.columns }));
+  const allExpectedIndexes = [...contractTable.indexes, ...fkBackingIndexes];
+
   const indexStatuses = verifyIndexes(
-    contractTable.indexes,
+    allExpectedIndexes,
     schemaTable.indexes,
     schemaTable.uniques,
     tableName,
@@ -936,7 +954,7 @@ function renderExpectedNativeType(
 function describeColumnDefault(columnDefault: ColumnDefault): string {
   switch (columnDefault.kind) {
     case 'literal':
-      return `literal(${columnDefault.expression})`;
+      return `literal(${formatLiteralValue(columnDefault.value)})`;
     case 'function':
       return columnDefault.expression;
   }
@@ -962,7 +980,14 @@ function columnDefaultsEqual(
 ): boolean {
   // If no normalizer provided, fall back to direct string comparison
   if (!normalizer) {
-    return contractDefault.expression === schemaDefault;
+    if (contractDefault.kind === 'function') {
+      return contractDefault.expression === schemaDefault;
+    }
+    const normalizedValue = normalizeLiteralValue(contractDefault.value, nativeType);
+    if (typeof normalizedValue === 'string') {
+      return normalizedValue === schemaDefault || `'${normalizedValue}'` === schemaDefault;
+    }
+    return String(normalizedValue) === schemaDefault;
   }
 
   // Normalize the raw schema default using target-specific logic
@@ -977,13 +1002,9 @@ function columnDefaultsEqual(
     return false;
   }
   if (contractDefault.kind === 'literal' && normalizedSchema.kind === 'literal') {
-    // Normalize both sides: the contract expression may also contain a type cast
-    // (e.g. 'atRisk'::"BillingState") that the normalizer strips, so run the
-    // normalizer on the contract expression too for a fair comparison.
-    const normalizedContract = normalizer(contractDefault.expression, nativeType ?? '');
-    const contractExpr = (normalizedContract?.expression ?? contractDefault.expression).trim();
-    const schemaExpr = normalizedSchema.expression.trim();
-    return contractExpr === schemaExpr;
+    const contractValue = normalizeLiteralValue(contractDefault.value, nativeType);
+    const schemaValue = normalizeLiteralValue(normalizedSchema.value, nativeType);
+    return literalValuesEqual(contractValue, schemaValue);
   }
   if (contractDefault.kind === 'function' && normalizedSchema.kind === 'function') {
     // Normalize function expressions for comparison (case-insensitive, whitespace-tolerant)
@@ -991,4 +1012,91 @@ function columnDefaultsEqual(
     return normalizeExpr(contractDefault.expression) === normalizeExpr(normalizedSchema.expression);
   }
   return false;
+}
+
+function isTemporalNativeType(nativeType?: string): boolean {
+  if (!nativeType) return false;
+  const normalized = nativeType.toLowerCase();
+  return normalized.includes('timestamp') || normalized === 'date';
+}
+
+function isBigIntNativeType(nativeType?: string): boolean {
+  if (!nativeType) return false;
+  const normalized = nativeType.toLowerCase();
+  return normalized === 'bigint' || normalized === 'int8';
+}
+
+function normalizeLiteralValue(value: unknown, nativeType?: string): unknown {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (isTaggedBigInt(value) && isBigIntNativeType(nativeType)) {
+    return value.value;
+  }
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (typeof value === 'string' && isTemporalNativeType(nativeType)) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  return value;
+}
+
+/**
+ * Recursively sorts object keys for deterministic JSON comparison.
+ * Postgres jsonb may canonicalize key order, so two semantically equal
+ * objects can have different key insertion order.
+ */
+function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, val) => {
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      const sorted: Record<string, unknown> = {};
+      for (const k of Object.keys(val as Record<string, unknown>).sort()) {
+        sorted[k] = (val as Record<string, unknown>)[k];
+      }
+      return sorted;
+    }
+    return val;
+  });
+}
+
+function literalValuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
+    return stableStringify(a) === stableStringify(b);
+  }
+  if (typeof a === 'object' && a !== null && typeof b === 'string') {
+    try {
+      return stableStringify(a) === stableStringify(JSON.parse(b));
+    } catch {
+      return false;
+    }
+  }
+  if (typeof a === 'string' && typeof b === 'object' && b !== null) {
+    try {
+      return stableStringify(JSON.parse(a)) === stableStringify(b);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function formatLiteralValue(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (isTaggedBigInt(value)) {
+    return value.value;
+  }
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  return JSON.stringify(value);
 }

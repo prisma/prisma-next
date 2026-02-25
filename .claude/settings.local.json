@@ -10,7 +10,8 @@
       "mcp__ide__getDiagnostics",
       "Skill(tsdown-package)",
       "Bash(ls:*)",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "Bash(gh pr view:*)"
     ],
     "deny": [],
     "ask": []

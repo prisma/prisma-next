@@ -11,8 +11,6 @@ import type {
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SelectBuilder } from '@prisma-next/sql-lane';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
-import type { OrmRegistry } from '@prisma-next/sql-orm-lane';
-import { orm as ormBuilder } from '@prisma-next/sql-orm-lane';
 import type { SchemaHandle } from '@prisma-next/sql-relational-core/schema';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import type {
@@ -60,7 +58,6 @@ export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
     ExtractCodecTypes<TContract>,
     ToSchemaOperationTypes<ExtractOperationTypes<TContract>>
   >;
-  readonly orm: OrmRegistry<TContract, ExtractCodecTypes<TContract>>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
   runtime(): Promise<Runtime>;
@@ -141,14 +138,12 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
 
   const schema: PostgresClient<TContract>['schema'] = schemaBuilder(context);
   const sql = sqlBuilder({ context });
-  const orm = ormBuilder({ context });
 
   let runtimePromise: Promise<Runtime> | undefined;
 
   return {
     sql,
     schema,
-    orm,
     context,
     stack,
     async runtime() {

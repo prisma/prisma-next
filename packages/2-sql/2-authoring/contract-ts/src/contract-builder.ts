@@ -1,8 +1,17 @@
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/contract/framework-components';
-import type { ExecutionMutationDefault } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ColumnDefaultLiteralInputValue,
+  ColumnDefaultLiteralValue,
+  ExecutionMutationDefault,
+  ExecutionMutationDefaultValue,
+  TaggedRaw,
+} from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
+  ColumnTypeDescriptor,
   ContractBuilderState,
+  ForeignKeyDefaultsState,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
@@ -19,16 +28,105 @@ import {
   type Mutable,
   TableBuilder,
 } from '@prisma-next/contract-authoring';
-import type {
-  ModelDefinition,
-  ModelField,
-  SqlContract,
-  SqlMappings,
-  SqlStorage,
-  StorageTypeInstance,
+import {
+  applyFkDefaults,
+  type ModelDefinition,
+  type ModelField,
+  type SqlContract,
+  type SqlMappings,
+  type SqlStorage,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { computeMappings } from './contract';
+
+type ColumnDefaultForCodec<
+  CodecTypes extends Record<string, { output: unknown }>,
+  CodecId extends string,
+> =
+  | {
+      readonly kind: 'literal';
+      readonly value: CodecId extends keyof CodecTypes ? CodecTypes[CodecId]['output'] : unknown;
+    }
+  | { readonly kind: 'function'; readonly expression: string };
+
+type SqlNullableColumnOptions<
+  Descriptor extends ColumnTypeDescriptor,
+  CodecTypes extends Record<string, { output: unknown }>,
+> = {
+  readonly type: Descriptor;
+  readonly nullable: true;
+  readonly typeParams?: Record<string, unknown>;
+  readonly default?: ColumnDefaultForCodec<CodecTypes, Descriptor['codecId']>;
+};
+
+type SqlNonNullableColumnOptions<
+  Descriptor extends ColumnTypeDescriptor,
+  CodecTypes extends Record<string, { output: unknown }>,
+> = {
+  readonly type: Descriptor;
+  readonly nullable?: false;
+  readonly typeParams?: Record<string, unknown>;
+  readonly default?: ColumnDefaultForCodec<CodecTypes, Descriptor['codecId']>;
+};
+
+type SqlGeneratedColumnOptions<
+  Descriptor extends ColumnTypeDescriptor,
+  CodecTypes extends Record<string, { output: unknown }>,
+> = Omit<SqlNonNullableColumnOptions<Descriptor, CodecTypes>, 'default' | 'nullable'> & {
+  readonly nullable?: false;
+  readonly generated: ExecutionMutationDefaultValue;
+};
+
+type SqlColumnOptions<
+  Descriptor extends ColumnTypeDescriptor,
+  CodecTypes extends Record<string, { output: unknown }>,
+> =
+  | SqlNullableColumnOptions<Descriptor, CodecTypes>
+  | SqlNonNullableColumnOptions<Descriptor, CodecTypes>;
+
+export interface SqlTableBuilder<
+  Name extends string,
+  CodecTypes extends Record<string, { output: unknown }>,
+  Columns extends Record<string, ColumnBuilderState<string, boolean, string>> = Record<
+    never,
+    ColumnBuilderState<string, boolean, string>
+  >,
+  PrimaryKey extends readonly string[] | undefined = undefined,
+> extends Omit<TableBuilder<Name, Columns, PrimaryKey>, 'column' | 'generated'> {
+  column<ColName extends string, Descriptor extends ColumnTypeDescriptor>(
+    name: ColName,
+    options: SqlNullableColumnOptions<Descriptor, CodecTypes>,
+  ): TableBuilder<
+    Name,
+    Columns & Record<ColName, ColumnBuilderState<ColName, true, Descriptor['codecId']>>,
+    PrimaryKey
+  >;
+  column<ColName extends string, Descriptor extends ColumnTypeDescriptor>(
+    name: ColName,
+    options: SqlNonNullableColumnOptions<Descriptor, CodecTypes>,
+  ): TableBuilder<
+    Name,
+    Columns & Record<ColName, ColumnBuilderState<ColName, false, Descriptor['codecId']>>,
+    PrimaryKey
+  >;
+  column<ColName extends string, Descriptor extends ColumnTypeDescriptor>(
+    name: ColName,
+    options: SqlColumnOptions<Descriptor, CodecTypes>,
+  ): TableBuilder<
+    Name,
+    Columns & Record<ColName, ColumnBuilderState<ColName, boolean, Descriptor['codecId']>>,
+    PrimaryKey
+  >;
+  generated<ColName extends string, Descriptor extends ColumnTypeDescriptor>(
+    name: ColName,
+    options: SqlGeneratedColumnOptions<Descriptor, CodecTypes>,
+  ): TableBuilder<
+    Name,
+    Columns & Record<ColName, ColumnBuilderState<ColName, false, Descriptor['codecId']>>,
+    PrimaryKey
+  >;
+}
 
 /**
  * Type-level mappings structure for contracts built via `defineContract()`.
@@ -70,6 +168,8 @@ type BuildStorageTable<
     readonly columns: readonly string[];
     readonly references: { readonly table: string; readonly columns: readonly string[] };
     readonly name?: string;
+    readonly constraint: boolean;
+    readonly index: boolean;
   }>;
 } & (PK extends readonly string[]
   ? { readonly primaryKey: { readonly columns: PK; readonly name?: string } }
@@ -117,6 +217,52 @@ export interface ColumnBuilder<Name extends string, Nullable extends boolean, Ty
   nullable<Value extends boolean>(value?: Value): ColumnBuilder<Name, Value, Type>;
   type<Id extends string>(id: Id): ColumnBuilder<Name, Nullable, Id>;
   build(): ColumnBuilderState<Name, Nullable, Type>;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function isJsonValue(value: unknown): value is ColumnDefaultLiteralValue {
+  if (value === null) return true;
+  const valueType = typeof value;
+  if (valueType === 'string' || valueType === 'number' || valueType === 'boolean') return true;
+  if (Array.isArray(value)) {
+    return value.every((item) => isJsonValue(item));
+  }
+  if (isPlainObject(value)) {
+    return Object.values(value).every((item) => isJsonValue(item));
+  }
+  return false;
+}
+
+function encodeDefaultLiteralValue(
+  value: ColumnDefaultLiteralInputValue,
+): ColumnDefaultLiteralValue {
+  if (typeof value === 'bigint') {
+    return { $type: 'bigint', value: value.toString() };
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (isJsonValue(value)) {
+    if (isPlainObject(value) && '$type' in value) {
+      return { $type: 'raw', value } satisfies TaggedRaw;
+    }
+    return value;
+  }
+  throw new Error(
+    'Unsupported column default literal value: expected JSON-safe value, bigint, or Date.',
+  );
+}
+
+function encodeColumnDefault(defaultInput: ColumnDefault): ColumnDefault {
+  if (defaultInput.kind === 'function') {
+    return { kind: 'function', expression: defaultInput.expression };
+  }
+  return { kind: 'literal', value: encodeDefaultLiteralValue(defaultInput.value) };
 }
 
 class SqlContractBuilder<
@@ -235,13 +381,18 @@ class SqlContractBuilder<
         const nativeType = columnState.nativeType;
         const typeRef = columnState.typeRef;
 
+        const encodedDefault =
+          columnState.default !== undefined
+            ? encodeColumnDefault(columnState.default as ColumnDefault)
+            : undefined;
+
         columns[columnName as keyof ColumnDefs] = {
           nativeType,
           codecId,
           nullable: (columnState.nullable ?? false) as ColumnDefs[keyof ColumnDefs]['nullable'] &
             boolean,
           ...ifDefined('typeParams', columnState.typeParams),
-          ...ifDefined('default', columnState.default),
+          ...ifDefined('default', encodedDefault),
           ...ifDefined('typeRef', typeRef),
         } as BuildStorageColumn<
           ColumnDefs[keyof ColumnDefs]['nullable'] & boolean,
@@ -268,10 +419,11 @@ class SqlContractBuilder<
         ...(i.name ? { name: i.name } : {}),
       }));
 
-      // Build foreign keys from table state
+      // Build foreign keys from table state, materializing defaults
       const foreignKeys = (tableState.foreignKeys ?? []).map((fk) => ({
         columns: fk.columns,
         references: fk.references,
+        ...applyFkDefaults(fk, this.state.foreignKeyDefaults),
         ...(fk.name ? { name: fk.name } : {}),
       }));
 
@@ -597,7 +749,12 @@ class SqlContractBuilder<
     Capabilities
   > {
     const tableBuilder = createTable(name);
-    const result = callback(tableBuilder);
+    const result = callback(
+      tableBuilder as unknown as SqlTableBuilder<
+        TableName,
+        CodecTypes
+      > as unknown as TableBuilder<TableName>,
+    );
     const finalBuilder = result instanceof TableBuilder ? result : tableBuilder;
     const tableState = finalBuilder.build();
 
@@ -660,6 +817,33 @@ class SqlContractBuilder<
       ...this.state,
       models: { ...this.state.models, [name]: modelState } as Models &
         Record<ModelName, ReturnType<M['build']>>,
+    });
+  }
+
+  override foreignKeyDefaults(
+    config: ForeignKeyDefaultsState,
+  ): SqlContractBuilder<
+    CodecTypes,
+    Target,
+    Tables,
+    Models,
+    Types,
+    StorageHash,
+    ExtensionPacks,
+    Capabilities
+  > {
+    return new SqlContractBuilder<
+      CodecTypes,
+      Target,
+      Tables,
+      Models,
+      Types,
+      StorageHash,
+      ExtensionPacks,
+      Capabilities
+    >({
+      ...this.state,
+      foreignKeyDefaults: config,
     });
   }
 

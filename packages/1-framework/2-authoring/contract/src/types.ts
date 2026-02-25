@@ -1,3 +1,4 @@
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
   ColumnBuilderState,
   ModelBuilderState,
@@ -11,6 +12,7 @@ export type BuildStorageColumn<Nullable extends boolean, Type extends string> = 
   readonly nullable: Nullable;
   readonly typeParams?: Record<string, unknown>;
   readonly typeRef?: string;
+  readonly default?: ColumnDefault;
 };
 
 export type ExtractColumns<

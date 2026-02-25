@@ -22,6 +22,7 @@ import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relationa
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
 import { codecDefinitions } from './codecs';
+import { escapeLiteral } from './sql-utils';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
 const VECTOR_CODEC_ID = 'pg/vector@1' as const;
@@ -188,6 +189,18 @@ function renderWhere(expr: WhereExpr, contract?: PostgresContract): string {
   if (expr.kind === 'nullCheck') {
     return renderNullCheck(expr, contract);
   }
+  if (expr.kind === 'and') {
+    if (expr.exprs.length === 0) {
+      return 'TRUE';
+    }
+    return `(${expr.exprs.map((part) => renderWhere(part, contract)).join(' AND ')})`;
+  }
+  if (expr.kind === 'or') {
+    if (expr.exprs.length === 0) {
+      return 'FALSE';
+    }
+    return `(${expr.exprs.map((part) => renderWhere(part, contract)).join(' OR ')})`;
+  }
   return renderBinary(expr, contract);
 }
 
@@ -201,17 +214,9 @@ function renderNullCheck(expr: NullCheckExpr, contract?: PostgresContract): stri
 function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
   const leftExpr = expr.left as ColumnRef | OperationExpr;
   const left = renderExpr(leftExpr, contract);
-  // Handle both ParamRef and ColumnRef on the right side
-  // (ColumnRef can appear in EXISTS subqueries for correlation)
-  const rightExpr = expr.right as ParamRef | ColumnRef;
-  const right =
-    rightExpr.kind === 'col'
-      ? renderColumn(rightExpr)
-      : renderParam(rightExpr as ParamRef, contract);
   // Only wrap in parentheses if it's an operation expression
   const leftRendered = isOperationExpr(leftExpr) ? `(${left})` : left;
-
-  // Map operators to SQL symbols
+  const right = renderBinaryRight(expr.right, contract);
   const operatorMap: Record<BinaryExpr['op'], string> = {
     eq: '=',
     neq: '!=',
@@ -219,9 +224,39 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
     lt: '<',
     gte: '>=',
     lte: '<=',
+    like: 'LIKE',
+    ilike: 'ILIKE',
+    in: 'IN',
+    notIn: 'NOT IN',
   };
 
   return `${leftRendered} ${operatorMap[expr.op]} ${right}`;
+}
+
+function renderBinaryRight(right: BinaryExpr['right'], contract?: PostgresContract): string {
+  if (right.kind === 'col') {
+    return renderColumn(right);
+  }
+  if (right.kind === 'param') {
+    return renderParam(right, contract);
+  }
+  if (right.kind === 'literal') {
+    return renderLiteral(right);
+  }
+  if (right.kind === 'operation') {
+    return renderExpr(right, contract);
+  }
+  if (right.kind === 'listLiteral') {
+    if (right.values.length === 0) {
+      return '(NULL)';
+    }
+    const values = right.values.map((value) =>
+      value.kind === 'param' ? renderParam(value, contract) : renderLiteral(value),
+    );
+    return `(${values.join(', ')})`;
+  }
+
+  throw new Error(`Unsupported binary right expression kind: ${(right as { kind: string }).kind}`);
 }
 
 function renderColumn(ref: ColumnRef): string {
@@ -251,7 +286,7 @@ function renderParam(
 
 function renderLiteral(expr: LiteralExpr): string {
   if (typeof expr.value === 'string') {
-    return `'${expr.value.replace(/'/g, "''")}'`;
+    return `'${escapeLiteral(expr.value)}'`;
   }
   if (typeof expr.value === 'number' || typeof expr.value === 'boolean') {
     return String(expr.value);
@@ -431,7 +466,10 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
     throw new Error(`Unsupported value kind in INSERT: ${(val as { kind: string }).kind}`);
   });
 
-  const insertClause = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')})`;
+  const insertClause =
+    columns.length === 0
+      ? `INSERT INTO ${table} DEFAULT VALUES`
+      : `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')})`;
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';

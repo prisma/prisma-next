@@ -4,6 +4,7 @@ export type {
   ColumnTypeDescriptor,
   ContractBuilderState,
   ForeignKeyDef,
+  ForeignKeyDefaultsState,
   IndexDef,
   ModelBuilderState,
   RelationDefinition,

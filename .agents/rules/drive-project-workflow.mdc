@@ -1,0 +1,81 @@
+---
+description: Organize work as spec → plan → implement (Drive skills + projects/ layout)
+alwaysApply: true
+---
+
+# Drive project workflow
+
+Use this workflow when shaping and delivering a **new project**.
+
+## Shape a project (spec first)
+
+This is the expected maker workflow:
+
+1. Run `drive-create-project` to scaffold `projects/<project>/`.
+2. Run `drive-create-spec` to produce the **project spec** at `projects/<project>/spec.md`.
+3. Run `drive-generate-plan` to produce the **project plan** at `projects/<project>/plan.md` (and task plans under `projects/<project>/plans/`).
+
+The agent should guide a short, targeted conversation to resolve ambiguity and document decisions in the spec/plan format, and keep Linear in sync.
+
+## Project lifecycle expectations
+
+The lifecycle for a project is:
+
+1. **Shaping (collaboration-heavy)**: Run the workflow above. The output is the project artifacts under `projects/<project>/`.
+   - Commit these artifacts to a new branch (typically the first branch for the project).
+   - Open a PR for the shaping artifacts and validate early:
+     - Validate the **spec** with the PM / stakeholders.
+     - Validate the **plan** with the team.
+   This is the phase where collaboration yields the highest leverage; it’s cheaper to iterate on assumptions and design decisions now than after implementation work depends on them.
+
+2. **Execution (iterate freely)**: Implement tasks from the plan, using as many follow-on branches/PRs as needed and following normal review.
+
+3. **Stakeholder verification**: Verify with the stakeholder (PM / requester) that the objectives and acceptance criteria in the spec were met.
+
+4. **Close-out (final PR)**: Migrate long-lived docs into `docs/`, then delete `projects/<project>/` (the close-out PR removes the transient project directory).
+
+## Keep project docs current during execution
+
+As you implement, keep project documentation up to date:
+
+- If you change the approach, sequencing, or discover new constraints, update `projects/<project>/plan.md` (and any supporting docs in `projects/<project>/**`).
+- You may regenerate the plan as you learn new things (rerun `drive-generate-plan`). Any time the plan changes, update the plan doc and supporting docs.
+- If you need to change the **project spec** (`projects/<project>/spec.md`), treat it as a major assumption change:
+  - Stop and inform the user you’ve hit a constraint that requires their permission to update the spec
+  - Recommend validating the change with external stakeholders (e.g. Product) before proceeding
+
+Keep Linear up to date throughout execution:
+
+- Linear is an observability mechanism for the health of the project and the maker’s lane.
+- If tickets aren’t moving, it’s a signal to an engineering manager that the maker may be blocked.
+- The agent is expected to update Linear projects/milestones/issues to reflect progress and plan changes (create/update/re-sequence as needed).
+
+## Keep project artifacts under `projects/<project>/`
+
+- Project home: `projects/<project>/`
+- Canonical project spec: `projects/<project>/spec.md`
+- Task/feature specs: `projects/<project>/specs/<task>.spec.md`
+- Project plan: `projects/<project>/plan.md`
+- Task/feature plans: `projects/<project>/plans/<task>.plan.md`
+- Project-specific reference material/assets: `projects/<project>/**`
+
+When starting work on a **task** from a project, ensure its spec is recorded under `projects/<project>/specs/` before implementation.
+
+## `projects/` is transient (close-out required)
+
+Anything under `projects/` is **temporary** and should be deleted when the work is done.
+
+- The **final task** in a project is to:
+  - Verify all acceptance criteria are met
+  - Finalize ADRs and any long-lived documentation
+  - Migrate finalized ADRs/docs into `docs/` (e.g. `docs/architecture docs/adrs/` or relevant subsystem docs)
+  - Delete `projects/<project>/` (specs, plans, notes, assets)
+
+## Collaboration + PR expectations
+
+- Shaping output is the project spec. This is the best time for team collaboration: share the **spec**, **plan**, and any **ADRs** early and validate decisions.
+- Project specs can change without ADRs. ADRs are for changes to the system architecture/behavior and are recorded under `docs/`.
+- During implementation you may update the plan freely, but keep the project spec stable (it should not change often).
+- Open an initial PR containing the project spec. During the project’s lifetime, later task PRs should reference the project spec (and usually should not modify it).
+- The close-out PR may (and usually will) migrate finalized docs into `docs/` and delete `projects/<project>/`.
+

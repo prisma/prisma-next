@@ -57,11 +57,11 @@ describe('Kysely integration', () => {
       // Insert some seed data
       await c.query('insert into "user" (email, "createdAt") values ($1, $2), ($3, $4), ($5, $6)', [
         'ada@example.com',
-        new Date().toISOString(),
+        new Date(),
         'tess@example.com',
-        new Date().toISOString(),
+        new Date(),
         'mike@example.com',
-        new Date().toISOString(),
+        new Date(),
       ]);
     });
   }, timeouts.spinUpPpgDev);

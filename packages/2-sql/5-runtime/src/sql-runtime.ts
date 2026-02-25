@@ -22,6 +22,7 @@ import type {
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
@@ -109,6 +110,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
   private readonly contract: TContract;
   private readonly adapter: Adapter<QueryAst, SqlContract<SqlStorage>, LoweredStatement>;
   private readonly codecRegistry: CodecRegistry;
+  private readonly jsonSchemaValidators: JsonSchemaValidatorRegistry | undefined;
   private codecRegistryValidated: boolean;
 
   constructor(options: RuntimeOptions<TContract>) {
@@ -116,6 +118,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     this.contract = context.contract;
     this.adapter = adapter;
     this.codecRegistry = context.codecs;
+    this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.codecRegistryValidated = false;
 
     const familyAdapter = new SqlFamilyAdapter(context.contract);
@@ -169,7 +172,11 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     const iterator = async function* (
       self: SqlRuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
-      const encodedParams = encodeParams(executablePlan, self.codecRegistry);
+      const encodedParams = encodeParams(
+        executablePlan,
+        self.codecRegistry,
+        self.jsonSchemaValidators,
+      );
       const planWithEncodedParams: ExecutionPlan<Row> = {
         ...executablePlan,
         params: encodedParams,
@@ -182,6 +189,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
           rawRow as Record<string, unknown>,
           executablePlan,
           self.codecRegistry,
+          self.jsonSchemaValidators,
         );
         yield decodedRow as Row;
       }

@@ -39,11 +39,46 @@
         },
         "name": {
           "column": "name"
+        },
+        "scheduledAt": {
+          "column": "scheduled_at"
         }
       },
       "relations": {},
       "storage": {
         "table": "event"
+      }
+    },
+    "LiteralDefaults": {
+      "fields": {
+        "active": {
+          "column": "active"
+        },
+        "bigCount": {
+          "column": "big_count"
+        },
+        "id": {
+          "column": "id"
+        },
+        "label": {
+          "column": "label"
+        },
+        "metadata": {
+          "column": "metadata"
+        },
+        "rating": {
+          "column": "rating"
+        },
+        "score": {
+          "column": "score"
+        },
+        "tags": {
+          "column": "tags"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "literal_defaults"
       }
     },
     "Post": {
@@ -162,6 +197,107 @@
           "name": {
             "codecId": "pg/text@1",
             "nativeType": "text"
+          },
+          "scheduled_at": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "kind": "literal",
+              "value": "2024-01-15T10:30:00.000Z"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "literal_defaults": {
+        "columns": {
+          "active": {
+            "codecId": "pg/bool@1",
+            "default": {
+              "kind": "literal",
+              "value": true
+            },
+            "nativeType": "bool",
+            "nullable": false
+          },
+          "big_count": {
+            "codecId": "pg/int8@1",
+            "default": {
+              "kind": "literal",
+              "value": {
+                "$type": "bigint",
+                "value": "9007199254740993"
+              }
+            },
+            "nativeType": "int8",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "default": {
+              "expression": "autoincrement()",
+              "kind": "function"
+            },
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "label": {
+            "codecId": "pg/text@1",
+            "default": {
+              "kind": "literal",
+              "value": "draft"
+            },
+            "nativeType": "text",
+            "nullable": false
+          },
+          "metadata": {
+            "codecId": "pg/jsonb@1",
+            "default": {
+              "kind": "literal",
+              "value": {
+                "key": "default"
+              }
+            },
+            "nativeType": "jsonb",
+            "nullable": false
+          },
+          "rating": {
+            "codecId": "pg/float8@1",
+            "default": {
+              "kind": "literal",
+              "value": 3.14
+            },
+            "nativeType": "float8",
+            "nullable": false
+          },
+          "score": {
+            "codecId": "pg/int4@1",
+            "default": {
+              "kind": "literal",
+              "value": 0
+            },
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "tags": {
+            "codecId": "pg/jsonb@1",
+            "default": {
+              "kind": "literal",
+              "value": [
+                "alpha",
+                "beta"
+              ]
+            },
+            "nativeType": "jsonb",
+            "nullable": false
           }
         },
         "foreignKeys": [],

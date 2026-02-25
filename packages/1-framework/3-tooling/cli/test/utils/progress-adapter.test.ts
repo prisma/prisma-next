@@ -1,3 +1,4 @@
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { ControlProgressEvent } from '../../src/control-api/types';
 import { createProgressAdapter } from '../../src/utils/progress-adapter';
@@ -49,7 +50,7 @@ describe('progress adapter', () => {
     }
   });
 
-  it('handles spanStart and spanEnd events', () => {
+  it('handles spanStart and spanEnd events', { timeout: timeouts.default }, () => {
     // Mock process.stdout.isTTY
     const originalIsTTY = process.stdout.isTTY;
     process.stdout.isTTY = true;

@@ -1,0 +1,80 @@
+import { describe, expect, it } from 'vitest';
+import {
+  createReturningUsersCollection,
+  createUsersCollection,
+  timeouts,
+  withCollectionRuntime,
+} from './helpers';
+
+describe('integration/create', () => {
+  it(
+    'create() returns inserted row when returning capability is enabled',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        const created = await users.create({ id: 9, name: 'Neo', email: 'neo@example.com' });
+        expect(created).toEqual({ id: 9, name: 'Neo', email: 'neo@example.com' });
+
+        const rows = await runtime.query<{ id: number; name: string }>(
+          'select id, name from users where id = $1',
+          [9],
+        );
+        expect(rows).toEqual([{ id: 9, name: 'Neo' }]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'createAll() inserts multiple rows and returns inserted rows',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createReturningUsersCollection(runtime);
+
+        const created = await users.createAll([
+          { id: 10, name: 'Alice', email: 'alice@example.com' },
+          { id: 11, name: 'Bob', email: 'bob@example.com' },
+        ]);
+
+        expect(created).toEqual([
+          { id: 10, name: 'Alice', email: 'alice@example.com' },
+          { id: 11, name: 'Bob', email: 'bob@example.com' },
+        ]);
+
+        const rows = await runtime.query<{ id: number; name: string; email: string }>(
+          'select id, name, email from users order by id',
+        );
+        expect(rows).toEqual([
+          { id: 10, name: 'Alice', email: 'alice@example.com' },
+          { id: 11, name: 'Bob', email: 'bob@example.com' },
+        ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'createCount() inserts multiple rows and returns inserted count',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        const count = await users.createCount([
+          { id: 20, name: 'Cara', email: 'cara@example.com' },
+          { id: 21, name: 'Dan', email: 'dan@example.com' },
+        ]);
+        expect(count).toBe(2);
+
+        const rows = await runtime.query<{ id: number; name: string }>(
+          'select id, name from users order by id',
+        );
+        expect(rows).toEqual([
+          { id: 20, name: 'Cara' },
+          { id: 21, name: 'Dan' },
+        ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+});

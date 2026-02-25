@@ -5,6 +5,7 @@ import {
   parsePostgresDefault,
   quoteIdentifier,
 } from '@prisma-next/adapter-postgres/control';
+import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
@@ -146,6 +147,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       ...this.buildPrimaryKeyOperations(sortedTables, options.schema, schemaName),
       ...this.buildUniqueOperations(sortedTables, options.schema, schemaName),
       ...this.buildIndexOperations(sortedTables, options.schema, schemaName),
+      ...this.buildFkBackingIndexOperations(sortedTables, options.schema, schemaName),
       ...this.buildForeignKeyOperations(sortedTables, options.schema, schemaName),
     );
 
@@ -553,6 +555,65 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     return operations;
   }
 
+  /**
+   * Generates FK-backing index operations for FKs with `index: true`,
+   * but only when no matching user-declared index exists in `contractTable.indexes`.
+   */
+  private buildFkBackingIndexOperations(
+    tables: SqlContract<SqlStorage>['storage']['tables'],
+    schema: SqlSchemaIR,
+    schemaName: string,
+  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    for (const [tableName, table] of sortedEntries(tables)) {
+      const schemaTable = schema.tables[tableName];
+      // Collect column sets of user-declared indexes to avoid duplicates
+      const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
+
+      for (const fk of table.foreignKeys) {
+        if (fk.index === false) continue;
+        // Skip if user already declared an index with these columns
+        if (declaredIndexColumns.has(fk.columns.join(','))) continue;
+        // Skip if the index already exists in the database
+        if (schemaTable && hasIndex(schemaTable, fk.columns)) continue;
+
+        const indexName = `${tableName}_${fk.columns.join('_')}_idx`;
+        operations.push({
+          id: `index.${tableName}.${indexName}`,
+          label: `Create FK-backing index ${indexName} on ${tableName}`,
+          summary: `Creates FK-backing index ${indexName} on ${tableName}`,
+          operationClass: 'additive',
+          target: {
+            id: 'postgres',
+            details: this.buildTargetDetails('index', indexName, schemaName, tableName),
+          },
+          precheck: [
+            {
+              description: `ensure index "${indexName}" is missing`,
+              sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NULL`,
+            },
+          ],
+          execute: [
+            {
+              description: `create FK-backing index "${indexName}"`,
+              sql: `CREATE INDEX ${quoteIdentifier(indexName)} ON ${qualifyTableName(
+                schemaName,
+                tableName,
+              )} (${fk.columns.map(quoteIdentifier).join(', ')})`,
+            },
+          ],
+          postcheck: [
+            {
+              description: `verify index "${indexName}" exists`,
+              sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NOT NULL`,
+            },
+          ],
+        });
+      }
+    }
+    return operations;
+  }
+
   private buildForeignKeyOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
@@ -562,6 +623,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
       for (const foreignKey of table.foreignKeys) {
+        if (foreignKey.constraint === false) continue;
         if (schemaTable && hasForeignKey(schemaTable, foreignKey)) {
           continue;
         }
@@ -1169,7 +1231,7 @@ function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): s
       const parts = [
         quoteIdentifier(columnName),
         buildColumnTypeSql(column),
-        buildColumnDefaultSql(column.default),
+        buildColumnDefaultSql(column.default, column),
         column.nullable ? '' : 'NOT NULL',
       ].filter(Boolean);
       return parts.join(' ');
@@ -1243,14 +1305,17 @@ function renderParameterizedTypeSql(column: StorageColumn): string | null {
  *
  * Note: autoincrement is handled specially via SERIAL types, so we skip it here.
  */
-function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined): string {
+function buildColumnDefaultSql(
+  columnDefault: PostgresColumnDefault | undefined,
+  column?: StorageColumn,
+): string {
   if (!columnDefault) {
     return '';
   }
 
   switch (columnDefault.kind) {
     case 'literal':
-      return `DEFAULT ${columnDefault.expression}`;
+      return `DEFAULT ${renderDefaultLiteral(columnDefault.value, column)}`;
     case 'function': {
       // autoincrement is handled by SERIAL type, no explicit DEFAULT needed
       if (columnDefault.expression === 'autoincrement()') {
@@ -1262,6 +1327,37 @@ function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined)
       // Sequence names use quoteIdentifier for safe identifier handling
       return `DEFAULT nextval(${quoteIdentifier(columnDefault.name)}::regclass)`;
   }
+}
+
+function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
+  const isJsonColumn = column?.nativeType === 'json' || column?.nativeType === 'jsonb';
+
+  if (value instanceof Date) {
+    return `'${escapeLiteral(value.toISOString())}'`;
+  }
+  if (!isJsonColumn && isTaggedBigInt(value)) {
+    if (!/^-?\d+$/.test(value.value)) {
+      throw new Error(`Invalid tagged bigint value: "${value.value}" is not a valid integer`);
+    }
+    return value.value;
+  }
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (typeof value === 'string') {
+    return `'${escapeLiteral(value)}'`;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (value === null) {
+    return 'NULL';
+  }
+  const json = JSON.stringify(value);
+  if (isJsonColumn) {
+    return `'${escapeLiteral(json)}'::${column.nativeType}`;
+  }
+  return `'${escapeLiteral(json)}'`;
 }
 
 function qualifyTableName(schema: string, table: string): string {
@@ -1364,7 +1460,7 @@ function buildAddColumnSql(
   column: StorageColumn,
 ): string {
   const typeSql = buildColumnTypeSql(column);
-  const defaultSql = buildColumnDefaultSql(column.default);
+  const defaultSql = buildColumnDefaultSql(column.default, column);
   const parts = [
     `ALTER TABLE ${qualifiedTableName}`,
     `ADD COLUMN ${quoteIdentifier(columnName)} ${typeSql}`,

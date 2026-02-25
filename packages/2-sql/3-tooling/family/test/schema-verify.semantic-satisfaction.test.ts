@@ -374,6 +374,7 @@ describe('verifySqlSchema - semantic satisfaction', () => {
                 name: 'post_author_id_fkey',
               },
             ],
+            indexes: [{ columns: ['author_id'], unique: false, name: 'post_author_id_idx' }],
           },
         ),
       });
@@ -479,6 +480,13 @@ describe('verifySqlSchema - semantic satisfaction', () => {
                 referencedTable: 'tenant',
                 referencedColumns: ['id', 'org_id'],
                 name: 'document_tenant_id_tenant_org_id_fkey', // Different name
+              },
+            ],
+            indexes: [
+              {
+                columns: ['tenant_id', 'tenant_org_id'],
+                unique: false,
+                name: 'document_tenant_id_tenant_org_id_idx',
               },
             ],
           },
