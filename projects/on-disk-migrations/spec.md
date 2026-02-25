@@ -11,7 +11,8 @@ The existing Postgres planner diffs a contract against a **live schema IR** (int
 Two user flows are in scope:
 
 1. **New project**: Write contract -> `db update` (or `migration plan`) -> optionally `migration apply` later
-2. **Existing database, no prisma-next contract**: Write contract by hand -> `db sign`/`db init` -> `migration plan` -> optionally `migration apply` later
+2. **Existing database, no prisma-next contract**: Write contract by hand -> `db sign`/`db init` -> `migration plan` -> `migration apply` later
+3. `migration apply` - but only in a limited sense. We want to be able to actually apply the migrations but maybe not some full production ready apply flow.
 
 The focus is on **creating and persisting migrations**, not applying them from disk.
 
@@ -24,6 +25,8 @@ The focus is on **creating and persisting migrations**, not applying them from d
 - Produces correct additive operations for MVP (create table, add column, add index, add FK, add unique, add PK, set default, enable extension, create storage type)
 - Must be deterministic: same inputs always produce the same plan
 - This is intended to become the single diff engine for all migration planning (see RD-3)
+
+**TODO**: Do we not want to go from contract -> schema IR instead and do diffing there? Different targets might lead to different operations, etc
 
 ### FR-2: On-disk migration file format (TypeScript types)
 - Define TypeScript types/interfaces for the on-disk artifacts specified in ADR 028:
@@ -44,7 +47,6 @@ The focus is on **creating and persisting migrations**, not applying them from d
 ### FR-5: DAG reconstruction from disk
 - Reconstruct the migration graph by reading all `migration.json` files from the `migrations/` directory
 - Support basic graph operations: path-exists, plan-to (find path from A to B), cycle detection, orphan detection
-- Optional: write/read `graph.index.json` as a performance cache
 
 ### FR-6: `prisma-next migration plan` CLI command
 - Fully offline — no database connection required
@@ -54,24 +56,19 @@ The focus is on **creating and persisting migrations**, not applying them from d
 - Write the resulting edge to disk as a new migration package
 - Output a human-readable summary of operations
 - Optional `--from <hash>` to explicitly select a different starting contract
-
-### FR-7: `prisma-next db update` CLI command
-- Requires a database connection
-- Read the "from" contract from the DB marker's `contract_json`
-- Read the "to" contract from the emitted `contract.json`
-- Uses the existing introspection-based planner (same as `db init`)
-- Synthesize and apply a migration edge immediately, without writing to disk
-- Record the edge in the migration ledger
-- **Assumption:** For MVP, `db update` supports the same additive-only operations as `db init`
+**TODO:** Can we unambiguously determine the "from" contract? Latest timestamp? Can we in some cases?
+If you have ambiguity you can specifiy --from manually otherwise latest timestamp (in the metadata, not the dir name)
 
 ### FR-8: `prisma-next migration new` CLI command (scaffold)
 - Scaffold an empty migration package directory (Draft state) with placeholder `migration.json` and `ops.json`
 - Accept optional `--from`/`--to` hash arguments
+- Out of scope
 
 ### FR-9: `prisma-next migration verify` CLI command
 - Recompute `edgeId` from existing migration package contents
 - Validate that the stored `edgeId` matches the recomputed one
 - Optionally sign with `--sign --key <keyId>` (signing infrastructure is a stretch goal)
+- Out of scope
 
 ## Non-Functional Requirements
 
@@ -115,7 +112,7 @@ The focus is on **creating and persisting migrations**, not applying them from d
 - [ ] Planner correctly handles extension-owned operations (e.g., pgvector column/index creation)
 
 ## On-disk format
-- [ ] TypeScript types for `migration.json`, `ops.json`, and `graph.index.json` are defined and exported
+- [ ] TypeScript types for `migration.json`, `ops.json`, are defined and exported
 - [ ] `migration.json` and `ops.json` can be written to and read from disk with full fidelity (round-trip)
 - [ ] `edgeId` is correctly computed via content-addressed hashing per ADR 028
 
@@ -281,3 +278,8 @@ These are distinct from the existing runtime `MIGRATION.*` codes (PRECHECK_FAILE
 3. **Should `migration plan` produce Draft or Attested artifacts?**
    The v2 branch and ADR 161 position `migration plan` as producing Draft artifacts (`edgeId: null`), with `migration verify` as a separate attestation step. Alternatively, `migration plan` could compute the `edgeId` immediately (Attested state) since the content is known at plan time. The two-step approach (plan → verify) adds ceremony but allows editing before attestation.
    **Default assumption:** `migration plan` produces Attested artifacts (computes `edgeId` immediately). If the user edits the migration, they run `migration verify` to re-attest.
+
+
+
+NOTE: Ensure that we have followed best practices wrt layering
+TODO: Abstract operations for migrations: Have we taken different targets into account? Do we not need some sort of operation registry or something similar? Maybe we should just consider lowering to SQL operations directly, at least for now.
