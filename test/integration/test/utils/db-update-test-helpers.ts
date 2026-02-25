@@ -1,6 +1,6 @@
 import { createDbUpdateCommand } from '../../../../packages/1-framework/3-tooling/cli/src/commands/db-update';
 import type { setupTestDirectoryFromFixtures } from './cli-test-helpers';
-import { executeCommand, setupDbTestFixture } from './cli-test-helpers';
+import { executeCommand, getExitCode, setupDbTestFixture } from './cli-test-helpers';
 
 export type DbUpdateTestSetup = ReturnType<typeof setupTestDirectoryFromFixtures>;
 
@@ -27,6 +27,26 @@ export async function runDbUpdate(
   try {
     process.chdir(testSetup.testDir);
     return await executeCommand(command, [...args]);
+  } finally {
+    process.chdir(originalCwd);
+  }
+}
+
+/**
+ * Runs db update and returns the exit code without re-throwing on failure.
+ * Use this for tests that expect the command to fail (e.g., missing marker, planning conflicts).
+ */
+export async function runDbUpdateAllowFailure(
+  testSetup: DbUpdateTestSetup,
+  args: readonly string[],
+): Promise<number> {
+  const command = createDbUpdateCommand();
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(testSetup.testDir);
+    return await executeCommand(command, [...args]);
+  } catch {
+    return getExitCode() ?? 1;
   } finally {
     process.chdir(originalCwd);
   }
