@@ -8,6 +8,7 @@ import { createPostgresMigrationPlanner } from '../../src/core/migrations/planne
 function createFkTestContract(fkConfig: {
   constraint: boolean;
   index: boolean;
+  includeUserIndex?: boolean;
 }): SqlContract<SqlStorage> {
   return {
     schemaVersion: '1',
@@ -35,7 +36,7 @@ function createFkTestContract(fkConfig: {
           },
           primaryKey: { columns: ['id'] },
           uniques: [],
-          indexes: [{ columns: ['userId'] }],
+          indexes: (fkConfig.includeUserIndex ?? true) ? [{ columns: ['userId'] }] : [],
           foreignKeys: [
             {
               columns: ['userId'],
@@ -139,10 +140,11 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
   });
 
   it('auto-creates FK-backing index when index=true and no user-declared index exists', () => {
-    const contract = createFkTestContract({ constraint: true, index: true });
-    // Remove the user-declared index to test auto-generation
-    const postTable = contract.storage.tables['post']!;
-    (postTable as { indexes: unknown[] }).indexes = [];
+    const contract = createFkTestContract({
+      constraint: true,
+      index: true,
+      includeUserIndex: false,
+    });
 
     const result = planner.plan({
       contract,
@@ -161,10 +163,11 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
   });
 
   it('does not auto-create FK-backing index when index=false and no user-declared index exists', () => {
-    const contract = createFkTestContract({ constraint: true, index: false });
-    // Remove the user-declared index
-    const postTable = contract.storage.tables['post']!;
-    (postTable as { indexes: unknown[] }).indexes = [];
+    const contract = createFkTestContract({
+      constraint: true,
+      index: false,
+      includeUserIndex: false,
+    });
 
     const result = planner.plan({
       contract,
