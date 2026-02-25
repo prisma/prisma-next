@@ -259,43 +259,43 @@ describe('parsePostgresDefault normalizer', () => {
     // Boolean literals
     expect(parsePostgresDefault('true')).toEqual({
       kind: 'literal',
-      expression: 'true',
+      value: true,
     });
     expect(parsePostgresDefault('false')).toEqual({
       kind: 'literal',
-      expression: 'false',
+      value: false,
     });
 
     // Numeric literals
     expect(parsePostgresDefault('42')).toEqual({
       kind: 'literal',
-      expression: '42',
+      value: 42,
     });
     expect(parsePostgresDefault('3.14')).toEqual({
       kind: 'literal',
-      expression: '3.14',
+      value: 3.14,
     });
     expect(parsePostgresDefault('-123.45')).toEqual({
       kind: 'literal',
-      expression: '-123.45',
+      value: -123.45,
     });
 
     // String literals (type casts are stripped)
     expect(parsePostgresDefault("'hello'::text")).toEqual({
       kind: 'literal',
-      expression: "'hello'",
+      value: 'hello',
     });
     expect(parsePostgresDefault('\'ok\'::"BillingState"')).toEqual({
       kind: 'literal',
-      expression: "'ok'",
+      value: 'ok',
     });
     expect(parsePostgresDefault("'Hello''s'::text")).toEqual({
       kind: 'literal',
-      expression: "'Hello''s'",
+      value: "Hello's",
     });
     expect(parsePostgresDefault("'plain text'")).toEqual({
       kind: 'literal',
-      expression: "'plain text'",
+      value: 'plain text',
     });
 
     // uuid_generate_v4() from uuid-ossp extension is normalized to gen_random_uuid()
@@ -310,70 +310,100 @@ describe('parsePostgresDefault strips type casts from string literals', () => {
   it('strips ::text cast from simple string literal', () => {
     expect(parsePostgresDefault("'ready'::text")).toEqual({
       kind: 'literal',
-      expression: "'ready'",
+      value: 'ready',
     });
   });
 
   it('strips ::character varying cast', () => {
     expect(parsePostgresDefault("'hello'::character varying")).toEqual({
       kind: 'literal',
-      expression: "'hello'",
+      value: 'hello',
     });
   });
 
   it('strips ::character varying(255) cast with length', () => {
     expect(parsePostgresDefault("'hello'::character varying(255)")).toEqual({
       kind: 'literal',
-      expression: "'hello'",
+      value: 'hello',
     });
   });
 
   it('strips quoted enum cast like ::"MyEnum"', () => {
     expect(parsePostgresDefault('\'active\'::"StatusEnum"')).toEqual({
       kind: 'literal',
-      expression: "'active'",
+      value: 'active',
     });
   });
 
   it('strips quoted camelCase enum cast like ::"EnvironmentModelKind"', () => {
     expect(parsePostgresDefault('\'ready\'::"EnvironmentModelKind"')).toEqual({
       kind: 'literal',
-      expression: "'ready'",
+      value: 'ready',
     });
   });
 
   it('preserves plain string literal without cast', () => {
     expect(parsePostgresDefault("'plain text'")).toEqual({
       kind: 'literal',
-      expression: "'plain text'",
+      value: 'plain text',
     });
   });
 
   it('strips cast from string with escaped quotes', () => {
     expect(parsePostgresDefault("'it''s ready'::text")).toEqual({
       kind: 'literal',
-      expression: "'it''s ready'",
+      value: "it's ready",
     });
   });
 
   it('strips ::varchar cast', () => {
     expect(parsePostgresDefault("'default_value'::varchar")).toEqual({
       kind: 'literal',
-      expression: "'default_value'",
+      value: 'default_value',
     });
   });
 
   it('strips ::bpchar cast (blank-padded char)', () => {
     expect(parsePostgresDefault("'Y'::bpchar")).toEqual({
       kind: 'literal',
-      expression: "'Y'",
+      value: 'Y',
     });
   });
 
   it('strips cast from empty string literal', () => {
     expect(parsePostgresDefault("''::text")).toEqual({
       kind: 'literal',
-      expression: "''",
+      value: '',
+    });
+  });
+});
+
+describe('parsePostgresDefault parses JSON literals for json/jsonb columns', () => {
+  it('parses object literal for jsonb native type', () => {
+    expect(parsePostgresDefault('\'{"key": "default"}\'::jsonb', 'jsonb')).toEqual({
+      kind: 'literal',
+      value: { key: 'default' },
+    });
+  });
+
+  it('parses array literal for jsonb native type', () => {
+    expect(parsePostgresDefault('\'["alpha", "beta"]\'::jsonb', 'jsonb')).toEqual({
+      kind: 'literal',
+      value: ['alpha', 'beta'],
+    });
+  });
+
+  it('parses object literal for json native type', () => {
+    expect(parsePostgresDefault('\'{"ok": true}\'::json', 'json')).toEqual({
+      kind: 'literal',
+      value: { ok: true },
+    });
+  });
+
+  it('falls back to string when JSON parsing fails', () => {
+    expect(parsePostgresDefault("'not-json'::jsonb", 'jsonb')).toEqual({
+      kind: 'literal',
+      value: 'not-json',
     });
   });
 });

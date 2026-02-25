@@ -9,11 +9,10 @@ import type {
   SqlContract,
   SqlMappings,
   SqlStorage,
-  StorageColumn,
-  StorageTable,
   StorageTypeInstance,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
+import { decodeContractDefaults } from '@prisma-next/sql-contract/validate';
 import { ColumnDefaultSchema } from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
 import type { O } from 'ts-toolbelt';
@@ -23,7 +22,7 @@ import type { O } from 'ts-toolbelt';
  * This validates the shape and types of the contract structure.
  */
 
-const StorageColumnSchema = type.declare<StorageColumn>().type({
+const StorageColumnSchema = type({
   nativeType: 'string',
   codecId: 'string',
   nullable: 'boolean',
@@ -66,7 +65,7 @@ const ForeignKeySchema = type.declare<ForeignKey>().type({
   index: 'boolean',
 });
 
-const StorageTableSchema = type.declare<StorageTable>().type({
+const StorageTableSchema = type({
   columns: type({ '[string]': StorageColumnSchema }),
   'primaryKey?': PrimaryKeySchema,
   uniques: UniqueConstraintSchema.array().readonly(),
@@ -74,7 +73,7 @@ const StorageTableSchema = type.declare<StorageTable>().type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
-const StorageSchema = type.declare<SqlStorage>().type({
+const StorageSchema = type({
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
@@ -262,6 +261,13 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
       if (column.typeParams !== undefined && Array.isArray(column.typeParams)) {
         throw new Error(
           `Column "${columnName}" in table "${tableName}" has invalid typeParams: must be a plain object, not an array`,
+        );
+      }
+
+      // Validate NOT NULL columns do not have literal null defaults
+      if (!column.nullable && column.default?.kind === 'literal' && column.default.value === null) {
+        throw new Error(
+          `Table "${tableName}" column "${columnName}" is NOT NULL but has a literal null default`,
         );
       }
 
@@ -549,5 +555,5 @@ export function validateContract<TContract extends SqlContract<SqlStorage>>(
 
   // Type assertion: The caller provides the strict type via TContract.
   // We validate the structure matches, but the precise types come from contract.d.ts
-  return contractWithMappings as TContract;
+  return decodeContractDefaults(contractWithMappings) as TContract;
 }

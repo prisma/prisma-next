@@ -273,9 +273,8 @@ const pgTimestampCodec = codec<typeof PG_TIMESTAMP_CODEC_ID, string | Date, stri
     return String(value);
   },
   decode: (wire: string | Date): string => {
-    if (typeof wire === 'string') return wire;
     if (wire instanceof Date) return wire.toISOString();
-    return String(wire);
+    return wire;
   },
   paramsSchema: precisionParamsSchema,
   meta: {
@@ -298,9 +297,8 @@ const pgTimestamptzCodec = codec<typeof PG_TIMESTAMPTZ_CODEC_ID, string | Date, 
     return String(value);
   },
   decode: (wire: string | Date): string => {
-    if (typeof wire === 'string') return wire;
     if (wire instanceof Date) return wire.toISOString();
-    return String(wire);
+    return wire;
   },
   paramsSchema: precisionParamsSchema,
   meta: {
@@ -405,11 +403,18 @@ const pgEnumCodec = codec<typeof PG_ENUM_CODEC_ID, string, string>({
   decode: (wire) => wire,
 });
 
-const pgIntervalCodec = codec<typeof PG_INTERVAL_CODEC_ID, string, string>({
+const pgIntervalCodec = codec<
+  typeof PG_INTERVAL_CODEC_ID,
+  string | Record<string, unknown>,
+  string
+>({
   typeId: PG_INTERVAL_CODEC_ID,
   targetTypes: ['interval'],
   encode: (value: string): string => value,
-  decode: (wire: string): string => wire,
+  decode: (wire: string | Record<string, unknown>): string => {
+    if (typeof wire === 'string') return wire;
+    return JSON.stringify(wire);
+  },
   paramsSchema: precisionParamsSchema,
   meta: {
     db: {

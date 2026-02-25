@@ -5,6 +5,7 @@ import {
   parsePostgresDefault,
   quoteIdentifier,
 } from '@prisma-next/adapter-postgres/control';
+import { isTaggedBigInt } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   CodecControlHooks,
@@ -781,7 +782,7 @@ function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): s
       const parts = [
         quoteIdentifier(columnName),
         buildColumnTypeSql(column),
-        buildColumnDefaultSql(column.default),
+        buildColumnDefaultSql(column.default, column),
         column.nullable ? '' : 'NOT NULL',
       ].filter(Boolean);
       return parts.join(' ');
@@ -855,14 +856,17 @@ function renderParameterizedTypeSql(column: StorageColumn): string | null {
  *
  * Note: autoincrement is handled specially via SERIAL types, so we skip it here.
  */
-function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined): string {
+function buildColumnDefaultSql(
+  columnDefault: PostgresColumnDefault | undefined,
+  column?: StorageColumn,
+): string {
   if (!columnDefault) {
     return '';
   }
 
   switch (columnDefault.kind) {
     case 'literal':
-      return `DEFAULT ${columnDefault.expression}`;
+      return `DEFAULT ${renderDefaultLiteral(columnDefault.value, column)}`;
     case 'function': {
       // autoincrement is handled by SERIAL type, no explicit DEFAULT needed
       if (columnDefault.expression === 'autoincrement()') {
@@ -874,6 +878,37 @@ function buildColumnDefaultSql(columnDefault: PostgresColumnDefault | undefined)
       // Sequence names use quoteIdentifier for safe identifier handling
       return `DEFAULT nextval(${quoteIdentifier(columnDefault.name)}::regclass)`;
   }
+}
+
+function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
+  const isJsonColumn = column?.nativeType === 'json' || column?.nativeType === 'jsonb';
+
+  if (value instanceof Date) {
+    return `'${escapeLiteral(value.toISOString())}'`;
+  }
+  if (!isJsonColumn && isTaggedBigInt(value)) {
+    if (!/^-?\d+$/.test(value.value)) {
+      throw new Error(`Invalid tagged bigint value: "${value.value}" is not a valid integer`);
+    }
+    return value.value;
+  }
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (typeof value === 'string') {
+    return `'${escapeLiteral(value)}'`;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (value === null) {
+    return 'NULL';
+  }
+  const json = JSON.stringify(value);
+  if (isJsonColumn) {
+    return `'${escapeLiteral(json)}'::${column.nativeType}`;
+  }
+  return `'${escapeLiteral(json)}'`;
 }
 
 function qualifyTableName(schema: string, table: string): string {
@@ -957,7 +992,7 @@ function buildAddColumnSql(
   column: StorageColumn,
 ): string {
   const typeSql = buildColumnTypeSql(column);
-  const defaultSql = buildColumnDefaultSql(column.default);
+  const defaultSql = buildColumnDefaultSql(column.default, column);
   const parts = [
     `ALTER TABLE ${qualifiedTableName}`,
     `ADD COLUMN ${quoteIdentifier(columnName)} ${typeSql}`,

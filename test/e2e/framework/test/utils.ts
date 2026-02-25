@@ -99,7 +99,9 @@ export async function runDbInit(options: {
   try {
     const result = await controlClient.dbInit({ contractIR, mode: 'apply' });
     if (!result.ok) {
-      throw new Error(`dbInit failed: ${result.failure.summary}`);
+      throw new Error(
+        `dbInit failed: ${result.failure.summary}\n${JSON.stringify(result.failure, null, 2)}`,
+      );
     }
   } finally {
     await controlClient.close();

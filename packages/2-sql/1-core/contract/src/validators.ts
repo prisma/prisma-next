@@ -9,12 +9,14 @@ import type {
   PrimaryKey,
   SqlContract,
   SqlStorage,
-  StorageTable,
   StorageTypeInstance,
   UniqueConstraint,
 } from './types';
 
-type ColumnDefaultLiteral = { readonly kind: 'literal'; readonly expression: string };
+type ColumnDefaultLiteral = {
+  readonly kind: 'literal';
+  readonly value: string | number | boolean | Record<string, unknown> | unknown[] | null;
+};
 type ColumnDefaultFunction = { readonly kind: 'function'; readonly expression: string };
 const literalKindSchema = type("'literal'");
 const functionKindSchema = type("'function'");
@@ -23,7 +25,7 @@ const generatorIdSchema = type("'ulid' | 'nanoid' | 'uuidv7' | 'uuidv4' | 'cuid2
 
 export const ColumnDefaultLiteralSchema = type.declare<ColumnDefaultLiteral>().type({
   kind: literalKindSchema,
-  expression: 'string',
+  value: 'string | number | boolean | null | unknown[] | Record<string, unknown>',
 });
 
 export const ColumnDefaultFunctionSchema = type.declare<ColumnDefaultFunction>().type({
@@ -102,7 +104,7 @@ const ForeignKeySchema = type.declare<ForeignKey>().type({
   index: 'boolean',
 });
 
-const StorageTableSchema = type.declare<StorageTable>().type({
+const StorageTableSchema = type({
   columns: type({ '[string]': StorageColumnSchema }),
   'primaryKey?': PrimaryKeySchema,
   uniques: UniqueConstraintSchema.array().readonly(),
@@ -110,7 +112,7 @@ const StorageTableSchema = type.declare<StorageTable>().type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
-const StorageSchema = type.declare<SqlStorage>().type({
+const StorageSchema = type({
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeInstanceSchema }),
 });
@@ -145,6 +147,13 @@ const SqlContractSchema = type({
   'execution?': ExecutionSchema,
 });
 
+// NOTE: StorageColumnSchema, StorageTableSchema, and StorageSchema use bare type()
+// instead of type.declare<T>().type() because the ColumnDefault union's value field
+// includes bigint | Date (runtime-only types after decoding) which cannot be expressed
+// in Arktype's JSON validation DSL. The `as SqlStorage` cast in validateStorage() bridges
+// the gap between the JSON-safe Arktype output and the runtime TypeScript type.
+// See decodeContractDefaults() in validate.ts for the decoding step.
+
 /**
  * Validates the structural shape of SqlStorage using Arktype.
  *
@@ -158,7 +167,7 @@ export function validateStorage(value: unknown): SqlStorage {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Storage validation failed: ${messages}`);
   }
-  return result;
+  return result as SqlStorage;
 }
 
 /**

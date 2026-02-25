@@ -46,7 +46,6 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
         expect(insertRows[0]).toMatchObject({
           id: expect.any(Number),
           email: 'e2e@example.com',
-          // Note: dates are currently interpreted as strings, e.g., "2026-01-30T13:29:22.101Z"
           created_at: expect.any(String),
           update_at: null,
         });
@@ -73,9 +72,6 @@ describe('DML E2E Tests', { timeout: 30000 }, () => {
             params: {
               newEmail: 'updated-e2e@example.com',
               userId,
-              // Note: dates are currently interpreted as strings, e.g., "2026-01-30T13:29:22.101Z"
-              created_at: expect.any(String),
-              update_at: null,
             },
           });
 
@@ -123,7 +119,12 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         .insert(eventTable, {
           name: param('name'),
         })
-        .returning(eventColumns.id!, eventColumns.name!, eventColumns.created_at!)
+        .returning(
+          eventColumns.id!,
+          eventColumns.name!,
+          eventColumns.created_at!,
+          eventColumns.scheduled_at!,
+        )
         .build({
           params: {
             name: 'uuidv7-test-event',
@@ -136,6 +137,7 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         id: expect.stringMatching(UUIDV7_REGEX),
         name: 'uuidv7-test-event',
         created_at: expect.any(String),
+        scheduled_at: '2024-01-15T10:30:00.000Z',
       });
     });
   });
@@ -243,6 +245,41 @@ describe('DML E2E Tests - UUIDv7 client-generated IDs', { timeout: 30000 }, () =
         expect(selectResult.rows.length).toBe(0);
       },
     );
+  });
+
+  it('applies literal defaults for every supported type', async () => {
+    await withTestRuntime<Contract>(contractJsonPath, async ({ tables, runtime, context }) => {
+      const litTable = tables.literal_defaults!;
+      const cols = litTable.columns;
+      const builder = sql({ context });
+
+      const insertPlan = builder
+        .insert(litTable, {})
+        .returning(
+          cols.id!,
+          cols.label!,
+          cols.score!,
+          cols.rating!,
+          cols.active!,
+          cols.big_count!,
+          cols.metadata!,
+          cols.tags!,
+        )
+        .build({ params: {} });
+
+      const rows = await executePlanAndCollect(runtime, insertPlan);
+      expect(rows).toHaveLength(1);
+
+      const row = rows[0]!;
+      expect(row.id).toEqual(expect.any(Number));
+      expect(row.label).toBe('draft');
+      expect(row.score).toBe(0);
+      expect(row.rating).toBeCloseTo(3.14);
+      expect(row.active).toBe(true);
+      expect(row.big_count).toBe('9007199254740993');
+      expect(row.metadata).toEqual({ key: 'default' });
+      expect(row.tags).toEqual(['alpha', 'beta']);
+    });
   });
 
   it('supports typed jsonb/json values in insert and select clauses', async () => {

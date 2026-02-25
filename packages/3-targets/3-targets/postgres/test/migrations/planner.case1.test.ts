@@ -616,25 +616,25 @@ describe('PostgresMigrationPlanner - column defaults', () => {
         nativeType: 'bool',
         codecId: 'pg/bool@1',
         nullable: false,
-        default: { kind: 'literal', expression: 'true' },
+        default: { kind: 'literal', value: true },
       },
       disabled: {
         nativeType: 'bool',
         codecId: 'pg/bool@1',
         nullable: false,
-        default: { kind: 'literal', expression: 'false' },
+        default: { kind: 'literal', value: false },
       },
       name: {
         nativeType: 'text',
         codecId: 'pg/text@1',
         nullable: false,
-        default: { kind: 'literal', expression: "'default'" },
+        default: { kind: 'literal', value: 'default' },
       },
       priority: {
         nativeType: 'int4',
         codecId: 'pg/int4@1',
         nullable: false,
-        default: { kind: 'literal', expression: '0' },
+        default: { kind: 'literal', value: 0 },
       },
     });
     expect(sql).toContain('"enabled" bool DEFAULT true NOT NULL');
@@ -666,6 +666,21 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       },
     });
     expect(sql).toContain('"id" uuid DEFAULT gen_random_uuid(INTERVAL \'5500 years\') NOT NULL');
+  });
+
+  it('renders JSONB default with $type key as JSON, not as tagged bigint', () => {
+    const sql = planTableSql('metadata', {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      payload: {
+        nativeType: 'jsonb',
+        codecId: 'pg/jsonb@1',
+        nullable: false,
+        default: { kind: 'literal', value: { $type: 'bigint', value: '42' } },
+      },
+    });
+    expect(sql).toContain(
+      '"payload" jsonb DEFAULT \'{"$type":"bigint","value":"42"}\'::jsonb NOT NULL',
+    );
   });
 
   it('preserves json and jsonb native types in CREATE TABLE', () => {

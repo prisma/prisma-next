@@ -68,6 +68,9 @@ importers:
       lint-staged:
         specifier: ^16.2.6
         version: 16.2.6
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
       turbo:
         specifier: ^2.6.1
         version: 2.6.1
