@@ -8,6 +8,7 @@ import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { CompiledQuery, DatabaseConnection, QueryResult, TransactionSettings } from 'kysely';
+import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './transform/errors';
 import { runGuardrails } from './transform/guardrails';
 import { transformKyselyToPnAst } from './transform/transform';
 
@@ -17,6 +18,41 @@ const TRANSFORMABLE_KINDS = new Set([
   'UpdateQueryNode',
   'DeleteQueryNode',
 ]);
+const RAW_QUERY_KIND = 'RawNode';
+
+function planUnsupportedForKysely(
+  kind: string,
+  reason?: string,
+): Error & {
+  readonly code: 'PLAN.UNSUPPORTED';
+  readonly category: 'PLAN';
+  readonly severity: 'error';
+  readonly details: { lane: 'kysely'; kyselyKind: string; reason?: string };
+} {
+  const message = reason
+    ? `Unsupported Kysely query kind: ${kind}. ${reason}`
+    : `Unsupported Kysely query kind: ${kind}`;
+  const error = new Error(message) as Error & {
+    code: 'PLAN.UNSUPPORTED';
+    category: 'PLAN';
+    severity: 'error';
+    details: { lane: 'kysely'; kyselyKind: string; reason?: string };
+  };
+  Object.defineProperty(error, 'name', {
+    value: 'RuntimeError',
+    configurable: true,
+  });
+  return Object.assign(error, {
+    code: 'PLAN.UNSUPPORTED' as const,
+    category: 'PLAN' as const,
+    severity: 'error' as const,
+    details: {
+      lane: 'kysely' as const,
+      kyselyKind: kind,
+      ...ifDefined('reason', reason),
+    },
+  });
+}
 
 export class KyselyPrismaConnection implements DatabaseConnection {
   #contract: ContractBase;
@@ -105,11 +141,19 @@ export class KyselyPrismaConnection implements DatabaseConnection {
     const kind = (query as { kind?: string })?.kind;
     if (query && typeof query === 'object' && kind !== undefined && TRANSFORMABLE_KINDS.has(kind)) {
       runGuardrails(sqlContract, query);
-      const { ast, metaAdditions } = transformKyselyToPnAst(
-        sqlContract,
-        query,
-        compiledQuery.parameters,
-      );
+      const { ast, metaAdditions } = (() => {
+        try {
+          return transformKyselyToPnAst(sqlContract, query, compiledQuery.parameters);
+        } catch (error) {
+          if (
+            KyselyTransformError.is(error) &&
+            error.code === KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE
+          ) {
+            throw planUnsupportedForKysely(kind, error.message);
+          }
+          throw error;
+        }
+      })();
 
       const annotations: { codecs?: Record<string, string>; selectAllIntent?: { table?: string } } =
         {};
@@ -148,6 +192,9 @@ export class KyselyPrismaConnection implements DatabaseConnection {
           ),
         },
       };
+    }
+    if (query && typeof query === 'object' && kind !== undefined && kind !== RAW_QUERY_KIND) {
+      throw planUnsupportedForKysely(kind);
     }
 
     return {

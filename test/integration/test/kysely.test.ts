@@ -396,6 +396,45 @@ describe('Kysely integration', () => {
     );
 
     it(
+      'fails unsupported Kysely query kinds with PLAN.UNSUPPORTED envelope',
+      async () => {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+        });
+
+        const kysely = new Kysely<KyselifyContract<Contract>>({
+          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
+        });
+
+        await expect(
+          kysely
+            .insertInto('user')
+            .values([
+              {
+                id: userId,
+                email: 'unsupported-1@example.com',
+                createdAt: new Date().toISOString(),
+              },
+              {
+                id: userId + 1,
+                email: 'unsupported-2@example.com',
+                createdAt: new Date().toISOString(),
+              },
+            ])
+            .execute(),
+        ).rejects.toMatchObject({
+          code: 'PLAN.UNSUPPORTED',
+          category: 'PLAN',
+          details: {
+            lane: 'kysely',
+            kyselyKind: 'InsertQueryNode',
+          },
+        });
+      },
+      testTimeout,
+    );
+
+    it(
       'uses lane raw and no ast for raw sql queries',
       async () => {
         const captured: ExecutionPlan[] = [];

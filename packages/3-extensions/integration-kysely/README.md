@@ -7,6 +7,7 @@ Kysely integration for Prisma Next: connects Kysely query builder output to the 
 - Provide a Kysely-compatible database interface that routes queries through the Prisma Next execution stack
 - Transform Kysely `compiledQuery` AST into Prisma Next SQL AST (`QueryAst`) for lane-agnostic plugin inspection
 - Populate `plan.meta.refs`, `plan.meta.paramDescriptors`, and related metadata for Kysely-authored queries
+- Fail unsupported Kysely-authored query kinds with a stable `PLAN.UNSUPPORTED` runtime envelope (`details.lane = 'kysely'`, `details.kyselyKind`)
 
 ## Architecture
 
@@ -57,7 +58,7 @@ The transformer (`src/transform/`) converts Kysely AST nodes to PN SQL AST:
 | `ColumnUpdateNode` | `UpdateAst.set` |
 | `ReturningNode` | `returning` column refs |
 
-All refs are validated against the contract. Unsupported node kinds throw `KyselyTransformError` with stable codes.
+All refs are validated against the contract. Unsupported node kinds throw `KyselyTransformError` with stable codes; the runtime connection maps unsupported cases to a stable `PLAN.UNSUPPORTED` envelope for callers.
 
 The transformer also throws defensively if ambiguous or invalid shapes slip through (e.g. when invoked without guardrails): unqualified column refs in multi-table scope, ambiguous `selectAll` in multi-table scope, and unsupported node kinds.
 
@@ -83,3 +84,4 @@ Multi-table scope is triggered by either joins (`JoinNode` present) or multiple 
 
 - [ADR 160](../../docs/architecture%20docs/adrs/ADR%20160%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md)
 - [Transform spec](../../agent-os/specs/2026-02-15-transform-kysely-ast-to-pn-ast/spec.md)
+- [Phase 2 extraction spec](../../projects/kysely-lane-rollout/specs/02-kysely-lane-build-only.spec.md)

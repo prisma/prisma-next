@@ -1,9 +1,10 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { RuntimeConnection, RuntimeTransaction } from '@prisma-next/runtime-executor';
-import type { QueryResult } from 'kysely';
+import type { CompiledQuery, QueryResult } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import { KyselyPrismaConnection } from '../src/connection';
 import { createAsyncResult, createCompiledQuery, createTestContract } from './helpers';
+import { contract as sqlContractFixture } from './transform.fixtures';
 
 interface CapturedExecution<Row = unknown> {
   readonly plan: ExecutionPlan<Row>;
@@ -102,5 +103,77 @@ describe('KyselyPrismaConnection', () => {
     await expect(connection.executeQuery(compiledQuery)).rejects.toThrow(
       'Invoked executeQuery on released connection',
     );
+  });
+
+  it('executeQuery fails unsupported Kysely query kinds with stable envelope', async () => {
+    const contract = createTestContract();
+    const runtimeConnection = createRuntimeConnection([[]]);
+    const connection = new KyselyPrismaConnection(contract, runtimeConnection.connection);
+    const compiledQuery = {
+      query: { kind: 'WithNode' },
+      queryId: {} as never,
+      sql: 'with x as (select 1) select * from x',
+      parameters: [],
+    } as unknown as CompiledQuery<unknown>;
+
+    await expect(connection.executeQuery(compiledQuery)).rejects.toMatchObject({
+      code: 'PLAN.UNSUPPORTED',
+      category: 'PLAN',
+      details: {
+        lane: 'kysely',
+        kyselyKind: 'WithNode',
+      },
+    });
+    expect(runtimeConnection.executions).toHaveLength(0);
+  });
+
+  it('maps transform unsupported errors to PLAN.UNSUPPORTED envelope', async () => {
+    const runtimeConnection = createRuntimeConnection([[]]);
+    const connection = new KyselyPrismaConnection(sqlContractFixture, runtimeConnection.connection);
+    const compiledQuery = {
+      query: {
+        kind: 'InsertQueryNode',
+        into: {
+          kind: 'TableNode',
+          table: { kind: 'IdentifierNode', name: 'user' },
+        },
+        columns: [
+          { kind: 'ColumnNode', column: { kind: 'IdentifierNode', name: 'id' } },
+          { kind: 'ColumnNode', column: { kind: 'IdentifierNode', name: 'email' } },
+        ],
+        values: {
+          kind: 'ValuesNode',
+          values: [
+            {
+              kind: 'PrimitiveValueListNode',
+              values: [
+                { kind: 'ValueNode', value: 'a' },
+                { kind: 'ValueNode', value: 'a@example.com' },
+              ],
+            },
+            {
+              kind: 'PrimitiveValueListNode',
+              values: [
+                { kind: 'ValueNode', value: 'b' },
+                { kind: 'ValueNode', value: 'b@example.com' },
+              ],
+            },
+          ],
+        },
+      },
+      queryId: {} as never,
+      sql: 'insert into "user" ("id","email") values ($1,$2), ($3,$4)',
+      parameters: ['a', 'a@example.com', 'b', 'b@example.com'],
+    } as unknown as CompiledQuery<unknown>;
+
+    await expect(connection.executeQuery(compiledQuery)).rejects.toMatchObject({
+      code: 'PLAN.UNSUPPORTED',
+      category: 'PLAN',
+      details: {
+        lane: 'kysely',
+        kyselyKind: 'InsertQueryNode',
+      },
+    });
+    expect(runtimeConnection.executions).toHaveLength(0);
   });
 });
