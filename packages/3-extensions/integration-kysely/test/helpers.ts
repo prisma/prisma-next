@@ -8,12 +8,21 @@ export function createTestContract(overrides: Partial<ContractBase> = {}): Contr
     target: 'postgres',
     targetFamily: 'sql',
     storageHash: 'sha256:test' as ContractBase['storageHash'],
+    storage: {
+      tables: {
+        users: {
+          columns: {
+            id: { codecId: 'string', nativeType: 'text', nullable: false },
+          },
+        },
+      },
+    },
     capabilities: {},
     extensionPacks: {},
     meta: {},
     sources: {},
     ...overrides,
-  };
+  } as unknown as ContractBase;
 }
 
 export function createCompiledQuery<Row>(
@@ -21,7 +30,31 @@ export function createCompiledQuery<Row>(
   parameters: readonly unknown[] = [],
 ): CompiledQuery<Row> {
   return {
-    query: {} as never,
+    query: {
+      kind: 'SelectQueryNode',
+      from: {
+        kind: 'FromNode',
+        froms: [
+          {
+            kind: 'TableNode',
+            table: { kind: 'IdentifierNode', name: 'users' },
+          },
+        ],
+      },
+      selections: [
+        {
+          kind: 'SelectionNode',
+          selection: {
+            kind: 'ReferenceNode',
+            column: {
+              kind: 'ColumnNode',
+              column: { kind: 'IdentifierNode', name: 'id' },
+              table: { kind: 'IdentifierNode', name: 'users' },
+            },
+          },
+        },
+      ],
+    } as never,
     queryId: {} as never,
     sql,
     parameters: [...parameters],

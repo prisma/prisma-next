@@ -13,7 +13,7 @@ Composition-root Postgres helper that builds a Prisma Next runtime client and ex
 `@prisma-next/postgres/runtime` exposes a single `postgres(...)` helper that composes the Postgres execution stack and returns query/runtime roots:
 
 - `db.sql`
-- `db.kysely(runtime)`
+- `db.kysely` (build-only Kysely authoring + `build(query)` plan assembly)
 - `db.schema`
 - `db.orm`
 - `db.context`
@@ -30,7 +30,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 ## Responsibilities
 
 - Build a static Postgres execution stack from target, adapter, and driver descriptors
-- Build typed SQL and Kysely lane instances from the same execution context
+- Build typed SQL and a build-only Kysely authoring surface from the same execution context
 - Build static schema and ORM roots from the execution context
 - Normalize runtime binding input (`binding`, `url`, `pg`)
 - Lazily instantiate runtime resources on first `db.runtime()` or `db.connect(...)` call
@@ -45,7 +45,8 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - `@prisma-next/adapter-postgres` for adapter descriptor
 - `@prisma-next/driver-postgres` for driver descriptor
 - `@prisma-next/sql-lane` for `sql(...)`
-- `@prisma-next/integration-kysely` for `KyselyPrismaDialect` and contract-to-Kysely typing
+- `@prisma-next/integration-kysely` for contract-to-Kysely typing
+- `@prisma-next/sql-kysely-lane` for build-only Kysely plan assembly
 - `@prisma-next/sql-relational-core` for `schema(...)`
 - `@prisma-next/sql-orm-client` for `orm(...)`
 - `@prisma-next/sql-contract` for `validateContract(...)` and contract types
@@ -57,7 +58,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 ```mermaid
 flowchart TD
     App[App Code] --> Client[postgres(...)]
-    Client --> Static[Roots: sql kysely(runtime) schema orm context stack]
+    Client --> Static[Roots: sql kysely(build-only) schema orm context stack]
     Client --> Lazy[runtime()]
 
     Lazy --> Instantiate[instantiateExecutionStack]

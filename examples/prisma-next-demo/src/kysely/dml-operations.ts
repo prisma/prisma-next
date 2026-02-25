@@ -1,12 +1,11 @@
 import { generateId } from '@prisma-next/ids/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
+import { executeKyselyTakeFirst } from './run';
 
 export async function insertUser(email: string, runtime: Runtime) {
   const userId = generateId({ id: 'uuidv4' });
-  const kysely = db.kysely(runtime);
-
-  const rows = await kysely
+  const query = db.kysely
     .insertInto('user')
     .values({
       id: userId,
@@ -14,33 +13,23 @@ export async function insertUser(email: string, runtime: Runtime) {
       kind: 'user',
       createdAt: new Date().toISOString(),
     })
-    .returning(['id', 'email'])
-    .execute();
+    .returning(['id', 'email']);
 
-  return rows[0] ?? null;
+  return executeKyselyTakeFirst(runtime, query);
 }
 
 export async function updateUser(userId: string, newEmail: string, runtime: Runtime) {
-  const kysely = db.kysely(runtime);
-
-  const rows = await kysely
+  const query = db.kysely
     .updateTable('user')
     .set({ email: newEmail })
     .where('id', '=', userId)
-    .returning(['id', 'email'])
-    .execute();
+    .returning(['id', 'email']);
 
-  return rows[0] ?? null;
+  return executeKyselyTakeFirst(runtime, query);
 }
 
 export async function deleteUser(userId: string, runtime: Runtime) {
-  const kysely = db.kysely(runtime);
+  const query = db.kysely.deleteFrom('user').where('id', '=', userId).returning(['id', 'email']);
 
-  const rows = await kysely
-    .deleteFrom('user')
-    .where('id', '=', userId)
-    .returning(['id', 'email'])
-    .execute();
-
-  return rows[0] ?? null;
+  return executeKyselyTakeFirst(runtime, query);
 }

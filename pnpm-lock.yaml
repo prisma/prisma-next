@@ -1022,6 +1022,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/shared/utils
+      kysely:
+        specifier: 'catalog:'
+        version: 0.28.10
     devDependencies:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
@@ -1382,6 +1385,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../2-sql/1-core/contract
+      '@prisma-next/sql-kysely-lane':
+        specifier: workspace:*
+        version: link:../../2-sql/4-lanes/kysely-lane
       '@prisma-next/sql-lane':
         specifier: workspace:*
         version: link:../../2-sql/4-lanes/sql-lane

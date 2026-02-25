@@ -62,7 +62,7 @@ function createRuntimeConnection(rowsByExecution: readonly Record<string, unknow
 }
 
 describe('KyselyPrismaConnection', () => {
-  it('executeQuery uses raw lane execution plan and returns rows', async () => {
+  it('executeQuery uses kysely lane execution plan and returns rows', async () => {
     const contract = createTestContract();
     const compiledQuery = createCompiledQuery<{ id: number }>('select "id" from "users"', []);
     const runtimeConnection = createRuntimeConnection([[{ id: 1 }, { id: 2 }]]);
@@ -74,9 +74,11 @@ describe('KyselyPrismaConnection', () => {
       rows: [{ id: 1 }, { id: 2 }],
     });
     expect(runtimeConnection.executions).toHaveLength(1);
-    expect(runtimeConnection.executions[0]?.plan.sql).toBe(compiledQuery.sql);
     expect(runtimeConnection.executions[0]?.plan.params).toEqual(compiledQuery.parameters);
-    expect(runtimeConnection.executions[0]?.plan.meta.lane).toBe('raw');
+    expect(runtimeConnection.executions[0]?.plan.meta.lane).toBe('kysely');
+    expect(runtimeConnection.executions[0]?.plan.meta.annotations).toMatchObject({
+      redactedSql: '/* redacted by @prisma-next/sql-kysely-lane */',
+    });
   });
 
   it('streamQuery preserves chunking behavior with converted plans', async () => {
@@ -93,7 +95,7 @@ describe('KyselyPrismaConnection', () => {
     expect(chunks).toEqual([{ rows: [{ id: 1 }, { id: 2 }] }, { rows: [{ id: 3 }] }]);
     expect(runtimeConnection.executions).toHaveLength(1);
     expect(runtimeConnection.executions[0]?.source).toBe('connection');
-    expect(runtimeConnection.executions[0]?.plan.meta.lane).toBe('raw');
+    expect(runtimeConnection.executions[0]?.plan.meta.lane).toBe('kysely');
   });
 
   it('executeQuery uses transaction executor while transaction is active', async () => {

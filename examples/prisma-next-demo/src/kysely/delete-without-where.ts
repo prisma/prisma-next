@@ -7,7 +7,5 @@ import { db } from '../prisma/db';
  * Used to validate that LINT.DELETE_WITHOUT_WHERE is enforced.
  */
 export async function deleteWithoutWhere(runtime: Runtime) {
-  const kysely = db.kysely(runtime);
-
-  await kysely.deleteFrom('user').execute();
+  await runtime.execute(db.kysely.build(db.kysely.deleteFrom('user'))).toArray();
 }

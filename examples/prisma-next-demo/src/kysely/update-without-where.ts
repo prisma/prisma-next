@@ -7,7 +7,7 @@ import { db } from '../prisma/db';
  * Used to validate that LINT.UPDATE_WITHOUT_WHERE is enforced.
  */
 export async function updateWithoutWhere(runtime: Runtime) {
-  const kysely = db.kysely(runtime);
-
-  await kysely.updateTable('user').set({ email: 'unsafe@example.com' }).execute();
+  await runtime
+    .execute(db.kysely.build(db.kysely.updateTable('user').set({ email: 'unsafe@example.com' })))
+    .toArray();
 }

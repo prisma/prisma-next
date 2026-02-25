@@ -6,22 +6,13 @@ import type {
 } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import {
+  buildKyselyPlan,
   KYSELY_TRANSFORM_ERROR_CODES,
   KyselyTransformError,
-  runGuardrails,
-  transformKyselyToPnAst,
 } from '@prisma-next/sql-kysely-lane';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { CompiledQuery, DatabaseConnection, QueryResult, TransactionSettings } from 'kysely';
-
-const TRANSFORMABLE_KINDS = new Set([
-  'SelectQueryNode',
-  'InsertQueryNode',
-  'UpdateQueryNode',
-  'DeleteQueryNode',
-]);
-const RAW_QUERY_KIND = 'RawNode';
 
 function planUnsupportedForKysely(
   kind: string,
@@ -132,81 +123,19 @@ export class KyselyPrismaConnection implements DatabaseConnection {
   }
 
   #createExecutionPlan<R>(compiledQuery: CompiledQuery<R>): SqlQueryPlan<R> | ExecutionPlan<R> {
-    const query = (compiledQuery as { query?: unknown }).query;
     const sqlContract = this.#contract as SqlContract<SqlStorage>;
-
-    const kind = (query as { kind?: string })?.kind;
-    if (query && typeof query === 'object' && kind !== undefined && TRANSFORMABLE_KINDS.has(kind)) {
-      runGuardrails(sqlContract, query);
-      const { ast, metaAdditions } = (() => {
-        try {
-          return transformKyselyToPnAst(sqlContract, query, compiledQuery.parameters);
-        } catch (error) {
-          if (
-            KyselyTransformError.is(error) &&
-            error.code === KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE
-          ) {
-            throw planUnsupportedForKysely(kind, error.message);
-          }
-          throw error;
-        }
-      })();
-
-      const annotations: { codecs?: Record<string, string>; selectAllIntent?: { table?: string } } =
-        {};
-      if (metaAdditions.projectionTypes && Object.keys(metaAdditions.projectionTypes).length > 0) {
-        annotations.codecs = { ...metaAdditions.projectionTypes };
+    const kind = (compiledQuery as { query?: { kind?: string } }).query?.kind ?? 'unknown';
+    try {
+      return buildKyselyPlan(sqlContract, compiledQuery, { lane: 'kysely' });
+    } catch (error) {
+      if (
+        KyselyTransformError.is(error) &&
+        error.code === KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE
+      ) {
+        throw planUnsupportedForKysely(kind, error.message);
       }
-      if (metaAdditions.selectAllIntent) {
-        annotations.selectAllIntent = metaAdditions.selectAllIntent;
-      }
-
-      const paramDescriptors = metaAdditions.paramDescriptors;
-      const params = compiledQuery.parameters.slice(0, paramDescriptors.length);
-
-      return {
-        ast,
-        params,
-        meta: {
-          target: this.#contract.target,
-          targetFamily: this.#contract.targetFamily,
-          storageHash: this.#contract.storageHash,
-          ...ifDefined('profileHash', this.#contract.profileHash),
-          lane: 'kysely' as const,
-          paramDescriptors,
-          refs: metaAdditions.refs,
-          ...ifDefined('projection', metaAdditions.projection),
-          ...ifDefined(
-            'projectionTypes',
-            metaAdditions.projectionTypes !== undefined &&
-              Object.keys(metaAdditions.projectionTypes).length > 0
-              ? metaAdditions.projectionTypes
-              : undefined,
-          ),
-          ...ifDefined(
-            'annotations',
-            Object.keys(annotations).length > 0 ? annotations : undefined,
-          ),
-        },
-      };
+      throw error;
     }
-    if (query && typeof query === 'object' && kind !== undefined && kind !== RAW_QUERY_KIND) {
-      throw planUnsupportedForKysely(kind);
-    }
-
-    return {
-      ast: undefined,
-      sql: compiledQuery.sql,
-      params: compiledQuery.parameters,
-      meta: {
-        target: this.#contract.target,
-        targetFamily: this.#contract.targetFamily,
-        storageHash: this.#contract.storageHash,
-        ...ifDefined('profileHash', this.#contract.profileHash),
-        lane: 'raw',
-        paramDescriptors: [],
-      },
-    };
   }
 
   #executor(): {

@@ -24,6 +24,7 @@ export type { TransformResult };
 function extractRefsFromAst(ast: QueryAst): PlanRefs {
   const tables = new Set<string>();
   const columns: Array<{ table: string; column: string }> = [];
+  const columnKeys = new Set<string>();
 
   function visit(node: unknown): void {
     if (!node || typeof node !== 'object') return;
@@ -42,7 +43,11 @@ function extractRefsFromAst(ast: QueryAst): PlanRefs {
     }
     if (kind === 'col' && typeof table === 'string' && typeof column === 'string') {
       tables.add(table);
-      columns.push({ table, column });
+      const key = `${table}.${column}`;
+      if (!columnKeys.has(key)) {
+        columnKeys.add(key);
+        columns.push({ table, column });
+      }
       return;
     }
     for (const value of Object.values(n)) {

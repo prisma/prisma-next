@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   driverConnect: vi.fn(),
   validateContract: vi.fn(),
   poolCtor: vi.fn(),
-  dialectCtor: vi.fn(),
   kyselyCtor: vi.fn(),
 }));
 
@@ -52,18 +51,17 @@ vi.mock('@prisma-next/driver-postgres/runtime', () => ({
   default: { id: 'driver-postgres' },
 }));
 
-vi.mock('@prisma-next/integration-kysely', () => ({
-  KyselyPrismaDialect: class {
-    constructor(options: unknown) {
-      mocks.dialectCtor(options);
-    }
-  },
-}));
-
 vi.mock('kysely', () => ({
   Kysely: class {
     constructor(config: unknown) {
       mocks.kyselyCtor(config);
+    }
+  },
+  PostgresAdapter: class {},
+  PostgresIntrospector: class {},
+  PostgresQueryCompiler: class {
+    compileQuery() {
+      return { query: { kind: 'SelectQueryNode' }, sql: 'select 1', parameters: [] };
     }
   },
 }));
@@ -111,7 +109,6 @@ describe('postgres', () => {
     mocks.driverConnect.mockReset();
     mocks.validateContract.mockReset();
     mocks.poolCtor.mockReset();
-    mocks.dialectCtor.mockReset();
     mocks.kyselyCtor.mockReset();
 
     mocks.createExecutionContext.mockReturnValue({
@@ -152,18 +149,27 @@ describe('postgres', () => {
     expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
   });
 
-  it('creates kysely lane from runtime and contract', () => {
+  it('exposes build-only kysely surface', () => {
     const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
     });
-    const runtime = db.runtime();
 
-    db.kysely(runtime);
-
-    expect(mocks.dialectCtor).toHaveBeenCalledTimes(1);
-    expect(mocks.dialectCtor).toHaveBeenCalledWith({ runtime, contract });
     expect(mocks.kyselyCtor).toHaveBeenCalledTimes(1);
+    expect(typeof db.kysely.build).toBe('function');
+  });
+
+  it('throws deterministically when execution is attempted on build-only kysely', async () => {
+    postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const config = mocks.kyselyCtor.mock.calls[0]?.[0] as { dialect: { createDriver(): unknown } };
+    const driver = config.dialect.createDriver() as { acquireConnection(): Promise<unknown> };
+    await expect(driver.acquireConnection()).rejects.toThrow(
+      /Kysely execution is disabled for db\.kysely/,
+    );
   });
 
   it('memoizes runtime instance', () => {

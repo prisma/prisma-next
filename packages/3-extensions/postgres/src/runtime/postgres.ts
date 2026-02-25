@@ -1,7 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
+import type { KyselifyContract } from '@prisma-next/integration-kysely';
 import type {
   ExtractCodecTypes,
   ExtractOperationTypes,
@@ -9,6 +9,7 @@ import type {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import { buildKyselyPlan, REDACTED_SQL } from '@prisma-next/sql-kysely-lane';
 import type { SelectBuilder } from '@prisma-next/sql-lane';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
@@ -32,7 +33,18 @@ import {
   createSqlExecutionStack,
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import { Kysely } from 'kysely';
+import type {
+  CompiledQuery,
+  DatabaseConnection,
+  DatabaseIntrospector,
+  DatabaseMetadata,
+  Dialect,
+  Driver,
+  Kysely,
+  QueryCompiler,
+  TransactionSettings,
+} from 'kysely';
+import { Kysely as KyselyClient, PostgresAdapter, PostgresQueryCompiler } from 'kysely';
 import { type Client, Pool } from 'pg';
 import {
   type PostgresBinding,
@@ -56,6 +68,100 @@ type OrmClient<TContract extends SqlContract<SqlStorage>> = ReturnType<
   typeof ormBuilder<TContract>
 >;
 
+type ExecutionMethodName =
+  | `execute${string}`
+  | `stream${string}`
+  | 'transaction'
+  | 'connection'
+  | 'destroy';
+type BuildOnlyify<T> = T extends (...args: infer Args) => infer Result
+  ? (...args: Args) => BuildOnlyify<Result>
+  : T extends object
+    ? {
+        [K in keyof T as K extends string
+          ? K extends ExecutionMethodName
+            ? never
+            : K
+          : K]: BuildOnlyify<T[K]>;
+      }
+    : T;
+
+export type BuildOnlyKysely<DB> = BuildOnlyify<Kysely<DB>> & {
+  build<Row>(query: {
+    compile(): unknown;
+  }): import('@prisma-next/sql-relational-core/plan').SqlQueryPlan<Row>;
+  readonly redactedSql: string;
+};
+
+const BUILD_ONLY_EXECUTION_MESSAGE =
+  'Kysely execution is disabled for db.kysely (build-only surface). Build a plan with db.kysely.build(query) and execute it through runtime.';
+
+class BuildOnlyKyselyDriver implements Driver {
+  async init(): Promise<void> {}
+  async destroy(): Promise<void> {}
+  async acquireConnection(): Promise<DatabaseConnection> {
+    throw new Error(BUILD_ONLY_EXECUTION_MESSAGE);
+  }
+  async beginTransaction(
+    _connection: DatabaseConnection,
+    _settings: TransactionSettings,
+  ): Promise<void> {
+    throw new Error(BUILD_ONLY_EXECUTION_MESSAGE);
+  }
+  async commitTransaction(_connection: DatabaseConnection): Promise<void> {
+    throw new Error(BUILD_ONLY_EXECUTION_MESSAGE);
+  }
+  async rollbackTransaction(_connection: DatabaseConnection): Promise<void> {
+    throw new Error(BUILD_ONLY_EXECUTION_MESSAGE);
+  }
+  async releaseConnection(_connection: DatabaseConnection): Promise<void> {}
+}
+
+class RedactingPostgresQueryCompiler implements QueryCompiler {
+  readonly #compiler = new PostgresQueryCompiler();
+  compileQuery(node: unknown): CompiledQuery {
+    const compiled = this.#compiler.compileQuery(node as never, {} as never);
+    return {
+      ...compiled,
+      sql: REDACTED_SQL,
+    };
+  }
+}
+
+class BuildOnlyPostgresDialect implements Dialect {
+  createAdapter = () => new PostgresAdapter();
+  createDriver = () => new BuildOnlyKyselyDriver();
+  createIntrospector = (): DatabaseIntrospector => ({
+    getSchemas: async () => [],
+    getTables: async () => [],
+    getMetadata: async (): Promise<DatabaseMetadata> => ({ tables: [] }),
+  });
+  createQueryCompiler = () => new RedactingPostgresQueryCompiler();
+}
+
+function createBuildOnlyKysely<TContract extends SqlContract<SqlStorage>>(
+  contract: TContract,
+): BuildOnlyKysely<KyselifyContract<TContract>> {
+  const base = new KyselyClient<KyselifyContract<TContract>>({
+    dialect: new BuildOnlyPostgresDialect(),
+  });
+  const buildOnly = base as unknown as BuildOnlyKysely<KyselifyContract<TContract>>;
+  Object.defineProperty(buildOnly, 'build', {
+    value: <Row>(query: { compile(): unknown }) =>
+      buildKyselyPlan(contract, query.compile() as CompiledQuery<Row>, { lane: 'kysely' }),
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+  Object.defineProperty(buildOnly, 'redactedSql', {
+    value: REDACTED_SQL,
+    enumerable: true,
+    configurable: false,
+    writable: false,
+  });
+  return buildOnly;
+}
+
 export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
   readonly sql: SelectBuilder<
     TContract,
@@ -63,7 +169,7 @@ export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
     ExtractCodecTypes<TContract>,
     ExtractOperationTypes<TContract>
   >;
-  kysely(runtime: Runtime): Kysely<KyselifyContract<TContract>>;
+  readonly kysely: BuildOnlyKysely<KyselifyContract<TContract>>;
   readonly schema: SchemaHandle<
     TContract,
     ExtractCodecTypes<TContract>,
@@ -242,11 +348,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
 
   return {
     sql,
-    kysely(runtime: Runtime) {
-      return new Kysely<KyselifyContract<TContract>>({
-        dialect: new KyselyPrismaDialect({ runtime, contract }),
-      });
-    },
+    kysely: createBuildOnlyKysely(contract),
     schema,
     orm,
     context,

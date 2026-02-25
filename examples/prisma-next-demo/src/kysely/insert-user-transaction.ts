@@ -1,38 +1,49 @@
 import { generateId } from '@prisma-next/ids/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
+import { executeKyselyTakeFirst } from './run';
 
 export async function insertUserTransaction(runtime: Runtime) {
   const userId = generateId({ id: 'uuidv4' });
-  const kysely = db.kysely(runtime);
+  const connection = await runtime.connection();
 
-  await kysely
-    .insertInto('user')
-    .values({
-      id: userId,
-      kind: 'user',
-      email: 'jane@doe.com',
-      createdAt: new Date().toISOString(),
-    })
-    .execute();
+  try {
+    await connection
+      .execute(
+        db.kysely.build(
+          db.kysely.insertInto('user').values({
+            id: userId,
+            kind: 'user',
+            email: 'jane@doe.com',
+            createdAt: new Date().toISOString(),
+          }),
+        ),
+      )
+      .toArray();
 
-  await kysely
-    .transaction()
-    .execute(async (trx) => {
-      await trx
-        .updateTable('user')
-        .set({ email: 'john@doe.com' })
-        .where('id', '=', userId)
-        .execute();
+    const transaction = await connection.transaction();
+    try {
+      await transaction
+        .execute(
+          db.kysely.build(
+            db.kysely.updateTable('user').set({ email: 'john@doe.com' }).where('id', '=', userId),
+          ),
+        )
+        .toArray();
 
       throw new Error('Simulated error to trigger rollback');
-    })
-    .catch((err) => {
-      if (err.message !== 'Simulated error to trigger rollback') {
-        // Ignore error
+    } catch (err) {
+      await transaction.rollback();
+      if ((err as Error).message !== 'Simulated error to trigger rollback') {
         throw err;
       }
-    });
+    }
+  } finally {
+    await connection.release();
+  }
 
-  return kysely.selectFrom('user').selectAll().where('id', '=', userId).executeTakeFirst();
+  return executeKyselyTakeFirst(
+    runtime,
+    db.kysely.selectFrom('user').selectAll().where('id', '=', userId),
+  );
 }
