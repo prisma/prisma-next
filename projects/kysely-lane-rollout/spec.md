@@ -117,9 +117,13 @@ No product analytics changes required. Development analytics are commit/test/CI 
 
 # References
 
+- Drive spec (Phase 1): `projects/kysely-lane-rollout/specs/01-kysely-integration-merge.spec.md`
+- Drive plan (Phase 1): `projects/kysely-lane-rollout/plans/01-kysely-integration-merge.plan.md`
 - `agent-os/specs/2026-02-19-kysely-query-lane-build-only/spec.md` (intended Phase 2 spec)
+- Drive spec (Phase 2): `projects/kysely-lane-rollout/specs/02-kysely-lane-build-only.spec.md`
+- Drive plan (Phase 2): `projects/kysely-lane-rollout/plans/02-kysely-lane-build-only.plan.md`
 - Current working branch: `tml-1892-transform-kysely-ast-to-pn-ast` (intended Phase 1 merge branch)
-- `projects/kysely-lane-rollout/plans/plan.md` (execution breakdown for this project)
+- `projects/kysely-lane-rollout/plan.md` (execution breakdown for this project)
 
 # Open Questions
 

@@ -39,13 +39,16 @@ Create (if missing):
 Notes:
 
 - `projects/{project}/` is **transient**. At close-out: verify acceptance criteria, migrate long-lived docs (incl. ADRs for system changes) into `docs/`, then delete `projects/{project}/`.
+- Project-level artifacts live at the project root:
+  - Spec: `projects/{project}/spec.md`
+  - Plan: `projects/{project}/plan.md`
 
 ## Stub files (optional)
 
 If stubs are requested (or defaulted) **and** the developer is **not** immediately starting shaping via `drive-create-spec`:
 
 - `projects/{project}/spec.md` (project spec placeholder)
-- `projects/{project}/plans/plan.md` (project plan placeholder)
+- `projects/{project}/plan.md` (project plan placeholder)
 
 Use these minimal stubs:
 
@@ -77,7 +80,7 @@ _Problem, users, scope. Replace this placeholder._
 # Open Questions
 ```
 
-### `projects/{project}/plans/plan.md`
+### `projects/{project}/plan.md`
 
 ```markdown
 # [Project Plan]
@@ -108,5 +111,5 @@ _Drafted via drive-generate-plan. Replace this placeholder._
 If the developer wants to start shaping now (default), hand off immediately:
 
 - Run `drive-create-spec` targeting `projects/{project}/spec.md`
-- Then run `drive-generate-plan` targeting `projects/{project}/plans/plan.md`
+- Then run `drive-generate-plan` targeting `projects/{project}/plan.md`
 

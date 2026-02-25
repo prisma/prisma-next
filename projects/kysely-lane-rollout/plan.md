@@ -1,10 +1,17 @@
-# Kysely Lane Plan
+# Kysely lane rollout plan
 
 ## Summary
 
 Deliver Kysely-lane work in three stages so we can ship immediate value, then restore architecture, then optionally improve internals.
 
 **Spec:** `projects/kysely-lane-rollout/spec.md`
+
+## Phase artifacts
+
+- Phase 1 spec: `projects/kysely-lane-rollout/specs/01-kysely-integration-merge.spec.md`
+- Phase 1 plan: `projects/kysely-lane-rollout/plans/01-kysely-integration-merge.plan.md`
+- Phase 2 spec: `projects/kysely-lane-rollout/specs/02-kysely-lane-build-only.spec.md`
+- Phase 2 plan: `projects/kysely-lane-rollout/plans/02-kysely-lane-build-only.plan.md`
 
 ## Milestones
 
