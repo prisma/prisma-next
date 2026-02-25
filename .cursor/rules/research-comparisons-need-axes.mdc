@@ -1,0 +1,13 @@
+# Research comparisons need axes
+
+When writing research/comparison docs (e.g. “X vs Prisma Next”), avoid placing two statements near each other without explaining the relationship.
+
+Every comparison section must make the shared axis explicit, using at least one of:
+
+- **Knob**: what the user actually does/chooses (import, config, API call)
+- **Invariant**: what the system can guarantee because of that choice
+- **Trade-off**: what you gain and what you give up
+- **So what**: the concrete implications for portability, safety, performance, testing, policy, or roadmap
+
+If a comparison cannot be expressed on a shared axis, treat it as an **open question** or restructure the section (don’t force an apples-to-oranges juxtaposition).
+
