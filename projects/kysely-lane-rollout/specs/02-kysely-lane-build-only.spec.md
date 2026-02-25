@@ -44,6 +44,7 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
     - `params: readonly unknown[]` aligned to those indices
     - `paramDescriptors: ReadonlyArray<ParamDescriptor>` aligned to those indices
 - ORM must be able to consume `WhereArg` without importing Kysely types.
+- Consumers pass `ToWhereExpr` as-is; ORM performs the conversion (no manual `.toWhereExpr()` at call sites).
 
 ### 3) Postgres convenience client exposes build-only Kysely surface
 

@@ -6,7 +6,7 @@ Concretely:
 
 - **Phase 1 (merge what we have):** keep the current runtime-attached integration, but make it *usable as Prisma Next* by producing **Prisma Next `QueryAst`** in query plans (not just SQL strings) so adapters/plugins/guardrails can inspect and enforce behavior.
 - **Phase 2 (make it a lane):** move Kysely authoring + transform + guardrails into `packages/2-sql/4-lanes/` as `@prisma-next/sql-kysely-lane` (build-only; no runtime dependency).
-- **Phase 3 (optional):** reduce/remove reliance on Kysely compilation/AST by constructing PN AST directly where it’s beneficial.
+- **Phase 3 (optional):** narrow reliance on Kysely compilation / operation internals, and construct PN AST more directly where it’s beneficial/feasible.
 
 # Description
 
@@ -23,7 +23,7 @@ That approach created two foundational problems:
 1. **Black-box plans**: Prisma Next runtime plugins and guardrails couldn’t understand the query because there was no Prisma Next AST on the plan—only SQL text.
 2. **Wrong architectural shape**: this was not a lane. It was runtime-attached, so it couldn’t live alongside other build-only query lanes in the SQL domain.
 
-The branch we’re currently on (`tml-1892-transform-kysely-ast-to-pn-ast`) is an attempt to fix the most damaging consequence first: **ensure Kysely-authored queries produce Prisma Next-native plans with Prisma Next AST** so the system can reason about them.
+`tml-1892-transform-kysely-ast-to-pn-ast` branch was an attempt to fix the most damaging consequence first: **ensure Kysely-authored queries produce Prisma Next-native plans with Prisma Next AST** so the system can reason about them.
 
 ## What each phase means (in concrete terms)
 
@@ -34,32 +34,27 @@ This project coordinates:
    - Ensure query plans carry **PN `QueryAst` + metadata**, and that execution uses Prisma Next’s lowering path (adapter), not Kysely’s compiled SQL string.
    - Result: the integration is still not a “lane,” but it becomes observable/enforceable inside Prisma Next and is safe to use.
 2. **Phase 2 (architecture, “make it a lane”):**
-   - Implement the intended design from `agent-os/specs/2026-02-19-kysely-query-lane-build-only/spec.md`.
+   - Implement the intended design from `projects/kysely-lane-rollout/specs/02-kysely-lane-build-only.spec.md`.
    - Create `@prisma-next/sql-kysely-lane` in the SQL domain lanes layer, move transform/guardrails/build-only semantics there, and keep runtime attachment (if needed) in extensions.
 3. **Phase 3 (optional, “make it simpler/stronger”):**
-   - Where useful, bypass Kysely AST/compile dependencies and construct PN AST directly (or narrow the reliance on Kysely internals).
+   - Where useful, narrow reliance on Kysely internals (for example compilation-derived artifacts) and construct PN AST more directly where feasible.
 
 # Requirements
 
 ## Functional Requirements
 
-- As a maintainer, I can merge Phase 1 with a bounded scope (“fix problems, don’t refactor architecture”).
-- As a runtime/plugin author, I can inspect Kysely-authored plans because they include PN AST, not only SQL strings.
-- As a platform owner, I can complete Phase 2 by moving Kysely lane responsibilities into the SQL lanes layer (`@prisma-next/sql-kysely-lane`) and keeping runtime attachment separate.
-- As a teammate joining later, I can read this spec and immediately understand:
-  - what the original approach was,
-  - why it failed (black-box plans + wrong layering),
-  - what Phase 1 ships,
-  - what Phase 2 fixes,
-  - what Phase 3 optionally improves.
+- Phase 1 is mergeable with a bounded scope: fix correctness/merge blockers, do not extract/refactor the lane architecture.
+- Supported Kysely-authored queries produce plans that include PN AST (`QueryAst`) and the plan metadata Prisma Next needs (params, descriptors, refs), not only SQL strings.
+- Runtime plugins/guardrails can inspect Kysely-authored plans by relying on the AST-backed plan shape.
+- Phase 2 produces a build-only lane package (`@prisma-next/sql-kysely-lane`) in `packages/2-sql/4-lanes/` and moves lane responsibilities there, keeping runtime attachment (dialect/driver/connection) separate.
+- Postgres public surface exposes a build-only `db.kysely` authoring API (no runtime argument) per the Phase 2 spec.
 
 ## Non-Functional Requirements
 
 - **Change risk control:** Each phase must be shippable independently with test coverage for its acceptance criteria.
 - **Architecture conformance:** Phase 2 must pass `pnpm lint:deps` with intended layer boundaries.
 - **Regression safety:** Existing supported Kysely behavior in tests must remain stable through Phase 1 and Phase 2.
-- **Developer clarity:** Project artifacts must make scope boundaries explicit to avoid “hidden refactor” creep.
-- **Assumption:** No immediate external API freeze requires bundling all 3 phases into one release.
+- **Scope clarity:** Phase boundaries must stay explicit to avoid “hidden refactor” creep.
 
 ## Non-goals
 
@@ -119,7 +114,6 @@ No product analytics changes required. Development analytics are commit/test/CI 
 
 - Drive spec (Phase 1): `projects/kysely-lane-rollout/specs/01-kysely-integration-merge.spec.md`
 - Drive plan (Phase 1): `projects/kysely-lane-rollout/plans/01-kysely-integration-merge.plan.md`
-- `agent-os/specs/2026-02-19-kysely-query-lane-build-only/spec.md` (intended Phase 2 spec)
 - Drive spec (Phase 2): `projects/kysely-lane-rollout/specs/02-kysely-lane-build-only.spec.md`
 - Drive plan (Phase 2): `projects/kysely-lane-rollout/plans/02-kysely-lane-build-only.plan.md`
 - Current working branch: `tml-1892-transform-kysely-ast-to-pn-ast` (intended Phase 1 merge branch)
@@ -127,10 +121,6 @@ No product analytics changes required. Development analytics are commit/test/CI 
 
 # Open Questions
 
-1. For Phase 1, what’s the merge gate?
-   - Only “tests green + typecheck + lint”?
-   - Also “docs updated for new behavior”?
-2. In Phase 1, what is the exact definition of “supported Kysely queries” we promise not to regress?
-3. In Phase 2, for unsupported Kysely node kinds in runtime attachment: keep raw fallback, or fail fast with a stable error?
-4. PR slicing: one PR per phase, or Phase 2 split into multiple PRs (lane package + ORM interop + Postgres surface + integration rescope)?
-5. What would force Phase 3 now (vs later): performance ceiling, correctness gap, Kysely API instability, or maintenance burden?
+1. For Phase 1, what’s the merge gate beyond “tests/typecheck/lint green” (if anything)?
+2. In Phase 2, for unsupported Kysely node kinds in runtime attachment: keep raw fallback, or fail fast with a stable, structured error?
+3. What would trigger Phase 3 work now (vs later): performance ceiling, correctness gap, Kysely internals churn, or maintenance burden?

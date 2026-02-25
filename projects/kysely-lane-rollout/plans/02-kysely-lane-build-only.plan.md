@@ -23,6 +23,7 @@ Deliverables:
 
 - `WhereArg` / `ToWhereExpr` / bound payload types exist in `@prisma-next/sql-relational-core`.
 - ORM can consume `WhereArg` without importing Kysely types.
+- Call sites can pass `ToWhereExpr` directly; ORM performs conversion (no manual `.toWhereExpr()` at call sites).
 
 **Tasks:**
 
