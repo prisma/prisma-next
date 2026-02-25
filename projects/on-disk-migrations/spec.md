@@ -6,7 +6,7 @@ Implement on-disk migration persistence for prisma-next: the ability to plan con
 
 prisma-next currently supports `db init` (bootstrap a fresh DB from a contract) and `db sign` (write a contract marker), but has no way to persist migration edges to disk. The architecture (ADR 001, ADR 028, Subsystem 7) specifies a rich on-disk format where migrations are directed edges in a DAG, each carrying `fromContract`/`toContract`, operations, pre/post checks, and a content-addressed `edgeId`.
 
-The existing Postgres planner diffs a contract against a **live schema IR** (introspection-based), which is the right approach for `db init` and `db update` — commands that operate against a running database. On-disk migrations are different: the user edits their schema, emits a new contract, and plans a migration *before* the database reflects those changes. This requires a **contract-to-contract diff planner** that compares two contract JSON structures and produces operations without needing a live database.
+The existing Postgres planner diffs a contract against a **live schema IR** (introspection-based), which is how `db init` currently works. On-disk migrations are different: the user edits their schema, emits a new contract, and plans a migration *before* the database reflects those changes. This requires a **contract-to-contract diff planner** that compares two contract JSON structures and produces operations without needing a live database. Long-term, the introspection-based path should converge to use the same diff engine: introspect → convert to contract → diff two contracts via `planContractDiff`. This project builds the contract-to-contract engine; converging the introspection path is future work (see RD-3).
 
 Two user flows are in scope:
 
@@ -21,8 +21,9 @@ The focus is on **creating and persisting migrations**, not applying them from d
 
 ### FR-1: Contract-to-contract diff planner
 - Given two canonical contract JSON objects (from-contract and to-contract), produce a migration plan with operations, pre/post checks, and metadata
-- Must produce the same output as the existing introspection-based planner for equivalent diffs (additive-only for MVP)
+- Produces correct additive operations for MVP (create table, add column, add index, add FK, add unique, add PK, set default, enable extension, create storage type)
 - Must be deterministic: same inputs always produce the same plan
+- This is intended to become the single diff engine for all migration planning (see RD-3)
 
 ### FR-2: On-disk migration file format (TypeScript types)
 - Define TypeScript types/interfaces for the on-disk artifacts specified in ADR 028:
@@ -83,7 +84,7 @@ The focus is on **creating and persisting migrations**, not applying them from d
 - Contract-to-contract planner logic should live at the SQL family level, not Postgres-specific (unless Postgres-specific DDL is needed)
 
 ### NFR-3: Test coverage
-- Contract-to-contract planner must have parity with existing planner tests
+- Contract-to-contract planner must have comprehensive coverage of additive operations
 - On-disk format round-trip tests (write then read back)
 - DAG reconstruction tests (path finding, cycle detection, orphan detection)
 - CLI integration tests for new commands
@@ -108,7 +109,7 @@ The focus is on **creating and persisting migrations**, not applying them from d
 # Acceptance Criteria
 
 ## Planner
-- [ ] Contract-to-contract planner produces the same additive operations (create table, add column, add index, add FK, add unique, add PK, set default) as the existing introspection-based planner for equivalent schema diffs
+- [ ] Contract-to-contract planner produces correct additive operations (create table, add column, add index, add FK, add unique, add PK, set default) for schema diffs
 - [ ] Planner output is deterministic: running twice with the same inputs produces byte-identical `ops.json`
 - [ ] Planner correctly handles the "from empty contract" case (new project)
 - [ ] Planner correctly handles extension-owned operations (e.g., pgvector column/index creation)
@@ -190,11 +191,12 @@ The existing introspection-based planner remains the right tool for `db init` an
 - If no migrations exist, assume the empty contract (`sha256:empty`) as the starting point (new project)
 - Optional: `--from <hash>` flag to explicitly specify a different starting contract from the migration history
 
-## RD-3: `migration plan` vs `db update` are distinct commands with distinct planners
+## RD-3: `migration plan` vs `db update` are distinct commands; one diff engine
 
 - `migration plan`: offline, contract-to-contract, writes to disk. No DB.
-- `db update`: online, reads DB marker contract + introspects DB, applies immediately, no disk artifacts. Reuses existing introspection-based planner.
-- They share the operation vocabulary and output format, but the diff input is different.
+- `db update`: online, reads DB marker contract + introspects DB, applies immediately, no disk artifacts.
+- Both commands should ultimately use the same diff engine: `planContractDiff`. The introspection-based path (`db init`, `db update`) currently diffs a `SqlSchemaIR` against a contract using a separate planner. The convergence path is: introspect → convert to contract IR → feed both contracts into `planContractDiff`. This avoids maintaining two diff engines that must produce identical output for identical inputs.
+- **This convergence is out of scope for this project** but is the intended architecture. For now, the introspection-based planner remains as-is and `planContractDiff` is the new engine for `migration plan`. The two planners share the abstract ops vocabulary.
 
 ## RD-4: Timestamp format
 
@@ -204,7 +206,7 @@ Use `YYYYMMDDThhmm_{slug}` format per ADR 028 and the v2 branch convention.
 
 The contract IR (`SqlStorage`) and `SqlSchemaIR` are structurally similar but not identical. Converting contract → SqlSchemaIR is feasible but lossy (structured `ColumnDefault` flattens to raw string, foreign key shapes differ, synthetic fields needed for annotations/extensions). Direct contract-to-contract diffing avoids all impedance mismatches since both sides are `SqlStorage` with identical types.
 
-The existing planner's operation-generation logic (how to build a `createTable` op from a table definition) can be extracted and shared. The diff strategy is new.
+This also sets the stage for convergence (RD-3): the introspection-based path should eventually convert the introspected schema into a contract and feed it through the same `planContractDiff` engine, rather than maintaining a separate diff implementation.
 
 ## RD-6: Abstract operation IR on disk (not SQL strings)
 
@@ -224,12 +226,6 @@ The CLI → control plane → sql family → postgres target delegation chain al
 
 Use the sentinel value `sha256:empty` — a human-readable marker, not a real SHA-256 hash. This is recognizable at a glance in migration files, error messages, and debugging. Export it as a named constant.
 
-## RD-9: Start fresh (don't cherry-pick v2)
-
-Start fresh, using the v2 branch as reference. Key reasons:
-- The v2 planner approach (introspection-based) is fundamentally different from what we need
-- Starting clean avoids merge conflicts and lets us structure packages properly from the start
-- The v2 `migration new` implementation, config normalization, and ADR 161 are good reference but straightforward to rewrite
 
 ## RD-10: On-disk persistence package location
 
