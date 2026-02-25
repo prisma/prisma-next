@@ -2,7 +2,7 @@
 
 ## Summary
 
-Implement on-disk migration persistence for prisma-next: a contract-to-contract diff planner, abstract operation IR, migration file management, DAG reconstruction, and CLI commands (`migration plan`, `migration new`, `migration verify`, `db update`). The system lets users plan schema changes offline from contract artifacts and persist them as migration edge packages. Apply is out of scope.
+Implement on-disk migration persistence for prisma-next: a contract-to-contract diff planner that lowers directly to target SQL, migration file management, DAG reconstruction, and CLI commands (`migration plan`, `migration apply`, `migration new`, `migration verify`). The system lets users plan schema changes offline from contract artifacts, persist them as migration edge packages with SQL operations, and apply them to a database. `db update` is out of scope.
 
 **Spec:** `projects/on-disk-migrations/spec.md`
 
@@ -15,26 +15,26 @@ Implement on-disk migration persistence for prisma-next: a contract-to-contract 
 
 ## Testing Strategy
 
-The planner produces abstract ops — not SQL. We test the planner by asserting directly on the ops it produces: given two contracts, verify the right ops come out in the right order with the right arguments. This is straightforward unit testing against known inputs and expected outputs.
+The planner produces SQL operations directly for the target. We test the planner by asserting on the SQL it produces: given two contracts, verify the right SQL statements come out in the right order. This is straightforward unit testing against known inputs and expected outputs.
 
-We do **not** build a test harness that resolves ops to SQL and executes them. That would require building the op resolver (abstract ops → SQL), which is `migration apply` territory and out of scope. The risk that an op can't be cleanly resolved to SQL later is low: the op vocabulary is derived directly from what the existing planner already generates as SQL, so we know the information content is sufficient.
-
-The E2E tests in Milestone 3 validate the full user flow (emit → plan → write to disk → read back) but stop short of apply. `db update` E2E tests exercise the existing introspection-based planner against a real database, providing confidence that the operation vocabulary is sound.
+The E2E tests in Milestone 3 validate the full offline user flow (emit → plan → write to disk → read back). Milestone 4 adds integration tests that exercise the full plan → apply flow against a real database.
 
 ## Milestones
 
-### Milestone 1: Planner + ops IR
+### Milestone 1: Planner + SQL generation
 
-Build the contract-to-contract planner, the abstract operation IR it produces, and the control plane wiring so the CLI can call it. This is the core of the project — everything else is persistence and CLI wrapping around it.
+Build the contract-to-contract planner that diffs two contracts and lowers directly to target SQL, plus the control plane wiring so the CLI can call it. This is the core of the project — everything else is persistence and CLI wrapping around it.
 
-The planner lives in `packages/2-sql/3-tooling/family/` (sql domain, tooling layer). The abstract ops IR types live in `packages/1-framework/3-tooling/` (framework domain) since they're target-agnostic. Tests assert directly on the planner's abstract ops output.
+The planner lives in `packages/2-sql/3-tooling/family/` (sql domain, tooling layer). It performs structural diffing at the `SqlStorage` level and generates SQL for the target. Tests assert directly on the planner's SQL output.
 
-**Deliverable:** Given two contracts, the planner produces the correct abstract ops. All additive operation types are covered. The control plane stack exposes the planner to the CLI layer.
+**Deliverable:** Given two contracts, the planner produces the correct SQL operations. All additive operation types are covered. The control plane stack exposes the planner to the CLI layer.
+
+**Note:** M1 was implemented with abstract ops IR. The decision to lower directly to SQL (RD-6 in spec) was made during M3 discussions. The existing implementation needs to be updated to produce SQL directly. The tasks below reflect the original implementation; the SQL lowering change is tracked separately.
 
 **Tasks:**
 
-#### Abstract ops IR (framework/tooling)
-- [x] Define the abstract operation IR types. The op vocabulary covers the additive operations the existing planner supports: `createTable`, `addColumn`, `createIndex`, `addUniqueConstraint`, `addPrimaryKey`, `addForeignKey`, `createStorageType` (for extension types like `vector`), `enableExtension`. Each op has: `op` (discriminant), typed `args` (op-specific), `pre[]` and `post[]` (check vocabulary per ADR 044), `operationClass`. Note: `setColumnDefault` is NOT a separate op — defaults are part of `createTable` and `addColumn` column definitions.
+#### Migration operation types (framework/tooling)
+- [x] Define migration operation types. The op vocabulary covers the additive operations the existing planner supports: `createTable`, `addColumn`, `createIndex`, `addUniqueConstraint`, `addPrimaryKey`, `addForeignKey`, `createStorageType` (for extension types like `vector`), `enableExtension`. Each op has: `op` (discriminant), typed `args` (op-specific), `pre[]` and `post[]` (check vocabulary per ADR 044), `operationClass`. Note: `setColumnDefault` is NOT a separate op — defaults are part of `createTable` and `addColumn` column definitions.
 - [x] Define the `sha256:empty` sentinel constant and export it.
 - [x] Verify `pnpm lint:deps` passes with the new types.
 
@@ -51,7 +51,7 @@ The planner lives in `packages/2-sql/3-tooling/family/` (sql domain, tooling lay
 - [x] Implement pre/post check generation per ADR 044.
 
 #### Control plane wiring
-- [x] ~~Extend `TargetMigrationsCapability`~~ — Not needed. `planContractDiff` is a target-agnostic pure function over `SqlStorage`, exported from `@prisma-next/family-sql/control`. No capability dispatch required. The CLI command in M3 will call it directly, similar to how `executeDbInit` calls the introspection planner.
+- [x] ~~Extend `TargetMigrationsCapability`~~ — Initially thought unnecessary, but M3 revealed a layering violation: the CLI (framework domain) cannot import directly from `@prisma-next/family-sql`. Resolved by adding `planContractDiff` to `TargetMigrationsCapability` (framework interface) and `contractDiff()` to `ControlClient`, with the Postgres target providing the implementation. See M3 architecture tasks.
 
 #### Tests
 - [x] Test: empty contract → single table with columns, PK, and a unique constraint → verify correct `createTable` op with all fields.
@@ -79,14 +79,14 @@ The planner lives in `packages/2-sql/3-tooling/family/` (sql domain, tooling lay
 
 Build the on-disk migration format, file management, edge attestation, and DAG reconstruction. This takes the planner output from Milestone 1 and makes it persistable and navigable.
 
-Lives in a new package `packages/1-framework/3-tooling/migration/` (framework domain, tooling layer, migration plane). This is reusable library code, not CLI-specific. All code here is target-agnostic — it works with the abstract ops IR, not SQL.
+Lives in a new package `packages/1-framework/3-tooling/migration/` (framework domain, tooling layer, migration plane). This is reusable library code, not CLI-specific.
 
 **Deliverable:** Migrations can be written to disk, read back, attested, and organized into a navigable DAG. Tested with unit tests (no DB needed — this is purely file-based).
 
 #### Package scaffolding
 
 - [x] Create `packages/1-framework/3-tooling/migration/` with `package.json` (name: `@prisma-next/migration-tools`), `tsconfig.json`, `tsdown.config.ts`, `vitest.config.ts`.
-  - Dependencies: `@prisma-next/core-control-plane` (for abstract ops types, `EMPTY_CONTRACT_HASH`), `@prisma-next/utils`, `pathe`.
+  - Dependencies: `@prisma-next/core-control-plane` (for `EMPTY_CONTRACT_HASH`, migration types), `@prisma-next/utils`, `pathe`.
   - Export subpaths: `./types` (manifest/DAG types), `./io` (read/write), `./attestation` (edgeId), `./dag` (graph operations).
   - Follow the pattern of `@prisma-next/emitter`: `src/exports/` barrel files, `tsdown` entry map, manual exports.
 - [x] Register the package in the pnpm workspace (`pnpm-workspace.yaml` or existing glob).
@@ -121,14 +121,14 @@ Lives in a new package `packages/1-framework/3-tooling/migration/` (framework do
   - `from`/`to` are the `storageHash` values from the contracts (or `EMPTY_CONTRACT_HASH`).
   - `fromContract`/`toContract` are the complete canonical contract JSON objects, not stringified.
   - `ContractIR` is imported from `@prisma-next/contract/ir`.
-- [x] Define `MigrationOps` type (`ops.json` shape): `readonly AbstractOp[]` — reuses the union type from M1 (`@prisma-next/core-control-plane/abstract-ops`).
+- [x] Define `MigrationOps` type (`ops.json` shape): SQL operations for the target.
 - [x] Define `MigrationPackage` interface — the in-memory representation of a read migration package:
   ```typescript
   interface MigrationPackage {
     readonly dirName: string        // directory name (e.g., '20260225T1430_add_users')
     readonly dirPath: string        // full absolute path
     readonly manifest: MigrationManifest
-    readonly ops: readonly AbstractOp[]
+    readonly ops: MigrationOps
   }
   ```
 
@@ -284,94 +284,104 @@ All tests are unit tests using vitest. Use `node:fs/promises` with temp director
 
 Build CLI commands and validate the full user flows end-to-end. Commands follow existing CLI patterns in `packages/1-framework/3-tooling/cli/`: Result envelope (`Result<T, CliStructuredError>`), `handleResult` for output, `GlobalFlags` for formatting, commander for argument parsing, `loadConfig` for config loading.
 
-**Deliverable:** `migration plan` and `migration verify` are registered and functional. E2E tests cover the new-project and incremental-change flows from the spec.
+**Deliverable:** `migration plan`, `migration verify`, and `migration new` are registered and functional. E2E tests cover the new-project and incremental-change flows from the spec.
 
-**Sequencing note:** `migration plan` is the critical-path command — it exercises M1 (planner) + M2 (I/O, attestation, DAG) end-to-end. Implement it first to validate the system works. `migration verify` and `migration new` are simple wrappers around M2 functions. `db update` is deferred — it requires the apply pipeline which is out of scope.
+**Sequencing note:** `migration plan` is the critical-path command — it exercises M1 (planner) + M2 (I/O, attestation, DAG) end-to-end. Implement it first to validate the system works. `migration verify` and `migration new` are simple wrappers around M2 functions.
 
 **Tasks:**
 
 #### Config
-- [ ] Add `migrations.dir` to `PrismaNextConfig` in `packages/1-framework/1-core/migration/control-plane/src/config-types.ts` (default: `'migrations'`). Type: `readonly migrations?: { readonly dir?: string }`.
-- [ ] Add config validation for the new field in `config-validation.ts` (optional field, string if present).
+- [x] Add `migrations.dir` to `PrismaNextConfig` in `packages/1-framework/1-core/migration/control-plane/src/config-types.ts` (default: `'migrations'`). Type: `readonly migrations?: { readonly dir?: string }`.
+- [x] Add config validation for the new field in `config-validation.ts` (optional field, string if present).
 
 #### CLI: `migration` subcommand group
-- [ ] Create `migration` subcommand group in `cli.ts`, following the pattern of the `db` and `contract` groups: `const migrationCommand = new Command('migration')` with description, then `program.addCommand(migrationCommand)`.
+- [x] Create `migration` subcommand group in `cli.ts`, following the pattern of the `db` and `contract` groups: `const migrationCommand = new Command('migration')` with description, then `program.addCommand(migrationCommand)`.
 
 #### CLI: `migration plan`
-- [ ] Create `src/commands/migration-plan.ts` following the `db-init.ts` pattern:
+- [x] Create `src/commands/migration-plan.ts` following the `db-init.ts` pattern:
   - Options interface: `--config <path>`, `--name <slug>`, `--from <hash>`, `--json [format]`, `-q`, `-v`, `-vv`, `--timestamps`, `--color`, `--no-color`.
   - `executeMigrationPlanCommand` function returning `Result<MigrationPlanResult, CliStructuredError>`.
-  - Logic:
-    1. `loadConfig(options.config)` → resolve `migrations.dir` (default `'migrations'`, relative to config dir).
-    2. Read emitted `contract.json` via `config.contract.output` (same as `db-init.ts`).
-    3. Parse contract JSON. Extract `storage` section and `storageHash` for the "to" side.
-    4. Read existing migrations: `readMigrationsDir(migrationsDir)` → `reconstructGraph(packages)` → `findLeaf(graph)`.
-    5. Determine "from" contract:
-       - If `--from <hash>` provided, use that hash and find the matching migration's `toContract`.
-       - If leaf is `EMPTY_CONTRACT_HASH`, from is `null` (new project).
-       - Otherwise, find the leaf migration's `toContract` and extract its `storage`.
-    6. Call `planContractDiff({ from, to })` from `@prisma-next/family-sql/control`.
-    7. If result is `failure`: map conflicts to `CliStructuredError` via `errorMigrationPlanningFailed`.
-    8. If result is `success` with empty ops: return no-op success (no files written).
-    9. If result is `success` with ops: build `MigrationManifest`, call `writeMigrationPackage`, call `attestMigration`.
-    10. Return success result with operation summary.
-  - Map `MigrationToolsError` to `CliStructuredError` at the boundary (catch + convert using `MigrationToolsError.is()`).
-- [ ] Create `createMigrationPlanCommand()` factory, register under `migration` subcommand group.
-- [ ] Add output formatters:
-  - TTY: styled header, operation list (id, label, operationClass), from/to hashes, directory path.
-  - JSON: `{ ok: true, from, to, edgeId, dir, operations: [...], noOp: boolean }`.
-- [ ] Add `MigrationPlanResult` type to `src/control-api/types.ts` or co-locate with the command.
+  - Logic delegates through the control client's `contractDiff()` method, which dispatches to the target's `planContractDiff` capability (respects layering: CLI → control client → target → family).
+  - `MigrationToolsError` is caught and mapped to `CliStructuredError` at the boundary.
+- [x] Create `createMigrationPlanCommand()` factory, register under `migration` subcommand group.
+- [x] Add output formatters (TTY: styled header + operation tree + hashes; JSON: structured result).
+- [x] `MigrationPlanResult` type co-located with the command.
 
 #### CLI: `migration verify`
-- [ ] Create `src/commands/migration-verify.ts`:
-  - Options: `--dir <path>` (required — path to a migration directory), `--config`, `--json`, `-q`, `-v`.
-  - Calls `verifyMigration(dir)` from `@prisma-next/migration-tools/attestation`.
-  - If draft: `attestMigration(dir)` and report newly attested.
-  - If ok: report verified.
-  - If mismatch: report stored vs computed edgeId.
-- [ ] Register under `migration` subcommand group.
-- [ ] Output formatters (TTY/JSON).
+- [x] Create `src/commands/migration-verify.ts`:
+  - Options: `--dir <path>` (required), `--json`, `-q`, `-v`.
+  - Calls `verifyMigration(dir)` / `attestMigration(dir)`.
+- [x] Register under `migration` subcommand group.
+- [x] Output formatters (TTY/JSON).
 
 #### CLI: `migration new`
-- [ ] Create `src/commands/migration-new.ts`:
+- [x] Create `src/commands/migration-new.ts`:
   - Options: `--name <slug>` (required), `--config`.
-  - Scaffolds an empty Draft migration package: `edgeId: null`, empty ops array, `from`/`to` set to `EMPTY_CONTRACT_HASH`, `kind: 'regular'`, empty `fromContract`/`toContract`.
-  - Calls `formatMigrationDirName(new Date(), name)` and `writeMigrationPackage(...)`.
-- [ ] Register under `migration` subcommand group.
-- [ ] Output formatters.
+  - Scaffolds an empty Draft migration package.
+- [x] Register under `migration` subcommand group.
+- [x] Output formatters.
 
-#### CLI: `db update` (deferred)
-`db update` requires the migration apply pipeline (op resolution to SQL, transaction management, marker update, ledger append). This is out of scope for this project per the spec. Defer to a follow-on project.
-
-The existing `db init` command already handles the "apply changes to a live database from contract" flow. `db update` adds incremental updates on top of that, which requires resolving abstract ops to SQL — work that belongs to `migration apply`.
+#### Architecture: `planContractDiff` via control plane
+- [x] Add optional `planContractDiff` method to `TargetMigrationsCapability` in `migrations.ts` — accepts `ContractIR | null` and `ContractIR`, returns `ContractDiffResult`.
+- [x] Implement in postgres target descriptor — casts `ContractIR.storage` to `SqlStorage` and delegates to `planContractDiff` from `@prisma-next/family-sql/control`.
+- [x] Add `contractDiff()` method to `ControlClient` interface and implementation — delegates to target capability.
+- [x] CLI imports only framework-domain types — no layering violations.
 
 #### Tests
 
-**Unit tests (in `packages/1-framework/3-tooling/cli/test/`):**
-- [ ] `migration-plan`: happy path with mocked config + contract → verifies migration package written to disk with correct manifest.
-- [ ] `migration-plan`: no-op when contracts are identical → no files written, success result.
-- [ ] `migration-plan`: missing contract.json → `CliStructuredError` with file-not-found.
-- [ ] `migration-plan`: `MigrationToolsError` from I/O is mapped to `CliStructuredError` at boundary.
-- [ ] `migration-verify`: verified package → success.
-- [ ] `migration-verify`: tampered package → mismatch error.
-- [ ] `migration-verify`: draft → attests and reports.
-- [ ] `migration-new`: scaffolds draft with correct structure.
+**Unit tests (in `packages/1-framework/3-tooling/cli/test/commands/`):**
+- [x] `migration-plan`: happy path — writes valid migration package with correct manifest.
+- [x] `migration-plan`: no-op when from and to hash match.
+- [x] `migration-plan`: missing contract.json → ENOENT detected.
+- [x] `migration-plan`: incremental DAG chain — two migrations, second's from === first's to.
+- [x] `migration-plan`: `MigrationToolsError` has expected shape for CLI mapping.
+- [x] `migration-verify`: verified package → success.
+- [x] `migration-verify`: tampered package → mismatch error.
+- [x] `migration-verify`: draft → attests and reports.
+- [x] `migration-new`: scaffolds draft with correct structure.
+- [x] `migration-new`: formats directory name correctly.
+- [x] `migration-new`: rejects empty slug.
 
-**End-to-end tests (in `test/e2e/` or `test/integration/`):**
-- [ ] **New project flow**: emit contract → `migration plan` → read migration package from disk → validate manifest fields (from=sha256:empty, to=storageHash, edgeId set, ops match planner output).
-- [ ] **Incremental change flow**: emit contract A → `migration plan` → emit contract B (adds table) → `migration plan` → verify two packages form valid DAG chain (A's `to` === B's `from`).
-- [ ] **No-op flow**: emit contract → `migration plan` → `migration plan` again → second invocation produces no new files.
-- [ ] **`migration new` → `migration verify` flow**: scaffold draft → verify attests it → verify again passes.
-- [ ] **Existing DB adoption flow**: `db init` / `db sign` with contract A → emit changed contract B → `migration plan` → verify migration edge has correct from/to.
+**End-to-end tests (in `packages/1-framework/3-tooling/cli/test/commands/migration-e2e.test.ts`):**
+- [x] **New project flow**: write migration package → attest → verify → read back and validate all manifest fields.
+- [x] **Incremental change flow**: two plans form valid DAG chain (A's `to` === B's `from`), both verify.
+- [x] **No-op flow**: leaf hash matches target hash → no new migration needed.
+- [x] **`migration new` → `migration verify` flow**: scaffold draft → verify detects draft → attest → verify passes.
+- [ ] **Existing DB adoption flow**: `db init` / `db sign` with contract A → emit changed contract B → `migration plan` → verify migration edge has correct from/to. (Requires live DB — deferred to integration test suite.)
 
-### Milestone 4: Close-out
+### Milestone 4: `migration apply` (limited)
+
+Build a minimal `migration apply` command that reads on-disk migration packages and executes the SQL against a live database. Since the planner lowers directly to SQL at plan time (RD-6), no resolver is needed — apply just reads the SQL from `ops.json` and executes it. This is intentionally limited: no dry-run, no rollback, no partial apply, no apply-to-specific-hash. Simple sequential execution of pending migrations.
+
+**Deliverable:** `migration apply` reads pending migrations from disk, executes their SQL, and updates the migration ledger/marker. Integration tests cover plan → apply against a real database.
+
+**Tasks:**
+
+#### CLI: `migration apply`
+- [ ] Create `src/commands/migration-apply.ts`:
+  - Options: `--config <path>`, `--url <connection-string>` (or from config/env), `--json`, `-q`, `-v`.
+  - Read migrations directory, reconstruct DAG, determine pending migrations (not yet applied).
+  - For each pending migration in order: execute SQL from `ops.json` in a transaction, record in ledger.
+- [ ] Register under `migration` subcommand group.
+- [ ] Output formatters (TTY: progress per migration; JSON: structured result).
+
+#### Ledger / marker integration
+- [ ] Determine how to track which migrations have been applied (ledger table, marker update, or both).
+- [ ] Record each applied migration's `edgeId` and `to` contract hash.
+
+#### Tests
+- [ ] Integration: plan → apply against a real Postgres database, verify schema changes applied.
+- [ ] Integration: apply is idempotent — running apply when all migrations are already applied is a no-op.
+- [ ] Integration: apply with multiple pending migrations executes them in DAG order.
+
+### Milestone 5: Close-out
 
 **Tasks:**
 
 - [ ] Walk through every acceptance criterion in the spec and confirm test coverage.
 - [ ] Run `pnpm test:all` and `pnpm lint:deps` — everything passes.
 - [ ] Update CLI README with new commands, usage examples, and workflow documentation.
-- [ ] Write/update ADRs if implementation decisions diverged from existing ADRs (abstract ops IR vocabulary, control plane capability extension).
+- [ ] Write/update ADRs if implementation decisions diverged from existing ADRs (direct SQL lowering, control plane capability extension).
 - [ ] Migrate long-lived docs into `docs/` (ops vocabulary reference, migration file format reference).
 - [ ] Delete `projects/on-disk-migrations/`.
 
@@ -379,7 +389,7 @@ The existing `db init` command already handles the "apply changes to a live data
 
 | Acceptance Criterion | Test Type | Milestone | Notes |
 |---|---|---|---|
-| Planner produces correct additive ops | Unit | M1 | Comprehensive coverage of all additive op types |
+| Planner produces correct additive SQL | Unit | M1 | Comprehensive coverage of all additive op types |
 | Planner output is deterministic | Unit | M1 | Byte-identical on repeated runs |
 | Planner handles empty contract (new project) | Unit | M1 | `from = null` → verify all ops present |
 | Planner handles extension ops (pgvector) | Unit | M1 | enableExtension + createStorageType + column/index ops |
@@ -398,17 +408,20 @@ The existing `db init` command already handles the "apply changes to a live data
 | `migration verify` validates edgeId | Unit | M3 | Pass/fail/attest |
 | Incremental migration chain | E2E | M3 | Two plans form valid DAG |
 | Existing DB adoption flow | E2E | M3 | init/sign → plan → verify |
-| All existing tests pass | E2E | M4 | `pnpm test:all` |
-| `pnpm lint:deps` passes | Lint | M1, M2, M3, M4 | After each new package |
+| `migration apply` executes SQL against live DB | Integration | M4 | plan → apply → verify schema |
+| `migration apply` updates ledger | Integration | M4 | edgeId + contract hash recorded |
+| `migration apply` idempotent | Integration | M4 | Re-run is no-op |
+| All existing tests pass | E2E | M5 | `pnpm test:all` |
+| `pnpm lint:deps` passes | Lint | M1, M2, M3, M4, M5 | After each new package |
 
 ## Open Items
 
-1. ~~**Control plane capability design**~~: **Resolved in M1.** `planContractDiff` is a target-agnostic pure function exported from `@prisma-next/family-sql/control`. No capability dispatch required — CLI calls it directly.
+1. ~~**Control plane capability design**~~: **Resolved in M3.** `planContractDiff` is exposed via `TargetMigrationsCapability` → `ControlClient.contractDiff()`. The Postgres target delegates to the sql family's pure function. CLI calls through the control client — no layering violations.
 
-2. ~~**Abstract ops IR vocabulary details**~~: **Resolved in M1.** All op types defined in `@prisma-next/core-control-plane/abstract-ops` with typed `args` for each.
+2. ~~**Migration operation types**~~: **Resolved in M1, updated post-M3.** The planner lowers directly to target SQL (RD-6). No abstract ops IR or separate resolver needed. `ops.json` contains SQL operations.
 
 3. ~~**Draft vs Attested from `migration plan`**~~: **Resolved.** `migration plan` produces Attested artifacts (computes `edgeId` immediately). `migration verify` serves as re-attestation after manual edits.
 
-4. **Op resolution at apply time**: Not in scope. The abstract ops IR is derived from the existing planner's SQL generation, so the information content is sufficient. The resolver (abstract ops → SQL) is built when `migration apply` is implemented.
+4. ~~**Op resolution at apply time**~~: **Resolved.** No resolver needed — the planner produces SQL directly. `migration apply` reads SQL from `ops.json` and executes it.
 
-5. ~~**`db update` overlap with `db init`**~~: **Deferred.** `db update` requires the apply pipeline (op resolution to SQL) which is out of scope. The existing `db init` covers the "apply from contract" flow.
+5. ~~**`db update` overlap with `db init`**~~: **Deferred.** `db update` is out of scope. The existing `db init` covers the "apply from contract" flow.
