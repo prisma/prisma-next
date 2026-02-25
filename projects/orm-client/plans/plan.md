@@ -26,12 +26,13 @@ Transition the `@prisma-next/sql-orm-client` from "feature-complete prototype" t
 
 ### Active implementation sequence (commit-scoped)
 
-1. **Fix-01:** `upsert({ update: {} })` guardrails
+1. **Fix-01:** `upsert({ update: {} })` guardrails ✅
    - Type-level: make empty `update` invalid in `Collection.upsert()` input type.
    - Runtime: reject empty mapped update payload before compilation.
    - Tests:
      - Runtime/unit: `test/sql-compilation/upsert.test.ts`
      - Type-level: `test/generated-contract-types.test-d.ts`
+   - Validation: package `test`, `lint`, and `typecheck` pass after implementation.
 2. **Fix-02:** nested `connect` strictness
    - Child-owned `connect`: throw when any criterion has no matching row.
    - Parent-owned `connect/create`: enforce single-target cardinality and throw on ambiguous arrays.

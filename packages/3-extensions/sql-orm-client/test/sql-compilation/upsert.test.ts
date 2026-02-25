@@ -50,6 +50,18 @@ describe('sql-compilation/upsert', () => {
     ).rejects.toThrow(/requires contract capability "returning"/);
   });
 
+  it('upsert() rejects empty update payloads at runtime', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+
+    await expect(
+      collection.upsert({
+        create: { id: 1, name: 'Alice', email: 'alice@example.com' },
+        update: {} as { name: string },
+      }),
+    ).rejects.toThrow(/requires at least one update field/);
+    expect(runtime.executions).toHaveLength(0);
+  });
+
   it('upsert() respects select() and include() result shaping', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     runtime.setNextResults([

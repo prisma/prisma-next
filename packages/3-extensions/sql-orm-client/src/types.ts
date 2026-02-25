@@ -778,10 +778,10 @@ type NestedCreateInput<TContract extends SqlContract<SqlStorage>, ModelName exte
     >
   >;
 
-type AtLeastOne<T> = keyof T extends never
+export type AtLeastOne<T> = keyof T extends never
   ? never
   : {
-      [K in keyof T]-?: Pick<T, K> & Partial<Omit<T, K>>;
+      [K in keyof T]-?: Required<Pick<T, K>> & Partial<Omit<T, K>>;
     }[keyof T];
 
 export type MutationCreateInput<

@@ -202,6 +202,11 @@ userCollection.upsert({
 });
 userCollection.upsert({
   create: { id: 'user_001', name: 'Alice', email: 'alice@example.com' },
+  // @ts-expect-error upsert() update payload must include at least one field
+  update: {},
+});
+userCollection.upsert({
+  create: { id: 'user_001', name: 'Alice', email: 'alice@example.com' },
   update: { name: 'Alice Updated' },
   // @ts-expect-error invalid conflict key for upsert()
   conflictOn: { unknown: 'value' },

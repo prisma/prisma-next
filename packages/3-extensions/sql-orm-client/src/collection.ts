@@ -65,6 +65,7 @@ import type {
   AggregateBuilder,
   AggregateResult,
   AggregateSpec,
+  AtLeastOne,
   CollectionContext,
   CollectionState,
   CollectionTypeState,
@@ -653,13 +654,21 @@ export class Collection<
 
   async upsert(input: {
     create: CreateInput<TContract, ModelName>;
-    update: Partial<DefaultModelRow<TContract, ModelName>>;
+    update: AtLeastOne<Partial<DefaultModelRow<TContract, ModelName>>>;
     conflictOn?: UniqueConstraintCriterion<TContract, ModelName>;
   }): Promise<Row> {
     assertReturningCapability(this.ctx.contract, 'upsert()');
 
     const createValues = mapModelDataToStorageRow(this.ctx.contract, this.modelName, input.create);
-    const updateValues = mapModelDataToStorageRow(this.ctx.contract, this.modelName, input.update);
+    const updateValues = mapModelDataToStorageRow(
+      this.ctx.contract,
+      this.modelName,
+      input.update as Record<string, unknown>,
+    );
+    if (Object.keys(updateValues).length === 0) {
+      throw new Error(`upsert() for model "${this.modelName}" requires at least one update field`);
+    }
+
     const conflictColumns = resolveUpsertConflictColumns(
       this.ctx.contract,
       this.modelName,
