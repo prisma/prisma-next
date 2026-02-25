@@ -20,7 +20,7 @@ import { initTestDatabase } from './utils/control-client';
 const executionContext = db.context;
 const { contract } = executionContext;
 
-function createTestDriver(connectionString: string, executionStack: (typeof db)['stack']) {
+async function createTestDriver(connectionString: string, executionStack: (typeof db)['stack']) {
   const driverDescriptor = executionStack.driver;
   if (!driverDescriptor) {
     throw new Error('Driver descriptor missing from execution stack');
@@ -28,17 +28,17 @@ function createTestDriver(connectionString: string, executionStack: (typeof db)[
   const pool = new Pool({ connectionString });
   const driver = driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
   if ('connect' in driver && typeof driver.connect === 'function') {
-    void driver.connect({ kind: 'pgPool', pool });
+    await driver.connect({ kind: 'pgPool', pool });
   }
   return driver;
 }
 
-function getRuntime(connectionString: string): Runtime {
+async function getRuntime(connectionString: string): Promise<Runtime> {
   const executionStack = db.stack;
   return createRuntime({
     stackInstance: instantiateExecutionStack(executionStack),
     context: executionContext,
-    driver: createTestDriver(connectionString, executionStack),
+    driver: await createTestDriver(connectionString, executionStack),
     verify: { mode: 'onFirstUse', requireMarker: false },
     plugins: [
       lints(),
@@ -114,7 +114,7 @@ describe('Kysely parity integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await seedTestData(runtime, { users: ['alice@example.com'] });
@@ -133,7 +133,7 @@ describe('Kysely parity integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await seedTestData(runtime, {
@@ -142,7 +142,7 @@ describe('Kysely parity integration', () => {
           });
           const posts = await getUserPosts('user_001', runtime);
           expect(posts).toHaveLength(1);
-          expect(posts[0]?.title).toBe('First Post');
+          expect(posts[0]!.title).toBe('First Post');
         } finally {
           await runtime.close();
         }
@@ -156,7 +156,7 @@ describe('Kysely parity integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await seedTestData(runtime, {
@@ -177,7 +177,7 @@ describe('Kysely parity integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await seedTestData(runtime, {
@@ -209,7 +209,7 @@ describe('Kysely parity integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await expect(deleteWithoutWhere(runtime)).rejects.toMatchObject({
@@ -229,7 +229,7 @@ describe('Kysely parity integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await expect(updateWithoutWhere(runtime)).rejects.toMatchObject({
@@ -249,7 +249,7 @@ describe('Kysely parity integration', () => {
     async () => {
       await withDevDatabase(async ({ connectionString }: { connectionString: string }) => {
         await initTestDatabase({ connection: connectionString, contractIR: contract });
-        const runtime = getRuntime(connectionString);
+        const runtime = await getRuntime(connectionString);
 
         try {
           await seedTestData(runtime, {

@@ -318,9 +318,15 @@ async function main() {
         console.error('Unexpected: query should have been blocked by LINT.DELETE_WITHOUT_WHERE');
         process.exit(1);
       } catch (error) {
-        const err = error as { code?: string; category?: string };
-        if (err.code === 'LINT.DELETE_WITHOUT_WHERE' && err.category === 'LINT') {
-          console.log('Guardrail correctly blocked execution:', err.code);
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          Object.hasOwn(error, 'code') &&
+          Object.hasOwn(error, 'category') &&
+          Reflect.get(error, 'code') === 'LINT.DELETE_WITHOUT_WHERE' &&
+          Reflect.get(error, 'category') === 'LINT'
+        ) {
+          console.log('Guardrail correctly blocked execution: LINT.DELETE_WITHOUT_WHERE');
         } else {
           throw error;
         }

@@ -8,6 +8,8 @@ export async function getUserPosts(userId: string, runtime: Runtime) {
     .selectFrom('post')
     .select(['id', 'title', 'userId', 'createdAt', 'embedding'])
     .where('userId', '=', userId)
+    .orderBy('createdAt', 'desc')
+    .orderBy('id', 'desc')
     .limit(1000)
     .execute();
 }
