@@ -2,6 +2,7 @@ import { defineConfig } from '@prisma-next/tsdown';
 
 export default defineConfig({
   entry: [
+    'src/exports/abstract-ops.ts',
     'src/exports/config-types.ts',
     'src/exports/config-validation.ts',
     'src/exports/errors.ts',

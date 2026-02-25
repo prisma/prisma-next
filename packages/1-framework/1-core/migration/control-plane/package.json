@@ -37,6 +37,7 @@
     "node": ">=20"
   },
   "exports": {
+    "./abstract-ops": "./dist/abstract-ops.mjs",
     "./config-types": "./dist/config-types.mjs",
     "./config-validation": "./dist/config-validation.mjs",
     "./emission": "./dist/emission.mjs",

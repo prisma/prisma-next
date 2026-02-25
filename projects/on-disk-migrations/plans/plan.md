@@ -34,42 +34,46 @@ The planner lives in `packages/2-sql/3-tooling/family/` (sql domain, tooling lay
 **Tasks:**
 
 #### Abstract ops IR (framework/tooling)
-- [ ] Define the abstract operation IR types. The op vocabulary covers the additive operations the existing planner supports: `createTable`, `addColumn`, `addIndex`, `addUniqueConstraint`, `addPrimaryKey`, `addForeignKey`, `setColumnDefault`, `createStorageType` (for extension types like `vector`), `enableExtension`. Each op has: `op` (discriminant), typed `args` (op-specific), `pre[]` and `post[]` (check vocabulary per ADR 044), `idempotency` class.
-- [ ] Define the `sha256:empty` sentinel constant and export it.
-- [ ] Verify `pnpm lint:deps` passes with the new types.
+- [x] Define the abstract operation IR types. The op vocabulary covers the additive operations the existing planner supports: `createTable`, `addColumn`, `createIndex`, `addUniqueConstraint`, `addPrimaryKey`, `addForeignKey`, `createStorageType` (for extension types like `vector`), `enableExtension`. Each op has: `op` (discriminant), typed `args` (op-specific), `pre[]` and `post[]` (check vocabulary per ADR 044), `operationClass`. Note: `setColumnDefault` is NOT a separate op — defaults are part of `createTable` and `addColumn` column definitions.
+- [x] Define the `sha256:empty` sentinel constant and export it.
+- [x] Verify `pnpm lint:deps` passes with the new types.
 
 #### Contract-to-contract planner (sql/tooling)
-- [ ] Study the existing Postgres planner to understand operation-generation logic for each additive type: createTable, addColumn, addIndex, addUniqueConstraint, addPrimaryKey, addForeignKey, setColumnDefault, storage types, database dependencies (extension enablement).
-- [ ] Design the planner function signature: `planContractDiff(from: ContractIR | null, to: ContractIR, options?) → PlanResult<AbstractOp[]>`. `null` for `from` means empty contract (new project).
-- [ ] Implement table-level diffing: tables in `to` but not in `from` → `createTable`. Tables in both → diff columns/constraints.
-- [ ] Implement column-level diffing within existing tables: new columns → `addColumn`.
-- [ ] Implement constraint diffing: primary keys, unique constraints, indexes, foreign keys. Use semantic satisfaction matching (not just name equality), following the existing planner's pattern.
-- [ ] Implement storage type diffing: new types → `createStorageType`.
-- [ ] Implement extension/database dependency diffing: emit `enableExtension` ops where needed.
-- [ ] Implement deterministic operation ordering: database deps → storage types → tables → columns → primary keys → unique constraints → indexes → foreign keys → defaults.
-- [ ] Implement conflict detection for non-additive changes: type change, nullability tightening, column removal → error. Additive-only policy for MVP.
-- [ ] Implement pre/post check generation per ADR 044.
+- [x] Study the existing Postgres planner to understand operation-generation logic for each additive type: createTable, addColumn, createIndex, addUniqueConstraint, addPrimaryKey, addForeignKey, storage types, database dependencies (extension enablement).
+- [x] Design the planner function signature: `planContractDiff({ from: SqlStorage | null, to: SqlStorage }) → ContractDiffResult`. `null` for `from` means empty contract (new project). Operates on `SqlStorage` directly (not full `ContractIR`) since that's the only section relevant to diffing.
+- [x] Implement table-level diffing: tables in `to` but not in `from` → `createTable`. Tables in both → diff columns/constraints.
+- [x] Implement column-level diffing within existing tables: new columns → `addColumn`.
+- [x] Implement constraint diffing: primary keys, unique constraints, indexes, foreign keys. Use semantic satisfaction matching (not just name equality), following the existing planner's pattern.
+- [x] Implement storage type diffing: new types → `createStorageType`.
+- [x] Implement extension/database dependency diffing: emit `enableExtension` ops where needed (codec→extension mapping for known cases like pgvector).
+- [x] Implement deterministic operation ordering: database deps → storage types → tables → columns → primary keys → unique constraints → indexes → foreign keys.
+- [x] Implement conflict detection for non-additive changes: type change, nullability tightening, column removal, table removal, PK change → error. Additive-only policy for MVP.
+- [x] Implement pre/post check generation per ADR 044.
 
 #### Control plane wiring
-- [ ] Extend `TargetMigrationsCapability` (or add sibling) in `packages/1-framework/1-core/migration/control-plane/` to expose contract-to-contract planning. Add a `contractPlanner` that accepts two contracts and returns abstract ops.
-- [ ] Implement the capability in the SQL family by wrapping the planner.
-- [ ] Wire through the Postgres target descriptor.
-- [ ] Add a control plane operation (`planMigrationFromContracts`) that the CLI can call.
+- [x] ~~Extend `TargetMigrationsCapability`~~ — Not needed. `planContractDiff` is a target-agnostic pure function over `SqlStorage`, exported from `@prisma-next/family-sql/control`. No capability dispatch required. The CLI command in M3 will call it directly, similar to how `executeDbInit` calls the introspection planner.
 
 #### Tests
-- [ ] Test: empty contract → single table with columns, PK, and a unique constraint → verify correct `createTable` op with all fields.
-- [ ] Test: empty contract → multiple tables with foreign key relationships → verify `createTable` ops + `addForeignKey` ops in correct order.
-- [ ] Test: empty contract → table with indexes → verify `addIndex` ops.
-- [ ] Test: empty contract → table with column defaults (literal and function) → verify `setColumnDefault` ops.
-- [ ] Test: single table → add new table (incremental) → verify only the new table appears as ops.
-- [ ] Test: existing table → add new columns → verify `addColumn` ops only for new columns.
-- [ ] Test: existing table → add new constraints (unique, index, FK) → verify correct constraint ops.
-- [ ] Test: extension-aware: pgvector column + index creation → verify `enableExtension` + `createStorageType` + column/index ops.
-- [ ] Test: determinism — run planner twice with identical inputs, verify byte-identical ops output.
-- [ ] Test: conflict rejection — type change between contracts → error, no ops produced.
-- [ ] Test: conflict rejection — column removal → error.
-- [ ] Test: no-op — identical contracts → empty ops list.
-- [ ] Test: control plane integration — load stack, call `planMigrationFromContracts`, verify ops returned correctly.
+- [x] Test: empty contract → single table with columns, PK, and a unique constraint → verify correct `createTable` op with all fields.
+- [x] Test: empty contract → multiple tables with foreign key relationships → verify `createTable` ops + `addForeignKey` ops in correct order.
+- [x] Test: empty contract → table with indexes → verify `createIndex` ops.
+- [x] Test: empty contract → table with column defaults (literal and function) → defaults are in column definitions within `createTable`.
+- [x] Test: single table → add new table (incremental) → verify only the new table appears as ops.
+- [x] Test: existing table → add new columns → verify `addColumn` ops only for new columns.
+- [x] Test: existing table → add new constraints (unique, index, FK) → verify correct constraint ops.
+- [x] Test: extension-aware: pgvector column + type creation → verify `enableExtension` + `createStorageType` + correct ordering.
+- [x] Test: determinism — run planner twice with identical inputs, verify byte-identical ops output.
+- [x] Test: conflict rejection — type change between contracts → error, no ops produced.
+- [x] Test: conflict rejection — column removal → error.
+- [x] Test: no-op — identical contracts → empty ops list.
+- [x] Test: pre/post checks — verify ADR 044 structured checks on all op types.
+- [x] Test: nullability tightening → conflict; nullability widening → not a conflict.
+- [x] Test: table removal → conflict.
+- [x] Test: addColumn NOT NULL without default → tableIsEmpty pre-check.
+- [x] Test: addColumn NOT NULL with default → no tableIsEmpty check.
+- [x] Test: addPrimaryKey for existing table without PK.
+- [x] Test: default constraint name generation (unique, index, FK).
+- [ ] ~~Test: control plane integration — load stack, call `planMigrationFromContracts`~~ — Deferred to M3 (CLI command integration).
 
 ### Milestone 2: On-disk persistence + DAG
 
