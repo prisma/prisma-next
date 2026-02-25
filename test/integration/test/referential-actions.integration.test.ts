@@ -367,7 +367,7 @@ describe('referential actions integration', () => {
                   ['userId'],
                   { table: 'user', columns: ['id'] },
                   {
-                    onDelete: 'setNull',
+                    onDelete: 'cascade',
                     onUpdate: 'restrict',
                   },
                 )
