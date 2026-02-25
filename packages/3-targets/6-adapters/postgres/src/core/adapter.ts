@@ -214,6 +214,15 @@ function renderNullCheck(expr: NullCheckExpr, contract?: PostgresContract): stri
 }
 
 function renderBinary(expr: BinaryExpr, contract?: PostgresContract): string {
+  if (expr.right.kind === 'listLiteral' && expr.right.values.length === 0) {
+    if (expr.op === 'in') {
+      return 'FALSE';
+    }
+    if (expr.op === 'notIn') {
+      return 'TRUE';
+    }
+  }
+
   const leftExpr = expr.left as ColumnRef | OperationExpr;
   const left = renderExpr(leftExpr, contract);
   const leftRendered = isOperationExpr(leftExpr) ? `(${left})` : left;

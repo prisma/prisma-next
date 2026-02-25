@@ -955,6 +955,50 @@ describe('createPostgresAdapter', () => {
         expect(lowered.body.sql).toContain('NOT IN');
         expect(lowered.body.sql).toContain('0');
       });
+
+      it('lowers SELECT with in operator and empty list to FALSE', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'bin',
+            op: 'in',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: {
+              kind: 'listLiteral',
+              values: [],
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [] });
+        expect(lowered.body.sql).toContain('WHERE FALSE');
+      });
+
+      it('lowers SELECT with notIn operator and empty list to TRUE', () => {
+        const adapter = createPostgresAdapter();
+
+        const ast: SelectAst = {
+          kind: 'select',
+          from: { kind: 'table', name: 'user' },
+          project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
+          where: {
+            kind: 'bin',
+            op: 'notIn',
+            left: { kind: 'col', table: 'user', column: 'id' },
+            right: {
+              kind: 'listLiteral',
+              values: [],
+            },
+          },
+        };
+
+        const lowered = adapter.lower(ast, { contract, params: [] });
+        expect(lowered.body.sql).toContain('WHERE TRUE');
+      });
     });
 
     describe('operation expressions', () => {
