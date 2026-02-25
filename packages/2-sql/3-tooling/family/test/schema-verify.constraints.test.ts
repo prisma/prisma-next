@@ -214,7 +214,7 @@ describe('verifySqlSchema - constraints', () => {
                 columns: ['author_id'],
                 references: { table: 'user', columns: ['id'] },
                 constraint: false,
-                index: true,
+                index: false,
               },
             ],
           },
