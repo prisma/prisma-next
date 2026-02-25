@@ -122,6 +122,8 @@ This project defines the scope and acceptance criteria for a docs overhaul that:
 - [ ] `wip/prune-docs/problematic-removals.md` exists locally and is kept up to date as removals/rewrites happen.
 - [ ] The sensitive content checklist is applied to docs that are kept or rewritten, and any violations found are either fixed or captured in `wip/prune-docs/problematic-removals.md`.
 
+**Reviewer note:** the `wip/` evidence log is intentionally **local-only** and must not be committed. In PR review, verify this criteria by checking (a) `.gitignore` includes `/wip` and (b) the PR contains no `wip/` files.
+
 # Other Considerations
 
 ## Security

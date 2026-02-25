@@ -7,5 +7,5 @@
   - `pnpm test:packages`
 - Run the demo:
   - `cd examples/prisma-next-demo`
-  - follow `examples/prisma-next-demo/README.md`
+  - follow [`examples/prisma-next-demo/README.md`](../../examples/prisma-next-demo/README.md)
 

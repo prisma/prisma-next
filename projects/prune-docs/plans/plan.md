@@ -67,7 +67,7 @@ Ensure there are stable entry points into the remaining docs, all links are vali
 - Update `AGENTS.md` so “Start Here” links only point to the retained public-safe docs set.
 - Add a canonical docs index (e.g. `docs/README.md`) and link it from the appropriate entry points (`README.md` and/or `AGENTS.md`).
 - Fix broken internal links caused by doc removals/renames across:
-  - `docs/`**
+  - `docs/**`
   - root docs
   - relevant package `README.md` files
 - Final verification pass:

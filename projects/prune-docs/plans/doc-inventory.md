@@ -20,5 +20,5 @@ This is the working inventory for docs pruning. It’s intentionally biased towa
 | `docs/architecture docs/adrs/ADR 158 - Execution mutation defaults.md` | Rewrite | Remove competitor references; keep decision + rationale | Search and rewire any references |
 | `docs/Architecture Overview.md` | Keep | Canonical high-level architecture overview | Ensure it doesn’t link to removed docs |
 | `docs/Testing Guide.md` | Keep | Public-safe engineering guidance | Ensure it doesn’t link to removed docs |
-| `docs/onboarding/Getting-Started.md` | Keep / Rewrite if needed | Ensure it doesn’t reference removed MVP/plan docs | Fix links if needed |
+| `docs/onboarding/Getting-Started.md` | Keep | Ensure it doesn’t reference removed MVP/plan docs | Fix links if needed |
 
