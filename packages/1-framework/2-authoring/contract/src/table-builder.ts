@@ -6,20 +6,18 @@ import type {
   ForeignKeyDef,
   ForeignKeyOptions,
   IndexDef,
-  NullableColumnCannotHaveDefault,
   TableBuilderState,
   UniqueConstraintDef,
 } from './builder-state';
 
 /**
  * Column options for nullable columns.
- * Nullable columns cannot have a default value.
  */
 interface NullableColumnOptions<Descriptor extends ColumnTypeDescriptor> {
   type: Descriptor;
   nullable: true;
   typeParams?: Record<string, unknown>;
-  default?: NullableColumnCannotHaveDefault;
+  default?: ColumnDefault;
 }
 
 /**
@@ -45,13 +43,7 @@ type GeneratedColumnOptions<Descriptor extends ColumnTypeDescriptor> = Omit<
   generated: ExecutionMutationDefaultValue;
 };
 
-/**
- * Column options that enforce nullable/default mutual exclusivity.
- *
- * Invariant: A column with a default value is always NOT NULL.
- * - If `nullable: true`, the `default` property is forbidden
- * - If `nullable` is `false` or omitted, the `default` property is allowed
- */
+/** Column options for any column nullability. */
 type ColumnOptions<Descriptor extends ColumnTypeDescriptor> =
   | NullableColumnOptions<Descriptor>
   | NonNullableColumnOptions<Descriptor>;
@@ -128,10 +120,7 @@ export class TableBuilder<
     return this._state.primaryKey;
   }
 
-  /**
-   * Add a nullable column to the table.
-   * Nullable columns cannot have a default value.
-   */
+  /** Add a nullable column to the table. */
   column<ColName extends string, Descriptor extends ColumnTypeDescriptor>(
     name: ColName,
     options: NullableColumnOptions<Descriptor>,
@@ -201,9 +190,6 @@ export class TableBuilder<
     const { codecId, nativeType, typeParams: descriptorTypeParams, typeRef } = options.type;
     const typeParams = options.typeParams ?? descriptorTypeParams;
 
-    // The type safety is enforced at the call site via overloads:
-    // - NullableColumnOptions forbids `default` when `nullable: true`
-    // - NonNullableColumnOptions allows `default` when `nullable` is false/omitted
     const columnState = {
       name,
       nullable,

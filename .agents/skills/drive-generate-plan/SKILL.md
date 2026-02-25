@@ -14,7 +14,7 @@ Transform a spec into an execution plan by structuring milestones, decomposing t
 
 ## File Naming
 
-- **Project plan (from `projects/{project}/spec.md`)**: `projects/{project}/plans/plan.md`
+- **Project plan (from `projects/{project}/spec.md`)**: `projects/{project}/plan.md`
 - **Task/feature plan (from `projects/{project}/specs/{name}.spec.md`)**: `projects/{project}/plans/{name}.plan.md`
 - The plan name `{name}` matches the spec name (e.g. `pdf-export.spec.md` → `pdf-export.plan.md`).
 

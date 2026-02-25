@@ -3,7 +3,9 @@ import {
   bitColumn,
   boolColumn,
   charColumn,
+  float8Column,
   int4Column,
+  int8Column,
   intervalColumn,
   json,
   jsonb,
@@ -114,9 +116,49 @@ export const contract = defineContract<CodecTypes>()
     t
       .generated('id', uuidv7())
       .column('name', { type: textColumn, nullable: false })
+      .column('scheduled_at', {
+        type: timestamptzColumn,
+        default: { kind: 'literal', value: new Date('2024-01-15T10:30:00.000Z') },
+      })
       .column('created_at', {
         type: timestamptzColumn,
         default: { kind: 'function', expression: 'now()' },
+      })
+      .primaryKey(['id']),
+  )
+  .table('literal_defaults', (t) =>
+    t
+      .column('id', {
+        type: int4Column,
+        default: { kind: 'function', expression: 'autoincrement()' },
+      })
+      .column('label', {
+        type: textColumn,
+        default: { kind: 'literal', value: 'draft' },
+      })
+      .column('score', {
+        type: int4Column,
+        default: { kind: 'literal', value: 0 },
+      })
+      .column('rating', {
+        type: float8Column,
+        default: { kind: 'literal', value: 3.14 },
+      })
+      .column('active', {
+        type: boolColumn,
+        default: { kind: 'literal', value: true },
+      })
+      .column('big_count', {
+        type: int8Column,
+        default: { kind: 'literal', value: 9007199254740993n },
+      })
+      .column('metadata', {
+        type: jsonb(),
+        default: { kind: 'literal', value: { key: 'default' } },
+      })
+      .column('tags', {
+        type: jsonb(),
+        default: { kind: 'literal', value: ['alpha', 'beta'] },
       })
       .primaryKey(['id']),
   )
@@ -146,7 +188,22 @@ export const contract = defineContract<CodecTypes>()
       .field('updatedAt', 'update_at'),
   )
   .model('Event', 'event', (m) =>
-    m.field('id', 'id').field('name', 'name').field('createdAt', 'created_at'),
+    m
+      .field('id', 'id')
+      .field('name', 'name')
+      .field('scheduledAt', 'scheduled_at')
+      .field('createdAt', 'created_at'),
+  )
+  .model('LiteralDefaults', 'literal_defaults', (m) =>
+    m
+      .field('id', 'id')
+      .field('label', 'label')
+      .field('score', 'score')
+      .field('rating', 'rating')
+      .field('active', 'active')
+      .field('bigCount', 'big_count')
+      .field('metadata', 'metadata')
+      .field('tags', 'tags'),
   )
   .capabilities({
     postgres: {

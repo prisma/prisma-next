@@ -48,6 +48,11 @@ describe('adapter-postgres codecs', () => {
       const date = new Date('2024-01-15T10:30:00Z');
       expect(timestampCodec.decode(date)).toBe('2024-01-15T10:30:00.000Z');
     });
+
+    it('decodes string to string', () => {
+      const result = timestampCodec.decode('2024-01-15T10:30:00.000Z');
+      expect(result).toBe('2024-01-15T10:30:00.000Z');
+    });
   });
 
   describe('json codec', () => {
@@ -259,7 +264,7 @@ describe('adapter-postgres codecs', () => {
   describe('interval codec', () => {
     const intervalCodec = codecDefinitions.interval.codec as {
       encode: (value: string) => string;
-      decode: (wire: string) => string;
+      decode: (wire: string | Record<string, unknown>) => string;
     };
 
     it('encodes string as-is', () => {
@@ -272,6 +277,11 @@ describe('adapter-postgres codecs', () => {
       const value = '2 hours';
       const decoded = intervalCodec.decode(value);
       expect(decoded).toBe(value);
+    });
+
+    it('serializes object wire values to JSON strings', () => {
+      const decoded = intervalCodec.decode({ hours: 2, minutes: 30 });
+      expect(decoded).toBe('{"hours":2,"minutes":30}');
     });
   });
 

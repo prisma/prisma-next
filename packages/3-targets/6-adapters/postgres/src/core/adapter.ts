@@ -22,6 +22,7 @@ import { createCodecRegistry, isOperationExpr } from '@prisma-next/sql-relationa
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
 import { codecDefinitions } from './codecs';
+import { escapeLiteral } from './sql-utils';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
 const VECTOR_CODEC_ID = 'pg/vector@1' as const;
@@ -285,7 +286,7 @@ function renderParam(
 
 function renderLiteral(expr: LiteralExpr): string {
   if (typeof expr.value === 'string') {
-    return `'${expr.value.replace(/'/g, "''")}'`;
+    return `'${escapeLiteral(expr.value)}'`;
   }
   if (typeof expr.value === 'number' || typeof expr.value === 'boolean') {
     return String(expr.value);
@@ -465,7 +466,10 @@ function renderInsert(ast: InsertAst, contract: PostgresContract): string {
     throw new Error(`Unsupported value kind in INSERT: ${(val as { kind: string }).kind}`);
   });
 
-  const insertClause = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')})`;
+  const insertClause =
+    columns.length === 0
+      ? `INSERT INTO ${table} DEFAULT VALUES`
+      : `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')})`;
   const returningClause = ast.returning?.length
     ? ` RETURNING ${ast.returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`
     : '';
