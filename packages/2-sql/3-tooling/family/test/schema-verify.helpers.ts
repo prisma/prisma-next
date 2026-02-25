@@ -3,7 +3,12 @@
  */
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
-import type { SqlContract, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  applyFkDefaults,
+  type SqlContract,
+  type SqlStorage,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migrations/types';
@@ -82,8 +87,7 @@ export function createContractTable(
     ),
     foreignKeys: (options?.foreignKeys ?? []).map((fk) => ({
       ...fk,
-      constraint: fk.constraint ?? true,
-      index: fk.index ?? true,
+      ...applyFkDefaults(fk),
     })),
     uniques: options?.uniques ?? [],
     indexes: options?.indexes ?? [],

@@ -85,7 +85,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(operationIds).toContain('index.post.post_userId_idx');
   });
 
-  it('emits FK constraints but omits FK indexes when constraint=true, index=false', () => {
+  it('emits FK constraint and user-declared index when constraint=true, index=false (user-declared index survives)', () => {
     const contract = createFkTestContract({ constraint: true, index: false });
     const result = planner.plan({
       contract,
@@ -99,7 +99,8 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
 
     const operationIds = result.plan.operations.map((op) => op.id);
     expect(operationIds).toContain('foreignKey.post.post_userId_fkey');
-    expect(operationIds).not.toContain('index.post.post_userId_idx');
+    // User-declared index is always emitted regardless of FK index flag
+    expect(operationIds).toContain('index.post.post_userId_idx');
   });
 
   it('omits FK constraints but emits FK indexes when constraint=false, index=true', () => {
@@ -119,7 +120,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(operationIds).toContain('index.post.post_userId_idx');
   });
 
-  it('omits both FK constraints and FK indexes when constraint=false, index=false', () => {
+  it('omits FK constraints but user-declared index survives when constraint=false, index=false', () => {
     const contract = createFkTestContract({ constraint: false, index: false });
     const result = planner.plan({
       contract,
@@ -133,6 +134,51 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
 
     const operationIds = result.plan.operations.map((op) => op.id);
     expect(operationIds).not.toContain('foreignKey.post.post_userId_fkey');
+    // User-declared index is always emitted regardless of FK index flag
+    expect(operationIds).toContain('index.post.post_userId_idx');
+  });
+
+  it('auto-creates FK-backing index when index=true and no user-declared index exists', () => {
+    const contract = createFkTestContract({ constraint: true, index: true });
+    // Remove the user-declared index to test auto-generation
+    const postTable = contract.storage.tables['post']!;
+    (postTable as { indexes: unknown[] }).indexes = [];
+
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [],
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') throw new Error('Expected success');
+
+    const operationIds = result.plan.operations.map((op) => op.id);
+    expect(operationIds).toContain('foreignKey.post.post_userId_fkey');
+    // FK-backing index auto-created since no user-declared index covers it
+    expect(operationIds).toContain('index.post.post_userId_idx');
+  });
+
+  it('does not auto-create FK-backing index when index=false and no user-declared index exists', () => {
+    const contract = createFkTestContract({ constraint: true, index: false });
+    // Remove the user-declared index
+    const postTable = contract.storage.tables['post']!;
+    (postTable as { indexes: unknown[] }).indexes = [];
+
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents: [],
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') throw new Error('Expected success');
+
+    const operationIds = result.plan.operations.map((op) => op.id);
+    expect(operationIds).toContain('foreignKey.post.post_userId_fkey');
+    // No index: no user-declared and FK index=false
     expect(operationIds).not.toContain('index.post.post_userId_idx');
   });
 });

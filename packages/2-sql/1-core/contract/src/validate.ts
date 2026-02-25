@@ -232,7 +232,7 @@ function validateContractLogic(contract: SqlContract<SqlStorage>): void {
   }
 }
 
-function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
+export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
   if (typeof contract !== 'object' || contract === null) {
     return contract as SqlContract<SqlStorage>;
   }
@@ -264,7 +264,10 @@ function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
           const rawForeignKeys = (tableObj['foreignKeys'] ?? []) as Array<Record<string, unknown>>;
           const normalizedForeignKeys = rawForeignKeys.map((fk) => ({
             ...fk,
-            ...applyFkDefaults(fk as { constraint?: boolean; index?: boolean }),
+            ...applyFkDefaults({
+              constraint: typeof fk['constraint'] === 'boolean' ? fk['constraint'] : undefined,
+              index: typeof fk['index'] === 'boolean' ? fk['index'] : undefined,
+            }),
           }));
 
           normalizedTables[tableName] = {

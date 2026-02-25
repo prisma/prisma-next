@@ -1,19 +1,18 @@
-import {
-  applyFkDefaults,
-  type ForeignKey,
-  type ForeignKeyReferences,
-  type Index,
-  type ModelDefinition,
-  type ModelField,
-  type ModelStorage,
-  type PrimaryKey,
-  type SqlContract,
-  type SqlMappings,
-  type SqlStorage,
-  type StorageColumn,
-  type StorageTable,
-  type StorageTypeInstance,
-  type UniqueConstraint,
+import type {
+  ForeignKey,
+  ForeignKeyReferences,
+  Index,
+  ModelDefinition,
+  ModelField,
+  ModelStorage,
+  PrimaryKey,
+  SqlContract,
+  SqlMappings,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+  StorageTypeInstance,
+  UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import { ColumnDefaultSchema } from '@prisma-next/sql-contract/validators';
 import { type } from 'arktype';
@@ -477,89 +476,8 @@ function validateContractLogic(structurallyValidatedContract: SqlContract<SqlSto
   }
 }
 
-export function normalizeContract(contract: unknown): SqlContract<SqlStorage> {
-  const contractObj = contract as Record<string, unknown>;
-
-  // Only normalize if storage exists (validation will catch if it's missing)
-  let normalizedStorage = contractObj['storage'];
-  if (normalizedStorage && typeof normalizedStorage === 'object' && normalizedStorage !== null) {
-    const storage = normalizedStorage as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown> | undefined;
-
-    if (tables) {
-      // Normalize storage tables
-      const normalizedTables: Record<string, unknown> = {};
-      for (const [tableName, table] of Object.entries(tables)) {
-        const tableObj = table as Record<string, unknown>;
-        const columns = tableObj['columns'] as Record<string, unknown> | undefined;
-
-        if (columns) {
-          // Normalize columns: add nullable: false if missing
-          const normalizedColumns: Record<string, unknown> = {};
-          for (const [columnName, column] of Object.entries(columns)) {
-            const columnObj = column as Record<string, unknown>;
-            const normalizedColumn: Record<string, unknown> = {
-              ...columnObj,
-              nullable: columnObj['nullable'] ?? false,
-            };
-
-            normalizedColumns[columnName] = normalizedColumn;
-          }
-
-          // Normalize foreign keys: add constraint/index defaults if missing
-          const rawForeignKeys = (tableObj['foreignKeys'] ?? []) as Array<Record<string, unknown>>;
-          const normalizedForeignKeys = rawForeignKeys.map((fk) => ({
-            ...fk,
-            ...applyFkDefaults(fk as { constraint?: boolean; index?: boolean }),
-          }));
-
-          // Normalize table arrays: add empty arrays if missing
-          normalizedTables[tableName] = {
-            ...tableObj,
-            columns: normalizedColumns,
-            uniques: tableObj['uniques'] ?? [],
-            indexes: tableObj['indexes'] ?? [],
-            foreignKeys: normalizedForeignKeys,
-          };
-        } else {
-          normalizedTables[tableName] = tableObj;
-        }
-      }
-
-      normalizedStorage = {
-        ...storage,
-        tables: normalizedTables,
-      };
-    }
-  }
-
-  // Only normalize if models exists (validation will catch if it's missing)
-  let normalizedModels = contractObj['models'];
-  if (normalizedModels && typeof normalizedModels === 'object' && normalizedModels !== null) {
-    const models = normalizedModels as Record<string, unknown>;
-    const normalizedModelsObj: Record<string, unknown> = {};
-    for (const [modelName, model] of Object.entries(models)) {
-      const modelObj = model as Record<string, unknown>;
-      normalizedModelsObj[modelName] = {
-        ...modelObj,
-        relations: modelObj['relations'] ?? {},
-      };
-    }
-    normalizedModels = normalizedModelsObj;
-  }
-
-  // Normalize top-level fields: add empty objects if missing
-  return {
-    ...contractObj,
-    models: normalizedModels,
-    relations: contractObj['relations'] ?? {},
-    storage: normalizedStorage,
-    extensionPacks: contractObj['extensionPacks'] ?? {},
-    capabilities: contractObj['capabilities'] ?? {},
-    meta: contractObj['meta'] ?? {},
-    sources: contractObj['sources'] ?? {},
-  } as SqlContract<SqlStorage>;
-}
+import { normalizeContract } from '@prisma-next/sql-contract/validate';
+export { normalizeContract };
 
 /**
  * Validates that a JSON import conforms to the SqlContract structure

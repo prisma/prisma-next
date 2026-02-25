@@ -443,19 +443,10 @@ function verifyTableChildren(options: {
   );
   tableChildren.push(...uniqueStatuses);
 
-  // Filter out FK-backing indexes for FKs with index: false
-  const disabledFkIndexColumns = new Set(
-    contractTable.foreignKeys.filter((fk) => fk.index === false).map((fk) => fk.columns.join(',')),
-  );
-  let indexesToVerify = contractTable.indexes;
-  if (disabledFkIndexColumns.size > 0) {
-    indexesToVerify = contractTable.indexes.filter(
-      (index) => !disabledFkIndexColumns.has(index.columns.join(',')),
-    );
-  }
-
+  // Verify all declared indexes unconditionally.
+  // FK `index` flag controls FK-backing index generation, not user-declared indexes.
   const indexStatuses = verifyIndexes(
-    indexesToVerify,
+    contractTable.indexes,
     schemaTable.indexes,
     schemaTable.uniques,
     tableName,
