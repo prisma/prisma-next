@@ -13,7 +13,7 @@ This is the expected maker workflow:
 
 1. Run `drive-create-project` to scaffold `projects/<project>/`.
 2. Run `drive-create-spec` to produce the **project spec** at `projects/<project>/spec.md`.
-3. Run `drive-generate-plan` to produce the **project plan** at `projects/<project>/plans/plan.md` (and task plans under `projects/<project>/plans/`).
+3. Run `drive-generate-plan` to produce the **project plan** at `projects/<project>/plan.md` (and task plans under `projects/<project>/plans/`).
 
 The agent should guide a short, targeted conversation to resolve ambiguity and document decisions in the spec/plan format, and keep Linear in sync.
 
@@ -38,7 +38,7 @@ The lifecycle for a project is:
 
 As you implement, keep project documentation up to date:
 
-- If you change the approach, sequencing, or discover new constraints, update `projects/<project>/plans/plan.md` (and any supporting docs in `projects/<project>/**`).
+- If you change the approach, sequencing, or discover new constraints, update `projects/<project>/plan.md` (and any supporting docs in `projects/<project>/**`).
 - You may regenerate the plan as you learn new things (rerun `drive-generate-plan`). Any time the plan changes, update the plan doc and supporting docs.
 - If you need to change the **project spec** (`projects/<project>/spec.md`), treat it as a major assumption change:
   - Stop and inform the user you’ve hit a constraint that requires their permission to update the spec
@@ -55,7 +55,7 @@ Keep Linear up to date throughout execution:
 - Project home: `projects/<project>/`
 - Canonical project spec: `projects/<project>/spec.md`
 - Task/feature specs: `projects/<project>/specs/<task>.spec.md`
-- Project plan: `projects/<project>/plans/plan.md`
+- Project plan: `projects/<project>/plan.md`
 - Task/feature plans: `projects/<project>/plans/<task>.plan.md`
 - Project-specific reference material/assets: `projects/<project>/**`
 
