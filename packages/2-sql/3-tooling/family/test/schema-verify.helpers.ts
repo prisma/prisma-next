@@ -3,11 +3,12 @@
  */
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ColumnDefault } from '@prisma-next/contract/types';
-import type {
-  ReferentialAction,
-  SqlContract,
-  SqlStorage,
-  StorageTable,
+import {
+  applyFkDefaults,
+  type ReferentialAction,
+  type SqlContract,
+  type SqlStorage,
+  type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type {
   SqlReferentialAction,
@@ -43,7 +44,9 @@ export function createTestContract(
       operationTypes: {},
     },
     extensionPacks,
-    foreignKeys: { constraints: true, indexes: true },
+    capabilities: {},
+    meta: {},
+    sources: {},
   } as SqlContract<SqlStorage>;
 }
 
@@ -73,6 +76,8 @@ export function createContractTable(
       name?: string;
       onDelete?: ReferentialAction;
       onUpdate?: ReferentialAction;
+      constraint?: boolean;
+      index?: boolean;
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
     indexes?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
@@ -90,7 +95,10 @@ export function createContractTable(
         },
       ]),
     ),
-    foreignKeys: options?.foreignKeys ?? [],
+    foreignKeys: (options?.foreignKeys ?? []).map((fk) => ({
+      ...fk,
+      ...applyFkDefaults(fk),
+    })),
     uniques: options?.uniques ?? [],
     indexes: options?.indexes ?? [],
   };

@@ -78,7 +78,7 @@ describe('TableBuilder', () => {
     const table = builder
       .column('userId', { type: intColumn })
       .foreignKey(['userId'], { table: 'user', columns: ['id'] })
-      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey')
+      .foreignKey(['userId'], { table: 'user', columns: ['id'] }, { name: 'post_userId_fkey' })
       .build();
 
     expect(table.foreignKeys).toHaveLength(2);

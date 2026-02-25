@@ -66,7 +66,7 @@ All AST construction flows through factories from `@prisma-next/sql-relational-c
 ## Related Packages
 
 - `@prisma-next/sql-relational-core` - Provides schema and column builders, AST factories used by this package
-- `@prisma-next/sql-orm-lane` - ORM builder that compiles to this package's DSL primitives
+- `@prisma-next/sql-orm-client` - Higher-level ORM client extension for model-centric queries
 - `@prisma-next/sql-contract` - Defines SQL contract types (via `@prisma-next/sql-contract/types`)
 
 ## Related Subsystems

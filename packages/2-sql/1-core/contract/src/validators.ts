@@ -2,7 +2,6 @@ import { type } from 'arktype';
 import type {
   ForeignKey,
   ForeignKeyReferences,
-  ForeignKeysConfig,
   Index,
   ModelDefinition,
   ModelField,
@@ -106,6 +105,8 @@ export const ForeignKeySchema = type.declare<ForeignKey>().type({
   'name?': 'string',
   'onDelete?': ReferentialActionSchema,
   'onUpdate?': ReferentialActionSchema,
+  constraint: 'boolean',
+  index: 'boolean',
 });
 
 const StorageTableSchema = type.declare<StorageTable>().type({
@@ -135,11 +136,6 @@ const ModelSchema = type.declare<ModelDefinition>().type({
   relations: type({ '[string]': 'unknown' }),
 });
 
-export const ForeignKeysConfigSchema = type.declare<ForeignKeysConfig>().type({
-  constraints: 'boolean',
-  indexes: 'boolean',
-});
-
 const SqlContractSchema = type({
   'schemaVersion?': "'1'",
   target: 'string',
@@ -154,7 +150,6 @@ const SqlContractSchema = type({
   models: type({ '[string]': ModelSchema }),
   storage: StorageSchema,
   'execution?': ExecutionSchema,
-  'foreignKeys?': ForeignKeysConfigSchema,
 });
 
 /**

@@ -17,6 +17,8 @@ function createRefActionContract(
   const fk: ForeignKey = {
     columns: ['userId'],
     references: { table: 'user', columns: ['id'] },
+    constraint: true,
+    index: true,
     ...(onDelete !== undefined && { onDelete }),
     ...(onUpdate !== undefined && { onUpdate }),
   };
@@ -57,7 +59,6 @@ function createRefActionContract(
     extensionPacks: {},
     meta: {},
     sources: {},
-    foreignKeys: { constraints: true, indexes: true },
   };
 }
 

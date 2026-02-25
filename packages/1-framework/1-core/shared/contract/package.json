@@ -38,5 +38,10 @@
     "./ir": "./dist/ir.mjs",
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/1-framework/1-core/shared/contract"
   }
 }

@@ -14,7 +14,6 @@ One-liner lazy Postgres client for Prisma Next runtime composition.
 
 - `db.sql`
 - `db.schema`
-- `db.orm`
 - `db.context`
 - `db.stack`
 
@@ -43,7 +42,6 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - `@prisma-next/driver-postgres` for driver descriptor
 - `@prisma-next/sql-lane` for `sql(...)`
 - `@prisma-next/sql-relational-core` for `schema(...)`
-- `@prisma-next/sql-orm-lane` for `orm(...)`
 - `@prisma-next/sql-contract` for `validateContract(...)` and contract types
 - `pg` for binding validation when using `pg` (Pool or Client) input
 
@@ -52,7 +50,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 ```mermaid
 flowchart TD
     App[App Code] --> Client[postgres(...)]
-    Client --> Static[Static roots: sql schema orm context stack]
+    Client --> Static[Static roots: sql schema context stack]
     Client --> Lazy[runtime()]
 
     Lazy --> Instantiate[instantiateExecutionStack]

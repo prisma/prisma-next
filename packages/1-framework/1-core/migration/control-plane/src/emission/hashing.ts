@@ -36,7 +36,6 @@ export function computeStorageHash(contract: ContractInput): string {
     sources: {},
     capabilities: {},
     meta: {},
-    ...ifDefined('foreignKeys', contract['foreignKeys']),
   };
   const canonical = canonicalizeContract(storageContract);
   return computeHash(canonical);

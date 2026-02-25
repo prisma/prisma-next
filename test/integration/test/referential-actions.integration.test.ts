@@ -223,7 +223,7 @@ describe('referential actions integration', () => {
                 )
                 .index(['userId']),
             )
-            .foreignKeys({ constraints: true, indexes: true })
+            .foreignKeyDefaults({ constraint: true, index: true })
             .build();
 
           const driver = await postgresDriver.create(connectionString);
@@ -309,7 +309,7 @@ describe('referential actions integration', () => {
                 )
                 .index(['userId']),
             )
-            .foreignKeys({ constraints: true, indexes: true })
+            .foreignKeyDefaults({ constraint: true, index: true })
             .build();
 
           const driver = await postgresDriver.create(connectionString);
@@ -373,7 +373,7 @@ describe('referential actions integration', () => {
                 )
                 .index(['userId']),
             )
-            .foreignKeys({ constraints: true, indexes: true })
+            .foreignKeyDefaults({ constraint: true, index: true })
             .build();
 
           const driver = await postgresDriver.create(connectionString);
@@ -457,7 +457,7 @@ describe('referential actions integration', () => {
                 .foreignKey(['userId'], { table: 'user', columns: ['id'] })
                 .index(['userId']),
             )
-            .foreignKeys({ constraints: true, indexes: true })
+            .foreignKeyDefaults({ constraint: true, index: true })
             .build();
 
           const driver = await postgresDriver.create(connectionString);

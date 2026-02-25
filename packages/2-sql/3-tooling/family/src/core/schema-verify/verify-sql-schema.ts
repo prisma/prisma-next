@@ -14,17 +14,13 @@ import type {
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/core-control-plane/types';
-import {
-  DEFAULT_FOREIGN_KEYS_CONFIG,
-  type ForeignKeysConfig,
-  type SqlContract,
-  type SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
 import type { CodecControlHooks, ComponentDatabaseDependency } from '../migrations/types';
 import {
+  arraysEqual,
   computeCounts,
   verifyDatabaseDependencies,
   verifyForeignKeys,
@@ -80,12 +76,6 @@ export interface VerifySqlSchemaOptions {
    * with contract native types (e.g., Postgres 'varchar' → 'character varying').
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
-  /**
-   * Optional FK configuration from the contract.
-   * When provided, verification skips FK constraints/indexes when disabled.
-   * Defaults to { constraints: true, indexes: true }.
-   */
-  readonly foreignKeysConfig?: ForeignKeysConfig;
 }
 
 /**
@@ -107,11 +97,8 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     typeMetadataRegistry,
     normalizeDefault,
     normalizeNativeType,
-    foreignKeysConfig,
   } = options;
   const startTime = Date.now();
-
-  const fkConfig = foreignKeysConfig ?? contract.foreignKeys ?? DEFAULT_FOREIGN_KEYS_CONFIG;
 
   // Extract codec control hooks once at entry point for reuse
   const codecHooks = extractCodecControlHooks(options.frameworkComponents);
@@ -124,7 +111,6 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     strict,
     typeMetadataRegistry,
     codecHooks,
-    foreignKeysConfig: fkConfig,
     ...ifDefined('normalizeDefault', normalizeDefault),
     ...ifDefined('normalizeNativeType', normalizeNativeType),
   });
@@ -250,7 +236,6 @@ function verifySchemaTables(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
-  foreignKeysConfig: ForeignKeysConfig;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
@@ -260,7 +245,6 @@ function verifySchemaTables(options: {
     strict,
     typeMetadataRegistry,
     codecHooks,
-    foreignKeysConfig,
     normalizeDefault,
     normalizeNativeType,
   } = options;
@@ -302,7 +286,6 @@ function verifySchemaTables(options: {
       strict,
       typeMetadataRegistry,
       codecHooks,
-      foreignKeysConfig,
       ...ifDefined('normalizeDefault', normalizeDefault),
       ...ifDefined('normalizeNativeType', normalizeNativeType),
     });
@@ -344,7 +327,6 @@ function verifyTableChildren(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
-  foreignKeysConfig: ForeignKeysConfig;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
@@ -357,7 +339,6 @@ function verifyTableChildren(options: {
     strict,
     typeMetadataRegistry,
     codecHooks,
-    foreignKeysConfig,
     normalizeDefault,
     normalizeNativeType,
   } = options;
@@ -438,9 +419,11 @@ function verifyTableChildren(options: {
     });
   }
 
-  if (foreignKeysConfig.constraints) {
+  // Verify FK constraints only for FKs with constraint: true
+  const constraintFks = contractTable.foreignKeys.filter((fk) => fk.constraint === true);
+  if (constraintFks.length > 0) {
     const fkStatuses = verifyForeignKeys(
-      contractTable.foreignKeys,
+      constraintFks,
       schemaTable.foreignKeys,
       tableName,
       tablePath,
@@ -461,17 +444,20 @@ function verifyTableChildren(options: {
   );
   tableChildren.push(...uniqueStatuses);
 
-  // Filter out FK-backing indexes when foreignKeys.indexes is disabled
-  let indexesToVerify = contractTable.indexes;
-  if (!foreignKeysConfig.indexes) {
-    const fkColumnSets = new Set(contractTable.foreignKeys.map((fk) => fk.columns.join(',')));
-    indexesToVerify = contractTable.indexes.filter(
-      (index) => !fkColumnSets.has(index.columns.join(',')),
-    );
-  }
+  // Combine user-declared indexes with FK-backing indexes (from FKs with index: true)
+  // so the verifier treats FK-backing indexes as expected, not "extra".
+  // Deduplicate: skip FK-backing indexes already covered by a user-declared index.
+  const fkBackingIndexes = contractTable.foreignKeys
+    .filter(
+      (fk) =>
+        fk.index === true &&
+        !contractTable.indexes.some((idx) => arraysEqual(idx.columns, fk.columns)),
+    )
+    .map((fk) => ({ columns: fk.columns }));
+  const allExpectedIndexes = [...contractTable.indexes, ...fkBackingIndexes];
 
   const indexStatuses = verifyIndexes(
-    indexesToVerify,
+    allExpectedIndexes,
     schemaTable.indexes,
     schemaTable.uniques,
     tableName,

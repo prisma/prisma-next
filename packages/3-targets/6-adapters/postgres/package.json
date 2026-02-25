@@ -31,6 +31,7 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/utils": "workspace:*",
+    "ajv": "^8.17.1",
     "arktype": "^2.0.0"
   },
   "devDependencies": {
@@ -49,5 +50,10 @@
     "./runtime": "./dist/runtime.mjs",
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-targets/6-adapters/postgres"
   }
 }

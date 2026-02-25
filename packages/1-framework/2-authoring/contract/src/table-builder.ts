@@ -274,22 +274,18 @@ export class TableBuilder<
   foreignKey(
     columns: readonly string[],
     references: { table: string; columns: readonly string[] },
-    nameOrOptions?: string | ForeignKeyOptions,
+    opts?: string | (ForeignKeyOptions & { constraint?: boolean; index?: boolean }),
   ): TableBuilder<Name, Columns, PrimaryKey> {
-    let fkDef: ForeignKeyDef;
-    if (typeof nameOrOptions === 'string') {
-      fkDef = { columns, references, name: nameOrOptions };
-    } else if (nameOrOptions) {
-      fkDef = {
-        columns,
-        references,
-        ...ifDefined('name', nameOrOptions.name),
-        ...ifDefined('onDelete', nameOrOptions.onDelete),
-        ...ifDefined('onUpdate', nameOrOptions.onUpdate),
-      };
-    } else {
-      fkDef = { columns, references };
-    }
+    const resolved = typeof opts === 'string' ? { name: opts } : opts;
+    const fkDef: ForeignKeyDef = {
+      columns,
+      references,
+      ...ifDefined('name', resolved?.name),
+      ...ifDefined('onDelete', resolved?.onDelete),
+      ...ifDefined('onUpdate', resolved?.onUpdate),
+      ...ifDefined('constraint', resolved?.constraint),
+      ...ifDefined('index', resolved?.index),
+    };
     return new TableBuilder(
       this._state.name,
       this._state.columns,

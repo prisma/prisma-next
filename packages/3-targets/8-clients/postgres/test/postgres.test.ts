@@ -30,10 +30,6 @@ vi.mock('@prisma-next/sql-lane', () => ({
   sql: vi.fn(() => ({ lane: 'sql' })),
 }));
 
-vi.mock('@prisma-next/sql-orm-lane', () => ({
-  orm: vi.fn(() => ({ lane: 'orm' })),
-}));
-
 vi.mock('@prisma-next/sql-relational-core/schema', () => ({
   schema: vi.fn(() => ({ tables: { user: { columns: {} } } })),
 }));
@@ -125,7 +121,6 @@ describe('postgres', () => {
     });
 
     expect(db.sql).toEqual({ lane: 'sql' });
-    expect(db.orm).toEqual({ lane: 'orm' });
     expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
     expect(mocks.createRuntime).not.toHaveBeenCalled();
 

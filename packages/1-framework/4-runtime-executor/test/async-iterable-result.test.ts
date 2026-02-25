@@ -33,13 +33,61 @@ describe('AsyncIterableResult', () => {
     expect(items).toEqual(['a', 'b', 'c']);
   });
 
+  it('await collects all values via thenable behavior', async () => {
+    async function* generateItems(): AsyncGenerator<number, void, unknown> {
+      yield 1;
+      yield 2;
+      yield 3;
+    }
+
+    const result = new AsyncIterableResult(generateItems());
+    const items = await result;
+
+    expect(items).toEqual([1, 2, 3]);
+  });
+
+  it('returns the same promise for repeated toArray calls', async () => {
+    async function* generateItems(): AsyncGenerator<number, void, unknown> {
+      yield 1;
+      yield 2;
+      yield 3;
+    }
+
+    const result = new AsyncIterableResult(generateItems());
+    const first = result.toArray();
+    const second = result.toArray();
+
+    expect(first).toBe(second);
+    await expect(first).resolves.toEqual([1, 2, 3]);
+    await expect(second).resolves.toEqual([1, 2, 3]);
+  });
+
+  it('shares one buffered execution across toArray and then', async () => {
+    let executionCount = 0;
+
+    async function* generateItems(): AsyncGenerator<number, void, unknown> {
+      executionCount += 1;
+      yield 1;
+      yield 2;
+      yield 3;
+    }
+
+    const result = new AsyncIterableResult(generateItems());
+    const fromToArray = result.toArray();
+    const fromThen = result.then((rows) => rows);
+
+    await expect(fromToArray).resolves.toEqual([1, 2, 3]);
+    await expect(fromThen).resolves.toEqual([1, 2, 3]);
+    expect(executionCount).toBe(1);
+  });
+
   it('handles empty results', async () => {
     async function* generateItems(): AsyncGenerator<number, void, unknown> {
       // No items
     }
 
     const result = new AsyncIterableResult(generateItems());
-    const items = await result.toArray();
+    const items = await result;
 
     expect(items).toEqual([]);
   });
@@ -77,7 +125,7 @@ describe('AsyncIterableResult', () => {
     expect(items).toEqual([1]);
   });
 
-  it('propagates errors during iteration with toArray', async () => {
+  it('propagates errors during thenable consumption', async () => {
     async function* generateItems(): AsyncGenerator<number, void, unknown> {
       yield 1;
       throw new Error('Test error');
@@ -85,6 +133,7 @@ describe('AsyncIterableResult', () => {
 
     const result = new AsyncIterableResult(generateItems());
 
+    await expect(result).rejects.toThrow('Test error');
     await expect(result.toArray()).rejects.toThrow('Test error');
   });
 
@@ -100,7 +149,7 @@ describe('AsyncIterableResult', () => {
     }
 
     const result = new AsyncIterableResult(generateItems());
-    const items = await result.toArray();
+    const items = await result;
 
     expect(items).toEqual([
       { id: 1, name: 'test' },
@@ -124,7 +173,6 @@ describe('AsyncIterableResult', () => {
     const result = new AsyncIterableResult(generateItems());
     await result.toArray();
 
-    // Iterator is consumed, so iterating again should throw an error
     await expect(async () => {
       for await (const _item of result) {
         // Should not reach here
@@ -132,7 +180,7 @@ describe('AsyncIterableResult', () => {
     }).rejects.toThrow('AsyncIterableResult iterator has already been consumed');
   });
 
-  it('throws error when calling toArray twice', async () => {
+  it('throws error when iterating after await', async () => {
     async function* generateItems(): AsyncGenerator<number, void, unknown> {
       yield 1;
       yield 2;
@@ -140,12 +188,13 @@ describe('AsyncIterableResult', () => {
     }
 
     const result = new AsyncIterableResult(generateItems());
-    await result.toArray();
+    await result;
 
-    // Calling toArray() again should throw an error
-    await expect(result.toArray()).rejects.toThrow(
-      'AsyncIterableResult iterator has already been consumed',
-    );
+    await expect(async () => {
+      for await (const _item of result) {
+        // Should not reach here
+      }
+    }).rejects.toThrow('AsyncIterableResult iterator has already been consumed');
   });
 
   it('throws error when iterating after for await', async () => {
@@ -157,14 +206,12 @@ describe('AsyncIterableResult', () => {
 
     const result = new AsyncIterableResult(generateItems());
 
-    // First iteration
-    const items1: number[] = [];
+    const items: number[] = [];
     for await (const item of result) {
-      items1.push(item);
+      items.push(item);
     }
-    expect(items1).toEqual([1, 2, 3]);
+    expect(items).toEqual([1, 2, 3]);
 
-    // Second iteration should throw an error
     await expect(async () => {
       for await (const _item of result) {
         // Should not reach here
@@ -181,16 +228,32 @@ describe('AsyncIterableResult', () => {
 
     const result = new AsyncIterableResult(generateItems());
 
-    // First iteration via for-await
-    const items1: number[] = [];
+    const items: number[] = [];
     for await (const item of result) {
-      items1.push(item);
+      items.push(item);
     }
-    expect(items1).toEqual([1, 2, 3]);
+    expect(items).toEqual([1, 2, 3]);
 
-    // Calling toArray() after iterator was consumed should throw an error
     await expect(result.toArray()).rejects.toThrow(
       'AsyncIterableResult iterator has already been consumed',
     );
+  });
+
+  it('throws error when awaiting after for await', async () => {
+    async function* generateItems(): AsyncGenerator<number, void, unknown> {
+      yield 1;
+      yield 2;
+      yield 3;
+    }
+
+    const result = new AsyncIterableResult(generateItems());
+
+    const items: number[] = [];
+    for await (const item of result) {
+      items.push(item);
+    }
+    expect(items).toEqual([1, 2, 3]);
+
+    await expect(result).rejects.toThrow('AsyncIterableResult iterator has already been consumed');
   });
 });

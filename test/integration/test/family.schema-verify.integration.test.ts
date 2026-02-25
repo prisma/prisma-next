@@ -509,7 +509,7 @@ describe('family instance schemaVerify', () => {
               .primaryKey(['id'])
               .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
           )
-          .foreignKeys({ constraints: true, indexes: true })
+          .foreignKeyDefaults({ constraint: true, index: true })
           .build();
 
         const driver = await postgresDriver.create(connectionString);

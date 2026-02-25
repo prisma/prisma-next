@@ -109,6 +109,8 @@ describe('contract builder constraint support', () => {
     expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
       columns: ['userId'],
       references: { table: 'user', columns: ['id'] },
+      constraint: true,
+      index: true,
     });
   });
 
@@ -121,7 +123,7 @@ describe('contract builder constraint support', () => {
           .column('id', { type: int4Column })
           .column('userId', { type: int4Column })
           .primaryKey(['id'])
-          .foreignKey(['userId'], { table: 'user', columns: ['id'] }, 'post_userId_fkey'),
+          .foreignKey(['userId'], { table: 'user', columns: ['id'] }, { name: 'post_userId_fkey' }),
       )
       .model('User', 'user', (m) => m.field('id', 'id'))
       .model('Post', 'post', (m) => m.field('id', 'id').field('userId', 'userId'))
@@ -131,6 +133,8 @@ describe('contract builder constraint support', () => {
     expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
       columns: ['userId'],
       references: { table: 'user', columns: ['id'] },
+      constraint: true,
+      index: true,
       name: 'post_userId_fkey',
     });
   });
@@ -185,46 +189,78 @@ describe('contract builder constraint support', () => {
     expect(contract.storage.tables.user.indexes).toHaveLength(2);
   });
 
-  it('defaults foreignKeys config to constraints=true, indexes=true', () => {
+  it('defaults per-FK constraint=true, index=true', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .table('post', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('userId', { type: int4Column })
+          .primaryKey(['id'])
+          .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
+      )
       .model('User', 'user', (m) => m.field('id', 'id'))
+      .model('Post', 'post', (m) => m.field('id', 'id').field('userId', 'userId'))
       .build();
 
-    expect(contract.foreignKeys).toEqual({ constraints: true, indexes: true });
+    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+      columns: ['userId'],
+      references: { table: 'user', columns: ['id'] },
+      constraint: true,
+      index: true,
+    });
   });
 
-  it('emits foreignKeys config with constraints disabled', () => {
+  it('materializes foreignKeyDefaults into per-FK fields', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
-      .foreignKeys({ constraints: false, indexes: true })
+      .foreignKeyDefaults({ constraint: false, index: true })
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .table('post', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('userId', { type: int4Column })
+          .primaryKey(['id'])
+          .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
+      )
       .model('User', 'user', (m) => m.field('id', 'id'))
+      .model('Post', 'post', (m) => m.field('id', 'id').field('userId', 'userId'))
       .build();
 
-    expect(contract.foreignKeys).toEqual({ constraints: false, indexes: true });
+    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+      columns: ['userId'],
+      references: { table: 'user', columns: ['id'] },
+      constraint: false,
+      index: true,
+    });
   });
 
-  it('emits foreignKeys config with indexes disabled', () => {
+  it('per-FK override takes precedence over foreignKeyDefaults', () => {
     const contract = defineContract<CodecTypes>()
       .target(postgresTargetPack)
-      .foreignKeys({ constraints: true, indexes: false })
+      .foreignKeyDefaults({ constraint: false, index: false })
       .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
+      .table('post', (t) =>
+        t
+          .column('id', { type: int4Column })
+          .column('userId', { type: int4Column })
+          .primaryKey(['id'])
+          .foreignKey(
+            ['userId'],
+            { table: 'user', columns: ['id'] },
+            { constraint: true, index: true },
+          ),
+      )
       .model('User', 'user', (m) => m.field('id', 'id'))
+      .model('Post', 'post', (m) => m.field('id', 'id').field('userId', 'userId'))
       .build();
 
-    expect(contract.foreignKeys).toEqual({ constraints: true, indexes: false });
-  });
-
-  it('emits foreignKeys config with both disabled', () => {
-    const contract = defineContract<CodecTypes>()
-      .target(postgresTargetPack)
-      .foreignKeys({ constraints: false, indexes: false })
-      .table('user', (t) => t.column('id', { type: int4Column }).primaryKey(['id']))
-      .model('User', 'user', (m) => m.field('id', 'id'))
-      .build();
-
-    expect(contract.foreignKeys).toEqual({ constraints: false, indexes: false });
+    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+      columns: ['userId'],
+      references: { table: 'user', columns: ['id'] },
+      constraint: true,
+      index: true,
+    });
   });
 });

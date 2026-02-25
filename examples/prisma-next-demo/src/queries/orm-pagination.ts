@@ -12,21 +12,23 @@ export async function ormGetUsersByIdCursor(
   pageSize: number,
   runtime: Runtime,
 ) {
-  let builder = db.orm
-    .user()
-    .select((u) => ({
-      id: u.id,
-      email: u.email,
-      createdAt: u.createdAt,
-    }))
-    .orderBy((u) => u.id.asc())
-    .take(pageSize);
+  const userTable = db.schema.tables.user;
+
+  let builder = db.sql
+    .from(userTable)
+    .select({
+      id: userTable.columns.id,
+      email: userTable.columns.email,
+      createdAt: userTable.columns.createdAt,
+    })
+    .orderBy(userTable.columns.id.asc())
+    .limit(pageSize);
 
   if (cursor !== null) {
-    builder = builder.where((u) => u.id.gt(param('cursor')));
+    builder = builder.where(userTable.columns.id.gt(param('cursor')));
   }
 
-  const plan = builder.findMany({
+  const plan = builder.build({
     params: cursor !== null ? { cursor } : {},
   });
 
@@ -42,22 +44,24 @@ export async function ormGetUsersByTimestampCursor(
   pageSize: number,
   runtime: Runtime,
 ) {
-  let builder = db.orm
-    .user()
-    .select((u) => ({
-      id: u.id,
-      email: u.email,
-      createdAt: u.createdAt,
-    }))
-    .orderBy((u) => u.createdAt.desc())
-    .take(pageSize);
+  const userTable = db.schema.tables.user;
+
+  let builder = db.sql
+    .from(userTable)
+    .select({
+      id: userTable.columns.id,
+      email: userTable.columns.email,
+      createdAt: userTable.columns.createdAt,
+    })
+    .orderBy(userTable.columns.createdAt.desc())
+    .limit(pageSize);
 
   if (cursor !== null) {
-    builder = builder.where((u) => u.createdAt.lt(param('cursor')));
+    builder = builder.where(userTable.columns.createdAt.lt(param('cursor')));
   }
 
-  const plan = builder.findMany({
-    params: cursor !== null ? { cursor } : {},
+  const plan = builder.build({
+    params: cursor !== null ? { cursor: cursor.toISOString() } : {},
   });
 
   return collect(runtime.execute(plan));
@@ -68,17 +72,19 @@ export async function ormGetUsersByTimestampCursor(
  * Fetches records before the cursor, useful for "previous page" navigation
  */
 export async function ormGetUsersBackward(cursor: string, pageSize: number, runtime: Runtime) {
-  const plan = db.orm
-    .user()
-    .where((u) => u.id.lt(param('cursor')))
-    .select((u) => ({
-      id: u.id,
-      email: u.email,
-      createdAt: u.createdAt,
-    }))
-    .orderBy((u) => u.id.desc())
-    .take(pageSize)
-    .findMany({
+  const userTable = db.schema.tables.user;
+
+  const plan = db.sql
+    .from(userTable)
+    .where(userTable.columns.id.lt(param('cursor')))
+    .select({
+      id: userTable.columns.id,
+      email: userTable.columns.email,
+      createdAt: userTable.columns.createdAt,
+    })
+    .orderBy(userTable.columns.id.desc())
+    .limit(pageSize)
+    .build({
       params: { cursor },
     });
 

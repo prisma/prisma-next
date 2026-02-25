@@ -70,6 +70,10 @@ export type ForeignKey = {
   readonly name?: string;
   readonly onDelete?: ReferentialAction;
   readonly onUpdate?: ReferentialAction;
+  /** Whether to emit FK constraint DDL (ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY). */
+  readonly constraint: boolean;
+  /** Whether to emit a backing index for the FK columns. */
+  readonly index: boolean;
 };
 
 export type StorageTable = {
@@ -128,15 +132,22 @@ export type SqlMappings = {
   readonly operationTypes: Record<string, Record<string, unknown>>;
 };
 
-export type ForeignKeysConfig = {
-  readonly constraints: boolean;
-  readonly indexes: boolean;
-};
+export const DEFAULT_FK_CONSTRAINT = true;
+export const DEFAULT_FK_INDEX = true;
 
-export const DEFAULT_FOREIGN_KEYS_CONFIG: ForeignKeysConfig = {
-  constraints: true,
-  indexes: true,
-};
+/**
+ * Resolves foreign key `constraint` and `index` fields to their effective boolean values,
+ * falling back through optional override defaults, then to the global defaults.
+ */
+export function applyFkDefaults(
+  fk: { constraint?: boolean | undefined; index?: boolean | undefined },
+  overrideDefaults?: { constraint?: boolean | undefined; index?: boolean | undefined },
+): { constraint: boolean; index: boolean } {
+  return {
+    constraint: fk.constraint ?? overrideDefaults?.constraint ?? DEFAULT_FK_CONSTRAINT,
+    index: fk.index ?? overrideDefaults?.index ?? DEFAULT_FK_INDEX,
+  };
+}
 
 export type SqlContract<
   S extends SqlStorage = SqlStorage,
@@ -153,7 +164,6 @@ export type SqlContract<
   readonly relations: R;
   readonly mappings: Map;
   readonly execution?: ExecutionSection;
-  readonly foreignKeys?: ForeignKeysConfig;
 };
 
 export type ExtractCodecTypes<TContract extends SqlContract<SqlStorage>> =

@@ -100,6 +100,8 @@ export interface ForeignKeyDef extends ForeignKeyOptions {
     readonly table: string;
     readonly columns: readonly string[];
   };
+  readonly constraint?: boolean;
+  readonly index?: boolean;
 }
 
 export interface TableBuilderState<
@@ -142,9 +144,9 @@ export interface ModelBuilderState<
   readonly relations: Relations;
 }
 
-export interface ForeignKeysConfigState {
-  readonly constraints: boolean;
-  readonly indexes: boolean;
+export interface ForeignKeyDefaultsState {
+  readonly constraint: boolean;
+  readonly index: boolean;
 }
 
 export interface ContractBuilderState<
@@ -182,7 +184,7 @@ export interface ContractBuilderState<
   readonly extensionPacks?: ExtensionPacks;
   readonly capabilities?: Capabilities;
   readonly storageTypes?: Record<string, StorageTypeInstanceState>;
-  readonly foreignKeys?: ForeignKeysConfigState;
+  readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
   /**
    * Array of extension pack namespace identifiers (e.g., ['pgvector', 'postgis']).
    * Populated when extension packs are registered during contract building.

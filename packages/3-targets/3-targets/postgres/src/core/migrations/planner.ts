@@ -26,14 +26,13 @@ import {
   isUniqueConstraintSatisfied,
   verifySqlSchema,
 } from '@prisma-next/family-sql/schema-verify';
-import {
-  DEFAULT_FOREIGN_KEYS_CONFIG,
-  type ForeignKey,
-  type ReferentialAction,
-  type SqlContract,
-  type SqlStorage,
-  type StorageColumn,
-  type StorageTable,
+import type {
+  ForeignKey,
+  ReferentialAction,
+  SqlContract,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -112,12 +111,6 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       return plannerFailure(storageTypePlan.conflicts);
     }
 
-    const fkConfig = options.contract.foreignKeys ?? DEFAULT_FOREIGN_KEYS_CONFIG;
-    const fkColumnSets =
-      fkConfig.indexes === false
-        ? this.collectForeignKeyColumnSets(options.contract.storage.tables)
-        : new Set<string>();
-
     // Build extension operations from component-owned database dependencies
     operations.push(
       ...this.buildDatabaseDependencyOperations(options),
@@ -130,19 +123,17 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         schemaName,
       ),
       ...this.buildUniqueOperations(options.contract.storage.tables, options.schema, schemaName),
-      ...this.buildIndexOperations(
+      ...this.buildIndexOperations(options.contract.storage.tables, options.schema, schemaName),
+      ...this.buildFkBackingIndexOperations(
         options.contract.storage.tables,
         options.schema,
         schemaName,
-        fkColumnSets,
       ),
-      ...(fkConfig.constraints
-        ? this.buildForeignKeyOperations(
-            options.contract.storage.tables,
-            options.schema,
-            schemaName,
-          )
-        : []),
+      ...this.buildForeignKeyOperations(
+        options.contract.storage.tables,
+        options.schema,
+        schemaName,
+      ),
     );
 
     const plan = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -500,31 +491,15 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     return operations;
   }
 
-  private collectForeignKeyColumnSets(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
-  ): Set<string> {
-    const fkColumnSets = new Set<string>();
-    for (const [tableName, table] of Object.entries(tables)) {
-      for (const fk of table.foreignKeys) {
-        fkColumnSets.add(`${tableName}:${fk.columns.join(',')}`);
-      }
-    }
-    return fkColumnSets;
-  }
-
   private buildIndexOperations(
     tables: SqlContract<SqlStorage>['storage']['tables'],
     schema: SqlSchemaIR,
     schemaName: string,
-    skipFkIndexes?: Set<string>,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of sortedEntries(tables)) {
       const schemaTable = schema.tables[tableName];
       for (const index of table.indexes) {
-        if (skipFkIndexes?.has(`${tableName}:${index.columns.join(',')}`)) {
-          continue;
-        }
         if (schemaTable && hasIndex(schemaTable, index.columns)) {
           continue;
         }
@@ -565,6 +540,65 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     return operations;
   }
 
+  /**
+   * Generates FK-backing index operations for FKs with `index: true`,
+   * but only when no matching user-declared index exists in `contractTable.indexes`.
+   */
+  private buildFkBackingIndexOperations(
+    tables: SqlContract<SqlStorage>['storage']['tables'],
+    schema: SqlSchemaIR,
+    schemaName: string,
+  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    for (const [tableName, table] of sortedEntries(tables)) {
+      const schemaTable = schema.tables[tableName];
+      // Collect column sets of user-declared indexes to avoid duplicates
+      const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
+
+      for (const fk of table.foreignKeys) {
+        if (fk.index === false) continue;
+        // Skip if user already declared an index with these columns
+        if (declaredIndexColumns.has(fk.columns.join(','))) continue;
+        // Skip if the index already exists in the database
+        if (schemaTable && hasIndex(schemaTable, fk.columns)) continue;
+
+        const indexName = `${tableName}_${fk.columns.join('_')}_idx`;
+        operations.push({
+          id: `index.${tableName}.${indexName}`,
+          label: `Create FK-backing index ${indexName} on ${tableName}`,
+          summary: `Creates FK-backing index ${indexName} on ${tableName}`,
+          operationClass: 'additive',
+          target: {
+            id: 'postgres',
+            details: this.buildTargetDetails('index', indexName, schemaName, tableName),
+          },
+          precheck: [
+            {
+              description: `ensure index "${indexName}" is missing`,
+              sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NULL`,
+            },
+          ],
+          execute: [
+            {
+              description: `create FK-backing index "${indexName}"`,
+              sql: `CREATE INDEX ${quoteIdentifier(indexName)} ON ${qualifyTableName(
+                schemaName,
+                tableName,
+              )} (${fk.columns.map(quoteIdentifier).join(', ')})`,
+            },
+          ],
+          postcheck: [
+            {
+              description: `verify index "${indexName}" exists`,
+              sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NOT NULL`,
+            },
+          ],
+        });
+      }
+    }
+    return operations;
+  }
+
   private buildForeignKeyOperations(
     tables: SqlContract<SqlStorage>['storage']['tables'],
     schema: SqlSchemaIR,
@@ -574,6 +608,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     for (const [tableName, table] of sortedEntries(tables)) {
       const schemaTable = schema.tables[tableName];
       for (const foreignKey of table.foreignKeys) {
+        if (foreignKey.constraint === false) continue;
         if (schemaTable && hasForeignKey(schemaTable, foreignKey)) {
           continue;
         }
@@ -635,7 +670,6 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
         kind: 'conflict';
         conflicts: SqlPlannerConflict[];
       } {
-    const fkConfig = options.contract.foreignKeys ?? DEFAULT_FOREIGN_KEYS_CONFIG;
     const verifyOptions: VerifySqlSchemaOptionsWithComponents = {
       contract: options.contract,
       schema: options.schema,
@@ -644,7 +678,6 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
       normalizeNativeType: normalizeSchemaNativeType,
-      foreignKeysConfig: fkConfig,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
 

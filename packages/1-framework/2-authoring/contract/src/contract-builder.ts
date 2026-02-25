@@ -2,7 +2,7 @@ import type { TargetPackRef } from '@prisma-next/contract/framework-components';
 import type {
   ColumnBuilderState,
   ContractBuilderState,
-  ForeignKeysConfigState,
+  ForeignKeyDefaultsState,
   ModelBuilderState,
   RelationDefinition,
   TableBuilderState,
@@ -154,12 +154,12 @@ export class ContractBuilder<
     });
   }
 
-  foreignKeys(
-    config: ForeignKeysConfigState,
+  foreignKeyDefaults(
+    config: ForeignKeyDefaultsState,
   ): ContractBuilder<Target, Tables, Models, StorageHash, ExtensionPacks, Capabilities> {
     return new ContractBuilder<Target, Tables, Models, StorageHash, ExtensionPacks, Capabilities>({
       ...this.state,
-      foreignKeys: config,
+      foreignKeyDefaults: config,
     });
   }
 }

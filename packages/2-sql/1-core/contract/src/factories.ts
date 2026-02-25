@@ -7,7 +7,6 @@ import type {
   ForeignKey,
   ForeignKeyOptions,
   ForeignKeyReferences,
-  ForeignKeysConfig,
   Index,
   ModelDefinition,
   ModelField,
@@ -20,6 +19,7 @@ import type {
   StorageTable,
   UniqueConstraint,
 } from './types';
+import { applyFkDefaults } from './types';
 
 /**
  * Creates a StorageColumn with nativeType and codecId.
@@ -59,23 +59,20 @@ export function fk(
   columns: readonly string[],
   refTable: string,
   refColumns: readonly string[],
-  nameOrOptions?: string | ForeignKeyOptions,
+  opts?: ForeignKeyOptions & { constraint?: boolean; index?: boolean },
 ): ForeignKey {
   const references: ForeignKeyReferences = {
     table: refTable,
     columns: refColumns,
   };
 
-  if (typeof nameOrOptions === 'string') {
-    return { columns, references, name: nameOrOptions };
-  }
-
   return {
     columns,
     references,
-    ...(nameOrOptions?.name !== undefined && { name: nameOrOptions.name }),
-    ...(nameOrOptions?.onDelete !== undefined && { onDelete: nameOrOptions.onDelete }),
-    ...(nameOrOptions?.onUpdate !== undefined && { onUpdate: nameOrOptions.onUpdate }),
+    ...(opts?.name !== undefined && { name: opts.name }),
+    ...(opts?.onDelete !== undefined && { onDelete: opts.onDelete }),
+    ...(opts?.onUpdate !== undefined && { onUpdate: opts.onUpdate }),
+    ...applyFkDefaults({ constraint: opts?.constraint, index: opts?.index }),
   };
 }
 
@@ -133,7 +130,6 @@ export function contract<
   extensionPacks?: Record<string, unknown>;
   meta?: Record<string, unknown>;
   sources?: Record<string, unknown>;
-  foreignKeys?: ForeignKeysConfig;
 }): SqlContract<
   SqlStorage,
   Record<string, unknown>,
@@ -158,7 +154,6 @@ export function contract<
     ...(opts.extensionPacks !== undefined && { extensionPacks: opts.extensionPacks }),
     ...(opts.meta !== undefined && { meta: opts.meta }),
     ...(opts.sources !== undefined && { sources: opts.sources as Record<string, unknown> }),
-    ...(opts.foreignKeys !== undefined && { foreignKeys: opts.foreignKeys }),
   } as SqlContract<
     SqlStorage,
     Record<string, unknown>,

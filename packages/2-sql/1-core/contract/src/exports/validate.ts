@@ -1,1 +1,1 @@
-export { validateContract } from '../validate';
+export { normalizeContract, validateContract } from '../validate';

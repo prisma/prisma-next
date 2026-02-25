@@ -1,0 +1,55 @@
+{
+  "name": "@prisma-next/sql-orm-client",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "description": "ORM client for Prisma Next — fluent, type-safe model collections",
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
+  },
+  "dependencies": {
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/integration-kysely": "workspace:*",
+    "@prisma-next/runtime-executor": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "kysely": "catalog:"
+  },
+  "devDependencies": {
+    "@types/pg": "catalog:",
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsdown": "workspace:*",
+    "pg": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-extensions/sql-orm-client"
+  }
+}

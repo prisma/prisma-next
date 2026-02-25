@@ -4,17 +4,18 @@ import { db } from '../prisma/db';
 import { collect } from './utils';
 
 export async function ormGetUserById(userId: string, runtime: Runtime) {
-  const plan = db.orm
-    .user()
-    .where((u) => u.id.eq(param('userId')))
-    .select((u) => ({
-      id: u.id,
-      email: u.email,
-      createdAt: u.createdAt,
-    }))
-    .findFirst({
-      params: { userId },
-    });
+  const userTable = db.schema.tables.user;
+
+  const plan = db.sql
+    .from(userTable)
+    .where(userTable.columns.id.eq(param('userId')))
+    .select({
+      id: userTable.columns.id,
+      email: userTable.columns.email,
+      createdAt: userTable.columns.createdAt,
+    })
+    .limit(1)
+    .build({ params: { userId } });
 
   const rows = await collect(runtime.execute(plan));
   return rows[0] ?? null;
