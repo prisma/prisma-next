@@ -210,6 +210,41 @@ describe('verifySqlSchema - defaults', () => {
     expect(result.schema.issues).toHaveLength(0);
   });
 
+  it('matches JSONB default with different key order (stable key sort)', () => {
+    const contract = createTestContract({
+      literal_defaults: createContractTable({
+        metadata: {
+          nativeType: 'jsonb',
+          nullable: false,
+          default: { kind: 'literal', value: { alpha: 1, beta: 2, gamma: 3 } },
+        },
+      }),
+    });
+
+    const schema = createTestSchemaIR({
+      literal_defaults: createSchemaTable('literal_defaults', {
+        metadata: {
+          nativeType: 'jsonb',
+          nullable: false,
+          // Postgres may canonicalize key order differently
+          default: '\'{"gamma":3,"alpha":1,"beta":2}\'::jsonb',
+        },
+      }),
+    });
+
+    const result = verifySqlSchema({
+      contract,
+      schema,
+      strict: false,
+      typeMetadataRegistry: emptyTypeMetadataRegistry,
+      frameworkComponents: [],
+      normalizeDefault: testNormalizer,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.schema.issues).toHaveLength(0);
+  });
+
   it('matches JSONB default that looks like a tagged bigint', () => {
     const contract = createTestContract({
       literal_defaults: createContractTable({
