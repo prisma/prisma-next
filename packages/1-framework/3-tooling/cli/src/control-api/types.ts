@@ -1,3 +1,5 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { ContractDiffResult } from '@prisma-next/core-control-plane/abstract-ops';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
   ControlAdapterDescriptor,
@@ -490,4 +492,16 @@ export interface ControlClient {
    * @returns Result pattern: Ok with emit details, NotOk with failure details
    */
   emit(options: EmitOptions): Promise<EmitResult>;
+
+  /**
+   * Diffs two contracts and produces abstract migration operations.
+   * This is an offline operation — no database connection required.
+   * Delegates to the target's `planContractDiff` capability.
+   *
+   * @param from - The source contract (null for new projects)
+   * @param to - The destination contract
+   * @returns Contract diff result with ops or conflicts
+   * @throws If the target does not support contract diffing
+   */
+  contractDiff(from: ContractIR | null, to: ContractIR): ContractDiffResult;
 }

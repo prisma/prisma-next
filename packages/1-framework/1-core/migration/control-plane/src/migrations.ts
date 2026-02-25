@@ -10,7 +10,9 @@
  */
 
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import type { Result } from '@prisma-next/utils/result';
+import type { ContractDiffResult } from './abstract-ops';
 import type { ControlDriverInstance, ControlFamilyInstance } from './types';
 
 // ============================================================================
@@ -244,4 +246,10 @@ export interface TargetMigrationsCapability<
 > {
   createPlanner(family: TFamilyInstance): MigrationPlanner<TFamilyId, TTargetId>;
   createRunner(family: TFamilyInstance): MigrationRunner<TFamilyId, TTargetId>;
+  /**
+   * Diff two contracts and produce abstract migration operations.
+   * The "from" contract is null for new projects (empty starting state).
+   * This is an offline operation — no database connection required.
+   */
+  planContractDiff?(from: ContractIR | null, to: ContractIR): ContractDiffResult;
 }

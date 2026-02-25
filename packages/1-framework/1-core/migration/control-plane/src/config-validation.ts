@@ -243,6 +243,22 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
     }
   }
 
+  // Validate migrations config if present
+  if (configObj['migrations'] !== undefined) {
+    const migrations = configObj['migrations'];
+    if (!migrations || typeof migrations !== 'object') {
+      throw errorConfigValidation('migrations', {
+        why: 'Config.migrations must be an object',
+      });
+    }
+    const migrationsObj = migrations as Record<string, unknown>;
+    if (migrationsObj['dir'] !== undefined && typeof migrationsObj['dir'] !== 'string') {
+      throw errorConfigValidation('migrations.dir', {
+        why: 'Config.migrations.dir must be a string when provided',
+      });
+    }
+  }
+
   // Validate contract config if present (structure validation - defineConfig() handles normalization)
   if (configObj['contract'] !== undefined) {
     const contract = configObj['contract'] as Record<string, unknown>;

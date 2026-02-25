@@ -1,0 +1,171 @@
+import { attestMigration, verifyMigration } from '@prisma-next/migration-tools/attestation';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { Command } from 'commander';
+import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
+import { setCommandDescriptions } from '../utils/command-helpers';
+import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import { formatCommandHelp, formatStyledHeader } from '../utils/output';
+import { handleResult } from '../utils/result-handler';
+
+interface MigrationVerifyOptions {
+  readonly dir: string;
+  readonly json?: string | boolean;
+  readonly quiet?: boolean;
+  readonly q?: boolean;
+  readonly verbose?: boolean;
+  readonly v?: boolean;
+  readonly vv?: boolean;
+  readonly trace?: boolean;
+  readonly timestamps?: boolean;
+  readonly color?: boolean;
+  readonly 'no-color'?: boolean;
+}
+
+export interface MigrationVerifyResult {
+  readonly ok: boolean;
+  readonly status: 'verified' | 'attested' | 'mismatch';
+  readonly dir: string;
+  readonly edgeId?: string | undefined;
+  readonly storedEdgeId?: string | undefined;
+  readonly computedEdgeId?: string | undefined;
+  readonly summary: string;
+}
+
+async function executeMigrationVerifyCommand(
+  options: MigrationVerifyOptions,
+  flags: GlobalFlags,
+): Promise<Result<MigrationVerifyResult, CliStructuredError>> {
+  const dir = options.dir;
+
+  if (flags.json !== 'object' && !flags.quiet) {
+    const header = formatStyledHeader({
+      command: 'migration verify',
+      description: 'Verify migration package integrity',
+      details: [{ label: 'dir', value: dir }],
+      flags,
+    });
+    console.log(header);
+  }
+
+  try {
+    const result = await verifyMigration(dir);
+
+    if (result.ok) {
+      return ok({
+        ok: true,
+        status: 'verified',
+        dir,
+        edgeId: result.storedEdgeId,
+        storedEdgeId: result.storedEdgeId,
+        computedEdgeId: result.computedEdgeId,
+        summary: 'Migration package verified — edgeId matches',
+      });
+    }
+
+    if (result.reason === 'draft') {
+      const edgeId = await attestMigration(dir);
+      return ok({
+        ok: true,
+        status: 'attested',
+        dir,
+        edgeId,
+        summary: `Draft migration attested with edgeId: ${edgeId}`,
+      });
+    }
+
+    return ok({
+      ok: false,
+      status: 'mismatch',
+      dir,
+      storedEdgeId: result.storedEdgeId,
+      computedEdgeId: result.computedEdgeId,
+      summary: `edgeId mismatch: stored=${result.storedEdgeId}, computed=${result.computedEdgeId}`,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'MigrationToolsError') {
+      const e = error as unknown as { code: string; why: string; fix: string };
+      return notOk(
+        errorRuntime(error.message, {
+          why: e.why,
+          fix: e.fix,
+          meta: { code: e.code },
+        }),
+      );
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to verify migration: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  }
+}
+
+export function createMigrationVerifyCommand(): Command {
+  const command = new Command('verify');
+  setCommandDescriptions(
+    command,
+    'Verify a migration package edgeId',
+    'Recomputes the content-addressed edgeId for a migration package and compares\n' +
+      'it against the stored value. Draft migrations (edgeId: null) are automatically\n' +
+      'attested.',
+  );
+  command
+    .configureHelp({
+      formatHelp: (cmd) => {
+        const flags2 = parseGlobalFlags({});
+        return formatCommandHelp({ command: cmd, flags: flags2 });
+      },
+    })
+    .requiredOption('--dir <path>', 'Path to the migration package directory')
+    .option('--json [format]', 'Output as JSON (object)', false)
+    .option('-q, --quiet', 'Quiet mode: errors only')
+    .option('-v, --verbose', 'Verbose output')
+    .option('-vv, --trace', 'Trace output')
+    .option('--timestamps', 'Add timestamps to output')
+    .option('--color', 'Force color output')
+    .option('--no-color', 'Disable color output')
+    .action(async (options: MigrationVerifyOptions) => {
+      const flags = parseGlobalFlags(options);
+
+      const result = await executeMigrationVerifyCommand(options, flags);
+
+      const exitCode = handleResult(result, flags, (verifyResult) => {
+        if (flags.json === 'object') {
+          console.log(JSON.stringify(verifyResult, null, 2));
+        } else if (!flags.quiet) {
+          console.log(formatMigrationVerifyOutput(verifyResult, flags));
+        }
+      });
+
+      process.exit(exitCode);
+    });
+
+  return command;
+}
+
+function formatMigrationVerifyOutput(result: MigrationVerifyResult, flags: GlobalFlags): string {
+  const lines: string[] = [];
+  const useColor = flags.color !== false;
+  const green_ = useColor ? (s: string) => `\x1b[32m${s}\x1b[0m` : (s: string) => s;
+  const red_ = useColor ? (s: string) => `\x1b[31m${s}\x1b[0m` : (s: string) => s;
+  const yellow_ = useColor ? (s: string) => `\x1b[33m${s}\x1b[0m` : (s: string) => s;
+  const dim_ = useColor ? (s: string) => `\x1b[2m${s}\x1b[0m` : (s: string) => s;
+
+  switch (result.status) {
+    case 'verified':
+      lines.push(`${green_('✔')} Migration verified`);
+      lines.push(dim_(`  edgeId: ${result.edgeId}`));
+      break;
+    case 'attested':
+      lines.push(`${yellow_('◉')} Draft migration attested`);
+      lines.push(dim_(`  edgeId: ${result.edgeId}`));
+      break;
+    case 'mismatch':
+      lines.push(`${red_('✘')} edgeId mismatch — migration has been modified`);
+      lines.push(dim_(`  stored:   ${result.storedEdgeId}`));
+      lines.push(dim_(`  computed: ${result.computedEdgeId}`));
+      break;
+  }
+
+  return lines.join('\n');
+}

@@ -24,6 +24,7 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/core-control-plane": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "arktype": "^2.0.0",
     "c12": "^3.3.2",
@@ -44,8 +45,8 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "@types/node": "catalog:",
     "@prisma-next/tsdown": "workspace:*",
+    "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
