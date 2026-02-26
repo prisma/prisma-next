@@ -454,6 +454,10 @@ importers:
         version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
 
   packages/1-framework/2-authoring/contract-psl:
+    dependencies:
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../../2-sql/1-core/contract
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
@@ -467,6 +471,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
 
   packages/1-framework/2-authoring/contract-ts:
     devDependencies:
