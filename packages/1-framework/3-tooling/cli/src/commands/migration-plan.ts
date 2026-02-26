@@ -11,7 +11,7 @@ import {
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
-import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { type MigrationManifest, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join } from 'pathe';
@@ -64,24 +64,8 @@ export interface MigrationPlanResult {
   };
 }
 
-interface MigrationToolsErrorLike extends Error {
-  readonly code: string;
-  readonly why: string;
-  readonly fix: string;
-  readonly details?: Record<string, unknown>;
-}
-
-function isMigrationToolsError(error: unknown): error is MigrationToolsErrorLike {
-  return (
-    error instanceof Error &&
-    error.name === 'MigrationToolsError' &&
-    'code' in error &&
-    typeof (error as unknown as Record<string, unknown>)['code'] === 'string'
-  );
-}
-
 function mapMigrationToolsError(error: unknown): CliStructuredError {
-  if (isMigrationToolsError(error)) {
+  if (MigrationToolsError.is(error)) {
     return errorRuntime(error.message, {
       why: error.why,
       fix: error.fix,
@@ -184,16 +168,23 @@ async function executeMigrationPlanCommand(
   let fromHash: string = EMPTY_CONTRACT_HASH;
 
   try {
-    const packages = await readMigrationsDir(migrationsDir);
+    const allPackages = await readMigrationsDir(migrationsDir);
+    const packages = allPackages.filter((p) => p.manifest.edgeId !== null);
     const graph = reconstructGraph(packages);
     const leafHash = findLeaf(graph);
 
     if (options.from) {
       fromHash = options.from;
       const sourcePkg = packages.find((p) => p.manifest.to === fromHash);
-      if (sourcePkg) {
-        fromContract = sourcePkg.manifest.toContract;
+      if (!sourcePkg) {
+        return notOk(
+          errorRuntime('Starting contract not found', {
+            why: `No migration with to="${fromHash}" exists in ${migrationsRelative}`,
+            fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the DAG leaf.',
+          }),
+        );
       }
+      fromContract = sourcePkg.manifest.toContract;
     } else if (leafHash !== EMPTY_CONTRACT_HASH) {
       fromHash = leafHash;
       const leafPkg = packages.find((p) => p.manifest.to === leafHash);
@@ -202,7 +193,7 @@ async function executeMigrationPlanCommand(
       }
     }
   } catch (error) {
-    if (isMigrationToolsError(error)) {
+    if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
     }
     throw error;
@@ -259,35 +250,22 @@ async function executeMigrationPlanCommand(
   const ops: readonly MigrationPlanOperation[] = plannerResult.plan.operations;
 
   if (ops.length === 0) {
-    // The hashes differ (we checked for hash equality earlier) but the additive-only
+    // The hashes differ (we returned early for hash equality above) but the additive-only
     // planner produced no operations. This means the contract changed in ways the
     // planner silently ignores — e.g. table/column removals. Destructive operations
     // are not yet supported, so we report an error rather than a misleading no-op.
-    if (fromHash !== toStorageHash) {
-      return notOk(
-        errorMigrationPlanningFailed({
-          conflicts: [
-            {
-              kind: 'unsupportedChange',
-              summary:
-                'Contract changed but no additive operations were produced. ' +
-                'This usually means destructive changes (table/column removal) which are not yet supported.',
-            },
-          ],
-        }),
-      );
-    }
-
-    const result: MigrationPlanResult = {
-      ok: true,
-      noOp: true,
-      from: fromHash,
-      to: toStorageHash,
-      operations: [],
-      summary: 'No operations needed',
-      timings: { total: Date.now() - startTime },
-    };
-    return ok(result);
+    return notOk(
+      errorMigrationPlanningFailed({
+        conflicts: [
+          {
+            kind: 'unsupportedChange',
+            summary:
+              'Contract changed but no additive operations were produced. ' +
+              'This usually means destructive changes (table/column removal) which are not yet supported.',
+          },
+        ],
+      }),
+    );
   }
 
   // Build manifest and write migration package

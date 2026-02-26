@@ -72,17 +72,6 @@ function convertTable(name: string, table: StorageTable): SqlTableIR {
 }
 
 /**
- * Converts a contract's `SqlStorage` to `SqlSchemaIR`.
- *
- * This is a lossy conversion that drops codec metadata (`codecId`, `typeParams`, `typeRef`)
- * since the schema IR only represents structural information. The resulting schema IR can be
- * fed into the existing planner as the "from" state for offline migration planning.
- *
- * `extensions` is always `[]` — the planner resolves extension dependencies from framework
- * components, and an empty array means "nothing installed yet" which is correct for the
- * "from" side of a diff.
- */
-/**
  * Detects destructive changes between two contract storages.
  *
  * The additive-only planner silently ignores removals (tables, columns).
@@ -124,6 +113,17 @@ export function detectDestructiveChanges(
   return conflicts;
 }
 
+/**
+ * Converts a contract's `SqlStorage` to `SqlSchemaIR`.
+ *
+ * This is a lossy conversion that drops codec metadata (`codecId`, `typeParams`, `typeRef`)
+ * since the schema IR only represents structural information. The resulting schema IR can be
+ * fed into the existing planner as the "from" state for offline migration planning.
+ *
+ * `extensions` is always `[]` — the planner resolves extension dependencies from framework
+ * components, and an empty array means "nothing installed yet" which is correct for the
+ * "from" side of a diff.
+ */
 export function contractToSchemaIR(storage: SqlStorage): SqlSchemaIR {
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {

@@ -93,6 +93,14 @@
       "types": "./dist/commands/migration-plan.d.mts",
       "import": "./dist/commands/migration-plan.mjs"
     },
+    "./commands/migration-new": {
+      "types": "./dist/commands/migration-new.d.mts",
+      "import": "./dist/commands/migration-new.mjs"
+    },
+    "./commands/migration-verify": {
+      "types": "./dist/commands/migration-verify.d.mts",
+      "import": "./dist/commands/migration-verify.mjs"
+    },
     "./config-loader": {
       "types": "./dist/config-loader.d.mts",
       "import": "./dist/config-loader.mjs"

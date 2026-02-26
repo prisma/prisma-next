@@ -14,9 +14,15 @@ export interface VerifyResult {
 }
 
 export function computeEdgeId(manifest: MigrationManifest, ops: MigrationOps): string {
-  const { edgeId: _edgeId, signature: _signature, ...stripped } = manifest;
+  const {
+    edgeId: _edgeId,
+    signature: _signature,
+    fromContract: _fromContract,
+    toContract: _toContract,
+    ...strippedMeta
+  } = manifest;
 
-  const canonicalManifest = canonicalizeJson(stripped);
+  const canonicalManifest = canonicalizeJson(strippedMeta);
   const canonicalOps = canonicalizeJson(ops);
 
   const canonicalFromContract =

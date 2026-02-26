@@ -1,4 +1,5 @@
 import { attestMigration, verifyMigration } from '@prisma-next/migration-tools/attestation';
+import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
@@ -23,7 +24,7 @@ interface MigrationVerifyOptions {
 
 export interface MigrationVerifyResult {
   readonly ok: boolean;
-  readonly status: 'verified' | 'attested' | 'mismatch';
+  readonly status: 'verified' | 'attested';
   readonly dir: string;
   readonly edgeId?: string | undefined;
   readonly storedEdgeId?: string | undefined;
@@ -73,22 +74,20 @@ async function executeMigrationVerifyCommand(
       });
     }
 
-    return ok({
-      ok: false,
-      status: 'mismatch',
-      dir,
-      storedEdgeId: result.storedEdgeId,
-      computedEdgeId: result.computedEdgeId,
-      summary: `edgeId mismatch: stored=${result.storedEdgeId}, computed=${result.computedEdgeId}`,
-    });
+    return notOk(
+      errorRuntime('edgeId mismatch — migration has been modified', {
+        why: `stored=${result.storedEdgeId}, computed=${result.computedEdgeId}`,
+        fix: 'Re-attest with `migration verify` if the change was intentional, or restore the original migration.',
+        meta: { storedEdgeId: result.storedEdgeId, computedEdgeId: result.computedEdgeId },
+      }),
+    );
   } catch (error) {
-    if (error instanceof Error && error.name === 'MigrationToolsError') {
-      const e = error as unknown as { code: string; why: string; fix: string };
+    if (MigrationToolsError.is(error)) {
       return notOk(
         errorRuntime(error.message, {
-          why: e.why,
-          fix: e.fix,
-          meta: { code: e.code },
+          why: error.why,
+          fix: error.fix,
+          meta: { code: error.code, ...(error.details ?? {}) },
         }),
       );
     }
@@ -112,8 +111,8 @@ export function createMigrationVerifyCommand(): Command {
   command
     .configureHelp({
       formatHelp: (cmd) => {
-        const flags2 = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags: flags2 });
+        const defaultFlags = parseGlobalFlags({});
+        return formatCommandHelp({ command: cmd, flags: defaultFlags });
       },
     })
     .requiredOption('--dir <path>', 'Path to the migration package directory')
@@ -147,7 +146,6 @@ function formatMigrationVerifyOutput(result: MigrationVerifyResult, flags: Globa
   const lines: string[] = [];
   const useColor = flags.color !== false;
   const green_ = useColor ? (s: string) => `\x1b[32m${s}\x1b[0m` : (s: string) => s;
-  const red_ = useColor ? (s: string) => `\x1b[31m${s}\x1b[0m` : (s: string) => s;
   const yellow_ = useColor ? (s: string) => `\x1b[33m${s}\x1b[0m` : (s: string) => s;
   const dim_ = useColor ? (s: string) => `\x1b[2m${s}\x1b[0m` : (s: string) => s;
 
@@ -159,11 +157,6 @@ function formatMigrationVerifyOutput(result: MigrationVerifyResult, flags: Globa
     case 'attested':
       lines.push(`${yellow_('◉')} Draft migration attested`);
       lines.push(dim_(`  edgeId: ${result.edgeId}`));
-      break;
-    case 'mismatch':
-      lines.push(`${red_('✘')} edgeId mismatch — migration has been modified`);
-      lines.push(dim_(`  stored:   ${result.storedEdgeId}`));
-      lines.push(dim_(`  computed: ${result.computedEdgeId}`));
       break;
   }
 

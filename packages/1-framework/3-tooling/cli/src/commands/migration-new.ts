@@ -1,7 +1,13 @@
 import { relative, resolve } from 'node:path';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
+import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import {
+  formatMigrationDirName,
+  readMigrationsDir,
+  writeMigrationPackage,
+} from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join } from 'pathe';
@@ -65,13 +71,31 @@ async function executeMigrationNewCommand(
   const dirName = formatMigrationDirName(timestamp, options.name);
   const packageDir = join(migrationsDir, dirName);
 
+  let fromHash = EMPTY_CONTRACT_HASH;
+  let fromContract: Record<string, unknown> | null = null;
+  try {
+    const packages = await readMigrationsDir(migrationsDir);
+    const attested = packages.filter((p) => p.manifest.edgeId !== null);
+    if (attested.length > 0) {
+      const graph = reconstructGraph(attested);
+      const leafHash = findLeaf(graph);
+      fromHash = leafHash;
+      const leafPkg = attested.find((p) => p.manifest.to === leafHash);
+      if (leafPkg) {
+        fromContract = leafPkg.manifest.toContract as Record<string, unknown>;
+      }
+    }
+  } catch {
+    // If reading migrations fails, start from empty — this is a draft scaffold
+  }
+
   const emptyContract = {
     schemaVersion: '1',
     targetFamily: '',
     target: '',
     models: {},
     relations: {},
-    storage: {},
+    storage: { tables: {} },
     extensionPacks: {},
     capabilities: {},
     meta: {},
@@ -79,11 +103,11 @@ async function executeMigrationNewCommand(
   };
 
   const manifest: MigrationManifest = {
-    from: EMPTY_CONTRACT_HASH,
+    from: fromHash,
     to: EMPTY_CONTRACT_HASH,
     edgeId: null,
     kind: 'regular',
-    fromContract: null,
+    fromContract,
     toContract: emptyContract,
     hints: {
       used: [],
@@ -106,13 +130,12 @@ async function executeMigrationNewCommand(
     };
     return ok(result);
   } catch (error) {
-    if (error instanceof Error && error.name === 'MigrationToolsError') {
-      const e = error as unknown as { code: string; why: string; fix: string };
+    if (MigrationToolsError.is(error)) {
       return notOk(
         errorRuntime(error.message, {
-          why: e.why,
-          fix: e.fix,
-          meta: { code: e.code },
+          why: error.why,
+          fix: error.fix,
+          meta: { code: error.code, ...(error.details ?? {}) },
         }),
       );
     }
@@ -136,8 +159,8 @@ export function createMigrationNewCommand(): Command {
   command
     .configureHelp({
       formatHelp: (cmd) => {
-        const flags2 = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags: flags2 });
+        const defaultFlags = parseGlobalFlags({});
+        return formatCommandHelp({ command: cmd, flags: defaultFlags });
       },
     })
     .requiredOption('--name <slug>', 'Name slug for the migration directory')

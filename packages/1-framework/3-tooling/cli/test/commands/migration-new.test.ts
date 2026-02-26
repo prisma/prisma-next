@@ -31,7 +31,7 @@ describe('migration new — scaffold', () => {
       target: '',
       models: {},
       relations: {},
-      storage: {},
+      storage: { tables: {} },
       extensionPacks: {},
       capabilities: {},
       meta: {},
