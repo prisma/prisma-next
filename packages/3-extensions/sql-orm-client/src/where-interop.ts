@@ -32,6 +32,44 @@ function assertBoundPayload(bound: BoundWhereExpr): void {
       `ToWhereExpr payload is invalid: params (${bound.params.length}) and paramDescriptors (${bound.paramDescriptors.length}) must align`,
     );
   }
+
+  const indexes = collectParamRefIndexes(bound.expr);
+  if (indexes.length === 0) {
+    if (bound.params.length > 0) {
+      throw new Error(
+        'ToWhereExpr payload is invalid: expr does not contain ParamRef entries but params were provided',
+      );
+    }
+    return;
+  }
+
+  const unique = [...new Set(indexes)].sort((a, b) => a - b);
+  const minIndex = unique[0];
+  const maxIndex = unique[unique.length - 1];
+
+  if (minIndex !== 1) {
+    throw new Error(
+      `ToWhereExpr payload is invalid: ParamRef indices must start at 1, found min index ${String(minIndex)}`,
+    );
+  }
+  if (maxIndex !== bound.params.length) {
+    throw new Error(
+      `ToWhereExpr payload is invalid: max ParamRef index (${String(maxIndex)}) must equal params length (${bound.params.length})`,
+    );
+  }
+  if (unique.length !== bound.params.length) {
+    throw new Error(
+      `ToWhereExpr payload is invalid: ParamRef indices must be contiguous with no gaps for params length ${bound.params.length}`,
+    );
+  }
+
+  for (let i = 0; i < unique.length; i++) {
+    if (unique[i] !== i + 1) {
+      throw new Error(
+        `ToWhereExpr payload is invalid: ParamRef indices must be contiguous from 1..${bound.params.length}`,
+      );
+    }
+  }
 }
 
 function assertBareWhereExprIsParamFree(expr: WhereExpr): void {
@@ -257,4 +295,108 @@ function paramRefToLiteral(
     kind: 'literal',
     value: params[idx],
   };
+}
+
+function collectParamRefIndexes(expr: WhereExpr): number[] {
+  const indexes: number[] = [];
+
+  const visitComparable = (
+    value: Expression | ParamRef | ListLiteralExpr | { kind: 'literal'; value: unknown },
+  ): void => {
+    if (value.kind === 'param') {
+      indexes.push(value.index);
+      return;
+    }
+    if (value.kind === 'literal') {
+      return;
+    }
+    if (value.kind === 'listLiteral') {
+      for (const entry of value.values) {
+        if (entry.kind === 'param') {
+          indexes.push(entry.index);
+        }
+      }
+      return;
+    }
+    visitExpression(value);
+  };
+
+  const visitExpression = (value: Expression): void => {
+    if (value.kind !== 'operation') {
+      return;
+    }
+    for (const arg of value.args) {
+      if (arg.kind === 'param') {
+        indexes.push(arg.index);
+      } else if (arg.kind !== 'literal') {
+        visitExpression(arg);
+      }
+    }
+  };
+
+  const visitJoinOn = (joinOn: JoinOnExpr): void => {
+    if (joinOn.kind === 'eqCol') {
+      return;
+    }
+    visitWhere(joinOn);
+  };
+
+  const visitSelect = (ast: SelectAst): void => {
+    if (ast.where) {
+      visitWhere(ast.where);
+    }
+    for (const projection of ast.project) {
+      if (projection.expr.kind !== 'includeRef' && projection.expr.kind !== 'literal') {
+        visitExpression(projection.expr);
+      }
+    }
+    for (const orderBy of ast.orderBy ?? []) {
+      visitExpression(orderBy.expr);
+    }
+    for (const join of ast.joins ?? []) {
+      visitJoinOn(join.on);
+    }
+    for (const include of ast.includes ?? []) {
+      const child = include.child;
+      if (child.where) {
+        visitWhere(child.where);
+      }
+      for (const childProjection of child.project) {
+        if (childProjection.expr.kind !== 'includeRef' && childProjection.expr.kind !== 'literal') {
+          visitExpression(childProjection.expr);
+        }
+      }
+      for (const childOrderBy of child.orderBy ?? []) {
+        visitExpression(childOrderBy.expr);
+      }
+    }
+  };
+
+  const visitWhere = (value: WhereExpr): void => {
+    switch (value.kind) {
+      case 'bin':
+        visitExpression(value.left);
+        visitComparable(value.right);
+        return;
+      case 'nullCheck':
+        visitExpression(value.expr);
+        return;
+      case 'and':
+      case 'or':
+        for (const nested of value.exprs) {
+          visitWhere(nested);
+        }
+        return;
+      case 'exists':
+        visitSelect(value.subquery);
+        return;
+      default: {
+        const neverExpr: never = value;
+        throw new Error(`Unsupported where expression kind: ${String(neverExpr)}`);
+      }
+    }
+  };
+
+  visitWhere(expr);
+  return indexes;
 }

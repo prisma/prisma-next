@@ -37,15 +37,18 @@ export function buildKyselyPlan<Row>(
   runGuardrails(contract, query);
   const { ast, metaAdditions } = transformKyselyToPnAst(contract, query, compiledQuery.parameters);
 
-  const annotations: { redactedSql?: string; codecs?: Record<string, string> } = {
-    redactedSql: REDACTED_SQL,
-  };
+  const paramDescriptors = metaAdditions.paramDescriptors;
+  if (compiledQuery.parameters.length !== paramDescriptors.length) {
+    throw new Error(
+      `Kysely plan parameter mismatch: compiled parameters length (${compiledQuery.parameters.length}) must match paramDescriptors length (${paramDescriptors.length})`,
+    );
+  }
+  const params = compiledQuery.parameters.slice();
+
+  const annotations: { codecs?: Record<string, string> } = {};
   if (metaAdditions.projectionTypes && Object.keys(metaAdditions.projectionTypes).length > 0) {
     annotations.codecs = { ...metaAdditions.projectionTypes };
   }
-
-  const paramDescriptors = metaAdditions.paramDescriptors;
-  const params = compiledQuery.parameters.slice(0, paramDescriptors.length);
 
   return {
     ast,

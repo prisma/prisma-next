@@ -45,6 +45,7 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
     - `paramDescriptors: ReadonlyArray<ParamDescriptor>` aligned to those indices
 - ORM must be able to consume `WhereArg` without importing Kysely types.
 - Consumers pass `ToWhereExpr` as-is; ORM performs the conversion (no manual `.toWhereExpr()` at call sites).
+- Phase 2 consumption semantics are **literal-normalizing**: ORM validates bound payload invariants, then substitutes `ParamRef` entries with `LiteralExpr` values during normalization. `paramDescriptors` are validated for alignment and indexing integrity but are not propagated into ORM plan metadata in this phase.
 
 ### 3) Postgres convenience client exposes build-only Kysely surface
 
@@ -85,10 +86,10 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
 - [x] **No runtime dependency**: `@prisma-next/sql-kysely-lane` does not depend on `@prisma-next/sql-runtime`; `pnpm lint:deps` passes.
 - [x] **Build-only types**: `db.kysely` (and any exported build-only lane types) do not expose execution entrypoints in their public TypeScript types.
 - [x] **Execution backstop**: runtime execution via `any` casts throws deterministically (tests cover at least one blocked path).
-- [ ] **Interop protocol**: `WhereArg`/`ToWhereExpr` exist in `@prisma-next/sql-relational-core`; `ToWhereExpr.toWhereExpr()` is zero-arg and returns `{expr, params, paramDescriptors}` with local param indices starting at 1.
-- [ ] **ORM consumption**: ORM accepts `WhereArg` and handles:
+- [x] **Interop protocol**: `WhereArg`/`ToWhereExpr` exist in `@prisma-next/sql-relational-core`; `ToWhereExpr.toWhereExpr()` is zero-arg and returns `{expr, params, paramDescriptors}` with local param indices starting at 1.
+- [x] **ORM consumption**: ORM accepts `WhereArg` and handles:
   - param-free bare `WhereExpr`
-  - bound `ToWhereExpr` payloads, including param reindexing when composing into a plan
+  - bound `ToWhereExpr` payloads, including strict payload validation and `ParamRef -> LiteralExpr` normalization
 - [x] **SQL redaction (Option A)**: compilation (if reachable) yields a stub SQL string while preserving operation tree and parameter ordering/values; tests confirm this.
 - [x] **Integration re-scope**: `@prisma-next/integration-kysely` no longer owns transformer/guardrail logic (moved to lane or delegated).
 - [x] **Parity preserved**: existing transformer/guardrail tests continue to pass (or are ported to the new lane package without reducing coverage).
@@ -124,11 +125,12 @@ No new data handling is expected. Ensure parameter descriptor and param handling
 
 # Open Questions
 
-1. **Interop strictness**: should ORM reject paramful bare `WhereExpr` immediately (as proposed) or allow it and normalize later?
+1. **Phase 3 interop shape**: should ORM evolve from literal-normalizing `ToWhereExpr` consumption to a bound-param-preserving composition model with descriptor propagation?
 2. **Minimum supported Kysely subset** for the build-only surface in Phase 2: exactly “what exists today”, or do we need to prune/clarify support before extraction?
 
 # Decision Log
 
 - Unsupported Kysely kinds in runtime attachment paths: **fail fast** with stable structured errors (no raw fallback).
 - Postgres public API for this phase: `db.kysely` remains **build-only only**; no execution-capable public Kysely API is introduced.
+- ORM `WhereArg` handling in this phase uses **literal-normalizing** consumption for `ToWhereExpr` payloads (strictly validated, then normalized to param-free `WhereExpr`).
 

@@ -1,17 +1,22 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
+import type { CompiledQuery } from 'kysely';
 import { db } from '../prisma/db';
+
+type BuildableKyselyQuery<Row> = {
+  compile(): CompiledQuery<Row>;
+};
 
 export async function executeKyselyQuery<Row>(
   runtime: Runtime,
-  query: { compile(): unknown },
+  query: BuildableKyselyQuery<Row>,
 ): Promise<Row[]> {
-  const plan = db.kysely.build(query as { compile(): never });
+  const plan = db.kysely.build<Row>(query);
   return runtime.execute(plan).toArray() as Promise<Row[]>;
 }
 
 export async function executeKyselyTakeFirst<Row>(
   runtime: Runtime,
-  query: { compile(): unknown },
+  query: BuildableKyselyQuery<Row>,
 ): Promise<Row | null> {
   const rows = await executeKyselyQuery<Row>(runtime, query);
   return rows[0] ?? null;
@@ -19,7 +24,7 @@ export async function executeKyselyTakeFirst<Row>(
 
 export async function executeKyselyTakeFirstOrThrow<Row>(
   runtime: Runtime,
-  query: { compile(): unknown },
+  query: BuildableKyselyQuery<Row>,
 ): Promise<Row> {
   const row = await executeKyselyTakeFirst<Row>(runtime, query);
   if (!row) {

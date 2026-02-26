@@ -14,6 +14,8 @@
  * - posts <userId>             Get posts for a user
  * - users-with-posts [limit]   Users with nested posts (includeMany)
  * - repo-users [limit]         Users via ORM client API
+ * - repo-users-wherearg <kind> [limit]
+ *                              Users via ORM ToWhereExpr filter interop
  * - repo-admins [limit]        Admin users via custom collection scope
  * - repo-user <email>          Find a user by email via ORM client find()
  * - repo-posts <userId> [limit] Posts for a user via ORM client API
@@ -68,6 +70,7 @@ import { ormClientGetUserKindBreakdown } from './orm-client/get-user-kind-breakd
 import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { ormClientGetUsers } from './orm-client/get-users';
 import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor';
+import { ormClientGetUsersViaWhereArg } from './orm-client/get-users-via-wherearg';
 import { ormClientUpsertUser } from './orm-client/upsert-user';
 import { db } from './prisma/db';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
@@ -116,6 +119,15 @@ async function main() {
     } else if (cmd === 'repo-admins') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await ormClientGetAdminUsers(limit, runtime);
+      console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'repo-users-wherearg') {
+      const [kind, limitStr] = args;
+      if (kind !== 'admin' && kind !== 'user') {
+        console.error('Usage: pnpm start -- repo-users-wherearg <admin|user> [limit]');
+        process.exit(1);
+      }
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const users = await ormClientGetUsersViaWhereArg(kind, limit, runtime);
       console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'repo-user') {
       const [email] = args;
@@ -317,7 +329,7 @@ async function main() {
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | ' +
-          'users-with-posts [limit] | repo-users [limit] | repo-admins [limit] | ' +
+          'users-with-posts [limit] | repo-users [limit] | repo-users-wherearg <admin|user> [limit] | repo-admins [limit] | ' +
           'repo-user <email> | repo-posts <userId> [limit] | ' +
           'repo-dashboard <emailDomain> <postTitleTerm> [limit] [postsPerUser] | ' +
           'repo-post-feed <postTitleTerm> [limit] | repo-users-cursor [cursor] [limit] | ' +

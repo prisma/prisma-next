@@ -76,9 +76,6 @@ describe('KyselyPrismaConnection', () => {
     expect(runtimeConnection.executions).toHaveLength(1);
     expect(runtimeConnection.executions[0]?.plan.params).toEqual(compiledQuery.parameters);
     expect(runtimeConnection.executions[0]?.plan.meta.lane).toBe('kysely');
-    expect(runtimeConnection.executions[0]?.plan.meta.annotations).toMatchObject({
-      redactedSql: '/* redacted by @prisma-next/sql-kysely-lane */',
-    });
   });
 
   it('streamQuery preserves chunking behavior with converted plans', async () => {

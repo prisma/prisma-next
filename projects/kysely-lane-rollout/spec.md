@@ -130,3 +130,4 @@ No product analytics changes required. Development analytics are commit/test/CI 
 
 - Phase 2 unsupported-kinds behavior: **fail fast** with stable structured errors in runtime attachment paths.
 - Phase 2 Postgres API shape: `db.kysely` is **build-only only**; no execution-capable public Kysely API.
+- Phase 2 ORM interop behavior: `ToWhereExpr` payloads are consumed via strict index/alignment validation and literal normalization (`ParamRef -> LiteralExpr`) at ORM boundaries.

@@ -50,6 +50,8 @@ Deliver Kysely-lane work in three stages so we can ship immediate value, then re
 **Tasks:**
 
 - [ ] Define go/no-go criteria for direct PN AST (maintainability/performance/correctness).
+- [ ] Evaluate whether ORM `WhereArg` should preserve bound params/descriptors through plan composition (currently literal-normalizing in Phase 2).
+- [ ] Standardize PLAN.UNSUPPORTED envelope construction on shared plan helpers where behavior can remain unchanged.
 - [ ] If go: implement direct construction path and update tests/docs.
 - [ ] If no-go: document deferral rationale and create a tracked follow-up item.
 

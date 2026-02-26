@@ -56,9 +56,17 @@ function extractRefsFromAst(ast: QueryAst): PlanRefs {
   }
 
   visit(ast);
+  const sortedTables = [...tables].sort((a, b) => a.localeCompare(b));
+  const sortedColumns = [...columns].sort((a, b) => {
+    const tableCompare = a.table.localeCompare(b.table);
+    if (tableCompare !== 0) {
+      return tableCompare;
+    }
+    return a.column.localeCompare(b.column);
+  });
   return {
-    tables: [...tables],
-    columns,
+    tables: sortedTables,
+    columns: sortedColumns,
   };
 }
 

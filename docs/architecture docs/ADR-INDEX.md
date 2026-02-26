@@ -26,7 +26,6 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 021 | Contract Marker Storage | Defines database storage for contract identity verification and alignment checks | [ADR 021 - Contract Marker Storage.md](adrs/ADR%20021%20-%20Contract%20Marker%20Storage.md) |
 | 042 | Contract Marker Evolution | Specifies marker table schema evolution and forward-compatible field additions | [ADR 042 - Contract Marker Evolution.md](adrs/ADR%20042%20-%20Contract%20Marker%20Evolution.md) |
 | 156 | Storage sets and check constraints | Adds `storage.sets` and a minimal `checks[]` shape to express “column value is in this set” explicitly in storage | [ADR 156 - Storage sets and check constraints.md](adrs/ADR%20156%20-%20Storage%20sets%20and%20check%20constraints.md) |
-| 162 | Typed default literal pipeline and extensibility | Documents the JSON-first typed-default pipeline (encode → emit → validate → verify → render), its limitations, and outlines a codec-keyed SPI for future extensibility | [ADR 162 - Typed default literal pipeline and extensibility.md](adrs/ADR%20162%20-%20Typed%20default%20literal%20pipeline%20and%20extensibility.md) |
 
 ## Query System
 
@@ -35,11 +34,12 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 011 | Unified Plan Model | Establishes common Plan structure across all query lanes with AST, SQL, and metadata | [ADR 011 - Unified Plan Model.md](adrs/ADR%20011%20-%20Unified%20Plan%20Model.md) |
 | 012 | Raw SQL Escape Hatch | Provides safe raw SQL execution with required annotations and verification | [ADR 012 - Raw SQL Escape Hatch.md](adrs/ADR%20012%20-%20Raw%20SQL%20Escape%20Hatch.md) |
 | 013 | Lane Agnostic Plan Identity | Ensures Plan identity and hashing work consistently across all query lanes | [ADR 013 - Lane Agnostic Plan Identity.md](adrs/ADR%20013%20-%20Lane%20Agnostic%20Plan%20Identity.md) |
+| 160 | Kysely lane emits PN SQL AST | Kysely authoring compiles to plans with PN-native QueryAst + refs so runtime plugins can inspect structure lane-agnostically | [ADR 160 - Kysely lane emits PN SQL AST.md](adrs/ADR%20160%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md) |
+| 162 | ORM WhereArg literal normalization in phase 2 | Records Phase 2 decision to validate bound ToWhereExpr payloads then normalize ParamRef values into literals at ORM boundaries | [ADR 162 - ORM WhereArg literal normalization in phase 2.md](adrs/ADR%20162%20-%20ORM%20WhereArg%20literal%20normalization%20in%20phase%202.md) |
 | 018 | Plan Annotations Schema | Defines canonical JSON schema for Plan annotations and validation rules | [ADR 018 - Plan Annotations Schema.md](adrs/ADR%20018%20-%20Plan%20Annotations%20Schema.md) |
 | 019 | TypedSQL as Separate CLI | Establishes TypedSQL as out-of-tree tool that emits Plan factories | [ADR 019 - TypedSQL as Separate CLI.md](adrs/ADR%20019%20-%20TypedSQL%20as%20Separate%20CLI.md) |
 | 020 | Result Typing Rules | Defines how DSL and ORM compute result types from projections and joins | [ADR 020 - Result Typing Rules.md](adrs/ADR%20020%20-%20Result%20Typing%20Rules.md) |
 | 025 | Plan Caching Memoization | Establishes Plan caching strategy with memoization and invalidation | [ADR 025 - Plan Caching Memoization.md](adrs/ADR%20025%20-%20Plan%20Caching%20Memoization.md) |
-| 162 | Kysely lane emits PN SQL AST | Kysely authoring compiles to plans with PN-native QueryAst + refs so runtime plugins can inspect structure lane-agnostically | [ADR 162 - Kysely lane emits PN SQL AST.md](adrs/ADR%20162%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md) |
 
 ## Runtime & Execution
 

@@ -32,8 +32,9 @@ Deliverables:
 - [x] Implement validation rule: bare `WhereExpr` accepted by ORM must be param-free (reject `ParamRef` usage).
 - [x] Implement ORM normalization path for `WhereArg`:
   - call `toWhereExpr()` immediately for `ToWhereExpr`
-  - reindex and append params/descriptors when composing into a plan
-- [x] Add unit tests for `WhereArg` normalization and param reindexing (including nested `and/or/exists` shapes).
+  - validate payload invariants (`ParamRef` starts at 1, contiguous, max index equals params/descriptors length)
+  - normalize `ParamRef` entries into `LiteralExpr` values for ORM-internal param-free filters
+- [x] Add unit tests for `WhereArg` normalization and payload-index invariant enforcement (including nested `and/or/exists` shapes).
 
 ### Milestone 2: Create `@prisma-next/sql-kysely-lane` package
 
@@ -94,7 +95,7 @@ Deliverables:
 | Build-only types: `db.kysely` and lane exports hide execution APIs | Type tests | Milestone 3 | Add `.test-d.ts` assertions for missing `.execute*` / `.stream*` / `.transaction*` |
 | Execution backstop: `any`/cast execution attempts throw deterministically | Unit | Milestone 2 | Cover at least one blocked execution path |
 | Interop protocol exists: `WhereArg` / zero-arg `ToWhereExpr` with bound payload | Unit | Milestone 1 | Verify `{ expr, params, paramDescriptors }` and local index origin at 1 |
-| ORM consumption handles bare `WhereExpr` + bound `ToWhereExpr` with reindexing | Unit + Integration | Milestone 1 | Include nested boolean/exists compositions and descriptor alignment |
+| ORM consumption handles bare `WhereExpr` + bound `ToWhereExpr` with strict payload validation + literal normalization | Unit + Integration | Milestone 1 | Include nested boolean/exists compositions and descriptor alignment |
 | SQL redaction (Option A): compiled SQL string is stubbed while params remain intact | Unit | Milestone 2 | Assert SQL is redacted and parameter ordering/values are unchanged |
 | Integration re-scope: `@prisma-next/integration-kysely` no longer owns lane transform/guardrails | Integration | Milestone 3 | Assert runtime-attachment-only boundary |
 | Parity preserved: existing transformer/guardrail coverage is retained after move/port | Unit + Integration | Milestone 2 + 3 | No net coverage loss on supported node kinds |
@@ -103,11 +104,12 @@ Deliverables:
 
 ## Open Items
 
-- Decide whether ORM should hard-reject paramful bare `WhereExpr` at normalization boundary (current plan assumes yes).
+- Decide whether Phase 3 should adopt bound-param-preserving ORM composition for `ToWhereExpr` payloads (instead of Phase 2 literal normalization).
 - Confirm minimum supported Kysely subset for the build-only surface and document it.
 
 ## Decision Log
 
 - Unsupported Kysely kinds policy for this phase: **fail fast** (no raw fallback).
 - Postgres API shape for this phase: `db.kysely` is **build-only only**; no execution-capable public Kysely API.
+- ORM `WhereArg` policy for this phase: consume bound `ToWhereExpr` payloads via strict validation + `ParamRef -> LiteralExpr` normalization (descriptor propagation deferred to Phase 3).
 

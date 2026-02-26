@@ -136,4 +136,60 @@ describe('where interop', () => {
 
     expect(() => normalizeWhereArg(arg)).toThrow(/paramDescriptors/i);
   });
+
+  it('rejects payloads that do not start ParamRef indexing at 1', () => {
+    const arg = toWhereExpr({
+      expr: {
+        kind: 'bin',
+        op: 'eq',
+        left: { kind: 'col', table: 'users', column: 'id' },
+        right: { kind: 'param', index: 2 },
+      },
+      params: ['a', 'b'],
+      paramDescriptors: [{ source: 'lane' }, { source: 'lane' }],
+    });
+
+    expect(() => normalizeWhereArg(arg)).toThrow(/start at 1/i);
+  });
+
+  it('rejects payloads with non-contiguous ParamRef indices', () => {
+    const arg = toWhereExpr({
+      expr: {
+        kind: 'and',
+        exprs: [
+          {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'users', column: 'id' },
+            right: { kind: 'param', index: 1 },
+          },
+          {
+            kind: 'bin',
+            op: 'eq',
+            left: { kind: 'col', table: 'users', column: 'email' },
+            right: { kind: 'param', index: 3 },
+          },
+        ],
+      },
+      params: ['a', 'b', 'c'],
+      paramDescriptors: [{ source: 'lane' }, { source: 'lane' }, { source: 'lane' }],
+    });
+
+    expect(() => normalizeWhereArg(arg)).toThrow(/contiguous/i);
+  });
+
+  it('rejects payloads whose max ParamRef index does not match params length', () => {
+    const arg = toWhereExpr({
+      expr: {
+        kind: 'bin',
+        op: 'eq',
+        left: { kind: 'col', table: 'users', column: 'id' },
+        right: { kind: 'param', index: 1 },
+      },
+      params: ['a', 'b'],
+      paramDescriptors: [{ source: 'lane' }, { source: 'lane' }],
+    });
+
+    expect(() => normalizeWhereArg(arg)).toThrow(/max ParamRef index/i);
+  });
 });
