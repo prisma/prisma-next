@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -444,6 +444,62 @@ describe('emit command', () => {
         expect(existsSync(contractJsonPath)).toBe(true);
       } finally {
         cleanupSync();
+      }
+    },
+  );
+
+  it(
+    'resolves psl source config and emits offline',
+    { timeout: timeouts.typeScriptCompilation },
+    async () => {
+      const command = createContractEmitCommand();
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(
+        fixtureSubdir,
+        'prisma-next.config.psl-source.ts',
+      );
+      const testDirPsl = testSetup.testDir;
+      const cleanupPsl = testSetup.cleanup;
+
+      try {
+        writeFileSync(
+          join(testDirPsl, 'schema.prisma'),
+          `model User {
+  id Int @id
+  email String
+}
+`,
+          'utf-8',
+        );
+
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDirPsl);
+          const exitCode = await executeCommand(command, [
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).toBe(0);
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        const contractJsonPath = join(testDirPsl, 'output/contract.json');
+        const contractDtsPath = join(testDirPsl, 'output/contract.d.ts');
+        expect(existsSync(contractJsonPath)).toBe(true);
+        expect(existsSync(contractDtsPath)).toBe(true);
+
+        const emitted = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+        expect(emitted).toMatchObject({
+          targetFamily: 'sql',
+          source: {
+            kind: 'psl',
+            schemaPath: resolve(testDirPsl, 'schema.prisma'),
+            schema: expect.stringContaining('model User'),
+          },
+        });
+      } finally {
+        cleanupPsl();
       }
     },
   );

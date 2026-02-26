@@ -1,4 +1,4 @@
-import type { PrismaNextConfig } from './config-types';
+import { isPslContractSourceConfig, type PrismaNextConfig } from './config-types';
 import { errorConfigValidation } from './errors';
 
 /**
@@ -256,6 +256,18 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
         why: 'Config.contract.source is required when contract is provided',
       });
     }
+
+    if (isPslContractSourceConfig(contract['source'])) {
+      if (
+        typeof contract['source'].schemaPath !== 'string' ||
+        contract['source'].schemaPath.trim() === ''
+      ) {
+        throw errorConfigValidation('contract.source.schemaPath', {
+          why: 'Config.contract.source.schemaPath must be a non-empty string when source.kind is "psl"',
+        });
+      }
+    }
+
     if (contract['output'] !== undefined && typeof contract['output'] !== 'string') {
       throw errorConfigValidation('contract.output', {
         why: 'Config.contract.output must be a string when provided',

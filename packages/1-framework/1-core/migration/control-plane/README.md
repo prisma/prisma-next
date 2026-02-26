@@ -61,7 +61,8 @@ const config = defineConfig({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   contract: {
-    source: contractBuilder,
+    source: contractBuilder, // TS-first value/loader
+    // source: { kind: 'psl', schemaPath: './schema.prisma' }, // PSL-first
     output: 'src/prisma/contract.json',
   },
 });
@@ -69,6 +70,10 @@ const config = defineConfig({
 // Validate config structure (pure validation, no file I/O)
 validateConfig(config);
 ```
+
+`contract.source` supports:
+- direct values and sync/async loader functions (TS-first)
+- `{ kind: 'psl', schemaPath: string }` (PSL-first, requires non-empty `schemaPath`)
 
 ### ControlPlaneStack
 

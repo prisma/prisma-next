@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -6,6 +6,26 @@ import { dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing } from '../../utils/cli-errors';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
+
+interface PslContractSourceInput {
+  readonly kind: 'psl';
+  readonly schemaPath: string;
+}
+
+interface ResolvedPslContractSource {
+  readonly kind: 'psl';
+  readonly schemaPath: string;
+  readonly schema: string;
+}
+
+function isPslContractSourceInput(source: unknown): source is PslContractSourceInput {
+  if (!source || typeof source !== 'object') {
+    return false;
+  }
+
+  const record = source as Record<string, unknown>;
+  return record['kind'] === 'psl';
+}
 
 /**
  * Executes the contract emit operation.
@@ -54,13 +74,10 @@ export async function executeContractEmit(
     });
   }
 
-  // Validate source is defined and is either a function or a non-null object
-  if (
-    contractConfig.source === null ||
-    (typeof contractConfig.source !== 'function' && typeof contractConfig.source !== 'object')
-  ) {
+  // Validate source exists
+  if (contractConfig.source === undefined) {
     throw errorContractConfigMissing({
-      why: 'Contract config must include a valid source (function or non-null object)',
+      why: 'Contract config must include a valid source',
     });
   }
 
@@ -78,10 +95,22 @@ export async function executeContractEmit(
   const familyInstance = config.family.create(stack);
 
   // Resolve contract source from config
-  const contractRaw =
+  const sourceValue =
     typeof contractConfig.source === 'function'
-      ? await unlessAborted(contractConfig.source())
+      ? await unlessAborted(Promise.resolve(contractConfig.source()))
       : contractConfig.source;
+  let contractRaw: unknown = sourceValue;
+  if (isPslContractSourceInput(sourceValue)) {
+    const schemaPath = isAbsolute(sourceValue.schemaPath)
+      ? sourceValue.schemaPath
+      : join(configDir, sourceValue.schemaPath);
+    const schema = await unlessAborted(readFile(schemaPath, 'utf-8'));
+    contractRaw = {
+      kind: 'psl',
+      schemaPath,
+      schema,
+    } satisfies ResolvedPslContractSource;
+  }
 
   // Emit contract via family instance
   const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: contractRaw }));

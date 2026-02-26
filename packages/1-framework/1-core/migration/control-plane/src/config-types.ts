@@ -14,6 +14,30 @@ import type {
  */
 export type CliDriver = ControlDriverInstance<string, string>;
 
+export interface PslContractSourceConfig {
+  readonly kind: 'psl';
+  readonly schemaPath: string;
+}
+
+export type ContractSourceValue =
+  | Record<string, unknown>
+  | readonly unknown[]
+  | string
+  | number
+  | boolean
+  | null;
+
+export type ContractSourceLoader = () => ContractSourceValue | Promise<ContractSourceValue>;
+
+export function isPslContractSourceConfig(source: unknown): source is PslContractSourceConfig {
+  if (!source || typeof source !== 'object') {
+    return false;
+  }
+
+  const record = source as Record<string, unknown>;
+  return record['kind'] === 'psl';
+}
+
 /**
  * Contract configuration specifying source and artifact locations.
  */
@@ -22,7 +46,7 @@ export interface ContractConfig {
    * Contract source. Can be a value or a function that returns a value (sync or async).
    * If a function, it will be called to resolve the contract.
    */
-  readonly source: unknown | (() => unknown | Promise<unknown>);
+  readonly source: ContractSourceValue | ContractSourceLoader;
   /**
    * Path to contract.json artifact. Defaults to 'src/prisma/contract.json'.
    * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
@@ -137,6 +161,14 @@ export function defineConfig<TFamilyId extends string = string, TTargetId extend
       throw new Error(
         'Config.contract.source must be a value (object, string, number, boolean, null) or a function',
       );
+    }
+
+    if (isPslContractSourceConfig(source)) {
+      if (typeof source.schemaPath !== 'string' || source.schemaPath.trim() === '') {
+        throw new Error(
+          'Config.contract.source.schemaPath must be a non-empty string when source.kind is "psl"',
+        );
+      }
     }
 
     // Apply defaults

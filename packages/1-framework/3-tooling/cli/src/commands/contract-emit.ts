@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -32,6 +33,31 @@ interface ContractEmitOptions {
   readonly timestamps?: boolean;
   readonly color?: boolean;
   readonly 'no-color'?: boolean;
+}
+
+interface PslContractSourceInput {
+  readonly kind: 'psl';
+  readonly schemaPath: string;
+}
+
+interface ResolvedPslContractSource {
+  readonly kind: 'psl';
+  readonly schemaPath: string;
+  readonly schema: string;
+}
+
+function isPslContractSourceInput(source: unknown): source is PslContractSourceInput {
+  if (!source || typeof source !== 'object') {
+    return false;
+  }
+
+  const record = source as Record<string, unknown>;
+  return record['kind'] === 'psl';
+}
+
+function resolvePslSchemaPath(schemaPath: string, configPath?: string): string {
+  const baseDir = configPath ? dirname(resolve(configPath)) : process.cwd();
+  return isAbsolute(schemaPath) ? schemaPath : join(baseDir, schemaPath);
 }
 
 /**
@@ -85,7 +111,7 @@ async function executeContractEmitCommand(
   if (!config.contract) {
     return notOk(
       errorContractConfigMissing({
-        why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ..., types: ... }',
+        why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ... }',
       }),
     );
   }
@@ -148,11 +174,27 @@ async function executeContractEmitCommand(
 
   try {
     // Convert user config source to discriminated union
-    // Type assertion is safe: we check typeof to determine if it's a function
     const source: EmitContractSource =
       typeof contractConfig.source === 'function'
-        ? { kind: 'loader', load: contractConfig.source as () => unknown | Promise<unknown> }
-        : { kind: 'value', value: contractConfig.source };
+        ? { kind: 'loader', load: contractConfig.source }
+        : isPslContractSourceInput(contractConfig.source)
+          ? (() => {
+              const pslSource = contractConfig.source;
+              return {
+                kind: 'loader',
+                load: async (): Promise<ResolvedPslContractSource> => {
+                  const schemaPath = resolvePslSchemaPath(pslSource.schemaPath, options.config);
+                  const schema = await readFile(schemaPath, 'utf-8');
+
+                  return {
+                    kind: 'psl',
+                    schemaPath,
+                    schema,
+                  };
+                },
+              };
+            })()
+          : { kind: 'value', value: contractConfig.source };
 
     // Call emit with progress callback
     const result = await client.emit({

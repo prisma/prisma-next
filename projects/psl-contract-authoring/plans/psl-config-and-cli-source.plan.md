@@ -22,13 +22,13 @@ Deliver the end-to-end config + CLI source path for PSL-first projects while pre
 
 **Tasks:**
 
-- [ ] Extend `PrismaNextConfig.contract.source` to accept `{ kind: 'psl', schemaPath: string }` with explicit `schemaPath`.
-- [ ] Add config validation for missing/invalid `schemaPath` with actionable error messages.
-- [ ] Keep existing TS-first source shapes valid (value and loader function).
-- [ ] Wire `prisma-next contract emit` to resolve PSL-first source into the emit operation flow (offline, no DB connection).
-- [ ] Add/update unit tests for config type normalization and validation behavior.
-- [ ] Add/update CLI integration tests covering PSL-first success path and TS-first regression protection.
-- [ ] Update CLI/config docs for PSL-first source selection and expected error behavior.
+- [x] Extend `PrismaNextConfig.contract.source` to accept `{ kind: 'psl', schemaPath: string }` with explicit `schemaPath`.
+- [x] Add config validation for missing/invalid `schemaPath` with actionable error messages.
+- [x] Keep existing TS-first source shapes valid (value and loader function).
+- [x] Wire `prisma-next contract emit` to resolve PSL-first source into the emit operation flow (offline, no DB connection).
+- [x] Add/update unit tests for config type normalization and validation behavior.
+- [x] Add/update CLI integration tests covering PSL-first success path and TS-first regression protection.
+- [x] Update CLI/config docs for PSL-first source selection and expected error behavior.
 
 ### Milestone 2: Feature verification and handoff
 
@@ -36,9 +36,9 @@ Validate all acceptance criteria for this feature spec and sync references for p
 
 **Tasks:**
 
-- [ ] Verify each acceptance criterion in the feature spec with linked tests/checks.
+- [x] Verify each acceptance criterion in the feature spec with linked tests/checks.
 - [ ] Ensure this feature plan and the corresponding Linear issue reflect final scope and outcomes.
-- [ ] Record any follow-up items discovered during verification in the parent project plan/specs.
+- [x] Record any follow-up items discovered during verification in the parent project plan/specs.
 
 ## Test Coverage
 

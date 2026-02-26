@@ -206,6 +206,31 @@ describe('defineConfig', () => {
     expect(result.contract?.source).toBe(sourceFn);
   });
 
+  it('validates contract source accepts psl source config', () => {
+    const config: PrismaNextConfig = {
+      ...baseConfig,
+      contract: {
+        source: { kind: 'psl', schemaPath: './schema.prisma' },
+      },
+    };
+
+    const result = defineConfig(config);
+    expect(result.contract?.source).toEqual({ kind: 'psl', schemaPath: './schema.prisma' });
+  });
+
+  it('throws when psl source config has invalid schemaPath', () => {
+    const config = {
+      ...baseConfig,
+      contract: {
+        source: { kind: 'psl', schemaPath: '' },
+      },
+    } as PrismaNextConfig;
+
+    expect(() => defineConfig(config)).toThrow(
+      'Config.contract.source.schemaPath must be a non-empty string when source.kind is "psl"',
+    );
+  });
+
   it('throws error on invalid config structure', () => {
     const invalidConfig = {
       family: null,

@@ -407,6 +407,44 @@ describe('validateConfig', () => {
     expect(() => validateConfig(config)).not.toThrow();
   });
 
+  it('validates psl contract source with schemaPath', () => {
+    const config = createValidConfig({
+      contract: {
+        source: {
+          kind: 'psl',
+          schemaPath: './schema.prisma',
+        },
+        output: 'src/prisma/contract.json',
+      },
+    });
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('throws when psl contract source schemaPath is missing', () => {
+    const config = createValidConfig({
+      contract: {
+        source: {
+          kind: 'psl',
+        },
+        output: 'src/prisma/contract.json',
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
+  it('throws when psl contract source schemaPath is empty', () => {
+    const config = createValidConfig({
+      contract: {
+        source: {
+          kind: 'psl',
+          schemaPath: '   ',
+        },
+        output: 'src/prisma/contract.json',
+      },
+    });
+    expect(() => validateConfig(config)).toThrow(CliStructuredError);
+  });
+
   it('throws error when family.version is missing', () => {
     const config1 = createValidConfig({
       family: {
