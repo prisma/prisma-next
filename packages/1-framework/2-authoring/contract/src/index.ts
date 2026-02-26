@@ -5,6 +5,7 @@ export type {
   ContractBuilderState,
   ForeignKeyDef,
   ForeignKeyDefaultsState,
+  ForeignKeyOptions,
   IndexDef,
   ModelBuilderState,
   RelationDefinition,

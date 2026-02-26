@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { col, contract, fk, model, pk, storage, table } from '../src/factories';
-import { validateModel, validateSqlContract, validateStorage } from '../src/validators';
+import type { ReferentialAction } from '../src/types';
+import {
+  validateModel,
+  validateSqlContract,
+  validateStorage,
+  validateStorageSemantics,
+} from '../src/validators';
 
 describe('SQL contract validators', () => {
   describe('validateStorage', () => {
@@ -389,6 +395,62 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContract(rawContract)).toThrow();
     });
 
+    it('validates storage with FK referential actions', () => {
+      const actions: ReferentialAction[] = [
+        'noAction',
+        'restrict',
+        'cascade',
+        'setNull',
+        'setDefault',
+      ];
+      for (const action of actions) {
+        const postTable = table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1'),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: action })] },
+        );
+        const s = storage({ post: postTable });
+        expect(() => validateStorage(s)).not.toThrow();
+      }
+    });
+
+    it('validates storage with FK onDelete and onUpdate', () => {
+      const postTable = table(
+        {
+          id: col('int4', 'pg/int4@1'),
+          userId: col('int4', 'pg/int4@1'),
+        },
+        { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'cascade', onUpdate: 'noAction' })] },
+      );
+      const s = storage({ post: postTable });
+      expect(() => validateStorage(s)).not.toThrow();
+    });
+
+    it('throws on invalid referential action string', () => {
+      const invalid = {
+        tables: {
+          post: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                columns: ['userId'],
+                references: { table: 'user', columns: ['id'] },
+                onDelete: 'invalidAction',
+              },
+            ],
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(invalid)).toThrow();
+    });
+
     it('validates FK with both disabled', () => {
       const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
       const postTable = table(
@@ -405,6 +467,149 @@ describe('SQL contract validators', () => {
         storage: s,
       });
       expect(() => validateSqlContract(c)).not.toThrow();
+    });
+  });
+
+  describe('validateStorageSemantics', () => {
+    it('rejects setNull on non-nullable FK column', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', false),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('setNull');
+      expect(errors[0]).toContain('userId');
+    });
+
+    it('allows setNull on nullable FK column', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', true),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setNull' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('allows cascade on non-nullable FK column', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', false),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'cascade' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('rejects setNull on onUpdate for non-nullable FK column', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', false),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onUpdate: 'setNull' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('setNull');
+    });
+
+    it('rejects setDefault on non-nullable FK column without DEFAULT', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', false),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('setDefault');
+      expect(errors[0]).toContain('userId');
+      expect(errors[0]).toContain('NOT NULL');
+      expect(errors[0]).toContain('no DEFAULT');
+    });
+
+    it('allows setDefault on non-nullable FK column with DEFAULT', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: {
+              nativeType: 'int4',
+              codecId: 'pg/int4@1',
+              nullable: false,
+              default: { kind: 'literal', expression: '0' },
+            },
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('allows setDefault on nullable FK column without DEFAULT', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', true),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onDelete: 'setDefault' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('rejects setDefault on onUpdate for non-nullable FK column without DEFAULT', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+        post: table(
+          {
+            id: col('int4', 'pg/int4@1'),
+            userId: col('int4', 'pg/int4@1', false),
+          },
+          { fks: [fk(['userId'], 'user', ['id'], { onUpdate: 'setDefault' })] },
+        ),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('setDefault');
+    });
+
+    it('returns no errors for storage without FKs', () => {
+      const s = storage({
+        user: table({ id: col('int4', 'pg/int4@1') }),
+      });
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(0);
     });
   });
 });

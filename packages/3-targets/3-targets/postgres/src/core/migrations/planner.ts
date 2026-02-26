@@ -29,6 +29,7 @@ import {
 } from '@prisma-next/family-sql/schema-verify';
 import type {
   ForeignKey,
+  ReferentialAction,
   SqlContract,
   SqlStorage,
   StorageColumn,
@@ -635,12 +636,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
           execute: [
             {
               description: `add foreign key "${fkName}"`,
-              sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ADD CONSTRAINT ${quoteIdentifier(fkName)}
-FOREIGN KEY (${foreignKey.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${foreignKey.references.columns
-                .map(quoteIdentifier)
-                .join(', ')})`,
+              sql: buildForeignKeySql(schemaName, tableName, fkName, foreignKey),
             },
           ],
           postcheck: [
@@ -1122,4 +1118,43 @@ function compareStrings(a?: string, b?: string): number {
     return 1;
   }
   return a < b ? -1 : 1;
+}
+
+const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
+  noAction: 'NO ACTION',
+  restrict: 'RESTRICT',
+  cascade: 'CASCADE',
+  setNull: 'SET NULL',
+  setDefault: 'SET DEFAULT',
+};
+
+function buildForeignKeySql(
+  schemaName: string,
+  tableName: string,
+  fkName: string,
+  foreignKey: ForeignKey,
+): string {
+  let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
+ADD CONSTRAINT ${quoteIdentifier(fkName)}
+FOREIGN KEY (${foreignKey.columns.map(quoteIdentifier).join(', ')})
+REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${foreignKey.references.columns
+    .map(quoteIdentifier)
+    .join(', ')})`;
+
+  if (foreignKey.onDelete !== undefined) {
+    const action = REFERENTIAL_ACTION_SQL[foreignKey.onDelete];
+    if (!action) {
+      throw new Error(`Unknown referential action for onDelete: ${String(foreignKey.onDelete)}`);
+    }
+    sql += `\nON DELETE ${action}`;
+  }
+  if (foreignKey.onUpdate !== undefined) {
+    const action = REFERENTIAL_ACTION_SQL[foreignKey.onUpdate];
+    if (!action) {
+      throw new Error(`Unknown referential action for onUpdate: ${String(foreignKey.onUpdate)}`);
+    }
+    sql += `\nON UPDATE ${action}`;
+  }
+
+  return sql;
 }

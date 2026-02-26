@@ -21,6 +21,7 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Parameterized Type Verification**: Expands contract `typeParams` into expected native type strings during schema verification and flags missing parameters as type mismatches
 - **Schema Defaults Policy**: Ignores execution mutation defaults during schema verification since they are applied before DB writes
 - **Foreign Key Config Awareness**: Schema verification respects the contract's `foreignKeys` configuration — when `foreignKeys.constraints` is `false`, FK constraint checks are skipped during verification (see [ADR 161](../../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md))
+- **Referential Action Verification**: When a contract FK specifies `onDelete` or `onUpdate`, the verifier compares them against the introspected schema and reports `foreign_key_mismatch` on mismatch (see [ADR 162](../../../docs/architecture%20docs/adrs/ADR%20162%20-%20Referential%20actions%20for%20foreign%20keys.md))
 
 ## Usage
 

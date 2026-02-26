@@ -5,6 +5,7 @@ import type {
 } from '@prisma-next/contract/types';
 import type {
   ForeignKey,
+  ForeignKeyOptions,
   ForeignKeyReferences,
   Index,
   ModelDefinition,
@@ -58,17 +59,20 @@ export function fk(
   columns: readonly string[],
   refTable: string,
   refColumns: readonly string[],
-  opts?: { name?: string; constraint?: boolean; index?: boolean },
+  opts?: ForeignKeyOptions & { constraint?: boolean; index?: boolean },
 ): ForeignKey {
   const references: ForeignKeyReferences = {
     table: refTable,
     columns: refColumns,
   };
+
   return {
     columns,
     references,
-    ...applyFkDefaults({ constraint: opts?.constraint, index: opts?.index }),
     ...(opts?.name !== undefined && { name: opts.name }),
+    ...(opts?.onDelete !== undefined && { onDelete: opts.onDelete }),
+    ...(opts?.onUpdate !== undefined && { onUpdate: opts.onUpdate }),
+    ...applyFkDefaults({ constraint: opts?.constraint, index: opts?.index }),
   };
 }
 

@@ -301,38 +301,42 @@ describe('runtime execute integration', () => {
     timeouts.databaseOperation,
   );
 
-  it('emits stable fingerprint for literal-only differences', async () => {
-    const runtime = await createTestRuntime(
-      fixtureContract,
-      {
-        binding: { kind: 'pgClient', client },
-        cursor: { disabled: true },
-      },
-      {
-        verify: { mode: 'onFirstUse', requireMarker: true },
-      },
-    );
+  it(
+    'emits stable fingerprint for literal-only differences',
+    async () => {
+      const runtime = await createTestRuntime(
+        fixtureContract,
+        {
+          binding: { kind: 'pgClient', client },
+          cursor: { disabled: true },
+        },
+        {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+        },
+      );
 
-    const context = createTestContext(fixtureContract, adapter);
-    const planOne = sql({ context }).raw(
-      'select id from "user" where email = \'ada@example.com\' limit 1',
-      { params: [] },
-    );
+      const context = createTestContext(fixtureContract, adapter);
+      const planOne = sql({ context }).raw(
+        'select id from "user" where email = \'ada@example.com\' limit 1',
+        { params: [] },
+      );
 
-    await drainPlanExecution(runtime, planOne);
-    const fingerprintOne = runtime.telemetry()?.fingerprint;
+      await drainPlanExecution(runtime, planOne);
+      const fingerprintOne = runtime.telemetry()?.fingerprint;
 
-    const planTwo = sql({ context }).raw(
-      'select id from "user" where email = \'tess@example.com\' limit 1',
-      { params: [] },
-    );
+      const planTwo = sql({ context }).raw(
+        'select id from "user" where email = \'tess@example.com\' limit 1',
+        { params: [] },
+      );
 
-    await drainPlanExecution(runtime, planTwo);
-    const fingerprintTwo = runtime.telemetry()?.fingerprint;
+      await drainPlanExecution(runtime, planTwo);
+      const fingerprintTwo = runtime.telemetry()?.fingerprint;
 
-    expect(fingerprintOne).toBeTypeOf('string');
-    expect(fingerprintTwo).toBe(fingerprintOne);
-  });
+      expect(fingerprintOne).toBeTypeOf('string');
+      expect(fingerprintTwo).toBe(fingerprintOne);
+    },
+    timeouts.databaseOperation,
+  );
 });
 
 function loadContractFixture(): SqlContract<SqlStorage> {

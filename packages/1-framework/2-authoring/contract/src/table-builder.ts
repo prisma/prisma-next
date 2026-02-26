@@ -4,6 +4,7 @@ import type {
   ColumnBuilderState,
   ColumnTypeDescriptor,
   ForeignKeyDef,
+  ForeignKeyOptions,
   IndexDef,
   TableBuilderState,
   UniqueConstraintDef,
@@ -259,14 +260,17 @@ export class TableBuilder<
   foreignKey(
     columns: readonly string[],
     references: { table: string; columns: readonly string[] },
-    opts?: { name?: string; constraint?: boolean; index?: boolean },
+    opts?: string | (ForeignKeyOptions & { constraint?: boolean; index?: boolean }),
   ): TableBuilder<Name, Columns, PrimaryKey> {
+    const resolved = typeof opts === 'string' ? { name: opts } : opts;
     const fkDef: ForeignKeyDef = {
       columns,
       references,
-      ...(opts?.name !== undefined && { name: opts.name }),
-      ...(opts?.constraint !== undefined && { constraint: opts.constraint }),
-      ...(opts?.index !== undefined && { index: opts.index }),
+      ...ifDefined('name', resolved?.name),
+      ...ifDefined('onDelete', resolved?.onDelete),
+      ...ifDefined('onUpdate', resolved?.onUpdate),
+      ...ifDefined('constraint', resolved?.constraint),
+      ...ifDefined('index', resolved?.index),
     };
     return new TableBuilder(
       this._state.name,

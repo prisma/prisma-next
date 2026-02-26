@@ -486,61 +486,66 @@ describe('family instance schemaVerify', () => {
       });
     }, timeouts.spinUpPpgDev);
 
-    // TODO: Enable this test once foreignKey() is implemented in contract builder
-    // Currently foreignKey() is a no-op that doesn't store foreign keys (see contract-authoring/RECOMMENDATIONS.md)
-    it.skip('returns ok=false with foreign_key_mismatch issue', async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
+    it(
+      'returns ok=false with foreign_key_mismatch issue',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
 
-      const contract = defineContract<CodecTypes>()
-        .target(postgresPack)
-        .table('user', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('email', { type: textColumn, nullable: false })
-            .primaryKey(['id']),
-        )
-        .table('post', (t) =>
-          t
-            .column('id', { type: int4Column, nullable: false })
-            .column('userId', { type: int4Column, nullable: false })
-            .column('title', { type: textColumn, nullable: false })
-            .primaryKey(['id'])
-            .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
-        )
-        .build();
+        const contract = defineContract<CodecTypes>()
+          .target(postgresPack)
+          .table('user', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('email', { type: textColumn, nullable: false })
+              .primaryKey(['id']),
+          )
+          .table('post', (t) =>
+            t
+              .column('id', { type: int4Column, nullable: false })
+              .column('userId', { type: int4Column, nullable: false })
+              .column('title', { type: textColumn, nullable: false })
+              .primaryKey(['id'])
+              .foreignKey(['userId'], { table: 'user', columns: ['id'] }),
+          )
+          .foreignKeyDefaults({ constraint: true, index: true })
+          .build();
 
-      const driver = await postgresDriver.create(connectionString);
-      try {
-        const familyInstance = sql.create({
-          target: postgres,
-          adapter: postgresAdapter,
-          driver: postgresDriver,
-          extensionPacks: [],
-        });
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create({
+            target: postgres,
+            adapter: postgresAdapter,
+            driver: postgresDriver,
+            extensionPacks: [],
+          });
 
-        const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
-        const frameworkComponents: ReadonlyArray<
-          TargetBoundComponentDescriptor<'sql', 'postgres'>
-        > = [postgres, postgresAdapter];
-        const result = await familyInstance.schemaVerify({
-          driver,
-          contractIR: validatedContract,
-          strict: false,
-          context: { contractPath: './contract.json' },
-          frameworkComponents,
-        });
+          const validatedContract = validateContract<SqlContract<SqlStorage>>(contract);
+          const frameworkComponents: ReadonlyArray<
+            TargetBoundComponentDescriptor<'sql', 'postgres'>
+          > = [postgres, postgresAdapter];
+          const result = await familyInstance.schemaVerify({
+            driver,
+            contractIR: validatedContract,
+            strict: false,
+            context: { contractPath: './contract.json' },
+            frameworkComponents,
+          });
 
-        expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some((i) => i.kind === 'foreign_key_mismatch' && i.table === 'post'),
-        ).toBe(true);
-      } finally {
-        await driver.close();
-      }
-    });
+          expect(result.ok).toBe(false);
+          expect(result.schema.counts.fail).toBeGreaterThan(0);
+          expect(
+            result.schema.issues.some(
+              (i) => i.kind === 'foreign_key_mismatch' && i.table === 'post',
+            ),
+          ).toBe(true);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('extension missing', () => {

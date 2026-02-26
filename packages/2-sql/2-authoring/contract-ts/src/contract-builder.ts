@@ -32,6 +32,7 @@ import {
   applyFkDefaults,
   type ModelDefinition,
   type ModelField,
+  type ReferentialAction,
   type SqlContract,
   type SqlMappings,
   type SqlStorage,
@@ -168,6 +169,8 @@ type BuildStorageTable<
     readonly columns: readonly string[];
     readonly references: { readonly table: string; readonly columns: readonly string[] };
     readonly name?: string;
+    readonly onDelete?: ReferentialAction;
+    readonly onUpdate?: ReferentialAction;
     readonly constraint: boolean;
     readonly index: boolean;
   }>;
@@ -425,6 +428,8 @@ class SqlContractBuilder<
         references: fk.references,
         ...applyFkDefaults(fk, this.state.foreignKeyDefaults),
         ...(fk.name ? { name: fk.name } : {}),
+        ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
+        ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
       }));
 
       const table = {

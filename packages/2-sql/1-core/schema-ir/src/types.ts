@@ -34,6 +34,12 @@ export type SqlColumnIR = {
 };
 
 /**
+ * Referential action for foreign keys in the schema IR.
+ * Defined here independently from the contract package to avoid coupling.
+ */
+export type SqlReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
+
+/**
  * SQL foreign key IR.
  */
 export type SqlForeignKeyIR = {
@@ -41,6 +47,8 @@ export type SqlForeignKeyIR = {
   readonly referencedTable: string;
   readonly referencedColumns: readonly string[];
   readonly name?: string;
+  readonly onDelete?: SqlReferentialAction;
+  readonly onUpdate?: SqlReferentialAction;
   readonly annotations?: SqlAnnotations;
 };
 

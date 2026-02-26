@@ -56,10 +56,20 @@ export type ForeignKeyReferences = {
   readonly columns: readonly string[];
 };
 
+export type ReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
+
+export type ForeignKeyOptions = {
+  readonly name?: string;
+  readonly onDelete?: ReferentialAction;
+  readonly onUpdate?: ReferentialAction;
+};
+
 export type ForeignKey = {
   readonly columns: readonly string[];
   readonly references: ForeignKeyReferences;
   readonly name?: string;
+  readonly onDelete?: ReferentialAction;
+  readonly onUpdate?: ReferentialAction;
   /** Whether to emit FK constraint DDL (ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY). */
   readonly constraint: boolean;
   /** Whether to emit a backing index for the FK columns. */
