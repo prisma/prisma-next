@@ -71,13 +71,17 @@ Two user flows are in scope:
 - If the migration is a Draft (`edgeId: null`), attest it (compute and write `edgeId`)
 - Signing with `--sign --key <keyId>` is deferred (see RD-15)
 
-### FR-10: `prisma-next migration apply` CLI command (follow-up)
-- **Not included in the initial PR — follow-up work**
-- Read on-disk migration packages from the migrations directory
-- Execute the SQL operations against the database
-- Update the migration ledger / marker
-- Limited scope: no dry-run, no rollback, no partial apply, no apply-to-specific-hash. Simple sequential execution of pending migrations.
-- Requires a database connection
+### FR-10: `prisma-next migration apply` CLI command
+- Read on-disk migration packages from the `migrations/` directory
+- Reconstruct DAG, read the current DB marker, find pending migrations (path from marker hash to DAG leaf)
+- For each pending migration in DAG order, construct a `SqlMigrationPlan` from the on-disk manifest + ops and execute via the existing `runner.execute()`
+- The runner handles: transaction boundaries, advisory locking, marker origin validation, precheck/execute/postcheck SQL, schema verification, marker update, and ledger entry — all within a single transaction per migration
+- Each migration is its own `runner.execute()` call. If migration N fails, migrations 1..N-1 are committed and migration N is rolled back. Re-running `migration apply` resumes from where it left off (the marker reflects the last successful migration)
+- Error when DB marker hash doesn't match any known `from` hash in the migration history (DB is in an unknown state)
+- Error when no pending migrations exist (no-op with informational message)
+- Requires a database connection (`--db <url>` or `config.db.connection`)
+- Enable runner execution checks (prechecks, postchecks, idempotency probes) — unlike `db init` which disables them
+- Limited scope: no dry-run, no rollback, no partial apply, no apply-to-specific-hash. Simple sequential execution of all pending migrations to reach the DAG leaf
 
 ## Non-Functional Requirements
 
@@ -100,7 +104,6 @@ Two user flows are in scope:
 
 ## Non-goals
 
-- **`migration apply`**: Executing on-disk migrations against a live database. Follow-up work after the initial PR (spec FR-10).
 - **`db update`**: Applying additive changes to a live DB and updating the marker without writing migration files. Deferred to a later project.
 - **Production-ready apply**: Dry-run, rollback, multi-step orchestration, partial apply, apply-to-specific-hash.
 - **Destructive operations**: Drops, renames, type narrowing. MVP is additive-only.
@@ -129,8 +132,10 @@ Two user flows are in scope:
 - [x] `prisma-next migration plan` fails clearly when no changes are detected between contracts
 - [x] `prisma-next migration new` scaffolds an empty migration package in Draft state
 - [x] `prisma-next migration verify` recomputes and validates `edgeId` for an existing migration package
-- [ ] `prisma-next migration apply` reads on-disk migrations and executes SQL against a live database (follow-up)
-- [ ] `prisma-next migration apply` updates the migration ledger after successful execution (follow-up)
+- [ ] `prisma-next migration apply` reads on-disk migrations and executes SQL against a live database
+- [ ] `prisma-next migration apply` updates the marker and ledger after each successful migration
+- [ ] `prisma-next migration apply` resumes from last successful migration on re-run after failure
+- [ ] `prisma-next migration apply` errors when DB marker doesn't match any known migration hash
 
 ## DAG
 - [x] DAG can be reconstructed from on-disk migration packages (reading all `migration.json` files)

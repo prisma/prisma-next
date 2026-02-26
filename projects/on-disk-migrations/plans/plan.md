@@ -71,20 +71,59 @@ Wire `migration plan` to use the existing planner directly (same path as `db ini
 - [x] CLI command unit tests for migration-plan, migration-new, migration-verify
 - [x] Migration tools tests: attestation, DAG, I/O round-trips
 
-### Milestone 3: `migration apply` (not started, descoped from current PR)
+### Milestone 3: `migration apply`
 
-Build a minimal `migration apply` command that reads on-disk migration packages and executes the SQL against a live database.
+Build a `migration apply` command that reads on-disk migration packages and executes them against a live database using the existing `MigrationRunner` infrastructure (same runner `db init` uses).
+
+**Key design decisions:**
+
+- **Reuse the runner**: The `PostgresMigrationRunner.execute()` handles transactions, advisory locks, marker/ledger management, pre/postchecks, idempotency probes, and schema verification. Each migration becomes a single `runner.execute()` call.
+- **One transaction per migration**: If migration N fails, migrations 1..N-1 are already committed. Re-running `apply` resumes from the last successful state (the marker reflects progress).
+- **Enable execution checks**: Unlike `db init` (which disables pre/postchecks since it just introspected), `migration apply` runs from potentially stale on-disk ops, so all checks are enabled by default (prechecks, postchecks, idempotency probes).
+- **Constructing `SqlMigrationPlan` from disk**: On-disk `ops.json` contains `SqlMigrationPlanOperation[]` (the planner serializes the full SQL-specific type). The manifest provides `from`/`to` hashes and contracts. These are assembled into a `SqlMigrationPlan` with `origin` and `destination` for the runner.
+- **No `ControlClient`**: Unlike `db init`, `migration apply` doesn't need the full `ControlClient` lifecycle. It can create the runner directly from `config.target.migrations.createRunner()` and use a lightweight driver connection. However, following the `db init` pattern (using `ControlClient.connect()` for consistency) is acceptable.
 
 **Tasks:**
 
+#### Core implementation
 - [ ] Create `src/commands/migration-apply.ts`
-- [ ] Read migrations directory, reconstruct DAG, determine pending migrations
-- [ ] Execute each pending migration's SQL from `ops.json` in a transaction
-- [ ] Update marker's `core_hash` to the migration's `to` hash after each successful migration
-- [ ] Register under `migration` subcommand group
-- [ ] Integration test: plan → apply against a real Postgres database
-- [ ] Integration test: apply is idempotent
-- [ ] Integration test: apply with multiple pending migrations executes them in DAG order
+- [ ] Load config, resolve database connection (`--db <url>` or `config.db.connection`)
+- [ ] Load contract file (the "to" contract — same as `migration plan`)
+- [ ] Read migrations directory, filter out drafts (`edgeId === null`), reconstruct DAG
+- [ ] Read the current DB marker (`familyInstance.readMarker({ driver })`)
+- [ ] Match marker's `storageHash` to a known hash in the migration DAG
+- [ ] Use `findPath(graph, markerHash, leafHash)` to determine pending migrations
+- [ ] Error when marker hash doesn't match any known migration node
+- [ ] Error (informational) when no pending migrations (marker already at leaf)
+- [ ] For each pending migration edge (in path order):
+  - [ ] Read the full `MigrationPackage` (manifest + ops) for that edge
+  - [ ] Construct `SqlMigrationPlan` from manifest (`origin` = edge's `from`, `destination` = edge's `to`, `operations` = ops cast to `SqlMigrationPlanOperation[]`)
+  - [ ] Call `runner.execute()` with the plan, driver, destination contract (from manifest's `toContract`), policy, and `executionChecks: { prechecks: true, postchecks: true, idempotencyChecks: true }`
+  - [ ] On runner failure: report which migration failed, what error code, and exit (previously applied migrations are safe)
+  - [ ] On runner success: report progress and continue to next migration
+- [ ] Report final summary: N migrations applied, marker now at hash X
+
+#### CLI registration
+- [ ] Register under `migration` subcommand group in `cli.ts`
+- [ ] Options: `--db <url>`, `--config <path>`, `--json [format]`, `-q/--quiet`, `-v/--verbose`, `--no-color`
+- [ ] Export command factory and result type from `package.json` exports
+- [ ] Output: styled header, per-migration progress, summary (matching `db init` style)
+- [ ] Add `migration apply` entry to CLI exports in `package.json`
+
+#### Error handling
+- [ ] Map runner failures to `CliStructuredError` (reuse `mapDbInitFailure` patterns for `RUNNER_FAILED`, `MARKER_ORIGIN_MISMATCH`, etc.)
+- [ ] Handle `MigrationToolsError` from DAG/IO operations (same pattern as `migration plan`)
+- [ ] Handle connection errors via `CliStructuredError.is()` (same as `db init`)
+- [ ] Graceful error message when migrations directory is empty or doesn't exist
+
+#### Tests
+- [ ] Unit test: command logic with mocked runner (pending migration identification, DAG path resolution)
+- [ ] Unit test: error when marker hash is unknown
+- [ ] Unit test: no-op when marker already at leaf
+- [ ] E2E test: `plan → apply` against a real Postgres database (using `withDevDatabase`)
+- [ ] E2E test: apply is idempotent (re-run after success is a no-op)
+- [ ] E2E test: apply with multiple pending migrations executes in DAG order
+- [ ] E2E test: partial failure (migration 2 of 3 fails) — migration 1 committed, re-run resumes from migration 2
 
 ### Milestone 4: Close-out
 
@@ -118,12 +157,19 @@ Build a minimal `migration apply` command that reads on-disk migration packages 
 | Path resolution finds correct edge sequence | Unit | M2 | ✅ |
 | Cycle detection identifies illegal cycles | Unit | M2 | ✅ |
 | Orphan detection identifies unreachable migrations | Unit | M2 | ✅ |
-| `migration apply` reads and executes SQL against live DB | Integration | M3 | Not started |
-| `migration apply` updates migration ledger | Integration | M3 | Not started |
+| `migration apply` reads and executes SQL against live DB | E2E | M3 | Not started |
+| `migration apply` updates marker and ledger after each migration | E2E | M3 | Not started |
+| `migration apply` resumes from last successful migration on re-run | E2E | M3 | Not started |
+| `migration apply` errors when marker hash is unknown | Unit | M3 | Not started |
+| `migration apply` is idempotent (re-run is no-op) | E2E | M3 | Not started |
+| `migration apply` executes multiple migrations in DAG order | E2E | M3 | Not started |
+| `migration apply` partial failure: committed migrations preserved | E2E | M3 | Not started |
 | All existing tests pass | E2E | M4 | ✅ |
 | `pnpm lint:deps` passes | Lint | M1–M4 | ✅ |
 | New CLI commands have e2e tests | E2E | M2 | ✅ 7 tests |
 
 ## Open Items
 
-None for M1–M2. M3 (`migration apply`) is descoped from the current PR and will be a follow-up.
+- M3 task spec: `projects/on-disk-migrations/specs/migration-apply.spec.md`
+- The on-disk `MigrationOps` type is `readonly MigrationPlanOperation[]` (framework-level), but at runtime the serialized ops are `SqlMigrationPlanOperation[]` (with `precheck`, `execute`, `postcheck` arrays). The runner expects `SqlMigrationPlanOperation[]`. Since we JSON.stringify/parse, the SQL-specific fields are preserved. A type assertion is needed when constructing the `SqlMigrationPlan` from disk — document this as a known type boundary.
+- Policy for `migration apply`: currently hardcoded to `additive` only (matches `migration plan`). If destructive migrations are supported in the future, the policy stored in `migration.json` hints should be respected.
