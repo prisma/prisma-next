@@ -15,7 +15,10 @@ export type { SqlControlDescriptorWithContributions } from '../core/assembly';
 export { extractCodecControlHooks } from '../core/assembly';
 export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/control-instance';
 // Contract → SchemaIR conversion for offline migration planning
-export { contractToSchemaIR } from '../core/migrations/contract-to-schema-ir';
+export {
+  contractToSchemaIR,
+  detectDestructiveChanges,
+} from '../core/migrations/contract-to-schema-ir';
 export {
   createMigrationPlan,
   plannerFailure,

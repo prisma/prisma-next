@@ -1,7 +1,10 @@
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { contractToSchemaIR } from '../src/core/migrations/contract-to-schema-ir';
+import {
+  contractToSchemaIR,
+  detectDestructiveChanges,
+} from '../src/core/migrations/contract-to-schema-ir';
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {
   return {
@@ -304,5 +307,109 @@ describe('contractToSchemaIR', () => {
       referencedTable: 'User',
       referencedColumns: ['id'],
     });
+  });
+});
+
+describe('detectDestructiveChanges', () => {
+  it('returns empty for null from', () => {
+    const to: SqlStorage = {
+      tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
+    };
+    expect(detectDestructiveChanges(null, to)).toEqual([]);
+  });
+
+  it('returns empty when no removals', () => {
+    const storage: SqlStorage = {
+      tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
+    };
+    expect(detectDestructiveChanges(storage, storage)).toEqual([]);
+  });
+
+  it('returns empty when columns are added', () => {
+    const from: SqlStorage = {
+      tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
+    };
+    const to: SqlStorage = {
+      tables: {
+        T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
+      },
+    };
+    expect(detectDestructiveChanges(from, to)).toEqual([]);
+  });
+
+  it('detects removed column', () => {
+    const from: SqlStorage = {
+      tables: {
+        T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
+      },
+    };
+    const to: SqlStorage = {
+      tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
+    };
+
+    const conflicts = detectDestructiveChanges(from, to);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]).toEqual({
+      kind: 'columnRemoved',
+      summary: 'Column "T"."b" was removed',
+      location: { table: 'T', column: 'b' },
+    });
+  });
+
+  it('detects removed table', () => {
+    const from: SqlStorage = {
+      tables: {
+        A: table({ columns: { id: col({ nativeType: 'text' }) } }),
+        B: table({ columns: { id: col({ nativeType: 'text' }) } }),
+      },
+    };
+    const to: SqlStorage = {
+      tables: { A: table({ columns: { id: col({ nativeType: 'text' }) } }) },
+    };
+
+    const conflicts = detectDestructiveChanges(from, to);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]).toEqual({
+      kind: 'tableRemoved',
+      summary: 'Table "B" was removed',
+      location: { table: 'B' },
+    });
+  });
+
+  it('does not report columns of a removed table individually', () => {
+    const from: SqlStorage = {
+      tables: {
+        T: table({
+          columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) },
+        }),
+      },
+    };
+    const to: SqlStorage = { tables: {} };
+
+    const conflicts = detectDestructiveChanges(from, to);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]!.kind).toBe('tableRemoved');
+  });
+
+  it('detects multiple removals', () => {
+    const from: SqlStorage = {
+      tables: {
+        A: table({
+          columns: { id: col({ nativeType: 'text' }), name: col({ nativeType: 'text' }) },
+        }),
+        B: table({ columns: { id: col({ nativeType: 'text' }) } }),
+      },
+    };
+    const to: SqlStorage = {
+      tables: {
+        A: table({ columns: { id: col({ nativeType: 'text' }) } }),
+      },
+    };
+
+    const conflicts = detectDestructiveChanges(from, to);
+    expect(conflicts).toHaveLength(2);
+    const kinds = conflicts.map((c) => c.kind);
+    expect(kinds).toContain('columnRemoved');
+    expect(kinds).toContain('tableRemoved');
   });
 });

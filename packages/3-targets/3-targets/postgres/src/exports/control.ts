@@ -9,7 +9,7 @@ import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
-import { contractToSchemaIR } from '@prisma-next/family-sql/control';
+import { contractToSchemaIR, detectDestructiveChanges } from '@prisma-next/family-sql/control';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
@@ -28,8 +28,16 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
       },
       planContractDiff(from: ContractIR | null, to: ContractIR): ContractDiffResult {
-        const fromSchemaIR = from
-          ? contractToSchemaIR(from.storage as SqlStorage)
+        const fromStorage = from ? (from.storage as SqlStorage) : null;
+        const toStorage = to.storage as SqlStorage;
+
+        const destructive = detectDestructiveChanges(fromStorage, toStorage);
+        if (destructive.length > 0) {
+          return { kind: 'failure', conflicts: destructive };
+        }
+
+        const fromSchemaIR = fromStorage
+          ? contractToSchemaIR(fromStorage)
           : contractToSchemaIR({ tables: {} });
         const planner = createPostgresMigrationPlanner();
         const result = planner.plan({

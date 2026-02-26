@@ -1,4 +1,5 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ContractDiffConflict } from '@prisma-next/core-control-plane/types';
 import type {
   ForeignKey,
   Index,
@@ -81,6 +82,50 @@ function convertTable(name: string, table: StorageTable): SqlTableIR {
  * components, and an empty array means "nothing installed yet" which is correct for the
  * "from" side of a diff.
  */
+/**
+ * Detects destructive changes between two contract storages.
+ *
+ * The additive-only planner silently ignores removals (tables, columns).
+ * This function detects those removals so callers can report them as conflicts
+ * rather than silently producing an empty plan.
+ *
+ * Returns an empty array if no destructive changes are found.
+ */
+export function detectDestructiveChanges(
+  from: SqlStorage | null,
+  to: SqlStorage,
+): readonly ContractDiffConflict[] {
+  if (!from) return [];
+
+  const conflicts: ContractDiffConflict[] = [];
+
+  for (const tableName of Object.keys(from.tables)) {
+    if (!to.tables[tableName]) {
+      conflicts.push({
+        kind: 'tableRemoved',
+        summary: `Table "${tableName}" was removed`,
+        location: { table: tableName },
+      });
+      continue;
+    }
+
+    const fromTable = from.tables[tableName]!;
+    const toTable = to.tables[tableName]!;
+
+    for (const columnName of Object.keys(fromTable.columns)) {
+      if (!toTable.columns[columnName]) {
+        conflicts.push({
+          kind: 'columnRemoved',
+          summary: `Column "${tableName}"."${columnName}" was removed`,
+          location: { table: tableName, column: columnName },
+        });
+      }
+    }
+  }
+
+  return conflicts;
+}
+
 export function contractToSchemaIR(storage: SqlStorage): SqlSchemaIR {
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
