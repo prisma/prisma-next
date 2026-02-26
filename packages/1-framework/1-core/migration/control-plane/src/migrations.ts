@@ -51,61 +51,6 @@ export interface MigrationPlanOperation {
 }
 
 // ============================================================================
-// Contract Diff Types
-// ============================================================================
-
-/**
- * Conflict detected during contract-to-contract planning.
- */
-export interface ContractDiffConflict {
-  readonly kind:
-    | 'typeMismatch'
-    | 'nullabilityConflict'
-    | 'columnRemoved'
-    | 'tableRemoved'
-    | 'primaryKeyChanged'
-    | 'unsupportedChange'
-    | 'indexIncompatible'
-    | 'foreignKeyConflict'
-    | 'missingButNonAdditive'
-    | 'unsupportedExtension'
-    | 'extensionMissing'
-    | 'unsupportedOperation';
-  readonly summary: string;
-  readonly location?: {
-    readonly table?: string;
-    readonly column?: string;
-    readonly constraint?: string;
-    readonly index?: string;
-    readonly extension?: string;
-  };
-  readonly meta?: Record<string, unknown>;
-}
-
-/**
- * Successful contract diff result.
- * Ops are typed as the base MigrationPlanOperation for framework-level consumers.
- * SQL-domain code knows these are SqlMigrationPlanOperation at runtime.
- */
-export interface ContractDiffSuccess {
-  readonly kind: 'success';
-  readonly ops: readonly MigrationPlanOperation[];
-}
-
-/**
- * Failed contract diff result (non-additive changes detected).
- */
-export interface ContractDiffFailure {
-  readonly kind: 'failure';
-  readonly conflicts: readonly ContractDiffConflict[];
-}
-
-/**
- * Result of a contract-to-contract diff operation.
- */
-export type ContractDiffResult = ContractDiffSuccess | ContractDiffFailure;
-
-// ============================================================================
 // Plan Types (Display-Oriented)
 // ============================================================================
 
@@ -313,9 +258,23 @@ export interface TargetMigrationsCapability<
   createPlanner(family: TFamilyInstance): MigrationPlanner<TFamilyId, TTargetId>;
   createRunner(family: TFamilyInstance): MigrationRunner<TFamilyId, TTargetId>;
   /**
-   * Diff two contracts and produce migration operations.
-   * The "from" contract is null for new projects (empty starting state).
-   * This is an offline operation — no database connection required.
+   * Synthesizes a family-specific schema IR from a contract for offline planning.
+   * The returned schema can be passed to `planner.plan({ schema })` as the "from" state.
+   *
+   * @param contract - The contract to convert, or null for a new project (empty schema).
+   * @returns Family-specific schema IR (e.g., `SqlSchemaIR` for SQL targets).
    */
-  planContractDiff?(from: ContractIR | null, to: ContractIR): ContractDiffResult;
+  contractToSchema(contract: ContractIR | null): unknown;
+  /**
+   * Detects destructive changes between two contracts that the additive-only
+   * planner would silently ignore (e.g., table/column removals).
+   *
+   * @param from - The source contract, or null for a new project.
+   * @param to - The destination contract.
+   * @returns Conflicts if destructive changes are detected, empty array otherwise.
+   */
+  detectDestructiveChanges(
+    from: ContractIR | null,
+    to: ContractIR,
+  ): readonly MigrationPlannerConflict[];
 }

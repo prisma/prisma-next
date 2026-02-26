@@ -1,5 +1,5 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
-import type { ContractDiffConflict } from '@prisma-next/core-control-plane/types';
+import type { MigrationPlannerConflict } from '@prisma-next/core-control-plane/types';
 import type {
   ForeignKey,
   Index,
@@ -94,17 +94,16 @@ function convertTable(name: string, table: StorageTable): SqlTableIR {
 export function detectDestructiveChanges(
   from: SqlStorage | null,
   to: SqlStorage,
-): readonly ContractDiffConflict[] {
+): readonly MigrationPlannerConflict[] {
   if (!from) return [];
 
-  const conflicts: ContractDiffConflict[] = [];
+  const conflicts: MigrationPlannerConflict[] = [];
 
   for (const tableName of Object.keys(from.tables)) {
     if (!to.tables[tableName]) {
       conflicts.push({
         kind: 'tableRemoved',
         summary: `Table "${tableName}" was removed`,
-        location: { table: tableName },
       });
       continue;
     }
@@ -117,7 +116,6 @@ export function detectDestructiveChanges(
         conflicts.push({
           kind: 'columnRemoved',
           summary: `Column "${tableName}"."${columnName}" was removed`,
-          location: { table: tableName, column: columnName },
         });
       }
     }

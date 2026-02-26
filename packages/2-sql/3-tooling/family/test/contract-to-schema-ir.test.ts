@@ -352,7 +352,6 @@ describe('detectDestructiveChanges', () => {
     expect(conflicts[0]).toEqual({
       kind: 'columnRemoved',
       summary: 'Column "T"."b" was removed',
-      location: { table: 'T', column: 'b' },
     });
   });
 
@@ -372,7 +371,6 @@ describe('detectDestructiveChanges', () => {
     expect(conflicts[0]).toEqual({
       kind: 'tableRemoved',
       summary: 'Table "B" was removed',
-      location: { table: 'B' },
     });
   });
 

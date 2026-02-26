@@ -1,7 +1,6 @@
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { ContractDiffResult } from '@prisma-next/core-control-plane/types';
-import { contractToSchemaIR } from '@prisma-next/family-sql/control';
+import type { MigrationPlannerResult } from '@prisma-next/core-control-plane/types';
+import { contractToSchemaIR, detectDestructiveChanges } from '@prisma-next/family-sql/control';
 import type {
   SqlContract,
   SqlStorage,
@@ -10,7 +9,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
-import postgresTargetDescriptor from '../../src/exports/control';
 
 function col(overrides: Partial<StorageColumn> & { nativeType: string }): StorageColumn {
   return {
@@ -53,23 +51,16 @@ function createTestContract(
   };
 }
 
-function createContractIR(storage: SqlStorage): ContractIR {
-  return {
-    schemaVersion: '1',
-    target: 'postgres',
-    targetFamily: 'sql',
-    storage,
-    models: {},
-    relations: {},
-    extensionPacks: {},
-    capabilities: {},
-    meta: {},
-    sources: {},
-  };
-}
-
-function planContractDiff(from: ContractIR | null, to: ContractIR): ContractDiffResult {
-  return postgresTargetDescriptor.migrations!.planContractDiff!(from, to);
+function planFromStorages(from: SqlStorage | null, to: SqlStorage): MigrationPlannerResult {
+  const toContract = createTestContract(to);
+  const fromSchemaIR = contractToSchemaIR(from ?? { tables: {} });
+  const planner = createPostgresMigrationPlanner();
+  return planner.plan({
+    contract: toContract,
+    schema: fromSchemaIR,
+    policy: { allowedOperationClasses: ['additive'] },
+    frameworkComponents: [],
+  });
 }
 
 describe('contractToSchemaIR → planner round-trip', () => {
@@ -248,9 +239,9 @@ describe('contractToSchemaIR → planner round-trip', () => {
   });
 });
 
-describe('planContractDiff — additive scenarios', () => {
+describe('planner — additive scenarios', () => {
   it('detects added column on existing table', () => {
-    const from = createContractIR({
+    const from: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -260,9 +251,9 @@ describe('planContractDiff — additive scenarios', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const to = createContractIR({
+    const to: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -273,20 +264,20 @@ describe('planContractDiff — additive scenarios', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const result = planContractDiff(from, to);
+    const result = planFromStorages(from, to);
 
     expect(result.kind).toBe('success');
     if (result.kind === 'success') {
-      const addColOp = result.ops.find((op) => op.id.includes('age'));
+      const addColOp = result.plan.operations.find((op) => op.id.includes('age'));
       expect(addColOp).toBeDefined();
       expect(addColOp!.label).toContain('age');
     }
   });
 
   it('detects added table', () => {
-    const from = createContractIR({
+    const from: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -295,9 +286,9 @@ describe('planContractDiff — additive scenarios', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const to = createContractIR({
+    const to: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -313,19 +304,19 @@ describe('planContractDiff — additive scenarios', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const result = planContractDiff(from, to);
+    const result = planFromStorages(from, to);
 
     expect(result.kind).toBe('success');
     if (result.kind === 'success') {
-      const tableOp = result.ops.find((op) => op.id.includes('post'));
+      const tableOp = result.plan.operations.find((op) => op.id.includes('post'));
       expect(tableOp).toBeDefined();
     }
   });
 
   it('detects multiple changes at once (table + unique + index)', () => {
-    const from = createContractIR({
+    const from: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -334,9 +325,9 @@ describe('planContractDiff — additive scenarios', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const to = createContractIR({
+    const to: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -355,21 +346,21 @@ describe('planContractDiff — additive scenarios', () => {
           indexes: [{ columns: ['title'] }],
         }),
       },
-    });
+    };
 
-    const result = planContractDiff(from, to);
+    const result = planFromStorages(from, to);
 
     expect(result.kind).toBe('success');
     if (result.kind === 'success') {
-      expect(result.ops.length).toBeGreaterThanOrEqual(3);
-      const ids = result.ops.map((op) => op.id);
+      expect(result.plan.operations.length).toBeGreaterThanOrEqual(3);
+      const ids = result.plan.operations.map((op) => op.id);
       expect(ids.some((id) => id.includes('post'))).toBe(true);
       expect(ids.some((id) => id.includes('unique') || id.includes('slug'))).toBe(true);
       expect(ids.some((id) => id.includes('index') || id.includes('title'))).toBe(true);
     }
   });
 
-  it('returns no ops when contracts are identical', () => {
+  it('returns no ops when storages are identical', () => {
     const storage: SqlStorage = {
       tables: {
         user: table({
@@ -382,19 +373,18 @@ describe('planContractDiff — additive scenarios', () => {
       },
     };
 
-    const ir = createContractIR(storage);
-    const result = planContractDiff(ir, ir);
+    const result = planFromStorages(storage, storage);
 
     expect(result.kind).toBe('success');
     if (result.kind === 'success') {
-      expect(result.ops).toHaveLength(0);
+      expect(result.plan.operations).toHaveLength(0);
     }
   });
 });
 
-describe('planContractDiff — destructive scenarios', () => {
+describe('detectDestructiveChanges', () => {
   it('rejects column removal with conflict', () => {
-    const from = createContractIR({
+    const from: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -405,9 +395,9 @@ describe('planContractDiff — destructive scenarios', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const to = createContractIR({
+    const to: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -417,20 +407,17 @@ describe('planContractDiff — destructive scenarios', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const result = planContractDiff(from, to);
+    const conflicts = detectDestructiveChanges(from, to);
 
-    expect(result.kind).toBe('failure');
-    if (result.kind === 'failure') {
-      expect(result.conflicts).toHaveLength(1);
-      expect(result.conflicts[0]!.kind).toBe('columnRemoved');
-      expect(result.conflicts[0]!.summary).toContain('name');
-    }
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]!.kind).toBe('columnRemoved');
+    expect(conflicts[0]!.summary).toContain('name');
   });
 
   it('rejects table removal with conflict', () => {
-    const from = createContractIR({
+    const from: SqlStorage = {
       tables: {
         user: table({
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
@@ -441,29 +428,26 @@ describe('planContractDiff — destructive scenarios', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const to = createContractIR({
+    const to: SqlStorage = {
       tables: {
         user: table({
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const result = planContractDiff(from, to);
+    const conflicts = detectDestructiveChanges(from, to);
 
-    expect(result.kind).toBe('failure');
-    if (result.kind === 'failure') {
-      expect(result.conflicts).toHaveLength(1);
-      expect(result.conflicts[0]!.kind).toBe('tableRemoved');
-      expect(result.conflicts[0]!.summary).toContain('post');
-    }
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]!.kind).toBe('tableRemoved');
+    expect(conflicts[0]!.summary).toContain('post');
   });
 
   it('rejects multiple destructive changes with all conflicts', () => {
-    const from = createContractIR({
+    const from: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -477,32 +461,29 @@ describe('planContractDiff — destructive scenarios', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const to = createContractIR({
+    const to: SqlStorage = {
       tables: {
         user: table({
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const result = planContractDiff(from, to);
+    const conflicts = detectDestructiveChanges(from, to);
 
-    expect(result.kind).toBe('failure');
-    if (result.kind === 'failure') {
-      expect(result.conflicts).toHaveLength(2);
-      const kinds = result.conflicts.map((c) => c.kind);
-      expect(kinds).toContain('columnRemoved');
-      expect(kinds).toContain('tableRemoved');
-    }
+    expect(conflicts).toHaveLength(2);
+    const kinds = conflicts.map((c) => c.kind);
+    expect(kinds).toContain('columnRemoved');
+    expect(kinds).toContain('tableRemoved');
   });
 });
 
-describe('planContractDiff — type and nullability change behavior', () => {
+describe('planner — type and nullability change behavior', () => {
   it('rejects type change (text → int4) as non-additive conflict', () => {
-    const from = createContractIR({
+    const from: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -512,9 +493,9 @@ describe('planContractDiff — type and nullability change behavior', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const to = createContractIR({
+    const to: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -524,9 +505,9 @@ describe('planContractDiff — type and nullability change behavior', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const result = planContractDiff(from, to);
+    const result = planFromStorages(from, to);
 
     expect(result.kind).toBe('failure');
     if (result.kind === 'failure') {
@@ -539,7 +520,7 @@ describe('planContractDiff — type and nullability change behavior', () => {
   });
 
   it('rejects nullability tightening (nullable → non-nullable) as non-additive conflict', () => {
-    const from = createContractIR({
+    const from: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -549,9 +530,9 @@ describe('planContractDiff — type and nullability change behavior', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const to = createContractIR({
+    const to: SqlStorage = {
       tables: {
         user: table({
           columns: {
@@ -561,9 +542,9 @@ describe('planContractDiff — type and nullability change behavior', () => {
           primaryKey: { columns: ['id'] },
         }),
       },
-    });
+    };
 
-    const result = planContractDiff(from, to);
+    const result = planFromStorages(from, to);
 
     expect(result.kind).toBe('failure');
     if (result.kind === 'failure') {

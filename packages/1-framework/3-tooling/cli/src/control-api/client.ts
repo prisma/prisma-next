@@ -1,9 +1,7 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type {
-  ContractDiffResult,
   ControlDriverInstance,
   ControlFamilyInstance,
   ControlPlaneStack,
@@ -571,16 +569,5 @@ class ControlClientImpl implements ControlClient {
         meta: undefined,
       });
     }
-  }
-
-  contractDiff(from: ContractIR | null, to: ContractIR): ContractDiffResult {
-    this.init();
-
-    const migrations = this.options.target.migrations;
-    if (!migrations?.planContractDiff) {
-      throw new Error(`Target "${this.options.target.targetId}" does not support contract diffing`);
-    }
-
-    return migrations.planContractDiff(from, to);
   }
 }

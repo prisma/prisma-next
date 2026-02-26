@@ -855,7 +855,7 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>]
 1. Loads config and reads `contract.json` (the "to" contract)
 2. Reads existing migrations from `config.migrations.dir` (default: `migrations/`)
 3. Reconstructs the migration DAG and finds the leaf (current state)
-4. Diffs the leaf contract against the new contract via the target's `planContractDiff` capability
+4. Diffs the leaf contract against the new contract using the target's migration planner (same planner as `db init`)
 5. Writes a new migration package (`migration.json` + `ops.json`) and attests the `edgeId`
 
 ### `prisma-next migration verify`

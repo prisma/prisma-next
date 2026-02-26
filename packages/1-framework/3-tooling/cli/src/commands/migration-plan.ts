@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
+import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
 import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
@@ -15,7 +16,6 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join } from 'pathe';
 import { loadConfig } from '../config-loader';
-import { createControlClient } from '../control-api/client';
 import {
   type CliErrorConflict,
   type CliStructuredError,
@@ -222,7 +222,7 @@ async function executeMigrationPlanCommand(
     return ok(result);
   }
 
-  // Check target supports contract diffing
+  // Check target supports migrations
   if (!config.target.migrations) {
     return notOk(
       errorTargetMigrationNotSupported({
@@ -231,25 +231,42 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  // Diff contracts
-  const client = createControlClient({
-    family: config.family,
-    target: config.target,
-    adapter: config.adapter,
-    extensionPacks: config.extensionPacks ?? [],
-  });
-
-  const diffResult = client.contractDiff(fromContract, toContractJson);
-
-  if (diffResult.kind === 'failure') {
+  // Detect destructive changes before planning
+  const { migrations } = config.target;
+  const destructive = migrations.detectDestructiveChanges(fromContract, toContractJson);
+  if (destructive.length > 0) {
     return notOk(
       errorMigrationPlanningFailed({
-        conflicts: diffResult.conflicts as readonly CliErrorConflict[],
+        conflicts: destructive as readonly CliErrorConflict[],
       }),
     );
   }
 
-  const ops: readonly MigrationPlanOperation[] = diffResult.ops;
+  // Plan migration using the same planner as db init
+  const stack = createControlPlaneStack({
+    target: config.target,
+    adapter: config.adapter,
+    extensionPacks: config.extensionPacks ?? [],
+  });
+  const familyInstance = config.family.create(stack);
+  const planner = migrations.createPlanner(familyInstance);
+  const fromSchemaIR = migrations.contractToSchema(fromContract);
+  const plannerResult = planner.plan({
+    contract: toContractJson,
+    schema: fromSchemaIR,
+    policy: { allowedOperationClasses: ['additive'] },
+    frameworkComponents: [],
+  });
+
+  if (plannerResult.kind === 'failure') {
+    return notOk(
+      errorMigrationPlanningFailed({
+        conflicts: plannerResult.conflicts as readonly CliErrorConflict[],
+      }),
+    );
+  }
+
+  const ops: readonly MigrationPlanOperation[] = plannerResult.plan.operations;
 
   if (ops.length === 0) {
     const result: MigrationPlanResult = {

@@ -1,9 +1,4 @@
 export type {
-  // Contract diff types
-  ContractDiffConflict,
-  ContractDiffFailure,
-  ContractDiffResult,
-  ContractDiffSuccess,
   // Control* types (ADR 151)
   ControlAdapterDescriptor,
   ControlAdapterInstance,
