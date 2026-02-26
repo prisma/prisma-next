@@ -25,6 +25,17 @@ export {
   runnerSuccess,
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
+export type {
+  EmitAddColumnInput,
+  EmitAddForeignKeyInput,
+  EmitAddPrimaryKeyInput,
+  EmitAddUniqueConstraintInput,
+  EmitCreateIndexInput,
+  EmitCreateStorageTypeInput,
+  EmitCreateTableInput,
+  EmitEnableExtensionInput,
+  SqlEmitter,
+} from '../core/migrations/sql-emitter';
 // SQL-specific types
 export type {
   CodecControlHooks,

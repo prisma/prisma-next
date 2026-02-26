@@ -1,5 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { AbstractOp } from '@prisma-next/core-control-plane/abstract-ops';
+import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import type { MigrationManifest } from '../src/types';
 
 export function createTestContract(overrides: Partial<ContractIR> = {}): ContractIR {
@@ -39,33 +39,12 @@ export function createTestManifest(overrides: Partial<MigrationManifest> = {}): 
   };
 }
 
-export function createTestOps(): readonly AbstractOp[] {
+export function createTestOps(): readonly MigrationPlanOperation[] {
   return [
     {
-      op: 'createTable',
       id: 'table.users',
       label: 'Create table users',
       operationClass: 'additive',
-      pre: [{ id: 'tableNotExists', params: { table: 'users' } }],
-      post: [{ id: 'tableExists', params: { table: 'users' } }],
-      args: {
-        table: 'users',
-        columns: [
-          {
-            name: 'id',
-            nativeType: 'integer',
-            codecId: 'int4',
-            nullable: false,
-          },
-          {
-            name: 'email',
-            nativeType: 'text',
-            codecId: 'text',
-            nullable: false,
-          },
-        ],
-        primaryKey: { columns: ['id'] },
-      },
     },
   ];
 }

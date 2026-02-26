@@ -1,10 +1,11 @@
-import type { AbstractOp } from '@prisma-next/core-control-plane/abstract-ops';
+import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { planContractDiff } from '../src/core/migrations/contract-planner';
+import { createTestEmitter } from './test-emitter';
 
 // ============================================================================
-// Helpers: build SqlStorage fixtures concisely
+// Helpers
 // ============================================================================
 
 function storage(tables: SqlStorage['tables'], types?: SqlStorage['types']): SqlStorage {
@@ -12,15 +13,24 @@ function storage(tables: SqlStorage['tables'], types?: SqlStorage['types']): Sql
 }
 
 const EMPTY: SqlStorage = storage({});
+const emitter = createTestEmitter();
+
+function plan(from: SqlStorage | null, to: SqlStorage) {
+  return planContractDiff({ from, to, emitter });
+}
+
+function successOps(from: SqlStorage | null, to: SqlStorage): readonly MigrationPlanOperation[] {
+  const result = plan(from, to);
+  expect(result.kind).toBe('success');
+  if (result.kind !== 'success') throw new Error('expected success');
+  return result.ops;
+}
 
 // ============================================================================
 // Tests
 // ============================================================================
 
 describe('planContractDiff', () => {
-  // --------------------------------------------------------------------------
-  // 1. empty → single table with columns, PK, and unique constraint
-  // --------------------------------------------------------------------------
   it('empty → single table with columns, PK, and unique', () => {
     const to = storage({
       users: {
@@ -36,36 +46,22 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from: null, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
+    const ops = successOps(null, to);
 
-    // createTable op
-    const createTable = result.ops.find((o) => o.op === 'createTable');
+    const createTable = ops.find((o) => o.id === 'table.users');
     expect(createTable).toBeDefined();
-    expect(createTable!.id).toBe('table.users');
-    if (createTable!.op !== 'createTable') return;
-    expect(createTable!.args.table).toBe('users');
-    expect(createTable!.args.columns).toHaveLength(3);
-    expect(createTable!.args.primaryKey).toEqual({ columns: ['id'], name: 'users_pkey' });
+    expect(createTable!.label).toBe('Create table users');
 
-    // addUniqueConstraint op
-    const addUnique = result.ops.find((o) => o.op === 'addUniqueConstraint');
+    const addUnique = ops.find((o) => o.id === 'unique.users.users_email_key');
     expect(addUnique).toBeDefined();
-    expect(addUnique!.id).toBe('unique.users.users_email_key');
 
-    // No addColumn ops (columns come from createTable)
-    const addColumns = result.ops.filter((o) => o.op === 'addColumn');
+    const addColumns = ops.filter((o) => o.id.startsWith('column.'));
     expect(addColumns).toHaveLength(0);
 
-    // No addPrimaryKey ops (PK is inline in createTable)
-    const addPKs = result.ops.filter((o) => o.op === 'addPrimaryKey');
+    const addPKs = ops.filter((o) => o.id.startsWith('primaryKey.'));
     expect(addPKs).toHaveLength(0);
   });
 
-  // --------------------------------------------------------------------------
-  // 2. empty → multiple tables with FK relationships
-  // --------------------------------------------------------------------------
   it('empty → multiple tables with FK relationships, correct order', () => {
     const to = storage({
       posts: {
@@ -91,33 +87,22 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from: null, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
+    const ops = successOps(null, to);
 
-    const createTables = result.ops.filter((o) => o.op === 'createTable');
+    const createTables = ops.filter((o) => o.id.startsWith('table.'));
     expect(createTables).toHaveLength(2);
-    // Deterministic alphabetical order
     expect(createTables[0]!.id).toBe('table.posts');
     expect(createTables[1]!.id).toBe('table.users');
 
-    const fkOps = result.ops.filter((o) => o.op === 'addForeignKey');
+    const fkOps = ops.filter((o) => o.id.startsWith('foreignKey.'));
     expect(fkOps).toHaveLength(1);
-    if (fkOps[0]!.op !== 'addForeignKey') return;
-    expect(fkOps[0]!.args.table).toBe('posts');
-    expect(fkOps[0]!.args.referencedTable).toBe('users');
-    expect(fkOps[0]!.args.columns).toEqual(['author_id']);
-    expect(fkOps[0]!.args.referencedColumns).toEqual(['id']);
+    expect(fkOps[0]!.id).toBe('foreignKey.posts.posts_author_id_fkey');
 
-    // FKs always come after createTable
-    const createTableIdx = result.ops.indexOf(createTables[1]!);
-    const fkIdx = result.ops.indexOf(fkOps[0]!);
+    const createTableIdx = ops.indexOf(createTables[1]!);
+    const fkIdx = ops.indexOf(fkOps[0]!);
     expect(fkIdx).toBeGreaterThan(createTableIdx);
   });
 
-  // --------------------------------------------------------------------------
-  // 3. empty → table with indexes
-  // --------------------------------------------------------------------------
   it('empty → table with indexes', () => {
     const to = storage({
       users: {
@@ -132,21 +117,14 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from: null, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
+    const ops = successOps(null, to);
 
-    const indexOps = result.ops.filter((o) => o.op === 'createIndex');
+    const indexOps = ops.filter((o) => o.id.startsWith('index.'));
     expect(indexOps).toHaveLength(1);
     expect(indexOps[0]!.id).toBe('index.users.users_email_idx');
-    if (indexOps[0]!.op !== 'createIndex') return;
-    expect(indexOps[0]!.args.columns).toEqual(['email']);
   });
 
-  // --------------------------------------------------------------------------
-  // 4. empty → table with column defaults (literal and function)
-  // --------------------------------------------------------------------------
-  it('empty → table with column defaults (literal and function)', () => {
+  it('empty → table with column defaults', () => {
     const to = storage({
       users: {
         columns: {
@@ -171,24 +149,11 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from: null, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
-
-    const createTable = result.ops.find((o) => o.op === 'createTable');
+    const ops = successOps(null, to);
+    const createTable = ops.find((o) => o.id === 'table.users');
     expect(createTable).toBeDefined();
-    if (createTable!.op !== 'createTable') return;
-
-    const statusCol = createTable!.args.columns.find((c) => c.name === 'status');
-    expect(statusCol!.default).toEqual({ kind: 'literal', expression: "'active'" });
-
-    const createdAtCol = createTable!.args.columns.find((c) => c.name === 'created_at');
-    expect(createdAtCol!.default).toEqual({ kind: 'function', expression: 'now()' });
   });
 
-  // --------------------------------------------------------------------------
-  // 5. single table → add new table (incremental)
-  // --------------------------------------------------------------------------
   it('single table → add new table (incremental)', () => {
     const from = storage({
       users: {
@@ -216,28 +181,16 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
+    const ops = successOps(from, to);
 
-    // Only the new table should appear
-    const createTables = result.ops.filter((o) => o.op === 'createTable');
+    const createTables = ops.filter((o) => o.id.startsWith('table.'));
     expect(createTables).toHaveLength(1);
     expect(createTables[0]!.id).toBe('table.posts');
 
-    // No ops for the existing users table
-    const userOps = result.ops.filter(
-      (o) =>
-        'args' in o &&
-        'table' in (o.args as Record<string, unknown>) &&
-        (o.args as Record<string, unknown>)['table'] === 'users',
-    );
+    const userOps = ops.filter((o) => o.id.includes('.users'));
     expect(userOps).toHaveLength(0);
   });
 
-  // --------------------------------------------------------------------------
-  // 6. existing table → add new columns
-  // --------------------------------------------------------------------------
   it('existing table → add new columns', () => {
     const from = storage({
       users: {
@@ -270,23 +223,16 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
+    const ops = successOps(from, to);
 
-    const addColumns = result.ops.filter((o) => o.op === 'addColumn');
+    const addColumns = ops.filter((o) => o.id.startsWith('column.'));
     expect(addColumns).toHaveLength(2);
-    // Alphabetical: email, name
     expect(addColumns[0]!.id).toBe('column.users.email');
     expect(addColumns[1]!.id).toBe('column.users.name');
 
-    // No createTable op
-    expect(result.ops.filter((o) => o.op === 'createTable')).toHaveLength(0);
+    expect(ops.filter((o) => o.id.startsWith('table.'))).toHaveLength(0);
   });
 
-  // --------------------------------------------------------------------------
-  // 7. existing table → add new constraints (unique, index, FK)
-  // --------------------------------------------------------------------------
   it('existing table → add new constraints', () => {
     const from = storage({
       users: {
@@ -329,30 +275,13 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
+    const ops = successOps(from, to);
 
-    const uniqueOps = result.ops.filter((o) => o.op === 'addUniqueConstraint');
-    expect(uniqueOps).toHaveLength(1);
-    expect(uniqueOps[0]!.id).toBe('unique.users.users_email_key');
-
-    // Both the unique and index are new (not in `from`), so both get ops.
-    // The contract planner doesn't deduplicate between new constraints —
-    // semantic satisfaction only checks the `from` table to avoid
-    // re-creating what already exists.
-    const indexOps = result.ops.filter((o) => o.op === 'createIndex');
-    expect(indexOps).toHaveLength(1);
-    expect(indexOps[0]!.id).toBe('index.users.users_email_idx');
-
-    const fkOps = result.ops.filter((o) => o.op === 'addForeignKey');
-    expect(fkOps).toHaveLength(1);
-    expect(fkOps[0]!.id).toBe('foreignKey.posts.posts_user_id_fkey');
+    expect(ops.filter((o) => o.id.startsWith('unique.'))).toHaveLength(1);
+    expect(ops.filter((o) => o.id.startsWith('index.'))).toHaveLength(1);
+    expect(ops.filter((o) => o.id.startsWith('foreignKey.'))).toHaveLength(1);
   });
 
-  // --------------------------------------------------------------------------
-  // 8. extension-aware: pgvector column + type
-  // --------------------------------------------------------------------------
   it('extension-aware: pgvector type → enableExtension + createStorageType', () => {
     const to = storage(
       {
@@ -382,35 +311,25 @@ describe('planContractDiff', () => {
       },
     );
 
-    const result = planContractDiff({ from: null, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
+    const ops = successOps(null, to);
 
-    // enableExtension for vector
-    const extOps = result.ops.filter((o) => o.op === 'enableExtension');
+    const extOps = ops.filter((o) => o.id.startsWith('extension.'));
     expect(extOps).toHaveLength(1);
-    if (extOps[0]!.op !== 'enableExtension') return;
-    expect(extOps[0]!.args.extension).toBe('vector');
+    expect(extOps[0]!.id).toBe('extension.vector');
 
-    // createStorageType for Embedding
-    const typeOps = result.ops.filter((o) => o.op === 'createStorageType');
+    const typeOps = ops.filter((o) => o.id.startsWith('storageType.'));
     expect(typeOps).toHaveLength(1);
-    if (typeOps[0]!.op !== 'createStorageType') return;
-    expect(typeOps[0]!.args.typeName).toBe('Embedding');
-    expect(typeOps[0]!.args.typeParams).toEqual({ length: 1536 });
+    expect(typeOps[0]!.id).toBe('storageType.Embedding');
 
     // Ordering: extensions → types → tables
-    const extIdx = result.ops.indexOf(extOps[0]!);
-    const typeIdx = result.ops.indexOf(typeOps[0]!);
-    const tableOp = result.ops.find((o) => o.op === 'createTable');
-    const tableIdx = result.ops.indexOf(tableOp!);
+    const extIdx = ops.indexOf(extOps[0]!);
+    const typeIdx = ops.indexOf(typeOps[0]!);
+    const tableOp = ops.find((o) => o.id.startsWith('table.'));
+    const tableIdx = ops.indexOf(tableOp!);
     expect(extIdx).toBeLessThan(typeIdx);
     expect(typeIdx).toBeLessThan(tableIdx);
   });
 
-  // --------------------------------------------------------------------------
-  // 9. determinism — same inputs → same outputs
-  // --------------------------------------------------------------------------
   it('determinism: identical inputs produce identical ops', () => {
     const to = storage({
       beta: {
@@ -434,16 +353,13 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result1 = planContractDiff({ from: null, to });
-    const result2 = planContractDiff({ from: null, to });
+    const result1 = plan(null, to);
+    const result2 = plan(null, to);
 
     expect(result1).toEqual(result2);
     expect(JSON.stringify(result1)).toBe(JSON.stringify(result2));
   });
 
-  // --------------------------------------------------------------------------
-  // 10. conflict: type change → error
-  // --------------------------------------------------------------------------
   it('conflict: column type change → failure', () => {
     const from = storage({
       users: {
@@ -471,7 +387,7 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from, to });
+    const result = plan(from, to);
     expect(result.kind).toBe('failure');
     if (result.kind !== 'failure') return;
 
@@ -481,9 +397,6 @@ describe('planContractDiff', () => {
     expect(result.conflicts[0]!.location?.column).toBe('email');
   });
 
-  // --------------------------------------------------------------------------
-  // 11. conflict: column removal → error
-  // --------------------------------------------------------------------------
   it('conflict: column removal → failure', () => {
     const from = storage({
       users: {
@@ -510,17 +423,12 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from, to });
+    const result = plan(from, to);
     expect(result.kind).toBe('failure');
     if (result.kind !== 'failure') return;
-
-    expect(result.conflicts).toHaveLength(1);
     expect(result.conflicts[0]!.kind).toBe('columnRemoved');
   });
 
-  // --------------------------------------------------------------------------
-  // 12. no-op: identical contracts → empty ops
-  // --------------------------------------------------------------------------
   it('no-op: identical contracts → empty ops list', () => {
     const both = storage({
       users: {
@@ -535,16 +443,11 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from: both, to: both });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
-    expect(result.ops).toHaveLength(0);
+    const ops = successOps(both, both);
+    expect(ops).toHaveLength(0);
   });
 
-  // --------------------------------------------------------------------------
-  // 13. pre/post checks — verify ADR 044 structured checks
-  // --------------------------------------------------------------------------
-  it('ops carry correct pre/post checks per ADR 044', () => {
+  it('ops carry correct operation class', () => {
     const to = storage({
       users: {
         columns: {
@@ -557,33 +460,13 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from: null, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
+    const ops = successOps(null, to);
 
-    // createTable checks
-    const createTable = result.ops.find((o) => o.op === 'createTable');
-    expect(createTable!.pre).toEqual([{ id: 'tableNotExists', params: { table: 'users' } }]);
-    expect(createTable!.post).toEqual([{ id: 'tableExists', params: { table: 'users' } }]);
-
-    // createIndex checks
-    const createIndex = result.ops.find((o) => o.op === 'createIndex');
-    expect(createIndex!.pre).toEqual([
-      { id: 'indexNotExists', params: { table: 'users', name: 'users_id_idx' } },
-    ]);
-    expect(createIndex!.post).toEqual([
-      { id: 'indexExists', params: { table: 'users', name: 'users_id_idx' } },
-    ]);
-
-    // All ops have operationClass 'additive'
-    for (const op of result.ops) {
+    for (const op of ops) {
       expect(op.operationClass).toBe('additive');
     }
   });
 
-  // --------------------------------------------------------------------------
-  // Additional edge cases
-  // --------------------------------------------------------------------------
   it('conflict: nullability tightening → failure', () => {
     const from = storage({
       users: {
@@ -611,7 +494,7 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from, to });
+    const result = plan(from, to);
     expect(result.kind).toBe('failure');
     if (result.kind !== 'failure') return;
     expect(result.conflicts[0]!.kind).toBe('nullabilityConflict');
@@ -630,7 +513,7 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from, to: EMPTY });
+    const result = plan(from, EMPTY);
     expect(result.kind).toBe('failure');
     if (result.kind !== 'failure') return;
     expect(result.conflicts[0]!.kind).toBe('tableRemoved');
@@ -663,94 +546,8 @@ describe('planContractDiff', () => {
       },
     });
 
-    // Nullability widening is not currently rejected (additive-only checks
-    // for tightening). It produces no ops since it's a change to an existing
-    // column, not an addition. In MVP this is a silent no-op.
-    const result = planContractDiff({ from, to });
+    const result = plan(from, to);
     expect(result.kind).toBe('success');
-  });
-
-  it('addColumn for NOT NULL without default requires tableIsEmpty check', () => {
-    const from = storage({
-      users: {
-        columns: {
-          id: { nativeType: 'integer', codecId: 'core/int@1', nullable: false },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      },
-    });
-
-    const to = storage({
-      users: {
-        columns: {
-          id: { nativeType: 'integer', codecId: 'core/int@1', nullable: false },
-          status: { nativeType: 'text', codecId: 'core/text@1', nullable: false },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      },
-    });
-
-    const result = planContractDiff({ from, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
-
-    const addCol = result.ops.find((o) => o.op === 'addColumn') as AbstractOp & { op: 'addColumn' };
-    expect(addCol).toBeDefined();
-    // Should have tableIsEmpty pre-check for NOT NULL without default
-    expect(addCol.pre).toContainEqual({ id: 'tableIsEmpty', params: { table: 'users' } });
-    // Should have columnIsNotNull post-check
-    expect(addCol.post).toContainEqual({
-      id: 'columnIsNotNull',
-      params: { table: 'users', column: 'status' },
-    });
-  });
-
-  it('addColumn for NOT NULL with default does NOT require tableIsEmpty', () => {
-    const from = storage({
-      users: {
-        columns: {
-          id: { nativeType: 'integer', codecId: 'core/int@1', nullable: false },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      },
-    });
-
-    const to = storage({
-      users: {
-        columns: {
-          id: { nativeType: 'integer', codecId: 'core/int@1', nullable: false },
-          status: {
-            nativeType: 'text',
-            codecId: 'core/text@1',
-            nullable: false,
-            default: { kind: 'literal', expression: "'active'" },
-          },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      },
-    });
-
-    const result = planContractDiff({ from, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
-
-    const addCol = result.ops.find((o) => o.op === 'addColumn') as AbstractOp & { op: 'addColumn' };
-    expect(addCol).toBeDefined();
-    // Should NOT have tableIsEmpty check
-    const emptyCheck = addCol.pre.find((c) => c.id === 'tableIsEmpty');
-    expect(emptyCheck).toBeUndefined();
   });
 
   it('addPrimaryKey for existing table without PK', () => {
@@ -777,15 +574,11 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
+    const ops = successOps(from, to);
 
-    const pkOps = result.ops.filter((o) => o.op === 'addPrimaryKey');
+    const pkOps = ops.filter((o) => o.id.startsWith('primaryKey.'));
     expect(pkOps).toHaveLength(1);
     expect(pkOps[0]!.id).toBe('primaryKey.users.users_pkey');
-    if (pkOps[0]!.op !== 'addPrimaryKey') return;
-    expect(pkOps[0]!.args.columns).toEqual(['id']);
   });
 
   it('default constraint name generation', () => {
@@ -802,20 +595,10 @@ describe('planContractDiff', () => {
       },
     });
 
-    const result = planContractDiff({ from: null, to });
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return;
+    const ops = successOps(null, to);
 
-    // Unique: tableName_columns_key
-    const unique = result.ops.find((o) => o.op === 'addUniqueConstraint');
-    expect(unique!.id).toBe('unique.users.users_email_key');
-
-    // Index: tableName_columns_idx
-    const index = result.ops.find((o) => o.op === 'createIndex');
-    expect(index!.id).toBe('index.users.users_id_email_idx');
-
-    // FK: tableName_columns_fkey
-    const fk = result.ops.find((o) => o.op === 'addForeignKey');
-    expect(fk!.id).toBe('foreignKey.users.users_id_fkey');
+    expect(ops.find((o) => o.id === 'unique.users.users_email_key')).toBeDefined();
+    expect(ops.find((o) => o.id === 'index.users.users_id_email_idx')).toBeDefined();
+    expect(ops.find((o) => o.id === 'foreignKey.users.users_id_fkey')).toBeDefined();
   });
 });

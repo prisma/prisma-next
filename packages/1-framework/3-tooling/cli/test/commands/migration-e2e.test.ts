@@ -2,8 +2,8 @@ import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { AbstractOp } from '@prisma-next/core-control-plane/abstract-ops';
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/abstract-ops';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
+import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { attestMigration, verifyMigration } from '@prisma-next/migration-tools/attestation';
 import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -40,16 +40,12 @@ function createContract(
   };
 }
 
-function createTableOp(table: string): AbstractOp {
+function createTableOp(table: string): MigrationPlanOperation {
   return {
-    op: 'createTable',
     id: `table.${table}`,
     label: `Create table "${table}"`,
     operationClass: 'additive',
-    pre: [],
-    post: [],
-    args: { table, columns: [] },
-  } as AbstractOp;
+  };
 }
 
 async function createTempDir(): Promise<string> {
@@ -74,7 +70,7 @@ describe('migration plan → verify end-to-end', () => {
       },
     });
 
-    const ops: AbstractOp[] = [createTableOp('user')];
+    const ops: MigrationPlanOperation[] = [createTableOp('user')];
 
     const manifest: MigrationManifest = {
       from: EMPTY_CONTRACT_HASH,

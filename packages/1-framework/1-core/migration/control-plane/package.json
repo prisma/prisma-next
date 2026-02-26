@@ -37,7 +37,7 @@
     "node": ">=20"
   },
   "exports": {
-    "./abstract-ops": "./dist/abstract-ops.mjs",
+    "./constants": "./dist/constants.mjs",
     "./emission": "./dist/emission.mjs",
     "./errors": "./dist/errors.mjs",
     "./schema-view": "./dist/schema-view.mjs",

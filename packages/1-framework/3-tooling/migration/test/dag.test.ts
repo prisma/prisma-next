@@ -1,4 +1,4 @@
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/abstract-ops';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { describe, expect, it } from 'vitest';
 import { detectCycles, detectOrphans, findLeaf, findPath, reconstructGraph } from '../src/dag';
 import { MigrationToolsError } from '../src/errors';

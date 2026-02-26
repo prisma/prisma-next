@@ -1,9 +1,9 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ContractDiffResult } from '@prisma-next/core-control-plane/abstract-ops';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type {
+  ContractDiffResult,
   ControlDriverInstance,
   ControlFamilyInstance,
   ControlPlaneStack,

@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { AbstractOp } from '@prisma-next/core-control-plane/abstract-ops';
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/abstract-ops';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
+import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
 import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -55,8 +55,8 @@ export interface MigrationPlanResult {
   readonly edgeId?: string;
   readonly dir?: string;
   readonly operations: readonly {
-    readonly op: string;
     readonly id: string;
+    readonly label: string;
   }[];
   readonly summary: string;
   readonly timings: {
@@ -249,7 +249,7 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  const ops: readonly AbstractOp[] = diffResult.ops;
+  const ops: readonly MigrationPlanOperation[] = diffResult.ops;
 
   if (ops.length === 0) {
     const result: MigrationPlanResult = {
@@ -298,7 +298,7 @@ async function executeMigrationPlanCommand(
       to: toStorageHash,
       edgeId,
       dir: relative(process.cwd(), packageDir),
-      operations: ops.map((op) => ({ op: op.op, id: op.id })),
+      operations: ops.map((op) => ({ id: op.id, label: op.label })),
       summary: `Planned ${ops.length} operation(s)`,
       timings: { total: Date.now() - startTime },
     };
@@ -376,7 +376,7 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
       const op = result.operations[i]!;
       const isLast = i === result.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
-      lines.push(`${dim_(treeChar)}─ ${op.id} ${dim_(`[${op.op}]`)}`);
+      lines.push(`${dim_(treeChar)}─ ${op.id} ${dim_(`[${op.label}]`)}`);
     }
     lines.push('');
   }

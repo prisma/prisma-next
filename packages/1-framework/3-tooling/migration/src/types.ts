@@ -1,5 +1,5 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { AbstractOp } from '@prisma-next/core-control-plane/abstract-ops';
+import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 
 export interface MigrationHints {
   readonly used: readonly string[];
@@ -22,7 +22,7 @@ export interface MigrationManifest {
   readonly createdAt: string;
 }
 
-export type MigrationOps = readonly AbstractOp[];
+export type MigrationOps = readonly MigrationPlanOperation[];
 
 export interface MigrationPackage {
   readonly dirName: string;

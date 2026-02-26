@@ -18,6 +18,10 @@ import type { CoreSchemaView } from './schema-view';
 
 // Re-export migration types for convenience
 export type {
+  ContractDiffConflict,
+  ContractDiffFailure,
+  ContractDiffResult,
+  ContractDiffSuccess,
   MigrationOperationClass,
   MigrationOperationPolicy,
   MigrationPlan,

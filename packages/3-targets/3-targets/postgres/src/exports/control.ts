@@ -13,6 +13,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
+import { createPostgresSqlEmitter } from '../core/migrations/postgres-sql-emitter';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 
 const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =
@@ -32,9 +33,11 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
       },
       planContractDiff(from: ContractIR | null, to: ContractIR) {
+        const emitter = createPostgresSqlEmitter();
         return planContractDiff({
           from: from ? (from.storage as SqlStorage) : null,
           to: to.storage as SqlStorage,
+          emitter,
         });
       },
     },

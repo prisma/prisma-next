@@ -1,5 +1,5 @@
 import { relative, resolve } from 'node:path';
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/abstract-ops';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';

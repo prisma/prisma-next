@@ -12,7 +12,6 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { Result } from '@prisma-next/utils/result';
-import type { ContractDiffResult } from './abstract-ops';
 import type { ControlDriverInstance, ControlFamilyInstance } from './types';
 
 // ============================================================================
@@ -50,6 +49,56 @@ export interface MigrationPlanOperation {
   /** The class of operation (additive, widening, destructive). */
   readonly operationClass: MigrationOperationClass;
 }
+
+// ============================================================================
+// Contract Diff Types
+// ============================================================================
+
+/**
+ * Conflict detected during contract-to-contract planning.
+ */
+export interface ContractDiffConflict {
+  readonly kind:
+    | 'typeMismatch'
+    | 'nullabilityConflict'
+    | 'columnRemoved'
+    | 'tableRemoved'
+    | 'primaryKeyChanged'
+    | 'unsupportedChange';
+  readonly summary: string;
+  readonly location?: {
+    readonly table?: string;
+    readonly column?: string;
+    readonly constraint?: string;
+  };
+}
+
+/**
+ * Successful contract diff result.
+ * Ops are typed as the base MigrationPlanOperation for framework-level consumers.
+ * SQL-domain code knows these are SqlMigrationPlanOperation at runtime.
+ */
+export interface ContractDiffSuccess {
+  readonly kind: 'success';
+  readonly ops: readonly MigrationPlanOperation[];
+}
+
+/**
+ * Failed contract diff result (non-additive changes detected).
+ */
+export interface ContractDiffFailure {
+  readonly kind: 'failure';
+  readonly conflicts: readonly ContractDiffConflict[];
+}
+
+/**
+ * Result of a contract-to-contract diff operation.
+ */
+export type ContractDiffResult = ContractDiffSuccess | ContractDiffFailure;
+
+// ============================================================================
+// Plan Types (Display-Oriented)
+// ============================================================================
 
 /**
  * A migration plan for display purposes.
@@ -255,7 +304,7 @@ export interface TargetMigrationsCapability<
   createPlanner(family: TFamilyInstance): MigrationPlanner<TFamilyId, TTargetId>;
   createRunner(family: TFamilyInstance): MigrationRunner<TFamilyId, TTargetId>;
   /**
-   * Diff two contracts and produce abstract migration operations.
+   * Diff two contracts and produce migration operations.
    * The "from" contract is null for new projects (empty starting state).
    * This is an offline operation — no database connection required.
    */

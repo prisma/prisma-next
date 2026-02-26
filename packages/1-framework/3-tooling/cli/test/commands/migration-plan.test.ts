@@ -2,8 +2,8 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { AbstractOp } from '@prisma-next/core-control-plane/abstract-ops';
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/abstract-ops';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
+import type { MigrationPlanOperation } from '@prisma-next/core-control-plane/types';
 import { attestMigration } from '@prisma-next/migration-tools/attestation';
 import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -33,16 +33,12 @@ function createTestContract(overrides?: Partial<ContractIR>): ContractIR {
   };
 }
 
-function createTableOp(table: string): AbstractOp {
+function createTableOp(table: string): MigrationPlanOperation {
   return {
-    op: 'createTable',
     id: `table.${table}`,
     label: `Create table "${table}"`,
     operationClass: 'additive',
-    pre: [],
-    post: [],
-    args: { table, columns: [] },
-  } as AbstractOp;
+  };
 }
 
 async function createTempDir(prefix: string): Promise<string> {
@@ -89,7 +85,7 @@ describe('migration plan — core flow', () => {
       createdAt: new Date().toISOString(),
     };
 
-    const ops: AbstractOp[] = [createTableOp('user')];
+    const ops: MigrationPlanOperation[] = [createTableOp('user')];
 
     const dirName = formatMigrationDirName(new Date(), 'initial');
     const packageDir = join(migrationsDir, dirName);
@@ -105,7 +101,7 @@ describe('migration plan — core flow', () => {
     expect(pkg.manifest.kind).toBe('regular');
     expect(pkg.manifest.fromContract).toBeNull();
     expect(pkg.ops).toHaveLength(1);
-    expect(pkg.ops[0]!.op).toBe('createTable');
+    expect(pkg.ops[0]!.id).toBe('table.user');
   });
 
   it('produces no-op when from and to hash match', async () => {

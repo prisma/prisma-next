@@ -1,11 +1,11 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
-import type { ContractDiffResult } from '@prisma-next/core-control-plane/abstract-ops';
 import type {
   ContractSourceDiagnostics,
   ContractSourceProvider,
 } from '@prisma-next/config/config-types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import type {
+  ContractDiffResult,
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
   ControlExtensionDescriptor,

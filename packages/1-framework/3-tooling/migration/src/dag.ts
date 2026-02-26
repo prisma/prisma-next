@@ -1,4 +1,4 @@
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/abstract-ops';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { errorAmbiguousLeaf, errorSelfLoop } from './errors';
 import type { MigrationGraph, MigrationGraphEdge, MigrationPackage } from './types';
 
