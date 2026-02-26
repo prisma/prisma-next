@@ -21,16 +21,16 @@ Build the converter that maps `SqlStorage` → `SqlSchemaIR`. This is the infras
 
 Lives in the sql family tooling layer (`packages/2-sql/3-tooling/family/`), since it bridges `SqlStorage` (from `@prisma-next/sql-contract`) and `SqlSchemaIR` (from `@prisma-next/sql-schema-ir`).
 
-The converter is exported as a standalone function from `@prisma-next/family-sql/control`. The `TargetMigrationsCapability` interface exposes `contractToSchema()` and `detectDestructiveChanges()` so the CLI can plan offline without importing SQL-domain code directly.
+The converter is exported as a standalone function from `@prisma-next/family-sql/control`. The `TargetMigrationsCapability` interface exposes `contractToSchema()` so the CLI can plan offline without importing SQL-domain code directly. Destructive change detection is handled by a hash-diff heuristic in the CLI itself (no family-specific method needed on the interface).
 
 **Tasks:**
 
 - [x] Implement `contractToSchemaIR(storage: SqlStorage): SqlSchemaIR`
 - [x] Handle `ColumnDefault` conversion, `ForeignKey` reshaping, `Index` → `SqlIndexIR`
 - [x] Export from `@prisma-next/family-sql/control`
-- [x] Implement `detectDestructiveChanges(from, to)` for table/column removals
-- [x] Add `contractToSchema()` and `detectDestructiveChanges()` to `TargetMigrationsCapability` interface
-- [x] Implement both methods on postgres target descriptor
+- [x] Implement `detectDestructiveChanges(from, to)` for table/column removals (SQL family utility, tested directly)
+- [x] Add `contractToSchema()` to `TargetMigrationsCapability` interface
+- [x] Implement `contractToSchema()` on postgres target descriptor
 - [x] Verify `pnpm lint:deps` passes
 - [x] Unit tests for `contractToSchemaIR` (15 tests)
 - [x] Unit tests for `detectDestructiveChanges` (7 tests)
@@ -45,8 +45,8 @@ Wire `migration plan` to use the existing planner directly (same path as `db ini
 
 #### CLI command
 - [x] `migration plan` reads config, loads contract, resolves "from" via DAG
-- [x] Uses `migrations.detectDestructiveChanges()` for pre-flight check
 - [x] Uses `migrations.contractToSchema()` + `migrations.createPlanner()` + `planner.plan()` — same path as `db init`
+- [x] Detects destructive changes via hash-diff heuristic (hashes differ but planner produces no ops → infer removals)
 - [x] Writes migration package to disk (`migration.json` + `ops.json`)
 - [x] Attests `edgeId` via content-addressed hashing
 - [x] `--from <hash>`, `--name <slug>`, `--json` flags

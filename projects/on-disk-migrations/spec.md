@@ -24,7 +24,7 @@ Two user flows are in scope:
 ### FR-1: Migration planning via existing planner + contract-to-schemaIR conversion
 - Reuse the existing `PostgresMigrationPlanner` (contract vs schema IR) to produce migration operations — the same planner `db init` uses
 - `migration plan` calls `TargetMigrationsCapability.contractToSchema()` to convert the "from" contract to a schema IR, then calls `planner.plan()` to diff it against the "to" contract
-- `TargetMigrationsCapability.detectDestructiveChanges()` catches table/column removals before the additive-only planner runs; the planner itself also catches type changes and nullability tightening
+- Destructive changes (table/column removals) are detected by a hash-diff heuristic: if the contract hashes differ but the additive-only planner produces zero operations, the CLI infers that the contract changed in ways the planner silently ignores and reports an error; the planner itself catches type changes and nullability tightening as conflicts
 - Fully offline — no database connection required
 - Produces correct additive SQL for MVP (create table, add column, add index, add FK, add unique, add PK, set default, enable extension, create storage type)
 - Must be deterministic: same inputs always produce the same plan
@@ -238,9 +238,9 @@ On-disk `ops.json` contains SQL operations lowered for the specific target (e.g.
 Validated against `architecture.config.json`:
 
 - **On-disk format types + DAG logic**: `packages/1-framework/3-tooling/migration/` — framework domain, tooling layer, migration plane. Target-agnostic.
-- **CLI commands**: `packages/1-framework/3-tooling/cli/` — calls through `TargetMigrationsCapability` interface methods (`contractToSchema()`, `detectDestructiveChanges()`, `createPlanner()`). Does not import from sql/targets domains directly.
+- **CLI commands**: `packages/1-framework/3-tooling/cli/` — calls through `TargetMigrationsCapability` interface methods (`contractToSchema()`, `createPlanner()`). Does not import from sql/targets domains directly. Destructive change detection uses a hash-diff heuristic in the CLI itself (no family-specific method needed).
 - **Existing planner**: `packages/3-targets/3-targets/postgres/` — the `PostgresMigrationPlanner` lives here and is accessed via the `TargetMigrationsCapability` interface.
-- **Contract-to-schema conversion**: `packages/2-sql/3-tooling/family/` — `contractToSchemaIR()` and `detectDestructiveChanges()` live here, exposed to CLI via the `TargetMigrationsCapability` methods on the postgres target descriptor.
+- **Contract-to-schema conversion**: `packages/2-sql/3-tooling/family/` — `contractToSchemaIR()` lives here, exposed to CLI via `TargetMigrationsCapability.contractToSchema()` on the postgres target descriptor. `detectDestructiveChanges()` also lives here as a SQL-family utility for direct use in tests and future tooling, but the CLI does not call it — it uses a hash-diff heuristic instead.
 
 The CLI uses `config.target.migrations.createPlanner()` + `planner.plan()` — the same code path `db init` uses. No separate contract-diffing abstraction is needed.
 

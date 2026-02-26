@@ -333,7 +333,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(threw).toBe(true);
           const errorOutput = consoleErrors.join('\n');
-          expect(errorOutput).toContain('email');
+          expect(errorOutput).toContain('destructive changes');
         },
         timeouts.typeScriptCompilation,
       );

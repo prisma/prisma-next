@@ -231,18 +231,8 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  // Detect destructive changes before planning
-  const { migrations } = config.target;
-  const destructive = migrations.detectDestructiveChanges(fromContract, toContractJson);
-  if (destructive.length > 0) {
-    return notOk(
-      errorMigrationPlanningFailed({
-        conflicts: destructive as readonly CliErrorConflict[],
-      }),
-    );
-  }
-
   // Plan migration using the same planner as db init
+  const { migrations } = config.target;
   const stack = createControlPlaneStack({
     target: config.target,
     adapter: config.adapter,
@@ -269,6 +259,25 @@ async function executeMigrationPlanCommand(
   const ops: readonly MigrationPlanOperation[] = plannerResult.plan.operations;
 
   if (ops.length === 0) {
+    // The hashes differ (we checked for hash equality earlier) but the additive-only
+    // planner produced no operations. This means the contract changed in ways the
+    // planner silently ignores — e.g. table/column removals. Destructive operations
+    // are not yet supported, so we report an error rather than a misleading no-op.
+    if (fromHash !== toStorageHash) {
+      return notOk(
+        errorMigrationPlanningFailed({
+          conflicts: [
+            {
+              kind: 'unsupportedChange',
+              summary:
+                'Contract changed but no additive operations were produced. ' +
+                'This usually means destructive changes (table/column removal) which are not yet supported.',
+            },
+          ],
+        }),
+      );
+    }
+
     const result: MigrationPlanResult = {
       ok: true,
       noOp: true,

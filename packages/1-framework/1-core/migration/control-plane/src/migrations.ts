@@ -265,16 +265,4 @@ export interface TargetMigrationsCapability<
    * @returns Family-specific schema IR (e.g., `SqlSchemaIR` for SQL targets).
    */
   contractToSchema(contract: ContractIR | null): unknown;
-  /**
-   * Detects destructive changes between two contracts that the additive-only
-   * planner would silently ignore (e.g., table/column removals).
-   *
-   * @param from - The source contract, or null for a new project.
-   * @param to - The destination contract.
-   * @returns Conflicts if destructive changes are detected, empty array otherwise.
-   */
-  detectDestructiveChanges(
-    from: ContractIR | null,
-    to: ContractIR,
-  ): readonly MigrationPlannerConflict[];
 }
