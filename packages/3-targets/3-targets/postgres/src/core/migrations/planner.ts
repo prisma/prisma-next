@@ -560,12 +560,12 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
    * but only when no matching user-declared index exists in `contractTable.indexes`.
    */
   private buildFkBackingIndexOperations(
-    tables: SqlContract<SqlStorage>['storage']['tables'],
+    tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    for (const [tableName, table] of sortedEntries(tables)) {
+    for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
       // Collect column sets of user-declared indexes to avoid duplicates
       const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
