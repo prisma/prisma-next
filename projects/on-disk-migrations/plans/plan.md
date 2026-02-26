@@ -349,7 +349,18 @@ Build CLI commands and validate the full user flows end-to-end. Commands follow 
 - [x] **`migration new` → `migration verify` flow**: scaffold draft → verify detects draft → attest → verify passes.
 - [ ] **Existing DB adoption flow**: `db init` / `db sign` with contract A → emit changed contract B → `migration plan` → verify migration edge has correct from/to. (Requires live DB — deferred to integration test suite.)
 
-### Milestone 4: `migration apply` (limited)
+### Milestone 4: SQL lowering + `migration apply` (limited)
+
+**Prerequisite:** Update the planner (M1) to produce SQL directly instead of abstract ops IR. The structural diffing and conflict detection are unchanged; the change is in what the planner emits. This must land before apply can work, since apply reads SQL from `ops.json`.
+
+**Detailed task plan:** [`m4-sql-lowering.plan.md`](./m4-sql-lowering.plan.md)
+
+**Tasks (SQL lowering):**
+- [ ] Phase 1: Move `EMPTY_CONTRACT_HASH`, define `SqlEmitter` interface, define new `ContractDiffResult`
+- [ ] Phase 2: Implement `PostgresSqlEmitter` (extract SQL gen from existing Postgres planner)
+- [ ] Phase 3: Update `planContractDiff` to accept emitter, produce `SqlMigrationPlanOperation[]`
+- [ ] Phase 4: Update consumer chain (capability, control client, CLI, migration-tools types, tests)
+- [ ] Phase 5: Delete `abstract-ops.ts`, update docs, verify build/tests/lint
 
 Build a minimal `migration apply` command that reads on-disk migration packages and executes the SQL against a live database. Since the planner lowers directly to SQL at plan time (RD-6), no resolver is needed — apply just reads the SQL from `ops.json` and executes it. This is intentionally limited: no dry-run, no rollback, no partial apply, no apply-to-specific-hash. Simple sequential execution of pending migrations.
 
@@ -408,6 +419,7 @@ Build a minimal `migration apply` command that reads on-disk migration packages 
 | `migration verify` validates edgeId | Unit | M3 | Pass/fail/attest |
 | Incremental migration chain | E2E | M3 | Two plans form valid DAG |
 | Existing DB adoption flow | E2E | M3 | init/sign → plan → verify |
+| Planner produces SQL (not abstract ops) | Unit | M4 | Updated M1 tests assert on SQL |
 | `migration apply` executes SQL against live DB | Integration | M4 | plan → apply → verify schema |
 | `migration apply` updates ledger | Integration | M4 | edgeId + contract hash recorded |
 | `migration apply` idempotent | Integration | M4 | Re-run is no-op |

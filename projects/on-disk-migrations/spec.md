@@ -8,11 +8,12 @@ prisma-next currently supports `db init` (bootstrap a fresh DB from a contract) 
 
 The existing Postgres planner diffs a contract against a **live schema IR** (introspection-based), which is how `db init` currently works. On-disk migrations are different: the user edits their schema, emits a new contract, and plans a migration *before* the database reflects those changes. This requires a **contract-to-contract diff planner** that compares two contract JSON structures and produces operations without needing a live database. Long-term, the introspection-based path should converge to use the same diff engine: introspect → convert to contract → diff two contracts via `planContractDiff`. This project builds the contract-to-contract engine; converging the introspection path is future work (see RD-3).
 
-Three user flows are in scope:
+Two user flows are in scope:
 
 1. **New project**: Write contract → emit → `migration plan` → `migration apply`
 2. **Existing database, no prisma-next contract**: Write contract → `db sign`/`db init` → `migration plan` → `migration apply`
-3. **Apply**: `migration apply` — apply on-disk migrations to a database. In scope in a limited sense: we want to be able to actually apply migrations, but not a full production-ready apply flow (e.g., no dry-run, no rollback, no multi-step orchestration).
+
+`migration apply` is in scope in a limited sense: we want to be able to actually apply migrations, but not a full production-ready apply flow (no dry-run, no rollback, no multi-step orchestration). See FR-10.
 
 # Requirements
 
@@ -30,7 +31,6 @@ Three user flows are in scope:
 - Define TypeScript types/interfaces for the on-disk artifacts specified in ADR 028:
   - `migration.json` header (from/to hashes, edgeId, kind, fromContract, toContract, hints, pre/post, labels, authorship)
   - `ops.json` (SQL operations for the target)
-  - `graph.index.json` (optional DAG cache)
 - These types must be the single source of truth for serialization/deserialization
 
 ### FR-3: Migration directory management
@@ -240,7 +240,6 @@ The CLI → control plane → sql family → postgres target delegation chain al
 ## RD-8: Empty contract representation
 
 Use the sentinel value `sha256:empty` — a human-readable marker, not a real SHA-256 hash. This is recognizable at a glance in migration files, error messages, and debugging. Export it as a named constant.
-
 
 ## RD-10: On-disk persistence package location
 
