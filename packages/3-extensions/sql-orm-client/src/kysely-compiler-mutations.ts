@@ -32,10 +32,18 @@ export function compileUpsertReturning(
   conflictColumns: readonly string[],
   returningColumns: readonly string[] | undefined,
 ): CompiledQuery {
+  const hasUpdateValues = Object.keys(updateValues).length > 0;
   const base = queryCompiler
     .insertInto(tableName)
     .values(createValues)
-    .onConflict((conflict) => conflict.columns(conflictColumns).doUpdateSet(updateValues));
+    .onConflict((conflict) => {
+      const conflictBuilder = conflict.columns(conflictColumns);
+      if (!hasUpdateValues) {
+        return conflictBuilder.doNothing();
+      }
+
+      return conflictBuilder.doUpdateSet(updateValues);
+    });
 
   if (returningColumns && returningColumns.length > 0) {
     return base.returning(returningColumns).compile();
