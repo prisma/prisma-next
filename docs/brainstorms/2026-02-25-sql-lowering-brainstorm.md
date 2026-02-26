@@ -1,13 +1,14 @@
 ---
 date: 2026-02-25
 topic: sql-lowering
+status: resolved
 ---
 
 # SQL Lowering: Drop Abstract Ops, Write SQL to Disk
 
-## What We're Building
+## What We Built
 
-Change the contract-to-contract planner to produce `SqlMigrationPlanOperation` directly instead of `AbstractOp`. Drop the abstract ops layer entirely. `ops.json` on disk becomes serialized `SqlMigrationPlanOperation[]` — the same type the existing runner already consumes. `migration apply` reads and executes the SQL without any resolver.
+Changed the migration planner to produce `SqlMigrationPlanOperation` directly instead of `AbstractOp`. Dropped the abstract ops layer entirely. `ops.json` on disk is serialized `SqlMigrationPlanOperation[]` — the same type the existing runner already consumes. `migration apply` will read and execute the SQL without any resolver.
 
 ## Why This Approach
 
@@ -19,15 +20,12 @@ The existing `SqlMigrationPlanOperation` type is battle-tested (used by the intr
 
 - **On-disk ops format**: `SqlMigrationPlanOperation<PostgresPlanTargetDetails>[]` serialized as JSON. Same type the runner already uses.
 - **Layering**: `migration-tools` (framework domain) cannot import from sql domain. It types ops as `MigrationPlanOperation[]` — the base interface already in `@prisma-next/core-control-plane`. The full `SqlMigrationPlanOperation` shape is on disk in JSON, but framework code only sees the base fields (`id`, `label`, `operationClass`). The sql/target layer widens to the full type when reading ops for execution.
-- **Abstract ops removal**: Delete `abstract-ops.ts` types (`AbstractOp`, `AbstractCheck`, `AbstractColumnDefinition`, etc.) and `ContractDiffResult`. Replace `ContractDiffResult` with a result type that carries `SqlMigrationPlanOperation[]` instead.
+- **Abstract ops removal**: Deleted `AbstractOp`, `AbstractCheck`, `AbstractColumnDefinition`, etc. No intermediate IR — the planner produces SQL directly.
+- **No separate diff types**: `migration plan` uses the same `planner.plan()` path as `db init`. The `ContractDiffResult` / `planContractDiff` abstraction was removed — it was a redundant wrapper over the existing planner. Instead, `TargetMigrationsCapability` exposes `contractToSchema()` and `detectDestructiveChanges()` for offline planning.
 - **Pre/post checks**: Move from structured `AbstractCheck` predicates to resolved SQL in `precheck`/`postcheck` steps (as `SqlMigrationPlanOperationStep`). The ADR 044 vocabulary still defines the *semantics*, but the on-disk format carries the resolved SQL, not the structured predicates. This matches what the existing planner already produces.
 - **`EMPTY_CONTRACT_HASH`**: Stays in framework domain. Not affected by this change.
 
-## Open Questions
+## Resolved Questions
 
-- Exact signature change for `planContractDiff` — needs to return `SqlMigrationPlanOperation[]` (or a result wrapper for the conflict case) instead of `ContractDiffResult`.
-- How much of the existing planner tests need rewriting vs adapting (they currently assert on `AbstractOp` shapes).
-
-## Next Steps
-
-Detailed task plan written: `projects/on-disk-migrations/plans/m4-sql-lowering.plan.md`
+- **Planner interface for offline planning**: `migration plan` calls `TargetMigrationsCapability.contractToSchema(fromContract)` to synthesize a schema IR, then `migrations.createPlanner(family).plan(...)` — the same code path as `db init`. No separate entry point needed.
+- **Existing planner tests**: Tests were adapted to use `planFromStorages()` helper (which calls `contractToSchemaIR` + `planner.plan()` directly) and `detectDestructiveChanges()` for destructive scenarios. No tests needed rewriting from scratch.
