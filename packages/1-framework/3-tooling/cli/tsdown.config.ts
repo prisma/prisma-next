@@ -12,6 +12,7 @@ export default defineConfig({
     'src/commands/db-sign.ts',
     'src/commands/db-verify.ts',
     'src/commands/contract-emit.ts',
+    'src/commands/migration-plan.ts',
     'src/config-loader.ts',
     'src/exports/control-api.ts',
   ],

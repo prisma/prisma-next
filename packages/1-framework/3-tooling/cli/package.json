@@ -89,6 +89,10 @@
       "types": "./dist/commands/contract-emit.d.mts",
       "import": "./dist/commands/contract-emit.mjs"
     },
+    "./commands/migration-plan": {
+      "types": "./dist/commands/migration-plan.d.mts",
+      "import": "./dist/commands/migration-plan.mjs"
+    },
     "./config-loader": {
       "types": "./dist/config-loader.d.mts",
       "import": "./dist/config-loader.mjs"
