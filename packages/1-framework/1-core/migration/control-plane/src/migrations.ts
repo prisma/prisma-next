@@ -64,13 +64,22 @@ export interface ContractDiffConflict {
     | 'columnRemoved'
     | 'tableRemoved'
     | 'primaryKeyChanged'
-    | 'unsupportedChange';
+    | 'unsupportedChange'
+    | 'indexIncompatible'
+    | 'foreignKeyConflict'
+    | 'missingButNonAdditive'
+    | 'unsupportedExtension'
+    | 'extensionMissing'
+    | 'unsupportedOperation';
   readonly summary: string;
   readonly location?: {
     readonly table?: string;
     readonly column?: string;
     readonly constraint?: string;
+    readonly index?: string;
+    readonly extension?: string;
   };
+  readonly meta?: Record<string, unknown>;
 }
 
 /**

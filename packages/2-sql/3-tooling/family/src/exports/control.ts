@@ -14,9 +14,8 @@ export type {
 export type { SqlControlDescriptorWithContributions } from '../core/assembly';
 export { extractCodecControlHooks } from '../core/assembly';
 export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/control-instance';
-export type { ContractPlannerOptions } from '../core/migrations/contract-planner';
-// Contract-to-contract planner
-export { planContractDiff } from '../core/migrations/contract-planner';
+// Contract → SchemaIR conversion for offline migration planning
+export { contractToSchemaIR } from '../core/migrations/contract-to-schema-ir';
 export {
   createMigrationPlan,
   plannerFailure,
@@ -25,17 +24,6 @@ export {
   runnerSuccess,
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
-export type {
-  EmitAddColumnInput,
-  EmitAddForeignKeyInput,
-  EmitAddPrimaryKeyInput,
-  EmitAddUniqueConstraintInput,
-  EmitCreateIndexInput,
-  EmitCreateStorageTypeInput,
-  EmitCreateTableInput,
-  EmitEnableExtensionInput,
-  SqlEmitter,
-} from '../core/migrations/sql-emitter';
 // SQL-specific types
 export type {
   CodecControlHooks,

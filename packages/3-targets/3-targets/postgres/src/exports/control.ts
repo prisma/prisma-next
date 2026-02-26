@@ -1,5 +1,6 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type {
+  ContractDiffResult,
   ControlTargetInstance,
   MigrationPlanner,
   MigrationRunner,
@@ -8,23 +9,17 @@ import type {
   SqlControlFamilyInstance,
   SqlControlTargetDescriptor,
 } from '@prisma-next/family-sql/control';
-import { planContractDiff } from '@prisma-next/family-sql/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { contractToSchemaIR } from '@prisma-next/family-sql/control';
+import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
-import { createPostgresSqlEmitter } from '../core/migrations/postgres-sql-emitter';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 
 const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =
   {
     ...postgresTargetDescriptorMeta,
     operationSignatures: () => [],
-    /**
-     * Migrations capability for CLI to access planner/runner via core types.
-     * The SQL-specific planner/runner types are compatible with the generic
-     * MigrationPlanner/MigrationRunner interfaces at runtime.
-     */
     migrations: {
       createPlanner(_family: SqlControlFamilyInstance) {
         return createPostgresMigrationPlanner() as MigrationPlanner<'sql', 'postgres'>;
@@ -32,13 +27,21 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
       createRunner(family) {
         return createPostgresMigrationRunner(family) as MigrationRunner<'sql', 'postgres'>;
       },
-      planContractDiff(from: ContractIR | null, to: ContractIR) {
-        const emitter = createPostgresSqlEmitter();
-        return planContractDiff({
-          from: from ? (from.storage as SqlStorage) : null,
-          to: to.storage as SqlStorage,
-          emitter,
+      planContractDiff(from: ContractIR | null, to: ContractIR): ContractDiffResult {
+        const fromSchemaIR = from
+          ? contractToSchemaIR(from.storage as SqlStorage)
+          : contractToSchemaIR({ tables: {} });
+        const planner = createPostgresMigrationPlanner();
+        const result = planner.plan({
+          contract: to as SqlContract<SqlStorage>,
+          schema: fromSchemaIR,
+          policy: { allowedOperationClasses: ['additive'] },
+          frameworkComponents: [],
         });
+        if (result.kind === 'failure') {
+          return { kind: 'failure', conflicts: result.conflicts };
+        }
+        return { kind: 'success', ops: result.plan.operations };
       },
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {

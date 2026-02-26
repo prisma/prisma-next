@@ -1,17 +1,19 @@
 # Summary
 
-Implement on-disk migration persistence for prisma-next: the ability to plan contract-to-contract diffs and write them as migration edge packages (`migration.json` + `ops.json`) to a `migrations/` directory on disk, and apply them. This covers `migration plan`, `migration apply`, `migration verify`, `migration new`, and supporting infrastructure (DAG reconstruction, edge attestation, on-disk types). `db update` is explicitly out of scope.
+Implement on-disk migration persistence for prisma-next: the ability to plan migrations using the existing planner and serialize them as migration edge packages (`migration.json` + `ops.json`) to a `migrations/` directory on disk. This covers `migration plan`, `migration apply`, `migration verify`, `migration new`, and supporting infrastructure (contract-to-schemaIR conversion, DAG reconstruction, edge attestation, on-disk types). `db update` is explicitly out of scope.
 
 # Description
 
 prisma-next currently supports `db init` (bootstrap a fresh DB from a contract) and `db sign` (write a contract marker), but has no way to persist migration edges to disk. The architecture (ADR 001, ADR 028, Subsystem 7) specifies a rich on-disk format where migrations are directed edges in a DAG, each carrying `fromContract`/`toContract`, operations, pre/post checks, and a content-addressed `edgeId`.
 
-The existing Postgres planner diffs a contract against a **live schema IR** (introspection-based), which is how `db init` currently works. On-disk migrations are different: the user edits their schema, emits a new contract, and plans a migration *before* the database reflects those changes. This requires a **contract-to-contract diff planner** that compares two contract JSON structures and produces operations without needing a live database. Long-term, the introspection-based path should converge to use the same diff engine: introspect → convert to contract → diff two contracts via `planContractDiff`. This project builds the contract-to-contract engine; converging the introspection path is future work (see RD-3).
+The existing Postgres planner diffs a `SqlContract` against an `SqlSchemaIR`. For `db init`, the `SqlSchemaIR` comes from introspecting a live database. For `migration plan`, we reuse the same planner but the `SqlSchemaIR` comes from **converting the "from" contract** (read from on-disk migration history) into a schema IR. This keeps `migration plan` fully offline (no database connection) while reusing the existing, well-tested planner.
+
+The new piece of infrastructure is a `ContractIR → SqlSchemaIR` converter that maps contract-level types (structured `ColumnDefault`, `codecId`, `typeParams`) down to the schema IR representation (raw default expressions, `nativeType`).
 
 Two user flows are in scope:
 
 1. **New project**: Write contract → emit → `migration plan` → `migration apply`
-2. **Existing database, no prisma-next contract**: Write contract → `db sign`/`db init` → `migration plan` → `migration apply`
+2. **Existing database, no prisma-next contract**: Write contract → `db sign`/`db init` → edit contract → emit → `migration plan` → `migration apply`
 
 `migration apply` is in scope in a limited sense: we want to be able to actually apply migrations, but not a full production-ready apply flow (no dry-run, no rollback, no multi-step orchestration). See FR-10.
 
@@ -19,13 +21,13 @@ Two user flows are in scope:
 
 ## Functional Requirements
 
-### FR-1: Contract-to-contract diff planner
-- Given two canonical contract JSON objects (from-contract and to-contract), produce a migration plan with SQL operations for the target, pre/post checks, and metadata
+### FR-1: Migration planning via existing planner + contract-to-schemaIR conversion
+- Reuse the existing `PostgresMigrationPlanner` (contract vs schema IR) to produce migration operations
+- `migration plan` converts the "from" contract to a `SqlSchemaIR`, then diffs it against the "to" contract using the existing planner
+- Fully offline — no database connection required
 - Produces correct additive SQL for MVP (create table, add column, add index, add FK, add unique, add PK, set default, enable extension, create storage type)
-- Lowers directly to target SQL — no abstract intermediate representation (see RD-6)
 - Must be deterministic: same inputs always produce the same plan
-- This is intended to become the single diff engine for all migration planning (see RD-3)
-- Diffing happens at the `SqlStorage` (contract) level, not at `SqlSchemaIR` level — see RD-5 for rationale
+- New infrastructure: `contractToSchemaIR(contract: SqlStorage) → SqlSchemaIR` converter
 
 ### FR-2: On-disk migration file format (TypeScript types)
 - Define TypeScript types/interfaces for the on-disk artifacts specified in ADR 028:
@@ -50,7 +52,8 @@ Two user flows are in scope:
 - Fully offline — no database connection required
 - Read the "from" contract from on-disk migration history (latest `toContract` in the DAG, or empty contract if no migrations exist)
 - Read the "to" contract from the emitted `contract.json`
-- Diff the two contracts using the contract-to-contract planner
+- Convert the "from" contract to `SqlSchemaIR` via `contractToSchemaIR`
+- Diff using the existing planner (to-contract vs from-schemaIR)
 - Write the resulting edge to disk as a new migration package
 - Output a human-readable summary of operations
 - Optional `--from <hash>` to explicitly select a different starting contract
@@ -82,10 +85,9 @@ Two user flows are in scope:
 
 ### NFR-2: Layering compliance
 - New code must respect the package layering rules (`pnpm lint:deps` must pass)
-- Structural diffing logic (what changed between two contracts) lives at the SQL family level; SQL generation is target-specific
+- CLI calls through the control plane stack abstraction — no direct imports from sql/targets domains
 
 ### NFR-3: Test coverage
-- Contract-to-contract planner must have comprehensive coverage of additive operations
 - On-disk format round-trip tests (write then read back)
 - DAG reconstruction tests (path finding, cycle detection, orphan detection)
 - CLI integration tests for new commands
@@ -110,10 +112,9 @@ Two user flows are in scope:
 # Acceptance Criteria
 
 ## Planner
-- [ ] Contract-to-contract planner produces correct additive operations (create table, add column, add index, add FK, add unique, add PK, set default) for schema diffs
-- [ ] Planner output is deterministic: running twice with the same inputs produces byte-identical `ops.json`
-- [ ] Planner correctly handles the "from empty contract" case (new project)
-- [ ] Planner correctly handles extension-owned operations (e.g., pgvector column/index creation)
+- [ ] `contractToSchemaIR` correctly converts a contract's `SqlStorage` to `SqlSchemaIR`
+- [ ] `migration plan` produces correct additive operations by converting the "from" contract to schema IR and diffing against the "to" contract
+- [ ] `migration plan` correctly handles the "from empty contract" case (new project)
 
 ## On-disk format
 - [ ] TypeScript types for `migration.json`, `ops.json`, are defined and exported
@@ -171,71 +172,73 @@ Not applicable for MVP. Future: track migration plan/apply frequency for product
 - [ADR 039 - DAG path resolution & integrity](../../docs/architecture%20docs/adrs/ADR%20039%20-%20DAG%20path%20resolution%20&%20integrity.md)
 - [ADR 010 - Canonicalization Rules](../../docs/architecture%20docs/adrs/ADR%20010%20-%20Canonicalization%20Rules.md)
 - [ADR 044 - Pre & post check vocabulary v1](../../docs/architecture%20docs/adrs/ADR%20044%20-%20Pre%20&%20post%20check%20vocabulary%20v1.md)
-- [ADR 161 - On-disk migration persistence workflow boundaries](../../docs/architecture%20docs/adrs/ADR%20161%20-%20On-disk%20migration%20persistence%20workflow%20boundaries.md) (v2 branch, not yet merged)
-- v2 branch `feat/on-disk-migrations-v2` — reference implementation for `migration new`, config normalization, and detailed plans
+- [ADR 161 - On-disk migration persistence workflow boundaries](../../docs/architecture%20docs/adrs/ADR%20161%20-%20On-disk%20migration%20persistence%20workflow%20boundaries.md)
+- Branch `feat/on-disk-migrations` — previous branch with contract-to-contract planner (preserved for reference)
 
 # Resolved Decisions
 
-## RD-1: Contract-to-contract diffing (not introspection-based)
+## RD-1: Reuse existing planner with contract-to-schemaIR conversion
 
-`migration plan` diffs two contracts — it does not introspect a live database. The user's workflow is: edit schema → emit contract → plan migration. The database doesn't exist in a state that reflects the new contract yet; the whole point of planning is to produce the edge that will transition it. The "from" contract comes from on-disk migration history, not from a DB.
+`migration plan` reuses the existing `PostgresMigrationPlanner` (which diffs `SqlContract` vs `SqlSchemaIR`), but instead of introspecting a live database for the schema IR, it **converts the "from" contract to a `SqlSchemaIR`**. This keeps `migration plan` fully offline while avoiding a second diff engine.
 
-The existing introspection-based planner remains the right tool for `db init` and `db update`, which operate against a live database. `migration plan` needs a new contract-to-contract diff engine.
+The conversion `contractToSchemaIR(SqlStorage) → SqlSchemaIR` maps contract-level constructs to schema IR:
+- `StorageColumn.nativeType` → `SqlColumnIR.nativeType` (direct)
+- `StorageColumn.nullable` → `SqlColumnIR.nullable` (direct)
+- `ColumnDefault` (structured `kind`/`expression`) → `SqlColumnIR.default` (raw expression string)
+- `StorageColumn.codecId`, `typeParams`, `typeRef` → dropped (not in schema IR)
+- `StorageTable.uniques` → `SqlTableIR.uniques` (direct mapping)
+- `StorageTable.indexes` → `SqlTableIR.indexes` (with `unique: false`)
+- `StorageTable.foreignKeys` → `SqlTableIR.foreignKeys` (structural reshaping)
+- `SqlStorage.types` → extension annotations or ignored (storage type instances are codec-level metadata)
 
-**Implementation approach:** Build a contract-to-contract diff planner that operates on canonical contract IR directly. The existing introspection-based planner and this new planner will share operation-generation logic where possible (e.g., how to produce a `createTable` op from a table definition), but the diff strategy is fundamentally different: contract IR comparison vs. schema IR comparison.
+This conversion is intentionally lossy in the contract→schemaIR direction (dropping codec metadata), but that's fine because the planner only needs the structural information to diff.
 
 ## RD-2: `migration plan` is fully offline (no DB connection)
 
-`migration plan` reads the "from" contract from on-disk migration artifacts and the "to" contract from the emitted `contract.json`. No database connection is needed.
+`migration plan` reads the "from" contract from on-disk migration artifacts and the "to" contract from the emitted `contract.json`. No database connection is needed. The "from" contract is converted to `SqlSchemaIR` and fed into the existing planner.
 
 **"From" contract resolution:**
-- If no migrations exist, assume the empty contract (`sha256:empty`) as the starting point (new project).
+- If no migrations exist, assume the empty contract (`sha256:empty`) as the starting point (new project). The converted schema IR is an empty schema.
 - If migrations exist, find the DAG leaf: the node reachable from `sha256:empty` that has no outgoing edges. In a linear history (the common case) the leaf is unambiguous.
 - If the DAG has multiple leaves (branching history — e.g., two developers planned migrations from the same starting point), `findLeaf` fails with a diagnostic listing the ambiguous leaves. The user must pass `--from <hash>` to disambiguate.
 - `--from <hash>` always takes precedence when provided — the planner looks up the matching migration's `toContract` for the "from" side.
 
 We resolve by DAG topology, not by timestamp. Timestamps are metadata for human readability (directory naming) but are not authoritative for ordering — the DAG edges (`from`/`to` hashes) are.
 
-## RD-3: `migration plan` vs `db update` are distinct commands; one diff engine
+## RD-3: `migration plan` vs `db init` share the same planner, different schema IR source
 
-- `migration plan`: offline, contract-to-contract, writes to disk. No DB.
-- `db update`: online, reads DB marker contract + introspects DB, applies immediately, no disk artifacts.
-- Both commands should ultimately use the same diff engine: `planContractDiff`. The introspection-based path (`db init`, `db update`) currently diffs a `SqlSchemaIR` against a contract using a separate planner. The convergence path is: introspect → convert to contract IR → feed both contracts into `planContractDiff`. This avoids maintaining two diff engines that must produce identical output for identical inputs.
-- **This convergence is out of scope for this project** but is the intended architecture. For now, the introspection-based planner remains as-is and `planContractDiff` is the new engine for `migration plan`.
+- `migration plan`: offline, converts "from" contract → `SqlSchemaIR`, writes ops to disk.
+- `db init`: online, introspects live DB → `SqlSchemaIR`, applies immediately.
+- `db update`: online, introspects DB, applies immediately (out of scope for this project).
+- All use the same `PostgresMigrationPlanner` (contract vs schema IR). The difference is where the schema IR comes from: `migration plan` synthesizes it from a contract, `db init`/`db update` introspect a live database.
 
 ## RD-4: Timestamp format
 
 Use `YYYYMMDDThhmm_{slug}` format per ADR 028 and the v2 branch convention.
 
-## RD-5: Diffing at the contract level, not at SqlSchemaIR
+## RD-5: Diffing via the existing planner (contract vs schema IR)
 
-**Decision:** The planner diffs two `SqlStorage` objects (from `ContractIR.storage`), not `SqlSchemaIR`. The planner then lowers the diff directly to target SQL (see RD-6).
+**Decision:** `migration plan` uses the existing planner that diffs a `SqlContract` against a `SqlSchemaIR`. For `migration plan`, the schema IR is synthesized from the "from" contract via `contractToSchemaIR`, not introspected from a live database.
 
-**Why not convert contract → SqlSchemaIR and diff there?**
+**Rationale:** The existing planner is proven, well-tested, and handles all the edge cases (default normalization, native type matching, extension dependencies). Building a separate contract-to-contract diff engine is a significant investment that can be deferred. The serialization layer (on-disk format, attestation, DAG) is orthogonal to how the ops are produced.
 
-1. **SqlSchemaIR is an introspection artifact, not a planning intermediate.** It represents what the DB *currently looks like* — raw default expressions, no codec IDs, no `typeRef` to custom storage types. Converting `SqlStorage` to `SqlSchemaIR` is lossy: structured `ColumnDefault` flattens to a raw string, foreign key shapes differ, and synthetic fields would be needed for annotations/extensions. Going the other way (SqlSchemaIR → contract) is the convergence path (RD-3).
-
-2. **Structural diffing is target-agnostic.** The question "what tables/columns/constraints were added or removed" is the same regardless of target. Two `SqlStorage` objects describe "what exists" and "what should exist" — the diff is purely structural.
-
-3. **Sets up convergence.** The intended architecture (RD-3) is that the introspection-based path eventually converts introspected state *into* a contract and feeds it through the same `planContractDiff`. Going via SqlSchemaIR as the diff intermediate would reverse this direction.
+**Key insight:** The `contractToSchemaIR` conversion is intentionally lossy (drops `codecId`, `typeParams`, `typeRef`), but the planner only needs structural information (native types, nullability, defaults, constraints) to produce correct diffs. The dropped metadata is contract-level semantic information that isn't relevant to schema diffing.
 
 ## RD-6: Direct SQL on disk (not abstract operation IR)
 
-On-disk `ops.json` contains SQL operations lowered for the specific target (e.g., Postgres DDL statements). The planner diffs two contracts and produces SQL directly — there is no intermediate abstract operation IR that needs a separate resolver at apply time.
+On-disk `ops.json` contains SQL operations lowered for the specific target (e.g., Postgres DDL statements). The existing planner already produces `SqlMigrationPlanOperation` with SQL — there is no intermediate abstract operation IR that needs a separate resolver at apply time.
 
-**Rationale:** Migrations are written for a specific database. If you change targets, you'd start fresh rather than replay thousands of migrations. An abstract IR adds indirection without practical benefit: you'd need to build and maintain a resolver (abstract ops → SQL) that must perfectly reproduce the SQL the planner would have generated directly. Lowering to SQL at plan time is simpler, more honest about the target-bound nature of migrations, and makes `migration apply` straightforward — it just executes the SQL that's already on disk.
-
-The planner still performs structural diffing at the `SqlStorage` level (RD-5), which is target-agnostic. Target-specific behavior enters at SQL generation time within the planner, not as a separate resolution step.
+**Rationale:** Migrations are written for a specific database. If you change targets, you'd start fresh rather than replay thousands of migrations. An abstract IR adds indirection without practical benefit. Having SQL on disk makes `migration apply` straightforward — it just executes the SQL that's already there.
 
 ## RD-7: Package layering
 
 Validated against `architecture.config.json`:
 
-- **On-disk format types + DAG logic**: `packages/1-framework/3-tooling/` — framework domain, tooling layer, migration plane. Target-agnostic.
-- **Contract-to-contract SQL diff planner**: `packages/2-sql/3-tooling/family/` — sql domain, tooling layer. Diffs `SqlStorage` objects and produces SQL operations. May import from framework domain.
+- **On-disk format types + DAG logic**: `packages/1-framework/3-tooling/migration/` — framework domain, tooling layer, migration plane. Target-agnostic.
 - **CLI commands**: `packages/1-framework/3-tooling/cli/` — calls through the control plane stack abstraction. Does not import from sql/targets domains directly.
+- **Existing planner**: `packages/3-targets/3-targets/postgres/` — the `PostgresMigrationPlanner` lives here and is accessed via the `TargetMigrationsCapability` interface.
 
-The CLI → control plane → sql family → postgres target delegation chain already exists for `db init`. The same pattern applies for `migration plan`.
+The CLI → control client → control plane → postgres target delegation chain already exists for `db init`. `migration plan` uses the same chain.
 
 ## RD-8: Empty contract representation
 
@@ -288,11 +291,11 @@ None.
 
 # Resolved Questions
 
-1. **How does the control plane stack expose contract-to-contract planning?**
-   Resolved: `TargetMigrationsCapability` gained an optional `planContractDiff` method. The Postgres target implements it by extracting `SqlStorage` from `ContractIR` and delegating to the sql family's `planContractDiff`. `ControlClient` exposes `contractDiff()` which delegates through this chain. The CLI calls `client.contractDiff()` — no layering violations.
+1. **How does `migration plan` get its operations?**
+   Resolved: `migration plan` uses the existing `PostgresMigrationPlanner` (same planner as `db init`). It reads the "from" contract from on-disk migration history, converts it to `SqlSchemaIR` via `contractToSchemaIR`, then diffs against the "to" contract. The result is serialized to disk. No database connection needed.
 
 2. **Should `migration plan` produce Draft or Attested artifacts?**
    Resolved: `migration plan` produces **Attested** artifacts (`edgeId` computed immediately). If the user edits the migration afterward, they run `migration verify` to re-attest. See RD-15 for the distinction between attestation and signing.
 
-3. **Abstract operations: target-agnostic IR vs direct SQL lowering?**
-   Resolved: lower directly to target SQL. Migrations are written for a specific database — if you change targets, you'd start fresh rather than replay thousands of migrations. An abstract IR adds indirection (a resolver layer) without practical benefit. Lowering to SQL at plan time is simpler, makes `migration apply` trivial (just execute the SQL on disk), and is more honest about the target-bound nature of migrations. See RD-6.
+3. **Direct SQL on disk?**
+   Resolved: Yes. The existing planner already produces `SqlMigrationPlanOperation` with SQL. These are serialized directly to `ops.json`. No abstract IR or resolver needed at apply time.
