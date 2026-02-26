@@ -62,4 +62,29 @@ describe('transformKyselyToPnAst — lowering parity', () => {
       await db.destroy();
     }
   });
+
+  it('stamps projectionTypes from compiled select columns', async () => {
+    const db = new Kysely<TestDb>({
+      dialect: new PostgresDialect({ pool: {} as unknown as import('pg').Pool }),
+    });
+
+    try {
+      const compiled = db
+        .selectFrom('user')
+        .select(['id', 'email'])
+        .where('id', '=', 'u_1')
+        .compile();
+      const transformed = transformKyselyToPnAst(contract, compiled.query, compiled.parameters);
+      const projectionTypes = transformed.metaAdditions.projectionTypes;
+
+      expect(projectionTypes).toBeDefined();
+      expect(projectionTypes).toMatchObject({
+        id: expect.any(String),
+        email: expect.any(String),
+      });
+      expect(Object.values(projectionTypes ?? {})).not.toContain('unknown');
+    } finally {
+      await db.destroy();
+    }
+  });
 });

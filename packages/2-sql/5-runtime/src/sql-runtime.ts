@@ -97,6 +97,10 @@ export interface RuntimeQueryable {
   ): AsyncIterableResult<Row>;
 }
 
+interface CoreQueryable {
+  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row>;
+}
+
 export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
 
 class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<SqlStorage>>
@@ -156,18 +160,20 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     }
   }
 
-  execute<Row = Record<string, unknown>>(
-    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
-  ): AsyncIterableResult<Row> {
-    this.ensureCodecRegistryValidated(this.contract);
-
+  private toExecutionPlan<Row>(plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): ExecutionPlan<Row> {
     const isSqlQueryPlan = (p: ExecutionPlan<Row> | SqlQueryPlan<Row>): p is SqlQueryPlan<Row> => {
       return 'ast' in p && !('sql' in p);
     };
 
-    const executablePlan: ExecutionPlan<Row> = isSqlQueryPlan(plan)
-      ? lowerSqlPlan(this.adapter, this.contract, plan)
-      : plan;
+    return isSqlQueryPlan(plan) ? lowerSqlPlan(this.adapter, this.contract, plan) : plan;
+  }
+
+  private executeAgainstQueryable<Row = Record<string, unknown>>(
+    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+    queryable: CoreQueryable,
+  ): AsyncIterableResult<Row> {
+    this.ensureCodecRegistryValidated(this.contract);
+    const executablePlan = this.toExecutionPlan(plan);
 
     const iterator = async function* (
       self: SqlRuntimeImpl<TContract>,
@@ -182,7 +188,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
         params: encodedParams,
       };
 
-      const coreIterator = self.core.execute(planWithEncodedParams);
+      const coreIterator = queryable.execute(planWithEncodedParams);
 
       for await (const rawRow of coreIterator) {
         const decodedRow = decodeRow(
@@ -198,6 +204,12 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
     return new AsyncIterableResult(iterator(this));
   }
 
+  execute<Row = Record<string, unknown>>(
+    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+  ): AsyncIterableResult<Row> {
+    return this.executeAgainstQueryable(plan, this.core);
+  }
+
   async connection(): Promise<RuntimeConnection> {
     const coreConn = await this.core.connection();
     const self = this;
@@ -210,7 +222,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
           execute<Row = Record<string, unknown>>(
             plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
           ): AsyncIterableResult<Row> {
-            return self.execute(plan);
+            return self.executeAgainstQueryable(plan, coreTx);
           },
         };
       },
@@ -218,7 +230,7 @@ class SqlRuntimeImpl<TContract extends SqlContract<SqlStorage> = SqlContract<Sql
       execute<Row = Record<string, unknown>>(
         plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
       ): AsyncIterableResult<Row> {
-        return self.execute(plan);
+        return self.executeAgainstQueryable(plan, coreConn);
       },
     };
     return wrappedConnection;

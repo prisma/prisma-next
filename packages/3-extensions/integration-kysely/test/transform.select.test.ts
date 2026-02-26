@@ -112,6 +112,39 @@ describe('transformKyselyToPnAst — SelectQueryNode', () => {
     expect(whereRight?.values).toHaveLength(3);
   });
 
+  it('transforms not in predicate', () => {
+    const query = selectQueryFixture({
+      where: {
+        kind: 'WhereNode',
+        node: {
+          kind: 'BinaryOperationNode',
+          left: {
+            kind: 'ReferenceNode',
+            column: {
+              kind: 'ColumnNode',
+              column: { kind: 'IdentifierNode', name: 'id' },
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
+          },
+          operator: { kind: 'OperatorNode', operator: 'not in' },
+          right: {
+            kind: 'PrimitiveValueListNode',
+            values: [{ kind: 'ValueNode', value: 'a' }],
+          },
+        },
+      },
+    });
+    const result = transformKyselyToPnAst(contract, query, ['a']);
+    const selectAst = result.ast as SelectAst;
+    expect(selectAst.where?.kind).toBe('bin');
+    expect(selectAst.where).toMatchObject({
+      kind: 'bin',
+      op: 'notIn',
+      left: { kind: 'col', table: 'user', column: 'id' },
+      right: { kind: 'listLiteral', values: expect.any(Array) },
+    });
+  });
+
   it('transforms AND composition', () => {
     const query = selectQueryFixture({
       where: {
@@ -219,6 +252,89 @@ describe('transformKyselyToPnAst — SelectQueryNode', () => {
     const firstJoin = selectAst.joins?.[0];
     expect(firstJoin).toBeDefined();
     expect(firstJoin!.on.kind).toBe('eqCol');
+  });
+
+  it('keeps explicit table refs when default table is provided', () => {
+    const query = {
+      kind: 'SelectQueryNode',
+      from: {
+        kind: 'FromNode',
+        froms: [
+          {
+            kind: 'TableNode',
+            table: { kind: 'IdentifierNode', name: 'user' },
+          },
+        ],
+      },
+      selections: [
+        {
+          kind: 'SelectionNode',
+          selection: {
+            kind: 'ReferenceNode',
+            column: {
+              kind: 'ColumnNode',
+              column: { kind: 'IdentifierNode', name: 'id' },
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
+          },
+        },
+      ],
+      joins: [
+        {
+          kind: 'JoinNode',
+          joinType: 'LeftJoinNode',
+          table: {
+            kind: 'TableNode',
+            table: { kind: 'IdentifierNode', name: 'post' },
+          },
+          on: {
+            kind: 'OnNode',
+            node: {
+              kind: 'BinaryOperationNode',
+              left: {
+                kind: 'ReferenceNode',
+                column: {
+                  kind: 'ColumnNode',
+                  column: { kind: 'IdentifierNode', name: 'id' },
+                  table: { kind: 'IdentifierNode', name: 'user' },
+                },
+              },
+              operator: { kind: 'OperatorNode', operator: '=' },
+              right: {
+                kind: 'ReferenceNode',
+                column: {
+                  kind: 'ColumnNode',
+                  column: { kind: 'IdentifierNode', name: 'userId' },
+                  table: { kind: 'IdentifierNode', name: 'post' },
+                },
+              },
+            },
+          },
+        },
+      ],
+      where: {
+        kind: 'WhereNode',
+        node: {
+          kind: 'BinaryOperationNode',
+          left: {
+            kind: 'ReferenceNode',
+            column: {
+              kind: 'ColumnNode',
+              column: { kind: 'IdentifierNode', name: 'userId' },
+              table: { kind: 'IdentifierNode', name: 'post' },
+            },
+          },
+          operator: { kind: 'OperatorNode', operator: '=' },
+          right: { kind: 'ValueNode', value: 1 },
+        },
+      },
+    };
+    const result = transformKyselyToPnAst(contract, query, [1]);
+    const selectAst = result.ast as SelectAst;
+    expect(selectAst.where).toMatchObject({
+      kind: 'bin',
+      left: { kind: 'col', table: 'post', column: 'userId' },
+    });
   });
 
   it('transforms orderBy', () => {

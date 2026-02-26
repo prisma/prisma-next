@@ -42,10 +42,15 @@ function transformReturning(
       if (colName) {
         refs.push(resolveColumnRef(toResolve, ctx, tableName));
       } else {
-        const expanded = expandSelectAll(tableName, ctx.contract);
-        for (const { expr } of expanded) {
-          if (expr.kind === 'col') refs.push(expr);
-        }
+        const nodeKind =
+          typeof toResolve === 'object' && toResolve !== null && 'kind' in toResolve
+            ? String((toResolve as { kind?: unknown }).kind ?? 'unknown')
+            : 'unknown';
+        throw new KyselyTransformError(
+          'Unsupported RETURNING expression; only column references and selectAll are supported',
+          KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+          { nodeKind },
+        );
       }
     }
   }

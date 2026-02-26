@@ -141,6 +141,44 @@ describe('transformKyselyToPnAst — InsertQueryNode', () => {
     expect(insertAst.returning).toContainEqual({ kind: 'col', table: 'user', column: 'id' });
     expect(insertAst.returning).toContainEqual({ kind: 'col', table: 'user', column: 'email' });
   });
+
+  it('throws on unsupported returning expression', () => {
+    const query = {
+      kind: 'InsertQueryNode',
+      into: {
+        kind: 'TableNode',
+        table: { kind: 'IdentifierNode', name: 'user' },
+      },
+      values: {
+        kind: 'ValuesNode',
+        values: [
+          {
+            column: {
+              kind: 'ColumnNode',
+              column: { kind: 'IdentifierNode', name: 'id' },
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
+            value: { kind: 'ValueNode', value: 'id-val' },
+          },
+        ],
+      },
+      returning: {
+        kind: 'ReturningNode',
+        selections: [
+          {
+            kind: 'SelectionNode',
+            selection: { kind: 'ValueNode', value: 1 },
+          },
+        ],
+      },
+    };
+    expect(() => transformKyselyToPnAst(contract, query, ['id-val'])).toThrow(KyselyTransformError);
+    try {
+      transformKyselyToPnAst(contract, query, ['id-val']);
+    } catch (e) {
+      expect((e as KyselyTransformError).code).toBe(KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE);
+    }
+  });
 });
 
 describe('transformKyselyToPnAst — UpdateQueryNode', () => {

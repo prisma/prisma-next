@@ -55,13 +55,7 @@ export function resolveColumnRef(
   ctx: TransformContext,
   tableOverride?: string,
 ): ColumnRef {
-  if (ctx.multiTableScope && tableOverride !== undefined && getTableName(node) === undefined) {
-    throw new KyselyTransformError(
-      'Unqualified column reference in multi-table scope; use table.column (e.g. user.id)',
-      KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
-    );
-  }
-  const table = tableOverride ?? resolveTable(node, ctx);
+  const table = resolveTable(node, ctx, tableOverride);
   let column = getColumnName(node);
   if (!column && typeof node === 'object' && node !== null) {
     const n = node as Record<string, unknown>;

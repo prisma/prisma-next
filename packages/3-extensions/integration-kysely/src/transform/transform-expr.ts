@@ -56,6 +56,7 @@ export function transformValue(
 }
 
 export function mapOperator(op: string): BinaryOp | undefined {
+  const normalized = op.trim().toLowerCase();
   const map: Record<string, BinaryOp> = {
     '=': 'eq',
     '==': 'eq',
@@ -68,9 +69,10 @@ export function mapOperator(op: string): BinaryOp | undefined {
     like: 'like',
     ilike: 'ilike',
     in: 'in',
+    'not in': 'notIn',
     notIn: 'notIn',
   };
-  return map[op?.toLowerCase?.() ?? op];
+  return map[normalized];
 }
 
 export function getOperatorFromNode(node: unknown): string | undefined {
