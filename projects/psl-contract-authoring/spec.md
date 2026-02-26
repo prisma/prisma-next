@@ -134,6 +134,23 @@ These are the v1 supported features. They also form the initial parity/conforman
 - Named type extensions (reusable, named storage type instances)
   - Prisma Next’s contract model supports named type instances via `storage.types` with column references via `typeRef`.
   - v1 PSL-first must be able to declare named types and reference them from fields, but this does **not** require supporting arbitrary namespaced extension attributes.
+  - **Decision (PSL syntax, v1):** use a `types { ... }` top-level block to declare named type instances, then reference them by name in models.
+    - Example:
+      ```prisma
+      types {
+        Email = String @db.VarChar(191)
+        Money = Decimal @db.Decimal(10, 2)
+      }
+
+      model User {
+        id    Int   @id
+        email Email
+        spend Money
+      }
+      ```
+    - Emission mapping:
+      - `types { ... }` entries become `storage.types.<Name> = { codecId, nativeType, typeParams }`
+      - A field using a named type (e.g. `email Email`) becomes a column with `typeRef: "Email"` (not inlined `typeParams`)
 
 ## Explicitly unsupported in v1 (strict errors)
 
@@ -164,7 +181,7 @@ Decisions already made:
 
 Remaining questions:
 
-1. **Named type extensions PSL syntax:** what is the PSL syntax for declaring and referencing named type instances (mapped to `storage.types` + `typeRef`) while keeping v1 simple and avoiding general namespaced attributes?
+None.
 
 # References
 
