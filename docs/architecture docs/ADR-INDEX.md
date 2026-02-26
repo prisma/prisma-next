@@ -35,11 +35,11 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 011 | Unified Plan Model | Establishes common Plan structure across all query lanes with AST, SQL, and metadata | [ADR 011 - Unified Plan Model.md](adrs/ADR%20011%20-%20Unified%20Plan%20Model.md) |
 | 012 | Raw SQL Escape Hatch | Provides safe raw SQL execution with required annotations and verification | [ADR 012 - Raw SQL Escape Hatch.md](adrs/ADR%20012%20-%20Raw%20SQL%20Escape%20Hatch.md) |
 | 013 | Lane Agnostic Plan Identity | Ensures Plan identity and hashing work consistently across all query lanes | [ADR 013 - Lane Agnostic Plan Identity.md](adrs/ADR%20013%20-%20Lane%20Agnostic%20Plan%20Identity.md) |
-| 162 | Kysely lane emits PN SQL AST | Kysely authoring compiles to plans with PN-native QueryAst + refs so runtime plugins can inspect structure lane-agnostically | [ADR 162 - Kysely lane emits PN SQL AST.md](adrs/ADR%20162%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md) |
 | 018 | Plan Annotations Schema | Defines canonical JSON schema for Plan annotations and validation rules | [ADR 018 - Plan Annotations Schema.md](adrs/ADR%20018%20-%20Plan%20Annotations%20Schema.md) |
 | 019 | TypedSQL as Separate CLI | Establishes TypedSQL as out-of-tree tool that emits Plan factories | [ADR 019 - TypedSQL as Separate CLI.md](adrs/ADR%20019%20-%20TypedSQL%20as%20Separate%20CLI.md) |
 | 020 | Result Typing Rules | Defines how DSL and ORM compute result types from projections and joins | [ADR 020 - Result Typing Rules.md](adrs/ADR%20020%20-%20Result%20Typing%20Rules.md) |
 | 025 | Plan Caching Memoization | Establishes Plan caching strategy with memoization and invalidation | [ADR 025 - Plan Caching Memoization.md](adrs/ADR%20025%20-%20Plan%20Caching%20Memoization.md) |
+| 162 | Kysely lane emits PN SQL AST | Kysely authoring compiles to plans with PN-native QueryAst + refs so runtime plugins can inspect structure lane-agnostically | [ADR 162 - Kysely lane emits PN SQL AST.md](adrs/ADR%20162%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md) |
 
 ## Runtime & Execution
 
