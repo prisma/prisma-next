@@ -5,7 +5,7 @@ import { getColumnName, getTableName } from './kysely-ast-types';
 import type { TransformContext } from './transform-context';
 
 export function validateTable(contract: SqlContract<SqlStorage>, table: string): void {
-  if (!contract.storage.tables[table]) {
+  if (!Object.hasOwn(contract.storage.tables, table)) {
     throw new KyselyTransformError(
       `Unknown table "${table}"`,
       KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,
@@ -21,7 +21,7 @@ export function validateColumn(
 ): void {
   validateTable(contract, table);
   const tableDef = contract.storage.tables[table];
-  if (!tableDef?.columns[column]) {
+  if (!tableDef || !Object.hasOwn(tableDef.columns, column)) {
     throw new KyselyTransformError(
       `Unknown column "${table}.${column}"`,
       KYSELY_TRANSFORM_ERROR_CODES.INVALID_REF,

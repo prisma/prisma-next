@@ -26,11 +26,16 @@ async function createTestDriver(connectionString: string, executionStack: (typeo
     throw new Error('Driver descriptor missing from execution stack');
   }
   const pool = new Pool({ connectionString });
-  const driver = driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
-  if ('connect' in driver && typeof driver.connect === 'function') {
-    await driver.connect({ kind: 'pgPool', pool });
+  try {
+    const driver = driverDescriptor.create({ connect: { pool }, cursor: { disabled: true } });
+    if ('connect' in driver && typeof driver.connect === 'function') {
+      await driver.connect({ kind: 'pgPool', pool });
+    }
+    return driver;
+  } catch (error) {
+    await pool.end();
+    throw error;
   }
-  return driver;
 }
 
 async function getRuntime(connectionString: string): Promise<Runtime> {

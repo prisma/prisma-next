@@ -13,6 +13,20 @@ import { transformValue, transformWhereExpr } from './transform-expr';
 import { expandSelectAll } from './transform-select';
 import { resolveColumnRef, transformTableRef, validateColumn } from './transform-validate';
 
+function requireParamRef(
+  value: ParamRef | { kind: 'literal'; value: unknown },
+  nodeKind: string,
+): ParamRef {
+  if (value.kind !== 'param') {
+    throw new KyselyTransformError(
+      `${nodeKind} supports parameterized values only`,
+      KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+      { nodeKind, valueKind: value.kind },
+    );
+  }
+  return value;
+}
+
 function transformReturning(
   returningNode: unknown,
   ctx: TransformContext,
@@ -117,7 +131,7 @@ export function transformInsert(node: Record<string, unknown>, ctx: TransformCon
         table: tableRef.name,
         column: colName,
       });
-      valuesRecord[colName] = val as ParamRef;
+      valuesRecord[colName] = requireParamRef(val, 'InsertQueryNode');
     }
   } else if (Array.isArray(valueEntries)) {
     for (const entry of valueEntries) {
@@ -125,13 +139,21 @@ export function transformInsert(node: Record<string, unknown>, ctx: TransformCon
         hasKind(entry, 'PrimitiveValueListNode') ||
         (typeof entry === 'object' && entry !== null && !('column' in entry) && !('value' in entry))
       ) {
-        continue;
+        const nodeKind =
+          typeof entry === 'object' && entry !== null && 'kind' in entry
+            ? String((entry as { kind?: unknown }).kind ?? 'unknown')
+            : 'unknown';
+        throw new KyselyTransformError(
+          'Unsupported INSERT values entry shape',
+          KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+          { nodeKind },
+        );
       }
       const colNode = (entry as { column?: unknown; value?: unknown }).column ?? entry;
       const colRef = resolveColumnRef(colNode, ctx, tableRef.name);
       const valueNode = (entry as { column?: unknown; value?: unknown }).value ?? entry;
       const val = transformValue(valueNode, ctx, { table: tableRef.name, column: colRef.column });
-      valuesRecord[colRef.column] = val as ParamRef;
+      valuesRecord[colRef.column] = requireParamRef(val, 'InsertQueryNode');
     }
   }
 
@@ -161,7 +183,7 @@ export function transformUpdate(node: Record<string, unknown>, ctx: TransformCon
     const colRef = resolveColumnRef(colNode, ctx, tableRef.name);
     const valueNode = e['value'] ?? entry;
     const val = transformValue(valueNode, ctx, { table: tableRef.name, column: colRef.column });
-    setRecord[colRef.column] = val as ParamRef;
+    setRecord[colRef.column] = requireParamRef(val, 'UpdateQueryNode');
   }
 
   const updateWhereNode = node['where'];

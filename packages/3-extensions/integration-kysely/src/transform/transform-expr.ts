@@ -98,9 +98,15 @@ export function transformWhereExpr(
 
   const n = node as Record<string, unknown>;
 
+  if (hasKind(node, 'ParensNode')) {
+    return transformWhereExpr(n['node'], ctx, defaultTable);
+  }
+
   const exprsArr = n['exprs'];
-  if (hasKind(node, 'AndNode') || (n['kind'] === 'AndNode' && Array.isArray(exprsArr))) {
-    const arr = Array.isArray(exprsArr) ? exprsArr : [];
+  if (hasKind(node, 'AndNode') || n['kind'] === 'AndNode') {
+    const arr = Array.isArray(exprsArr)
+      ? exprsArr
+      : [n['left'], n['right']].filter((value): value is unknown => value !== undefined);
     const exprs = arr
       .map((e: unknown) => transformWhereExpr(e, ctx, defaultTable))
       .filter((e): e is WhereExpr => e !== undefined);
@@ -110,8 +116,10 @@ export function transformWhereExpr(
   }
 
   const orExprsArr = n['exprs'];
-  if (hasKind(node, 'OrNode') || (n['kind'] === 'OrNode' && Array.isArray(orExprsArr))) {
-    const orArr = Array.isArray(orExprsArr) ? orExprsArr : [];
+  if (hasKind(node, 'OrNode') || n['kind'] === 'OrNode') {
+    const orArr = Array.isArray(orExprsArr)
+      ? orExprsArr
+      : [n['left'], n['right']].filter((value): value is unknown => value !== undefined);
     const exprs = orArr
       .map((e: unknown) => transformWhereExpr(e, ctx, defaultTable))
       .filter((e): e is WhereExpr => e !== undefined);
@@ -172,14 +180,21 @@ export function transformWhereExpr(
         right = transformValue(rightNode, ctx);
       }
     } else {
-      left = transformValue(leftNode, ctx) as ColumnRef | ParamRef | LiteralExpr;
-      right = transformValue(rightNode, ctx);
+      const nodeKind =
+        typeof leftNode === 'object' && leftNode !== null && 'kind' in leftNode
+          ? String((leftNode as { kind?: unknown }).kind ?? 'unknown')
+          : 'unknown';
+      throw new KyselyTransformError(
+        `Unsupported left operand kind: ${nodeKind}`,
+        KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE,
+        { nodeKind },
+      );
     }
 
     return {
       kind: 'bin',
       op,
-      left: left as ColumnRef,
+      left,
       right,
     };
   }
@@ -196,7 +211,29 @@ export function transformOrderByItem(
   const n = node as Record<string, unknown>;
   const exprNode = n['column'] ?? n['orderBy'] ?? n;
   const colRef = resolveColumnRef(exprNode, ctx, defaultTable);
-  const dir = (n['direction'] === 'desc' ? 'desc' : 'asc') as Direction;
+  const directionNode = n['direction'];
+  const directionValue = (() => {
+    if (typeof directionNode === 'string') {
+      return directionNode;
+    }
+    if (typeof directionNode !== 'object' || directionNode === null) {
+      return '';
+    }
+    const directionRecord = directionNode as Record<string, unknown>;
+    const nested = directionRecord['direction'];
+    if (typeof nested === 'string') {
+      return nested;
+    }
+    const sqlFragments = directionRecord['sqlFragments'];
+    if (Array.isArray(sqlFragments)) {
+      return sqlFragments
+        .map((fragment) => (typeof fragment === 'string' ? fragment : ''))
+        .join(' ')
+        .trim();
+    }
+    return '';
+  })();
+  const dir = (directionValue.toLowerCase() === 'desc' ? 'desc' : 'asc') as Direction;
   return { expr: colRef, dir };
 }
 

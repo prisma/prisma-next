@@ -193,7 +193,12 @@ export function transformSelect(node: Record<string, unknown>, ctx: TransformCon
     const table = transformTableRef(jn['table'] ?? jn, ctx);
     const onNode = jn['on'];
     const onNodeRec = onNode as Record<string, unknown> | null | undefined;
-    const on = transformJoinOn(onNodeRec?.['node'] ?? onNode, ctx, fromTable, table.name);
+    const on = transformJoinOn(
+      onNodeRec?.['node'] ?? onNodeRec?.['on'] ?? onNode,
+      ctx,
+      fromTable,
+      table.name,
+    );
     joins.push({ kind: 'join', joinType, table, on });
   }
 

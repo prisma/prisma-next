@@ -179,6 +179,46 @@ describe('transformKyselyToPnAst — InsertQueryNode', () => {
       expect((e as KyselyTransformError).code).toBe(KYSELY_TRANSFORM_ERROR_CODES.UNSUPPORTED_NODE);
     }
   });
+
+  it('throws when insert value is non-parameter literal', () => {
+    const query = {
+      kind: 'InsertQueryNode',
+      into: {
+        kind: 'TableNode',
+        table: { kind: 'IdentifierNode', name: 'user' },
+      },
+      values: {
+        kind: 'ValuesNode',
+        values: [
+          {
+            column: {
+              kind: 'ColumnNode',
+              column: { kind: 'IdentifierNode', name: 'id' },
+              table: { kind: 'IdentifierNode', name: 'user' },
+            },
+            value: 'id-val',
+          },
+        ],
+      },
+    };
+    expect(() => transformKyselyToPnAst(contract, query, [])).toThrow(KyselyTransformError);
+  });
+
+  it('throws on unsupported values entry shape', () => {
+    const query = {
+      kind: 'InsertQueryNode',
+      into: { kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } },
+      values: {
+        kind: 'ValuesNode',
+        values: [
+          {
+            kind: 'UnsupportedValuesNode',
+          },
+        ],
+      },
+    };
+    expect(() => transformKyselyToPnAst(contract, query, [])).toThrow(KyselyTransformError);
+  });
 });
 
 describe('transformKyselyToPnAst — UpdateQueryNode', () => {

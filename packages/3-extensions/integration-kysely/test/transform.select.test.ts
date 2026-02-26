@@ -151,34 +151,32 @@ describe('transformKyselyToPnAst — SelectQueryNode', () => {
         kind: 'WhereNode',
         node: {
           kind: 'AndNode',
-          exprs: [
-            {
-              kind: 'BinaryOperationNode',
-              left: {
-                kind: 'ReferenceNode',
-                column: {
-                  kind: 'ColumnNode',
-                  column: { kind: 'IdentifierNode', name: 'id' },
-                  table: { kind: 'IdentifierNode', name: 'user' },
-                },
+          left: {
+            kind: 'BinaryOperationNode',
+            left: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'id' },
+                table: { kind: 'IdentifierNode', name: 'user' },
               },
-              operator: { kind: 'OperatorNode', operator: '=' },
-              right: { kind: 'ValueNode', value: 'x' },
             },
-            {
-              kind: 'BinaryOperationNode',
-              left: {
-                kind: 'ReferenceNode',
-                column: {
-                  kind: 'ColumnNode',
-                  column: { kind: 'IdentifierNode', name: 'email' },
-                  table: { kind: 'IdentifierNode', name: 'user' },
-                },
+            operator: { kind: 'OperatorNode', operator: '=' },
+            right: { kind: 'ValueNode', value: 'x' },
+          },
+          right: {
+            kind: 'BinaryOperationNode',
+            left: {
+              kind: 'ReferenceNode',
+              column: {
+                kind: 'ColumnNode',
+                column: { kind: 'IdentifierNode', name: 'email' },
+                table: { kind: 'IdentifierNode', name: 'user' },
               },
-              operator: { kind: 'OperatorNode', operator: 'like' },
-              right: { kind: 'ValueNode', value: '%@x.com' },
             },
-          ],
+            operator: { kind: 'OperatorNode', operator: 'like' },
+            right: { kind: 'ValueNode', value: '%@x.com' },
+          },
         },
       },
     });
@@ -217,7 +215,7 @@ describe('transformKyselyToPnAst — SelectQueryNode', () => {
           },
           on: {
             kind: 'OnNode',
-            node: {
+            on: {
               kind: 'BinaryOperationNode',
               left: {
                 kind: 'ReferenceNode',
@@ -352,7 +350,7 @@ describe('transformKyselyToPnAst — SelectQueryNode', () => {
                 table: { kind: 'IdentifierNode', name: 'user' },
               },
             },
-            direction: 'asc',
+            direction: { kind: 'RawNode', sqlFragments: ['desc'], parameters: [] },
           },
         ],
       },
@@ -362,7 +360,7 @@ describe('transformKyselyToPnAst — SelectQueryNode', () => {
     expect(selectWithOrder.orderBy).toHaveLength(1);
     expect(selectWithOrder.orderBy?.[0]).toMatchObject({
       expr: { kind: 'col', table: 'user', column: 'email' },
-      dir: 'asc',
+      dir: 'desc',
     });
   });
 });
