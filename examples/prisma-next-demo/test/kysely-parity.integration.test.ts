@@ -53,7 +53,7 @@ async function getRuntime(connectionString: string): Promise<Runtime> {
 }
 
 async function seedTestData(
-  runtime: ReturnType<typeof getRuntime>,
+  runtime: Runtime,
   data: {
     users?: string[];
     posts?: Array<{ title: string; userIndex: number }>;
@@ -80,7 +80,7 @@ async function seedTestData(
 
       type InsertedRow = ResultType<typeof plan>;
       for await (const row of runtime.execute(plan)) {
-        userIds.push((row as InsertedRow)['id']!);
+        userIds.push((row as InsertedRow).id!);
       }
     }
   }
