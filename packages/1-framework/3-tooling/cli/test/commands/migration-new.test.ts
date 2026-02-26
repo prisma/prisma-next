@@ -1,14 +1,33 @@
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
+import { attestMigration } from '@prisma-next/migration-tools/attestation';
+import { reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
   formatMigrationDirName,
   readMigrationPackage,
+  readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { describe, expect, it } from 'vitest';
+
+function createTestContract(): ContractIR {
+  return {
+    schemaVersion: '1',
+    targetFamily: 'sql',
+    target: 'postgres',
+    models: {},
+    relations: {},
+    storage: { tables: {} },
+    extensionPacks: {},
+    capabilities: {},
+    meta: {},
+    sources: {},
+  };
+}
 
 async function createTempDir(prefix: string): Promise<string> {
   const dir = join(
@@ -71,5 +90,49 @@ describe('migration new — scaffold', () => {
 
   it('rejects empty slug', () => {
     expect(() => formatMigrationDirName(new Date(), '---')).toThrow();
+  });
+
+  it('draft packages are skipped when building DAG', async () => {
+    const tempDir = await createTempDir('draft-skip');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    const attestedManifest: MigrationManifest = {
+      from: EMPTY_CONTRACT_HASH,
+      to: 'sha256:hash-a',
+      edgeId: null,
+      kind: 'regular',
+      fromContract: null,
+      toContract: createTestContract(),
+      hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
+      labels: [],
+      createdAt: new Date().toISOString(),
+    };
+    const attestedDir = join(migrationsDir, formatMigrationDirName(new Date(2026, 0, 1), 'first'));
+    await writeMigrationPackage(attestedDir, attestedManifest, []);
+    await attestMigration(attestedDir);
+
+    const draftManifest: MigrationManifest = {
+      from: 'sha256:hash-a',
+      to: EMPTY_CONTRACT_HASH,
+      edgeId: null,
+      kind: 'regular',
+      fromContract: createTestContract(),
+      toContract: createTestContract(),
+      hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'manual' },
+      labels: [],
+      createdAt: new Date().toISOString(),
+    };
+    const draftDir = join(migrationsDir, formatMigrationDirName(new Date(2026, 0, 2), 'draft'));
+    await writeMigrationPackage(draftDir, draftManifest, []);
+
+    const allPackages = await readMigrationsDir(migrationsDir);
+    expect(allPackages).toHaveLength(2);
+
+    const attested = allPackages.filter((p) => p.manifest.edgeId !== null);
+    expect(attested).toHaveLength(1);
+
+    const graph = reconstructGraph(attested);
+    expect(graph.nodes.size).toBe(2);
   });
 });

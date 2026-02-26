@@ -244,6 +244,34 @@ describe('migration plan — core flow', () => {
   });
 });
 
+describe('--from hash lookup', () => {
+  it('finds no package for unknown hash', async () => {
+    const tempDir = await createTempDir('from-lookup');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    const manifest: MigrationManifest = {
+      from: EMPTY_CONTRACT_HASH,
+      to: 'sha256:known-hash',
+      edgeId: null,
+      kind: 'regular',
+      fromContract: null,
+      toContract: createTestContract(),
+      hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'additive' },
+      labels: [],
+      createdAt: new Date().toISOString(),
+    };
+    const dirName = formatMigrationDirName(new Date(), 'test');
+    const packageDir = join(migrationsDir, dirName);
+    await writeMigrationPackage(packageDir, manifest, []);
+    await attestMigration(packageDir);
+
+    const packages = await readMigrationsDir(migrationsDir);
+    const found = packages.find((p) => p.manifest.to === 'sha256:nonexistent');
+    expect(found).toBeUndefined();
+  });
+});
+
 describe('MigrationToolsError mapping', () => {
   it('MigrationToolsError has expected shape for CLI mapping', () => {
     // Simulate a MigrationToolsError-like object as the CLI would encounter it
