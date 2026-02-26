@@ -91,7 +91,7 @@ flowchart TD
 - Defines `SqlQueryPlan<Row>` interface for SQL query plans produced by lanes before lowering
 - Provides `augmentDescriptorWithColumnMeta(descriptors, columnMeta)` helper to update ParamDescriptor with `codecId` and `nativeType` from column metadata
 
-### AST Types (`ast/types.ts`)
+### AST Surface (`ast/*` via `exports/ast.ts`)
 - Query roots: `SelectAst`, `InsertAst`, `UpdateAst`, `DeleteAst`
 - Expressions: `ColumnRef`, `ParamRef`, `LiteralExpr`, `OperationExpr`, `ListLiteralExpr`
 - Predicates: `BinaryExpr` (ops: `eq`, `neq`, `gt`, `lt`, `gte`, `lte`, `like`, `ilike`, `in`, `notIn`), `AndExpr`, `OrExpr`, `ExistsExpr`, `NullCheckExpr`

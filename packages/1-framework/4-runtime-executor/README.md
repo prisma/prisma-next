@@ -78,7 +78,7 @@ const core = createRuntimeCore({
 - `computeSqlFingerprint` - SQL fingerprint computation
 - `parseContractMarkerRow` - Marker parsing utilities
 
-**Note:** The `lints` plugin has been migrated to the SQL domain. Import `lints` and `LintsOptions` from `@prisma-next/sql-runtime` instead. See [ADR 162](../../../docs/architecture%20docs/adrs/ADR%20162%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md) for rationale.
+**Note:** The `lints` plugin has been migrated to the SQL domain. Import `lints` and `LintsOptions` from `@prisma-next/sql-runtime` instead. See [ADR 162](../../../docs/architecture docs/adrs/ADR 162 - Kysely lane emits PN SQL AST.md) for rationale.
 
 ## Testing
 
