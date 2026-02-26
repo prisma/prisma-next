@@ -1,6 +1,6 @@
 # Summary
 
-Implement on-disk migration persistence for prisma-next: the ability to plan migrations using the existing planner and serialize them as migration edge packages (`migration.json` + `ops.json`) to a `migrations/` directory on disk. This covers `migration plan`, `migration apply`, `migration verify`, `migration new`, and supporting infrastructure (contract-to-schemaIR conversion, DAG reconstruction, edge attestation, on-disk types). `db update` is explicitly out of scope.
+Implement on-disk migration persistence for prisma-next: the ability to plan migrations using the existing planner and serialize them as migration edge packages (`migration.json` + `ops.json`) to a `migrations/` directory on disk. This covers `migration plan`, `migration verify`, `migration new`, and supporting infrastructure (contract-to-schemaIR conversion, DAG reconstruction, edge attestation, on-disk types). `migration apply` and `db update` are explicitly out of scope for the initial PR and will be follow-up work.
 
 # Description
 
@@ -15,19 +15,20 @@ Two user flows are in scope:
 1. **New project**: Write contract → emit → `migration plan` → `migration apply`
 2. **Existing database, no prisma-next contract**: Write contract → `db sign`/`db init` → edit contract → emit → `migration plan` → `migration apply`
 
-`migration apply` is in scope in a limited sense: we want to be able to actually apply migrations, but not a full production-ready apply flow (no dry-run, no rollback, no multi-step orchestration). See FR-10.
+`migration apply` is follow-up work — it is not included in the initial PR. The initial scope covers offline planning and serialization only.
 
 # Requirements
 
 ## Functional Requirements
 
 ### FR-1: Migration planning via existing planner + contract-to-schemaIR conversion
-- Reuse the existing `PostgresMigrationPlanner` (contract vs schema IR) to produce migration operations
-- `migration plan` converts the "from" contract to a `SqlSchemaIR`, then diffs it against the "to" contract using the existing planner
+- Reuse the existing `PostgresMigrationPlanner` (contract vs schema IR) to produce migration operations — the same planner `db init` uses
+- `migration plan` calls `TargetMigrationsCapability.contractToSchema()` to convert the "from" contract to a schema IR, then calls `planner.plan()` to diff it against the "to" contract
+- `TargetMigrationsCapability.detectDestructiveChanges()` catches table/column removals before the additive-only planner runs; the planner itself also catches type changes and nullability tightening
 - Fully offline — no database connection required
 - Produces correct additive SQL for MVP (create table, add column, add index, add FK, add unique, add PK, set default, enable extension, create storage type)
 - Must be deterministic: same inputs always produce the same plan
-- New infrastructure: `contractToSchemaIR(contract: SqlStorage) → SqlSchemaIR` converter
+- Infrastructure: `contractToSchemaIR(storage: SqlStorage) → SqlSchemaIR` converter in sql family tooling layer, exposed to CLI via `TargetMigrationsCapability.contractToSchema()` (respects layering — CLI does not import sql-domain code directly)
 
 ### FR-2: On-disk migration file format (TypeScript types)
 - Define TypeScript types/interfaces for the on-disk artifacts specified in ADR 028:
@@ -70,7 +71,8 @@ Two user flows are in scope:
 - If the migration is a Draft (`edgeId: null`), attest it (compute and write `edgeId`)
 - Signing with `--sign --key <keyId>` is deferred (see RD-15)
 
-### FR-10: `prisma-next migration apply` CLI command (limited)
+### FR-10: `prisma-next migration apply` CLI command (follow-up)
+- **Not included in the initial PR — follow-up work**
 - Read on-disk migration packages from the migrations directory
 - Execute the SQL operations against the database
 - Update the migration ledger / marker
@@ -98,8 +100,9 @@ Two user flows are in scope:
 
 ## Non-goals
 
+- **`migration apply`**: Executing on-disk migrations against a live database. Follow-up work after the initial PR (spec FR-10).
 - **`db update`**: Applying additive changes to a live DB and updating the marker without writing migration files. Deferred to a later project.
-- **Production-ready apply**: Dry-run, rollback, multi-step orchestration, partial apply, apply-to-specific-hash. The MVP `migration apply` is a simple "read SQL from disk, execute" path.
+- **Production-ready apply**: Dry-run, rollback, multi-step orchestration, partial apply, apply-to-specific-hash.
 - **Destructive operations**: Drops, renames, type narrowing. MVP is additive-only.
 - **Squash/baseline tooling**: Creating baselines from paths, archiving edges. Infrastructure is designed for it but tooling is deferred.
 - **Preflight commands**: `prisma-next preflight` (shadow or PPg). Deferred.
@@ -112,33 +115,33 @@ Two user flows are in scope:
 # Acceptance Criteria
 
 ## Planner
-- [ ] `contractToSchemaIR` correctly converts a contract's `SqlStorage` to `SqlSchemaIR`
-- [ ] `migration plan` produces correct additive operations by converting the "from" contract to schema IR and diffing against the "to" contract
-- [ ] `migration plan` correctly handles the "from empty contract" case (new project)
+- [x] `contractToSchemaIR` correctly converts a contract's `SqlStorage` to `SqlSchemaIR`
+- [x] `migration plan` produces correct additive operations by converting the "from" contract to schema IR and diffing against the "to" contract
+- [x] `migration plan` correctly handles the "from empty contract" case (new project)
 
 ## On-disk format
-- [ ] TypeScript types for `migration.json`, `ops.json`, are defined and exported
-- [ ] `migration.json` and `ops.json` can be written to and read from disk with full fidelity (round-trip)
-- [ ] `edgeId` is correctly computed via content-addressed hashing per ADR 028
+- [x] TypeScript types for `migration.json`, `ops.json`, are defined and exported
+- [x] `migration.json` and `ops.json` can be written to and read from disk with full fidelity (round-trip)
+- [x] `edgeId` is correctly computed via content-addressed hashing per ADR 028
 
 ## CLI commands
-- [ ] `prisma-next migration plan` writes a valid migration package to `migrations/` with correct `migration.json` and `ops.json`
-- [ ] `prisma-next migration plan` fails clearly when no changes are detected between contracts
-- [ ] `prisma-next migration new` scaffolds an empty migration package in Draft state
-- [ ] `prisma-next migration verify` recomputes and validates `edgeId` for an existing migration package
-- [ ] `prisma-next migration apply` reads on-disk migrations and executes SQL against a live database
-- [ ] `prisma-next migration apply` updates the migration ledger after successful execution
+- [x] `prisma-next migration plan` writes a valid migration package to `migrations/` with correct `migration.json` and `ops.json`
+- [x] `prisma-next migration plan` fails clearly when no changes are detected between contracts
+- [x] `prisma-next migration new` scaffolds an empty migration package in Draft state
+- [x] `prisma-next migration verify` recomputes and validates `edgeId` for an existing migration package
+- [ ] `prisma-next migration apply` reads on-disk migrations and executes SQL against a live database (follow-up)
+- [ ] `prisma-next migration apply` updates the migration ledger after successful execution (follow-up)
 
 ## DAG
-- [ ] DAG can be reconstructed from on-disk migration packages (reading all `migration.json` files)
-- [ ] Path resolution finds the correct sequence of edges from any known hash to a target hash
-- [ ] Cycle detection identifies and reports illegal cycles
-- [ ] Orphan detection identifies migrations not reachable from the empty contract
+- [x] DAG can be reconstructed from on-disk migration packages (reading all `migration.json` files)
+- [x] Path resolution finds the correct sequence of edges from any known hash to a target hash
+- [x] Cycle detection identifies and reports illegal cycles
+- [x] Orphan detection identifies migrations not reachable from the empty contract
 
 ## Integration
-- [ ] All existing tests continue to pass
-- [ ] `pnpm lint:deps` passes with new packages
-- [ ] New CLI commands have e2e tests
+- [x] All existing tests continue to pass
+- [x] `pnpm lint:deps` passes with new packages
+- [x] New CLI commands have e2e tests
 
 # Other Considerations
 
@@ -207,10 +210,10 @@ We resolve by DAG topology, not by timestamp. Timestamps are metadata for human 
 
 ## RD-3: `migration plan` vs `db init` share the same planner, different schema IR source
 
-- `migration plan`: offline, converts "from" contract → `SqlSchemaIR`, writes ops to disk.
-- `db init`: online, introspects live DB → `SqlSchemaIR`, applies immediately.
+- `migration plan`: offline, uses `TargetMigrationsCapability.contractToSchema()` to synthesize "from" schema IR from the previous contract, calls `planner.plan()`, writes ops to disk.
+- `db init`: online, introspects live DB → `SqlSchemaIR`, calls `planner.plan()`, applies immediately.
 - `db update`: online, introspects DB, applies immediately (out of scope for this project).
-- All use the same `PostgresMigrationPlanner` (contract vs schema IR). The difference is where the schema IR comes from: `migration plan` synthesizes it from a contract, `db init`/`db update` introspect a live database.
+- All use the same `PostgresMigrationPlanner` via `TargetMigrationsCapability.createPlanner()`. The difference is where the schema IR comes from: `migration plan` synthesizes it from a contract via `contractToSchema()`, `db init`/`db update` introspect a live database via `familyInstance.introspect()`.
 
 ## RD-4: Timestamp format
 
@@ -235,10 +238,11 @@ On-disk `ops.json` contains SQL operations lowered for the specific target (e.g.
 Validated against `architecture.config.json`:
 
 - **On-disk format types + DAG logic**: `packages/1-framework/3-tooling/migration/` — framework domain, tooling layer, migration plane. Target-agnostic.
-- **CLI commands**: `packages/1-framework/3-tooling/cli/` — calls through the control plane stack abstraction. Does not import from sql/targets domains directly.
+- **CLI commands**: `packages/1-framework/3-tooling/cli/` — calls through `TargetMigrationsCapability` interface methods (`contractToSchema()`, `detectDestructiveChanges()`, `createPlanner()`). Does not import from sql/targets domains directly.
 - **Existing planner**: `packages/3-targets/3-targets/postgres/` — the `PostgresMigrationPlanner` lives here and is accessed via the `TargetMigrationsCapability` interface.
+- **Contract-to-schema conversion**: `packages/2-sql/3-tooling/family/` — `contractToSchemaIR()` and `detectDestructiveChanges()` live here, exposed to CLI via the `TargetMigrationsCapability` methods on the postgres target descriptor.
 
-The CLI → control client → control plane → postgres target delegation chain already exists for `db init`. `migration plan` uses the same chain.
+The CLI uses `config.target.migrations.createPlanner()` + `planner.plan()` — the same code path `db init` uses. No separate contract-diffing abstraction is needed.
 
 ## RD-8: Empty contract representation
 
