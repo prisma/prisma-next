@@ -183,7 +183,13 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
   if (mode === 'plan') {
     const result: DbInitSuccess = {
       mode: 'plan',
-      plan: { operations: migrationPlan.operations },
+      plan: {
+        operations: migrationPlan.operations.map((op) => ({
+          id: op.id,
+          label: op.label,
+          operationClass: op.operationClass,
+        })),
+      },
       summary: `Planned ${migrationPlan.operations.length} operation(s)`,
     };
     return ok(result);
@@ -264,7 +270,13 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
 
   const result: DbInitSuccess = {
     mode: 'apply',
-    plan: { operations: migrationPlan.operations },
+    plan: {
+      operations: migrationPlan.operations.map((op) => ({
+        id: op.id,
+        label: op.label,
+        operationClass: op.operationClass,
+      })),
+    },
     execution: {
       operationsPlanned: execution.operationsPlanned,
       operationsExecuted: execution.operationsExecuted,
