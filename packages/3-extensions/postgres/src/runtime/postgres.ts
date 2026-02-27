@@ -33,8 +33,13 @@ import {
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Kysely } from 'kysely';
-import { Pool } from 'pg';
-import { type PostgresBindingInput, resolvePostgresBinding } from './binding';
+import { type Client, Pool } from 'pg';
+import {
+  type PostgresBinding,
+  type PostgresBindingInput,
+  resolveOptionalPostgresBinding,
+  resolvePostgresBinding,
+} from './binding';
 
 type NormalizeOperationTypes<T> = {
   [TypeId in keyof T]: {
@@ -67,6 +72,7 @@ export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
   readonly orm: OrmClient<TContract>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
+  connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
   runtime(): Runtime;
 }
 
@@ -80,15 +86,21 @@ export interface PostgresOptionsBase<TContract extends SqlContract<SqlStorage>> 
   };
 }
 
+export interface PostgresBindingOptions {
+  readonly binding?: PostgresBinding;
+  readonly url?: string;
+  readonly pg?: Pool | Client;
+}
+
 export type PostgresOptionsWithContract<TContract extends SqlContract<SqlStorage>> =
-  PostgresBindingInput &
+  PostgresBindingOptions &
     PostgresOptionsBase<TContract> & {
       readonly contract: TContract;
       readonly contractJson?: never;
     };
 
 export type PostgresOptionsWithContractJson<TContract extends SqlContract<SqlStorage>> =
-  PostgresBindingInput &
+  PostgresBindingOptions &
     PostgresOptionsBase<TContract> & {
       readonly contractJson: unknown;
       readonly contract?: never;
@@ -111,6 +123,24 @@ function resolveContract<TContract extends SqlContract<SqlStorage>>(
   return validateContract<TContract>(contractInput);
 }
 
+function toRuntimeBinding<TContract extends SqlContract<SqlStorage>>(
+  binding: PostgresBinding,
+  options: PostgresOptions<TContract>,
+) {
+  if (binding.kind !== 'url') {
+    return binding;
+  }
+
+  return {
+    kind: 'pgPool',
+    pool: new Pool({
+      connectionString: binding.url,
+      connectionTimeoutMillis: options.poolOptions?.connectionTimeoutMillis ?? 20_000,
+      idleTimeoutMillis: options.poolOptions?.idleTimeoutMillis ?? 30_000,
+    }),
+  } as const;
+}
+
 /**
  * Creates a lazy Postgres client from either `contractJson` or a TypeScript-authored `contract`.
  * Static query surfaces are available immediately, while `runtime()` instantiates the driver/pool on first call.
@@ -125,7 +155,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
   options: PostgresOptions<TContract>,
 ): PostgresClient<TContract> {
   const contract = resolveContract(options);
-  const binding = resolvePostgresBinding(options);
+  let binding = resolveOptionalPostgresBinding(options);
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
@@ -141,7 +171,35 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
   const schema: PostgresClient<TContract>['schema'] = schemaBuilder(context);
   const sql = sqlBuilder({ context });
   let runtimeInstance: Runtime | undefined;
+  let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
+  let driverConnected = false;
+  let connectPromise: Promise<void> | undefined;
+  let backgroundConnectError: unknown;
+  const connectDriver = async (resolvedBinding: PostgresBinding): Promise<void> => {
+    if (driverConnected) return;
+    if (!runtimeDriver) throw new Error('Postgres runtime driver missing');
+    if (connectPromise) return connectPromise;
+    const runtimeBinding = toRuntimeBinding(resolvedBinding, options);
+    connectPromise = runtimeDriver
+      .connect(runtimeBinding)
+      .then(() => {
+        driverConnected = true;
+      })
+      .catch(async (err) => {
+        backgroundConnectError = err;
+        connectPromise = undefined;
+        if (resolvedBinding.kind === 'url' && runtimeBinding.kind === 'pgPool') {
+          await runtimeBinding.pool.end().catch(() => undefined);
+        }
+        throw err;
+      });
+    return connectPromise;
+  };
   const getRuntime = (): Runtime => {
+    if (backgroundConnectError !== undefined) {
+      throw backgroundConnectError;
+    }
+
     if (runtimeInstance) {
       return runtimeInstance;
     }
@@ -152,23 +210,13 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
       throw new Error('Driver descriptor missing from execution stack');
     }
 
-    const connect =
-      binding.kind === 'url'
-        ? {
-            pool: new Pool({
-              connectionString: binding.url,
-              connectionTimeoutMillis: options.poolOptions?.connectionTimeoutMillis ?? 20_000,
-              idleTimeoutMillis: options.poolOptions?.idleTimeoutMillis ?? 30_000,
-            }),
-          }
-        : binding.kind === 'pgPool'
-          ? { pool: binding.pool }
-          : { client: binding.client };
-
     const driver = driverDescriptor.create({
-      connect,
       cursor: { disabled: true },
     });
+    runtimeDriver = driver;
+    if (binding !== undefined) {
+      void connectDriver(binding).catch(() => undefined);
+    }
 
     runtimeInstance = createRuntime({
       stackInstance,
@@ -203,6 +251,29 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     orm,
     context,
     stack,
+    async connect(bindingInput) {
+      if (driverConnected || connectPromise) {
+        throw new Error('Postgres client already connected');
+      }
+
+      if (bindingInput !== undefined) {
+        binding = resolvePostgresBinding(bindingInput);
+      }
+
+      if (binding === undefined) {
+        throw new Error(
+          'Postgres binding not configured. Pass url/pg/binding to postgres(...) or call db.connect({ ... }).',
+        );
+      }
+
+      const runtime = getRuntime();
+      if (driverConnected) {
+        return runtime;
+      }
+
+      await connectDriver(binding);
+      return runtime;
+    },
     runtime() {
       return getRuntime();
     },

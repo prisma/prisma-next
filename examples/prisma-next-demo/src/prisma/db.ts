@@ -6,7 +6,6 @@ import contractJson from './contract.json' with { type: 'json' };
 
 export const db = postgres<Contract>({
   contractJson,
-  url: process.env['DATABASE_URL'] ?? 'postgresql://localhost:5432/prisma_next_demo',
   extensions: [pgvector],
   plugins: [
     budgets({

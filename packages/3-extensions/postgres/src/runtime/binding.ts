@@ -23,6 +23,12 @@ export type PostgresBindingInput =
       readonly url?: never;
     };
 
+type PostgresBindingFields = {
+  readonly binding?: PostgresBinding;
+  readonly url?: string;
+  readonly pg?: Pool | Client;
+};
+
 function validatePostgresUrl(url: string): string {
   const trimmed = url.trim();
   if (trimmed.length === 0) {
@@ -77,4 +83,19 @@ export function resolvePostgresBinding(options: PostgresBindingInput): PostgresB
   throw new Error(
     'Unable to determine pg binding type from pg input; use binding with explicit kind',
   );
+}
+
+export function resolveOptionalPostgresBinding(
+  options: PostgresBindingFields,
+): PostgresBinding | undefined {
+  const providedCount =
+    Number(options.binding !== undefined) +
+    Number(options.url !== undefined) +
+    Number(options.pg !== undefined);
+
+  if (providedCount === 0) {
+    return undefined;
+  }
+
+  return resolvePostgresBinding(options as PostgresBindingInput);
 }

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
   driverCreate: vi.fn(),
+  driverConnect: vi.fn(),
   validateContract: vi.fn(),
   poolCtor: vi.fn(),
   dialectCtor: vi.fn(),
@@ -107,6 +108,7 @@ describe('postgres', () => {
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
     mocks.driverCreate.mockReset();
+    mocks.driverConnect.mockReset();
     mocks.validateContract.mockReset();
     mocks.poolCtor.mockReset();
     mocks.dialectCtor.mockReset();
@@ -125,7 +127,8 @@ describe('postgres', () => {
       extensionPacks: [],
     });
     mocks.instantiateExecutionStack.mockReturnValue({ adapter: {} });
-    mocks.driverCreate.mockReturnValue({ id: 'driver-instance' });
+    mocks.driverConnect.mockResolvedValue(undefined);
+    mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.validateContract.mockReturnValue(contract);
   });
@@ -190,15 +193,106 @@ describe('postgres', () => {
     expect(mocks.poolCtor).not.toHaveBeenCalled();
   });
 
-  it('throws for missing binding input during client construction', () => {
-    expect(() =>
-      postgres({
-        contract,
-      } as unknown as Parameters<typeof postgres<typeof contract>>[0]),
-    ).toThrow('Provide one binding input');
-    expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
-    expect(mocks.createRuntime).not.toHaveBeenCalled();
+  it('allows deferred binding during client construction', () => {
+    const db = postgres({
+      contract,
+    } as Parameters<typeof postgres<typeof contract>>[0]);
+
+    db.runtime();
+
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).not.toHaveBeenCalled();
     expect(mocks.poolCtor).not.toHaveBeenCalled();
+  });
+
+  it('connects with explicit binding after construction', async () => {
+    const db = postgres({
+      contract,
+    } as Parameters<typeof postgres<typeof contract>>[0]);
+
+    await db.connect({
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expect(mocks.poolCtor).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledWith({
+      kind: 'pgPool',
+      pool: expect.any(Pool),
+    });
+  });
+
+  it('throws when connect is called without configured binding', async () => {
+    const db = postgres({
+      contract,
+    } as Parameters<typeof postgres<typeof contract>>[0]);
+
+    await expect(db.connect()).rejects.toThrow('Postgres binding not configured');
+  });
+
+  it('throws when attempting to connect twice', async () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    await db.connect();
+    await expect(db.connect({ url: 'postgres://localhost:5432/db2' })).rejects.toThrow(
+      'Postgres client already connected',
+    );
+
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws when attempting to connect twice without arguments', async () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    await db.connect();
+    await expect(db.connect()).rejects.toThrow('Postgres client already connected');
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects concurrent connect calls', async () => {
+    let resolveFirst!: () => void;
+    mocks.driverConnect.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const first = db.connect();
+    await expect(db.connect({ url: 'postgres://localhost:5432/db2' })).rejects.toThrow(
+      'Postgres client already connected',
+    );
+    resolveFirst();
+    await first;
+  });
+
+  it('captures background connect errors from runtime()', async () => {
+    const connectError = new Error('connect failed');
+    mocks.driverConnect.mockRejectedValueOnce(connectError);
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expect(() => db.runtime()).not.toThrow();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(() => db.runtime()).toThrow('connect failed');
   });
 
   it('validates contractJson input', () => {
@@ -236,6 +330,10 @@ describe('postgres', () => {
       connectionString: 'postgres://localhost:5432/db',
       connectionTimeoutMillis: 20_000,
       idleTimeoutMillis: 30_000,
+    });
+    expect(mocks.driverConnect).toHaveBeenCalledWith({
+      kind: 'pgPool',
+      pool: expect.any(Pool),
     });
   });
 
@@ -296,9 +394,9 @@ describe('postgres', () => {
     db.runtime();
 
     expect(mocks.driverCreate).toHaveBeenCalledWith({
-      connect: { pool },
       cursor: { disabled: true },
     });
+    expect(mocks.driverConnect).toHaveBeenCalledWith({ kind: 'pgPool', pool });
   });
 
   it('uses pg client binding', () => {
@@ -311,9 +409,9 @@ describe('postgres', () => {
     db.runtime();
 
     expect(mocks.driverCreate).toHaveBeenCalledWith({
-      connect: { client },
       cursor: { disabled: true },
     });
+    expect(mocks.driverConnect).toHaveBeenCalledWith({ kind: 'pgClient', client });
   });
 
   it('uses explicit binding object', () => {
@@ -326,9 +424,9 @@ describe('postgres', () => {
     db.runtime();
 
     expect(mocks.driverCreate).toHaveBeenCalledWith({
-      connect: { pool },
       cursor: { disabled: true },
     });
+    expect(mocks.driverConnect).toHaveBeenCalledWith({ kind: 'pgPool', pool });
   });
 
   it('throws when pg input is neither Pool nor Client', () => {
