@@ -1,4 +1,5 @@
 import { relative, resolve } from 'node:path';
+import type { ContractIR } from '@prisma-next/contract/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -71,8 +72,8 @@ async function executeMigrationNewCommand(
   const dirName = formatMigrationDirName(timestamp, options.name);
   const packageDir = join(migrationsDir, dirName);
 
-  let fromHash = EMPTY_CONTRACT_HASH;
-  let fromContract: Record<string, unknown> | null = null;
+  let fromHash: string = EMPTY_CONTRACT_HASH;
+  let fromContract: ContractIR | null = null;
   try {
     const packages = await readMigrationsDir(migrationsDir);
     const attested = packages.filter((p) => p.manifest.edgeId !== null);
@@ -82,14 +83,14 @@ async function executeMigrationNewCommand(
       fromHash = leafHash;
       const leafPkg = attested.find((p) => p.manifest.to === leafHash);
       if (leafPkg) {
-        fromContract = leafPkg.manifest.toContract as Record<string, unknown>;
+        fromContract = leafPkg.manifest.toContract;
       }
     }
   } catch {
     // If reading migrations fails, start from empty — this is a draft scaffold
   }
 
-  const emptyContract = {
+  const emptyContract: ContractIR = {
     schemaVersion: '1',
     targetFamily: '',
     target: '',
