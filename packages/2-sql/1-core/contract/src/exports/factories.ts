@@ -1,4 +1,7 @@
 export {
+  bm25ExprField,
+  bm25Field,
+  bm25Index,
   col,
   contract,
   fk,

@@ -46,9 +46,41 @@ export type UniqueConstraint = {
   readonly name?: string;
 };
 
+/**
+ * Supported index access methods.
+ * Only includes methods with deliberate IR support — each access method
+ * may carry its own config shape (e.g., BM25 needs `keyField` + `fieldConfigs`).
+ */
+export type IndexAccessMethod = 'btree' | 'bm25';
+
+/**
+ * Per-field configuration for a BM25 full-text search index.
+ * Each entry describes one indexed field and its tokenizer settings.
+ *
+ * Either `column` or `expression` must be set, but not both.
+ */
+export type Bm25FieldConfig = {
+  /** Column name. Mutually exclusive with `expression`. */
+  readonly column?: string;
+  /** Raw SQL expression (e.g., "description || ' ' || category"). Mutually exclusive with `column`. */
+  readonly expression?: string;
+  /** Tokenizer ID (e.g., 'unicode', 'simple', 'ngram', 'icu', 'regex_pattern', 'literal'). */
+  readonly tokenizer?: string;
+  /** Tokenizer parameters (e.g., { min: 2, max: 5 } for ngram). */
+  readonly tokenizerParams?: Record<string, unknown>;
+  /** Alias for multi-tokenizer per field. Required when `expression` is used. */
+  readonly alias?: string;
+};
+
 export type Index = {
   readonly columns: readonly string[];
   readonly name?: string;
+  /** Access method. Defaults to 'btree' when omitted. */
+  readonly using?: IndexAccessMethod;
+  /** BM25-specific: unique column used as the document key. */
+  readonly keyField?: string;
+  /** BM25-specific: per-field tokenizer configuration. */
+  readonly fieldConfigs?: readonly Bm25FieldConfig[];
 };
 
 export type ForeignKeyReferences = {

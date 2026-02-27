@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { col, contract, fk, index, model, pk, storage, table, unique } from '../src/factories';
+import {
+  bm25ExprField,
+  bm25Field,
+  bm25Index,
+  col,
+  contract,
+  fk,
+  index,
+  model,
+  pk,
+  storage,
+  table,
+  unique,
+} from '../src/factories';
 
 describe('SQL contract factories', () => {
   describe('col', () => {
@@ -279,6 +292,171 @@ describe('SQL contract factories', () => {
           index: true,
         },
       ]);
+    });
+  });
+
+  describe('bm25Field', () => {
+    it('creates a column-based field config with defaults', () => {
+      const field = bm25Field('description');
+      expect(field).toEqual({ column: 'description' });
+    });
+
+    it('creates a field config with tokenizer', () => {
+      const field = bm25Field('description', { tokenizer: 'simple' });
+      expect(field).toEqual({ column: 'description', tokenizer: 'simple' });
+    });
+
+    it('creates a field config with tokenizer and params', () => {
+      const field = bm25Field('description', {
+        tokenizer: 'ngram',
+        tokenizerParams: { min: 2, max: 5 },
+      });
+      expect(field).toEqual({
+        column: 'description',
+        tokenizer: 'ngram',
+        tokenizerParams: { min: 2, max: 5 },
+      });
+    });
+
+    it('creates a field config with alias for multi-tokenizer', () => {
+      const field = bm25Field('description', {
+        tokenizer: 'simple',
+        alias: 'description_simple',
+      });
+      expect(field).toEqual({
+        column: 'description',
+        tokenizer: 'simple',
+        alias: 'description_simple',
+      });
+    });
+
+    it('omits undefined optional fields', () => {
+      const field = bm25Field('category', {});
+      expect(field).toEqual({ column: 'category' });
+      expect(field).not.toHaveProperty('tokenizer');
+      expect(field).not.toHaveProperty('tokenizerParams');
+      expect(field).not.toHaveProperty('alias');
+    });
+  });
+
+  describe('bm25ExprField', () => {
+    it('creates an expression-based field config', () => {
+      const field = bm25ExprField("description || ' ' || category", {
+        alias: 'concat',
+        tokenizer: 'simple',
+      });
+      expect(field).toEqual({
+        expression: "description || ' ' || category",
+        alias: 'concat',
+        tokenizer: 'simple',
+      });
+    });
+
+    it('creates expression field with tokenizer params', () => {
+      const field = bm25ExprField("(metadata->>'color')", {
+        alias: 'meta_color',
+        tokenizer: 'ngram',
+        tokenizerParams: { min: 2, max: 3 },
+      });
+      expect(field).toEqual({
+        expression: "(metadata->>'color')",
+        alias: 'meta_color',
+        tokenizer: 'ngram',
+        tokenizerParams: { min: 2, max: 3 },
+      });
+    });
+
+    it('creates expression field without tokenizer', () => {
+      const field = bm25ExprField('rating + 1', { alias: 'rating_plus' });
+      expect(field).toEqual({
+        expression: 'rating + 1',
+        alias: 'rating_plus',
+      });
+    });
+  });
+
+  describe('bm25Index', () => {
+    it('creates a BM25 index with column-based fields', () => {
+      const idx = bm25Index({
+        keyField: 'id',
+        fields: [bm25Field('description'), bm25Field('category')],
+      });
+      expect(idx).toEqual({
+        columns: ['description', 'category'],
+        using: 'bm25',
+        keyField: 'id',
+        fieldConfigs: [{ column: 'description' }, { column: 'category' }],
+      });
+    });
+
+    it('creates a named BM25 index', () => {
+      const idx = bm25Index({
+        keyField: 'id',
+        fields: [bm25Field('description')],
+        name: 'search_idx',
+      });
+      expect(idx.name).toBe('search_idx');
+      expect(idx.using).toBe('bm25');
+    });
+
+    it('creates BM25 index with mixed field types', () => {
+      const idx = bm25Index({
+        keyField: 'id',
+        fields: [
+          bm25Field('description', { tokenizer: 'simple' }),
+          bm25Field('rating'),
+          bm25ExprField("(metadata->>'color')", {
+            alias: 'meta_color',
+            tokenizer: 'ngram',
+            tokenizerParams: { min: 2, max: 3 },
+          }),
+        ],
+      });
+      expect(idx.columns).toEqual(['description', 'rating', 'meta_color']);
+      expect(idx.fieldConfigs).toHaveLength(3);
+      expect(idx.fieldConfigs![2]).toEqual({
+        expression: "(metadata->>'color')",
+        alias: 'meta_color',
+        tokenizer: 'ngram',
+        tokenizerParams: { min: 2, max: 3 },
+      });
+    });
+
+    it('round-trips through JSON serialization', () => {
+      const idx = bm25Index({
+        keyField: 'id',
+        fields: [
+          bm25Field('description', { tokenizer: 'ngram', tokenizerParams: { min: 2, max: 5 } }),
+          bm25ExprField("description || ' ' || category", { alias: 'concat', tokenizer: 'simple' }),
+        ],
+        name: 'search_idx',
+      });
+      const roundTripped = JSON.parse(JSON.stringify(idx));
+      expect(roundTripped).toEqual(idx);
+    });
+
+    it('creates a table with BM25 index alongside plain indexes', () => {
+      const t = table(
+        {
+          id: col('int4', 'pg/int4@1'),
+          description: col('text', 'pg/text@1'),
+          email: col('text', 'pg/text@1'),
+        },
+        {
+          pk: pk('id'),
+          indexes: [
+            index('email'),
+            bm25Index({
+              keyField: 'id',
+              fields: [bm25Field('description')],
+              name: 'search_idx',
+            }),
+          ],
+        },
+      );
+      expect(t.indexes).toHaveLength(2);
+      expect(t.indexes[0]).toEqual({ columns: ['email'] });
+      expect(t.indexes[1]).toMatchObject({ using: 'bm25', keyField: 'id', name: 'search_idx' });
     });
   });
 

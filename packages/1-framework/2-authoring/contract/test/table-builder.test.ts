@@ -313,6 +313,109 @@ describe('TableBuilder', () => {
     expect(table.columns.id).not.toHaveProperty('typeParams');
   });
 
+  describe('bm25Index', () => {
+    it('produces IndexDef with using: bm25 and fieldConfigs', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('description', { type: textColumn })
+        .primaryKey(['id'])
+        .bm25Index({
+          fields: [{ column: 'description', tokenizer: 'simple' }],
+          name: 'search_idx',
+        })
+        .build();
+
+      expect(table.indexes).toHaveLength(1);
+      expect(table.indexes[0]).toEqual({
+        columns: ['description'],
+        using: 'bm25',
+        keyField: 'id',
+        fieldConfigs: [{ column: 'description', tokenizer: 'simple' }],
+        name: 'search_idx',
+      });
+    });
+
+    it('auto-infers keyField from single-column PK', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('body', { type: textColumn })
+        .primaryKey(['id'])
+        .bm25Index({ fields: [{ column: 'body' }] })
+        .build();
+
+      expect(table.indexes[0]!.keyField).toBe('id');
+    });
+
+    it('uses explicit keyField override', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('uuid', { type: textColumn })
+        .column('body', { type: textColumn })
+        .primaryKey(['id'])
+        .bm25Index({ keyField: 'uuid', fields: [{ column: 'body' }] })
+        .build();
+
+      expect(table.indexes[0]!.keyField).toBe('uuid');
+    });
+
+    it('throws when composite PK and no explicit keyField', () => {
+      const builder = createTable('items')
+        .column('a', { type: intColumn, nullable: false })
+        .column('b', { type: intColumn, nullable: false })
+        .column('body', { type: textColumn })
+        .primaryKey(['a', 'b'])
+        .bm25Index({ fields: [{ column: 'body' }] });
+
+      expect(() => builder.build()).toThrow('explicit keyField');
+    });
+
+    it('throws when no PK and no explicit keyField', () => {
+      const builder = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('body', { type: textColumn })
+        .bm25Index({ fields: [{ column: 'body' }] });
+
+      expect(() => builder.build()).toThrow('explicit keyField');
+    });
+
+    it('handles expression-based fields using alias in columns', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('description', { type: textColumn })
+        .column('category', { type: textColumn })
+        .primaryKey(['id'])
+        .bm25Index({
+          fields: [
+            { column: 'description' },
+            { expression: "description || ' ' || category", alias: 'concat', tokenizer: 'simple' },
+          ],
+        })
+        .build();
+
+      expect(table.indexes[0]!.columns).toEqual(['description', 'concat']);
+      expect(table.indexes[0]!.fieldConfigs![1]).toEqual({
+        expression: "description || ' ' || category",
+        alias: 'concat',
+        tokenizer: 'simple',
+      });
+    });
+
+    it('coexists with plain indexes', () => {
+      const table = createTable('items')
+        .column('id', { type: intColumn, nullable: false })
+        .column('email', { type: textColumn })
+        .column('body', { type: textColumn })
+        .primaryKey(['id'])
+        .index(['email'])
+        .bm25Index({ fields: [{ column: 'body' }] })
+        .build();
+
+      expect(table.indexes).toHaveLength(2);
+      expect(table.indexes[0]).toEqual({ columns: ['email'] });
+      expect(table.indexes[1]!.using).toBe('bm25');
+    });
+  });
+
   describe('nullable/default mutual exclusivity', () => {
     it('allows nullable column without default', () => {
       const table = createTable('user')

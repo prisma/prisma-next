@@ -1,10 +1,12 @@
 export type {
+  Bm25FieldConfig,
   ExtractCodecTypes,
   ExtractOperationTypes,
   ForeignKey,
   ForeignKeyOptions,
   ForeignKeyReferences,
   Index,
+  IndexAccessMethod,
   ModelDefinition,
   ModelField,
   ModelStorage,

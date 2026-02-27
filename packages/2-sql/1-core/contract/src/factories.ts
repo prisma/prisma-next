@@ -4,6 +4,7 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type {
+  Bm25FieldConfig,
   ForeignKey,
   ForeignKeyOptions,
   ForeignKeyReferences,
@@ -52,6 +53,63 @@ export function unique(...columns: readonly string[]): UniqueConstraint {
 export function index(...columns: readonly string[]): Index {
   return {
     columns,
+  };
+}
+
+/**
+ * Creates a BM25 index definition for ParadeDB full-text search.
+ */
+export function bm25Index(opts: {
+  keyField: string;
+  fields: readonly Bm25FieldConfig[];
+  name?: string;
+}): Index {
+  const columns = opts.fields.map((f) => f.column ?? f.alias ?? f.expression ?? '');
+  return {
+    columns,
+    using: 'bm25',
+    keyField: opts.keyField,
+    fieldConfigs: opts.fields,
+    ...(opts.name !== undefined && { name: opts.name }),
+  };
+}
+
+/**
+ * Creates a BM25 field config for a column reference.
+ */
+export function bm25Field(
+  column: string,
+  opts?: {
+    tokenizer?: string;
+    tokenizerParams?: Record<string, unknown>;
+    alias?: string;
+  },
+): Bm25FieldConfig {
+  return {
+    column,
+    ...(opts?.tokenizer !== undefined && { tokenizer: opts.tokenizer }),
+    ...(opts?.tokenizerParams !== undefined && { tokenizerParams: opts.tokenizerParams }),
+    ...(opts?.alias !== undefined && { alias: opts.alias }),
+  };
+}
+
+/**
+ * Creates a BM25 field config for a raw SQL expression.
+ * `alias` is required for expression-based fields.
+ */
+export function bm25ExprField(
+  expression: string,
+  opts: {
+    alias: string;
+    tokenizer?: string;
+    tokenizerParams?: Record<string, unknown>;
+  },
+): Bm25FieldConfig {
+  return {
+    expression,
+    alias: opts.alias,
+    ...(opts.tokenizer !== undefined && { tokenizer: opts.tokenizer }),
+    ...(opts.tokenizerParams !== undefined && { tokenizerParams: opts.tokenizerParams }),
   };
 }
 

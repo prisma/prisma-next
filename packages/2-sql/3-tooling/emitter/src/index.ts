@@ -7,6 +7,8 @@ import type {
   ValidationContext,
 } from '@prisma-next/contract/types';
 import type {
+  Bm25FieldConfig,
+  Index,
   ModelDefinition,
   ModelField,
   SqlStorage,
@@ -173,11 +175,45 @@ export const sqlTargetFamilyHook = {
       }
 
       for (const index of table.indexes) {
-        for (const colName of index.columns) {
-          if (!columnNames.has(colName)) {
-            throw new Error(
-              `Table "${tableName}" index references non-existent column "${colName}"`,
-            );
+        const idx = index as Index;
+
+        if (idx.using === 'bm25') {
+          // BM25 index: validate keyField and fieldConfigs
+          if (idx.keyField) {
+            const hasUniqueOrPk =
+              (table.primaryKey?.columns.includes(idx.keyField) ?? false) ||
+              table.uniques.some((u) => u.columns.length === 1 && u.columns[0] === idx.keyField);
+            if (!hasUniqueOrPk) {
+              throw new Error(
+                `Table "${tableName}" BM25 index keyField "${idx.keyField}" must reference a primary key or unique column`,
+              );
+            }
+          }
+          if (idx.fieldConfigs) {
+            for (const fc of idx.fieldConfigs) {
+              if (fc.expression) {
+                // Expression-based fields must have an alias
+                if (!fc.alias) {
+                  throw new Error(
+                    `Table "${tableName}" BM25 index expression field must have an alias`,
+                  );
+                }
+                // Skip column-existence validation for expressions (raw SQL is opaque)
+              } else if (fc.column && !columnNames.has(fc.column)) {
+                throw new Error(
+                  `Table "${tableName}" BM25 index references non-existent column "${fc.column}"`,
+                );
+              }
+            }
+          }
+        } else {
+          // Standard index: validate all columns exist
+          for (const colName of idx.columns) {
+            if (!columnNames.has(colName)) {
+              throw new Error(
+                `Table "${tableName}" index references non-existent column "${colName}"`,
+              );
+            }
           }
         }
       }
@@ -372,9 +408,15 @@ export const sqlTargetFamilyHook = {
 
       const indexes = table.indexes
         .map((i) => {
-          const cols = i.columns.map((c: string) => `'${c}'`).join(', ');
-          const name = i.name ? `; readonly name: '${i.name}'` : '';
-          return `{ readonly columns: readonly [${cols}]${name} }`;
+          const idx = i as Index;
+          const cols = idx.columns.map((c: string) => `'${c}'`).join(', ');
+          const name = idx.name ? `; readonly name: '${idx.name}'` : '';
+          const using = idx.using ? `; readonly using: '${idx.using}'` : '';
+          const keyField = idx.keyField ? `; readonly keyField: '${idx.keyField}'` : '';
+          const fieldConfigs = idx.fieldConfigs
+            ? `; readonly fieldConfigs: readonly [${idx.fieldConfigs.map((f: Bm25FieldConfig) => this.serializeBm25FieldConfig(f)).join(', ')}]`
+            : '';
+          return `{ readonly columns: readonly [${cols}]${name}${using}${keyField}${fieldConfigs} }`;
         })
         .join(', ');
       tableParts.push(`indexes: readonly [${indexes}]`);
@@ -682,6 +724,20 @@ export const sqlTargetFamilyHook = {
     parts.push(`codecTypes: ${codecTypes || 'Record<string, never>'}`);
     parts.push(`operationTypes: ${operationTypes || 'Record<string, never>'}`);
 
+    return `{ ${parts.join('; ')} }`;
+  },
+
+  serializeBm25FieldConfig(f: Bm25FieldConfig): string {
+    const parts: string[] = [];
+    if (f.column !== undefined) parts.push(`readonly column: ${this.serializeValue(f.column)}`);
+    if (f.expression !== undefined)
+      parts.push(`readonly expression: ${this.serializeValue(f.expression)}`);
+    if (f.tokenizer !== undefined)
+      parts.push(`readonly tokenizer: ${this.serializeValue(f.tokenizer)}`);
+    if (f.tokenizerParams !== undefined) {
+      parts.push(`readonly tokenizerParams: ${this.serializeTypeParamsLiteral(f.tokenizerParams)}`);
+    }
+    if (f.alias !== undefined) parts.push(`readonly alias: ${this.serializeValue(f.alias)}`);
     return `{ ${parts.join('; ')} }`;
   },
 } as const;

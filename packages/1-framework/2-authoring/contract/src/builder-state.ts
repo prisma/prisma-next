@@ -65,11 +65,32 @@ export interface UniqueConstraintDef {
 }
 
 /**
+ * Supported index access methods.
+ * Duplicated from sql-contract to avoid cross-layer dependency.
+ */
+export type IndexAccessMethod = 'btree' | 'bm25';
+
+/**
+ * Per-field configuration for a BM25 full-text search index.
+ * Duplicated from sql-contract to avoid cross-layer dependency.
+ */
+export interface Bm25FieldConfigDef {
+  readonly column?: string;
+  readonly expression?: string;
+  readonly tokenizer?: string;
+  readonly tokenizerParams?: Record<string, unknown>;
+  readonly alias?: string;
+}
+
+/**
  * Index definition for table builder.
  */
 export interface IndexDef {
   readonly columns: readonly string[];
   readonly name?: string;
+  readonly using?: IndexAccessMethod;
+  readonly keyField?: string;
+  readonly fieldConfigs?: readonly Bm25FieldConfigDef[];
 }
 
 /**
