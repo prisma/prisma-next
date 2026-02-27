@@ -65,11 +65,21 @@ export function getIdentifierName(node: OperationNode | undefined): string | und
   return undefined;
 }
 
-function getSchemableIdentifierName(node: OperationNode): string | undefined {
-  if (!SchemableIdentifierNode.is(node)) {
+function getSchemableIdentifierName(node: unknown): string | undefined {
+  if (!isOperationNode(node)) {
     return undefined;
   }
-  return getIdentifierName(node.identifier);
+
+  if (SchemableIdentifierNode.is(node)) {
+    return getIdentifierName(node.identifier);
+  }
+
+  // Some compiled query shapes inline IdentifierNode directly in table slots.
+  if (IdentifierNode.is(node)) {
+    return node.name;
+  }
+
+  return undefined;
 }
 
 export function getAliasName(node: unknown): string | undefined {
