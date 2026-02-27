@@ -23,4 +23,4 @@ CI runs on pull requests via GitHub Actions (`.github/workflows/ci.yml`):
 - **test** + **test-e2e**: Run after build, require Postgres service
 - **coverage**: Generates coverage reports, uploaded as artifacts
 
-Environment: Node 24, pnpm 10, Postgres 15. `TEST_TIMEOUT_MULTIPLIER=2` in CI.
+Environment: Node 24.13.0, pnpm 10, Postgres 15. `TEST_TIMEOUT_MULTIPLIER=2` in CI.

@@ -256,13 +256,23 @@ For detailed information about package layering, see:
 **First time here?** Start with the Quick Demo above, then explore the example app.
 
 ### Prerequisites
-- Node.js >= 20
+- Node.js 24.13.0 (managed via `mise` + `.tool-versions`)
 - pnpm 9.x
 - PostgreSQL (for running the example)
+
+To set up Node locally with `mise`:
+```bash
+curl https://mise.run | sh
+echo 'eval "$($HOME/.local/bin/mise activate zsh)"' >> "$HOME/.zshrc"
+mise install
+```
 
 ### Installation & Setup
 
 ```bash
+# Install Node from .tool-versions
+mise install
+
 # Install dependencies and build
 pnpm install && pnpm build
 
