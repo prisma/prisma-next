@@ -1,0 +1,29 @@
+{
+  "name": "prisma-next-db-update-demo",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "create-dbs": "bun run scripts/create-dbs.ts",
+    "scenario": "bun run scripts/scenario.ts",
+    "scenario:sql": "bun run scripts/scenario.ts --sql"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/core-control-plane": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
+    "arktype": "^2.1.29",
+    "dotenv": "^16.4.5",
+    "pg": "catalog:",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@types/pg": "catalog:"
+  }
+}

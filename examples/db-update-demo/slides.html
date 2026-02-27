@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>prisma-next db update</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0b;
+    --bg-surface: #141416;
+    --bg-elevated: #1c1c1f;
+    --border: #27272a;
+    --border-subtle: #1e1e21;
+    --text: #fafafa;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+    --accent: #10b981;
+    --accent-dim: #065f46;
+    --destructive: #ef4444;
+    --destructive-dim: #7f1d1d;
+    --warning: #f59e0b;
+    --info: #3b82f6;
+    --font-display: 'Outfit', system-ui, sans-serif;
+    --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .deck { position: relative; width: 100%; height: 100%; }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: translateX(40px);
+    padding: 72px 100px;
+  }
+  .slide.active { opacity: 1; pointer-events: auto; transform: translateX(0); }
+  .slide.prev { opacity: 0; transform: translateX(-40px); }
+
+  .progress {
+    position: fixed; bottom: 0; left: 0; height: 3px;
+    background: var(--accent);
+    transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 100;
+  }
+  .counter {
+    position: fixed; bottom: 24px; right: 40px;
+    font-family: var(--font-mono); font-size: 13px;
+    color: var(--text-muted); z-index: 100; letter-spacing: 0.05em;
+  }
+  .nav-hint {
+    position: fixed; bottom: 24px; left: 40px;
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--text-muted); opacity: 0.4; z-index: 100;
+  }
+
+  h1 { font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+  h2 { font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; font-size: 44px; }
+  h3 { font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; font-size: 26px; }
+
+  .label {
+    font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--accent); font-weight: 500;
+  }
+  .subtitle {
+    font-size: 21px; color: var(--text-secondary); line-height: 1.5;
+    font-weight: 300; max-width: 580px;
+  }
+
+  /* Terminal */
+  .terminal {
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    font-family: var(--font-mono); font-size: 13.5px; line-height: 1.7; width: 100%;
+  }
+  .terminal-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+  }
+  .terminal-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--border); }
+  .terminal-dot.r { background: #ef4444; }
+  .terminal-dot.y { background: #f59e0b; }
+  .terminal-dot.g { background: #22c55e; }
+  .terminal-title { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+  .terminal-body { padding: 18px 22px; white-space: pre; overflow-x: auto; }
+
+  .t-green { color: #4ade80; }
+  .t-red { color: #f87171; }
+  .t-yellow { color: #fbbf24; }
+  .t-dim { color: #52525b; }
+  .t-blue { color: #60a5fa; }
+  .t-accent { color: var(--accent); }
+  .t-bold { font-weight: 600; }
+  .t-white { color: #fafafa; }
+
+  /* Flow */
+  .flow { display: flex; align-items: center; }
+  .flow-step {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 10px; flex-shrink: 0;
+  }
+  .flow-icon {
+    width: 64px; height: 64px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 700;
+    border: 1px solid var(--border); background: var(--bg-surface);
+    color: var(--text); font-family: var(--font-mono);
+  }
+  .flow-icon.hi { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+  .flow-label { font-size: 12px; color: var(--text-secondary); text-align: center; max-width: 90px; font-weight: 500; }
+  .flow-arrow {
+    width: 40px; height: 2px; background: var(--border); flex-shrink: 0; position: relative;
+  }
+  .flow-arrow::after {
+    content: ''; position: absolute; right: 0; top: -4px;
+    border: solid var(--border); border-width: 0 2px 2px 0;
+    display: inline-block; padding: 4px; transform: rotate(-45deg);
+  }
+
+  /* Layouts */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; width: 100%; height: 100%; align-items: center; }
+  .split-narrow { display: grid; grid-template-columns: 2fr 3fr; gap: 56px; width: 100%; height: 100%; align-items: center; }
+  .vstack { display: flex; flex-direction: column; justify-content: center; height: 100%; width: 100%; }
+
+  /* Diff */
+  .diff-line {
+    display: flex; align-items: center; font-family: var(--font-mono);
+    font-size: 13px; line-height: 1.8;
+  }
+  .diff-sign { width: 22px; text-align: center; flex-shrink: 0; font-weight: 600; }
+  .diff-add { color: #4ade80; background: #4ade8008; }
+  .diff-del { color: #f87171; background: #f8717108; }
+  .diff-neutral { color: var(--text-muted); }
+
+  /* Decorative */
+  .glow {
+    position: absolute; width: 400px; height: 400px; border-radius: 50%;
+    filter: blur(120px); opacity: 0.12; pointer-events: none;
+  }
+  .glow-accent { background: var(--accent); }
+  .glow-red { background: #ef4444; }
+
+  /* Story context box */
+  .story-context {
+    padding: 16px 20px; border-radius: 10px;
+    background: var(--bg-surface); border: 1px solid var(--border-subtle);
+    font-size: 14px; color: var(--text-secondary); line-height: 1.6;
+  }
+  .story-context strong { color: var(--text); font-weight: 500; }
+
+  /* Step indicator */
+  .step-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.05em;
+    padding: 6px 14px; border-radius: 8px; width: fit-content;
+  }
+  .step-badge.green { background: #065f4620; color: #4ade80; border: 1px solid #065f4640; }
+  .step-badge.red { background: #7f1d1d20; color: #f87171; border: 1px solid #7f1d1d40; }
+  .step-badge.yellow { background: #78350f20; color: #fbbf24; border: 1px solid #78350f40; }
+  .step-badge.blue { background: #1e3a5f20; color: #60a5fa; border: 1px solid #1e3a5f40; }
+
+  /* Takeaway */
+  .takeaway-list { display: flex; flex-direction: column; gap: 28px; }
+  .takeaway-item { display: flex; align-items: flex-start; gap: 20px; }
+  .takeaway-num {
+    font-family: var(--font-mono); font-size: 32px; font-weight: 700;
+    color: var(--accent); line-height: 1; min-width: 48px;
+  }
+  .takeaway-title { font-weight: 600; font-size: 21px; letter-spacing: -0.02em; }
+  .takeaway-desc { font-size: 15px; color: var(--text-secondary); line-height: 1.5; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 1: Referential Actions — Title -->
+  <!-- ============================================================ -->
+  <div class="slide active" data-slide="0">
+    <div class="glow glow-accent" style="top: -100px; right: 200px;"></div>
+    <div class="vstack" style="gap: 32px;">
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <p class="label">Prisma Next</p>
+        <h1 style="font-size: 84px;">Contract: Referential Actions</h1>
+        <p class="subtitle">
+          Define ON DELETE and ON UPDATE behavior directly in your contract.
+          The database enforces referential integrity for you.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 2: Referential Actions — What & Why -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="1">
+    <div class="split">
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <p class="label">New: Referential Actions</p>
+          <h2>Act on your rows<br/>as relations change</h2>
+        </div>
+        <p class="subtitle" style="font-size: 17px;">
+          Define <strong style="color: var(--text); font-weight: 500;">ON DELETE</strong> and
+          <strong style="color: var(--text); font-weight: 500;">ON UPDATE</strong> behavior
+          directly in the contract. The database enforces it &mdash; no application code needed.
+        </p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px;">
+          <div style="padding: 14px 16px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px;">
+            <p style="font-family: var(--font-mono); font-size: 11px; color: #fbbf24; margin-bottom: 6px;">ON DELETE: SET NULL</p>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">Delete a user? Their posts survive &mdash; the FK column becomes NULL.</p>
+          </div>
+          <div style="padding: 14px 16px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px;">
+            <p style="font-family: var(--font-mono); font-size: 11px; color: #60a5fa; margin-bottom: 6px;">ON UPDATE: CASCADE</p>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">Update a user's PK? Every referencing post automatically follows.</p>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+          <p style="font-size: 13px; color: var(--text-muted);">All five PostgreSQL actions supported:</p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <span class="step-badge green" style="font-size: 11px; padding: 4px 10px;">cascade</span>
+            <span class="step-badge yellow" style="font-size: 11px; padding: 4px 10px;">setNull</span>
+            <span class="step-badge blue" style="font-size: 11px; padding: 4px 10px;">restrict</span>
+            <span class="step-badge blue" style="font-size: 11px; padding: 4px 10px;">setDefault</span>
+            <span class="step-badge blue" style="font-size: 11px; padding: 4px 10px;">noAction</span>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot r"></div>
+            <div class="terminal-dot y"></div>
+            <div class="terminal-dot g"></div>
+            <span class="terminal-title">contract.ts</span>
+          </div>
+          <div class="terminal-body"><span class="t-dim">// Before — no referential action config</span>
+<span class="t-white">defineContract</span>()
+  .<span class="t-accent">table</span>(<span class="t-yellow">'post'</span>, t =&gt; t
+    .column(<span class="t-yellow">'userId'</span>, { type: int4Column })
+    .foreignKey([<span class="t-yellow">'userId'</span>], {
+      table: <span class="t-yellow">'user'</span>,
+      columns: [<span class="t-yellow">'id'</span>],
+    })
+  )</div>
+        </div>
+        <div class="terminal" style="border-color: var(--accent);">
+          <div class="terminal-header" style="border-bottom-color: var(--accent);">
+            <div class="terminal-dot r"></div>
+            <div class="terminal-dot y"></div>
+            <div class="terminal-dot g"></div>
+            <span class="terminal-title" style="color: var(--accent);">contract.ts  (with referential actions)</span>
+          </div>
+          <div class="terminal-body"><span class="t-white">defineContract</span>()
+  .<span class="t-accent">table</span>(<span class="t-yellow">'post'</span>, t =&gt; t
+    .column(<span class="t-yellow">'userId'</span>, { type: int4Column, <span class="t-green">nullable: true</span> })
+    .foreignKey([<span class="t-yellow">'userId'</span>], {
+      table: <span class="t-yellow">'user'</span>,
+      columns: [<span class="t-yellow">'id'</span>],
+    }, {
+      <span class="t-yellow">onDelete: 'setNull'</span>,
+      <span class="t-blue">onUpdate: 'cascade'</span>,
+    })
+  )</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 3: Referential Actions — In Practice -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="2">
+    <div class="split">
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <p class="label">Referential Actions</p>
+          <h2>What happens<br/>at query time</h2>
+        </div>
+        <div class="story-context">
+          A <strong>user</strong> has many <strong>posts</strong>.
+          The FK is configured with
+          <strong style="color: #fbbf24;">onDelete: 'setNull'</strong> and
+          <strong style="color: #60a5fa;">onUpdate: 'cascade'</strong>.
+          <br/><br/>
+          The database handles the referential integrity for you &mdash;
+          no manual cleanup queries, no orphan-hunting.
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px;">
+          <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.5;">
+            <span style="color: var(--accent); font-weight: 500;">Validation built in.</span>
+            Setting <code style="font-family: var(--font-mono); font-size: 13px; color: #fbbf24;">setNull</code>
+            on a non-nullable column? The contract rejects it at emit time, before it ever reaches the database.
+          </p>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="padding: 4px 0;">
+          <p style="font-weight: 500; font-size: 14px; margin-bottom: 10px; color: var(--text-secondary);">Scenario A: Delete a user</p>
+          <div class="terminal">
+            <div class="terminal-header">
+              <div class="terminal-dot r"></div>
+              <div class="terminal-dot y"></div>
+              <div class="terminal-dot g"></div>
+              <span class="terminal-title">onDelete: 'setNull'</span>
+            </div>
+            <div class="terminal-body"><span class="t-dim">-- Before</span>
+user  │ <span class="t-white">id=1</span>  email=<span class="t-yellow">'ada@prisma.io'</span>
+post  │ id=10 userId=<span class="t-accent">1</span>  title=<span class="t-yellow">'Hello'</span>
+post  │ id=11 userId=<span class="t-accent">1</span>  title=<span class="t-yellow">'World'</span>
+
+<span class="t-red">DELETE FROM</span> "user" <span class="t-red">WHERE</span> id = <span class="t-white">1</span>;
+
+<span class="t-dim">-- After</span>
+user  │ <span class="t-dim">(deleted)</span>
+post  │ id=10 userId=<span class="t-yellow">NULL</span> title=<span class="t-yellow">'Hello'</span>
+post  │ id=11 userId=<span class="t-yellow">NULL</span> title=<span class="t-yellow">'World'</span>
+
+<span class="t-dim">Posts preserved. FK set to NULL.</span></div>
+          </div>
+        </div>
+        <div style="padding: 4px 0;">
+          <p style="font-weight: 500; font-size: 14px; margin-bottom: 10px; color: var(--text-secondary);">Scenario B: Update a user's PK</p>
+          <div class="terminal">
+            <div class="terminal-header">
+              <div class="terminal-dot r"></div>
+              <div class="terminal-dot y"></div>
+              <div class="terminal-dot g"></div>
+              <span class="terminal-title">onUpdate: 'cascade'</span>
+            </div>
+            <div class="terminal-body"><span class="t-dim">-- Before</span>
+user  │ id=<span class="t-white">1</span>    email=<span class="t-yellow">'ada@prisma.io'</span>
+post  │ id=10  userId=<span class="t-accent">1</span>
+
+<span class="t-blue">UPDATE</span> "user" <span class="t-blue">SET</span> id = <span class="t-white">42</span> <span class="t-blue">WHERE</span> id = <span class="t-white">1</span>;
+
+<span class="t-dim">-- After</span>
+user  │ id=<span class="t-white">42</span>   email=<span class="t-yellow">'ada@prisma.io'</span>
+post  │ id=10  userId=<span class="t-accent">42</span>  <span class="t-dim">&lt;-- cascaded</span>
+
+<span class="t-dim">FK automatically updated.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 4: db update — Title -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="3">
+    <div class="glow glow-accent" style="bottom: -80px; left: 300px;"></div>
+    <div class="glow glow-accent" style="top: -120px; right: 160px; opacity: 0.06;"></div>
+    <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 28px; text-align: center;">
+        <p class="label" style="letter-spacing: 0.2em;">Prisma Next</p>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+          <p style="font-size: 24px; color: var(--text-secondary); font-weight: 300; letter-spacing: -0.01em;">New Command</p>
+          <h1 style="font-size: 96px; font-family: var(--font-mono); color: var(--accent); letter-spacing: -0.05em;">db update</h1>
+        </div>
+        <p style="font-size: 19px; color: var(--text-muted); font-weight: 300; max-width: 520px; line-height: 1.6;">
+          Keep your database in sync with your evolving contract.
+          Safely, predictably, every time.
+        </p>
+        <div style="margin-top: 8px; padding: 10px 24px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border);">
+          <span style="font-family: var(--font-mono); font-size: 15px; color: var(--text-secondary);">$</span>
+          <span style="font-family: var(--font-mono); font-size: 15px; color: var(--text); margin-left: 8px;">prisma-next db update</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 5: The Problem -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="4">
+    <div class="split">
+      <div style="display: flex; flex-direction: column; gap: 28px;">
+        <p class="label">The Problem</p>
+        <h2>Schemas evolve.<br/>Databases must follow.</h2>
+        <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 4px;">
+          <div style="display: flex; align-items: flex-start; gap: 14px;">
+            <span style="color: var(--destructive); font-family: var(--font-mono); font-weight: 600; font-size: 18px; margin-top: 2px;">x</span>
+            <div>
+              <p style="font-weight: 500; font-size: 16px;">Manual ALTER TABLE scripts</p>
+              <p style="color: var(--text-secondary); font-size: 14px;">Error-prone, no audit trail, no verification</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 14px;">
+            <span style="color: var(--destructive); font-family: var(--font-mono); font-weight: 600; font-size: 18px; margin-top: 2px;">x</span>
+            <div>
+              <p style="font-weight: 500; font-size: 16px;">Silent schema drift</p>
+              <p style="color: var(--text-secondary); font-size: 14px;">Extra columns and tables accumulate unnoticed</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 14px;">
+            <span style="color: var(--destructive); font-family: var(--font-mono); font-weight: 600; font-size: 18px; margin-top: 2px;">x</span>
+            <div>
+              <p style="font-weight: 500; font-size: 16px;">Accidental data loss</p>
+              <p style="color: var(--text-secondary); font-size: 14px;">Dropping a column shouldn't be a one-keystroke mistake</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="terminal">
+        <div class="terminal-header">
+          <div class="terminal-dot r"></div>
+          <div class="terminal-dot y"></div>
+          <div class="terminal-dot g"></div>
+          <span class="terminal-title">the old way</span>
+        </div>
+        <div class="terminal-body"><span class="t-dim">-- need to add a slug column</span>
+<span class="t-dim">-- does this break anything? who knows</span>
+<span class="t-yellow">ALTER TABLE</span> project
+  <span class="t-yellow">ADD COLUMN</span> slug varchar(128);
+
+<span class="t-dim">-- someone left this behind months ago</span>
+<span class="t-dim">-- is anything using it? no idea</span>
+<span class="t-red">ALTER TABLE</span> account
+  <span class="t-red">DROP COLUMN</span> legacy_code;
+
+<span class="t-dim">-- hope no production data was lost...</span>
+<span class="t-dim">-- no record of what just happened</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 6: How It Works -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="5">
+    <div class="vstack" style="gap: 36px;">
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <p class="label">How It Works</p>
+        <h2>Contract-first reconciliation</h2>
+        <p class="subtitle" style="font-size: 17px;">
+          One command diffs your contract against the live database,
+          computes a plan, and applies it with full verification.
+        </p>
+      </div>
+      <div class="flow" style="justify-content: center; padding: 0 16px;">
+        <div class="flow-step">
+          <div class="flow-icon">M</div>
+          <span class="flow-label">Read Marker</span>
+        </div>
+        <div class="flow-arrow"></div>
+        <div class="flow-step">
+          <div class="flow-icon">I</div>
+          <span class="flow-label">Introspect DB</span>
+        </div>
+        <div class="flow-arrow"></div>
+        <div class="flow-step">
+          <div class="flow-icon hi">D</div>
+          <span class="flow-label">Diff & Plan</span>
+        </div>
+        <div class="flow-arrow"></div>
+        <div class="flow-step">
+          <div class="flow-icon">A</div>
+          <span class="flow-label">Apply Ops</span>
+        </div>
+        <div class="flow-arrow"></div>
+        <div class="flow-step">
+          <div class="flow-icon">W</div>
+          <span class="flow-label">Write Marker</span>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 4px;">
+        <div style="padding: 16px 20px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px;">
+          <p style="font-family: var(--font-mono); font-size: 11px; color: var(--accent); margin-bottom: 6px;">CONTRACT</p>
+          <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">Deterministic JSON with cryptographic hash. The single source of truth for what the schema should be.</p>
+        </div>
+        <div style="padding: 16px 20px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px;">
+          <p style="font-family: var(--font-mono); font-size: 11px; color: var(--accent); margin-bottom: 6px;">PLAN</p>
+          <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">Immutable migration object. Each operation is classified as additive, widening, or destructive. Previewable before execution.</p>
+        </div>
+        <div style="padding: 16px 20px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px;">
+          <p style="font-family: var(--font-mono); font-size: 11px; color: var(--accent); margin-bottom: 6px;">MARKER</p>
+          <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">Hash stored in the database. Anchors the plan origin so the runner verifies the DB is at the expected state.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 7: Scenario — Add a feature (preview) -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="6">
+    <div class="split">
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <p class="label">Scenario: Add a Feature</p>
+          <h2>Preview before<br/>you touch the DB</h2>
+        </div>
+        <div class="story-context">
+          Your app tracks <strong>accounts</strong> and <strong>projects</strong>.
+          A new feature needs a <strong>slug</strong> column on the project table.
+          You update the contract in TypeScript and re-emit.
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <p style="font-weight: 500; font-size: 14px; margin-bottom: 2px; color: var(--text-secondary);">The contract change (v1 &rarr; v2)</p>
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 18px;">
+            <div class="diff-line diff-neutral"><span class="diff-sign"></span> .column('name', { type: textColumn })</div>
+            <div class="diff-line diff-add"><span class="diff-sign">+</span> .column('slug', { type: varcharColumn(128), nullable: true })</div>
+            <div class="diff-line diff-neutral"><span class="diff-sign"></span> .column('visibility', { ... })</div>
+          </div>
+        </div>
+        <span class="step-badge blue">Step 1 of 2 -- preview with --plan</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot r"></div>
+            <div class="terminal-dot y"></div>
+            <div class="terminal-dot g"></div>
+            <span class="terminal-title">prisma-next db update --plan</span>
+          </div>
+          <div class="terminal-body"><span class="t-green">&#10004;</span> <span class="t-dim">Connecting to database... (378ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Reading contract marker (83ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Introspecting database schema (679ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Planning migration (8ms)</span>
+<span class="t-green t-bold">&#10004;</span> <span class="t-white t-bold">Planned 1 operation(s)</span>
+<span class="t-dim">│</span>
+<span class="t-dim">└</span>─ Add column slug to project <span class="t-dim">[additive]</span>
+
+<span class="t-dim">Destination hash: sha256:07269a...</span>
+
+<span class="t-dim">DDL preview</span>
+
+<span class="t-yellow">ALTER TABLE</span> "public"."project"
+  <span class="t-yellow">ADD COLUMN</span> "slug" character varying(128);
+
+<span class="t-dim">This is a dry run. No changes were applied.</span>
+<span class="t-dim">Run without --plan to apply changes.</span></div>
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px;">
+          <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.5;">
+            <span style="color: #4ade80; font-weight: 500;">Nothing changed.</span>
+            The DB is untouched. You see exactly what will happen: one additive operation, the DDL, and the destination hash.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 8: Scenario — Apply the update -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="7">
+    <div class="split">
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <p class="label">Scenario: Apply</p>
+          <h2>Confident?<br/>Apply it.</h2>
+        </div>
+        <div class="story-context">
+          You reviewed the plan. The single additive operation looks right.
+          Now run without <strong>--plan</strong> to apply and update the marker.
+        </div>
+        <span class="step-badge green">Step 2 of 2 -- apply</span>
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <span style="color: #4ade80; font-family: var(--font-mono); font-weight: 600; font-size: 16px; margin-top: 1px;">&#10004;</span>
+            <div>
+              <p style="font-weight: 500; font-size: 15px;">Column added to the live database</p>
+              <p style="color: var(--text-secondary); font-size: 13px;">The slug column now exists on the project table</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <span style="color: #4ade80; font-family: var(--font-mono); font-weight: 600; font-size: 16px; margin-top: 1px;">&#10004;</span>
+            <div>
+              <p style="font-weight: 500; font-size: 15px;">Marker updated with new hash</p>
+              <p style="color: var(--text-secondary); font-size: 13px;">The DB now records that it matches the v2 contract</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <span style="color: #4ade80; font-family: var(--font-mono); font-weight: 600; font-size: 16px; margin-top: 1px;">&#10004;</span>
+            <div>
+              <p style="font-weight: 500; font-size: 15px;">Running it again? Zero operations</p>
+              <p style="color: var(--text-secondary); font-size: 13px;">Idempotent by design. No-op when already in sync.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot r"></div>
+            <div class="terminal-dot y"></div>
+            <div class="terminal-dot g"></div>
+            <span class="terminal-title">prisma-next db update</span>
+          </div>
+          <div class="terminal-body"><span class="t-green">&#10004;</span> <span class="t-dim">Connecting to database... (382ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Reading contract marker (80ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Introspecting database schema (699ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Planning migration (7ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Applying migration plan (1587ms)</span>
+<span class="t-green t-bold">&#10004;</span> <span class="t-white t-bold">Applied 1 operation(s)</span>
+<span class="t-dim">  Marker written: sha256:07269a...</span>
+<span class="t-dim">  Profile hash:   sha256:213e9b...</span></div>
+        </div>
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot r"></div>
+            <div class="terminal-dot y"></div>
+            <div class="terminal-dot g"></div>
+            <span class="terminal-title">prisma-next db update  (run again)</span>
+          </div>
+          <div class="terminal-body"><span class="t-green t-bold">&#10004;</span> <span class="t-white t-bold">Applied 0 operation(s)</span>
+<span class="t-dim">  Marker written: sha256:a8f3e1...</span></div>
+        </div>
+        <div style="padding: 14px 18px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px;">
+          <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.5;">
+            <span style="color: var(--accent); font-weight: 500;">That's the happy path.</span>
+            Preview &rarr; Apply &rarr; Done. But what about drift?
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 9: Scenario — Destructive safety -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="8">
+    <div class="glow glow-red" style="top: 100px; right: 100px;"></div>
+    <div class="split">
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <p class="label">Scenario: Drift Detection</p>
+          <h2>Catch what<br/>doesn't belong</h2>
+        </div>
+        <div class="story-context">
+          Someone ran manual SQL against the database:
+          added a <strong>legacy_code</strong> column on account and
+          created a <strong>legacy_audit</strong> table.
+          <br/><br/>
+          The contract knows nothing about these. When you run <strong>db update</strong>,
+          it detects the drift and classifies the cleanup as <strong style="color: #f87171;">destructive</strong>.
+        </div>
+        <span class="step-badge yellow">destructive ops detected</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot r"></div>
+            <div class="terminal-dot y"></div>
+            <div class="terminal-dot g"></div>
+            <span class="terminal-title">prisma-next db update --plan</span>
+          </div>
+          <div class="terminal-body"><span class="t-green">&#10004;</span> <span class="t-dim">Connecting to database... (401ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Reading contract marker (76ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Introspecting database schema (712ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Planning migration (11ms)</span>
+<span class="t-green t-bold">&#10004;</span> <span class="t-white t-bold">Planned 2 operation(s)</span>
+<span class="t-dim">│</span>
+<span class="t-dim">├</span>─ Drop column legacy_code on account <span class="t-red">[destructive]</span>
+<span class="t-dim">└</span>─ Drop table legacy_audit              <span class="t-red">[destructive]</span>
+
+<span class="t-dim">DDL preview</span>
+
+<span class="t-red">ALTER TABLE</span> "public"."account"
+  <span class="t-red">DROP COLUMN</span> "legacy_code";
+<span class="t-red">DROP TABLE</span> "public"."legacy_audit";
+
+<span class="t-dim">This is a dry run. No changes were applied.</span></div>
+        </div>
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot r"></div>
+            <div class="terminal-dot y"></div>
+            <div class="terminal-dot g"></div>
+            <span class="terminal-title">prisma-next db update</span>
+          </div>
+          <div class="terminal-body"><span class="t-green">&#10004;</span> <span class="t-dim">Connecting to database... (373ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Reading contract marker (78ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Introspecting database schema (658ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Planning migration (6ms)</span>
+<span class="t-red t-bold">&#10008;</span> <span class="t-red t-bold">Planned 1 destructive operation(s)</span>
+  <span class="t-red t-bold">that require confirmation (PN-RTM-3030)</span>
+  <span class="t-dim">Why:</span> Use <span class="t-white">--plan</span> to preview destructive
+       operations, then re-run with
+       <span class="t-white">--accept-data-loss</span> to apply
+  <span class="t-dim">Fix:</span> Use <span class="t-white">prisma-next db update --plan</span>
+       to preview, then re-run with
+       <span class="t-white">--accept-data-loss</span> to apply</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 11: Scenario — Planning conflict -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="10">
+    <div class="split">
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <p class="label">Scenario: Irreconcilable Drift</p>
+
+          <h2>When the plan<br/>can't reconcile</h2>
+        </div>
+        <div class="story-context">
+          A more extreme case: someone changed the <strong>primary key</strong>
+          of the account table from <strong>id</strong> to <strong>email</strong>
+          directly in the database.
+          <br/><br/>
+          The contract still expects <strong>id</strong> as the PK.
+          This isn't just a column to drop &mdash; it's a structural conflict
+          the planner cannot resolve automatically.
+        </div>
+        <span class="step-badge red">PLANNING_FAILED</span>
+        <div style="padding: 14px 18px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px;">
+          <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.5;">
+            <span style="color: #f87171; font-weight: 500;">No silent corruption.</span>
+            The command halts before touching anything and tells you exactly what conflicts.
+          </p>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="terminal">
+          <div class="terminal-header">
+            <div class="terminal-dot r"></div>
+            <div class="terminal-dot y"></div>
+            <div class="terminal-dot g"></div>
+            <span class="terminal-title">prisma-next db update</span>
+          </div>
+          <div class="terminal-body"><span class="t-green">&#10004;</span> <span class="t-dim">Connecting to database... (437ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Reading contract marker (96ms)</span>
+<span class="t-green">&#10004;</span> <span class="t-dim">Introspecting database schema (799ms)</span>
+<span class="t-red">&#10008;</span> <span class="t-dim">Planning migration (failed)</span>
+<span class="t-red t-bold">&#10008;</span> <span class="t-red t-bold">Migration planning failed (PN-CLI-4020)</span>
+  <span class="t-dim">Why:</span> Table "account" has primary key mismatch:
+       expected columns <span class="t-green">[id]</span>, got <span class="t-red">[email]</span>
+  <span class="t-dim">Fix:</span> Use <span class="t-white">db schema-verify</span> to inspect conflicts,
+       or ensure the database is empty
+  <span class="t-dim">Conflicts (showing 1 of 1):</span>
+    <span class="t-dim">-</span> <span class="t-dim">[indexIncompatible]</span> Table "account"
+      has primary key mismatch:
+      expected columns <span class="t-green">[id]</span>, got <span class="t-red">[email]</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 10: JSON output for tooling -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="9">
+    <div class="split">
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <p class="label">Scenario: Machine-Readable Output</p>
+          <h2>Built for<br/>tooling and CI</h2>
+        </div>
+        <div class="story-context">
+          Append <strong>--json</strong> to get a structured envelope.
+          Plan metadata, operations with IDs and classes,
+          DDL statements, origin and destination hashes, timings &mdash;
+          everything a CI pipeline or AI agent needs.
+        </div>
+        <span class="step-badge blue">--plan --json</span>
+        <div style="padding: 14px 18px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px;">
+          <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.5;">
+            <span style="color: var(--accent); font-weight: 500;">Agent-friendly.</span>
+            Deterministic IDs like <code style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">column.project.slug</code>
+            make operations addressable. Hash anchoring makes plans verifiable.
+          </p>
+        </div>
+      </div>
+      <div class="terminal" style="font-size: 12.5px;">
+        <div class="terminal-header">
+          <div class="terminal-dot r"></div>
+          <div class="terminal-dot y"></div>
+          <div class="terminal-dot g"></div>
+          <span class="terminal-title">prisma-next db update --plan --json</span>
+        </div>
+        <div class="terminal-body">{
+  <span class="t-blue">"ok"</span>: <span class="t-green">true</span>,
+  <span class="t-blue">"mode"</span>: <span class="t-yellow">"plan"</span>,
+  <span class="t-blue">"plan"</span>: {
+    <span class="t-blue">"targetId"</span>: <span class="t-yellow">"postgres"</span>,
+    <span class="t-blue">"destination"</span>: {
+      <span class="t-blue">"storageHash"</span>: <span class="t-dim">"sha256:07269a..."</span>,
+      <span class="t-blue">"profileHash"</span>: <span class="t-dim">"sha256:213e9b..."</span>
+    },
+    <span class="t-blue">"operations"</span>: [
+      {
+        <span class="t-blue">"id"</span>: <span class="t-yellow">"column.project.slug"</span>,
+        <span class="t-blue">"label"</span>: <span class="t-yellow">"Add column slug to project"</span>,
+        <span class="t-blue">"operationClass"</span>: <span class="t-green">"additive"</span>
+      }
+    ],
+    <span class="t-blue">"sql"</span>: [
+      <span class="t-yellow">"ALTER TABLE \"public\".\"project\" ADD COLUMN \"slug\" character varying(128)"</span>
+    ]
+  },
+  <span class="t-blue">"origin"</span>: {
+    <span class="t-blue">"storageHash"</span>: <span class="t-dim">"sha256:de90d4..."</span>,
+    <span class="t-blue">"profileHash"</span>: <span class="t-dim">"sha256:213e9b..."</span>
+  },
+  <span class="t-blue">"summary"</span>: <span class="t-yellow">"Planned 1 operation(s)"</span>,
+  <span class="t-blue">"timings"</span>: { <span class="t-blue">"total"</span>: <span class="t-white">1285</span> }
+}</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 12: npm publish -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="11">
+    <div class="glow glow-accent" style="top: -60px; left: 400px; opacity: 0.08;"></div>
+    <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 28px; text-align: center;">
+        <p class="label" style="letter-spacing: 0.2em;">Status Update</p>
+        <h2 style="font-size: 52px;">Publishing to npm<br/><span style="color: var(--accent);">works now</span></h2>
+        <p style="font-size: 18px; color: var(--text-secondary); font-weight: 300; max-width: 480px; line-height: 1.6;">
+          The full prisma-next package set can be published
+          and installed from the npm registry.
+        </p>
+        <div style="margin-top: 8px; padding: 10px 24px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border);">
+          <span style="font-family: var(--font-mono); font-size: 15px; color: var(--text-secondary);">$</span>
+          <span style="font-family: var(--font-mono); font-size: 15px; color: var(--text); margin-left: 8px;">pnpm add prisma-next @prisma-next/postgres</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 13: Takeaways -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="12">
+    <div class="glow glow-accent" style="bottom: -100px; left: 100px;"></div>
+    <div class="vstack" style="gap: 40px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <p class="label">Takeaways</p>
+        <h2>Why this matters</h2>
+      </div>
+      <div class="takeaway-list">
+        <div class="takeaway-item">
+          <span class="takeaway-num">01</span>
+          <div>
+            <p class="takeaway-title">Referential actions in the contract</p>
+            <p class="takeaway-desc">ON DELETE and ON UPDATE behavior is declared alongside your schema. The database enforces it, validated at emit time.</p>
+          </div>
+        </div>
+        <div class="takeaway-item">
+          <span class="takeaway-num">02</span>
+          <div>
+            <p class="takeaway-title">Preview every migration before applying</p>
+            <p class="takeaway-desc">Plan mode shows operations, classes, DDL, and destination hash. No changes touch the database until you say so.</p>
+          </div>
+        </div>
+        <div class="takeaway-item">
+          <span class="takeaway-num">03</span>
+          <div>
+            <p class="takeaway-title">Destructive changes are gated</p>
+            <p class="takeaway-desc">Drift is detected and classified. Drops require --accept-data-loss. Irreconcilable conflicts halt with structured errors.</p>
+          </div>
+        </div>
+        <div class="takeaway-item">
+          <span class="takeaway-num">04</span>
+          <div>
+            <p class="takeaway-title">Machine-readable by default</p>
+            <p class="takeaway-desc">JSON output with deterministic operation IDs, hash anchoring, and timings. Built for CI pipelines and AI agents.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="progress" id="progress"></div>
+<div class="counter" id="counter"></div>
+<div class="nav-hint">Arrow keys to navigate</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('counter');
+  const total = slides.length;
+  let current = 0;
+
+  function update() {
+    slides.forEach((s, i) => {
+      s.classList.remove('active', 'prev');
+      if (i === current) s.classList.add('active');
+      else if (i < current) s.classList.add('prev');
+    });
+    progress.style.width = `${((current + 1) / total) * 100}%`;
+    counter.textContent = `${current + 1} / ${total}`;
+  }
+
+  function next() { if (current < total - 1) { current++; update(); } }
+  function prev() { if (current > 0) { current--; update(); } }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); prev(); }
+    if (e.key === 'Home') { e.preventDefault(); current = 0; update(); }
+    if (e.key === 'End') { e.preventDefault(); current = total - 1; update(); }
+  });
+
+  document.addEventListener('click', (e) => {
+    // Click navigation disabled — use arrow keys only
+  });
+
+  update();
+</script>
+
+</body>
+</html>

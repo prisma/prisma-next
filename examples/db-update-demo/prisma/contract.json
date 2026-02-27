@@ -1,0 +1,326 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "storageHash": "sha256:07269adbfe7f338433a3f99cb80c27ae1a60352c080ce395003f14e7afda0086",
+  "executionHash": "sha256:281885b1086af4f83cb5a5b80868563707f3d4d2826fc04930bc9bc6575fa394",
+  "profileHash": "sha256:213e9b660e9ab4c8929c891c2c428437b100c39f01bb17c1705d2f7b89588dff",
+  "models": {
+    "Account": {
+      "fields": {
+        "createdAt": {
+          "column": "createdAt"
+        },
+        "email": {
+          "column": "email"
+        },
+        "id": {
+          "column": "id"
+        },
+        "profile": {
+          "column": "profile"
+        },
+        "status": {
+          "column": "status"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "account"
+      }
+    },
+    "Project": {
+      "fields": {
+        "accountId": {
+          "column": "accountId"
+        },
+        "createdAt": {
+          "column": "createdAt"
+        },
+        "id": {
+          "column": "id"
+        },
+        "metadata": {
+          "column": "metadata"
+        },
+        "name": {
+          "column": "name"
+        },
+        "slug": {
+          "column": "slug"
+        },
+        "visibility": {
+          "column": "visibility"
+        }
+      },
+      "relations": {},
+      "storage": {
+        "table": "project"
+      }
+    }
+  },
+  "storage": {
+    "tables": {
+      "account": {
+        "columns": {
+          "createdAt": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz"
+          },
+          "email": {
+            "codecId": "sql/varchar@1",
+            "nativeType": "character varying",
+            "typeParams": {
+              "length": 320
+            }
+          },
+          "id": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "profile": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": true,
+            "typeParams": {
+              "schemaJson": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "properties": {
+                  "avatarUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "preferences": {
+                    "properties": {
+                      "emailUpdates": {
+                        "type": "boolean"
+                      },
+                      "theme": {
+                        "enum": [
+                          "dark",
+                          "light"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "emailUpdates",
+                      "theme"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "avatarUrl",
+                  "displayName",
+                  "preferences"
+                ],
+                "type": "object"
+              },
+              "type": "{ avatarUrl: string | null, displayName: string, preferences: { emailUpdates: boolean, theme: \"dark\" | \"light\" } }"
+            }
+          },
+          "status": {
+            "codecId": "pg/enum@1",
+            "nativeType": "account_status",
+            "typeRef": "AccountStatus"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": [
+          {
+            "columns": [
+              "email"
+            ]
+          }
+        ]
+      },
+      "project": {
+        "columns": {
+          "accountId": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "createdAt": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz"
+          },
+          "id": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "metadata": {
+            "codecId": "pg/jsonb@1",
+            "nativeType": "jsonb",
+            "nullable": true,
+            "typeParams": {
+              "schemaJson": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "properties": {
+                  "repo": {
+                    "properties": {
+                      "provider": {
+                        "enum": [
+                          "bitbucket",
+                          "github",
+                          "gitlab"
+                        ]
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "repo",
+                  "tags"
+                ],
+                "type": "object"
+              },
+              "type": "{ repo: { provider: \"bitbucket\" | \"github\" | \"gitlab\", url: string }, tags: string[] }"
+            }
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text"
+          },
+          "slug": {
+            "codecId": "sql/varchar@1",
+            "nativeType": "character varying",
+            "nullable": true,
+            "typeParams": {
+              "length": 128
+            }
+          },
+          "visibility": {
+            "codecId": "pg/enum@1",
+            "nativeType": "project_visibility",
+            "typeRef": "ProjectVisibility"
+          }
+        },
+        "foreignKeys": [
+          {
+            "columns": [
+              "accountId"
+            ],
+            "constraint": true,
+            "index": true,
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "account"
+            }
+          }
+        ],
+        "indexes": [
+          {
+            "columns": [
+              "accountId"
+            ]
+          }
+        ],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      }
+    },
+    "types": {
+      "AccountStatus": {
+        "codecId": "pg/enum@1",
+        "nativeType": "account_status",
+        "typeParams": {
+          "values": [
+            "ACTIVE",
+            "INVITED",
+            "SUSPENDED"
+          ]
+        }
+      },
+      "ProjectVisibility": {
+        "codecId": "pg/enum@1",
+        "nativeType": "project_visibility",
+        "typeParams": {
+          "values": [
+            "PRIVATE",
+            "TEAM",
+            "PUBLIC"
+          ]
+        }
+      }
+    }
+  },
+  "execution": {
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "ulid",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "account"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "ulid",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "project"
+          }
+        }
+      ]
+    }
+  },
+  "capabilities": {},
+  "extensionPacks": {},
+  "meta": {},
+  "sources": {},
+  "relations": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}
