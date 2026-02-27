@@ -23,7 +23,7 @@ import { db } from '../src/prisma/db';
 
 async function main() {
   const { databaseUrl } = loadAppConfig();
-  const runtime = db.connect({ url: databaseUrl });
+  const runtime = await db.connect({ url: databaseUrl });
 
   try {
     const tables = db.schema.tables;

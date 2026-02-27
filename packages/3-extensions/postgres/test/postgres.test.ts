@@ -127,6 +127,7 @@ describe('postgres', () => {
       extensionPacks: [],
     });
     mocks.instantiateExecutionStack.mockReturnValue({ adapter: {} });
+    mocks.driverConnect.mockResolvedValue(undefined);
     mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.validateContract.mockReturnValue(contract);
@@ -205,12 +206,12 @@ describe('postgres', () => {
     expect(mocks.poolCtor).not.toHaveBeenCalled();
   });
 
-  it('connects with explicit binding after construction', () => {
+  it('connects with explicit binding after construction', async () => {
     const db = postgres({
       contract,
     } as Parameters<typeof postgres<typeof contract>>[0]);
 
-    db.connect({
+    await db.connect({
       url: 'postgres://localhost:5432/db',
     });
 
@@ -222,22 +223,22 @@ describe('postgres', () => {
     });
   });
 
-  it('throws when connect is called without configured binding', () => {
+  it('throws when connect is called without configured binding', async () => {
     const db = postgres({
       contract,
     } as Parameters<typeof postgres<typeof contract>>[0]);
 
-    expect(() => db.connect()).toThrow('Postgres binding not configured');
+    await expect(db.connect()).rejects.toThrow('Postgres binding not configured');
   });
 
-  it('throws when attempting to connect twice', () => {
+  it('throws when attempting to connect twice', async () => {
     const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
     });
 
-    db.connect();
-    expect(() => db.connect({ url: 'postgres://localhost:5432/db2' })).toThrow(
+    await db.connect();
+    await expect(db.connect({ url: 'postgres://localhost:5432/db2' })).rejects.toThrow(
       'Postgres client already connected',
     );
 
@@ -245,14 +246,14 @@ describe('postgres', () => {
     expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
   });
 
-  it('throws when attempting to connect twice without arguments', () => {
+  it('throws when attempting to connect twice without arguments', async () => {
     const db = postgres({
       contract,
       url: 'postgres://localhost:5432/db',
     });
 
-    db.connect();
-    expect(() => db.connect()).toThrow('Postgres client already connected');
+    await db.connect();
+    await expect(db.connect()).rejects.toThrow('Postgres client already connected');
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
     expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
   });

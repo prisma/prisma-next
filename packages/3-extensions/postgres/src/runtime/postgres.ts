@@ -72,7 +72,7 @@ export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
   readonly orm: OrmClient<TContract>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
-  connect(bindingInput?: PostgresBindingInput): Runtime;
+  connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
   runtime(): Runtime;
 }
 
@@ -173,6 +173,22 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
+  let connectPromise: Promise<void> | undefined;
+  const connectDriver = async (resolvedBinding: PostgresBinding): Promise<void> => {
+    if (driverConnected) return;
+    if (!runtimeDriver) throw new Error('Postgres runtime driver missing');
+    if (connectPromise) return connectPromise;
+    connectPromise = runtimeDriver
+      .connect(toRuntimeBinding(resolvedBinding, options))
+      .then(() => {
+        driverConnected = true;
+      })
+      .catch((err) => {
+        connectPromise = undefined;
+        throw err;
+      });
+    return connectPromise;
+  };
   const getRuntime = (): Runtime => {
     if (runtimeInstance) {
       return runtimeInstance;
@@ -189,8 +205,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     });
     runtimeDriver = driver;
     if (binding !== undefined) {
-      void driver.connect(toRuntimeBinding(binding, options));
-      driverConnected = true;
+      void connectDriver(binding);
     }
 
     runtimeInstance = createRuntime({
@@ -226,7 +241,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     orm,
     context,
     stack,
-    connect(bindingInput) {
+    async connect(bindingInput) {
       if (driverConnected) {
         throw new Error('Postgres client already connected');
       }
@@ -246,13 +261,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
         return runtime;
       }
 
-      const driver = runtimeDriver;
-      if (!driver) {
-        throw new Error('Postgres runtime driver missing');
-      }
-
-      void driver.connect(toRuntimeBinding(binding, options));
-      driverConnected = true;
+      await connectDriver(binding);
       return runtime;
     },
     runtime() {
