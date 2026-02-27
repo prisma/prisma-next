@@ -11,6 +11,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { ok } from '@prisma-next/utils/result';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   executeCommand,
@@ -438,9 +439,8 @@ withTempDir(({ createTempDir }) => {
             // driver is missing - this is what we're testing
             extensionPacks: [],
             contract: {
-              source: contract,
+              source: async () => ok(contract),
               output: 'output/contract.json',
-              types: 'output/contract.d.ts',
             },
             db: {
               connection: connectionString,

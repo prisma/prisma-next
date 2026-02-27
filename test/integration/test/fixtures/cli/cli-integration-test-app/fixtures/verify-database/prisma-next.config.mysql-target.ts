@@ -3,6 +3,7 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
+import { ok } from '@prisma-next/utils/result';
 import { contract } from './contract';
 
 // This config uses postgres target but we'll manually modify the emitted contract
@@ -14,9 +15,8 @@ export default defineConfig({
   driver: postgresDriver,
   extensions: [],
   contract: {
-    source: contract,
+    source: async () => ok(contract),
     output: 'output/contract.json',
-    types: 'output/contract.d.ts',
   },
   db: {
     connection: '{{DB_URL}}',

@@ -4,6 +4,7 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
+import { ok } from '@prisma-next/utils/result';
 import { contract } from './prisma/contract';
 
 export default defineConfig({
@@ -13,7 +14,7 @@ export default defineConfig({
   driver: postgresDriver,
   extensionPacks: [],
   contract: {
-    source: contract,
+    source: async () => ok(contract),
     output: 'src/prisma-next/contract.json',
   },
   db: {
