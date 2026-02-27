@@ -74,19 +74,19 @@ type ExecutionMethodName =
   | 'transaction'
   | 'connection'
   | 'destroy';
-type BuildOnlyify<T> = T extends (...args: infer Args) => infer Result
-  ? (...args: Args) => BuildOnlyify<Result>
+type StripKyselyExecutionMethods<T> = T extends (...args: infer Args) => infer Result
+  ? (...args: Args) => StripKyselyExecutionMethods<Result>
   : T extends object
     ? {
         [K in keyof T as K extends string
           ? K extends ExecutionMethodName
             ? never
             : K
-          : K]: BuildOnlyify<T[K]>;
+          : K]: StripKyselyExecutionMethods<T[K]>;
       }
     : T;
 
-export type BuildOnlyKysely<DB> = BuildOnlyify<Kysely<DB>> & {
+export type BuildOnlyKysely<DB> = StripKyselyExecutionMethods<Kysely<DB>> & {
   build<Row>(query: {
     compile(): unknown;
   }): import('@prisma-next/sql-relational-core/plan').SqlQueryPlan<Row>;

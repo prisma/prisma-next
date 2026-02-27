@@ -1,4 +1,5 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
+import { REDACTED_SQL } from '@prisma-next/sql-kysely-lane';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -61,7 +62,7 @@ vi.mock('kysely', () => ({
   PostgresIntrospector: class {},
   PostgresQueryCompiler: class {
     compileQuery() {
-      return { query: { kind: 'SelectQueryNode' }, sql: 'select 1', parameters: [] };
+      return { query: { kind: 'SelectQueryNode' }, sql: 'select 1', parameters: ['p1', 2] };
     }
   },
 }));
@@ -170,6 +171,26 @@ describe('postgres', () => {
     await expect(driver.acquireConnection()).rejects.toThrow(
       /Kysely execution is disabled for db\.kysely/,
     );
+  });
+
+  it('redacts compiled SQL and preserves compiled parameters on build-only kysely', () => {
+    postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const config = mocks.kyselyCtor.mock.calls[0]?.[0] as {
+      dialect: {
+        createQueryCompiler(): {
+          compileQuery(node: unknown): { sql: string; parameters: unknown[] };
+        };
+      };
+    };
+    const compiler = config.dialect.createQueryCompiler();
+    const compiled = compiler.compileQuery({ kind: 'SelectQueryNode' });
+
+    expect(compiled.sql).toBe(REDACTED_SQL);
+    expect(compiled.parameters).toEqual(['p1', 2]);
   });
 
   it('memoizes runtime instance', () => {
