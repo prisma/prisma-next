@@ -174,6 +174,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
   let driverConnected = false;
   let connectPromise: Promise<void> | undefined;
+  let backgroundConnectError: unknown;
   const connectDriver = async (resolvedBinding: PostgresBinding): Promise<void> => {
     if (driverConnected) return;
     if (!runtimeDriver) throw new Error('Postgres runtime driver missing');
@@ -185,6 +186,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
         driverConnected = true;
       })
       .catch(async (err) => {
+        backgroundConnectError = err;
         connectPromise = undefined;
         if (resolvedBinding.kind === 'url' && runtimeBinding.kind === 'pgPool') {
           await runtimeBinding.pool.end().catch(() => undefined);
@@ -194,6 +196,10 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     return connectPromise;
   };
   const getRuntime = (): Runtime => {
+    if (backgroundConnectError !== undefined) {
+      throw backgroundConnectError;
+    }
+
     if (runtimeInstance) {
       return runtimeInstance;
     }
@@ -209,7 +215,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     });
     runtimeDriver = driver;
     if (binding !== undefined) {
-      void connectDriver(binding);
+      void connectDriver(binding).catch(() => undefined);
     }
 
     runtimeInstance = createRuntime({

@@ -280,6 +280,21 @@ describe('postgres', () => {
     await first;
   });
 
+  it('captures background connect errors from runtime()', async () => {
+    const connectError = new Error('connect failed');
+    mocks.driverConnect.mockRejectedValueOnce(connectError);
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expect(() => db.runtime()).not.toThrow();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(() => db.runtime()).toThrow('connect failed');
+  });
+
   it('validates contractJson input', () => {
     const contractJson = { models: {} };
 
