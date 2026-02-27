@@ -101,6 +101,10 @@
       "types": "./dist/commands/migration-verify.d.mts",
       "import": "./dist/commands/migration-verify.mjs"
     },
+    "./commands/migration-apply": {
+      "types": "./dist/commands/migration-apply.d.mts",
+      "import": "./dist/commands/migration-apply.mjs"
+    },
     "./config-loader": {
       "types": "./dist/config-loader.d.mts",
       "import": "./dist/config-loader.mjs"

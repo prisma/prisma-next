@@ -858,6 +858,34 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>]
 4. Diffs the leaf contract against the new contract using the target's migration planner (same planner as `db init`)
 5. Writes a new migration package (`migration.json` + `ops.json`) and attests the `edgeId`
 
+### `prisma-next migration apply`
+
+Apply pending migrations to the database. Reads on-disk migration packages, determines which are pending by comparing the database marker against the migration DAG, and executes each pending migration sequentially in its own transaction.
+
+```bash
+prisma-next migration apply [--db <url>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
+```
+
+**Options:**
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection`)
+- `--config <path>`: Path to `prisma-next.config.ts`
+- `--json`: Output as JSON object
+- `-q, --quiet`: Quiet mode (errors only)
+- `-v, --verbose`: Verbose output (debug info, timings)
+
+**What it does:**
+1. Reads attested migration packages from `config.migrations.dir`
+2. Reconstructs the migration DAG (skips drafts with `edgeId: null`)
+3. Connects to the database and reads the current marker
+4. Finds the path from the marker hash to the DAG leaf
+5. Executes each pending migration in order using the target's `MigrationRunner`
+6. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
+7. After each migration, the runner verifies the schema and updates the marker/ledger
+
+**Config requirements:** Requires `driver`, `db.connection` (or `--db`), and `migrations.dir` in the config.
+
+**Resume semantics:** If a migration fails, previously applied migrations are preserved. Re-running `migration apply` resumes from the last successful migration.
+
 ### `prisma-next migration verify`
 
 Verify a migration package's integrity by recomputing the content-addressed `edgeId`.
@@ -1218,6 +1246,10 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/commands/db-sign`**: Exports `createDbSignCommand`
 - **`@prisma-next/cli/commands/db-verify`**: Exports `createDbVerifyCommand`
 - **`@prisma-next/cli/commands/contract-emit`**: Exports `createContractEmitCommand`
+- **`@prisma-next/cli/commands/migration-plan`**: Exports `createMigrationPlanCommand`
+- **`@prisma-next/cli/commands/migration-apply`**: Exports `createMigrationApplyCommand`
+- **`@prisma-next/cli/commands/migration-new`**: Exports `createMigrationNewCommand`
+- **`@prisma-next/cli/commands/migration-verify`**: Exports `createMigrationVerifyCommand`
 - **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function
 
 **Important**: `loadContractFromTs` is exported from the main package (`@prisma-next/cli`). See `.cursor/rules/cli-package-exports.mdc` for import patterns.

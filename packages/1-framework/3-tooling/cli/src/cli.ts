@@ -6,6 +6,7 @@ import { createDbSchemaVerifyCommand } from './commands/db-schema-verify';
 import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
+import { createMigrationApplyCommand } from './commands/migration-apply';
 import { createMigrationNewCommand } from './commands/migration-new';
 import { createMigrationPlanCommand } from './commands/migration-plan';
 import { createMigrationVerifyCommand } from './commands/migration-verify';
@@ -203,7 +204,7 @@ const migrationCommand = new Command('migration');
 setCommandDescriptions(
   migrationCommand,
   'On-disk migration management commands',
-  'Plan, verify, and scaffold on-disk migration packages. Migrations are\n' +
+  'Plan, apply, verify, and scaffold on-disk migration packages. Migrations are\n' +
     'contract-to-contract edges stored as versioned directories under migrations/.',
 );
 migrationCommand.configureHelp({
@@ -222,6 +223,9 @@ migrationCommand.addCommand(migrationVerifyCommand);
 
 const migrationNewCommand = createMigrationNewCommand();
 migrationCommand.addCommand(migrationNewCommand);
+
+const migrationApplyCommand = createMigrationApplyCommand();
+migrationCommand.addCommand(migrationApplyCommand);
 
 program.addCommand(migrationCommand);
 
