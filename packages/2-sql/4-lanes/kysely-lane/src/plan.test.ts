@@ -254,4 +254,13 @@ describe('buildKyselyPlan', () => {
     const plan = buildKyselyPlan(contract, query);
     expect(plan.params).toEqual(['u1']);
   });
+
+  it('fails when compiled parameters are fewer than descriptors', () => {
+    const query = {
+      ...createSelectCompiledQuery(),
+      parameters: [],
+    } as CompiledQuery<{ id: string; email: string }>;
+
+    expect(() => buildKyselyPlan(contract, query)).toThrow(/Kysely plan parameter mismatch/);
+  });
 });
