@@ -258,6 +258,28 @@ describe('postgres', () => {
     expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects concurrent connect calls', async () => {
+    let resolveFirst!: () => void;
+    mocks.driverConnect.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const first = db.connect();
+    await expect(db.connect({ url: 'postgres://localhost:5432/db2' })).rejects.toThrow(
+      'Postgres client already connected',
+    );
+    resolveFirst();
+    await first;
+  });
+
   it('validates contractJson input', () => {
     const contractJson = { models: {} };
 

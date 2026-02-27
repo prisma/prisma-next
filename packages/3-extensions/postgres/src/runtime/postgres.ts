@@ -178,13 +178,17 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     if (driverConnected) return;
     if (!runtimeDriver) throw new Error('Postgres runtime driver missing');
     if (connectPromise) return connectPromise;
+    const runtimeBinding = toRuntimeBinding(resolvedBinding, options);
     connectPromise = runtimeDriver
-      .connect(toRuntimeBinding(resolvedBinding, options))
+      .connect(runtimeBinding)
       .then(() => {
         driverConnected = true;
       })
-      .catch((err) => {
+      .catch(async (err) => {
         connectPromise = undefined;
+        if (resolvedBinding.kind === 'url' && runtimeBinding.kind === 'pgPool') {
+          await runtimeBinding.pool.end().catch(() => undefined);
+        }
         throw err;
       });
     return connectPromise;
@@ -242,7 +246,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     context,
     stack,
     async connect(bindingInput) {
-      if (driverConnected) {
+      if (driverConnected || connectPromise) {
         throw new Error('Postgres client already connected');
       }
 
