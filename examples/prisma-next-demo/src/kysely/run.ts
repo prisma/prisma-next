@@ -1,10 +1,16 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import type { CompiledQuery } from 'kysely';
+import type { CompiledQuery, Kysely } from 'kysely';
 import { db } from '../prisma/db';
 
 type BuildableKyselyQuery<Row> = {
-  compile(): CompiledQuery<Row>;
+  compile(): CompiledQuery<Row> | unknown;
 };
+
+type DemoDb = Record<string, Record<string, unknown>>;
+
+export function getDemoKysely(): Kysely<DemoDb> {
+  return db.kysely as unknown as Kysely<DemoDb>;
+}
 
 export async function executeKyselyQuery<Row>(
   runtime: Runtime,

@@ -374,7 +374,7 @@ describe('Collection', () => {
             ]),
         } as never),
       ).rejects.toThrow(/did not return a row/);
-    });
+    }, 500);
 
     it('update() returns null when nested mutation target is missing', async () => {
       const { collection, runtime } = createReturningCollectionFor('User');

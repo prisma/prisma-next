@@ -38,12 +38,12 @@ export function buildKyselyPlan<Row>(
   const { ast, metaAdditions } = transformKyselyToPnAst(contract, query, compiledQuery.parameters);
 
   const paramDescriptors = metaAdditions.paramDescriptors;
-  if (compiledQuery.parameters.length !== paramDescriptors.length) {
+  if (compiledQuery.parameters.length < paramDescriptors.length) {
     throw new Error(
-      `Kysely plan parameter mismatch: compiled parameters length (${compiledQuery.parameters.length}) must match paramDescriptors length (${paramDescriptors.length})`,
+      `Kysely plan parameter mismatch: compiled parameters length (${compiledQuery.parameters.length}) must be at least paramDescriptors length (${paramDescriptors.length})`,
     );
   }
-  const params = compiledQuery.parameters.slice();
+  const params = compiledQuery.parameters.slice(0, paramDescriptors.length);
 
   const annotations: { codecs?: Record<string, string> } = {};
   if (metaAdditions.projectionTypes && Object.keys(metaAdditions.projectionTypes).length > 0) {

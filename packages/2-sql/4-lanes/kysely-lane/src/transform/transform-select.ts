@@ -9,7 +9,6 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import {
-  type JoinNode,
   ReferenceNode,
   SelectAllNode,
   type SelectionNode,
@@ -21,7 +20,9 @@ import {
   getColumnName,
   isSelectAllReference,
   unwrapAliasNode,
+  unwrapOnNode,
   unwrapSelectionNode,
+  unwrapWhereNode,
 } from './kysely-ast-types';
 import { addParamDescriptor, nextParamIndex, type TransformContext } from './transform-context';
 import { transformJoinOn, transformOrderByItem, transformWhereExpr } from './transform-expr';
@@ -46,6 +47,12 @@ function resolveSelectAllTable(
   fromTable: string,
 ): string {
   if (SelectAllNode.is(node)) {
+    const explicitSelectAllRef =
+      (node as { table?: unknown; reference?: unknown }).table ??
+      (node as { table?: unknown; reference?: unknown }).reference;
+    if (explicitSelectAllRef) {
+      return resolveTable(explicitSelectAllRef, ctx, fromTable);
+    }
     if (ctx.multiTableScope) {
       throw new KyselyTransformError(
         'Ambiguous selectAll in multi-table scope; qualify with table (e.g. db.selectFrom(u).innerJoin(p).selectAll("user"))',
@@ -55,7 +62,9 @@ function resolveSelectAllTable(
     return fromTable;
   }
 
-  if (!node.table) {
+  const explicitTableNode =
+    node.table ?? (node as { column?: { table?: unknown } }).column?.table ?? undefined;
+  if (!explicitTableNode) {
     if (ctx.multiTableScope) {
       throw new KyselyTransformError(
         'Ambiguous selectAll in multi-table scope; qualify with table (e.g. db.selectFrom(u).innerJoin(p).selectAll("user"))',
@@ -65,7 +74,7 @@ function resolveSelectAllTable(
     return fromTable;
   }
 
-  return resolveTable(node.table, ctx, fromTable);
+  return resolveTable(explicitTableNode, ctx, fromTable);
 }
 
 export function transformSelections(
@@ -108,21 +117,32 @@ export function transformSelections(
   return project;
 }
 
-function mapJoinType(joinType: JoinNode['joinType']): JoinAst['joinType'] {
+function mapJoinType(joinType: string): JoinAst['joinType'] {
   switch (joinType) {
+    case 'InnerJoinNode':
     case 'InnerJoin':
+    case 'CrossJoinNode':
     case 'CrossJoin':
+    case 'LateralInnerJoinNode':
     case 'LateralInnerJoin':
+    case 'LateralCrossJoinNode':
     case 'LateralCrossJoin':
+    case 'UsingNode':
     case 'Using':
+    case 'CrossApplyNode':
     case 'CrossApply':
       return 'inner';
+    case 'LeftJoinNode':
     case 'LeftJoin':
+    case 'LateralLeftJoinNode':
     case 'LateralLeftJoin':
+    case 'OuterApplyNode':
     case 'OuterApply':
       return 'left';
+    case 'RightJoinNode':
     case 'RightJoin':
       return 'right';
+    case 'FullJoinNode':
     case 'FullJoin':
       return 'full';
     default:
@@ -157,7 +177,7 @@ export function transformSelect(node: SelectQueryNode, ctx: TransformContext): S
 
   const project = transformSelections(node.selections, ctx, fromTable);
 
-  const where = transformWhereExpr(node.where?.where, ctx, fromTable);
+  const where = transformWhereExpr(unwrapWhereNode(node.where), ctx, fromTable);
 
   const orderBy =
     node.orderBy && node.orderBy.items.length > 0
@@ -180,10 +200,10 @@ export function transformSelect(node: SelectQueryNode, ctx: TransformContext): S
 
   const joins: JoinAst[] = [];
   for (const { joinNode, tableRef } of resolvedJoins) {
-    const onExpr = transformJoinOn(joinNode.on?.on, ctx, fromTable, tableRef.name);
+    const onExpr = transformJoinOn(unwrapOnNode(joinNode.on), ctx, fromTable, tableRef.name);
     joins.push({
       kind: 'join',
-      joinType: mapJoinType(joinNode.joinType),
+      joinType: mapJoinType(joinNode.joinType as string),
       table: tableRef,
       on: onExpr,
     });

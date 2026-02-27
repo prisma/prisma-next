@@ -1,9 +1,9 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { db } from '../prisma/db';
-import { executeKyselyTakeFirstOrThrow } from './run';
+import { executeKyselyTakeFirstOrThrow, getDemoKysely } from './run';
 
 export async function getUserById(userId: string, runtime: Runtime) {
-  const query = db.kysely
+  const kysely = getDemoKysely();
+  const query = kysely
     .selectFrom('user')
     .select(['id', 'email', 'createdAt'])
     .where('id', '=', userId)

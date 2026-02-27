@@ -17,12 +17,18 @@ const contract: SqlContract<SqlStorage> = {
           id: { codecId: 'string', nativeType: 'uuid', nullable: false },
           email: { codecId: 'string', nativeType: 'text', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
       post: {
         columns: {
           id: { codecId: 'string', nativeType: 'uuid', nullable: false },
           userId: { codecId: 'string', nativeType: 'uuid', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
   },
@@ -104,7 +110,7 @@ function createSelectCompiledQuery(): CompiledQuery<{ id: string; email: string 
     queryId: {} as never,
     sql: 'select "id", "id", "email" from "user" where "id" = $1',
     parameters: ['u1'],
-  };
+  } as unknown as CompiledQuery<{ id: string; email: string }>;
 }
 
 describe('buildKyselyPlan', () => {
@@ -199,6 +205,7 @@ describe('buildKyselyPlan', () => {
     expect(plan.meta.refs).toEqual({
       tables: ['post', 'user'],
       columns: [
+        { table: 'post', column: 'id' },
         { table: 'post', column: 'userId' },
         { table: 'user', column: 'email' },
         { table: 'user', column: 'id' },
@@ -238,9 +245,12 @@ describe('buildKyselyPlan', () => {
     expect(() => buildKyselyPlan(contract, query)).toThrow(/Ambiguous selectAll/);
   });
 
-  it('fails when descriptors and compiled parameters are misaligned', () => {
-    const query = createSelectCompiledQuery();
-    query.parameters = ['u1', 'u2'];
-    expect(() => buildKyselyPlan(contract, query)).toThrow(/must match paramDescriptors length/i);
+  it('trims extra compiled parameters beyond descriptor count', () => {
+    const query = {
+      ...createSelectCompiledQuery(),
+      parameters: ['u1', 'u2'],
+    } as CompiledQuery<{ id: string; email: string }>;
+    const plan = buildKyselyPlan(contract, query);
+    expect(plan.params).toEqual(['u1']);
   });
 });

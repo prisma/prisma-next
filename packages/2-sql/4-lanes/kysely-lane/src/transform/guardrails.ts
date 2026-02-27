@@ -17,7 +17,14 @@ import {
   WhereNode,
 } from 'kysely';
 import { KYSELY_TRANSFORM_ERROR_CODES, KyselyTransformError } from './errors';
-import { isSelectAllReference, unwrapAliasNode, unwrapSelectionNode } from './kysely-ast-types';
+import {
+  getTableName,
+  isSelectAllReference,
+  unwrapAliasNode,
+  unwrapOnNode,
+  unwrapSelectionNode,
+  unwrapWhereNode,
+} from './kysely-ast-types';
 
 function isMultiTableSelect(node: SelectQueryNode): boolean {
   const hasJoins = (node.joins?.length ?? 0) > 0;
@@ -38,7 +45,7 @@ function checkUnqualifiedColumnRef(node: OperationNode, multiTable: boolean, pat
     return;
   }
 
-  if (!node.table) {
+  if (!getTableName(node)) {
     throw new KyselyTransformError(
       'Unqualified column reference in multi-table scope; use table.column (e.g. user.id)',
       KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
@@ -75,12 +82,12 @@ function walkForColumnRefs(node: unknown, multiTable: boolean, path: string): vo
   }
 
   if (WhereNode.is(operation)) {
-    walkForColumnRefs(operation.where, multiTable, `${path}.where`);
+    walkForColumnRefs(unwrapWhereNode(operation), multiTable, `${path}.where`);
     return;
   }
 
   if (OnNode.is(operation)) {
-    walkForColumnRefs(operation.on, multiTable, `${path}.on`);
+    walkForColumnRefs(unwrapOnNode(operation), multiTable, `${path}.on`);
     return;
   }
 
@@ -90,12 +97,21 @@ function walkForColumnRefs(node: unknown, multiTable: boolean, path: string): vo
   }
 
   if (BinaryOperationNode.is(operation)) {
-    walkForColumnRefs(operation.leftOperand, multiTable, `${path}.leftOperand`);
-    walkForColumnRefs(operation.rightOperand, multiTable, `${path}.rightOperand`);
+    const leftOperand = operation.leftOperand ?? (operation as { left?: OperationNode }).left;
+    const rightOperand = operation.rightOperand ?? (operation as { right?: OperationNode }).right;
+    walkForColumnRefs(leftOperand, multiTable, `${path}.leftOperand`);
+    walkForColumnRefs(rightOperand, multiTable, `${path}.rightOperand`);
     return;
   }
 
   if (AndNode.is(operation) || OrNode.is(operation)) {
+    const exprs = (operation as { exprs?: unknown[] }).exprs;
+    if (exprs && exprs.length > 0) {
+      for (let index = 0; index < exprs.length; index++) {
+        walkForColumnRefs(exprs[index], multiTable, `${path}.exprs[${index}]`);
+      }
+      return;
+    }
     walkForColumnRefs(operation.left, multiTable, `${path}.left`);
     walkForColumnRefs(operation.right, multiTable, `${path}.right`);
     return;
@@ -133,13 +149,19 @@ function checkSelectAllAmbiguity(
     const { node: selectionNode } = unwrapAliasNode(unwrappedSelection);
 
     if (SelectAllNode.is(selectionNode)) {
+      const explicitSelectAllRef =
+        (selectionNode as { table?: unknown; reference?: unknown }).table ??
+        (selectionNode as { table?: unknown; reference?: unknown }).reference;
+      if (explicitSelectAllRef) {
+        continue;
+      }
       throw new KyselyTransformError(
         "Ambiguous selectAll in multi-table scope; qualify with table (e.g. db.selectFrom(u).innerJoin(p).selectAll('user'))",
         KYSELY_TRANSFORM_ERROR_CODES.AMBIGUOUS_SELECT_ALL,
       );
     }
 
-    if (isSelectAllReference(selectionNode) && !selectionNode.table) {
+    if (isSelectAllReference(selectionNode) && !getTableName(selectionNode)) {
       throw new KyselyTransformError(
         "Ambiguous selectAll in multi-table scope; qualify with table (e.g. db.selectFrom(u).innerJoin(p).selectAll('user'))",
         KYSELY_TRANSFORM_ERROR_CODES.AMBIGUOUS_SELECT_ALL,
@@ -162,12 +184,12 @@ export function runGuardrails(_contract: SqlContract<SqlStorage>, query: unknown
   const multiTable = isMultiTableSelect(selectQuery);
 
   walkForColumnRefs(selectQuery.selections, multiTable, 'selections');
-  walkForColumnRefs(selectQuery.where?.where, multiTable, 'where.where');
+  walkForColumnRefs(unwrapWhereNode(selectQuery.where), multiTable, 'where.where');
   walkForColumnRefs(selectQuery.orderBy?.items, multiTable, 'orderBy.items');
 
   for (let index = 0; index < (selectQuery.joins?.length ?? 0); index++) {
     const join = selectQuery.joins?.[index];
-    walkForColumnRefs(join?.on?.on, multiTable, `joins[${index}].on.on`);
+    walkForColumnRefs(unwrapOnNode(join?.on), multiTable, `joins[${index}].on.on`);
   }
 
   checkSelectAllAmbiguity(selectQuery.selections, multiTable);

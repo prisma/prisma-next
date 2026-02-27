@@ -37,3 +37,83 @@ export function compileQuery<Row>(queryBuilder: CompilableQuery<Row>): CompiledQ
 export function normalizeSql(sql: string): string {
   return sql.replace(/\s+/g, ' ').trim().toLowerCase();
 }
+
+type SelectFixtureOverrides = Partial<{
+  from: unknown;
+  selections: unknown;
+  where: unknown;
+  joins: unknown;
+  orderBy: unknown;
+  limit: unknown;
+}>;
+
+export function binaryWhere(
+  column: string,
+  value: unknown,
+  table = 'user',
+): Record<string, unknown> {
+  return {
+    kind: 'WhereNode',
+    node: {
+      kind: 'BinaryOperationNode',
+      left: {
+        kind: 'ReferenceNode',
+        column: {
+          kind: 'ColumnNode',
+          column: { kind: 'IdentifierNode', name: column },
+          table: { kind: 'IdentifierNode', name: table },
+        },
+      },
+      operator: { kind: 'OperatorNode', operator: '=' },
+      right: { kind: 'ValueNode', value },
+    },
+  };
+}
+
+export function selectQueryFixture(
+  overrides: SelectFixtureOverrides = {},
+): Record<string, unknown> {
+  return {
+    kind: 'SelectQueryNode',
+    from: {
+      kind: 'FromNode',
+      froms: [{ kind: 'TableNode', table: { kind: 'IdentifierNode', name: 'user' } }],
+    },
+    selections: [
+      {
+        kind: 'SelectionNode',
+        selection: {
+          kind: 'ReferenceNode',
+          column: {
+            kind: 'ColumnNode',
+            column: { kind: 'IdentifierNode', name: 'id' },
+            table: { kind: 'IdentifierNode', name: 'user' },
+          },
+        },
+      },
+      {
+        kind: 'SelectionNode',
+        selection: {
+          kind: 'ReferenceNode',
+          column: {
+            kind: 'ColumnNode',
+            column: { kind: 'IdentifierNode', name: 'email' },
+            table: { kind: 'IdentifierNode', name: 'user' },
+          },
+        },
+      },
+      {
+        kind: 'SelectionNode',
+        selection: {
+          kind: 'ReferenceNode',
+          column: {
+            kind: 'ColumnNode',
+            column: { kind: 'IdentifierNode', name: 'createdAt' },
+            table: { kind: 'IdentifierNode', name: 'user' },
+          },
+        },
+      },
+    ],
+    ...overrides,
+  };
+}

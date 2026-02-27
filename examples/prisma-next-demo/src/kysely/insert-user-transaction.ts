@@ -1,17 +1,18 @@
 import { generateId } from '@prisma-next/ids/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
-import { executeKyselyTakeFirst } from './run';
+import { executeKyselyTakeFirst, getDemoKysely } from './run';
 
 export async function insertUserTransaction(runtime: Runtime) {
   const userId = generateId({ id: 'uuidv4' });
+  const kysely = getDemoKysely();
   const connection = await runtime.connection();
 
   try {
     await connection
       .execute(
         db.kysely.build(
-          db.kysely.insertInto('user').values({
+          kysely.insertInto('user').values({
             id: userId,
             kind: 'user',
             email: 'jane@doe.com',
@@ -26,7 +27,7 @@ export async function insertUserTransaction(runtime: Runtime) {
       await transaction
         .execute(
           db.kysely.build(
-            db.kysely.updateTable('user').set({ email: 'john@doe.com' }).where('id', '=', userId),
+            kysely.updateTable('user').set({ email: 'john@doe.com' }).where('id', '=', userId),
           ),
         )
         .toArray();
@@ -44,6 +45,6 @@ export async function insertUserTransaction(runtime: Runtime) {
 
   return executeKyselyTakeFirst(
     runtime,
-    db.kysely.selectFrom('user').selectAll().where('id', '=', userId),
+    kysely.selectFrom('user').selectAll().where('id', '=', userId),
   );
 }

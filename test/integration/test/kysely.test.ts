@@ -435,27 +435,28 @@ describe('Kysely integration', () => {
     );
 
     it(
-      'uses lane raw and no ast for raw sql queries',
+      'rejects raw sql queries',
       async () => {
-        const captured: ExecutionPlan[] = [];
         const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
-          plugins: [createPlanCapturePlugin(captured)],
         });
 
         const kysely = new Kysely<KyselifyContract<Contract>>({
           dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
         });
 
-        await sql<{ id: number; email: string }>`
-          SELECT id, email FROM "user" WHERE email = ${'ada@example.com'}
-        `.execute(kysely);
-
-        expect(captured).toHaveLength(1);
-        const plan = captured[0]!;
-        expect(plan.ast).toBeUndefined();
-        expect(plan.meta.lane).toBe('raw');
-        expect(plan.meta.paramDescriptors).toEqual([]);
+        await expect(
+          sql<{ id: number; email: string }>`
+            SELECT id, email FROM "user" WHERE email = ${'ada@example.com'}
+          `.execute(kysely),
+        ).rejects.toMatchObject({
+          code: 'PLAN.UNSUPPORTED',
+          category: 'PLAN',
+          details: {
+            lane: 'kysely',
+            kyselyKind: 'RawNode',
+          },
+        });
       },
       testTimeout,
     );
@@ -480,7 +481,7 @@ describe('Kysely integration', () => {
     );
 
     it(
-      'executes raw SQL queries',
+      'rejects raw SQL queries',
       async () => {
         const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
           verify: { mode: 'onFirstUse', requireMarker: true },
@@ -490,13 +491,18 @@ describe('Kysely integration', () => {
           dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
         });
 
-        // Use existing seed data
-        const result = await sql<{ id: number; email: string; createdAt: string }>`
-        SELECT * FROM "user" WHERE email = ${'ada@example.com'}
-      `.execute(kysely);
-
-        expect(result.rows).toHaveLength(1);
-        expect(result.rows[0]?.email).toBe('ada@example.com');
+        await expect(
+          sql<{ id: number; email: string; createdAt: string }>`
+            SELECT * FROM "user" WHERE email = ${'ada@example.com'}
+          `.execute(kysely),
+        ).rejects.toMatchObject({
+          code: 'PLAN.UNSUPPORTED',
+          category: 'PLAN',
+          details: {
+            lane: 'kysely',
+            kyselyKind: 'RawNode',
+          },
+        });
       },
       testTimeout,
     );

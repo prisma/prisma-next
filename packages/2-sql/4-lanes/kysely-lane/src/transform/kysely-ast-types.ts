@@ -107,7 +107,12 @@ export function getTableName(node: unknown): string | undefined {
   }
 
   if (ReferenceNode.is(node)) {
-    return node.table ? getTableName(node.table) : undefined;
+    if (node.table) {
+      return getTableName(node.table);
+    }
+    // Backward-compatible fallback for legacy compiled-query shapes.
+    const legacyColumnTable = (node as { column?: { table?: OperationNode } }).column?.table;
+    return legacyColumnTable ? getTableName(legacyColumnTable) : undefined;
   }
 
   if (TableNode.is(node)) {
@@ -180,14 +185,20 @@ export function unwrapWhereNode(node: unknown): OperationNode | undefined {
   if (!isOperationNode(node)) {
     return undefined;
   }
-  return WhereNode.is(node) ? node.where : node;
+  if (!WhereNode.is(node)) {
+    return node;
+  }
+  return node.where ?? (node as { node?: OperationNode }).node;
 }
 
 export function unwrapOnNode(node: unknown): OperationNode | undefined {
   if (!isOperationNode(node)) {
     return undefined;
   }
-  return OnNode.is(node) ? node.on : node;
+  if (!OnNode.is(node)) {
+    return node;
+  }
+  return node.on ?? (node as { node?: OperationNode }).node;
 }
 
 export function unwrapSelectionNode(node: OperationNode): OperationNode {

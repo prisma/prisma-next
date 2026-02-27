@@ -197,41 +197,57 @@ function replaceBoundParams(expr: WhereExpr, params: readonly unknown[]): WhereE
 }
 
 function replaceParamsInSelect(ast: SelectAst, params: readonly unknown[]): SelectAst {
-  return {
-    ...ast,
-    joins: ast.joins?.map((join) => ({
-      ...join,
-      on: replaceParamsInJoinOn(join.on, params),
-    })),
-    includes: ast.includes?.map((inc) => ({
-      ...inc,
-      child: {
-        ...inc.child,
-        where: inc.child.where ? replaceBoundParams(inc.child.where, params) : undefined,
-        orderBy: inc.child.orderBy?.map((order) => ({
-          ...order,
-          expr: replaceParamsInExpression(order.expr, params),
-        })),
-        project: inc.child.project.map((projection) => ({
-          ...projection,
-          expr: replaceParamsInExpression(projection.expr, params),
-        })),
-      },
-    })),
-    project: ast.project.map((projection) => {
-      if (projection.expr.kind === 'includeRef' || projection.expr.kind === 'literal') {
-        return projection;
-      }
-      return {
+  const joins = ast.joins?.map((join) => ({
+    ...join,
+    on: replaceParamsInJoinOn(join.on, params),
+  }));
+  const includes = ast.includes?.map((inc) => {
+    const child = {
+      ...inc.child,
+      ...(inc.child.where ? { where: replaceBoundParams(inc.child.where, params) } : {}),
+      ...(inc.child.orderBy
+        ? {
+            orderBy: inc.child.orderBy.map((order) => ({
+              ...order,
+              expr: replaceParamsInExpression(order.expr, params),
+            })),
+          }
+        : {}),
+      project: inc.child.project.map((projection) => ({
         ...projection,
         expr: replaceParamsInExpression(projection.expr, params),
-      };
-    }),
-    where: ast.where ? replaceBoundParams(ast.where, params) : undefined,
-    orderBy: ast.orderBy?.map((order) => ({
-      ...order,
-      expr: replaceParamsInExpression(order.expr, params),
-    })),
+      })),
+    };
+    return {
+      ...inc,
+      child,
+    };
+  });
+  const project = ast.project.map((projection) => {
+    if (projection.expr.kind === 'includeRef' || projection.expr.kind === 'literal') {
+      return projection;
+    }
+    return {
+      ...projection,
+      expr: replaceParamsInExpression(projection.expr, params),
+    };
+  });
+  const where = ast.where ? replaceBoundParams(ast.where, params) : undefined;
+  const orderBy = ast.orderBy?.map((order) => ({
+    ...order,
+    expr: replaceParamsInExpression(order.expr, params),
+  }));
+
+  return {
+    kind: ast.kind,
+    from: ast.from,
+    project,
+    ...(joins ? { joins } : {}),
+    ...(includes ? { includes } : {}),
+    ...(where ? { where } : {}),
+    ...(orderBy ? { orderBy } : {}),
+    ...(ast.limit !== undefined ? { limit: ast.limit } : {}),
+    ...(ast.selectAllIntent ? { selectAllIntent: ast.selectAllIntent } : {}),
   };
 }
 
@@ -362,9 +378,7 @@ function collectParamRefIndexes(expr: WhereExpr): number[] {
         visitWhere(child.where);
       }
       for (const childProjection of child.project) {
-        if (childProjection.expr.kind !== 'includeRef' && childProjection.expr.kind !== 'literal') {
-          visitExpression(childProjection.expr);
-        }
+        visitExpression(childProjection.expr);
       }
       for (const childOrderBy of child.orderBy ?? []) {
         visitExpression(childOrderBy.expr);
