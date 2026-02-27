@@ -8,22 +8,24 @@ import type { EmitOptions, EmitResult } from './types';
 
 const PROVENANCE_KEYS = new Set(['source', 'sourceId', 'schemaPath', 'sources']);
 
-function stripProvenance(value: unknown): unknown {
+function assertNoProvenance(value: unknown, path: string[] = []): void {
   if (Array.isArray(value)) {
-    return value.map((entry) => stripProvenance(entry));
+    for (let index = 0; index < value.length; index += 1) {
+      assertNoProvenance(value[index], [...path, String(index)]);
+    }
+    return;
   }
   if (!value || typeof value !== 'object') {
-    return value;
+    return;
   }
 
-  const sanitized: Record<string, unknown> = {};
   for (const [key, entry] of Object.entries(value)) {
     if (PROVENANCE_KEYS.has(key)) {
-      continue;
+      const currentPath = [...path, key].join('.');
+      throw new Error(`ContractIR contains provenance key "${key}" at "${currentPath}"`);
     }
-    sanitized[key] = stripProvenance(entry);
+    assertNoProvenance(entry, [...path, key]);
   }
-  return sanitized;
 }
 
 function validateCoreStructure(ir: ContractIR): void {
@@ -82,7 +84,7 @@ export async function emit(
 
   targetFamily.validateStructure(ir);
 
-  const contractJson = {
+  const canonicalContract = {
     schemaVersion: ir.schemaVersion,
     targetFamily: ir.targetFamily,
     target: ir.target,
@@ -92,21 +94,18 @@ export async function emit(
     ...ifDefined('execution', ir.execution),
     extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
-    meta: stripProvenance(ir.meta) as Record<string, unknown>,
-  } as const;
+    meta: ir.meta,
+  };
+  assertNoProvenance(canonicalContract);
 
-  const storageHash = computeStorageHash(contractJson);
-  const executionHash = ir.execution ? computeExecutionHash(contractJson) : undefined;
-  const profileHash = computeProfileHash(contractJson);
+  const storageHash = computeStorageHash(canonicalContract);
+  const executionHash = canonicalContract.execution
+    ? computeExecutionHash(canonicalContract)
+    : undefined;
+  const profileHash = computeProfileHash(canonicalContract);
 
-  const contractWithHashes: ContractIR & {
-    storageHash?: string;
-    executionHash?: string;
-    profileHash?: string;
-  } = {
-    ...ir,
-    meta: stripProvenance(ir.meta) as Record<string, unknown>,
-    schemaVersion: contractJson.schemaVersion,
+  const contractWithHashes = {
+    ...canonicalContract,
     storageHash,
     ...ifDefined('executionHash', executionHash),
     profileHash,
@@ -115,10 +114,15 @@ export async function emit(
   // Add _generated metadata to indicate this is a generated artifact
   // This ensures consistency between CLI emit and programmatic emit
   // Always add/update _generated with standard content for consistency
-  const contractJsonObj = JSON.parse(canonicalizeContract(contractWithHashes)) as Record<
-    string,
-    unknown
-  >;
+  const contractJsonObj = JSON.parse(
+    canonicalizeContract(
+      contractWithHashes as ContractIR & {
+        storageHash?: string;
+        executionHash?: string;
+        profileHash?: string;
+      },
+    ),
+  ) as Record<string, unknown>;
   const contractJsonWithMeta = {
     ...contractJsonObj,
     _generated: {

@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { errorContractConfigMissing } from '@prisma-next/core-control-plane/errors';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { dirname, relative, resolve } from 'pathe';
+import { dirname, isAbsolute, join, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import type { EmitFailure } from '../control-api/types';
@@ -108,7 +108,10 @@ async function executeContractEmitCommand(
       }),
     );
   }
-  const outputJsonPath = resolve(contractConfig.output);
+  const configDir = options.config ? dirname(resolve(options.config)) : process.cwd();
+  const outputJsonPath = isAbsolute(contractConfig.output)
+    ? contractConfig.output
+    : join(configDir, contractConfig.output);
   // Colocate .d.ts with .json (contract.json → contract.d.ts)
   const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
 

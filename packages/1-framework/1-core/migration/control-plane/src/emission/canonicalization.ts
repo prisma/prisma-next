@@ -28,6 +28,7 @@ const TOP_LEVEL_ORDER = [
   'executionHash',
   'profileHash',
   'models',
+  'relations',
   'storage',
   'execution',
   'capabilities',
