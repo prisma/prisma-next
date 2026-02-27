@@ -181,10 +181,15 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
   if (mode === 'plan') {
     const planSql =
       familyInstance.familyId === 'sql' ? extractSqlDdl(migrationPlan.operations) : undefined;
+    const strippedOperations = migrationPlan.operations.map((op) => ({
+      id: op.id,
+      label: op.label,
+      operationClass: op.operationClass,
+    }));
     const result: DbUpdateSuccess = {
       mode: 'plan',
       plan: {
-        operations: migrationPlan.operations,
+        operations: strippedOperations,
         ...(planSql !== undefined ? { sql: planSql } : {}),
       },
       origin: {
@@ -287,7 +292,13 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
 
   const result: DbUpdateSuccess = {
     mode: 'apply',
-    plan: { operations: migrationPlan.operations },
+    plan: {
+      operations: migrationPlan.operations.map((op) => ({
+        id: op.id,
+        label: op.label,
+        operationClass: op.operationClass,
+      })),
+    },
     origin: {
       storageHash: marker.storageHash,
       ...ifDefined('profileHash', marker.profileHash),
