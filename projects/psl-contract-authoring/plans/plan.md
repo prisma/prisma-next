@@ -50,6 +50,10 @@ Implement a reusable PSL parser library that can be consumed by emit tooling and
   - failure diagnostics include correct spans
   - strict errors for unsupported constructs (no warnings)
 
+### Addendum 2.1: Red-green syntax tree
+
+- [ ] Evaluate a lossless red/green syntax tree approach (rowan-style) for language tooling: define the round-trip invariant (`print(parse(psl))` equals the original PSL byte-for-byte) and decide how invalid/out-of-place tokens are preserved (e.g. kept in the green tree or represented as explicit `invalid` nodes). Record the decision + follow-up work (don’t block the current parser milestone on this).
+
 ### Milestone 3: PSL → normalized contract IR + parity/determinism coverage
 
 Normalize PSL AST into the same normalized contract IR used by TS-first, then emit canonical artifacts and prove parity/determinism on a shared conformance set.
