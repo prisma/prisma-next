@@ -137,4 +137,55 @@ model User {
 
     expect(first).toEqual(second);
   });
+
+  it('parses blocks with braces inside string defaults', () => {
+    const schema = `
+model User {
+  id Int @id
+  pattern String @default("{foo}")
+}
+
+model Post {
+  id Int @id
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.ast.models.map((model) => model.name)).toEqual(['User', 'Post']);
+  });
+
+  it('returns diagnostics when named types collide with scalar or model names', () => {
+    const schema = `
+types {
+  String = String @db.VarChar(191)
+  User = String @db.VarChar(191)
+}
+
+model User {
+  id Int @id
+}
+`;
+
+    const result = parsePslDocument({
+      schema,
+      sourceId: 'schema.prisma',
+    });
+
+    expect(result.ok).toBe(false);
+    const messages = result.diagnostics
+      .filter((entry) => entry.code === 'PSL_INVALID_TYPES_MEMBER')
+      .map((entry) => entry.message);
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('conflicts with scalar type "String"'),
+        expect.stringContaining('conflicts with model name "User"'),
+      ]),
+    );
+  });
 });

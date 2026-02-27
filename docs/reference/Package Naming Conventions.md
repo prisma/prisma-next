@@ -57,7 +57,7 @@ Planes (shared, migration, runtime) appear as subdirectories only when a layer c
 | `packages/1-framework/1-core/runtime/execution-plane/` | `@prisma-next/core-execution-plane` |
 | `packages/1-framework/2-authoring/contract/` | `@prisma-next/contract-authoring` |
 | `packages/1-framework/2-authoring/contract-ts/` | `@prisma-next/contract-ts` |
-| `packages/1-framework/2-authoring/contract-psl/` | `@prisma-next/contract-psl` |
+| `packages/1-framework/2-authoring/contract-psl/` | `@prisma-next/psl-parser` |
 | `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |
 | `packages/1-framework/3-tooling/emitter/` | `@prisma-next/emitter` |
 | `packages/1-framework/4-runtime-executor/` | `@prisma-next/runtime-executor` |

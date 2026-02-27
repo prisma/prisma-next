@@ -1,5 +1,3 @@
-import type { ReferentialAction } from '@prisma-next/sql-contract/types';
-
 export interface PslPosition {
   readonly offset: number;
   readonly line: number;
@@ -62,10 +60,12 @@ export interface PslRelationAttribute {
   readonly kind: 'relation';
   readonly fields: readonly string[];
   readonly references: readonly string[];
-  readonly onDelete?: ReferentialAction;
-  readonly onUpdate?: ReferentialAction;
+  readonly onDelete?: PslReferentialAction;
+  readonly onUpdate?: PslReferentialAction;
   readonly span: PslSpan;
 }
+
+export type PslReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
 
 export type PslFieldAttribute =
   | PslIdAttribute

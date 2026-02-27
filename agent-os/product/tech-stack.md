@@ -14,7 +14,7 @@
 - **Workspace Structure:** Framework domain, SQL family domain, targets, extensions
 
 ### Schema & Type System
-- **Schema Language:** PSL (Prisma Schema Language) - parsed via `@prisma-next/contract-psl`
+- **Schema Language:** PSL (Prisma Schema Language) - parsed via `@prisma-next/psl-parser`
 - **Contract Format:** JSON with TypeScript definitions (contract.json + contract.d.ts)
 - **Validation:** Arktype for runtime validation with `.infer` type extraction
 - **Type Generation:** Custom TypeScript emitter producing lightweight types (not executable client)
@@ -28,7 +28,7 @@
 - **`@prisma-next/operations`** - Target-neutral operation registry
 - **`@prisma-next/contract-authoring`** - Base contract builders and canonicalization
 - **`@prisma-next/contract-ts`** - TypeScript contract authoring surface
-- **`@prisma-next/contract-psl`** - PSL parser and contract emission
+- **`@prisma-next/psl-parser`** - PSL parser and contract emission
 - **`@prisma-next/cli`** - Framework CLI (family-agnostic, config-driven)
 - **`@prisma-next/emitter`** - Contract emission engine with family hooks
 - **`@prisma-next/runtime-executor`** - Target-agnostic execution engine with plugin lifecycle

@@ -1,9 +1,9 @@
 {
-  "name": "@prisma-next/contract-psl",
+  "name": "@prisma-next/psl-parser",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "PSL parser and IR for Prisma Next (future)",
+  "description": "Reusable parser for Prisma Schema Language (PSL)",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
@@ -14,9 +14,7 @@
     "lint:fix:unsafe": "biome check --write --unsafe .",
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
-  "dependencies": {
-    "@prisma-next/sql-contract": "workspace:*"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",

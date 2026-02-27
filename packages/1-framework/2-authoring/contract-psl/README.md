@@ -1,10 +1,10 @@
-# @prisma-next/contract-psl
+# @prisma-next/psl-parser
 
 Reusable PSL parser for Prisma Next.
 
 ## Overview
 
-`@prisma-next/contract-psl` parses Prisma Schema Language (PSL) source into a deterministic AST with source spans and stable machine-readable diagnostics. It is intentionally parser-only: normalization to contract IR and emit integration happen in downstream milestones/packages.
+`@prisma-next/psl-parser` parses Prisma Schema Language (PSL) source into a deterministic AST with source spans and stable machine-readable diagnostics. It is intentionally parser-only: normalization to contract IR and emit integration happen in downstream milestones/packages.
 
 ## Responsibilities
 
@@ -21,7 +21,7 @@ Reusable PSL parser for Prisma Next.
 ## Dependencies
 
 - **Depends on**
-  - `@prisma-next/sql-contract`: referential action type compatibility with SQL contract authoring types.
+  - No cross-domain runtime dependencies.
 - **Used by**
   - PSL normalization/emission tooling (next milestone)
   - Potential language tooling and external parsers that need spans + diagnostics
@@ -30,7 +30,7 @@ Reusable PSL parser for Prisma Next.
 
 ```mermaid
 flowchart LR
-  PSL[PSL source text] --> Parser[contract-psl parser]
+  PSL[PSL source text] --> Parser[psl-parser]
   Parser --> AST[PSL AST with spans]
   Parser --> Diagnostics[Structured diagnostics]
   AST --> Normalizer[PSL -> contract IR normalizer]

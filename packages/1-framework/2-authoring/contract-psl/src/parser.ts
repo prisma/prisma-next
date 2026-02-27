@@ -1,4 +1,3 @@
-import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type {
   ParsePslDocumentInput,
   ParsePslDocumentResult,
@@ -16,13 +15,14 @@ import type {
   PslModelAttribute,
   PslNamedTypeDeclaration,
   PslPosition,
+  PslReferentialAction,
   PslRelationAttribute,
   PslSpan,
   PslTypesBlock,
   PslUniqueConstraint,
 } from './types';
 
-const REFERENTIAL_ACTION_MAP: Record<string, ReferentialAction> = {
+const REFERENTIAL_ACTION_MAP: Record<string, PslReferentialAction> = {
   NoAction: 'noAction',
   Restrict: 'restrict',
   Cascade: 'cascade',
@@ -144,6 +144,23 @@ export function parsePslDocument(input: ParsePslDocumentInput): ParsePslDocument
     (typesBlock?.declarations ?? []).map((declaration) => declaration.name),
   );
   const modelNames = new Set(models.map((model) => model.name));
+  for (const declaration of typesBlock?.declarations ?? []) {
+    if (SCALAR_TYPES.has(declaration.name)) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_TYPES_MEMBER',
+        message: `Named type "${declaration.name}" conflicts with scalar type "${declaration.name}"`,
+        span: declaration.span,
+      });
+      continue;
+    }
+    if (modelNames.has(declaration.name)) {
+      pushDiagnostic(context, {
+        code: 'PSL_INVALID_TYPES_MEMBER',
+        message: `Named type "${declaration.name}" conflicts with model name "${declaration.name}"`,
+        span: declaration.span,
+      });
+    }
+  }
   const normalizedModels = models.map((model) => ({
     ...model,
     fields: model.fields.map((field) => {
@@ -435,8 +452,8 @@ function parseRelationAttribute(
   const parts = splitTopLevel(argsRaw, ',');
   const fields: string[] = [];
   const references: string[] = [];
-  let onDelete: ReferentialAction | undefined;
-  let onUpdate: ReferentialAction | undefined;
+  let onDelete: PslReferentialAction | undefined;
+  let onUpdate: PslReferentialAction | undefined;
 
   for (const part of parts) {
     const [keyRaw, ...valueParts] = part.split(':');
@@ -504,7 +521,7 @@ function parseReferentialAction(
   context: ParserContext,
   value: string,
   lineIndex: number,
-): ReferentialAction | undefined {
+): PslReferentialAction | undefined {
   const action = REFERENTIAL_ACTION_MAP[value];
   if (action) {
     return action;
@@ -585,7 +602,23 @@ function findBlockBounds(context: ParserContext, startLine: number): BlockBounds
 
   for (let lineIndex = startLine; lineIndex < context.lines.length; lineIndex += 1) {
     const line = stripInlineComment(context.lines[lineIndex] ?? '');
+    let quote: '"' | "'" | null = null;
+    let previousCharacter = '';
     for (const character of line) {
+      if (quote) {
+        if (character === quote && previousCharacter !== '\\') {
+          quote = null;
+        }
+        previousCharacter = character;
+        continue;
+      }
+
+      if (character === '"' || character === "'") {
+        quote = character;
+        previousCharacter = character;
+        continue;
+      }
+
       if (character === '{') {
         depth += 1;
       }
@@ -595,6 +628,7 @@ function findBlockBounds(context: ParserContext, startLine: number): BlockBounds
           return { startLine, endLine: lineIndex, closed: true };
         }
       }
+      previousCharacter = character;
     }
   }
 
