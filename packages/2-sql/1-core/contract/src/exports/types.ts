@@ -1,4 +1,6 @@
 export type {
+  Bm25ColumnFieldConfig,
+  Bm25ExpressionFieldConfig,
   Bm25FieldConfig,
   ExtractCodecTypes,
   ExtractOperationTypes,

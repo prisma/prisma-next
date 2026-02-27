@@ -64,7 +64,8 @@ export function bm25Index(opts: {
   fields: readonly Bm25FieldConfig[];
   name?: string;
 }): Index {
-  const columns = opts.fields.map((f) => f.column ?? f.alias ?? f.expression ?? '');
+  // Column fields use alias ?? column; expression fields always have alias
+  const columns = opts.fields.map((f) => f.alias ?? f.column ?? '');
   return {
     columns,
     using: 'bm25',

@@ -269,7 +269,7 @@ export class TableBuilder<
     keyField?: string;
     name?: string;
   }): TableBuilder<Name, Columns, PrimaryKey> {
-    const columns = opts.fields.map((f) => f.column ?? f.alias ?? f.expression ?? '');
+    const columns = opts.fields.map((f) => f.alias ?? f.column ?? '');
     const indexDef: IndexDef = {
       columns,
       using: 'bm25',

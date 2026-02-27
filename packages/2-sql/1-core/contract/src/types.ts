@@ -54,23 +54,36 @@ export type UniqueConstraint = {
 export type IndexAccessMethod = 'btree' | 'bm25';
 
 /**
+ * BM25 field config for a column reference.
+ */
+export type Bm25ColumnFieldConfig = {
+  readonly column: string;
+  readonly expression?: never;
+  readonly tokenizer?: string;
+  readonly tokenizerParams?: Record<string, unknown>;
+  readonly alias?: string;
+};
+
+/**
+ * BM25 field config for a raw SQL expression.
+ * `alias` is required (the expression has no column name to derive one from).
+ */
+export type Bm25ExpressionFieldConfig = {
+  readonly expression: string;
+  readonly column?: never;
+  readonly alias: string;
+  readonly tokenizer?: string;
+  readonly tokenizerParams?: Record<string, unknown>;
+};
+
+/**
  * Per-field configuration for a BM25 full-text search index.
  * Each entry describes one indexed field and its tokenizer settings.
  *
- * Either `column` or `expression` must be set, but not both.
+ * Discriminated union: either `column` (for table columns) or `expression`
+ * (for raw SQL) must be set, but not both. Enforced at the type level.
  */
-export type Bm25FieldConfig = {
-  /** Column name. Mutually exclusive with `expression`. */
-  readonly column?: string;
-  /** Raw SQL expression (e.g., "description || ' ' || category"). Mutually exclusive with `column`. */
-  readonly expression?: string;
-  /** Tokenizer ID (e.g., 'unicode', 'simple', 'ngram', 'icu', 'regex_pattern', 'literal'). */
-  readonly tokenizer?: string;
-  /** Tokenizer parameters (e.g., { min: 2, max: 5 } for ngram). */
-  readonly tokenizerParams?: Record<string, unknown>;
-  /** Alias for multi-tokenizer per field. Required when `expression` is used. */
-  readonly alias?: string;
-};
+export type Bm25FieldConfig = Bm25ColumnFieldConfig | Bm25ExpressionFieldConfig;
 
 export type Index = {
   readonly columns: readonly string[];
