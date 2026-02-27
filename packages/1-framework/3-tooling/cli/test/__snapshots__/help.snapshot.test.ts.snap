@@ -82,6 +82,9 @@ exports[`help text snapshots > formats db update help 1`] = `
 │ --timestamps          Add timestamps to output
 │ --color               Force color output
 │ --no-color            Disable color output
+│ --accept-data-loss    Confirm destructive operations (required when plan
+│                       includes drops or type changes)
+│                       default: false
 │
 │ Updates a marker-managed database to match your emitted contract using
 │ additive,

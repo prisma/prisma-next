@@ -3,6 +3,7 @@
  * This is the serialized form of a CliStructuredError.
  */
 export interface CliErrorEnvelope {
+  readonly ok: false;
   readonly code: string;
   readonly domain: string;
   readonly severity: 'error' | 'warn' | 'info';
@@ -83,6 +84,7 @@ export class CliStructuredError extends Error {
   toEnvelope(): CliErrorEnvelope {
     const codePrefix = this.domain === 'CLI' ? 'PN-CLI-' : 'PN-RTM-';
     return {
+      ok: false as const,
       code: `${codePrefix}${this.code}`,
       domain: this.domain,
       severity: this.severity,
@@ -344,7 +346,7 @@ export function errorConfigValidation(
 }
 
 // ============================================================================
-// Runtime Errors (PN-RTM-3000-3003)
+// Runtime Errors (PN-RTM-3000-3020)
 // ============================================================================
 
 /**
@@ -401,6 +403,58 @@ export function errorTargetMismatch(
       `Contract target does not match config target (expected: ${expected}, actual: ${actual})`,
     fix: 'Align contract target and config target',
     meta: { expected, actual },
+  });
+}
+
+/**
+ * Database marker is required but not found (db update precondition).
+ */
+export function errorMarkerRequired(options?: {
+  readonly why?: string;
+  readonly fix?: string;
+}): CliStructuredError {
+  return new CliStructuredError('3010', 'Marker required', {
+    domain: 'RTM',
+    why: options?.why ?? 'Contract marker not found in database',
+    fix: options?.fix ?? 'Run `prisma-next db init` first to adopt the database',
+  });
+}
+
+/**
+ * Migration runner failed during execution.
+ */
+export function errorRunnerFailed(
+  summary: string,
+  options?: {
+    readonly why?: string;
+    readonly fix?: string;
+    readonly meta?: Record<string, unknown>;
+  },
+): CliStructuredError {
+  return new CliStructuredError('3020', summary, {
+    domain: 'RTM',
+    why: options?.why ?? 'Migration runner failed',
+    fix: options?.fix ?? 'Inspect the reported conflict and reconcile schema drift',
+    ...(options?.meta ? { meta: options.meta } : {}),
+  });
+}
+
+/**
+ * Destructive operations require explicit confirmation via --accept-data-loss.
+ */
+export function errorDestructiveChanges(
+  summary: string,
+  options?: {
+    readonly why?: string;
+    readonly fix?: string;
+    readonly meta?: Record<string, unknown>;
+  },
+): CliStructuredError {
+  return new CliStructuredError('3030', summary, {
+    domain: 'RTM',
+    why: options?.why ?? 'Planned operations include destructive changes that require confirmation',
+    fix: options?.fix ?? 'Use `--plan` to preview, then re-run with `--accept-data-loss`',
+    ...(options?.meta ? { meta: options.meta } : {}),
   });
 }
 

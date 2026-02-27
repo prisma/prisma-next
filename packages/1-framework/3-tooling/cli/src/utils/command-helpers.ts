@@ -47,9 +47,18 @@ export interface MigrationCommandOptions {
 
 /**
  * Masks the password portion of a database connection URL.
- * Replaces the password between `:` and `@` with `****`.
+ * Uses URL parsing for robust handling of encoded characters and edge cases.
  * Safe to call with non-URL strings (returns them unchanged).
  */
 export function maskConnectionUrl(url: string): string {
-  return url.replace(/:([^:@]+)@/, ':****@');
+  try {
+    const parsed = new URL(url);
+    if (parsed.password) {
+      parsed.password = '****';
+    }
+    return parsed.toString();
+  } catch {
+    // Not a parseable URL — return as-is (safe fallback for non-URL connection strings)
+    return url;
+  }
 }

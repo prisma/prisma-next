@@ -37,8 +37,9 @@ import type {
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
+import { buildLossyPlan } from './planner-lossy';
 
-type OperationClass =
+export type OperationClass =
   | 'extension'
   | 'type'
   | 'table'
@@ -80,7 +81,7 @@ interface PlannerConfig {
   readonly defaultSchema: string;
 }
 
-interface PlanningMode {
+export interface PlanningMode {
   readonly includeExtraObjects: boolean;
   readonly allowWidening: boolean;
   readonly allowDestructive: boolean;
@@ -118,7 +119,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
 
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
-    const lossyPlan = this.buildLossyOperations({
+    const lossyPlan = buildLossyPlan({
       contract: options.contract,
       issues: schemaIssues,
       schemaName,
@@ -388,7 +389,12 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
         ? [
             {
               description: `verify column "${columnName}" is NOT NULL`,
-              sql: columnIsNotNullCheck({ schema, table: tableName, column: columnName }),
+              sql: columnNullabilityCheck({
+                schema,
+                table: tableName,
+                column: columnName,
+                nullable: false,
+              }),
             },
           ]
         : []),
@@ -682,278 +688,6 @@ REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${forei
     return table.columns[columnName] ?? null;
   }
 
-  private buildDropTableOperation(
-    schemaName: string,
-    tableName: string,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-    return {
-      id: `dropTable.${tableName}`,
-      label: `Drop table ${tableName}`,
-      summary: `Drops extra table ${tableName}`,
-      operationClass: 'destructive',
-      target: {
-        id: 'postgres',
-        details: this.buildTargetDetails('table', tableName, schemaName),
-      },
-      precheck: [
-        {
-          description: `ensure table "${tableName}" exists`,
-          sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NOT NULL`,
-        },
-      ],
-      execute: [
-        {
-          description: `drop table "${tableName}"`,
-          sql: `DROP TABLE ${qualifyTableName(schemaName, tableName)}`,
-        },
-      ],
-      postcheck: [
-        {
-          description: `verify table "${tableName}" is removed`,
-          sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NULL`,
-        },
-      ],
-    };
-  }
-
-  private buildDropColumnOperation(
-    schemaName: string,
-    tableName: string,
-    columnName: string,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-    return {
-      id: `dropColumn.${tableName}.${columnName}`,
-      label: `Drop column ${columnName} from ${tableName}`,
-      summary: `Drops extra column ${columnName} from table ${tableName}`,
-      operationClass: 'destructive',
-      target: {
-        id: 'postgres',
-        details: this.buildTargetDetails('column', columnName, schemaName, tableName),
-      },
-      precheck: [
-        {
-          description: `ensure column "${columnName}" exists`,
-          sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-        },
-      ],
-      execute: [
-        {
-          description: `drop column "${columnName}"`,
-          sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)} DROP COLUMN ${quoteIdentifier(columnName)}`,
-        },
-      ],
-      postcheck: [
-        {
-          description: `verify column "${columnName}" is removed`,
-          sql: columnExistsCheck({
-            schema: schemaName,
-            table: tableName,
-            column: columnName,
-            exists: false,
-          }),
-        },
-      ],
-    };
-  }
-
-  private buildDropIndexOperation(
-    schemaName: string,
-    tableName: string,
-    indexName: string,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-    return {
-      id: `dropIndex.${tableName}.${indexName}`,
-      label: `Drop index ${indexName} on ${tableName}`,
-      summary: `Drops extra index ${indexName} on table ${tableName}`,
-      operationClass: 'destructive',
-      target: {
-        id: 'postgres',
-        details: this.buildTargetDetails('index', indexName, schemaName, tableName),
-      },
-      precheck: [
-        {
-          description: `ensure index "${indexName}" exists`,
-          sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NOT NULL`,
-        },
-      ],
-      execute: [
-        {
-          description: `drop index "${indexName}"`,
-          sql: `DROP INDEX ${qualifyTableName(schemaName, indexName)}`,
-        },
-      ],
-      postcheck: [
-        {
-          description: `verify index "${indexName}" is removed`,
-          sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NULL`,
-        },
-      ],
-    };
-  }
-
-  private buildDropConstraintOperation(
-    schemaName: string,
-    tableName: string,
-    constraintName: string,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-    return {
-      id: `dropConstraint.${tableName}.${constraintName}`,
-      label: `Drop constraint ${constraintName} on ${tableName}`,
-      summary: `Drops extra constraint ${constraintName} on table ${tableName}`,
-      operationClass: 'destructive',
-      target: {
-        id: 'postgres',
-        details: this.buildTargetDetails('foreignKey', constraintName, schemaName, tableName),
-      },
-      precheck: [
-        {
-          description: `ensure constraint "${constraintName}" exists`,
-          sql: constraintExistsCheck({ constraintName, schema: schemaName }),
-        },
-      ],
-      execute: [
-        {
-          description: `drop constraint "${constraintName}"`,
-          sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-DROP CONSTRAINT ${quoteIdentifier(constraintName)}`,
-        },
-      ],
-      postcheck: [
-        {
-          description: `verify constraint "${constraintName}" is removed`,
-          sql: constraintExistsCheck({ constraintName, schema: schemaName, exists: false }),
-        },
-      ],
-    };
-  }
-
-  private buildDropNotNullOperation(
-    schemaName: string,
-    tableName: string,
-    columnName: string,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-    return {
-      id: `alterNullability.${tableName}.${columnName}`,
-      label: `Relax nullability for ${columnName} on ${tableName}`,
-      summary: `Drops NOT NULL constraint for ${columnName} on table ${tableName}`,
-      operationClass: 'widening',
-      target: {
-        id: 'postgres',
-        details: this.buildTargetDetails('column', columnName, schemaName, tableName),
-      },
-      precheck: [
-        {
-          description: `ensure column "${columnName}" exists`,
-          sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-        },
-      ],
-      execute: [
-        {
-          description: `drop NOT NULL from "${columnName}"`,
-          sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ALTER COLUMN ${quoteIdentifier(columnName)} DROP NOT NULL`,
-        },
-      ],
-      postcheck: [
-        {
-          description: `verify "${columnName}" is nullable`,
-          sql: columnIsNullableCheck({ schema: schemaName, table: tableName, column: columnName }),
-        },
-      ],
-    };
-  }
-
-  private buildSetNotNullOperation(
-    schemaName: string,
-    tableName: string,
-    columnName: string,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-    const qualified = qualifyTableName(schemaName, tableName);
-    return {
-      id: `alterNullability.${tableName}.${columnName}`,
-      label: `Enforce NOT NULL for ${columnName} on ${tableName}`,
-      summary: `Sets NOT NULL on ${columnName} for table ${tableName}`,
-      operationClass: 'destructive',
-      target: {
-        id: 'postgres',
-        details: this.buildTargetDetails('column', columnName, schemaName, tableName),
-      },
-      precheck: [
-        {
-          description: `ensure column "${columnName}" exists`,
-          sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-        },
-        {
-          description: `ensure "${columnName}" has no NULL values`,
-          sql: `SELECT NOT EXISTS (
-  SELECT 1 FROM ${qualified}
-  WHERE ${quoteIdentifier(columnName)} IS NULL
-  LIMIT 1
-)`,
-        },
-      ],
-      execute: [
-        {
-          description: `set NOT NULL on "${columnName}"`,
-          sql: `ALTER TABLE ${qualified}
-ALTER COLUMN ${quoteIdentifier(columnName)} SET NOT NULL`,
-        },
-      ],
-      postcheck: [
-        {
-          description: `verify "${columnName}" is NOT NULL`,
-          sql: columnIsNotNullCheck({ schema: schemaName, table: tableName, column: columnName }),
-        },
-      ],
-    };
-  }
-
-  private buildAlterColumnTypeOperation(
-    schemaName: string,
-    tableName: string,
-    columnName: string,
-    column: StorageColumn,
-  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-    const qualified = qualifyTableName(schemaName, tableName);
-    const expectedType = buildColumnTypeSql(column);
-    return {
-      id: `alterType.${tableName}.${columnName}`,
-      label: `Alter type for ${columnName} on ${tableName}`,
-      summary: `Changes type of ${columnName} to ${expectedType}`,
-      operationClass: 'destructive',
-      target: {
-        id: 'postgres',
-        details: this.buildTargetDetails('column', columnName, schemaName, tableName),
-      },
-      meta: {
-        warning: 'TABLE_REWRITE',
-        detail:
-          'ALTER COLUMN TYPE requires a full table rewrite and acquires an ACCESS EXCLUSIVE lock. On large tables, this can cause significant downtime.',
-      },
-      precheck: [
-        {
-          description: `ensure column "${columnName}" exists`,
-          sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-        },
-      ],
-      execute: [
-        {
-          description: `alter type of "${columnName}"`,
-          sql: `ALTER TABLE ${qualified}
-ALTER COLUMN ${quoteIdentifier(columnName)}
-TYPE ${expectedType}
-USING ${quoteIdentifier(columnName)}::${expectedType}`,
-        },
-      ],
-      postcheck: [
-        {
-          description: `verify column "${columnName}" exists after type change`,
-          sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-        },
-      ],
-    };
-  }
-
   private buildTargetDetails(
     objectType: OperationClass,
     name: string,
@@ -992,205 +726,6 @@ USING ${quoteIdentifier(columnName)}::${expectedType}`,
     };
     const verifyResult = verifySqlSchema(verifyOptions);
     return verifyResult.schema.issues;
-  }
-
-  private buildLossyOperations(options: {
-    contract: SqlContract<SqlStorage>;
-    issues: readonly SchemaIssue[];
-    schemaName: string;
-    mode: PlanningMode;
-    policy: MigrationOperationPolicy;
-  }): {
-    readonly operations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
-    readonly conflicts: readonly SqlPlannerConflict[];
-  } {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
-    const conflicts: SqlPlannerConflict[] = [];
-    const { mode } = options;
-    const seenOperationIds = new Set<string>();
-
-    for (const issue of sortSchemaIssues(options.issues)) {
-      if (isAdditiveIssue(issue)) {
-        continue;
-      }
-
-      const operation = this.buildLossyOperationFromIssue({
-        issue,
-        contract: options.contract,
-        schemaName: options.schemaName,
-        mode,
-      });
-      if (!operation) {
-        conflicts.push(
-          this.convertIssueToConflict(issue) ?? {
-            kind: 'missingButNonAdditive',
-            summary: issue.message,
-            ...ifDefined('location', buildConflictLocation(issue)),
-          },
-        );
-        continue;
-      }
-
-      if (!options.policy.allowedOperationClasses.includes(operation.operationClass)) {
-        conflicts.push({
-          kind: 'missingButNonAdditive',
-          summary: `Issue "${issue.kind}" requires "${operation.operationClass}" operation "${operation.id}"`,
-          ...ifDefined('location', buildConflictLocation(issue)),
-        });
-        continue;
-      }
-
-      if (seenOperationIds.has(operation.id)) {
-        continue;
-      }
-      seenOperationIds.add(operation.id);
-      operations.push(operation);
-    }
-
-    return {
-      operations: operations.sort((a, b) => a.id.localeCompare(b.id)),
-      conflicts: conflicts.sort(conflictComparator),
-    };
-  }
-
-  private buildLossyOperationFromIssue(options: {
-    issue: SchemaIssue;
-    contract: SqlContract<SqlStorage>;
-    schemaName: string;
-    mode: PlanningMode;
-  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> | null {
-    const { issue, contract, schemaName, mode } = options;
-    switch (issue.kind) {
-      case 'extra_table':
-        if (!mode.allowDestructive || !issue.table) {
-          return null;
-        }
-        return this.buildDropTableOperation(schemaName, issue.table);
-
-      case 'extra_column':
-        if (!mode.allowDestructive || !issue.table || !issue.column) {
-          return null;
-        }
-        return this.buildDropColumnOperation(schemaName, issue.table, issue.column);
-
-      case 'extra_index':
-        if (!mode.allowDestructive || !issue.table || !issue.indexOrConstraint) {
-          return null;
-        }
-        return this.buildDropIndexOperation(schemaName, issue.table, issue.indexOrConstraint);
-
-      case 'extra_foreign_key':
-      case 'extra_unique_constraint': {
-        if (!mode.allowDestructive || !issue.table || !issue.indexOrConstraint) {
-          return null;
-        }
-        return this.buildDropConstraintOperation(schemaName, issue.table, issue.indexOrConstraint);
-      }
-
-      case 'extra_primary_key': {
-        if (!mode.allowDestructive || !issue.table) {
-          return null;
-        }
-        const constraintName = issue.indexOrConstraint ?? `${issue.table}_pkey`;
-        return this.buildDropConstraintOperation(schemaName, issue.table, constraintName);
-      }
-
-      case 'nullability_mismatch': {
-        if (!issue.table || !issue.column) {
-          return null;
-        }
-        const expectedNullable = issue.expected === 'true';
-        const actualNullable = issue.actual === 'true';
-        if (expectedNullable === actualNullable) {
-          return null;
-        }
-        if (expectedNullable && !actualNullable) {
-          if (!mode.allowWidening) {
-            return null;
-          }
-          return this.buildDropNotNullOperation(schemaName, issue.table, issue.column);
-        }
-        if (!expectedNullable && actualNullable) {
-          if (!mode.allowDestructive) {
-            return null;
-          }
-          return this.buildSetNotNullOperation(schemaName, issue.table, issue.column);
-        }
-        return null;
-      }
-
-      case 'type_mismatch': {
-        if (!mode.allowDestructive || !issue.table || !issue.column) {
-          return null;
-        }
-        const contractColumn = this.getContractColumn(contract, issue.table, issue.column);
-        if (!contractColumn) {
-          return null;
-        }
-        return this.buildAlterColumnTypeOperation(
-          schemaName,
-          issue.table,
-          issue.column,
-          contractColumn,
-        );
-      }
-
-      // Remaining issue kinds (default_missing, default_mismatch, primary_key_mismatch,
-      // unique_constraint_mismatch, index_mismatch, foreign_key_mismatch) do not yet have
-      // lossy operation builders. They fall through to the caller, which converts them to
-      // conflicts via convertIssueToConflict. When a new SchemaIssue kind is added, add a
-      // case here if the planner can emit an operation for it; otherwise it becomes a conflict.
-      default:
-        return null;
-    }
-  }
-
-  private convertIssueToConflict(issue: SchemaIssue): SqlPlannerConflict | null {
-    switch (issue.kind) {
-      case 'type_mismatch':
-        return this.buildConflict('typeMismatch', issue);
-      case 'nullability_mismatch':
-        return this.buildConflict('nullabilityConflict', issue);
-      case 'default_missing':
-      case 'default_mismatch':
-      case 'extra_table':
-      case 'extra_column':
-      case 'extra_primary_key':
-      case 'extra_foreign_key':
-      case 'extra_unique_constraint':
-      case 'extra_index':
-        return this.buildConflict('missingButNonAdditive', issue);
-      case 'primary_key_mismatch':
-      case 'unique_constraint_mismatch':
-      case 'index_mismatch':
-        return this.buildConflict('indexIncompatible', issue);
-      case 'foreign_key_mismatch':
-        return this.buildConflict('foreignKeyConflict', issue);
-      // Additive issue kinds (missing_table, missing_column, type_missing, type_values_mismatch,
-      // extension_missing) are filtered by isAdditiveIssue before reaching this method.
-      // If a new SchemaIssue kind is introduced, add a mapping here so it becomes a conflict
-      // rather than being silently ignored.
-      default:
-        return null;
-    }
-  }
-
-  private buildConflict(kind: SqlPlannerConflict['kind'], issue: SchemaIssue): SqlPlannerConflict {
-    const location = buildConflictLocation(issue);
-    const meta =
-      issue.expected || issue.actual
-        ? Object.freeze({
-            ...ifDefined('expected', issue.expected),
-            ...ifDefined('actual', issue.actual),
-          })
-        : undefined;
-
-    return {
-      kind,
-      summary: issue.message,
-      ...ifDefined('location', location),
-      ...ifDefined('meta', meta),
-    };
   }
 }
 
@@ -1250,10 +785,35 @@ function buildCreateTableSql(qualifiedTableName: string, table: StorageTable): s
 }
 
 /**
+ * Pattern for safe PostgreSQL type names.
+ * Allows letters, digits, underscores, spaces (for "double precision", "character varying"),
+ * and trailing [] for array types.
+ */
+const SAFE_NATIVE_TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_ ]*(\[\])?$/;
+
+function assertSafeNativeType(nativeType: string): void {
+  if (!SAFE_NATIVE_TYPE_PATTERN.test(nativeType)) {
+    throw new Error(
+      `Unsafe native type name in contract: "${nativeType}". ` +
+        'Native type names must match /^[a-zA-Z][a-zA-Z0-9_ ]*(\\[\\])?$/',
+    );
+  }
+}
+
+function assertSafeDefaultExpression(expression: string): void {
+  if (expression.includes(';') || /--|\/\*/.test(expression)) {
+    throw new Error(
+      `Unsafe default expression in contract: "${expression}". ` +
+        'Default expressions must not contain semicolons or SQL comment tokens.',
+    );
+  }
+}
+
+/**
  * Builds the column type SQL, handling autoincrement as a special case.
  * For autoincrement on int4/int8, we use SERIAL/BIGSERIAL types.
  */
-function buildColumnTypeSql(column: StorageColumn): string {
+export function buildColumnTypeSql(column: StorageColumn): string {
   const columnDefault = column.default;
 
   // For autoincrement, use SERIAL/BIGSERIAL types instead of int4/int8
@@ -1273,6 +833,8 @@ function buildColumnTypeSql(column: StorageColumn): string {
     return quoteIdentifier(column.nativeType);
   }
 
+  // Validate nativeType before using it unquoted in DDL
+  assertSafeNativeType(column.nativeType);
   return renderParameterizedTypeSql(column) ?? column.nativeType;
 }
 
@@ -1321,6 +883,7 @@ function buildColumnDefaultSql(
       if (columnDefault.expression === 'autoincrement()') {
         return '';
       }
+      assertSafeDefaultExpression(columnDefault.expression);
       return `DEFAULT ${columnDefault.expression}`;
     }
     case 'sequence':
@@ -1360,11 +923,11 @@ function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
   return `'${escapeLiteral(json)}'`;
 }
 
-function qualifyTableName(schema: string, table: string): string {
+export function qualifyTableName(schema: string, table: string): string {
   return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
 }
 
-function toRegclassLiteral(schema: string, name: string): string {
+export function toRegclassLiteral(schema: string, name: string): string {
   const regclass = `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
   return `'${escapeLiteral(regclass)}'`;
 }
@@ -1373,7 +936,7 @@ function sortedEntries<V>(record: Readonly<Record<string, V>>): Array<[string, V
   return Object.entries(record).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, V]>;
 }
 
-function constraintExistsCheck({
+export function constraintExistsCheck({
   constraintName,
   schema,
   exists = true,
@@ -1391,7 +954,7 @@ function constraintExistsCheck({
 )`;
 }
 
-function columnExistsCheck({
+export function columnExistsCheck({
   schema,
   table,
   column,
@@ -1412,41 +975,25 @@ function columnExistsCheck({
 )`;
 }
 
-function columnIsNotNullCheck({
+export function columnNullabilityCheck({
   schema,
   table,
   column,
+  nullable,
 }: {
   schema: string;
   table: string;
   column: string;
+  nullable: boolean;
 }): string {
+  const expected = nullable ? 'YES' : 'NO';
   return `SELECT EXISTS (
   SELECT 1
   FROM information_schema.columns
   WHERE table_schema = '${escapeLiteral(schema)}'
     AND table_name = '${escapeLiteral(table)}'
     AND column_name = '${escapeLiteral(column)}'
-    AND is_nullable = 'NO'
-)`;
-}
-
-function columnIsNullableCheck({
-  schema,
-  table,
-  column,
-}: {
-  schema: string;
-  table: string;
-  column: string;
-}): string {
-  return `SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
-    AND table_name = '${escapeLiteral(table)}'
-    AND column_name = '${escapeLiteral(column)}'
-    AND is_nullable = 'YES'
+    AND is_nullable = '${expected}'
 )`;
 }
 
@@ -1519,96 +1066,4 @@ function hasForeignKey(table: SqlSchemaIR['tables'][string], fk: ForeignKey): bo
       candidate.referencedTable === fk.references.table &&
       arraysEqual(candidate.referencedColumns, fk.references.columns),
   );
-}
-
-function isAdditiveIssue(issue: SchemaIssue): boolean {
-  switch (issue.kind) {
-    case 'type_missing':
-    case 'type_values_mismatch':
-    case 'missing_table':
-    case 'missing_column':
-    case 'extension_missing':
-      return true;
-    case 'primary_key_mismatch':
-      return issue.actual === undefined;
-    case 'unique_constraint_mismatch':
-    case 'index_mismatch':
-    case 'foreign_key_mismatch':
-      return issue.indexOrConstraint === undefined;
-    default:
-      return false;
-  }
-}
-
-function sortSchemaIssues(issues: readonly SchemaIssue[]): readonly SchemaIssue[] {
-  if (issues.length <= 1) {
-    return issues;
-  }
-  return [...issues].sort((a, b) => {
-    const kindCompare = a.kind.localeCompare(b.kind);
-    if (kindCompare !== 0) {
-      return kindCompare;
-    }
-    const tableCompare = compareStrings(a.table, b.table);
-    if (tableCompare !== 0) {
-      return tableCompare;
-    }
-    const columnCompare = compareStrings(a.column, b.column);
-    if (columnCompare !== 0) {
-      return columnCompare;
-    }
-    return compareStrings(a.indexOrConstraint, b.indexOrConstraint);
-  });
-}
-
-function buildConflictLocation(issue: SchemaIssue) {
-  const location: {
-    table?: string;
-    column?: string;
-    constraint?: string;
-  } = {};
-  if (issue.table) {
-    location.table = issue.table;
-  }
-  if (issue.column) {
-    location.column = issue.column;
-  }
-  if (issue.indexOrConstraint) {
-    location.constraint = issue.indexOrConstraint;
-  }
-  return Object.keys(location).length > 0 ? location : undefined;
-}
-
-function conflictComparator(a: SqlPlannerConflict, b: SqlPlannerConflict): number {
-  if (a.kind !== b.kind) {
-    return a.kind < b.kind ? -1 : 1;
-  }
-  const aLocation = a.location ?? {};
-  const bLocation = b.location ?? {};
-  const tableCompare = compareStrings(aLocation.table, bLocation.table);
-  if (tableCompare !== 0) {
-    return tableCompare;
-  }
-  const columnCompare = compareStrings(aLocation.column, bLocation.column);
-  if (columnCompare !== 0) {
-    return columnCompare;
-  }
-  const constraintCompare = compareStrings(aLocation.constraint, bLocation.constraint);
-  if (constraintCompare !== 0) {
-    return constraintCompare;
-  }
-  return compareStrings(a.summary, b.summary);
-}
-
-function compareStrings(a?: string, b?: string): number {
-  if (a === b) {
-    return 0;
-  }
-  if (a === undefined) {
-    return -1;
-  }
-  if (b === undefined) {
-    return 1;
-  }
-  return a < b ? -1 : 1;
 }

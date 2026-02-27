@@ -204,6 +204,14 @@ export interface DbUpdateOptions {
    * The type is driver-specific (e.g., string URL for Postgres).
    */
   readonly connection?: unknown;
+  /**
+   * When true, allows applying plans that contain destructive operations
+   * (e.g., DROP TABLE, DROP COLUMN, ALTER TYPE).
+   * When false (default), the operation returns a failure if the plan
+   * includes destructive operations, prompting the user to use --plan
+   * to preview and then re-run with --accept-data-loss.
+   */
+  readonly acceptDataLoss?: boolean;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }
@@ -344,6 +352,7 @@ export interface DbUpdateSuccess {
       readonly label: string;
       readonly operationClass: string;
     }>;
+    readonly sql?: ReadonlyArray<string>;
   };
   readonly destination: {
     readonly storageHash: string;
@@ -367,7 +376,11 @@ export interface DbUpdateSuccess {
 /**
  * Failure codes for dbUpdate operation.
  */
-export type DbUpdateFailureCode = 'PLANNING_FAILED' | 'MARKER_REQUIRED' | 'RUNNER_FAILED';
+export type DbUpdateFailureCode =
+  | 'PLANNING_FAILED'
+  | 'MARKER_REQUIRED'
+  | 'RUNNER_FAILED'
+  | 'DESTRUCTIVE_CHANGES';
 
 /**
  * Failure details for dbUpdate operation.
