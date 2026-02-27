@@ -19,7 +19,7 @@ Composition-root Postgres helper that builds a Prisma Next runtime client and ex
 - `db.context`
 - `db.stack`
 
-Runtime resources are deferred until `db.runtime()` is called.
+Runtime resources are deferred until `db.runtime()` or `db.connect(...)` is called.
 Connection binding can be provided up front (`url`, `pg`, `binding`) or deferred via `db.connect(...)`.
 
 When URL binding is used, pool timeouts are configurable via `poolOptions`:
