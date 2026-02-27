@@ -11,6 +11,18 @@ import contractJson from './fixtures/generated/contract.json' with { type: 'json
 
 const contract = validateContract<Contract>(contractJson);
 
+function expectGuardrailErrorCode(query: unknown, code: string) {
+  try {
+    runGuardrails(contract, query);
+    throw new Error(`Expected runGuardrails to throw ${code}`);
+  } catch (error) {
+    expect(KyselyTransformError.is(error)).toBe(true);
+    if (KyselyTransformError.is(error)) {
+      expect(error.code).toBe(code);
+    }
+  }
+}
+
 function selectWithJoin(selections: unknown[], where?: unknown) {
   return {
     kind: 'SelectQueryNode',
@@ -77,15 +89,7 @@ describe('runGuardrails', () => {
         },
       ]);
 
-      expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
-      try {
-        runGuardrails(contract, query);
-      } catch (e) {
-        expect(KyselyTransformError.is(e)).toBe(true);
-        expect((e as KyselyTransformError).code).toBe(
-          KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
-        );
-      }
+      expectGuardrailErrorCode(query, KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE);
     });
 
     it('rejects unqualified column ref in multi-table where', () => {
@@ -110,14 +114,7 @@ describe('runGuardrails', () => {
         },
       );
 
-      expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
-      try {
-        runGuardrails(contract, query);
-      } catch (e) {
-        expect((e as KyselyTransformError).code).toBe(
-          KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
-        );
-      }
+      expectGuardrailErrorCode(query, KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE);
     });
 
     it('rejects unqualified column ref in multi-table orderBy', () => {
@@ -144,14 +141,7 @@ describe('runGuardrails', () => {
         ],
       };
 
-      expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
-      try {
-        runGuardrails(contract, query);
-      } catch (e) {
-        expect((e as KyselyTransformError).code).toBe(
-          KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
-        );
-      }
+      expectGuardrailErrorCode(query, KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE);
     });
 
     it('rejects IdentifierNode column ref in multi-table scope (regression: getTableName fallback bug)', () => {
@@ -165,15 +155,7 @@ describe('runGuardrails', () => {
         },
       ]);
 
-      expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
-      try {
-        runGuardrails(contract, query);
-      } catch (e) {
-        expect(KyselyTransformError.is(e)).toBe(true);
-        expect((e as KyselyTransformError).code).toBe(
-          KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
-        );
-      }
+      expectGuardrailErrorCode(query, KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE);
     });
 
     it('allows qualified column refs in multi-table scope', () => {
@@ -247,14 +229,7 @@ describe('runGuardrails', () => {
         ],
       };
 
-      expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
-      try {
-        runGuardrails(contract, query);
-      } catch (e) {
-        expect((e as KyselyTransformError).code).toBe(
-          KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE,
-        );
-      }
+      expectGuardrailErrorCode(query, KYSELY_TRANSFORM_ERROR_CODES.UNQUALIFIED_REF_IN_MULTI_TABLE);
     });
   });
 
@@ -262,15 +237,7 @@ describe('runGuardrails', () => {
     it('rejects selectAll without table reference in multi-table scope', () => {
       const query = selectWithJoin([{ kind: 'SelectAllNode' }]);
 
-      expect(() => runGuardrails(contract, query)).toThrow(KyselyTransformError);
-      try {
-        runGuardrails(contract, query);
-      } catch (e) {
-        expect(KyselyTransformError.is(e)).toBe(true);
-        expect((e as KyselyTransformError).code).toBe(
-          KYSELY_TRANSFORM_ERROR_CODES.AMBIGUOUS_SELECT_ALL,
-        );
-      }
+      expectGuardrailErrorCode(query, KYSELY_TRANSFORM_ERROR_CODES.AMBIGUOUS_SELECT_ALL);
     });
 
     it('allows selectAll with explicit table in multi-table scope', () => {
