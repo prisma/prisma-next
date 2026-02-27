@@ -21,19 +21,8 @@ import {
   plannerFailure,
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
-import {
-  arraysEqual,
-  isIndexSatisfied,
-  isUniqueConstraintSatisfied,
-  verifySqlSchema,
-} from '@prisma-next/family-sql/schema-verify';
-import type {
-  ForeignKey,
-  SqlContract,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-} from '@prisma-next/sql-contract/types';
+import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import type { ForeignKey, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
@@ -472,8 +461,9 @@ PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
+      const lookup = schemaTable ? buildSchemaTableLookup(schemaTable) : undefined;
       for (const unique of table.uniques) {
-        if (schemaTable && hasUniqueConstraint(schemaTable, unique.columns)) {
+        if (lookup && hasUniqueConstraint(lookup, unique.columns)) {
           continue;
         }
         const constraintName = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
@@ -520,8 +510,9 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
+      const lookup = schemaTable ? buildSchemaTableLookup(schemaTable) : undefined;
       for (const index of table.indexes) {
-        if (schemaTable && hasIndex(schemaTable, index.columns)) {
+        if (lookup && hasIndex(lookup, index.columns)) {
           continue;
         }
         const indexName = index.name ?? `${tableName}_${index.columns.join('_')}_idx`;
@@ -573,6 +564,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
+      const lookup = schemaTable ? buildSchemaTableLookup(schemaTable) : undefined;
       // Collect column sets of user-declared indexes to avoid duplicates
       const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
 
@@ -581,7 +573,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
         // Skip if user already declared an index with these columns
         if (declaredIndexColumns.has(fk.columns.join(','))) continue;
         // Skip if the index already exists in the database
-        if (schemaTable && hasIndex(schemaTable, fk.columns)) continue;
+        if (lookup && hasIndex(lookup, fk.columns)) continue;
 
         const indexName = `${tableName}_${fk.columns.join('_')}_idx`;
         operations.push({
@@ -628,9 +620,10 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
+      const lookup = schemaTable ? buildSchemaTableLookup(schemaTable) : undefined;
       for (const foreignKey of table.foreignKeys) {
         if (foreignKey.constraint === false) continue;
-        if (schemaTable && hasForeignKey(schemaTable, foreignKey)) {
+        if (lookup && hasForeignKey(lookup, foreignKey)) {
           continue;
         }
         const fkName = foreignKey.name ?? `${tableName}_${foreignKey.columns.join('_')}_fkey`;
@@ -669,18 +662,6 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
       }
     }
     return operations;
-  }
-
-  private getContractColumn(
-    contract: SqlContract<SqlStorage>,
-    tableName: string,
-    columnName: string,
-  ): StorageColumn | null {
-    const table = contract.storage.tables[tableName];
-    if (!table) {
-      return null;
-    }
-    return table.columns[columnName] ?? null;
   }
 
   private buildTargetDetails(
@@ -1036,29 +1017,42 @@ function tableHasPrimaryKeyCheck(
 }
 
 /**
- * Checks if table has a unique constraint satisfied by the given columns.
- * Uses shared semantic satisfaction predicate from verify-helpers.
+ * Pre-computed lookup sets for a schema table's constraints.
+ * Converts O(n*m) linear scans to O(1) Set lookups per constraint check.
  */
-function hasUniqueConstraint(
-  table: SqlSchemaIR['tables'][string],
-  columns: readonly string[],
-): boolean {
-  return isUniqueConstraintSatisfied(table.uniques, table.indexes, columns);
+interface SchemaTableLookup {
+  readonly uniqueKeys: Set<string>;
+  readonly indexKeys: Set<string>;
+  readonly uniqueIndexKeys: Set<string>;
+  readonly fkKeys: Set<string>;
 }
 
-/**
- * Checks if table has an index satisfied by the given columns.
- * Uses shared semantic satisfaction predicate from verify-helpers.
- */
-function hasIndex(table: SqlSchemaIR['tables'][string], columns: readonly string[]): boolean {
-  return isIndexSatisfied(table.indexes, table.uniques, columns);
+function buildSchemaTableLookup(table: SqlSchemaIR['tables'][string]): SchemaTableLookup {
+  const uniqueKeys = new Set(table.uniques.map((u) => u.columns.join(',')));
+  const indexKeys = new Set(table.indexes.map((i) => i.columns.join(',')));
+  const uniqueIndexKeys = new Set(
+    table.indexes.filter((i) => i.unique).map((i) => i.columns.join(',')),
+  );
+  const fkKeys = new Set(
+    table.foreignKeys.map(
+      (fk) => `${fk.columns.join(',')}|${fk.referencedTable}|${fk.referencedColumns.join(',')}`,
+    ),
+  );
+  return { uniqueKeys, indexKeys, uniqueIndexKeys, fkKeys };
 }
 
-function hasForeignKey(table: SqlSchemaIR['tables'][string], fk: ForeignKey): boolean {
-  return table.foreignKeys.some(
-    (candidate) =>
-      arraysEqual(candidate.columns, fk.columns) &&
-      candidate.referencedTable === fk.references.table &&
-      arraysEqual(candidate.referencedColumns, fk.references.columns),
+function hasUniqueConstraint(lookup: SchemaTableLookup, columns: readonly string[]): boolean {
+  const key = columns.join(',');
+  return lookup.uniqueKeys.has(key) || lookup.uniqueIndexKeys.has(key);
+}
+
+function hasIndex(lookup: SchemaTableLookup, columns: readonly string[]): boolean {
+  const key = columns.join(',');
+  return lookup.indexKeys.has(key) || lookup.uniqueKeys.has(key);
+}
+
+function hasForeignKey(lookup: SchemaTableLookup, fk: ForeignKey): boolean {
+  return lookup.fkKeys.has(
+    `${fk.columns.join(',')}|${fk.references.table}|${fk.references.columns.join(',')}`,
   );
 }

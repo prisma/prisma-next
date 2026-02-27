@@ -1,4 +1,4 @@
-import { escapeLiteral, quoteIdentifier } from '@prisma-next/adapter-postgres/control';
+import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { SchemaIssue } from '@prisma-next/core-control-plane/types';
 import type {
   MigrationOperationPolicy,
