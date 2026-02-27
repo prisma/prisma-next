@@ -79,7 +79,6 @@ export default defineConfig({
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',
-    types: 'src/prisma/contract.d.ts',
   },
 });
 ```
@@ -160,7 +159,6 @@ export default defineConfig({
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',
-    types: 'src/prisma/contract.d.ts',
   },
   db: {
     connection: process.env.DATABASE_URL, // Optional: can also use --db flag
@@ -471,7 +469,6 @@ export default defineConfig({
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',
-    types: 'src/prisma/contract.d.ts',
   },
   db: {
     connection: process.env.DATABASE_URL, // Optional: can also use --db flag
@@ -682,7 +679,6 @@ export default defineConfig({
   contract: {
     source: contract,
     output: 'src/prisma/contract.json',
-    types: 'src/prisma/contract.d.ts',
   },
   db: {
     connection: process.env.DATABASE_URL, // Optional: can also use --db flag
@@ -827,6 +823,8 @@ The `contract.source` field can be:
 - A PSL source selector: `source: { kind: 'psl', schemaPath: './schema.prisma' }` (requires explicit `schemaPath`)
 
 The `contract.output` field specifies the path to `contract.json`. This is the canonical location where other CLI commands can find the contract JSON artifact. Defaults to `'src/prisma/contract.json'` if not specified.
+
+`contract.d.ts` is always colocated with `contract.json` and derived from `contract.output` (`contract.json` → `contract.d.ts`).
 
 **Output:**
 - `contract.json`: Includes `_generated` metadata field indicating it's a generated artifact (excluded from canonicalization/hashing)

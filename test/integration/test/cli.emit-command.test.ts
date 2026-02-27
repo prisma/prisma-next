@@ -505,7 +505,7 @@ describe('emit command', () => {
   );
 
   it(
-    'throws error when contract config missing output or types',
+    'throws error when contract config output is missing',
     { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
@@ -520,7 +520,7 @@ describe('emit command', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDirMissing);
-          // Command should throw for missing output or types
+          // Command should throw for missing output
           await expect(
             executeCommand(command, [
               'node',
