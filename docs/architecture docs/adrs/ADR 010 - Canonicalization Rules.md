@@ -11,11 +11,11 @@
 
 - Define a strict canonical JSON format for `contract.json`
 - Apply canonicalization in the emitter after validation and normalization and before hashing
-- Compute coreHash and profileHash over the canonical bytes
+- Compute `storageHash` (and optional `executionHash`) plus `profileHash` over canonical bytes
 - Treat any divergence from these rules as an emitter bug
 - Define a `canonicalVersion` field and require it to be embedded in every stored contract blob and DB marker
-- State that TS-first and PSL-first must canonicalize to the identical JSON and coreHash
-- Require a recanonicalize tool and policy: emitter changes bump `canonicalVersion`, not coreHash, and repos can bulk-upgrade blobs
+- State that TS-first and PSL-first must canonicalize to the identical JSON and `storageHash` for equivalent intent
+- Require a recanonicalize tool and policy: canonicalization rule changes bump `canonicalVersion` and require bulk-upgrading stored blobs intentionally
 
 ## Canonical JSON profile
 
@@ -49,13 +49,14 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 2. `canonicalVersion`
 3. `targetFamily`
 4. `target`
-5. `coreHash`
-6. `profileHash`
-7. `models`
-8. `storage`
-9. `capabilities`
-10. `codecs`
-11. `meta`
+5. `storageHash`
+6. `executionHash`
+7. `profileHash`
+8. `models`
+9. `storage`
+10. `capabilities`
+11. `codecs`
+12. `meta`
 
 Within each of these sections, standard lexicographic sort applies, except where domain-specific ordering rules are defined below.
 
@@ -90,21 +91,22 @@ Within each of these sections, standard lexicographic sort applies, except where
 - Keys within extensions follow the same lexicographic ordering
 - Fields that do not alter logical meaning are included in profileHash only per ADR 004
 
-### Meta and provenance
+### Meta (non-semantic; no provenance)
 
-- `meta` contains non-semantic information useful for tooling
-- `source`: `psl` or `ts`
-- `sourcePath`: normalized posix path relative to repo root
-- `emitterVersion`, `adapterVersions`, `generatedAt` as ISO string
-- `generatedAt` is excluded from all hashes
-- `meta` key ordering is lexicographic and appears after core sections as defined above
+If `meta` is present, it must not contain authoring provenance (no schema paths, no `sourceId`s, no spans). Provenance lives in diagnostics only and must not participate in hashing.
+
+Examples of acceptable `meta` fields (non-semantic, tooling-only):
+
+- `emitterVersion`, `adapterVersions`
+- `generatedAt` as ISO string (excluded from all hashes)
+
+`meta` key ordering is lexicographic and appears after core sections as defined above.
 
 ### Hashing
 
-- coreHash is computed over the canonical JSON with profile-only fields stripped
-- profileHash is computed over canonical JSON including profile fields
+- `storageHash` is computed over canonical JSON for storage meaning (profile-only fields stripped)
+- `profileHash` is computed over canonical JSON including profile fields
 - Hash algorithm: SHA-256, represented as `sha256:<hex>`
-- The exact canonicalization variant and schema version are embedded in meta for future migrations
 
 ## Emitter responsibilities
 
@@ -112,26 +114,26 @@ Within each of these sections, standard lexicographic sort applies, except where
 - Provide `--verify` mode that re-parses and re-emits to assert byte-identical output
 - Provide a `prisma-next verify contract.json` command to check adherence outside of emit
 - Provide a `prisma-next recanonicalize` command to bulk-upgrade contract blobs when `canonicalVersion` changes
-- Ensure TS-first and PSL-first projects produce identical canonical JSON and coreHash for the same logical schema
+- Ensure TS-first and PSL-first projects produce identical canonical JSON and `storageHash` for the same logical schema
 
 ## Consumer responsibilities
 
 - Treat `contract.json` as immutable content-addressed data
 - Never reorder or pretty-print when storing or transmitting
-- Use coreHash for applicability checks and profileHash for drift checks
+- Use `storageHash` for applicability checks and `profileHash` for drift checks
 
 ## Examples
 
 ### Minimal canonical object
 
 ```json
-{"schemaVersion":"1","targetFamily":"sql","target":"postgres","coreHash":"sha256:...","models":{},"storage":{"tables":{}}}
+{"schemaVersion":"1","targetFamily":"sql","target":"postgres","storageHash":"sha256:...","models":{},"storage":{"tables":{}}}
 ```
 
-### With capabilities and meta
+### With capabilities
 
 ```json
-{"schemaVersion":"1","targetFamily":"sql","target":"postgres","coreHash":"sha256:...","profileHash":"sha256:...","models":{"User":{"storage":{"table":"user"},"fields":{"id":{"column":"id"},"email":{"column":"email"}}}},"storage":{"tables":{"user":{"columns":{"email":{"type":"text"},"id":{"type":"int4"}},"primaryKey":{"columns":["id"],"name":"user_pkey"}}}},"capabilities":{"postgres":{"jsonAgg":true,"lateral":true}},"codecs":{"int4":{"ts":"number"},"text":{"ts":"string"}},"meta":{"emitterVersion":"1.0.0","source":"psl","sourcePath":"prisma/schema.prisma"}}
+{"schemaVersion":"1","targetFamily":"sql","target":"postgres","storageHash":"sha256:...","profileHash":"sha256:...","models":{"User":{"storage":{"table":"user"},"fields":{"id":{"column":"id"},"email":{"column":"email"}}}},"storage":{"tables":{"user":{"columns":{"email":{"type":"text"},"id":{"type":"int4"}},"primaryKey":{"columns":["id"],"name":"user_pkey"}}}},"capabilities":{"postgres":{"jsonAgg":true,"lateral":true}},"codecs":{"int4":{"ts":"number"},"text":{"ts":"string"}}}
 ```
 
 ## Alternatives considered
@@ -145,7 +147,7 @@ Within each of these sections, standard lexicographic sort applies, except where
 ### Positive
 
 - Byte-identical artifacts across OSes and authoring modes
-- Stable coreHash and profileHash for CI and PPg
+- Stable `storageHash` and `profileHash` for CI and PPg
 - Cleaner diffs and lower review noise
 - Deterministic planner inputs and fewer spurious changes
 
@@ -167,7 +169,7 @@ Within each of these sections, standard lexicographic sort applies, except where
 - Older contracts without canonicalization are re-emitted on first emit and pick up hashes accordingly
 - Schema version bump if canonicalization rules change in a breaking way
 - `canonicalVersion` defaults to 1 for existing contracts; older contracts without this field are accepted
-- Emitter changes that only affect canonicalization bump `canonicalVersion`, not coreHash, ensuring stable hashing
+- Canonicalization rule changes bump `canonicalVersion` and require bulk-upgrading stored blobs deliberately (hashes will change if canonical bytes change)
 
 ## Open questions
 

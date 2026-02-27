@@ -1,5 +1,9 @@
 # ADR 127 — Views as extension-owned read-only sources
 
+> Note: This ADR predates the provider-based authoring direction and the decision that canonical `contract.json` must have **no** top-level `sources` field (see [ADR 006 — Dual Authoring Modes](ADR%20006%20-%20Dual%20Authoring%20Modes.md)).
+>
+> The “publish views into `contract.sources`” mechanism described below should be treated as **deprecated** until this ADR is revised to match the “no top-level `sources` field” guarantee. Views remain extension-owned; the surfacing mechanism for type-safe querying must not rely on a canonical root `sources` registry.
+
 ## Context
 
 Database views and materialized views are widely used but vary significantly across targets in definition, materialization, refresh semantics, and performance characteristics. Making views a core object would bloat the contract, couple us to dialect semantics, and complicate portable type generation.

@@ -17,6 +17,17 @@
 
 ## Details
 
+### Problem statement
+
+We want dual authoring surfaces without coupling the framework/CLI to every possible input format. The convergence boundary must remain a framework-defined Contract IR and a single canonical artifact (`contract.json`) so parity and determinism are enforceable.
+
+### Constraints (non-negotiables)
+
+- `contract.json` must be deterministic and cross-platform stable.
+- Hashing must only cover canonical contract meaning (no file paths, no source IDs, no spans).
+- The CLI/control plane must be source-agnostic (no `kind` switching on “PSL vs TS vs …”).
+- Providers may produce rich diagnostics (including spans), but those diagnostics must not enter canonical artifacts.
+
 ### Authoring modes
 
 #### PSL-first
@@ -30,16 +41,61 @@
 ### Canonical artifact
 
 - `contract.json` is canonical, deterministic, and cross-platform stable
-- Hashing follows ADR 004 with coreHash and profileHash
+- Hashing follows ADR 004: meaning hashes (e.g. `storageHash`, optional `executionHash`) plus `profileHash` for pinned capability profile
 - `.d.ts` provides types only, no generated runtime objects
+
+### Responsibility split (how we decouple framework from authoring)
+
+**Contract source provider (authoring-owned):**
+
+- Loads input(s) (read files, evaluate TS builder, etc.).
+- Parses/constructs an intermediate representation and returns **framework-defined `ContractIR`**.
+- Returns structured diagnostics on failure (optionally with `sourceId` + span).
+
+**Framework emission pipeline (framework-owned):**
+
+- Validates provider-produced IR (structure + invariants).
+- Normalizes IR into the canonical, parity-enforcing boundary (defaulting, stable ordering/identities).
+- Canonicalizes + hashes from normalized IR.
+- Emits `contract.json` + `contract.d.ts` deterministically.
+
+This ensures the framework remains **ignorant of source formats** while still enforcing **shared meaning** and **identical canonical artifacts** across providers.
 
 ### Configuration
 
 `prisma-next.config.ts` declares:
-- `contract.source` provider (`() => Promise<Result<ContractIR, Diagnostics>>`)
-- Provider-owned parsing/loading (PSL, TS, or future sources)
-- `outDir` for emitted artifacts
-- Target info and naming scheme used for deterministic names
+
+- `contract.source`: an async provider `() => Promise<Result<ContractIR, ContractSourceDiagnostics>>`
+- `contract.output`: path to `contract.json` (types are colocated as `contract.d.ts`)
+
+Example (shape):
+
+```ts
+import { defineConfig } from '@prisma-next/core-control-plane/config-types';
+import { err, ok } from '@prisma-next/utils/result';
+
+export default defineConfig({
+  // ... family/target/adapter wiring ...
+  contract: {
+    output: 'src/prisma/contract.json',
+    source: async () => {
+      // Provider-owned I/O + parsing/authoring.
+      // Must return framework-defined ContractIR (not JSON).
+      try {
+        const ir = await buildContractIrSomehow();
+        return ok(ir);
+      } catch (e) {
+        return err({
+          summary: 'Failed to build Contract IR',
+          diagnostics: [
+            { code: 'contract_source_error', message: String(e) },
+          ],
+        });
+      }
+    },
+  },
+});
+```
 
 ### Dev and CI behavior
 
