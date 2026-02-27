@@ -129,7 +129,7 @@ withTempDir(({ createTempDir }) => {
           },
         });
       },
-      timeouts.databaseOperation,
+      timeouts.spinUpPpgDev,
     );
   });
 });

@@ -39,6 +39,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 019 | TypedSQL as Separate CLI | Establishes TypedSQL as out-of-tree tool that emits Plan factories | [ADR 019 - TypedSQL as Separate CLI.md](adrs/ADR%20019%20-%20TypedSQL%20as%20Separate%20CLI.md) |
 | 020 | Result Typing Rules | Defines how DSL and ORM compute result types from projections and joins | [ADR 020 - Result Typing Rules.md](adrs/ADR%20020%20-%20Result%20Typing%20Rules.md) |
 | 025 | Plan Caching Memoization | Establishes Plan caching strategy with memoization and invalidation | [ADR 025 - Plan Caching Memoization.md](adrs/ADR%20025%20-%20Plan%20Caching%20Memoization.md) |
+| 162 | Kysely lane emits PN SQL AST | Kysely authoring compiles to plans with PN-native QueryAst + refs so runtime plugins can inspect structure lane-agnostically | [ADR 162 - Kysely lane emits PN SQL AST.md](adrs/ADR%20162%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md) |
 
 ## Runtime & Execution
 

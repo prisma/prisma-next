@@ -1,7 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
-import type { PostgresDriverCreateOptions } from '@prisma-next/driver-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import type {
   ExtractCodecTypes,
   ExtractOperationTypes,
@@ -11,6 +11,7 @@ import type {
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SelectBuilder } from '@prisma-next/sql-lane';
 import { sql as sqlBuilder } from '@prisma-next/sql-lane';
+import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type { SchemaHandle } from '@prisma-next/sql-relational-core/schema';
 import { schema as schemaBuilder } from '@prisma-next/sql-relational-core/schema';
 import type {
@@ -31,7 +32,8 @@ import {
   createSqlExecutionStack,
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import { ifDefined } from '@prisma-next/utils/defined';
+import { Kysely } from 'kysely';
+import { Pool } from 'pg';
 import { type PostgresBindingInput, resolvePostgresBinding } from './binding';
 
 type NormalizeOperationTypes<T> = {
@@ -45,6 +47,9 @@ type NormalizeOperationTypes<T> = {
 type ToSchemaOperationTypes<T> = T extends OperationTypes ? T : NormalizeOperationTypes<T>;
 
 export type PostgresTargetId = 'postgres';
+type OrmClient<TContract extends SqlContract<SqlStorage>> = ReturnType<
+  typeof ormBuilder<TContract>
+>;
 
 export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
   readonly sql: SelectBuilder<
@@ -53,21 +58,26 @@ export interface PostgresClient<TContract extends SqlContract<SqlStorage>> {
     ExtractCodecTypes<TContract>,
     ExtractOperationTypes<TContract>
   >;
+  kysely(runtime: Runtime): Kysely<KyselifyContract<TContract>>;
   readonly schema: SchemaHandle<
     TContract,
     ExtractCodecTypes<TContract>,
     ToSchemaOperationTypes<ExtractOperationTypes<TContract>>
   >;
+  readonly orm: OrmClient<TContract>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
-  runtime(): Promise<Runtime>;
+  runtime(): Runtime;
 }
 
 export interface PostgresOptionsBase<TContract extends SqlContract<SqlStorage>> {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
   readonly plugins?: readonly Plugin<TContract>[];
   readonly verify?: RuntimeVerifyOptions;
-  readonly cursor?: PostgresDriverCreateOptions['cursor'];
+  readonly poolOptions?: {
+    readonly connectionTimeoutMillis?: number;
+    readonly idleTimeoutMillis?: number;
+  };
 }
 
 export type PostgresOptionsWithContract<TContract extends SqlContract<SqlStorage>> =
@@ -119,15 +129,7 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    driver:
-      options.cursor === undefined
-        ? postgresDriver
-        : {
-            ...postgresDriver,
-            create() {
-              return postgresDriver.create({ cursor: options.cursor });
-            },
-          },
+    driver: postgresDriver,
     extensionPacks: options.extensions ?? [],
   });
 
@@ -138,49 +140,71 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
 
   const schema: PostgresClient<TContract>['schema'] = schemaBuilder(context);
   const sql = sqlBuilder({ context });
+  let runtimeInstance: Runtime | undefined;
+  const getRuntime = (): Runtime => {
+    if (runtimeInstance) {
+      return runtimeInstance;
+    }
 
-  let runtimePromise: Promise<Runtime> | undefined;
+    const stackInstance = instantiateExecutionStack(stack);
+    const driverDescriptor = stack.driver;
+    if (!driverDescriptor) {
+      throw new Error('Driver descriptor missing from execution stack');
+    }
+
+    const connect =
+      binding.kind === 'url'
+        ? {
+            pool: new Pool({
+              connectionString: binding.url,
+              connectionTimeoutMillis: options.poolOptions?.connectionTimeoutMillis ?? 20_000,
+              idleTimeoutMillis: options.poolOptions?.idleTimeoutMillis ?? 30_000,
+            }),
+          }
+        : binding.kind === 'pgPool'
+          ? { pool: binding.pool }
+          : { client: binding.client };
+
+    const driver = driverDescriptor.create({
+      connect,
+      cursor: { disabled: true },
+    });
+
+    runtimeInstance = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
+      ...(options.plugins ? { plugins: options.plugins } : {}),
+    });
+
+    return runtimeInstance;
+  };
+  const orm: OrmClient<TContract> = ormBuilder({
+    contract,
+    runtime: {
+      execute(plan) {
+        return getRuntime().execute(plan);
+      },
+      connection() {
+        return getRuntime().connection();
+      },
+    },
+  });
 
   return {
     sql,
+    kysely(runtime: Runtime) {
+      return new Kysely<KyselifyContract<TContract>>({
+        dialect: new KyselyPrismaDialect({ runtime, contract }),
+      });
+    },
     schema,
+    orm,
     context,
     stack,
-    async runtime() {
-      if (runtimePromise) {
-        return runtimePromise;
-      }
-
-      runtimePromise = (async () => {
-        const stackInstance = instantiateExecutionStack(stack);
-        const driver = stackInstance.driver;
-        if (driver === undefined) {
-          throw new Error('Relational runtime requires a driver descriptor on the execution stack');
-        }
-
-        try {
-          // `binding` is normalized by resolvePostgresBinding(), so this call site remains
-          // type-safe in practice while SqlRuntimeDriverInstance currently uses SqlDriver<unknown>.
-          await driver.connect(binding);
-
-          return createRuntime({
-            stackInstance,
-            context,
-            driver,
-            verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-            ...ifDefined('plugins', options.plugins),
-          });
-        } catch (error) {
-          await driver.close().catch(() => undefined);
-          throw error;
-        }
-      })();
-
-      runtimePromise.catch(() => {
-        runtimePromise = undefined;
-      });
-
-      return runtimePromise;
+    runtime() {
+      return getRuntime();
     },
   };
 }

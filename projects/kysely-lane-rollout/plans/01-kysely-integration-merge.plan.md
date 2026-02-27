@@ -22,9 +22,9 @@ Deliverable: a clear “what’s supported” and “what happens when unsupport
 
 **Tasks:**
 
-- [ ] Document the Phase 1 merge gate (which `pnpm` scripts must be green).
-- [ ] Enumerate supported Kysely query kinds for Phase 1 (by test coverage).
-- [ ] Add/confirm policy: unsupported kinds fail with `PLAN.UNSUPPORTED` runtime error envelope, with structured `details` including `lane: 'kysely'` and `kyselyKind`.
+- [x] Document the Phase 1 merge gate (which `pnpm` scripts must be green).
+- [x] Enumerate supported Kysely query kinds for Phase 1 (by test coverage).
+- [x] Add/confirm policy: unsupported kinds fail with `PLAN.UNSUPPORTED` runtime error envelope, with structured `details` including `lane: 'kysely'` and `kyselyKind`.
 
 ### Milestone 2: Correctness + observability fixes (no refactors)
 
@@ -32,10 +32,10 @@ Deliverable: supported Kysely queries produce AST-backed plans and are enforceab
 
 **Tasks:**
 
-- [ ] Ensure supported Kysely execution path produces plans with `ast: QueryAst` populated and `params` aligned to `meta.paramDescriptors`.
-- [ ] Ensure supported execution uses Prisma Next lowering/adapter pipeline (not Kysely-compiled SQL as the execution truth).
-- [ ] Add/adjust tests proving runtime plugins/guardrails can inspect and enforce based on the AST-backed plan.
-- [ ] Add a test for at least one unsupported query kind that asserts `PLAN.UNSUPPORTED` envelope shape and `details`.
+- [x] Ensure supported Kysely execution path produces plans with `ast: QueryAst` populated and `params` aligned to `meta.paramDescriptors`.
+- [x] Ensure supported execution uses Prisma Next lowering/adapter pipeline (not Kysely-compiled SQL as the execution truth).
+- [x] Add/adjust tests proving runtime plugins/guardrails can inspect and enforce based on the AST-backed plan.
+- [x] Add a test for at least one unsupported query kind that asserts `PLAN.UNSUPPORTED` envelope shape and `details`.
 
 ### Milestone 3: Merge readiness
 
@@ -43,9 +43,9 @@ Deliverable: repo is green and Phase 1 is safe to merge.
 
 **Tasks:**
 
-- [ ] Run the Phase 1 merge gate scripts and fix any failures (tests, typecheck, lint).
-- [ ] Add minimal docs updates so teammates can use the merged integration without reading history.
-- [ ] Ensure Phase 1 docs explicitly link to Phase 2 extraction spec.
+- [x] Run the Phase 1 merge gate scripts and fix any failures (tests, typecheck, lint).
+- [x] Add minimal docs updates so teammates can use the merged integration without reading history.
+- [x] Ensure Phase 1 docs explicitly link to Phase 2 extraction spec.
 
 ## Test Coverage
 
@@ -57,8 +57,19 @@ Deliverable: repo is green and Phase 1 is safe to merge.
 | Unsupported kinds fail with `PLAN.UNSUPPORTED` envelope | Unit/Integration | Milestone 2 | Assert `details.lane` and `details.kyselyKind` |
 | Repo merge gate passes | CI / Manual | Milestone 3 | Record which scripts define the gate |
 
-## Open Items
+## Execution Notes (2026-02-25)
 
-- Which unsupported Kysely kind do we use as the canonical test case?
-- Confirm which `pnpm` scripts are the agreed Phase 1 merge gate.
+- Canonical unsupported kind test case: multi-row `InsertQueryNode` (asserts `PLAN.UNSUPPORTED` + details envelope shape).
+- Phase 1 merge gate scripts used:
+  - `pnpm test:packages`
+  - `pnpm test:integration`
+  - `pnpm typecheck:packages`
+  - `pnpm lint:packages`
+  - `pnpm lint:deps`
+- Current gate status in this worktree:
+  - `pnpm test:packages` passes.
+  - `pnpm test:integration` passes.
+  - `pnpm typecheck:packages` passes.
+  - `pnpm lint:packages` passes.
+  - `pnpm lint:deps` passes.
 

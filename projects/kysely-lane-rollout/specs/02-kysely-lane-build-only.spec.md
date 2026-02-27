@@ -59,6 +59,9 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
 ### 5) Preserve behavior (no coverage regressions)
 
 - Transformer and guardrail behavior for currently supported Kysely node kinds must not regress for MVP; this phase is primarily a **layering/package refactor** with the new build-only surface and interop protocol.
+- Phase 2 hardening must include:
+  - deterministic + deduplicated `meta.refs` emission in transformer output
+  - broader guardrail traversal coverage across supported query-node shapes (not only narrow happy paths)
 
 ## Non-Functional Requirements
 
@@ -88,6 +91,8 @@ This spec is a Drive-format conversion of `agent-os/specs/2026-02-19-kysely-quer
 - [ ] **SQL redaction (Option A)**: compilation (if reachable) yields a stub SQL string while preserving operation tree and parameter ordering/values; tests confirm this.
 - [ ] **Integration re-scope**: `@prisma-next/integration-kysely` no longer owns transformer/guardrail logic (moved to lane or delegated).
 - [ ] **Parity preserved**: existing transformer/guardrail tests continue to pass (or are ported to the new lane package without reducing coverage).
+- [ ] **Refs determinism**: extracted lane emits `meta.refs` deterministically with dedup semantics (tests cover stability across equivalent query shapes).
+- [ ] **Guardrail breadth**: extracted guardrail traversal handles broader supported-node coverage with explicit tests for previously narrow traversal paths.
 
 # Other Considerations
 

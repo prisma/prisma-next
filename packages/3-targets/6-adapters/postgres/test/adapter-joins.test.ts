@@ -1,5 +1,13 @@
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
+import {
+  createBinaryExpr,
+  createColumnRef,
+  createJoin,
+  createLiteralExpr,
+  createSelectAst,
+  createTableRef,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
@@ -263,30 +271,32 @@ describe('Postgres adapter join rendering', () => {
     );
   });
 
-  it('throws error for unsupported join ON expression kind', () => {
+  it('renders join ON with WhereExpr (AndExpr)', () => {
     const adapter = createPostgresAdapter();
 
-    const ast: SelectAst = {
-      kind: 'select',
-      from: { kind: 'table', name: 'user' },
+    const ast = createSelectAst({
+      from: createTableRef('user'),
       joins: [
-        {
-          kind: 'join',
-          joinType: 'inner',
-          table: { kind: 'table', name: 'post' },
-          on: {
-            // @ts-expect-error - Testing unsupported join ON expression kind
-            kind: 'unsupported',
-            left: { kind: 'col', table: 'user', column: 'id' },
-            right: { kind: 'col', table: 'post', column: 'userId' },
-          },
-        },
+        createJoin('inner', createTableRef('post'), {
+          kind: 'and',
+          exprs: [
+            createBinaryExpr(
+              'eq',
+              createColumnRef('user', 'id'),
+              createColumnRef('post', 'userId'),
+            ),
+            createBinaryExpr('neq', createColumnRef('post', 'title'), createLiteralExpr('')),
+          ],
+        }),
       ],
-      project: [{ alias: 'id', expr: { kind: 'col', table: 'user', column: 'id' } }],
-    };
+      project: [{ alias: 'id', expr: createColumnRef('user', 'id') }],
+    });
 
-    expect(() => adapter.lower(ast, { contract, params: [] })).toThrow(
-      'Unsupported join ON expression kind: unsupported',
-    );
+    const lowered = adapter.lower(ast, { contract, params: [] });
+
+    expect(lowered.body.sql).toContain('ON');
+    expect(lowered.body.sql).toContain('AND');
+    expect(lowered.body.sql).toContain('"user"."id" = "post"."userId"');
+    expect(lowered.body.sql).toContain('"post"."title"');
   });
 });

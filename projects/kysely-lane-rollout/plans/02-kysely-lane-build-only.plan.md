@@ -45,9 +45,11 @@ Deliverables:
 - [ ] Scaffold `packages/2-sql/4-lanes/kysely-lane/` (package.json, tsconfig, exports, README with responsibilities + mermaid).
 - [ ] Move/port transformer and guardrails from `@prisma-next/integration-kysely` into the lane package.
 - [ ] Implement plan assembly API: build-only Kysely query → `SqlQueryPlan<Row>` with PN `QueryAst`, params, paramDescriptors, refs, etc.
+- [ ] Harden `meta.refs` generation with deterministic ordering + dedup semantics in the extracted transformer path.
 - [ ] Implement SQL redaction (Option A): ensure any compiled SQL string exposed by internal compilation is stubbed, while preserving `query` + `parameters`.
 - [ ] Implement execution backstop behavior for build-only surface (throws deterministically if execution is attempted via casts).
-- [ ] Port and/or update tests so transformer + guardrails parity is preserved in the lane package.
+- [ ] Expand guardrail traversal to a broader and safer node walk strategy in the extracted lane package.
+- [ ] Port and/or update tests so transformer + guardrails parity is preserved in the lane package, including the new refs/guardrail hardening behavior.
 - [ ] Add dependency/layering assertions: lane must not import `@prisma-next/sql-runtime` (enforced by `pnpm lint:deps`).
 
 ### Milestone 3: Re-scope extensions and update Postgres public surface

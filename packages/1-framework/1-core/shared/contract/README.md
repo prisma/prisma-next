@@ -247,6 +247,21 @@ This separation keeps human-readable tree output clean while preserving full dat
 
 ## Type System
 
+### Plan Types
+
+#### ParamDescriptor
+
+`ParamDescriptor` describes a single parameter in an execution plan. Used in `PlanMeta.paramDescriptors` for param encoding and plugin inspection.
+
+- **`source`**: Origin of the parameter:
+  - **`'dsl'`**: From the Prisma Next DSL/ORM query builder
+  - **`'raw'`**: From raw SQL (e.g. `sql\`...\`` with placeholders)
+  - **`'lane'`**: From a lane integration (e.g. Kysely) that transforms an external AST into PN plan form; the lane id is in `meta.lane`
+- **`index`** (optional): 1-based position into `plan.params`
+- **`name`** (optional): Parameter name for codec resolution
+- **`codecId`**, **`nativeType`**, **`nullable`** (optional): Type metadata from contract
+- **`refs`** (optional): `{ table, column }` when the param is used against a known column
+
 ### Type Guards
 
 Use type guards to narrow the contract type:

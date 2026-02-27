@@ -33,6 +33,13 @@
  * - users-paginate [cursor]    Cursor-based pagination
  * - similarity-search <vec>    Vector similarity search (pgvector)
  * - budget-violation           Demo budget enforcement error
+ * - user-kysely <id>           Get user by ID (Kysely lane)
+ * - posts-kysely <userId>      Get posts for user (Kysely lane)
+ * - users-kysely [limit]       List users with limit (Kysely lane)
+ * - users-with-posts-kysely    Users with nested posts (Kysely lane)
+ * - user-transaction-kysely    Insert user with rollback demo (Kysely lane)
+ * - dml-kysely <op> <args>     Insert/update/delete with returning (Kysely lane)
+ * - guardrail-delete-kysely    Demo AST lint blocking DELETE without WHERE
  *
  * See also:
  * - main-no-emit.ts: Same CLI using inline contract (no emission step)
@@ -40,7 +47,16 @@
  */
 import 'dotenv/config';
 import { type as arktype } from 'arktype';
+import { deleteWithoutWhere } from './kysely/delete-without-where';
+import {
+  deleteUser as deleteUserKysely,
+  insertUser as insertUserKysely,
+  updateUser as updateUserKysely,
+} from './kysely/dml-operations';
 import { getUserById as getUserByIdKysely } from './kysely/get-user-by-id';
+import { getUserPosts as getUserPostsKysely } from './kysely/get-user-posts';
+import { getUsers as getUsersKysely } from './kysely/get-users';
+import { getUsersWithPosts as getUsersWithPostsKysely } from './kysely/get-users-with-posts';
 import { insertUserTransaction as insertUserTransactionKysely } from './kysely/insert-user-transaction';
 import { ormClientFindUserByEmail } from './orm-client/find-user-by-email';
 import { ormClientGetAdminUsers } from './orm-client/get-admin-users';
@@ -259,9 +275,62 @@ async function main() {
       }
       const user = await getUserByIdKysely(userIdStr, runtime);
       console.log(JSON.stringify(user, null, 2));
+    } else if (cmd === 'posts-kysely') {
+      const [userIdStr] = args;
+      if (!userIdStr) {
+        console.error('Usage: pnpm start -- posts-kysely <userId>');
+        process.exit(1);
+      }
+      const posts = await getUserPostsKysely(userIdStr, runtime);
+      console.log(JSON.stringify(posts, null, 2));
+    } else if (cmd === 'users-kysely') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const users = await getUsersKysely(runtime, limit);
+      console.log(JSON.stringify(users, null, 2));
+    } else if (cmd === 'users-with-posts-kysely') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      const users = await getUsersWithPostsKysely(runtime, limit);
+      console.log(JSON.stringify(users, null, 2));
     } else if (cmd === 'user-transaction-kysely') {
       const newUser = await insertUserTransactionKysely(runtime);
       console.log('Inserted user:', JSON.stringify(newUser, null, 2));
+    } else if (cmd === 'dml-kysely') {
+      const [op, ...opArgs] = args;
+      if (op === 'insert' && opArgs[0]) {
+        const inserted = await insertUserKysely(opArgs[0], runtime);
+        console.log('Inserted:', JSON.stringify(inserted, null, 2));
+      } else if (op === 'update' && opArgs[0] && opArgs[1]) {
+        const updated = await updateUserKysely(opArgs[0], opArgs[1], runtime);
+        console.log('Updated:', JSON.stringify(updated, null, 2));
+      } else if (op === 'delete' && opArgs[0]) {
+        const deleted = await deleteUserKysely(opArgs[0], runtime);
+        console.log('Deleted:', JSON.stringify(deleted, null, 2));
+      } else {
+        console.error(
+          'Usage: pnpm start -- dml-kysely <insert email | update userId newEmail | delete userId>',
+        );
+        process.exit(1);
+      }
+    } else if (cmd === 'guardrail-delete-kysely') {
+      console.log('Running DELETE without WHERE to demonstrate AST-based lint guardrail...');
+      try {
+        await deleteWithoutWhere(runtime);
+        console.error('Unexpected: query should have been blocked by LINT.DELETE_WITHOUT_WHERE');
+        process.exit(1);
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          Object.hasOwn(error, 'code') &&
+          Object.hasOwn(error, 'category') &&
+          Reflect.get(error, 'code') === 'LINT.DELETE_WITHOUT_WHERE' &&
+          Reflect.get(error, 'category') === 'LINT'
+        ) {
+          console.log('Guardrail correctly blocked execution: LINT.DELETE_WITHOUT_WHERE');
+        } else {
+          throw error;
+        }
+      }
     } else {
       console.log(
         'Usage: pnpm start -- [users [limit] | user <userId> | posts <userId> | ' +
@@ -272,7 +341,9 @@ async function main() {
           'repo-latest-per-kind | repo-user-insights [limit] | repo-kind-breakdown [minUsers] | ' +
           'repo-upsert-user <id> <email> <kind> | users-paginate [cursor] [limit] | ' +
           'users-paginate-back <cursor> [limit] | similarity-search <queryVector> [limit] | ' +
-          'budget-violation | user-kysely <userId> | user-transaction-kysely]',
+          'budget-violation | user-kysely <userId> | posts-kysely <userId> | users-kysely [limit] | ' +
+          'users-with-posts-kysely [limit] | user-transaction-kysely | dml-kysely <op> <args...> | ' +
+          'guardrail-delete-kysely]',
       );
       process.exit(1);
     }

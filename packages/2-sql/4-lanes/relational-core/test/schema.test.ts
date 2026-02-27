@@ -252,7 +252,8 @@ describe('schema', () => {
       const tables = schema(context).tables;
       const idColumn = tables.user.columns.id;
 
-      const method = idColumn[op]!;
+      const method = idColumn[op] as (value: unknown) => unknown;
+      expect(method).toBeDefined();
       const binary = method.call(idColumn, param('value'));
 
       expect(binary).toMatchObject({
@@ -294,7 +295,8 @@ describe('schema', () => {
       const idColumn = tables.user.columns.id;
       const emailColumn = tables.user.columns.email;
 
-      const method = idColumn[op]!;
+      const method = idColumn[op] as (value: unknown) => unknown;
+      expect(method).toBeDefined();
       // Pass another ColumnBuilder as ExpressionSource
       const binary = method.call(idColumn, emailColumn);
 

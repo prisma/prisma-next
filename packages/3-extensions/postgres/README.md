@@ -1,23 +1,25 @@
 # @prisma-next/postgres
 
-One-liner lazy Postgres client for Prisma Next runtime composition.
+Composition-root Postgres helper that builds a Prisma Next runtime client and exposes SQL, ORM, schema, and Kysely-integrated query access.
 
 ## Package Classification
 
-- **Domain**: targets
-- **Layer**: clients
+- **Domain**: extensions
+- **Layer**: adapters
 - **Plane**: runtime
 
 ## Overview
 
-`@prisma-next/postgres` (or `@prisma-next/postgres/runtime`) exposes a single `postgres(...)` helper that composes the SQL execution stack for Postgres and returns static query roots immediately:
+`@prisma-next/postgres/runtime` exposes a single `postgres(...)` helper that composes the Postgres execution stack and returns query/runtime roots:
 
 - `db.sql`
+- `db.kysely(runtime)`
 - `db.schema`
+- `db.orm`
 - `db.context`
 - `db.stack`
 
-Runtime and connection resources are deferred until `await db.runtime()` is called. The getter returns `Promise<Runtime>`.
+Runtime and connection resources are deferred until `db.runtime()` is called.
 
 When URL binding is used, pool timeouts are configurable via `poolOptions`:
 
@@ -27,11 +29,11 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 ## Responsibilities
 
 - Build a static Postgres execution stack from target, adapter, and driver descriptors
-- Build static query roots from the execution context
+- Build typed SQL and Kysely lane instances from the same execution context
+- Build static schema and ORM roots from the execution context
 - Normalize runtime binding input (`binding`, `url`, `pg`)
-- Lazily instantiate stack and driver on first `await db.runtime()` call
-- Connect driver with resolved binding before creating runtime
-- Memoize runtime so repeated `await db.runtime()` calls return one instance
+- Lazily instantiate runtime resources on first `db.runtime()` call
+- Memoize runtime so repeated `db.runtime()` calls return one instance
 
 ## Dependencies
 
@@ -41,23 +43,26 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - `@prisma-next/adapter-postgres` for adapter descriptor
 - `@prisma-next/driver-postgres` for driver descriptor
 - `@prisma-next/sql-lane` for `sql(...)`
+- `@prisma-next/integration-kysely` for `KyselyPrismaDialect` and contract-to-Kysely typing
 - `@prisma-next/sql-relational-core` for `schema(...)`
+- `@prisma-next/sql-orm-client` for `orm(...)`
 - `@prisma-next/sql-contract` for `validateContract(...)` and contract types
-- `pg` for binding validation when using `pg` (Pool or Client) input
+- `kysely` for query-builder API surface
+- `pg` for lazy `Pool` construction when using URL binding
 
 ## Architecture
 
 ```mermaid
 flowchart TD
     App[App Code] --> Client[postgres(...)]
-    Client --> Static[Static roots: sql schema context stack]
+    Client --> Static[Roots: sql kysely(runtime) schema orm context stack]
     Client --> Lazy[runtime()]
 
     Lazy --> Instantiate[instantiateExecutionStack]
     Lazy --> Bind[Resolve binding: url or pg]
-    Bind --> Assert[Assert stackInstance.driver]
-    Assert --> Connect[driver.connect binding]
-    Connect --> Runtime[createRuntime]
+    Bind --> Pool[pg.Pool for url binding]
+    Bind --> Reuse[Reuse Pool or Client for pg binding]
+    Lazy --> Runtime[createRuntime]
 
     Runtime --> Target[@prisma-next/target-postgres]
     Runtime --> Adapter[@prisma-next/adapter-postgres]
@@ -71,3 +76,4 @@ flowchart TD
 - Spec: `agent-os/specs/2026-02-10-postgres-one-liner-lazy-client/spec.md`
 - Architecture: `docs/Architecture Overview.md`
 - Subsystem: `docs/architecture docs/subsystems/4. Runtime & Plugin Framework.md`
+- Subsystem: `docs/architecture docs/subsystems/5. Adapters & Targets.md`

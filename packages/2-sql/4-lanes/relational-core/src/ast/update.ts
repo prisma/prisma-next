@@ -4,7 +4,7 @@ import { compact } from './util';
 export interface CreateUpdateAstOptions {
   readonly table: TableRef;
   readonly set: Record<string, ColumnRef | ParamRef>;
-  readonly where: WhereExpr;
+  readonly where?: WhereExpr;
   readonly returning?: ReadonlyArray<ColumnRef>;
 }
 
