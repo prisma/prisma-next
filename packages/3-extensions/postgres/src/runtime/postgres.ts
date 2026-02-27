@@ -235,15 +235,15 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
         binding = resolvePostgresBinding(bindingInput);
       }
 
-      const runtime = getRuntime();
-      if (driverConnected) {
-        return runtime;
-      }
-
       if (binding === undefined) {
         throw new Error(
           'Postgres binding not configured. Pass url/pg/binding to postgres(...) or call db.connect({ ... }).',
         );
+      }
+
+      const runtime = getRuntime();
+      if (driverConnected) {
+        return runtime;
       }
 
       const driver = runtimeDriver;
