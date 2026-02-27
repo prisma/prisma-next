@@ -1,7 +1,6 @@
 ---
 name: drive-create-spec
-description: >
-  Generate and iteratively refine engineering specs from a description, conversation summary,
+description: Generate and iteratively refine engineering specs from a description, conversation summary,
   or blank template. Use when the user wants to create a spec, PRD, product requirements document,
   write up requirements, or spec out a feature. Also use when summarising a conversation into a spec.
 metadata:

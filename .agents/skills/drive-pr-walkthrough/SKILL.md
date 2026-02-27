@@ -1,6 +1,6 @@
 ---
 name: drive-pr-walkthrough
-description: Write an intent-first walkthrough (semantic narrative) of a PR/branch or commit range: the overall purpose, the sequence of conceptual steps, the concrete behavior changes, and links to both implementation touchpoints and tests as evidence. Use during branch/PR review when the user asks for a walkthrough, narrative of changes, semantic diff, intent of commits, or “what changed and why” (not a file-by-file diff recap).
+description: Write an intent-first walkthrough (semantic narrative) of a PR/branch or commit range - the overall purpose, the sequence of conceptual steps, the concrete behavior changes, and links to both implementation touchpoints and tests as evidence. Use during branch/PR review when the user asks for a walkthrough, narrative of changes, semantic diff, intent of commits, or “what changed and why” (not a file-by-file diff recap).
 ---
 
 # Walkthrough
@@ -90,7 +90,11 @@ If you’re walking through a historical merge commit:
    - Name each thread with a behavior-level label (not “refactor tests”).
 
 3. **Derive behavior changes (semantic units)**
-   - Express each change as “**Before → After**” in terms of observable behavior, API, guarantees, error semantics, or invariants.
+   - Prefer **plain-English additive phrasing** when the change is primarily an addition.
+     - Good: “Adds a reusable PSL parser that produces a deterministic AST and structured diagnostics with spans.”
+     - Avoid: “no parser → deterministic AST …” (this reads like a state transition and is easy to misinterpret).
+   - Use “**Before → After**” when there is a meaningful **behavioral change** to an existing system surface (observable behavior, API, guarantees, error semantics, invariants).
+   - Don’t force a “Before” clause when there isn’t a concrete prior behavior to point at; state what was added/introduced instead.
    - Separate **behavior changes** from **refactors**. Refactors can be described as “no behavior change” and still linked.
 
 4. **Map each behavior change to evidence**
@@ -126,13 +130,24 @@ For the most important 1–3 snippets total, also include a small excerpt with p
 ## Output template (use this structure)
 
 ````markdown
-## Before / After (intention in code)
+## Key snippet(s) (optional)
+Use snippets only when they materially clarify the change.
+
+- If the change is a **modification**, use **Before / After** and keep both snippets small.
+- If the change is an **addition**, prefer a single **New** snippet (omit “Before” entirely).
+
+### Before / After (when modifying existing behavior)
 ```ts
 // BEFORE — smallest snippet that captures the old shape
 ```
 
 ```ts
 // AFTER — smallest snippet that captures the new shape
+```
+
+### New (when adding a new capability)
+```ts
+// NEW — smallest snippet that captures the new capability
 ```
 
 ## Sources (optional but recommended when available)
@@ -157,7 +172,7 @@ For the most important 1–3 snippets total, also include a small excerpt with p
 3. ...
 
 ## Behavior changes & evidence
-- **Behavior change A**: <Before → After statement>
+- **Behavior change A**: <Additive statement (“Adds X that …”) OR Before → After statement>
   - **Why**: <rationale / constraint / trade-off>
   - **Implementation**:
     - [path/to/file.ts (L12–L34)](path/to/file.ts:12-34)
@@ -179,6 +194,7 @@ For the most important 1–3 snippets total, also include a small excerpt with p
 ## Quality checklist (self-review before sending)
 
 - [ ] The walkthrough reads like **intent and behavior**, not a file list.
+- [ ] Additive changes are phrased as “Adds/Introduces …” (avoid “no X → …” shorthand).
 - [ ] Each behavior change has **tests linked** (or an explicit “no tests” rationale).
 - [ ] Tests are presented as **evidence for behavior**, not as a separate storyline.
 - [ ] The narrative has a small number of semantic steps (not commit-by-commit retelling).

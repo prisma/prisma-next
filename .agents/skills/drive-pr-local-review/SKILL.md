@@ -1,7 +1,6 @@
 ---
 name: drive-pr-local-review
-description: >
-  Generate local PR/branch review artifacts for the current branch vs its base: an in-repo canonical
+description: Generate local PR/branch review artifacts for the current branch vs its base - an in-repo canonical
   spec (if present) or an inferred review `spec.md`, plus `system-design-review.md`, `code-review.md`,
   and `walkthrough.md` (via `.agents/skills/drive-pr-walkthrough/SKILL.md`). Writes artifacts to disk
   (next to the in-repo spec when present, otherwise under `wip/`). Use when the user asks for a local

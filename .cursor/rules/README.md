@@ -100,6 +100,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 
 ## Research & docs writing
 - `.cursor/rules/research-comparisons-need-axes.mdc` — Comparisons must state the shared axis (knob/invariant/trade-off)
+- `.cursor/rules/walkthrough-additive-changes.mdc` — Walkthrough wording: phrase additive changes as additions (avoid “no X → Y”)
 
 Notes
 - Prefer short rulecards with Do/Don’t + examples; link to detailed docs in `docs/`.

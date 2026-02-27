@@ -1,7 +1,6 @@
 ---
 name: drive-generate-plan
-description: >
-  Generate an execution plan from a spec, with milestones, tasks, and test coverage for all
+description: Generate an execution plan from a spec, with milestones, tasks, and test coverage for all
   acceptance criteria. Use when the user wants to plan a project, break a spec into milestones,
   generate tasks from a spec, or create an execution plan. Optionally creates a Linear project.
 metadata:
