@@ -320,8 +320,8 @@ describe('Config Errors', () => {
 
   it('errorConfigValidation creates correct error', () => {
     const error = errorConfigValidation('family');
-    expect(error.code).toBe('4001');
-    expect(error.message).toBe('Config file not found');
+    expect(error.code).toBe('4009');
+    expect(error.message).toBe('Config validation error');
     expect(error.why).toBe('Config must have a "family" field');
   });
 

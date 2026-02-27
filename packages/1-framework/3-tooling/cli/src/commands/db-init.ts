@@ -11,6 +11,7 @@ import {
   errorRuntime,
   errorUnexpected,
 } from '../utils/cli-errors';
+import type { MigrationCommandOptions } from '../utils/command-helpers';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import {
@@ -26,21 +27,7 @@ import {
 } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 
-type DbInitOptions = {
-  readonly db?: string;
-  readonly config?: string;
-  readonly plan?: boolean;
-  readonly json?: string | boolean;
-  readonly quiet?: boolean;
-  readonly q?: boolean;
-  readonly verbose?: boolean;
-  readonly v?: boolean;
-  readonly vv?: boolean;
-  readonly trace?: boolean;
-  readonly timestamps?: boolean;
-  readonly color?: boolean;
-  readonly 'no-color'?: boolean;
-};
+type DbInitOptions = MigrationCommandOptions;
 
 /**
  * Maps a DbInitFailure to a CliStructuredError for consistent error handling.

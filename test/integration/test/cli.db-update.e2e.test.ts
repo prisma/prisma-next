@@ -99,6 +99,7 @@ withTempDir(({ createTempDir }) => {
           const planOutput = stripAnsi(consoleOutput.join('\n'));
           expect(planOutput).toContain('Planned');
           expect(planOutput).toContain('nickname');
+          expect(planOutput).toContain('DDL preview');
 
           consoleOutput.length = 0;
           await runDbUpdate(testSetup, ['--config', configPath, '--no-color']);
@@ -154,8 +155,12 @@ withTempDir(({ createTempDir }) => {
               targetId: expect.any(String),
               destination: { storageHash: expect.any(String) },
               operations: expect.any(Array),
+              sql: expect.any(Array),
             },
           });
+
+          const sqlPreview = (payload as { plan?: { sql?: unknown[] } }).plan?.sql ?? [];
+          expect(sqlPreview.length).toBeGreaterThan(0);
         });
       },
       timeouts.spinUpPpgDev,
@@ -401,7 +406,39 @@ withTempDir(({ createTempDir }) => {
       timeouts.spinUpPpgDev,
     );
 
-    // Scenario 7: Runner failure after planning
+    // Scenario 7a: Destructive changes gate
+    it(
+      'fails with DESTRUCTIVE_CHANGES when destructive ops require --accept-data-loss',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const { testSetup, configPath } = await setupDbUpdateFixture(
+            connectionString,
+            createTempDir,
+            scenarioFixtureSubdir,
+          );
+
+          await runDbInit(testSetup, ['--config', configPath, '--no-color']);
+
+          // Add drift column so the planner generates a destructive drop
+          await withClient(connectionString, async (client) => {
+            await client.query('ALTER TABLE "public"."project" ADD COLUMN "legacy_notes" text');
+          });
+
+          const exitCode = await runDbUpdateAllowFailure(testSetup, [
+            '--config',
+            configPath,
+            '--no-color',
+          ]);
+
+          expect(exitCode).not.toBe(0);
+          const allOutput = [...consoleOutput, ...consoleErrors].join('\n');
+          expect(allOutput).toMatch(/destructive|accept-data-loss/i);
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    // Scenario 7b: Runner failure after planning (with --accept-data-loss)
     it(
       'fails during apply when a blocking view prevents column drop',
       async () => {
@@ -425,6 +462,7 @@ withTempDir(({ createTempDir }) => {
           const exitCode = await runDbUpdateAllowFailure(testSetup, [
             '--config',
             configPath,
+            '--accept-data-loss',
             '--no-color',
           ]);
 
