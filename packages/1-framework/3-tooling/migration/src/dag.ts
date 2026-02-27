@@ -1,5 +1,5 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import { errorAmbiguousLeaf, errorSelfLoop } from './errors';
+import { errorAmbiguousLeaf, errorNoLeaf, errorSelfLoop } from './errors';
 import type { MigrationGraph, MigrationGraphEdge, MigrationPackage } from './types';
 
 export function reconstructGraph(packages: readonly MigrationPackage[]): MigrationGraph {
@@ -76,13 +76,12 @@ export function findLeaf(graph: MigrationGraph): string {
   // Nodes that are only sources (the EMPTY_CONTRACT_HASH with outgoing) are not leaves
   const realLeaves = leaves.filter((n) => graph.reverseEdges.has(n));
 
-  const leaf = realLeaves[0];
-  if (leaf === undefined) {
-    return EMPTY_CONTRACT_HASH;
+  if (realLeaves.length === 0) {
+    throw errorNoLeaf([...graph.nodes].sort());
   }
 
   if (realLeaves.length === 1) {
-    return leaf;
+    return realLeaves[0]!;
   }
 
   throw errorAmbiguousLeaf(realLeaves);

@@ -10,6 +10,7 @@ import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
+  getExitCode,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
@@ -237,7 +238,7 @@ withTempDir(({ createTempDir }) => {
 
     describe('resume after partial apply', () => {
       it(
-        'resumes from last successful migration',
+        'resumes from last successful migration after failure',
         async () => {
           await withDevDatabase(async ({ connectionString }) => {
             const { testDir, configPath, contractPath } = setupTestDirectoryFromFixtures(
@@ -253,50 +254,79 @@ withTempDir(({ createTempDir }) => {
               '--config',
               configPath,
               '--name',
-              'add_user',
+              'initial',
               '--no-color',
             ]);
 
+            // Apply first migration successfully.
+            consoleOutput.length = 0;
+            await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
+            const firstApply = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            expect(firstApply.migrationsApplied).toBe(1);
+
+            // Insert data so a later NOT NULL column addition will fail.
+            await withClient(connectionString, async (client) => {
+              await client.query(`INSERT INTO "user" (id, email) VALUES (1, 'user@example.com')`);
+            });
+
+            // Plan second migration that adds a non-null column with no default.
             const contractSrc = readFileSync(contractPath!, 'utf-8');
             const modified = contractSrc.replace(
               `.primaryKey(['id'])`,
-              `.column('name', { type: textColumn, nullable: true })\n      .primaryKey(['id'])`,
+              `.column('required_name', { type: textColumn, nullable: false })\n      .primaryKey(['id'])`,
             );
             writeFileSync(contractPath!, modified, 'utf-8');
 
-            consoleOutput.length = 0;
             await emitContract(testDir, configPath);
             await runMigrationPlan(testDir, [
               '--config',
               configPath,
               '--name',
-              'add_name',
+              'add_required_name',
               '--no-color',
             ]);
 
-            // Apply only the first migration by first applying all, then checking state
-            // Actually, we simulate resume by: apply first, then re-apply all (should only apply 2nd)
-            // First: apply the first migration
+            // Apply should fail on the second migration because existing rows violate NOT NULL.
+            consoleOutput.length = 0;
+            let failed = false;
+            try {
+              await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
+            } catch {
+              failed = true;
+            }
+            expect(failed).toBe(true);
+            expect(getExitCode()).toBe(1);
+
+            // Marker must remain at the first migration hash (resume point).
             const migrationsDir = join(testDir, 'migrations');
             const packages = await readMigrationsDir(migrationsDir);
-            expect(packages).toHaveLength(2);
+            const firstMigration = packages.find((p) => p.manifest.from === 'sha256:empty');
+            const secondMigration = packages.find(
+              (p) => p.manifest.to !== firstMigration?.manifest.to,
+            );
+            expect(firstMigration).toBeDefined();
+            expect(secondMigration).toBeDefined();
 
-            // Apply all — both should apply
+            await withClient(connectionString, async (client) => {
+              const marker = await client.query(
+                'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
+                [1],
+              );
+              expect(marker.rows[0]?.core_hash).toBe(firstMigration!.manifest.to);
+            });
+
+            // Make second migration runnable, then re-run apply; it should resume from marker.
+            await withClient(connectionString, async (client) => {
+              await client.query('DELETE FROM "user"');
+            });
+
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
-
-            const firstResult = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
-            expect(firstResult.migrationsApplied).toBe(2);
-
-            // Re-run — should be no-op (resume semantics)
-            consoleOutput.length = 0;
-            await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
-
-            const secondResult = JSON.parse(
+            const resumeResult = JSON.parse(
               consoleOutput.join('\n').trim(),
             ) as MigrationApplyResult;
-            expect(secondResult.migrationsApplied).toBe(0);
-            expect(secondResult.summary).toBe('Already up to date');
+            expect(resumeResult.migrationsApplied).toBe(1);
+            expect(resumeResult.markerHash).toBe(secondMigration!.manifest.to);
           });
         },
         timeouts.spinUpPpgDev,

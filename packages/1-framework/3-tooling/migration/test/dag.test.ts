@@ -103,6 +103,20 @@ describe('findLeaf', () => {
       expect(mte.fix).toContain('--from');
     }
   });
+
+  it('errors with MIGRATION.NO_LEAF when graph has no terminal node', () => {
+    const graph = reconstructGraph([pkg('A', 'B', 'm1'), pkg('B', 'A', 'm2')]);
+    try {
+      findLeaf(graph);
+      expect.fail('expected error');
+    } catch (e) {
+      expect(MigrationToolsError.is(e)).toBe(true);
+      const mte = e as MigrationToolsError;
+      expect(mte.code).toBe('MIGRATION.NO_LEAF');
+      expect(mte.category).toBe('MIGRATION');
+      expect(mte.details).toHaveProperty('nodes');
+    }
+  });
 });
 
 describe('findPath', () => {

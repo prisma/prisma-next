@@ -38,6 +38,10 @@ interface MigrationApplyCommandOptions {
   readonly 'no-color'?: boolean;
 }
 
+function maskDatabaseUrl(value: string): string {
+  return value.replace(/:([^:@]+)@/, ':****@');
+}
+
 export interface MigrationApplyResult {
   readonly ok: boolean;
   readonly migrationsApplied: number;
@@ -128,8 +132,8 @@ async function executeMigrationApplyCommand(
       { label: 'config', value: configPath },
       { label: 'migrations', value: migrationsRelative },
     ];
-    if (options.db) {
-      details.push({ label: 'database', value: options.db });
+    if (typeof dbConnection === 'string') {
+      details.push({ label: 'database', value: maskDatabaseUrl(dbConnection) });
     }
     const header = formatStyledHeader({
       command: 'migration apply',
@@ -226,9 +230,10 @@ async function executeMigrationApplyCommand(
     }
 
     // Resolve graph edges to full apply-ready edges
+    const packageByDir = new Map(packages.map((pkg) => [pkg.dirName, pkg]));
     const pendingEdges: MigrationApplyEdge[] = [];
     for (const edge of pendingPath) {
-      const pkg = packages.find((p) => p.dirName === edge.dirName);
+      const pkg = packageByDir.get(edge.dirName);
       if (!pkg) {
         return notOk(
           errorRuntime(`Migration package not found: ${edge.dirName}`, {

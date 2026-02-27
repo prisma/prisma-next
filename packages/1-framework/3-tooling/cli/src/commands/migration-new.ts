@@ -41,6 +41,14 @@ export interface MigrationNewResult {
   readonly summary: string;
 }
 
+function mapMigrationToolsError(error: MigrationToolsError): CliStructuredError {
+  return errorRuntime(error.message, {
+    why: error.why,
+    fix: error.fix,
+    meta: { code: error.code, ...(error.details ?? {}) },
+  });
+}
+
 async function executeMigrationNewCommand(
   options: MigrationNewOptions,
   flags: GlobalFlags,
@@ -86,8 +94,15 @@ async function executeMigrationNewCommand(
         fromContract = leafPkg.manifest.toContract;
       }
     }
-  } catch {
-    // If reading migrations fails, start from empty — this is a draft scaffold
+  } catch (error) {
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to read migration history: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
   }
 
   const emptyContract: ContractIR = {
@@ -132,13 +147,7 @@ async function executeMigrationNewCommand(
     return ok(result);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
-      return notOk(
-        errorRuntime(error.message, {
-          why: error.why,
-          fix: error.fix,
-          meta: { code: error.code, ...(error.details ?? {}) },
-        }),
-      );
+      return notOk(mapMigrationToolsError(error));
     }
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {

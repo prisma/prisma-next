@@ -99,3 +99,11 @@ export function errorAmbiguousLeaf(leaves: readonly string[]): MigrationToolsErr
     details: { leaves },
   });
 }
+
+export function errorNoLeaf(nodes: readonly string[]): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.NO_LEAF', 'Migration graph has no leaf', {
+    why: `No terminal node exists in the migration graph (nodes: ${nodes.join(', ')}). This usually means a cycle or corrupted edge data.`,
+    fix: 'Inspect the migrations directory for cycles or invalid edges, then repair or remove the corrupt migration package.',
+    details: { nodes },
+  });
+}

@@ -896,7 +896,7 @@ prisma-next migration verify --dir <path>
 
 - **Verified**: stored `edgeId` matches recomputed value
 - **Draft**: `edgeId` is null — automatically attests the package
-- **Mismatch**: package has been modified since attestation
+- **Mismatch**: package has been modified since attestation (command exits non-zero)
 
 ### `prisma-next migration new`
 
