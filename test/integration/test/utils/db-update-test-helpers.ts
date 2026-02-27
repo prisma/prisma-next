@@ -1,4 +1,5 @@
-import { createDbUpdateCommand } from '../../../../packages/1-framework/3-tooling/cli/src/commands/db-update';
+import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { setupTestDirectoryFromFixtures } from './cli-test-helpers';
 import { executeCommand, getExitCode, setupDbTestFixture } from './cli-test-helpers';
 
@@ -14,7 +15,7 @@ export async function setupDbUpdateFixture(
     connectionString,
     createTempDir,
     fixtureSubdir,
-    ...(schemaSql ? { schemaSql } : {}),
+    ...ifDefined('schemaSql', schemaSql),
   });
 }
 

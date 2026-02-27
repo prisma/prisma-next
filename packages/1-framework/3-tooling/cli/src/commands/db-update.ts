@@ -1,64 +1,66 @@
-import { readFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { loadConfig } from '../config-loader';
-import { createControlClient } from '../control-api/client';
 import { ContractValidationError } from '../control-api/errors';
 import type { DbUpdateFailure } from '../control-api/types';
 import {
   CliStructuredError,
   errorContractValidationFailed,
-  errorDatabaseConnectionRequired,
-  errorDriverRequired,
-  errorFileNotFound,
+  errorDestructiveChanges,
   errorJsonFormatNotSupported,
+  errorMarkerRequired,
   errorMigrationPlanningFailed,
-  errorRuntime,
-  errorTargetMigrationNotSupported,
+  errorRunnerFailed,
   errorUnexpected,
 } from '../utils/cli-errors';
-import {
-  type MigrationCommandOptions,
-  maskConnectionUrl,
-  setCommandDescriptions,
-} from '../utils/command-helpers';
+import type { MigrationCommandOptions } from '../utils/command-helpers';
+import { setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
+import {
+  addMigrationCommandOptions,
+  prepareMigrationContext,
+} from '../utils/migration-command-scaffold';
 import {
   formatCommandHelp,
   formatMigrationApplyOutput,
   formatMigrationJson,
   formatMigrationPlanOutput,
-  formatStyledHeader,
   type MigrationCommandResult,
 } from '../utils/output';
-import { createProgressAdapter } from '../utils/progress-adapter';
 import { handleResult } from '../utils/result-handler';
 
-type DbUpdateOptions = MigrationCommandOptions;
+type DbUpdateOptions = MigrationCommandOptions & {
+  readonly acceptDataLoss?: boolean;
+};
 
+/**
+ * Maps a DbUpdateFailure to a CliStructuredError for consistent error handling.
+ */
 function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
   if (failure.code === 'PLANNING_FAILED') {
     return errorMigrationPlanningFailed({ conflicts: failure.conflicts ?? [] });
   }
 
   if (failure.code === 'MARKER_REQUIRED') {
-    return errorRuntime('Database marker is required before db update', {
+    return errorMarkerRequired({
       why: failure.why ?? 'Contract marker not found in database',
       fix: 'Run `prisma-next db init` first to adopt the database, then re-run `prisma-next db update`',
-      meta: { code: 'MARKER_REQUIRED' },
     });
   }
 
   if (failure.code === 'RUNNER_FAILED') {
-    return errorRuntime(failure.summary, {
+    return errorRunnerFailed(failure.summary, {
       why: failure.why ?? 'Migration runner failed',
       fix: 'Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`',
-      meta: {
-        code: 'RUNNER_FAILED',
-        ...(failure.meta ?? {}),
-      },
+      ...(failure.meta ? { meta: failure.meta } : {}),
+    });
+  }
+
+  if (failure.code === 'DESTRUCTIVE_CHANGES') {
+    return errorDestructiveChanges(failure.summary, {
+      ...(failure.why ? { why: failure.why } : {}),
+      fix: 'Use `prisma-next db update --plan` to preview, then re-run with `--accept-data-loss` to apply destructive changes',
+      ...(failure.meta ? { meta: failure.meta } : {}),
     });
   }
 
@@ -66,119 +68,46 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
   throw new Error(`Unhandled DbUpdateFailure code: ${exhaustive}`);
 }
 
+/**
+ * Executes the db update command and returns a structured Result.
+ */
 async function executeDbUpdateCommand(
   options: DbUpdateOptions,
   flags: GlobalFlags,
   startTime: number,
 ): Promise<Result<MigrationCommandResult, CliStructuredError>> {
-  const config = await loadConfig(options.config);
-  const configPath = options.config
-    ? relative(process.cwd(), resolve(options.config))
-    : 'prisma-next.config.ts';
-  const contractPathAbsolute = config.contract?.output
-    ? resolve(config.contract.output)
-    : resolve('src/prisma/contract.json');
-  const contractPath = relative(process.cwd(), contractPathAbsolute);
-
-  if (flags.json !== 'object' && !flags.quiet) {
-    const details: Array<{ label: string; value: string }> = [
-      { label: 'config', value: configPath },
-      { label: 'contract', value: contractPath },
-    ];
-    if (options.db) {
-      details.push({ label: 'database', value: maskConnectionUrl(options.db) });
-    }
-    if (options.plan) {
-      details.push({ label: 'mode', value: 'plan (dry run)' });
-    }
-    const header = formatStyledHeader({
-      command: 'db update',
-      description: 'Reconcile a marker-managed database to the current contract',
-      url: 'https://pris.ly/db-update',
-      details,
-      flags,
-    });
-    console.log(header);
-  }
-
-  let contractJsonContent: string;
-  try {
-    contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
-  } catch (error) {
-    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-      return notOk(
-        errorFileNotFound(contractPathAbsolute, {
-          why: `Contract file not found at ${contractPathAbsolute}`,
-          fix: `Run \`prisma-next contract emit\` to generate ${contractPath}, or update \`config.contract.output\` in ${configPath}`,
-        }),
-      );
-    }
-    return notOk(
-      errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Failed to read contract file: ${error instanceof Error ? error.message : String(error)}`,
-      }),
-    );
-  }
-
-  let contractJson: Record<string, unknown>;
-  try {
-    contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
-  } catch (error) {
-    return notOk(
-      errorContractValidationFailed(
-        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
-        { where: { path: contractPathAbsolute } },
-      ),
-    );
-  }
-
-  const dbConnection = options.db ?? config.db?.connection;
-  if (!dbConnection) {
-    return notOk(
-      errorDatabaseConnectionRequired({
-        why: `Database connection is required for db update (set db.connection in ${configPath}, or pass --db <url>)`,
-      }),
-    );
-  }
-
-  if (!config.driver) {
-    return notOk(errorDriverRequired({ why: 'Config.driver is required for db update' }));
-  }
-
-  if (!config.target.migrations) {
-    return notOk(
-      errorTargetMigrationNotSupported({
-        why: `Target "${config.target.id}" does not support migrations`,
-      }),
-    );
-  }
-
-  const client = createControlClient({
-    family: config.family,
-    target: config.target,
-    adapter: config.adapter,
-    driver: config.driver,
-    extensionPacks: config.extensionPacks ?? [],
+  // Prepare shared migration context (config, contract, connection, client)
+  const ctxResult = await prepareMigrationContext(options, flags, {
+    commandName: 'db update',
+    description: 'Reconcile a marker-managed database to the current contract',
+    url: 'https://pris.ly/db-update',
   });
-  const onProgress = createProgressAdapter({ flags });
+  if (!ctxResult.ok) {
+    return ctxResult;
+  }
+  const { client, contractJson, dbConnection, onProgress, contractPathAbsolute } = ctxResult.value;
 
   try {
+    // Call dbUpdate with connection and progress callback
     const result = await client.dbUpdate({
       contractIR: contractJson,
       mode: options.plan ? 'plan' : 'apply',
       connection: dbConnection,
+      ...(options.acceptDataLoss ? { acceptDataLoss: true } : {}),
       onProgress,
     });
 
+    // Handle failures by mapping to CLI structured error
     if (!result.ok) {
       return notOk(mapDbUpdateFailure(result.failure));
     }
 
+    // Convert success result to CLI output format
     const dbUpdateResult: MigrationCommandResult = {
       ok: true,
       mode: result.value.mode,
       plan: {
-        targetId: config.target.targetId,
+        targetId: ctxResult.value.config.target.targetId,
         destination: {
           storageHash: result.value.destination.storageHash,
           ...ifDefined('profileHash', result.value.destination.profileHash),
@@ -188,6 +117,7 @@ async function executeDbUpdateCommand(
           label: op.label,
           operationClass: op.operationClass,
         })),
+        ...(result.value.plan.sql !== undefined ? { sql: result.value.plan.sql } : {}),
       },
       origin: {
         storageHash: result.value.origin.storageHash,
@@ -246,55 +176,50 @@ export function createDbUpdateCommand(): Command {
       'widening, and destructive operations when required. Requires an existing contract marker.\n' +
       'Use --plan to preview operations before applying.',
   );
-  command
-    .configureHelp({
-      formatHelp: (cmd) => {
-        const flags = parseGlobalFlags({});
-        return formatCommandHelp({ command: cmd, flags });
-      },
-    })
-    .option('--db <url>', 'Database connection string')
-    .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--plan', 'Preview planned operations without applying', false)
-    .option('--json [format]', 'Output as JSON (object)', false)
-    .option('-q, --quiet', 'Quiet mode: errors only')
-    .option('-v, --verbose', 'Verbose output: debug info, timings')
-    .option('-vv, --trace', 'Trace output: deep internals, stack traces')
-    .option('--timestamps', 'Add timestamps to output')
-    .option('--color', 'Force color output')
-    .option('--no-color', 'Disable color output')
-    .action(async (options: DbUpdateOptions) => {
-      const flags = parseGlobalFlags(options);
-      const startTime = Date.now();
+  addMigrationCommandOptions(command);
+  command.option(
+    '--accept-data-loss',
+    'Confirm destructive operations (required when plan includes drops or type changes)',
+    false,
+  );
+  command.configureHelp({
+    formatHelp: (cmd) => {
+      const flags = parseGlobalFlags({});
+      return formatCommandHelp({ command: cmd, flags });
+    },
+  });
+  command.action(async (options: DbUpdateOptions) => {
+    const flags = parseGlobalFlags(options);
+    const startTime = Date.now();
 
-      if (flags.json === 'ndjson') {
-        const result = notOk(
-          errorJsonFormatNotSupported({
-            command: 'db update',
-            format: 'ndjson',
-            supportedFormats: ['object'],
-          }),
-        );
-        const exitCode = handleResult(result, flags);
-        process.exit(exitCode);
-      }
-
-      const result = await executeDbUpdateCommand(options, flags, startTime);
-      const exitCode = handleResult(result, flags, (dbUpdateResult) => {
-        if (flags.json === 'object') {
-          console.log(formatMigrationJson(dbUpdateResult));
-        } else {
-          const output =
-            dbUpdateResult.mode === 'plan'
-              ? formatMigrationPlanOutput(dbUpdateResult, flags)
-              : formatMigrationApplyOutput(dbUpdateResult, flags);
-          if (output) {
-            console.log(output);
-          }
-        }
-      });
+    if (flags.json === 'ndjson') {
+      const result = notOk(
+        errorJsonFormatNotSupported({
+          command: 'db update',
+          format: 'ndjson',
+          supportedFormats: ['object'],
+        }),
+      );
+      const exitCode = handleResult(result, flags);
       process.exit(exitCode);
+    }
+
+    const result = await executeDbUpdateCommand(options, flags, startTime);
+    const exitCode = handleResult(result, flags, (dbUpdateResult) => {
+      if (flags.json === 'object') {
+        console.log(formatMigrationJson(dbUpdateResult));
+      } else {
+        const output =
+          dbUpdateResult.mode === 'plan'
+            ? formatMigrationPlanOutput(dbUpdateResult, flags)
+            : formatMigrationApplyOutput(dbUpdateResult, flags);
+        if (output) {
+          console.log(output);
+        }
+      }
     });
+    process.exit(exitCode);
+  });
 
   return command;
 }

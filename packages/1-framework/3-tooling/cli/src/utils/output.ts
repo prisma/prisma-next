@@ -828,6 +828,7 @@ export interface MigrationCommandResult {
       readonly label: string;
       readonly operationClass: string;
     }[];
+    readonly sql?: readonly string[];
   };
   /** Origin contract identity (present in db-update results, absent in db-init). */
   readonly origin?: {
@@ -849,7 +850,7 @@ export interface MigrationCommandResult {
 }
 
 /**
- * Formats human-readable output for db init plan mode.
+ * Formats human-readable output for migration commands (db init, db update) in plan mode.
  */
 export function formatMigrationPlanOutput(
   result: MigrationCommandResult,
@@ -890,6 +891,24 @@ export function formatMigrationPlanOutput(
     );
   }
 
+  // SQL DDL preview (SQL family only)
+  const planSql = result.plan?.sql;
+  if (planSql) {
+    lines.push(`${prefix}`);
+    lines.push(`${prefix}${formatDimText('DDL preview')}`);
+    if (planSql.length === 0) {
+      lines.push(`${prefix}${formatDimText('No DDL operations.')}`);
+    } else {
+      lines.push(`${prefix}`);
+      for (const statement of planSql) {
+        const trimmed = statement.trim();
+        if (!trimmed) continue;
+        const line = trimmed.endsWith(';') ? trimmed : `${trimmed};`;
+        lines.push(`${prefix}${line}`);
+      }
+    }
+  }
+
   // Timings in verbose mode
   if (isVerbose(flags, 1)) {
     lines.push(`${prefix}${formatDimText(`Total time: ${result.timings.total}ms`)}`);
@@ -904,7 +923,7 @@ export function formatMigrationPlanOutput(
 }
 
 /**
- * Formats human-readable output for db init apply mode.
+ * Formats human-readable output for migration commands (db init, db update) in apply mode.
  */
 export function formatMigrationApplyOutput(
   result: MigrationCommandResult,
@@ -943,7 +962,7 @@ export function formatMigrationApplyOutput(
 }
 
 /**
- * Formats JSON output for db init command.
+ * Formats JSON output for migration commands (db init, db update).
  */
 export function formatMigrationJson(result: MigrationCommandResult): string {
   return JSON.stringify(result, null, 2);

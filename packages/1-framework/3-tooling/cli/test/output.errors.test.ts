@@ -5,6 +5,7 @@ import { parseGlobalFlags } from '../src/utils/global-flags';
 import { formatErrorOutput } from '../src/utils/output';
 
 const baseError: CliErrorEnvelope = {
+  ok: false,
   code: 'PN-CLI-4020',
   domain: 'CLI',
   severity: 'error',
