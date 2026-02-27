@@ -301,7 +301,7 @@ describe('executeDbUpdate', () => {
     expect(runnerExecute).not.toHaveBeenCalled();
   });
 
-  it('uses lossy policy with additive, widening, and destructive classes', async () => {
+  it('allows additive, widening, and destructive operation classes', async () => {
     const planFn = vi.fn().mockReturnValue({
       kind: 'success',
       plan: {

@@ -541,8 +541,8 @@ export interface ControlClient {
   dbInit(options: DbInitOptions): Promise<DbInitResult>;
 
   /**
-   * Reconciles an adopted database to match the current contract.
-   * Requires an existing marker and supports lossy operation classes.
+   * Reconciles a signed (marker-managed) database to match the current contract.
+   * Requires an existing marker and allows additive, widening, and destructive operation classes.
    *
    * @param options.mode - 'plan' to preview, 'apply' to execute
    * @returns Result pattern: Ok with planned/executed operations, NotOk with failure details

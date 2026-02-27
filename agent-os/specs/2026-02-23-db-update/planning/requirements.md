@@ -2,13 +2,13 @@
 
 ### Summary
 
-Add `prisma-next db update` as the contract-driven schema reconciliation command for already-adopted databases.
+Add `prisma-next db update` as the contract-driven schema reconciliation command for already signed (marker-managed) databases.
 
 The command must:
 
 - Require an existing DB marker (missing marker fails with clear `db init` guidance).
 - Plan from live schema + desired contract, not from authoring lifecycle hints.
-- Allow lossy operations for now (including destructive/widening classes where supported).
+- Allow additive, widening, and destructive operation classes where supported.
 - Reuse existing migration runner safety and audit semantics (lock, checks, marker, ledger).
 
 ### Functional requirements

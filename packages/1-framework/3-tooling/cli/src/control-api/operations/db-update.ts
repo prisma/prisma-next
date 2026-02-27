@@ -14,7 +14,7 @@ import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbUpdateResult, DbUpdateSuccess, OnControlProgress } from '../types';
 import { extractSqlDdl } from './extract-sql-ddl';
 
-// F12: db update uses a lossy policy that allows additive, widening, and destructive operations.
+// F12: db update allows additive, widening, and destructive operations.
 const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 } as const;
