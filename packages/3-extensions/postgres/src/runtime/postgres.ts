@@ -131,11 +131,21 @@ class RedactingPostgresQueryCompiler implements QueryCompiler {
 class BuildOnlyPostgresDialect implements Dialect {
   createAdapter = () => new PostgresAdapter();
   createDriver = () => new BuildOnlyKyselyDriver();
-  createIntrospector = (): DatabaseIntrospector => ({
-    getSchemas: async () => [],
-    getTables: async () => [],
-    getMetadata: async (): Promise<DatabaseMetadata> => ({ tables: [] }),
-  });
+  createIntrospector = (): DatabaseIntrospector => {
+    const msg =
+      'Introspection is not supported on the build-only Kysely dialect. Use the runtime schema API instead.';
+    return {
+      getSchemas: async () => {
+        throw new Error(msg);
+      },
+      getTables: async () => {
+        throw new Error(msg);
+      },
+      getMetadata: async (): Promise<DatabaseMetadata> => {
+        throw new Error(msg);
+      },
+    };
+  };
   createQueryCompiler = () => new RedactingPostgresQueryCompiler();
 }
 
