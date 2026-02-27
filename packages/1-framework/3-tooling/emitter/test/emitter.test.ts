@@ -593,6 +593,30 @@ describe('emitter', () => {
     expect(contractJson).not.toHaveProperty('sources');
   });
 
+  it('strips provenance metadata from emitted contract artifact', async () => {
+    const ir = createContractIR({
+      meta: {
+        sourceId: 'schema.prisma',
+        schemaPath: '/tmp/schema.prisma',
+        source: 'psl',
+        keep: 'value',
+      },
+    });
+
+    const options: EmitOptions = {
+      outputDir: '',
+      operationRegistry: createOperationRegistry(),
+      codecTypeImports: [],
+      operationTypeImports: [],
+      extensionIds: [],
+    };
+
+    const result = await emit(ir, options, mockSqlHook);
+    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
+    const meta = contractJson['meta'] as Record<string, unknown>;
+    expect(meta).toEqual({ keep: 'value' });
+  });
+
   it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {
     // extensionIds includes adapters/targets which are not in contract.extensionPacks
     const ir = createContractIR({

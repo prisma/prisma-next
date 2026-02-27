@@ -24,7 +24,7 @@ function computeHash(content: string): string {
 }
 
 export function computeStorageHash(contract: ContractInput): string {
-  const storageContract: ContractIR = {
+  const storageContract = {
     schemaVersion: contract.schemaVersion,
     targetFamily: contract.targetFamily,
     target: contract.target,
@@ -32,16 +32,15 @@ export function computeStorageHash(contract: ContractInput): string {
     models: {},
     relations: {},
     extensionPacks: {},
-    sources: {},
     capabilities: {},
     meta: {},
-  };
+  } as ContractIR;
   const canonical = canonicalizeContract(storageContract);
   return computeHash(canonical);
 }
 
 export function computeProfileHash(contract: ContractInput): string {
-  const profileContract: ContractIR = {
+  const profileContract = {
     schemaVersion: contract.schemaVersion,
     targetFamily: contract.targetFamily,
     target: contract.target,
@@ -49,16 +48,15 @@ export function computeProfileHash(contract: ContractInput): string {
     relations: {},
     storage: {},
     extensionPacks: {},
-    sources: {},
     capabilities: contract.capabilities,
     meta: {},
-  };
+  } as ContractIR;
   const canonical = canonicalizeContract(profileContract);
   return computeHash(canonical);
 }
 
 export function computeExecutionHash(contract: ContractInput): string {
-  const executionContract: ContractIR = {
+  const executionContract = {
     schemaVersion: contract.schemaVersion,
     targetFamily: contract.targetFamily,
     target: contract.target,
@@ -66,11 +64,10 @@ export function computeExecutionHash(contract: ContractInput): string {
     relations: {},
     storage: {},
     extensionPacks: {},
-    sources: {},
     capabilities: {},
     meta: {},
     ...ifDefined('execution', contract.execution),
-  };
+  } as ContractIR;
   const canonical = canonicalizeContract(executionContract);
   return computeHash(canonical);
 }

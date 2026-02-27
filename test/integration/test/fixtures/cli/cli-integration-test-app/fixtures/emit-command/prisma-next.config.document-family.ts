@@ -1,5 +1,6 @@
 import { defineConfig } from '@prisma-next/cli/config-types';
 import type { ControlFamilyInstance } from '@prisma-next/core-control-plane/types';
+import { ok } from '@prisma-next/utils/result';
 import { contract } from './invalid-contract-document';
 
 // Create a config with document family (which doesn't exist, but we'll test the error)
@@ -50,8 +51,7 @@ export default defineConfig({
   },
   extensions: [],
   contract: {
-    source: contract,
+    source: async () => ok(contract),
     output: 'output/contract.json',
-    types: 'output/contract.d.ts',
   },
 });

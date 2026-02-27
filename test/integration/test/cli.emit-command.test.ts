@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -412,44 +412,40 @@ describe('emit command', () => {
     },
   );
 
-  it(
-    'handles sync contract source function',
-    { timeout: timeouts.typeScriptCompilation },
-    async () => {
-      const command = createContractEmitCommand();
-      const testSetup = setupIntegrationTestDirectoryFromFixtures(
-        fixtureSubdir,
-        'prisma-next.config.sync-source.ts',
-        { '{{OUTPUT_DIR}}': outputDir },
-      );
-      const testDirSync = testSetup.testDir;
-      const cleanupSync = testSetup.cleanup;
+  it('handles provider source function', { timeout: timeouts.typeScriptCompilation }, async () => {
+    const command = createContractEmitCommand();
+    const testSetup = setupIntegrationTestDirectoryFromFixtures(
+      fixtureSubdir,
+      'prisma-next.config.sync-source.ts',
+      { '{{OUTPUT_DIR}}': outputDir },
+    );
+    const testDirSync = testSetup.testDir;
+    const cleanupSync = testSetup.cleanup;
 
+    try {
+      const originalCwd = process.cwd();
       try {
-        const originalCwd = process.cwd();
-        try {
-          process.chdir(testDirSync);
-          await executeCommand(command, [
-            'node',
-            'cli.js',
-            'emit',
-            '--config',
-            'prisma-next.config.ts',
-          ]);
-        } finally {
-          process.chdir(originalCwd);
-        }
-
-        const contractJsonPath = join(outputDir, 'contract.json');
-        expect(existsSync(contractJsonPath)).toBe(true);
+        process.chdir(testDirSync);
+        await executeCommand(command, [
+          'node',
+          'cli.js',
+          'emit',
+          '--config',
+          'prisma-next.config.ts',
+        ]);
       } finally {
-        cleanupSync();
+        process.chdir(originalCwd);
       }
-    },
-  );
+
+      const contractJsonPath = join(outputDir, 'contract.json');
+      expect(existsSync(contractJsonPath)).toBe(true);
+    } finally {
+      cleanupSync();
+    }
+  });
 
   it(
-    'resolves psl source config and emits offline',
+    'emits from psl provider and matches ts provider hashes',
     { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
@@ -461,6 +457,26 @@ describe('emit command', () => {
       const cleanupPsl = testSetup.cleanup;
 
       try {
+        const originalCwd = process.cwd();
+        let tsProviderStorageHash = '';
+        let tsProviderProfileHash = '';
+        try {
+          process.chdir(testDir);
+          const exitCode = await executeCommand(command, [
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).toBe(0);
+          const tsContract = JSON.parse(
+            readFileSync(join(outputDir, 'contract.json'), 'utf-8'),
+          ) as Record<string, unknown>;
+          tsProviderStorageHash = tsContract['storageHash'] as string;
+          tsProviderProfileHash = tsContract['profileHash'] as string;
+        } finally {
+          process.chdir(originalCwd);
+        }
+
         writeFileSync(
           join(testDirPsl, 'schema.prisma'),
           `model User {
@@ -471,7 +487,6 @@ describe('emit command', () => {
           'utf-8',
         );
 
-        const originalCwd = process.cwd();
         try {
           process.chdir(testDirPsl);
           const exitCode = await executeCommand(command, [
@@ -492,12 +507,13 @@ describe('emit command', () => {
         const emitted = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
         expect(emitted).toMatchObject({
           targetFamily: 'sql',
-          source: {
-            kind: 'psl',
-            schemaPath: resolve(testDirPsl, 'schema.prisma'),
-            schema: expect.stringContaining('model User'),
-          },
+          storageHash: tsProviderStorageHash,
+          profileHash: tsProviderProfileHash,
         });
+        expect(emitted).not.toHaveProperty('sources');
+        expect(emitted['meta']).not.toHaveProperty('source');
+        expect(emitted['meta']).not.toHaveProperty('sourceId');
+        expect(emitted['meta']).not.toHaveProperty('schemaPath');
       } finally {
         cleanupPsl();
       }

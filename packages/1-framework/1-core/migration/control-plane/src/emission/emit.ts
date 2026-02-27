@@ -6,6 +6,26 @@ import { canonicalizeContract } from './canonicalization';
 import { computeExecutionHash, computeProfileHash, computeStorageHash } from './hashing';
 import type { EmitOptions, EmitResult } from './types';
 
+const PROVENANCE_KEYS = new Set(['source', 'sourceId', 'schemaPath', 'sources']);
+
+function stripProvenance(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => stripProvenance(entry));
+  }
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (PROVENANCE_KEYS.has(key)) {
+      continue;
+    }
+    sanitized[key] = stripProvenance(entry);
+  }
+  return sanitized;
+}
+
 function validateCoreStructure(ir: ContractIR): void {
   if (!ir.targetFamily) {
     throw new Error('ContractIR must have targetFamily');
@@ -72,7 +92,7 @@ export async function emit(
     ...ifDefined('execution', ir.execution),
     extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
-    meta: ir.meta,
+    meta: stripProvenance(ir.meta) as Record<string, unknown>,
   } as const;
 
   const storageHash = computeStorageHash(contractJson);
@@ -85,6 +105,7 @@ export async function emit(
     profileHash?: string;
   } = {
     ...ir,
+    meta: stripProvenance(ir.meta) as Record<string, unknown>,
     schemaVersion: contractJson.schemaVersion,
     storageHash,
     ...ifDefined('executionHash', executionHash),
