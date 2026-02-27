@@ -44,7 +44,7 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
   if (failure.code === 'MARKER_REQUIRED') {
     return errorMarkerRequired({
       why: failure.why ?? 'Contract marker not found in database',
-      fix: 'Run `prisma-next db init` first to adopt the database, then re-run `prisma-next db update`',
+      fix: 'Run `prisma-next db init` first to sign the database, then re-run `prisma-next db update`',
     });
   }
 

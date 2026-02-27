@@ -6,10 +6,10 @@ Two complementary commands for managing database schema lifecycle.
 
 | Command | Purpose | Marker required? | Policy |
 |---------|---------|-----------------|--------|
-| `db init` | Adopt an existing database under contract management | No (creates one) | Additive only |
+| `db init` | Sign an existing database under contract management | No (creates one) | Additive only |
 | `db update` | Reconcile a managed database to the current contract | Yes | Additive + widening + destructive |
 
-**`db init`** is run once per database to bring it under contract management. It introspects the live schema, plans additive operations to fill any gaps, executes them, and writes a contract marker.
+**`db init`** is run once per database to sign it under contract management. It introspects the live schema, plans additive operations to fill any gaps, executes them, and writes a contract marker (signature).
 
 **`db update`** is run after every contract change. It reads the existing marker, introspects the live schema, plans a full reconciliation (including destructive operations like dropping extra columns/tables), executes the plan, and advances the marker.
 
@@ -19,7 +19,7 @@ Two complementary commands for managing database schema lifecycle.
 # 1. Define schema and emit contract
 prisma-next contract emit --config prisma-next.config.ts
 
-# 2. Adopt the database (first time only)
+# 2. Sign the database (first time only)
 prisma-next db init --db $DATABASE_URL
 
 # 3. Evolve the schema: add a column, change a type, etc.
@@ -42,19 +42,21 @@ prisma-next db update --db $DATABASE_URL
 ```
 ✖ Database marker is required before db update (MARKER_REQUIRED)
   Why: Contract marker not found in database
-  Fix: Run `prisma-next db init` first to adopt the database, then re-run `prisma-next db update`
+  Fix: Run `prisma-next db init` first to sign the database, then re-run `prisma-next db update`
 ```
 
-**Why**: `db update` is designed for databases already under contract management. It needs a marker to know the origin state. For fresh databases, use `db init` first.
+**Why**: `db update` is designed for databases already signed under contract management. It needs a marker to know the origin state. For fresh databases, use `db init` first.
 
 **JSON output** (`--json`):
 ```json
 {
   "ok": false,
-  "domain": "RUNTIME",
-  "code": "MARKER_REQUIRED",
-  "summary": "Database marker is required before db update",
-  "fix": "Run `prisma-next db init` first to adopt the database, then re-run `prisma-next db update`"
+  "code": "PN-RTM-3010",
+  "domain": "RTM",
+  "severity": "error",
+  "summary": "Marker required",
+  "why": "Contract marker not found in database",
+  "fix": "Run `prisma-next db init` first to sign the database, then re-run `prisma-next db update`"
 }
 ```
 
@@ -133,7 +135,7 @@ If the runner detects that the marker has drifted since planning (origin mismatc
 | Operation policy | Additive only | Additive + widening + destructive |
 | Execution checks | Disabled (fresh introspection) | Enabled (database may have drifted) |
 | Existing marker handling | Idempotent if hash matches; error if mismatched | Reads marker as origin for plan |
-| Use case | First-time adoption | Ongoing schema evolution |
+| Use case | First-time signing | Ongoing schema evolution |
 
 ## Flags
 
