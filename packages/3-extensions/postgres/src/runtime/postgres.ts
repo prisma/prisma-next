@@ -119,8 +119,11 @@ class BuildOnlyKyselyDriver implements Driver {
 
 class RedactingPostgresQueryCompiler implements QueryCompiler {
   readonly #compiler = new PostgresQueryCompiler();
-  compileQuery(node: unknown): CompiledQuery {
-    const compiled = this.#compiler.compileQuery(node as never, {} as never);
+  compileQuery(
+    ...args: Parameters<PostgresQueryCompiler['compileQuery']>
+  ): ReturnType<PostgresQueryCompiler['compileQuery']> {
+    const [node, queryId] = args;
+    const compiled = this.#compiler.compileQuery(node, queryId);
     return {
       ...compiled,
       sql: REDACTED_SQL,

@@ -39,13 +39,20 @@ export function buildKyselyPlan<Row>(
 
   const paramDescriptors = metaAdditions.paramDescriptors;
   if (compiledQuery.parameters.length < paramDescriptors.length) {
-    throw new Error(
+    throw new KyselyTransformError(
       `Kysely plan parameter mismatch: compiled parameters length (${compiledQuery.parameters.length}) must be at least paramDescriptors length (${paramDescriptors.length})`,
+      KYSELY_TRANSFORM_ERROR_CODES.PARAMETER_MISMATCH,
+      {
+        compiledParamCount: compiledQuery.parameters.length,
+        descriptorCount: paramDescriptors.length,
+      },
     );
   }
   const params = compiledQuery.parameters.slice(0, paramDescriptors.length);
 
-  const annotations: { codecs?: Record<string, string> } = {};
+  const annotations: { sql?: string; codecs?: Record<string, string> } = {
+    sql: REDACTED_SQL,
+  };
   if (metaAdditions.projectionTypes && Object.keys(metaAdditions.projectionTypes).length > 0) {
     annotations.codecs = { ...metaAdditions.projectionTypes };
   }
@@ -69,7 +76,7 @@ export function buildKyselyPlan<Row>(
           ? metaAdditions.projectionTypes
           : undefined,
       ),
-      ...ifDefined('annotations', Object.keys(annotations).length > 0 ? annotations : undefined),
+      annotations,
     },
   };
 }

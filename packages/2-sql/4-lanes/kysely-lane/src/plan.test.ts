@@ -1,7 +1,7 @@
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CompiledQuery } from 'kysely';
 import { describe, expect, it } from 'vitest';
-import { buildKyselyPlan } from './plan';
+import { buildKyselyPlan, REDACTED_SQL } from './plan';
 
 const contract: SqlContract<SqlStorage> = {
   schemaVersion: '1',
@@ -118,6 +118,7 @@ describe('buildKyselyPlan', () => {
     const plan = buildKyselyPlan(contract, createSelectCompiledQuery());
 
     expect(plan.params).toEqual(['u1']);
+    expect(plan.meta.annotations).toMatchObject({ sql: REDACTED_SQL });
     expect(plan.meta.refs).toEqual({
       tables: ['user'],
       columns: [
