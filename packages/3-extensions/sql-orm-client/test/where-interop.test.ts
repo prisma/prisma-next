@@ -8,24 +8,29 @@ function toWhereExpr(expr: BoundWhereExpr): WhereArg {
   };
 }
 
+const col = (table: string, column: string) => ({ kind: 'col' as const, table, column });
+const param = (index: number) => ({ kind: 'param' as const, index });
+const literal = (value: unknown) => ({ kind: 'literal' as const, value });
+const eq = (
+  left: ReturnType<typeof col>,
+  right: ReturnType<typeof param> | ReturnType<typeof literal>,
+) => ({
+  kind: 'bin' as const,
+  op: 'eq' as const,
+  left,
+  right,
+});
+
 describe('where interop', () => {
   it('normalizes bound params into literals', () => {
     const arg = toWhereExpr({
-      expr: {
-        kind: 'bin',
-        op: 'eq',
-        left: { kind: 'col', table: 'users', column: 'name' },
-        right: { kind: 'param', index: 1 },
-      },
+      expr: eq(col('users', 'name'), param(1)),
       params: ['Alice'],
       paramDescriptors: [{ source: 'lane' }],
     });
 
     expect(normalizeWhereArg(arg)).toEqual({
-      kind: 'bin',
-      op: 'eq',
-      left: { kind: 'col', table: 'users', column: 'name' },
-      right: { kind: 'literal', value: 'Alice' },
+      ...eq(col('users', 'name'), literal('Alice')),
     });
   });
 
@@ -35,19 +40,13 @@ describe('where interop', () => {
         kind: 'and',
         exprs: [
           {
-            kind: 'bin',
-            op: 'eq',
-            left: { kind: 'col', table: 'users', column: 'id' },
-            right: { kind: 'param', index: 1 },
+            ...eq(col('users', 'id'), param(1)),
           },
           {
             kind: 'or',
             exprs: [
               {
-                kind: 'bin',
-                op: 'eq',
-                left: { kind: 'col', table: 'users', column: 'email' },
-                right: { kind: 'param', index: 2 },
+                ...eq(col('users', 'email'), param(2)),
               },
               {
                 kind: 'exists',
@@ -55,12 +54,9 @@ describe('where interop', () => {
                 subquery: {
                   kind: 'select',
                   from: { kind: 'table', name: 'posts' },
-                  project: [{ alias: 'id', expr: { kind: 'col', table: 'posts', column: 'id' } }],
+                  project: [{ alias: 'id', expr: col('posts', 'id') }],
                   where: {
-                    kind: 'bin',
-                    op: 'eq',
-                    left: { kind: 'col', table: 'posts', column: 'user_id' },
-                    right: { kind: 'param', index: 3 },
+                    ...eq(col('posts', 'user_id'), param(3)),
                   },
                 },
               },
@@ -76,19 +72,13 @@ describe('where interop', () => {
       kind: 'and',
       exprs: [
         {
-          kind: 'bin',
-          op: 'eq',
-          left: { kind: 'col', table: 'users', column: 'id' },
-          right: { kind: 'literal', value: 1 },
+          ...eq(col('users', 'id'), literal(1)),
         },
         {
           kind: 'or',
           exprs: [
             {
-              kind: 'bin',
-              op: 'eq',
-              left: { kind: 'col', table: 'users', column: 'email' },
-              right: { kind: 'literal', value: 'a@b.c' },
+              ...eq(col('users', 'email'), literal('a@b.c')),
             },
             {
               kind: 'exists',
@@ -96,12 +86,9 @@ describe('where interop', () => {
               subquery: {
                 kind: 'select',
                 from: { kind: 'table', name: 'posts' },
-                project: [{ alias: 'id', expr: { kind: 'col', table: 'posts', column: 'id' } }],
+                project: [{ alias: 'id', expr: col('posts', 'id') }],
                 where: {
-                  kind: 'bin',
-                  op: 'eq',
-                  left: { kind: 'col', table: 'posts', column: 'user_id' },
-                  right: { kind: 'literal', value: 99 },
+                  ...eq(col('posts', 'user_id'), literal(99)),
                 },
               },
             },
@@ -112,12 +99,7 @@ describe('where interop', () => {
   });
 
   it('rejects bare WhereExpr with ParamRef', () => {
-    const expr: WhereExpr = {
-      kind: 'bin',
-      op: 'eq',
-      left: { kind: 'col', table: 'users', column: 'id' },
-      right: { kind: 'param', index: 1 },
-    };
+    const expr: WhereExpr = eq(col('users', 'id'), param(1));
 
     expect(() => normalizeWhereArg(expr)).toThrow(/bare WhereExpr.*ParamRef/i);
   });
@@ -125,10 +107,7 @@ describe('where interop', () => {
   it('rejects invalid bound payload alignment', () => {
     const arg = toWhereExpr({
       expr: {
-        kind: 'bin',
-        op: 'eq',
-        left: { kind: 'col', table: 'users', column: 'id' },
-        right: { kind: 'param', index: 1 },
+        ...eq(col('users', 'id'), param(1)),
       },
       params: [1],
       paramDescriptors: [],
@@ -140,10 +119,7 @@ describe('where interop', () => {
   it('rejects payloads that do not start ParamRef indexing at 1', () => {
     const arg = toWhereExpr({
       expr: {
-        kind: 'bin',
-        op: 'eq',
-        left: { kind: 'col', table: 'users', column: 'id' },
-        right: { kind: 'param', index: 2 },
+        ...eq(col('users', 'id'), param(2)),
       },
       params: ['a', 'b'],
       paramDescriptors: [{ source: 'lane' }, { source: 'lane' }],
@@ -158,16 +134,10 @@ describe('where interop', () => {
         kind: 'and',
         exprs: [
           {
-            kind: 'bin',
-            op: 'eq',
-            left: { kind: 'col', table: 'users', column: 'id' },
-            right: { kind: 'param', index: 1 },
+            ...eq(col('users', 'id'), param(1)),
           },
           {
-            kind: 'bin',
-            op: 'eq',
-            left: { kind: 'col', table: 'users', column: 'email' },
-            right: { kind: 'param', index: 3 },
+            ...eq(col('users', 'email'), param(3)),
           },
         ],
       },
@@ -181,10 +151,7 @@ describe('where interop', () => {
   it('rejects payloads whose max ParamRef index does not match params length', () => {
     const arg = toWhereExpr({
       expr: {
-        kind: 'bin',
-        op: 'eq',
-        left: { kind: 'col', table: 'users', column: 'id' },
-        right: { kind: 'param', index: 1 },
+        ...eq(col('users', 'id'), param(1)),
       },
       params: ['a', 'b'],
       paramDescriptors: [{ source: 'lane' }, { source: 'lane' }],
