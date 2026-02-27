@@ -12,6 +12,5 @@ export function loadAppConfig() {
     const message = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Invalid app configuration: ${message}`);
   }
-  const parsed = result as { DATABASE_URL: string };
-  return { databaseUrl: parsed.DATABASE_URL };
+  return { databaseUrl: result.DATABASE_URL };
 }
