@@ -227,10 +227,11 @@ export default function postgres<TContract extends SqlContract<SqlStorage>>(
     context,
     stack,
     connect(bindingInput) {
+      if (driverConnected) {
+        throw new Error('Postgres client already connected');
+      }
+
       if (bindingInput !== undefined) {
-        if (driverConnected) {
-          throw new Error('Postgres client already connected');
-        }
         binding = resolvePostgresBinding(bindingInput);
       }
 

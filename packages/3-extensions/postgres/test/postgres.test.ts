@@ -245,6 +245,18 @@ describe('postgres', () => {
     expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
   });
 
+  it('throws when attempting to connect twice without arguments', () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    db.connect();
+    expect(() => db.connect()).toThrow('Postgres client already connected');
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+  });
+
   it('validates contractJson input', () => {
     const contractJson = { models: {} };
 
