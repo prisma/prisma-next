@@ -10,9 +10,13 @@ describe('transformKyselyToPnAst — paramDescriptors', () => {
     const result = transformKyselyToPnAst(contract, query, ['uid']);
     const desc = result.metaAdditions.paramDescriptors[0];
     expect(desc).toBeDefined();
-    expect(desc?.refs).toEqual({ table: 'user', column: 'id' });
-    expect(desc?.codecId).toBeDefined();
-    expect(desc?.nativeType).toBeDefined();
+    expect(desc).toMatchObject({
+      index: 1,
+      source: 'lane',
+      refs: { table: 'user', column: 'id' },
+      codecId: expect.any(String),
+      nativeType: expect.any(String),
+    });
   });
 });
 
