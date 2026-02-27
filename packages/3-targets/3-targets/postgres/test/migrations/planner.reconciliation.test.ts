@@ -5,7 +5,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 
-const LOSSY_POLICY: MigrationOperationPolicy = {
+const RECONCILIATION_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
 };
 
@@ -13,7 +13,7 @@ const WIDENING_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening'],
 };
 
-describe('PostgresMigrationPlanner - lossy planning', () => {
+describe('PostgresMigrationPlanner - reconciliation planning', () => {
   const planner = createPostgresMigrationPlanner();
 
   it('plans destructive drop for extra column when policy allows destructive', () => {
@@ -51,7 +51,7 @@ describe('PostgresMigrationPlanner - lossy planning', () => {
     const result = planner.plan({
       contract,
       schema,
-      policy: LOSSY_POLICY,
+      policy: RECONCILIATION_POLICY,
       frameworkComponents: [],
     });
 
@@ -172,8 +172,8 @@ function createContract(
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    storageHash: coreHash('sha256:lossy-contract'),
-    profileHash: profileHash('sha256:lossy-profile'),
+    storageHash: coreHash('sha256:reconciliation-contract'),
+    profileHash: profileHash('sha256:reconciliation-profile'),
     storage: { tables },
     models: {},
     relations: {},
