@@ -177,10 +177,10 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
 
   // When applying, require explicit acceptance for destructive operations
   if (!options.acceptDataLoss) {
-    const destructiveOps = migrationPlan.operations
-      .filter((op) => op.operationClass === 'destructive')
-      .map((op) => ({ id: op.id, label: op.label }));
-    if (destructiveOps.length > 0) {
+    if (migrationPlan.operations.some((op) => op.operationClass === 'destructive')) {
+      const destructiveOps = migrationPlan.operations
+        .filter((op) => op.operationClass === 'destructive')
+        .map((op) => ({ id: op.id, label: op.label }));
       return notOk({
         code: 'DESTRUCTIVE_CHANGES' as const,
         summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
