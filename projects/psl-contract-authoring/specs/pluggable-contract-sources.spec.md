@@ -22,21 +22,17 @@ This spec defines the provider interface, config wiring, error behavior, and the
 - `prisma-next.config.ts` can supply a **contract source provider** instead of a source “kind” union.
   - **Provider contract**: a provider can be invoked to produce a `Result<ContractIR, Diagnostics>` (sync or async).
   - Diagnostics are structured (include spans/sourceIds where available) and are intended for CLI/editor rendering.
-
 - The CLI/control plane remains **source-agnostic**:
   - It calls the provider to obtain `ContractIR`.
   - It does not need to understand “PSL”, “TS”, or any future source types.
-
 - The framework remains responsible for artifact-level guarantees:
   - Validate the returned IR (structure + invariants).
   - Normalize IR into the canonical normalized boundary (defaults, stable naming/id rules, consistent representation).
   - Canonicalize/hash from normalized IR.
   - Emit `contract.json` + `contract.d.ts` deterministically.
-
 - **Contract artifacts do not contain source locations/IDs**:
   - `contract.json` (and hashes) must not include schema paths, sourceIds, or other provenance identifiers.
   - Source locations/IDs exist only in diagnostics and other non-canonical debug output.
-
 - **Decision: remove `sources` from canonical artifacts entirely**:
   - The canonical contract artifact (`contract.json`) must not contain a top-level `sources` field (even as an empty structural placeholder).
   - Any provenance/debug information must live outside canonical artifacts (e.g. diagnostics, CLI debug output).
@@ -58,34 +54,34 @@ This spec defines the provider interface, config wiring, error behavior, and the
 
 ## Provider boundary
 
-- [ ] A provider interface exists and is documented with:
-  - [ ] how it produces `ContractIR`
-  - [ ] how it reports diagnostics/errors
-  - [ ] what determinism constraints apply (especially around normalization/canonicalization expectations)
+- A provider interface exists and is documented with:
+  - how it produces `ContractIR`
+  - how it reports diagnostics/errors
+  - what determinism constraints apply (especially around normalization/canonicalization expectations)
 
 ## Framework guarantees
 
-- [ ] The framework/CLI can emit artifacts from provider-returned IR without any source-specific branching.
-- [ ] The framework applies a normalization + canonicalization pass that:
-  - [ ] yields stable `contract.json` ordering/omissions
-  - [ ] produces stable hashes for equivalent normalized IR
-  - [ ] strips any provider-supplied provenance (paths/sourceIds) from the canonical artifact surface
-  - [ ] emits `contract.json` with **no `sources` field**
+- The framework/CLI can emit artifacts from provider-returned IR without any source-specific branching.
+- The framework applies a normalization + canonicalization pass that:
+  - yields stable `contract.json` ordering/omissions
+  - produces stable hashes for equivalent normalized IR
+  - strips any provider-supplied provenance (paths/sourceIds) from the canonical artifact surface
+  - emits `contract.json` with **no `sources` field**
 
 ## Conformance
 
-- [ ] A conformance harness exists where at least two providers (TS-first and PSL-first) can be run on an equivalent schema intent and compared at:
-  - [ ] normalized IR boundary
-  - [ ] emitted `contract.json` boundary (and hashes)
+- A conformance harness exists where at least two providers (TS-first and PSL-first) can be run on an equivalent schema intent and compared at:
+  - normalized IR boundary
+  - emitted `contract.json` boundary (and hashes)
 
 ## Documentation + ADR alignment
 
-- [ ] Docs are updated to reflect:
-  - [ ] provider-based authoring as the intended end-state (no enumerated source “kind” union)
-  - [ ] canonical artifacts contain no provenance and no `sources` field
-- [ ] Relevant ADR(s) are updated (or a new ADR is added) to record:
-  - [ ] the provider-based authoring direction
-  - [ ] the decision to remove `sources` from canonical artifacts
+- Docs are updated to reflect:
+  - provider-based authoring as the intended end-state (no enumerated source “kind” union)
+  - canonical artifacts contain no provenance and no `sources` field
+- Relevant ADR(s) are updated (or a new ADR is added) to record:
+  - the provider-based authoring direction
+  - the decision to remove `sources` from canonical artifacts
 
 # Other Considerations
 

@@ -21,10 +21,11 @@ Deliver a PSL-first contract authoring path for Prisma Next: users point `prisma
 Make contract authoring sources pluggable by design. Instead of enumerating source “kinds” in framework config, accept a source provider that returns `ContractIR` (via `Result<>`). The framework remains responsible for validation, normalization, canonicalization/hashing, and artifact emission.
 
 **Spec:** `projects/psl-contract-authoring/specs/pluggable-contract-sources.spec.md`
+**Execution Plan:** `projects/psl-contract-authoring/plans/pluggable-contract-sources.plan.md`
 
 **Tasks:**
 
-- [ ] Define a `ContractSourceProvider` interface that produces `Result<ContractIR, Diagnostics>` (sync or async), with diagnostics suitable for CLI/editor rendering.
+- [ ] Define a `ContractSourceProvider` interface that produces `Promise<Result<ContractIR, Diagnostics>>` (always async), with diagnostics suitable for CLI/editor rendering.
 - [ ] Update config typing + validation to accept providers (commit to provider-only; remove enumerated source “kind” union from the intended end-state).
 - [ ] Update `contract emit` to call the provider to obtain IR, then run framework-owned validation + normalization + canonicalization/hashing + emission (source-agnostic).
 - [ ] Ensure canonical artifacts do not include source locations/IDs (paths/sourceIds are diagnostics-only).
@@ -32,6 +33,7 @@ Make contract authoring sources pluggable by design. Instead of enumerating sour
   - TS-first provider emits `contract.json` + `contract.d.ts`
   - PSL-first provider emits `contract.json` + `contract.d.ts`
   - No source-specific branching is required in the CLI/control plane
+  - E2E conformance/parity coverage for provider-based emission boundaries
 
 ### Milestone 2: Reusable PSL parser package (`@prisma-next/contract-psl`)
 
