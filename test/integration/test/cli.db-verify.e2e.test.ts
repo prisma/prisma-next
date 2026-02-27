@@ -199,7 +199,7 @@ withTempDir(({ createTempDir }) => {
             why: expect.any(String),
             fix: expect.any(String),
           });
-          expect(parsed.summary).toContain('Marker missing');
+          expect(parsed.summary).toContain('Database not signed');
         });
       },
       timeouts.spinUpPpgDev,
@@ -356,7 +356,7 @@ withTempDir(({ createTempDir }) => {
             why: expect.any(String),
             fix: expect.any(String),
           });
-          expect(parsed.summary).toContain('Marker missing');
+          expect(parsed.summary).toContain('Database not signed');
         });
       },
       timeouts.spinUpPpgDev,

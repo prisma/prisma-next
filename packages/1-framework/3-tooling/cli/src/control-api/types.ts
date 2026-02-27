@@ -521,9 +521,9 @@ export interface ControlClient {
   schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult>;
 
   /**
-   * Signs the database with a contract marker.
-   * Writes or updates the contract marker if schema verification passes.
-   * Idempotent (no-op if marker already matches).
+   * Signs the database with a contract signature.
+   * Writes or updates the signature if schema verification passes.
+   * Idempotent (no-op if signature already matches).
    *
    * @returns Structured result
    * @throws If not connected or infrastructure failure

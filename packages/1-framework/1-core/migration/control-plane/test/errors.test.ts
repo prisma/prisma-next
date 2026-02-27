@@ -353,7 +353,7 @@ describe('Runtime Errors', () => {
   it('errorMarkerMissing creates correct error', () => {
     const error = errorMarkerMissing();
     expect(error.code).toBe('3001');
-    expect(error.message).toBe('Marker missing');
+    expect(error.message).toBe('Database not signed');
     expect(error.domain).toBe('RTM');
   });
 
@@ -411,7 +411,7 @@ describe('Runtime Errors', () => {
   it('errorMarkerRequired creates correct error', () => {
     const error = errorMarkerRequired();
     expect(error.code).toBe('3010');
-    expect(error.message).toBe('Marker required');
+    expect(error.message).toBe('Database must be signed first');
     expect(error.domain).toBe('RTM');
   });
 

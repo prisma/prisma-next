@@ -77,7 +77,7 @@ describe('executeDbUpdate', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure.code).toBe('MARKER_REQUIRED');
-      expect(result.failure.summary).toContain('marker');
+      expect(result.failure.summary).toContain('signed');
     }
   });
 

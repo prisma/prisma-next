@@ -63,7 +63,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     action: 'dbUpdate',
     kind: 'spanStart',
     spanId: readMarkerSpanId,
-    label: 'Reading contract marker',
+    label: 'Checking database signature',
   });
   const marker = await familyInstance.readMarker({ driver });
   if (!marker) {
@@ -75,8 +75,8 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     });
     return notOk({
       code: 'MARKER_REQUIRED' as const,
-      summary: 'Database marker is required before running db update',
-      why: 'No contract marker found in the database',
+      summary: 'Database must be signed before running db update',
+      why: 'No database signature (marker) found',
       conflicts: undefined,
       meta: undefined,
     });
@@ -284,7 +284,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
           profileHash: migrationPlan.destination.profileHash,
         }
       : { storageHash: migrationPlan.destination.storageHash },
-    summary: `Applied ${execution.operationsExecuted} operation(s), marker written`,
+    summary: `Applied ${execution.operationsExecuted} operation(s), signature updated`,
   };
   return ok(result);
 }

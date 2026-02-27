@@ -40,9 +40,9 @@ prisma-next db init --db $DATABASE_URL
 
 ## What db update does
 
-`prisma-next db update` reconciles a marker-managed database to the current contract. It reads the contract marker, introspects the live schema, plans a migration with additive, widening, and destructive operations, then applies the plan and updates the marker.
+`prisma-next db update` reconciles a signed (marker-managed) database to the current contract. It reads the database signature, introspects the live schema, plans a migration with additive, widening, and destructive operations, then applies the plan and updates the signature.
 
-## Scenario 1: Missing marker (fails fast)
+## Scenario 1: Database not signed (fails fast)
 
 Use this when the database has not been signed.
 
@@ -53,8 +53,8 @@ prisma-next db update --db $DATABASE_URL
 Expected output:
 
 ```text
-✖ Database marker is required before db update (MARKER_REQUIRED)
-  Why: Contract marker not found in database
+✖ Database must be signed before running db update (PN-RTM-3010)
+  Why: No database signature (marker) found
   Fix: Run `prisma-next db init` first to sign the database, then re-run `prisma-next db update`
 ```
 
@@ -104,7 +104,7 @@ Example output:
 
 ```text
 ✔ Applied 1 operation(s)
-  Marker written: sha256:new-hash...
+  Signature: sha256:new-hash...
 ```
 
 ## Scenario 4: No-op update
@@ -119,7 +119,7 @@ Example output:
 
 ```text
 ✔ Applied 0 operation(s)
-  Marker written: sha256:current-hash...
+  Signature: sha256:current-hash...
 ```
 
 ## Scenario 5: Destructive changes with a safety review
@@ -168,7 +168,7 @@ Recovery:
 
 ## Scenario 7: Runner failure after planning
 
-This happens when the runner rejects the apply phase. A common cause is marker drift between plan and apply.
+This happens when the runner rejects the apply phase. A common cause is signature drift between plan and apply.
 
 ```bash
 prisma-next db update --db $DATABASE_URL
@@ -178,13 +178,13 @@ Example output:
 
 ```text
 ✖ Origin mismatch (RUNNER_FAILED)
-  Why: Marker drifted
+  Why: Signature drifted
   Fix: Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`
 ```
 
 Recovery:
 
-1. Verify which contract last wrote the marker.
+1. Verify which contract last signed the database.
 2. Reconcile schema drift or re-apply the intended change.
 3. Re-run `prisma-next db update --db $DATABASE_URL`.
 

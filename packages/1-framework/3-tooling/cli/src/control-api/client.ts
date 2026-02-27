@@ -199,7 +199,7 @@ class ControlClientImpl implements ControlClient {
       action: 'verify',
       kind: 'spanStart',
       spanId: 'verify',
-      label: 'Verifying contract marker...',
+      label: 'Verifying database signature...',
     });
 
     try {

@@ -59,9 +59,9 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
     }
 
     return errorRuntime(
-      `Existing contract marker does not match plan destination.${mismatchParts.length > 0 ? ` Mismatch in ${mismatchParts.join(' and ')}.` : ''}`,
+      `Existing database signature does not match plan destination.${mismatchParts.length > 0 ? ` Mismatch in ${mismatchParts.join(' and ')}.` : ''}`,
       {
-        why: 'Database has an existing contract marker that does not match the target contract',
+        why: 'Database has an existing signature (marker) that does not match the target contract',
         fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
         meta: {
           code: 'MARKER_ORIGIN_MISMATCH',
@@ -189,11 +189,11 @@ export function createDbInitCommand(): Command {
   const command = new Command('init');
   setCommandDescriptions(
     command,
-    'Bootstrap a database to match the current contract and write the contract marker',
+    'Bootstrap a database to match the current contract and sign it',
     'Initializes a database to match your emitted contract using additive-only operations.\n' +
       'Creates any missing tables, columns, indexes, and constraints defined in your contract.\n' +
       'Leaves existing compatible structures in place, surfaces conflicts when destructive changes\n' +
-      'would be required, and writes a contract marker to track the database state. Use --plan to\n' +
+      'would be required, and signs the database to track contract state. Use --plan to\n' +
       'preview changes without applying.',
   );
   addMigrationCommandOptions(command);
