@@ -553,7 +553,6 @@ class ControlClientImpl implements ControlClient {
         summary: 'Failed to resolve contract source',
         why: error instanceof Error ? error.message : String(error),
         meta: undefined,
-        diagnostics: undefined,
       });
     }
 
