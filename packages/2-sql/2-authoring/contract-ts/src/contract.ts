@@ -1,5 +1,4 @@
 import type {
-  Index,
   ModelDefinition,
   ModelField,
   ModelStorage,
@@ -45,9 +44,22 @@ const UniqueConstraintSchema = type.declare<UniqueConstraint>().type({
   'name?': 'string',
 });
 
-const IndexSchema = type.declare<Index>().type({
+// Uses bare type() instead of type.declare<Index>() because the Bm25FieldConfig
+// discriminated union cannot be expressed in Arktype's JSON validation DSL.
+const Bm25FieldConfigSchema = type({
+  'column?': 'string',
+  'expression?': 'string',
+  'tokenizer?': 'string',
+  'tokenizerParams?': 'Record<string, unknown>',
+  'alias?': 'string',
+});
+
+const IndexSchema = type({
   columns: type.string.array().readonly(),
   'name?': 'string',
+  'using?': "'btree' | 'bm25'",
+  'keyField?': 'string',
+  'fieldConfigs?': Bm25FieldConfigSchema.array().readonly(),
 });
 
 const StorageTableSchema = type({
