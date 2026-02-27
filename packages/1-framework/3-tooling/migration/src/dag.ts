@@ -76,12 +76,12 @@ export function findLeaf(graph: MigrationGraph): string {
   // Nodes that are only sources (the EMPTY_CONTRACT_HASH with outgoing) are not leaves
   const realLeaves = leaves.filter((n) => graph.reverseEdges.has(n));
 
-  if (realLeaves.length === 0) {
+  const leaf = realLeaves[0];
+  if (leaf === undefined) {
     return EMPTY_CONTRACT_HASH;
   }
 
   if (realLeaves.length === 1) {
-    const [leaf] = realLeaves;
     return leaf;
   }
 
