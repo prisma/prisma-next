@@ -1,12 +1,10 @@
 import { generateId } from '@prisma-next/ids/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
-import { getDemoKysely } from './run';
 
 export async function insertUser(email: string, runtime: Runtime) {
   const userId = generateId({ id: 'uuidv4' });
-  const kysely = getDemoKysely();
-  const query = kysely
+  const query = db.kysely
     .insertInto('user')
     .values({
       id: userId,
@@ -21,8 +19,7 @@ export async function insertUser(email: string, runtime: Runtime) {
 }
 
 export async function updateUser(userId: string, newEmail: string, runtime: Runtime) {
-  const kysely = getDemoKysely();
-  const query = kysely
+  const query = db.kysely
     .updateTable('user')
     .set({ email: newEmail })
     .where('id', '=', userId)
@@ -33,8 +30,7 @@ export async function updateUser(userId: string, newEmail: string, runtime: Runt
 }
 
 export async function deleteUser(userId: string, runtime: Runtime) {
-  const kysely = getDemoKysely();
-  const query = kysely.deleteFrom('user').where('id', '=', userId).returning(['id', 'email']);
+  const query = db.kysely.deleteFrom('user').where('id', '=', userId).returning(['id', 'email']);
 
   const rows = await runtime.execute(db.kysely.build(query)).toArray();
   return rows[0] ?? null;
