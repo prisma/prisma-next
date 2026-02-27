@@ -175,6 +175,13 @@ Prioritize findings by impact: security > correctness > performance > maintainab
 
 ### 4.3) Finding format (required)
 
+#### 4.3.1) Finding IDs (required)
+
+All findings must have a **unique, unambiguous ID** so they can be referenced from other places (follow-up docs, comments, issue trackers).
+
+- Use a single, globally unique sequence across the entire `code-review.md` (do not restart numbering per section).
+- Preferred format: `F<NN>` (e.g. `F01`, `F02`, …), optionally with a section prefix for readability (e.g. `BLOCK-F01`, `NB-F02`, `NIT-F03`), but keep IDs globally unique.
+
 For each finding, include:
 - **Location**: repo-relative path + line range
 - **Issue**: concise description of the problem and why it matters
