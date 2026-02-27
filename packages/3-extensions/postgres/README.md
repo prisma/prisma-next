@@ -33,7 +33,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - Build typed SQL and Kysely lane instances from the same execution context
 - Build static schema and ORM roots from the execution context
 - Normalize runtime binding input (`binding`, `url`, `pg`)
-- Lazily instantiate runtime resources on first `db.runtime()` call
+- Lazily instantiate runtime resources on first `db.runtime()` or `db.connect(...)` call
 - Connect the internal Postgres driver through `db.connect(...)` or from initial binding options
 - Memoize runtime so repeated `db.runtime()` calls return one instance
 
