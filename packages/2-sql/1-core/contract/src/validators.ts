@@ -7,6 +7,7 @@ import type {
   ModelField,
   ModelStorage,
   PrimaryKey,
+  ReferentialAction,
   SqlContract,
   SqlStorage,
   StorageTypeInstance,
@@ -91,15 +92,21 @@ const IndexSchema = type.declare<Index>().type({
   'name?': 'string',
 });
 
-const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({
+export const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({
   table: 'string',
   columns: type.string.array().readonly(),
 });
 
-const ForeignKeySchema = type.declare<ForeignKey>().type({
+export const ReferentialActionSchema = type
+  .declare<ReferentialAction>()
+  .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
+
+export const ForeignKeySchema = type.declare<ForeignKey>().type({
   columns: type.string.array().readonly(),
   references: ForeignKeyReferencesSchema,
   'name?': 'string',
+  'onDelete?': ReferentialActionSchema,
+  'onUpdate?': ReferentialActionSchema,
   constraint: 'boolean',
   index: 'boolean',
 });
@@ -224,4 +231,49 @@ export function validateSqlContract<T extends SqlContract<SqlStorage>>(value: un
   // TypeScript needs an assertion here due to exactOptionalPropertyTypes differences
   // between Arktype's inferred type and the generic T, but runtime-wise they're compatible
   return contractResult as T;
+}
+
+/**
+ * Validates semantic constraints on SqlStorage that cannot be expressed in Arktype schemas.
+ *
+ * Returns an array of human-readable error strings. Empty array = valid.
+ *
+ * Currently checks:
+ * - `setNull` referential action on a non-nullable FK column (would fail at runtime)
+ * - `setDefault` referential action on a non-nullable FK column without a DEFAULT (would fail at runtime)
+ */
+export function validateStorageSemantics(storage: SqlStorage): string[] {
+  const errors: string[] = [];
+
+  for (const [tableName, table] of Object.entries(storage.tables)) {
+    for (const fk of table.foreignKeys) {
+      for (const colName of fk.columns) {
+        const column = table.columns[colName];
+        if (!column) continue;
+
+        if (fk.onDelete === 'setNull' && !column.nullable) {
+          errors.push(
+            `Table "${tableName}": onDelete setNull on foreign key column "${colName}" which is NOT NULL`,
+          );
+        }
+        if (fk.onUpdate === 'setNull' && !column.nullable) {
+          errors.push(
+            `Table "${tableName}": onUpdate setNull on foreign key column "${colName}" which is NOT NULL`,
+          );
+        }
+        if (fk.onDelete === 'setDefault' && !column.nullable && column.default === undefined) {
+          errors.push(
+            `Table "${tableName}": onDelete setDefault on foreign key column "${colName}" which is NOT NULL and has no DEFAULT`,
+          );
+        }
+        if (fk.onUpdate === 'setDefault' && !column.nullable && column.default === undefined) {
+          errors.push(
+            `Table "${tableName}": onUpdate setDefault on foreign key column "${colName}" which is NOT NULL and has no DEFAULT`,
+          );
+        }
+      }
+    }
+  }
+
+  return errors;
 }

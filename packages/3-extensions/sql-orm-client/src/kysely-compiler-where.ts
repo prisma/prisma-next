@@ -141,6 +141,10 @@ function buildSelectQuery(ast: SelectAst): AnySelectQueryBuilder {
 }
 
 function applyJoin(qb: AnySelectQueryBuilder, join: JoinAst): AnySelectQueryBuilder {
+  if (join.on.kind !== 'eqCol') {
+    throw new Error('Only eqCol join predicates are supported in orm-client subqueries');
+  }
+
   const left = `${join.on.left.table}.${join.on.left.column}`;
   const right = `${join.on.right.table}.${join.on.right.column}`;
 

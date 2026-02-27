@@ -127,6 +127,65 @@ describe('SQL contract factories', () => {
         index: true,
       });
     });
+
+    it('creates foreign key with onDelete via options object', () => {
+      const foreignKey = fk(['userId'], 'user', ['id'], { onDelete: 'cascade' });
+      expect(foreignKey).toEqual({
+        columns: ['userId'],
+        references: { table: 'user', columns: ['id'] },
+        onDelete: 'cascade',
+        constraint: true,
+        index: true,
+      });
+    });
+
+    it('creates foreign key with onDelete and onUpdate', () => {
+      const foreignKey = fk(['userId'], 'user', ['id'], {
+        onDelete: 'cascade',
+        onUpdate: 'noAction',
+      });
+      expect(foreignKey).toEqual({
+        columns: ['userId'],
+        references: { table: 'user', columns: ['id'] },
+        onDelete: 'cascade',
+        onUpdate: 'noAction',
+        constraint: true,
+        index: true,
+      });
+    });
+
+    it('creates foreign key with name and referential actions via options', () => {
+      const foreignKey = fk(['userId'], 'user', ['id'], {
+        name: 'post_userId_fkey',
+        onDelete: 'setNull',
+        onUpdate: 'cascade',
+      });
+      expect(foreignKey).toEqual({
+        columns: ['userId'],
+        references: { table: 'user', columns: ['id'] },
+        name: 'post_userId_fkey',
+        onDelete: 'setNull',
+        onUpdate: 'cascade',
+        constraint: true,
+        index: true,
+      });
+    });
+
+    it.each([
+      'noAction',
+      'restrict',
+      'cascade',
+      'setNull',
+      'setDefault',
+    ] as const)('accepts %s as a referential action', (action) => {
+      const foreignKey = fk(['userId'], 'user', ['id'], { onDelete: action });
+      expect(foreignKey.onDelete).toBe(action);
+    });
+
+    it('omits undefined referential actions from output', () => {
+      const foreignKey = fk(['userId'], 'user', ['id'], { onDelete: 'cascade' });
+      expect(foreignKey).not.toHaveProperty('onUpdate');
+    });
   });
 
   describe('table', () => {

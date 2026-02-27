@@ -192,44 +192,48 @@ withTempDir(({ createTempDir }) => {
       timeouts.typeScriptCompilation,
     );
 
-    it('throws error with PN-CLI code when contract config is missing', async () => {
-      // Set up test directory from fixtures with no-contract config
-      const testSetup = setupTestDirectoryFromFixtures(
-        createTempDir,
-        fixtureSubdir,
-        'prisma-next.config.no-contract.ts',
-      );
-      const testDir = testSetup.testDir;
+    it(
+      'throws error with PN-CLI code when contract config is missing',
+      async () => {
+        // Set up test directory from fixtures with no-contract config
+        const testSetup = setupTestDirectoryFromFixtures(
+          createTempDir,
+          fixtureSubdir,
+          'prisma-next.config.no-contract.ts',
+        );
+        const testDir = testSetup.testDir;
 
-      const command = createContractEmitCommand();
-      const originalCwd = process.cwd();
-      try {
-        process.chdir(testDir);
-        // Commands don't throw - they call process.exit() with non-zero exit code
-        // executeCommand will catch the process.exit error and re-throw for non-zero codes
-        await expect(
-          executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
-        ).rejects.toThrow('process.exit called');
-      } finally {
-        process.chdir(originalCwd);
-      }
+        const command = createContractEmitCommand();
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testDir);
+          // Commands don't throw - they call process.exit() with non-zero exit code
+          // executeCommand will catch the process.exit error and re-throw for non-zero codes
+          await expect(
+            executeCommand(command, ['--config', 'prisma-next.config.ts', '--json']),
+          ).rejects.toThrow('process.exit called');
+        } finally {
+          process.chdir(originalCwd);
+        }
 
-      // Check exit code is non-zero (error)
-      const exitCode = getExitCode();
-      expect(exitCode).not.toBe(0);
+        // Check exit code is non-zero (error)
+        const exitCode = getExitCode();
+        expect(exitCode).not.toBe(0);
 
-      // Parse and verify JSON error output
-      const errorOutput = consoleErrors.join('\n');
-      expect(() => JSON.parse(errorOutput)).not.toThrow();
+        // Parse and verify JSON error output
+        const errorOutput = consoleErrors.join('\n');
+        expect(() => JSON.parse(errorOutput)).not.toThrow();
 
-      const parsed = JSON.parse(errorOutput);
-      expect(parsed).toMatchObject({
-        code: expect.stringMatching(/^PN-CLI-/),
-        summary: expect.any(String),
-        why: expect.any(String),
-        fix: expect.any(String),
-      });
-    });
+        const parsed = JSON.parse(errorOutput);
+        expect(parsed).toMatchObject({
+          code: expect.stringMatching(/^PN-CLI-/),
+          summary: expect.any(String),
+          why: expect.any(String),
+          fix: expect.any(String),
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
 
     it(
       'outputs timings in verbose mode',

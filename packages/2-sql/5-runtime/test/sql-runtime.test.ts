@@ -1,4 +1,4 @@
-import { coreHash } from '@prisma-next/contract/types';
+import { coreHash, type ExecutionPlan } from '@prisma-next/contract/types';
 import type { ExecutionStackInstance } from '@prisma-next/core-execution-plane/stack';
 import { instantiateExecutionStack } from '@prisma-next/core-execution-plane/stack';
 import type {
@@ -40,6 +40,14 @@ const testContract: SqlContract<SqlStorage> = {
   },
 };
 
+interface DriverExecuteSpies {
+  rootExecute: ReturnType<typeof vi.fn>;
+  connectionExecute: ReturnType<typeof vi.fn>;
+  transactionExecute: ReturnType<typeof vi.fn>;
+}
+
+type MockSqlDriver = SqlDriver & { __spies: DriverExecuteSpies };
+
 function createStubCodecs(): CodecRegistry {
   const registry = createCodecRegistry();
   registry.register(
@@ -75,28 +83,52 @@ function createStubAdapter() {
   };
 }
 
-function createMockDriver(): SqlDriver {
-  const queryable = {
-    execute: vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
-      yield { id: 1 };
-    }),
-    query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+function createMockDriver(): MockSqlDriver {
+  const rootExecute = vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
+    yield { id: 1 };
+  });
+  const connectionExecute = vi.fn().mockImplementation(async function* (
+    _request: SqlExecuteRequest,
+  ) {
+    yield { id: 2 };
+  });
+  const transactionExecute = vi.fn().mockImplementation(async function* (
+    _request: SqlExecuteRequest,
+  ) {
+    yield { id: 3 };
+  });
+
+  const query = vi.fn().mockResolvedValue({ rows: [], rowCount: 0 });
+
+  const transaction = {
+    execute: transactionExecute,
+    query,
+    commit: vi.fn().mockResolvedValue(undefined),
+    rollback: vi.fn().mockResolvedValue(undefined),
   };
 
-  return {
-    ...queryable,
+  const connection = {
+    execute: connectionExecute,
+    query,
+    release: vi.fn().mockResolvedValue(undefined),
+    beginTransaction: vi.fn().mockResolvedValue(transaction),
+  };
+
+  const driver: SqlDriver = {
+    execute: rootExecute,
+    query,
     connect: vi.fn().mockImplementation(async (_binding?: undefined) => undefined),
-    acquireConnection: vi.fn().mockResolvedValue({
-      ...queryable,
-      release: vi.fn().mockResolvedValue(undefined),
-      beginTransaction: vi.fn().mockResolvedValue({
-        ...queryable,
-        commit: vi.fn().mockResolvedValue(undefined),
-        rollback: vi.fn().mockResolvedValue(undefined),
-      }),
-    }),
+    acquireConnection: vi.fn().mockResolvedValue(connection),
     close: vi.fn().mockResolvedValue(undefined),
   };
+
+  return Object.assign(driver, {
+    __spies: {
+      rootExecute,
+      connectionExecute,
+      transactionExecute,
+    },
+  });
 }
 
 function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
@@ -164,6 +196,20 @@ function createTestSetup() {
   });
 
   return { stackInstance, context, driver };
+}
+
+function createRawExecutionPlan<Row = Record<string, unknown>>(): ExecutionPlan<Row> {
+  return {
+    sql: 'select 1',
+    params: [],
+    meta: {
+      target: testContract.target,
+      targetFamily: testContract.targetFamily,
+      storageHash: testContract.storageHash,
+      lane: 'raw',
+      paramDescriptors: [],
+    },
+  };
 }
 
 describe('createRuntime', () => {
@@ -237,5 +283,61 @@ describe('createRuntime', () => {
     });
 
     expect(runtime).toBeDefined();
+  });
+
+  it('uses acquired connection queryable for connection.execute', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    const connection = await runtime.connection();
+    await connection.execute(createRawExecutionPlan()).toArray();
+
+    expect(driver.__spies.connectionExecute).toHaveBeenCalledTimes(1);
+    expect(driver.__spies.transactionExecute).not.toHaveBeenCalled();
+    expect(driver.__spies.rootExecute).not.toHaveBeenCalled();
+
+    await connection.release();
+  });
+
+  it('uses transaction queryable for transaction.execute', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    const connection = await runtime.connection();
+    const transaction = await connection.transaction();
+    await transaction.execute(createRawExecutionPlan()).toArray();
+
+    expect(driver.__spies.transactionExecute).toHaveBeenCalledTimes(1);
+    expect(driver.__spies.connectionExecute).not.toHaveBeenCalled();
+    expect(driver.__spies.rootExecute).not.toHaveBeenCalled();
+
+    await transaction.rollback();
+    await connection.release();
+  });
+
+  it('keeps root execute on driver queryable for runtime.execute', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    await runtime.execute(createRawExecutionPlan()).toArray();
+
+    expect(driver.__spies.rootExecute).toHaveBeenCalledTimes(1);
+    expect(driver.__spies.connectionExecute).not.toHaveBeenCalled();
+    expect(driver.__spies.transactionExecute).not.toHaveBeenCalled();
   });
 });

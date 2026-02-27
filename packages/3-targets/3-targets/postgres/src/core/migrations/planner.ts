@@ -22,7 +22,7 @@ import {
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import type { ForeignKey, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import type { ForeignKey, ReferentialAction, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
@@ -648,12 +648,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
           execute: [
             {
               description: `add foreign key "${fkName}"`,
-              sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ADD CONSTRAINT ${quoteIdentifier(fkName)}
-FOREIGN KEY (${foreignKey.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${foreignKey.references.columns
-                .map(quoteIdentifier)
-                .join(', ')})`,
+              sql: buildForeignKeySql(schemaName, tableName, fkName, foreignKey),
             },
           ],
           postcheck: [
@@ -1081,4 +1076,43 @@ function hasForeignKey(lookup: SchemaTableLookup, fk: ForeignKey): boolean {
   return lookup.fkKeys.has(
     `${fk.columns.join(',')}|${fk.references.table}|${fk.references.columns.join(',')}`,
   );
+}
+
+const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
+  noAction: 'NO ACTION',
+  restrict: 'RESTRICT',
+  cascade: 'CASCADE',
+  setNull: 'SET NULL',
+  setDefault: 'SET DEFAULT',
+};
+
+function buildForeignKeySql(
+  schemaName: string,
+  tableName: string,
+  fkName: string,
+  foreignKey: ForeignKey,
+): string {
+  let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
+ADD CONSTRAINT ${quoteIdentifier(fkName)}
+FOREIGN KEY (${foreignKey.columns.map(quoteIdentifier).join(', ')})
+REFERENCES ${qualifyTableName(schemaName, foreignKey.references.table)} (${foreignKey.references.columns
+    .map(quoteIdentifier)
+    .join(', ')})`;
+
+  if (foreignKey.onDelete !== undefined) {
+    const action = REFERENTIAL_ACTION_SQL[foreignKey.onDelete];
+    if (!action) {
+      throw new Error(`Unknown referential action for onDelete: ${String(foreignKey.onDelete)}`);
+    }
+    sql += `\nON DELETE ${action}`;
+  }
+  if (foreignKey.onUpdate !== undefined) {
+    const action = REFERENTIAL_ACTION_SQL[foreignKey.onUpdate];
+    if (!action) {
+      throw new Error(`Unknown referential action for onUpdate: ${String(foreignKey.onUpdate)}`);
+    }
+    sql += `\nON UPDATE ${action}`;
+  }
+
+  return sql;
 }

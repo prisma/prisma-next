@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { type KyselifyContract, KyselyPrismaDialect } from '@prisma-next/integration-kysely';
 import { validateContract } from '@prisma-next/sql-contract/validate';
+import { lints, type Plugin } from '@prisma-next/sql-runtime';
 import { teardownTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { Kysely, sql } from 'kysely';
@@ -10,6 +12,15 @@ import { Client } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/contract.js';
 import { createTestRuntimeFromClient, setupE2EDatabase } from './utils.js';
+
+function createPlanCapturePlugin(captured: ExecutionPlan[]): Plugin {
+  return {
+    name: 'plan-capture',
+    async beforeExecute(plan) {
+      captured.push(plan);
+    },
+  };
+}
 
 // Load contract fixture from the integration test fixtures
 const fixtureContract = loadContractFixture();
@@ -295,6 +306,156 @@ describe('Kysely integration', () => {
           .execute();
 
         expect(users).toHaveLength(0);
+      },
+      testTimeout,
+    );
+  });
+
+  describe('plan structure (Phase 5)', () => {
+    it(
+      'attaches plan.ast, meta.lane, meta.refs, paramDescriptors for Kysely select',
+      async () => {
+        const captured: ExecutionPlan[] = [];
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+          plugins: [createPlanCapturePlugin(captured)],
+        });
+
+        const kysely = new Kysely<KyselifyContract<Contract>>({
+          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
+        });
+
+        await kysely
+          .selectFrom('user')
+          .select(['id', 'email'])
+          .where('email', 'like', '%@example.com')
+          .limit(5)
+          .execute();
+
+        expect(captured).toHaveLength(1);
+        const plan = captured[0]!;
+        expect(plan).toMatchObject({
+          ast: { kind: 'select' },
+          meta: {
+            lane: 'kysely',
+            refs: {
+              tables: expect.arrayContaining(['user']),
+              columns: expect.any(Array),
+            },
+            paramDescriptors: expect.any(Array),
+            projection: expect.any(Object),
+            projectionTypes: expect.any(Object),
+            annotations: { codecs: expect.any(Object) },
+          },
+        });
+        expect(plan.meta.refs?.columns?.length ?? 0).toBeGreaterThan(0);
+      },
+      testTimeout,
+    );
+
+    it(
+      'AST-first lints block Kysely DELETE without WHERE',
+      async () => {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+          plugins: [lints()],
+        });
+
+        const kysely = new Kysely<KyselifyContract<Contract>>({
+          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
+        });
+
+        await expect(kysely.deleteFrom('user').execute()).rejects.toMatchObject({
+          code: 'LINT.DELETE_WITHOUT_WHERE',
+          category: 'LINT',
+        });
+      },
+      testTimeout,
+    );
+
+    it(
+      'AST-first lints block Kysely UPDATE without WHERE',
+      async () => {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+          plugins: [lints()],
+        });
+
+        const kysely = new Kysely<KyselifyContract<Contract>>({
+          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
+        });
+
+        await expect(
+          kysely.updateTable('user').set({ email: 'unsafe@example.com' }).execute(),
+        ).rejects.toMatchObject({
+          code: 'LINT.UPDATE_WITHOUT_WHERE',
+          category: 'LINT',
+        });
+      },
+      testTimeout,
+    );
+
+    it(
+      'fails unsupported Kysely query kinds with PLAN.UNSUPPORTED envelope',
+      async () => {
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+        });
+
+        const kysely = new Kysely<KyselifyContract<Contract>>({
+          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
+        });
+
+        await expect(
+          kysely
+            .insertInto('user')
+            .values([
+              {
+                id: userId,
+                email: 'unsupported-1@example.com',
+                createdAt: new Date().toISOString(),
+              },
+              {
+                id: userId + 1,
+                email: 'unsupported-2@example.com',
+                createdAt: new Date().toISOString(),
+              },
+            ])
+            .execute(),
+        ).rejects.toMatchObject({
+          code: 'PLAN.UNSUPPORTED',
+          category: 'PLAN',
+          details: {
+            lane: 'kysely',
+            kyselyKind: 'InsertQueryNode',
+          },
+        });
+      },
+      testTimeout,
+    );
+
+    it(
+      'uses lane raw and no ast for raw sql queries',
+      async () => {
+        const captured: ExecutionPlan[] = [];
+        const runtime = await createTestRuntimeFromClient(fixtureContract, client, {
+          verify: { mode: 'onFirstUse', requireMarker: true },
+          plugins: [createPlanCapturePlugin(captured)],
+        });
+
+        const kysely = new Kysely<KyselifyContract<Contract>>({
+          dialect: new KyselyPrismaDialect({ runtime, contract: fixtureContract }),
+        });
+
+        await sql<{ id: number; email: string }>`
+          SELECT id, email FROM "user" WHERE email = ${'ada@example.com'}
+        `.execute(kysely);
+
+        expect(captured).toHaveLength(1);
+        const plan = captured[0]!;
+        expect(plan.ast).toBeUndefined();
+        expect(plan.meta.lane).toBe('raw');
+        expect(plan.meta.paramDescriptors).toEqual([]);
       },
       testTimeout,
     );

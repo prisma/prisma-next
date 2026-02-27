@@ -1,5 +1,5 @@
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import postgres from '@prisma-next/postgres';
+import postgres from '@prisma-next/postgres/runtime';
 import { budgets } from '@prisma-next/sql-runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };

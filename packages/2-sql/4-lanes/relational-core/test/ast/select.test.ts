@@ -44,6 +44,19 @@ describe('ast/select', () => {
       expect(selectAst.where).toBeUndefined();
       expect(selectAst.orderBy).toBeUndefined();
       expect(selectAst.limit).toBeUndefined();
+      expect(selectAst.selectAllIntent).toBeUndefined();
+    });
+
+    it('creates select ast with selectAllIntent', () => {
+      const from: TableRef = createTableRef('user');
+      const project = [
+        { alias: 'id', expr: createColumnRef('user', 'id') as ColumnRef },
+        { alias: 'email', expr: createColumnRef('user', 'email') as ColumnRef },
+      ];
+
+      const selectAst = createSelectAst({ from, project, selectAllIntent: { table: 'user' } });
+
+      expect(selectAst.selectAllIntent).toEqual({ table: 'user' });
     });
 
     it('creates select ast with joins', () => {

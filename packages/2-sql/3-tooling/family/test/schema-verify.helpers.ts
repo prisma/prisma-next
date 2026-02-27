@@ -5,11 +5,16 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/frame
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import {
   applyFkDefaults,
+  type ReferentialAction,
   type SqlContract,
   type SqlStorage,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type {
+  SqlReferentialAction,
+  SqlSchemaIR,
+  SqlTableIR,
+} from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migrations/types';
 
@@ -39,6 +44,9 @@ export function createTestContract(
       operationTypes: {},
     },
     extensionPacks,
+    capabilities: {},
+    meta: {},
+    sources: {},
   } as SqlContract<SqlStorage>;
 }
 
@@ -66,6 +74,8 @@ export function createContractTable(
       columns: readonly string[];
       references: { table: string; columns: readonly string[] };
       name?: string;
+      onDelete?: ReferentialAction;
+      onUpdate?: ReferentialAction;
       constraint?: boolean;
       index?: boolean;
     }>;
@@ -112,6 +122,8 @@ export function createSchemaTable(
       referencedTable: string;
       referencedColumns: readonly string[];
       name?: string;
+      onDelete?: SqlReferentialAction;
+      onUpdate?: SqlReferentialAction;
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
     indexes?: ReadonlyArray<{ columns: readonly string[]; unique: boolean; name?: string }>;

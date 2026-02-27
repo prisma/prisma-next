@@ -1,4 +1,3 @@
-import { executeCompiledQuery } from '@prisma-next/integration-kysely';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { BinaryOp, WhereExpr } from '@prisma-next/sql-relational-core/ast';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
@@ -9,6 +8,7 @@ import {
   GROUPED_HAVING_TABLE,
 } from './kysely-compiler';
 import { combineWhereFilters } from './kysely-compiler-where';
+import { executeCompiledQuery } from './raw-compiled-query';
 import type {
   AggregateBuilder,
   AggregateResult,

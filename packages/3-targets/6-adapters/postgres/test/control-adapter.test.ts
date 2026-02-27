@@ -681,6 +681,8 @@ describe('PostgresControlAdapter', () => {
               referenced_table_schema: 'public',
               referenced_table_name: 'user',
               referenced_column_name: 'id',
+              delete_rule: 'NO ACTION',
+              update_rule: 'NO ACTION',
             },
           ],
         },
@@ -753,6 +755,8 @@ describe('PostgresControlAdapter', () => {
               referenced_table_schema: 'public',
               referenced_table_name: 'account',
               referenced_column_name: 'user_id',
+              delete_rule: 'CASCADE',
+              update_rule: 'NO ACTION',
             },
             {
               table_name: 'order',
@@ -762,6 +766,8 @@ describe('PostgresControlAdapter', () => {
               referenced_table_schema: 'public',
               referenced_table_name: 'account',
               referenced_column_name: 'id',
+              delete_rule: 'CASCADE',
+              update_rule: 'NO ACTION',
             },
           ],
         },
@@ -779,6 +785,7 @@ describe('PostgresControlAdapter', () => {
           referencedTable: 'account',
           referencedColumns: ['user_id', 'id'],
           name: 'order_account_fkey',
+          onDelete: 'cascade',
         },
       ]);
     });

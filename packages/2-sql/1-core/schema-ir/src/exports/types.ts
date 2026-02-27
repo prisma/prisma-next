@@ -4,6 +4,7 @@ export type {
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
+  SqlReferentialAction,
   SqlSchemaIR,
   SqlTableIR,
   SqlTypeMetadata,

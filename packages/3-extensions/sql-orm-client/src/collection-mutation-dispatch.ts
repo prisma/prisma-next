@@ -1,4 +1,3 @@
-import { executeCompiledQuery } from '@prisma-next/integration-kysely';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlContract, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CompiledQuery } from 'kysely';
@@ -10,6 +9,7 @@ import {
   mapStorageRowToModelFields,
   stripHiddenMappedFields,
 } from './collection-runtime';
+import { executeCompiledQuery } from './raw-compiled-query';
 import type { CollectionContext, IncludeExpr } from './types';
 
 interface DispatchMutationRowsOptions<Row> {

@@ -157,15 +157,15 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/3-targets/8-clients/postgres/src/runtime/**",
-      "domain": "targets",
-      "layer": "clients",
+      "glob": "packages/3-extensions/postgres/src/runtime/**",
+      "domain": "extensions",
+      "layer": "adapters",
       "plane": "runtime"
     },
     {
-      "glob": "packages/3-targets/8-clients/postgres/src/exports/runtime.ts",
-      "domain": "targets",
-      "layer": "clients",
+      "glob": "packages/3-extensions/postgres/src/exports/runtime.ts",
+      "domain": "extensions",
+      "layer": "adapters",
       "plane": "runtime"
     },
     {

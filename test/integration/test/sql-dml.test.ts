@@ -315,55 +315,59 @@ describe('DML Integration Tests', () => {
       ]);
     }, timeouts.spinUpPpgDev);
 
-    it('deletes a row and returns it with returning clause', async () => {
-      const runtime = await createTestRuntime(
-        fixtureContract,
-        {
-          binding: { kind: 'pgClient', client },
-          cursor: { disabled: true },
-        },
-        {
-          verify: { mode: 'onFirstUse', requireMarker: true },
-        },
-      );
-
-      const context = createTestContext(fixtureContract, adapter);
-      const tables = schema(context).tables;
-      const builder = sql({ context });
-      const userTable = tables['user'];
-      if (!userTable) {
-        throw new Error('user table not found');
-      }
-      const userColumns = userTable.columns;
-      const idCol = userColumns['id'];
-      const emailCol = userColumns['email'];
-      if (!idCol || !emailCol) {
-        throw new Error('Required columns not found');
-      }
-
-      const deletePlan = builder
-        .delete(userTable)
-        .where(idCol.eq(param('userId')))
-        .returning(idCol as ColumnBuilder, emailCol as ColumnBuilder)
-        .build({
-          params: {
-            userId: 1,
+    it(
+      'deletes a row and returns it with returning clause',
+      async () => {
+        const runtime = await createTestRuntime(
+          fixtureContract,
+          {
+            binding: { kind: 'pgClient', client },
+            cursor: { disabled: true },
           },
+          {
+            verify: { mode: 'onFirstUse', requireMarker: true },
+          },
+        );
+
+        const context = createTestContext(fixtureContract, adapter);
+        const tables = schema(context).tables;
+        const builder = sql({ context });
+        const userTable = tables['user'];
+        if (!userTable) {
+          throw new Error('user table not found');
+        }
+        const userColumns = userTable.columns;
+        const idCol = userColumns['id'];
+        const emailCol = userColumns['email'];
+        if (!idCol || !emailCol) {
+          throw new Error('Required columns not found');
+        }
+
+        const deletePlan = builder
+          .delete(userTable)
+          .where(idCol.eq(param('userId')))
+          .returning(idCol as ColumnBuilder, emailCol as ColumnBuilder)
+          .build({
+            params: {
+              userId: 1,
+            },
+          });
+
+        type Row = ResultType<typeof deletePlan>;
+        const rows: Row[] = await executePlanAndCollect(runtime, deletePlan);
+
+        expect(rows.length).toBe(1);
+        expect(rows[0]).toMatchObject({
+          id: 1,
+          email: 'delete1@example.com',
         });
 
-      type Row = ResultType<typeof deletePlan>;
-      const rows: Row[] = await executePlanAndCollect(runtime, deletePlan);
-
-      expect(rows.length).toBe(1);
-      expect(rows[0]).toMatchObject({
-        id: 1,
-        email: 'delete1@example.com',
-      });
-
-      const selectResult = await client.query('SELECT * FROM "user"');
-      expect(selectResult.rows.length).toBe(1);
-      expect(selectResult.rows[0].email).toBe('delete2@example.com');
-    });
+        const selectResult = await client.query('SELECT * FROM "user"');
+        expect(selectResult.rows.length).toBe(1);
+        expect(selectResult.rows[0].email).toBe('delete2@example.com');
+      },
+      timeouts.databaseOperation,
+    );
 
     it(
       'deletes a row without returning clause',

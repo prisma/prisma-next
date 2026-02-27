@@ -44,6 +44,7 @@ flowchart TD
         PARAM[Parameter Helpers]
         OPS[Operations Registry]
         TYPES[Type Definitions]
+        AST[AST Types]
     end
 
     subgraph "Consumers"
@@ -61,6 +62,8 @@ flowchart TD
     OPS --> ORM
     TYPES --> SQL
     TYPES --> ORM
+    AST --> SQL
+    AST --> ORM
 ```
 
 ## Components
@@ -87,6 +90,14 @@ flowchart TD
 ### Plan Helpers (`plan.ts`)
 - Defines `SqlQueryPlan<Row>` interface for SQL query plans produced by lanes before lowering
 - Provides `augmentDescriptorWithColumnMeta(descriptors, columnMeta)` helper to update ParamDescriptor with `codecId` and `nativeType` from column metadata
+
+### AST Surface (`ast/*` via `exports/ast.ts`)
+- Query roots: `SelectAst`, `InsertAst`, `UpdateAst`, `DeleteAst`
+- Expressions: `ColumnRef`, `ParamRef`, `LiteralExpr`, `OperationExpr`, `ListLiteralExpr`
+- Predicates: `BinaryExpr` (ops: `eq`, `neq`, `gt`, `lt`, `gte`, `lte`, `like`, `ilike`, `in`, `notIn`), `AndExpr`, `OrExpr`, `ExistsExpr`, `NullCheckExpr`
+- Joins: `JoinAst`, `JoinOnExpr` (eqCol or WhereExpr)
+- `SelectAst.selectAllIntent` — preserves select-all intent when normalized to explicit columns
+- `DeleteAst.where` and `UpdateAst.where` optional for mutation-without-WHERE lint support
 
 ### Type Definitions (`types.ts`)
 - Defines TypeScript types for column builders, operations, projections
@@ -115,6 +126,7 @@ This package follows the standard `exports/` directory pattern:
 - `src/exports/types.ts` - Re-exports type definitions
 - `src/exports/operations-registry.ts` - Re-exports operations registry
 - `src/exports/plan.ts` - Re-exports plan types and helpers
+- `src/exports/ast.ts` - Re-exports SQL AST types
 - `src/exports/errors.ts` - Re-exports error helpers (from `@prisma-next/plan`)
 - `src/index.ts` - Main entry point that re-exports from `exports/`
 
