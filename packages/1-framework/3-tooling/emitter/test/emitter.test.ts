@@ -572,10 +572,12 @@ describe('emitter', () => {
     await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have meta');
   });
 
-  it('throws error when sources is missing', async () => {
+  it('omits sources from emitted contract artifact', async () => {
     const ir = createContractIR({
-      sources: undefined as unknown as Record<string, unknown>,
-    }) as ContractIR;
+      sources: {
+        schema: { sourceId: 'schema.prisma' },
+      },
+    });
 
     const operationRegistry = createOperationRegistry();
     const options: EmitOptions = {
@@ -586,24 +588,9 @@ describe('emitter', () => {
       extensionIds: [],
     };
 
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have sources');
-  });
-
-  it('throws error when sources is not an object', async () => {
-    const ir = createContractIR({
-      sources: 'not-an-object' as unknown as Record<string, unknown>,
-    }) as ContractIR;
-
-    const operationRegistry = createOperationRegistry();
-    const options: EmitOptions = {
-      outputDir: '',
-      operationRegistry,
-      codecTypeImports: [],
-      operationTypeImports: [],
-      extensionIds: [],
-    };
-
-    await expect(emit(ir, options, mockSqlHook)).rejects.toThrow('ContractIR must have sources');
+    const result = await emit(ir, options, mockSqlHook);
+    const contractJson = JSON.parse(result.contractJson) as Record<string, unknown>;
+    expect(contractJson).not.toHaveProperty('sources');
   });
 
   it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {

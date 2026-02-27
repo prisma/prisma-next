@@ -12,7 +12,6 @@ type ContractInput = {
   storage: Record<string, unknown>;
   execution?: Record<string, unknown>;
   extensionPacks: Record<string, unknown>;
-  sources: Record<string, unknown>;
   capabilities: Record<string, Record<string, boolean>>;
   meta: Record<string, unknown>;
   [key: string]: unknown;
@@ -50,9 +49,9 @@ export function computeProfileHash(contract: ContractInput): string {
     relations: {},
     storage: {},
     extensionPacks: {},
+    sources: {},
     capabilities: contract.capabilities,
     meta: {},
-    sources: {},
   };
   const canonical = canonicalizeContract(profileContract);
   return computeHash(canonical);

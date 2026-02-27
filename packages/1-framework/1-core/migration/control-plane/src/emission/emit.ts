@@ -34,9 +34,6 @@ function validateCoreStructure(ir: ContractIR): void {
   if (!ir.meta || typeof ir.meta !== 'object') {
     throw new Error('ContractIR must have meta');
   }
-  if (!ir.sources || typeof ir.sources !== 'object') {
-    throw new Error('ContractIR must have sources');
-  }
 }
 
 export async function emit(
@@ -76,7 +73,6 @@ export async function emit(
     extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
     meta: ir.meta,
-    sources: ir.sources,
   } as const;
 
   const storageHash = computeStorageHash(contractJson);

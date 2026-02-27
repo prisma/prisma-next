@@ -17,7 +17,6 @@ type NormalizedContract = {
   extensionPacks: Record<string, unknown>;
   capabilities: Record<string, Record<string, boolean>>;
   meta: Record<string, unknown>;
-  sources: Record<string, unknown>;
 };
 
 const TOP_LEVEL_ORDER = [
@@ -34,7 +33,6 @@ const TOP_LEVEL_ORDER = [
   'capabilities',
   'extensionPacks',
   'meta',
-  'sources',
 ] as const;
 
 function isDefaultValue(value: unknown): boolean {
@@ -94,7 +92,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isRequiredExtensionPacks = isArrayEqual(currentPath, ['extensionPacks']);
       const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
       const isRequiredMeta = isArrayEqual(currentPath, ['meta']);
-      const isRequiredSources = isArrayEqual(currentPath, ['sources']);
       const isRequiredExecutionDefaults = isArrayEqual(currentPath, [
         'execution',
         'mutations',
@@ -140,7 +137,6 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isRequiredExtensionPacks &&
         !isRequiredCapabilities &&
         !isRequiredMeta &&
-        !isRequiredSources &&
         !isRequiredExecutionDefaults &&
         !isExtensionNamespace &&
         !isModelRelations &&
@@ -272,7 +268,6 @@ export function canonicalizeContract(
     extensionPacks: ir.extensionPacks,
     capabilities: ir.capabilities,
     meta: ir.meta,
-    sources: ir.sources,
   };
   Object.assign(
     normalized,

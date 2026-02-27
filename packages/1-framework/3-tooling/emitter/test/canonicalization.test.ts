@@ -133,14 +133,12 @@ describe('canonicalization', () => {
         tables: expect.anything(),
       },
     });
-    // Required top-level fields (capabilities, extensionPacks, meta, relations, sources) are preserved even when empty
-    // because they are required by ContractIR and needed for round-trip tests
+    // Required top-level fields (capabilities, extensionPacks, meta, relations) are preserved even when empty.
     expect(parsed).toMatchObject({
       capabilities: expect.anything(),
       extensionPacks: expect.anything(),
       meta: expect.anything(),
       relations: expect.anything(),
-      sources: expect.anything(),
     });
   });
 
