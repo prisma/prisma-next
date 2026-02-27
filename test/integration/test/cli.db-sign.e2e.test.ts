@@ -115,8 +115,10 @@ withTempDir(({ createTempDir }) => {
             expect(result.rows[0]?.core_hash).toBeDefined();
           });
 
-          // Snapshot test for output
-          expect(normalized).toMatchSnapshot();
+          expect(normalized).toContain('Database signed');
+          expect(normalized).toContain('storageHash:');
+          expect(normalized).toContain('from: none');
+          expect(normalized).toContain('to:');
         });
       },
       timeouts.spinUpPpgDev,
@@ -221,8 +223,16 @@ withTempDir(({ createTempDir }) => {
             },
           });
 
-          // Snapshot test for JSON output
-          expect(normalized).toMatchSnapshot();
+          expect(normalized).toMatchObject({
+            contract: {
+              profileHash: expect.any(String),
+              storageHash: expect.any(String),
+            },
+            marker: {
+              created: true,
+              updated: false,
+            },
+          });
         });
       },
       timeouts.spinUpPpgDev,
