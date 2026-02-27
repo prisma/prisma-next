@@ -1,5 +1,15 @@
 # PSL Config + CLI Source Plan
 
+> ⚠️ **Superseded / replaced**
+>
+> This plan describes the **enumerated source kind** approach (`contract.source = { kind: 'psl', schemaPath }`).
+> The project has since moved to **provider-based contract sources** (pluggable providers returning `ContractIR` via `Result<>`).
+>
+> - **Replacement spec**: `projects/psl-contract-authoring/specs/pluggable-contract-sources.spec.md`
+> - **Current project plan**: `projects/psl-contract-authoring/plans/plan.md` (Milestone 1)
+>
+> Keep this file only as historical context for what was implemented earlier on the branch; do not extend it going forward.
+
 ## Summary
 
 Implement PSL-first source selection in `prisma-next.config.ts` and wire `prisma-next contract emit` to resolve PSL input without breaking TS-first behavior. Success means users can configure `contract.source = { kind: 'psl', schemaPath: string }`, get clear config errors when invalid, and run emit through the existing offline pipeline.

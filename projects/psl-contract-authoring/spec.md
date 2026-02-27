@@ -24,7 +24,7 @@ Key constraints:
 ## PSL-first project
 
 1. Author writes/updates a Prisma schema file (e.g. `schema.prisma`).
-2. Project config (`prisma-next.config.ts`) points to PSL as the contract source.
+2. Project config (`prisma-next.config.ts`) points to a **PSL contract source provider** as the contract source.
 3. Author runs:
    - `prisma-next contract emit`
 4. Tool emits:
@@ -35,19 +35,21 @@ Key constraints:
 ## TS-first project (must remain working)
 
 1. Author writes/updates the TS contract source (e.g. `contract.ts` using the existing TS authoring packages).
-2. Config points to TS as the contract source.
+2. Config points to a **TS contract source provider** as the contract source.
 3. `prisma-next contract emit` continues to emit the same artifacts as today.
 
 # Requirements
 
 ## Functional Requirements
 
-- A project can choose **PSL-first** or **TS-first** as the contract source via `prisma-next.config.ts`.
-- `prisma-next contract emit` can read PSL as input (when configured) and emit `contract.json` and `contract.d.ts`.
+- A project can choose **PSL-first** or **TS-first** authoring by configuring `prisma-next.config.ts` with a contract **source provider** (provider-based authoring; no enumerated `{ kind: ... }` union end-state).
+- `prisma-next contract emit` can emit `contract.json` and `contract.d.ts` from a provider-produced Contract IR.
+- The PSL provider reads PSL as input and produces Contract IR (bounded by the existing Prisma Next contract model).
 - Emission validates PSL and reports actionable diagnostics (with source locations).
 - PSL-first output and TS-first output are compatible with the rest of Prisma Next (validator, tooling, runtime).
 - For schemas that are expressible in both surfaces, PSL-first and TS-first emission produce the **same canonical contract meaning** (including deterministic hashing/identity in `contract.json`).
 - Both authoring surfaces remain available and documented; there is no forced migration.
+- Canonical artifacts must not include provenance: `contract.json` must not embed schema paths/sourceIds and must not contain a top-level `sources` field (diagnostics-only).
 
 ## Non-Functional Requirements
 
@@ -66,8 +68,8 @@ Key constraints:
 
 ## Basic
 
-- [ ] With a PSL-first `prisma-next.config.ts`, `prisma-next contract emit` emits `contract.json` + `contract.d.ts`.
-- [ ] With a TS-first `prisma-next.config.ts`, `prisma-next contract emit` still works exactly as it does today.
+- [ ] With a PSL contract source provider configured, `prisma-next contract emit` emits `contract.json` + `contract.d.ts`.
+- [ ] With a TS contract source provider configured, `prisma-next contract emit` still works exactly as it does today.
 - [ ] Running emit twice with unchanged inputs produces equivalent outputs.
 - [ ] Invalid PSL fails with a helpful diagnostic that points to the exact location in the PSL file.
 
@@ -78,7 +80,7 @@ Key constraints:
 
 ## Documentation & tests
 
-- [ ] Docs explain: how to choose PSL-first vs TS-first in config; how to run `contract emit`; where artifacts land; how to interpret errors.
+- [ ] Docs explain: how to choose PSL vs TS providers in config; how to run `contract emit`; where artifacts land; how to interpret errors.
 - [ ] Tests cover: successful PSL emission, failure diagnostics, determinism, and TS↔PSL parity on the conformance set.
 
 # Proposed architecture plan (draft for discussion)
@@ -89,19 +91,20 @@ This section is intentionally concrete so we can decide a plan together.
 
 PSL is an **input format**, not a second contract model. Both authoring modes must feed the same emission pipeline:
 
-PSL/TS input → parse → normalize into contract IR → validate → canonicalize/hash → emit JSON + `.d.ts`
+Provider (TS/PSL) → Contract IR → normalize → validate → canonicalize/hash → emit JSON + `.d.ts`
 
 ## Where the work likely lives
 
+- **Contract source providers (new)**: implement importable providers that produce `ContractIR` (via `Result<>`) so the CLI/control plane does not need to enumerate source kinds.
+  - TS-first provider wraps the existing TS authoring surface.
+  - PSL-first provider uses the PSL parser + normalization pipeline.
 - **PSL parsing (reusable package)**: implement PSL parsing as a standalone package so other tools can reuse it (language tooling, external tooling, etc.).
   - **Decision:** build this in `packages/1-framework/2-authoring/contract-psl` (`@prisma-next/contract-psl`), which already exists as a placeholder.
   - Output should preserve source spans so we can produce great diagnostics.
 - **Normalization**: convert that AST into the same normalized contract IR that TS-first ultimately produces.
 - **Validation**: reuse existing validators; add PSL-specific validation for mapping PSL concepts onto the existing IR.
 - **Types generation**: reuse the existing `.d.ts` generation logic (it should be driven by the validated IR/contract, not by PSL directly).
-- **Config**: extend `prisma-next.config.ts` to choose PSL-first and provide PSL source path(s).
-  - **Decision:** use a discriminated union shape for PSL config, consistent with existing “source as data” patterns. Example intent: `contract.source = { kind: 'psl', schemaPath: 'schema.prisma' }`.
-  - TS-first continues to support existing shapes (a contract object value, or a loader function).
+- **Config**: `prisma-next.config.ts` wires a provider for `contract.source` (provider-based authoring).
 
 ## Compatibility constraint (no new primitives)
 
@@ -171,13 +174,14 @@ Anything outside the supported set must fail with a strict, targeted error (not 
 
 Decisions already made:
 
-- **Config**: use a discriminated union for PSL-first selection (see above).
+- **Config direction**: provider-based sources (pluggable providers returning `ContractIR` via `Result<>`), replacing the earlier discriminated union approach.
 - **PSL parser package**: implement as a reusable package (`@prisma-next/contract-psl`).
 - **Parity boundary**: enforce parity at the normalized contract IR boundary (and therefore on emitted `contract.json`).
 - **Both sources present**: allowed; the config chooses the source of truth.
 - **Initial conformance set**: models, scalars, required/optional, `@id`, `@unique`, `@@unique`, `@@index`, relations with `@relation(fields, references)`, referential actions, enums, defaults (`autoincrement()`, `now()`, literals), plus a small set of extension attributes where Prisma Next already has representation.
 - **Unsupported feature behavior**: strict errors (no “ignored metadata” warnings).
-- **Schema path**: always explicit in config (no implicit `schema.prisma` default).
+- **PSL schema path**: PSL-first requires an explicit schema path (no implicit `schema.prisma` default); this is enforced by the PSL provider’s API/validation.
+- **Canonical artifacts**: `contract.json` contains no provenance and no top-level `sources` field (diagnostics-only).
 
 Remaining questions:
 

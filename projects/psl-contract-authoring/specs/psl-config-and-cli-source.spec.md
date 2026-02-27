@@ -1,5 +1,15 @@
 # Summary
 
+> ⚠️ **Superseded / replaced**
+>
+> This spec describes the **enumerated source kind** approach (`contract.source = { kind: 'psl', schemaPath }`).
+> The project has since moved to **provider-based contract sources** (pluggable providers returning `ContractIR` via `Result<>`).
+>
+> - **Replacement spec**: `projects/psl-contract-authoring/specs/pluggable-contract-sources.spec.md`
+> - **Current project plan**: `projects/psl-contract-authoring/plans/plan.md` (Milestone 1)
+>
+> Keep this spec only as historical context for what was implemented earlier on the branch; do not treat it as the current plan of record.
+
 Add PSL-first project configuration and CLI wiring so `prisma-next contract emit` can read a Prisma schema file (PSL) as the contract source while keeping the existing TS-first flow unchanged.
 
 # Description
