@@ -43,10 +43,12 @@ export function isPslContractSourceConfig(source: unknown): source is PslContrac
  */
 export interface ContractConfig {
   /**
-   * Contract source. Can be a value or a function that returns a value (sync or async).
+   * Contract source. Can be:
+   * - a value (including PSL selector object)
+   * - a function that returns a value (sync or async)
    * If a function, it will be called to resolve the contract.
    */
-  readonly source: ContractSourceValue | ContractSourceLoader;
+  readonly source: ContractSourceValue | ContractSourceLoader | PslContractSourceConfig;
   /**
    * Path to contract.json artifact. Defaults to 'src/prisma/contract.json'.
    * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).

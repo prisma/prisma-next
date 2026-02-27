@@ -1,31 +1,12 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing } from '../../utils/cli-errors';
+import { resolveContractSourceValue } from '../../utils/psl-source';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
-
-interface PslContractSourceInput {
-  readonly kind: 'psl';
-  readonly schemaPath: string;
-}
-
-interface ResolvedPslContractSource {
-  readonly kind: 'psl';
-  readonly schemaPath: string;
-  readonly schema: string;
-}
-
-function isPslContractSourceInput(source: unknown): source is PslContractSourceInput {
-  if (!source || typeof source !== 'object') {
-    return false;
-  }
-
-  const record = source as Record<string, unknown>;
-  return record['kind'] === 'psl';
-}
 
 /**
  * Executes the contract emit operation.
@@ -95,22 +76,11 @@ export async function executeContractEmit(
   const familyInstance = config.family.create(stack);
 
   // Resolve contract source from config
-  const sourceValue =
-    typeof contractConfig.source === 'function'
-      ? await unlessAborted(Promise.resolve(contractConfig.source()))
-      : contractConfig.source;
-  let contractRaw: unknown = sourceValue;
-  if (isPslContractSourceInput(sourceValue)) {
-    const schemaPath = isAbsolute(sourceValue.schemaPath)
-      ? sourceValue.schemaPath
-      : join(configDir, sourceValue.schemaPath);
-    const schema = await unlessAborted(readFile(schemaPath, 'utf-8'));
-    contractRaw = {
-      kind: 'psl',
-      schemaPath,
-      schema,
-    } satisfies ResolvedPslContractSource;
-  }
+  const contractRaw = await unlessAborted(
+    resolveContractSourceValue(contractConfig.source, {
+      configPath: normalizedConfigPath,
+    }),
+  );
 
   // Emit contract via family instance
   const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: contractRaw }));
