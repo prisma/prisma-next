@@ -16,19 +16,22 @@ Deliver a PSL-first contract authoring path for Prisma Next: users point `prisma
 
 ## Milestones
 
-### Milestone 1: Config + CLI support for PSL source
+### Milestone 1: Pluggable contract sources (provider API)
 
-Make it possible for a project to select PSL-first in `prisma-next.config.ts` (discriminated union shape) and route `prisma-next contract emit` through the existing emission pipeline without breaking TS-first.
+Make contract authoring sources pluggable by design. Instead of enumerating source “kinds” in framework config, accept a source provider that returns `ContractIR` (via `Result<>`). The framework remains responsible for validation, normalization, canonicalization/hashing, and artifact emission.
+
+**Spec:** `projects/psl-contract-authoring/specs/pluggable-contract-sources.spec.md`
 
 **Tasks:**
 
-- [ ] Extend `PrismaNextConfig.contract.source` to accept a PSL-first config value `{ kind: 'psl', schemaPath: string }` (schemaPath required).
-- [ ] Implement config validation errors for missing/invalid `schemaPath`.
-- [ ] Ensure TS-first `contract.source` behavior remains unchanged (value or loader function).
-- [ ] Wire `contract emit` to resolve PSL-first source into a family-compatible contract IR input (no DB connection).
+- [ ] Define a `ContractSourceProvider` interface that produces `Result<ContractIR, Diagnostics>` (sync or async), with diagnostics suitable for CLI/editor rendering.
+- [ ] Update config typing + validation to accept providers (commit to provider-only; remove enumerated source “kind” union from the intended end-state).
+- [ ] Update `contract emit` to call the provider to obtain IR, then run framework-owned validation + normalization + canonicalization/hashing + emission (source-agnostic).
+- [ ] Ensure canonical artifacts do not include source locations/IDs (paths/sourceIds are diagnostics-only).
 - [ ] Add CLI/integration tests covering:
-  - PSL-first config shape is accepted
-  - TS-first config continues to work
+  - TS-first provider emits `contract.json` + `contract.d.ts`
+  - PSL-first provider emits `contract.json` + `contract.d.ts`
+  - No source-specific branching is required in the CLI/control plane
 
 ### Milestone 2: Reusable PSL parser package (`@prisma-next/contract-psl`)
 
@@ -72,7 +75,7 @@ Normalize PSL AST into the same normalized contract IR used by TS-first, then em
 - [ ] Add diagnostics tests:
   - invalid PSL produces actionable errors with file+span and a targeted “unsupported feature” message
 - [ ] Documentation updates:
-  - config example for PSL-first
+  - config example for provider-based authoring (TS-first and PSL-first)
   - how to run `prisma-next contract emit`
   - where artifacts land; how to interpret errors
 
@@ -90,8 +93,8 @@ Finalize long-lived docs and remove transient project artifacts.
 
 | Acceptance Criterion | Test Type | Task/Milestone | Notes |
 |---|---|---|---|
-| PSL-first config + `contract emit` emits `contract.json` + `contract.d.ts` | Integration/E2E | Milestone 1 + 3 | Use CLI test fixtures |
-| TS-first config still works | Integration/E2E | Milestone 1 | Guard against regressions |
+| PSL-first `contract emit` emits `contract.json` + `contract.d.ts` | Integration/E2E | Milestone 1 + 3 | Use CLI test fixtures |
+| TS-first `contract emit` still works | Integration/E2E | Milestone 1 | Guard against regressions |
 | Emit twice with unchanged inputs produces equivalent outputs | Integration | Milestone 3 | Determinism harness |
 | Invalid PSL yields helpful diagnostic with source location | Unit + Integration | Milestone 2 + 3 | Parser spans + CLI surface |
 | PSL/TS conformance set yields equivalent canonical `contract.json` + stable hashes | Unit/Integration | Milestone 3 | Assert IR parity + JSON/hash parity |
