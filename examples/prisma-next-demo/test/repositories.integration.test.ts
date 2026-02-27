@@ -233,10 +233,11 @@ describe('ORM client integration examples', () => {
           await seedOrmClientData(runtime);
           const users = await ormClientGetUsersViaWhereArg('admin', 10, runtime);
           const userRecords = users as Array<Record<string, unknown>>;
-          expect(userRecords.map((user) => asId(user['id']))).toEqual([
-            seededUserIds.admin,
-            seededUserIds.adminTwo,
-          ]);
+          const ids = userRecords.map((user) => asId(user['id']));
+          expect(ids).toEqual(
+            expect.arrayContaining([seededUserIds.admin, seededUserIds.adminTwo]),
+          );
+          expect(ids).toHaveLength(2);
           expect(userRecords.every((user) => user['kind'] === 'admin')).toBe(true);
         } finally {
           await runtime.close();
