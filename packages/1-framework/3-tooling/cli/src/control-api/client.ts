@@ -389,6 +389,7 @@ class ControlClientImpl implements ControlClient {
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
+      ...(options.acceptDataLoss ? { acceptDataLoss: options.acceptDataLoss } : {}),
       ...(onProgress ? { onProgress } : {}),
     });
   }

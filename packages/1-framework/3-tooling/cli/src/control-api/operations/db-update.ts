@@ -18,6 +18,41 @@ const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 } as const;
 
+function isDdlStatement(sqlStatement: string): boolean {
+  const trimmed = sqlStatement.trim().toLowerCase();
+  return (
+    trimmed.startsWith('create ') || trimmed.startsWith('alter ') || trimmed.startsWith('drop ')
+  );
+}
+
+function extractSqlDdl(operations: readonly MigrationPlanOperation[]): string[] {
+  const statements: string[] = [];
+  for (const operation of operations) {
+    const record = operation as unknown as Record<string, unknown>;
+    const execute = record['execute'];
+    if (!Array.isArray(execute)) {
+      continue;
+    }
+    for (const step of execute) {
+      if (typeof step !== 'object' || step === null) {
+        continue;
+      }
+      const sql = (step as Record<string, unknown>)['sql'];
+      if (typeof sql !== 'string') {
+        continue;
+      }
+      if (isDdlStatement(sql)) {
+        statements.push(sql.trim());
+      }
+    }
+  }
+  return statements;
+}
+
+/**
+ * Options for the executeDbUpdate operation.
+ * Config-agnostic: receives pre-resolved driver, family, contract, and migrations capability.
+ */
 export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId>;
@@ -29,9 +64,17 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
     ControlFamilyInstance<TFamilyId>
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
+  readonly acceptDataLoss?: boolean;
+  /** Optional progress callback for observing operation progress. */
   readonly onProgress?: OnControlProgress;
 }
 
+/**
+ * Executes the db update operation: readMarker → introspect → plan → (optionally) apply → marker.
+ *
+ * Unlike db init, db update requires an existing marker and keeps all runner execution checks
+ * enabled because the database may have drifted since the last marker write.
+ */
 export async function executeDbUpdate<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbUpdateOptions<TFamilyId, TTargetId>,
 ): Promise<DbUpdateResult> {
@@ -136,9 +179,14 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
   };
 
   if (mode === 'plan') {
+    const planSql =
+      familyInstance.familyId === 'sql' ? extractSqlDdl(migrationPlan.operations) : undefined;
     const result: DbUpdateSuccess = {
       mode: 'plan',
-      plan: { operations: migrationPlan.operations },
+      plan: {
+        operations: migrationPlan.operations,
+        ...(planSql !== undefined ? { sql: planSql } : {}),
+      },
       origin: {
         storageHash: marker.storageHash,
         ...ifDefined('profileHash', marker.profileHash),
@@ -150,6 +198,25 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
       summary: `Planned ${migrationPlan.operations.length} operation(s)`,
     };
     return ok(result);
+  }
+
+  // When applying, require explicit acceptance for destructive operations
+  if (!options.acceptDataLoss) {
+    const hasDestructive = migrationPlan.operations.some(
+      (op) => op.operationClass === 'destructive',
+    );
+    if (hasDestructive) {
+      const destructiveOps = migrationPlan.operations
+        .filter((op) => op.operationClass === 'destructive')
+        .map((op) => ({ id: op.id, label: op.label }));
+      return notOk({
+        code: 'DESTRUCTIVE_CHANGES' as const,
+        summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
+        why: 'Use --plan to preview destructive operations, then re-run with --accept-data-loss to apply',
+        conflicts: undefined,
+        meta: { destructiveOperations: destructiveOps },
+      });
+    }
   }
 
   const applySpanId = 'apply';
