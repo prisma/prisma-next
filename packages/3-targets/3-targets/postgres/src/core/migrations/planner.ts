@@ -22,7 +22,12 @@ import {
   plannerSuccess,
 } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import type { ForeignKey, ReferentialAction, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import type {
+  ForeignKey,
+  ReferentialAction,
+  StorageColumn,
+  StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
