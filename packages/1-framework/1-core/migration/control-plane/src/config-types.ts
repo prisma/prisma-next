@@ -1,3 +1,5 @@
+import type { ContractIR } from '@prisma-next/contract/ir';
+import type { Result } from '@prisma-next/utils/result';
 import { type } from 'arktype';
 import type {
   ControlAdapterDescriptor,
@@ -14,41 +16,41 @@ import type {
  */
 export type CliDriver = ControlDriverInstance<string, string>;
 
-export interface PslContractSourceConfig {
-  readonly kind: 'psl';
-  readonly schemaPath: string;
+export interface ContractSourceDiagnosticPosition {
+  readonly offset: number;
+  readonly line: number;
+  readonly column: number;
 }
 
-export type ContractSourceValue =
-  | Record<string, unknown>
-  | readonly unknown[]
-  | string
-  | number
-  | boolean
-  | null;
-
-export type ContractSourceLoader = () => ContractSourceValue | Promise<ContractSourceValue>;
-
-export function isPslContractSourceConfig(source: unknown): source is PslContractSourceConfig {
-  if (!source || typeof source !== 'object') {
-    return false;
-  }
-
-  const record = source as Record<string, unknown>;
-  return record['kind'] === 'psl';
+export interface ContractSourceDiagnosticSpan {
+  readonly start: ContractSourceDiagnosticPosition;
+  readonly end: ContractSourceDiagnosticPosition;
 }
+
+export interface ContractSourceDiagnostic {
+  readonly code: string;
+  readonly message: string;
+  readonly sourceId?: string;
+  readonly span?: ContractSourceDiagnosticSpan;
+}
+
+export interface ContractSourceDiagnostics {
+  readonly summary: string;
+  readonly diagnostics: readonly ContractSourceDiagnostic[];
+  readonly meta?: Record<string, unknown>;
+}
+
+export type ContractSourceProvider = () => Promise<Result<ContractIR, ContractSourceDiagnostics>>;
 
 /**
  * Contract configuration specifying source and artifact locations.
  */
 export interface ContractConfig {
   /**
-   * Contract source. Can be:
-   * - a value (including PSL selector object)
-   * - a function that returns a value (sync or async)
-   * If a function, it will be called to resolve the contract.
+   * Contract source provider. The provider is always async and must return
+   * a Result containing either ContractIR or structured diagnostics.
    */
-  readonly source: ContractSourceValue | ContractSourceLoader | PslContractSourceConfig;
+  readonly source: ContractSourceProvider;
   /**
    * Path to contract.json artifact. Defaults to 'src/prisma/contract.json'.
    * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
@@ -150,27 +152,12 @@ export function defineConfig<TFamilyId extends string = string, TTargetId extend
 
   // Normalize contract config if present
   if (config.contract) {
-    // Validate contract.source is a value or function (runtime check)
+    // Validate contract.source is a provider function (runtime check)
     const source = config.contract.source;
-    if (
-      source !== null &&
-      typeof source !== 'object' &&
-      typeof source !== 'function' &&
-      typeof source !== 'string' &&
-      typeof source !== 'number' &&
-      typeof source !== 'boolean'
-    ) {
+    if (typeof source !== 'function') {
       throw new Error(
-        'Config.contract.source must be a value (object, string, number, boolean, null) or a function',
+        'Config.contract.source must be a provider function returning Promise<Result<ContractIR, Diagnostics>>',
       );
-    }
-
-    if (isPslContractSourceConfig(source)) {
-      if (typeof source.schemaPath !== 'string' || source.schemaPath.trim() === '') {
-        throw new Error(
-          'Config.contract.source.schemaPath must be a non-empty string when source.kind is "psl"',
-        );
-      }
     }
 
     // Apply defaults

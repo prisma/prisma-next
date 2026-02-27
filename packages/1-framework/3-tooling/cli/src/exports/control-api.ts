@@ -25,8 +25,6 @@ export { executeContractEmit } from '../control-api/operations/contract-emit';
 export type {
   ContractEmitOptions,
   ContractEmitResult,
-  ContractSourceLoader,
-  ContractSourceValue,
   ControlActionName,
   ControlClient,
   ControlClientOptions,
@@ -37,7 +35,6 @@ export type {
   DbInitResult,
   DbInitSuccess,
   EmitContractConfig,
-  EmitContractSource,
   EmitFailure,
   EmitFailureCode,
   EmitOptions,

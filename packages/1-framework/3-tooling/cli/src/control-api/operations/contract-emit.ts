@@ -5,7 +5,6 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { dirname, isAbsolute, join, resolve } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing } from '../../utils/cli-errors';
-import { resolveContractSourceValue } from '../../utils/psl-source';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
 /**
@@ -75,15 +74,17 @@ export async function executeContractEmit(
   const stack = createControlPlaneStack(config);
   const familyInstance = config.family.create(stack);
 
-  // Resolve contract source from config
-  const contractRaw = await unlessAborted(
-    resolveContractSourceValue(contractConfig.source, {
-      configPath: normalizedConfigPath,
-    }),
-  );
+  const providerResult = await unlessAborted(contractConfig.source());
+  if (!providerResult.ok) {
+    throw errorContractConfigMissing({
+      why: providerResult.failure.summary,
+    });
+  }
 
   // Emit contract via family instance
-  const emitResult = await unlessAborted(familyInstance.emitContract({ contractIR: contractRaw }));
+  const emitResult = await unlessAborted(
+    familyInstance.emitContract({ contractIR: providerResult.value }),
+  );
 
   // Create directory if needed and write files (both colocated)
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));

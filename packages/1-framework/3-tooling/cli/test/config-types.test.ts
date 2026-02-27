@@ -1,6 +1,7 @@
 import type { ContractIR } from '@prisma-next/contract/ir';
 import type { PrismaNextConfig } from '@prisma-next/core-control-plane/config-types';
 import { defineConfig } from '@prisma-next/core-control-plane/config-types';
+import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 
 describe('defineConfig', () => {
@@ -109,10 +110,11 @@ describe('defineConfig', () => {
   });
 
   it('normalizes contract config with default output', () => {
+    const sourceProvider = async () => ok({ targetFamily: 'sql' } as ContractIR);
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
-        source: { target: 'postgres' },
+        source: sourceProvider,
       },
     };
 
@@ -121,10 +123,11 @@ describe('defineConfig', () => {
   });
 
   it('normalizes contract config with custom output', () => {
+    const sourceProvider = async () => ok({ targetFamily: 'sql' } as ContractIR);
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
-        source: { target: 'postgres' },
+        source: sourceProvider,
         output: 'custom/contract.json',
       },
     };
@@ -133,101 +136,29 @@ describe('defineConfig', () => {
     expect(result.contract?.output).toBe('custom/contract.json');
   });
 
-  it('validates contract source accepts object', () => {
+  it('validates contract source accepts provider function', () => {
+    const sourceProvider = async () => ok({ targetFamily: 'sql' } as ContractIR);
     const config: PrismaNextConfig = {
       ...baseConfig,
       contract: {
-        source: { target: 'postgres' },
+        source: sourceProvider,
       },
     };
 
     const result = defineConfig(config);
-    expect(result.contract?.source).toEqual({ target: 'postgres' });
+    expect(result.contract?.source).toBe(sourceProvider);
   });
 
-  it('validates contract source accepts string', () => {
-    const config: PrismaNextConfig = {
-      ...baseConfig,
-      contract: {
-        source: 'test',
-      },
-    };
-
-    const result = defineConfig(config);
-    expect(result.contract?.source).toBe('test');
-  });
-
-  it('validates contract source accepts number', () => {
-    const config: PrismaNextConfig = {
-      ...baseConfig,
-      contract: {
-        source: 42,
-      },
-    };
-
-    const result = defineConfig(config);
-    expect(result.contract?.source).toBe(42);
-  });
-
-  it('validates contract source accepts boolean', () => {
-    const config: PrismaNextConfig = {
-      ...baseConfig,
-      contract: {
-        source: true,
-      },
-    };
-
-    const result = defineConfig(config);
-    expect(result.contract?.source).toBe(true);
-  });
-
-  it('validates contract source accepts null', () => {
-    const config: PrismaNextConfig = {
-      ...baseConfig,
-      contract: {
-        source: null,
-      },
-    };
-
-    const result = defineConfig(config);
-    expect(result.contract?.source).toBeNull();
-  });
-
-  it('validates contract source accepts function', () => {
-    const sourceFn = () => ({ target: 'postgres' });
-    const config: PrismaNextConfig = {
-      ...baseConfig,
-      contract: {
-        source: sourceFn,
-      },
-    };
-
-    const result = defineConfig(config);
-    expect(result.contract?.source).toBe(sourceFn);
-  });
-
-  it('validates contract source accepts psl source config', () => {
-    const config: PrismaNextConfig = {
-      ...baseConfig,
-      contract: {
-        source: { kind: 'psl', schemaPath: './schema.prisma' },
-      },
-    };
-
-    const result = defineConfig(config);
-    expect(result.contract?.source).toEqual({ kind: 'psl', schemaPath: './schema.prisma' });
-  });
-
-  it('throws when psl source config has invalid schemaPath', () => {
+  it('throws when source is not a provider function', () => {
     const config = {
       ...baseConfig,
       contract: {
-        source: { kind: 'psl', schemaPath: '' },
+        source: 'invalid' as unknown,
       },
     } as PrismaNextConfig;
 
     expect(() => defineConfig(config)).toThrow(
-      'Config.contract.source.schemaPath must be a non-empty string when source.kind is "psl"',
+      'Config.contract.source must be a provider function returning Promise<Result<ContractIR, Diagnostics>>',
     );
   });
 
@@ -248,7 +179,7 @@ describe('defineConfig', () => {
     } as PrismaNextConfig;
 
     expect(() => defineConfig(config)).toThrow(
-      'Config.contract.source must be a value (object, string, number, boolean, null) or a function',
+      'Config.contract.source must be a provider function returning Promise<Result<ContractIR, Diagnostics>>',
     );
   });
 });

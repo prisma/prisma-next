@@ -1,8 +1,10 @@
 export type {
   ContractConfig,
-  ContractSourceLoader,
-  ContractSourceValue,
+  ContractSourceDiagnostic,
+  ContractSourceDiagnosticPosition,
+  ContractSourceDiagnosticSpan,
+  ContractSourceDiagnostics,
+  ContractSourceProvider,
   PrismaNextConfig,
-  PslContractSourceConfig,
 } from '../config-types';
-export { defineConfig, isPslContractSourceConfig } from '../config-types';
+export { defineConfig } from '../config-types';

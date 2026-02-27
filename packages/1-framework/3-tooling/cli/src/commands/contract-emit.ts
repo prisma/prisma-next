@@ -5,7 +5,7 @@ import { Command } from 'commander';
 import { dirname, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
-import type { EmitContractSource, EmitFailure } from '../control-api/types';
+import type { EmitFailure } from '../control-api/types';
 import { CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
@@ -18,7 +18,6 @@ import {
   formatSuccessMessage,
 } from '../utils/output';
 import { createProgressAdapter } from '../utils/progress-adapter';
-import { resolveContractSourceValue } from '../utils/psl-source';
 import { handleResult } from '../utils/result-handler';
 
 interface ContractEmitOptions {
@@ -41,8 +40,8 @@ interface ContractEmitOptions {
 function mapEmitFailure(failure: EmitFailure): CliStructuredError {
   if (failure.code === 'CONTRACT_SOURCE_INVALID') {
     return errorRuntime(failure.summary, {
-      why: failure.why ?? 'Contract source is invalid',
-      fix: 'Check your contract source configuration in prisma-next.config.ts',
+      why: failure.why ?? 'Contract source provider failed',
+      fix: 'Check your contract source provider in prisma-next.config.ts and ensure it returns Result<ContractIR, Diagnostics>',
     });
   }
 
@@ -148,20 +147,10 @@ async function executeContractEmitCommand(
   const onProgress = createProgressAdapter({ flags });
 
   try {
-    // Convert user config source to discriminated union
-    const source: EmitContractSource = {
-      kind: 'loader',
-      load: () =>
-        resolveContractSourceValue(
-          contractConfig.source,
-          options.config ? { configPath: options.config } : undefined,
-        ),
-    };
-
     // Call emit with progress callback
     const result = await client.emit({
       contractConfig: {
-        source,
+        sourceProvider: contractConfig.source,
         output: outputJsonPath,
       },
       onProgress,

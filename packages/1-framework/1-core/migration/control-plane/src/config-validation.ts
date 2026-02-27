@@ -1,4 +1,4 @@
-import { isPslContractSourceConfig, type PrismaNextConfig } from './config-types';
+import type { PrismaNextConfig } from './config-types';
 import { errorConfigValidation } from './errors';
 
 /**
@@ -257,15 +257,10 @@ export function validateConfig(config: unknown): asserts config is PrismaNextCon
       });
     }
 
-    if (isPslContractSourceConfig(contract['source'])) {
-      if (
-        typeof contract['source'].schemaPath !== 'string' ||
-        contract['source'].schemaPath.trim() === ''
-      ) {
-        throw errorConfigValidation('contract.source.schemaPath', {
-          why: 'Config.contract.source.schemaPath must be a non-empty string when source.kind is "psl"',
-        });
-      }
+    if (typeof contract['source'] !== 'function') {
+      throw errorConfigValidation('contract.source', {
+        why: 'Config.contract.source must be a provider function returning Promise<Result<ContractIR, Diagnostics>>',
+      });
     }
 
     if (contract['output'] !== undefined && typeof contract['output'] !== 'string') {
