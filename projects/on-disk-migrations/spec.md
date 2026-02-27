@@ -15,7 +15,7 @@ Two user flows are in scope:
 1. **New project**: Write contract → emit → `migration plan` → `migration apply`
 2. **Existing database, no prisma-next contract**: Write contract → `db sign`/`db init` → edit contract → emit → `migration plan` → `migration apply`
 
-`migration apply` is follow-up work — it is not included in the initial PR. The initial scope covers offline planning and serialization only.
+`migration apply` has been implemented and is included in M3.
 
 # Requirements
 
@@ -132,10 +132,10 @@ Two user flows are in scope:
 - [x] `prisma-next migration plan` fails clearly when no changes are detected between contracts
 - [x] `prisma-next migration new` scaffolds an empty migration package in Draft state
 - [x] `prisma-next migration verify` recomputes and validates `edgeId` for an existing migration package
-- [ ] `prisma-next migration apply` reads on-disk migrations and executes SQL against a live database
-- [ ] `prisma-next migration apply` updates the marker and ledger after each successful migration
-- [ ] `prisma-next migration apply` resumes from last successful migration on re-run after failure
-- [ ] `prisma-next migration apply` errors when DB marker doesn't match any known migration hash
+- [x] `prisma-next migration apply` reads on-disk migrations and executes SQL against a live database
+- [x] `prisma-next migration apply` updates the marker and ledger after each successful migration
+- [x] `prisma-next migration apply` resumes from last successful migration on re-run after failure
+- [x] `prisma-next migration apply` errors when DB marker doesn't match any known migration hash
 
 ## DAG
 - [x] DAG can be reconstructed from on-disk migration packages (reading all `migration.json` files)

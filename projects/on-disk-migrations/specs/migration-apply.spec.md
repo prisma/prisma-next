@@ -49,8 +49,10 @@ CLI flags → load config → load contract → read migrations dir
 | `MigrationRunner` | `config.target.migrations.createRunner()` | Executes each migration within a transaction |
 | `readMigrationsDir` | `@prisma-next/migration-tools/io` | Reads on-disk packages |
 | `reconstructGraph`, `findLeaf`, `findPath` | `@prisma-next/migration-tools/dag` | Determines pending migrations |
-| `ControlClient` | `@prisma-next/cli/control-api/client` | Manages DB connection lifecycle |
+| `createControlPlaneStack` | `@prisma-next/core-control-plane/stack` | Creates stack for family instance |
 | `familyInstance.readMarker()` | Family instance | Reads current DB state |
+| `familyInstance.validateContractIR()` | Family instance | Validates destination contract for runner |
+| `assertFrameworkComponentsCompatible()` | CLI utils | Builds framework components for schema verification |
 
 ### Type boundary: `MigrationOps` → `SqlMigrationPlanOperation[]`
 
@@ -89,11 +91,20 @@ If any step fails, the runner rolls back the current transaction. Previously com
 
 ## Acceptance criteria
 
-- [ ] `migration apply` reads on-disk migrations and executes SQL against a live database
-- [ ] `migration apply` updates the marker and ledger after each successful migration
-- [ ] `migration apply` resumes from last successful migration on re-run after failure
-- [ ] `migration apply` errors when DB marker doesn't match any known migration hash
-- [ ] `migration apply` reports "already up to date" when no pending migrations exist
-- [ ] `migration apply` executes multiple migrations in correct DAG order
-- [ ] `migration apply` enables execution checks (prechecks, postchecks, idempotency)
-- [ ] `migration apply` skips draft migrations (edgeId === null)
+- [x] `migration apply` reads on-disk migrations and executes SQL against a live database
+- [x] `migration apply` updates the marker and ledger after each successful migration
+- [x] `migration apply` resumes from last successful migration on re-run after failure
+- [x] `migration apply` errors when DB marker doesn't match any known migration hash
+- [x] `migration apply` reports "already up to date" when no pending migrations exist
+- [x] `migration apply` executes multiple migrations in correct DAG order
+- [x] `migration apply` enables execution checks (prechecks, postchecks, idempotency)
+- [x] `migration apply` skips draft migrations (edgeId === null)
+
+### Implementation notes
+
+Key discoveries during implementation:
+
+- **`origin: null` for first migration**: The runner expects `origin: null` when there's no existing marker (fresh DB), not `origin: { storageHash: EMPTY_CONTRACT_HASH }`. The `EMPTY_CONTRACT_HASH` sentinel is a DAG convention, not a runner convention.
+- **Contract validation required**: The destination contract from on-disk manifests must be validated via `familyInstance.validateContractIR()` before passing to the runner, to ensure type normalization matches what the schema verifier expects (e.g., `nullable: undefined` vs `nullable: false`).
+- **Framework components required**: The runner's schema verification step needs framework components (target, adapter, extensions) to properly match types. Passing `frameworkComponents: []` causes spurious verification failures.
+- **No `ControlClient`**: Unlike `db init`, `migration apply` uses the driver directly instead of `ControlClient`, since it needs fine-grained control over the runner lifecycle and doesn't need the full `ControlClient` API.
