@@ -26,7 +26,7 @@ import type { ForeignKey, StorageColumn, StorageTable } from '@prisma-next/sql-c
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresColumnDefault } from '../types';
-import { buildLossyPlan } from './planner-lossy';
+import { buildReconciliationPlan } from './planner-reconciliation';
 
 export type OperationClass =
   | 'extension'
@@ -108,15 +108,15 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
 
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
 
-    const lossyPlan = buildLossyPlan({
+    const reconciliationPlan = buildReconciliationPlan({
       contract: options.contract,
       issues: schemaIssues,
       schemaName,
       mode: planningMode,
       policy: options.policy,
     });
-    if (lossyPlan.conflicts.length > 0) {
-      return plannerFailure(lossyPlan.conflicts);
+    if (reconciliationPlan.conflicts.length > 0) {
+      return plannerFailure(reconciliationPlan.conflicts);
     }
 
     const storageTypePlan = this.buildStorageTypeOperations(options, schemaName, codecHooks);
@@ -134,7 +134,7 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     operations.push(
       ...this.buildDatabaseDependencyOperations(options),
       ...storageTypePlan.operations,
-      ...lossyPlan.operations,
+      ...reconciliationPlan.operations,
       ...this.buildTableOperations(sortedTables, options.schema, schemaName),
       ...this.buildColumnOperations(sortedTables, options.schema, schemaName),
       ...this.buildPrimaryKeyOperations(sortedTables, options.schema, schemaName),
@@ -676,7 +676,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     const allowWidening = policy.allowedOperationClasses.includes('widening');
     const allowDestructive = policy.allowedOperationClasses.includes('destructive');
     // `db init` uses additive-only policy and intentionally ignores extras.
-    // Any lossy-capable policy should inspect extras to reconcile strict equality.
+    // Any reconciliation-capable policy should inspect extras to reconcile strict equality.
     const includeExtraObjects = allowWidening || allowDestructive;
     return { includeExtraObjects, allowWidening, allowDestructive };
   }

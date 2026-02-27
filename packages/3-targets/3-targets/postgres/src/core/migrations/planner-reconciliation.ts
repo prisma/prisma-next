@@ -22,7 +22,7 @@ import {
 // Public API
 // ============================================================================
 
-export function buildLossyPlan(options: {
+export function buildReconciliationPlan(options: {
   readonly contract: SqlContract<SqlStorage>;
   readonly issues: readonly SchemaIssue[];
   readonly schemaName: string;
@@ -42,7 +42,7 @@ export function buildLossyPlan(options: {
       continue;
     }
 
-    const operation = buildLossyOperationFromIssue({
+    const operation = buildReconciliationOperationFromIssue({
       issue,
       contract: options.contract,
       schemaName: options.schemaName,
@@ -104,7 +104,7 @@ function isAdditiveIssue(issue: SchemaIssue): boolean {
 // Operation Builders
 // ============================================================================
 
-function buildLossyOperationFromIssue(options: {
+function buildReconciliationOperationFromIssue(options: {
   readonly issue: SchemaIssue;
   readonly contract: SqlContract<SqlStorage>;
   readonly schemaName: string;
@@ -175,7 +175,7 @@ function buildLossyOperationFromIssue(options: {
 
     // Remaining issue kinds (default_missing, default_mismatch, primary_key_mismatch,
     // unique_constraint_mismatch, index_mismatch, foreign_key_mismatch) do not yet have
-    // lossy operation builders. They fall through to the caller, which converts them to
+    // reconciliation operation builders. They fall through to the caller, which converts them to
     // conflicts via convertIssueToConflict. When a new SchemaIssue kind is added, add a
     // case here if the planner can emit an operation for it; otherwise it becomes a conflict.
     default:
