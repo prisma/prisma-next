@@ -1,6 +1,6 @@
 ## `prisma-next db update`
 
-Reconcile an already adopted (marker-managed) database to the current emitted contract.
+Reconcile an already signed (marker-managed) database to the current emitted contract.
 
 ### Canonical usage and flags
 

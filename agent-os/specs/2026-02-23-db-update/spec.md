@@ -4,7 +4,7 @@ Add `prisma-next db update` as the contract-driven reconciliation command for da
 
 # Description
 
-This branch implements a new CLI command, `prisma-next db update`, and a matching control API operation to reconcile an existing, marker-managed database to the current emitted contract. The flow requires a contract marker, introspects the live schema, plans a migration using a lossy policy (additive, widening, destructive), and either outputs a dry-run plan or applies the plan via the migration runner. It also adds supporting docs, demos, and end-to-end tests that mirror the scenarios in `DEMO.md`.
+This branch implements a new CLI command, `prisma-next db update`, and a matching control API operation to reconcile an existing, signed (marker-managed) database to the current emitted contract. The flow requires a contract marker, introspects the live schema, plans a migration allowing additive, widening, and destructive operation classes, and either outputs a dry-run plan or applies the plan via the migration runner. It also adds supporting docs, demos, and end-to-end tests that mirror the scenarios in `DEMO.md`.
 
 # Requirements
 

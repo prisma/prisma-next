@@ -44,7 +44,7 @@ prisma-next db init --db $DATABASE_URL
 
 ## Scenario 1: Missing marker (fails fast)
 
-Use this when the database has not been adopted.
+Use this when the database has not been signed.
 
 ```bash
 prisma-next db update --db $DATABASE_URL
