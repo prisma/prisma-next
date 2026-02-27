@@ -794,7 +794,12 @@ describe('ControlClient progress emission', () => {
       const mockTargetWithMigrations = {
         ...mockTarget,
         migrations: {
-          createPlanner: () => ({}),
+          createPlanner: () => ({
+            plan: () => ({
+              kind: 'success',
+              plan: { targetId: 'postgres', destination: { storageHash: 'x' }, operations: [] },
+            }),
+          }),
           createRunner: () => ({
             execute: async () => ({
               ok: true,
@@ -803,7 +808,7 @@ describe('ControlClient progress emission', () => {
           }),
           contractToSchema: () => ({}),
         },
-      } as typeof mockTarget;
+      } as unknown as typeof mockTarget;
 
       mockFamilyInstance.validateContractIR = (ir: unknown) => ir as ContractIR;
 
@@ -862,7 +867,12 @@ describe('ControlClient progress emission', () => {
       const mockTargetWithMigrations = {
         ...mockTarget,
         migrations: {
-          createPlanner: () => ({}),
+          createPlanner: () => ({
+            plan: () => ({
+              kind: 'success',
+              plan: { targetId: 'postgres', destination: { storageHash: 'x' }, operations: [] },
+            }),
+          }),
           createRunner: () => ({
             execute: async () => ({
               ok: false,
@@ -876,7 +886,7 @@ describe('ControlClient progress emission', () => {
           }),
           contractToSchema: () => ({}),
         },
-      } as typeof mockTarget;
+      } as unknown as typeof mockTarget;
 
       mockFamilyInstance.validateContractIR = (ir: unknown) => ir as ContractIR;
 

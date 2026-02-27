@@ -4,6 +4,7 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
+  MigrationOperationClass,
   MigrationPlanOperation,
   MigrationRunnerResult,
   TargetMigrationsCapability,
@@ -44,7 +45,6 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
   } = options;
 
   const runner = migrations.createRunner(familyInstance);
-  const policy = { allowedOperationClasses: ['additive'] as const };
   const applied: MigrationApplyAppliedEntry[] = [];
 
   for (const edge of pendingEdges) {
@@ -56,13 +56,23 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       label: `Applying ${edge.dirName}`,
     });
 
+    const operations = edge.operations as readonly MigrationPlanOperation[];
+
+    // Derive the policy from the operations themselves. The planner already
+    // decided what operation classes to emit at plan time — apply trusts that
+    // decision rather than hardcoding additive-only. This means if the planner
+    // gains support for destructive/widening ops, apply works without changes.
+    const policy = {
+      allowedOperationClasses: deriveAllowedClasses(operations),
+    };
+
     // EMPTY_CONTRACT_HASH means "no prior state" — the runner expects origin: null
     // for a fresh database (no marker present).
     const plan = {
       targetId,
       origin: edge.from === EMPTY_CONTRACT_HASH ? null : { storageHash: edge.from },
       destination: { storageHash: edge.to },
-      operations: edge.operations as readonly MigrationPlanOperation[],
+      operations,
     };
 
     const destinationContract = familyInstance.validateContractIR(edge.toContract as ContractIR);
@@ -124,4 +134,17 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     applied,
     summary: `Applied ${applied.length} migration(s) (${totalOps} operation(s)), marker at ${finalHash}`,
   });
+}
+
+function deriveAllowedClasses(
+  operations: readonly MigrationPlanOperation[],
+): readonly MigrationOperationClass[] {
+  const classes = new Set<MigrationOperationClass>();
+  for (const op of operations) {
+    classes.add(op.operationClass);
+  }
+  if (classes.size === 0) {
+    classes.add('additive');
+  }
+  return [...classes];
 }

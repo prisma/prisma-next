@@ -106,7 +106,7 @@ Two user flows are in scope:
 
 - **`db update`**: Applying additive changes to a live DB and updating the marker without writing migration files. Deferred to a later project.
 - **Production-ready apply**: Dry-run, rollback, multi-step orchestration, partial apply, apply-to-specific-hash.
-- **Destructive operations**: Drops, renames, type narrowing. MVP is additive-only.
+- **Destructive operations**: Drops, renames, type narrowing. MVP is additive-only. See RD-17 for the policy architecture — `migration apply` is already policy-agnostic, but the planner and `migration plan` policy gate are additive-only.
 - **Squash/baseline tooling**: Creating baselines from paths, archiving edges. Infrastructure is designed for it but tooling is deferred.
 - **Preflight commands**: `prisma-next preflight` (shadow or PPg). Deferred.
 - **Graph visualization**: Rendering the DAG for human review. Deferred.
@@ -278,6 +278,18 @@ The `authorship` field is included in the `MigrationManifest` type as optional (
 This project implements **attestation** only: computing the content-addressed `edgeId` hash via `computeEdgeId` / `verifyEdgeId`. **Signing** (cryptographic signature over `edgeId` for provenance, required by PPg hosted preflight) is a separate project requiring key management infrastructure. The `signature` field is included in the `MigrationManifest` type as `signature?: { keyId: string; value: string } | null` for forward compatibility but is not written by any command.
 
 Terminology note: "attestation" (hashing migration content → `edgeId`), "signing" (cryptographic signature → provenance), and "database signing" (`db sign` → writing marker to DB) are three distinct concepts.
+
+## RD-17: `migration apply` is policy-agnostic (trusts the planner)
+
+`migration apply` derives its operation policy from the operations already present in the on-disk `ops.json`, rather than hardcoding `['additive']`. The planner is the single authority that decides which operation classes to emit at plan time — `apply` just executes what was already planned.
+
+**Rationale:** The policy gate belongs at planning time (`migration plan`), not at apply time. The planner currently only emits additive operations and treats destructive changes as conflicts, so today `migration apply` will only ever see additive ops. But if the planner gains support for destructive or widening operations in the future, `migration apply` will work without changes — it derives `allowedOperationClasses` from the `operationClass` field on each operation in the migration package.
+
+**Where the policy lives:**
+- `migration plan` (planner call): hardcodes `{ allowedOperationClasses: ['additive'] }` — this is the policy gate where we decide what the planner is allowed to produce.
+- `migration apply` (runner call): derives `allowedOperationClasses` from the operations in each edge via `deriveAllowedClasses()`. If an edge has no operations, defaults to `['additive']`.
+
+**Implication:** To support destructive operations end-to-end, two things need to change: (1) the planner must learn to generate destructive SQL instead of emitting conflicts, and (2) `migration plan` must relax its policy to allow the planner to emit those operations. `migration apply` requires no changes.
 
 ## RD-16: Structured errors with MIGRATION.* stable codes
 
