@@ -35,17 +35,17 @@ prisma-next db update --db $DATABASE_URL
 
 ## How `db update` reacts to database state
 
-### Scenario 1: Empty database (no marker)
+### Scenario 1: Empty database (not signed)
 
 **Behavior**: `db update` fails with `MARKER_REQUIRED`.
 
 ```
-✖ Database marker is required before db update (MARKER_REQUIRED)
-  Why: Contract marker not found in database
+✖ Database must be signed before running db update (PN-RTM-3010)
+  Why: No database signature (marker) found
   Fix: Run `prisma-next db init` first to sign the database, then re-run `prisma-next db update`
 ```
 
-**Why**: `db update` is designed for databases already signed under contract management. It needs a marker to know the origin state. For fresh databases, use `db init` first.
+**Why**: `db update` is designed for databases already signed under contract management. It needs a signature to know the origin state. For fresh databases, use `db init` first.
 
 **JSON output** (`--json`):
 ```json
@@ -54,8 +54,8 @@ prisma-next db update --db $DATABASE_URL
   "code": "PN-RTM-3010",
   "domain": "RTM",
   "severity": "error",
-  "summary": "Marker required",
-  "why": "Contract marker not found in database",
+  "summary": "Database must be signed first",
+  "why": "No database signature (marker) found",
   "fix": "Run `prisma-next db init` first to sign the database, then re-run `prisma-next db update`"
 }
 ```
@@ -66,7 +66,7 @@ prisma-next db update --db $DATABASE_URL
 
 ```
 ✔ Applied 0 operation(s)
-  Marker written: sha256:abc123...
+  Signature: sha256:abc123...
 ```
 
 **When this happens**: You run `db init` and then immediately run `db update` without changing the contract. Or you run `db update` twice in a row. The command is idempotent.
@@ -94,7 +94,7 @@ For SQL targets, plan mode also prints a DDL preview derived from planned operat
 **Apply mode** (default):
 ```
 ✔ Applied 1 operation(s)
-  Marker written: sha256:new-hash...
+  Signature: sha256:new-hash...
 ```
 
 The planner supports three operation classes:

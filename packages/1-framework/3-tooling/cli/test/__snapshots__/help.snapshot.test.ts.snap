@@ -88,8 +88,8 @@ exports[`help text snapshots > formats db update help 1`] = `
 │
 │ Updates a marker-managed database to match your emitted contract using
 │ additive,
-│ widening, and destructive operations when required. Requires an existing
-│ contract marker.
+│ widening, and destructive operations when required. Requires a signed
+│ database.
 │ Use --plan to preview operations before applying.
 └
 "

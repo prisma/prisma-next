@@ -356,10 +356,10 @@ export function errorMarkerMissing(options?: {
   readonly why?: string;
   readonly dbUrl?: string;
 }): CliStructuredError {
-  return new CliStructuredError('3001', 'Marker missing', {
+  return new CliStructuredError('3001', 'Database not signed', {
     domain: 'RTM',
-    why: options?.why ?? 'Contract marker not found in database',
-    fix: 'Run `prisma-next db sign --db <url>` to create marker',
+    why: options?.why ?? 'No database signature (marker) found',
+    fix: 'Run `prisma-next db sign --db <url>` to sign the database',
   });
 }
 
@@ -413,9 +413,9 @@ export function errorMarkerRequired(options?: {
   readonly why?: string;
   readonly fix?: string;
 }): CliStructuredError {
-  return new CliStructuredError('3010', 'Marker required', {
+  return new CliStructuredError('3010', 'Database must be signed first', {
     domain: 'RTM',
-    why: options?.why ?? 'Contract marker not found in database',
+    why: options?.why ?? 'No database signature (marker) found',
     fix: options?.fix ?? 'Run `prisma-next db init` first to sign the database',
   });
 }

@@ -68,7 +68,7 @@ function createApplyResult(overrides?: Partial<MigrationCommandResult>): Migrati
     marker: {
       storageHash: 'sha256:dest-hash',
     },
-    summary: 'Applied 1 operation(s), marker written',
+    summary: 'Applied 1 operation(s), signature updated',
     timings: { total: 100 },
     ...overrides,
   };
@@ -164,7 +164,7 @@ describe('formatMigrationApplyOutput', () => {
     const output = formatMigrationApplyOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('Marker written: sha256:dest-hash');
+    expect(stripped).toContain('Signature: sha256:dest-hash');
   });
 
   it('shows profile hash when present', () => {

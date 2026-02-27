@@ -293,7 +293,7 @@ withTempDir(({ createTempDir }) => {
           const applyOutput = stripAnsi(consoleOutput.join('\n'));
 
           expect(applyOutput).toContain('Applied');
-          expect(applyOutput).toContain('Marker written');
+          expect(applyOutput).toContain('Signature');
 
           // Verify slug column exists in database
           await withClient(connectionString, async (client) => {

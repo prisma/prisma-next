@@ -43,7 +43,7 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
 
   if (failure.code === 'MARKER_REQUIRED') {
     return errorMarkerRequired({
-      why: failure.why ?? 'Contract marker not found in database',
+      why: failure.why ?? 'No database signature (marker) found',
       fix: 'Run `prisma-next db init` first to sign the database, then re-run `prisma-next db update`',
     });
   }
@@ -173,7 +173,7 @@ export function createDbUpdateCommand(): Command {
     command,
     'Reconcile a marker-managed database to the current contract',
     'Updates a marker-managed database to match your emitted contract using additive,\n' +
-      'widening, and destructive operations when required. Requires an existing contract marker.\n' +
+      'widening, and destructive operations when required. Requires a signed database.\n' +
       'Use --plan to preview operations before applying.',
   );
   addMigrationCommandOptions(command);

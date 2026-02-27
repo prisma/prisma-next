@@ -946,7 +946,7 @@ export function formatMigrationApplyOutput(
 
     // Marker info
     if (result.marker) {
-      lines.push(`${prefix}${formatDimText(`  Marker written: ${result.marker.storageHash}`)}`);
+      lines.push(`${prefix}${formatDimText(`  Signature: ${result.marker.storageHash}`)}`);
       if (result.marker.profileHash) {
         lines.push(`${prefix}${formatDimText(`  Profile hash: ${result.marker.profileHash}`)}`);
       }

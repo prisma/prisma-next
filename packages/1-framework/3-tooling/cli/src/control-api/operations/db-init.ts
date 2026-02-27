@@ -115,7 +115,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     action: 'dbInit',
     kind: 'spanStart',
     spanId: checkMarkerSpanId,
-    label: 'Checking contract marker',
+    label: 'Checking database signature',
   });
   const existingMarker = await familyInstance.readMarker({ driver });
   if (existingMarker) {
@@ -291,7 +291,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
           profileHash: migrationPlan.destination.profileHash,
         }
       : { storageHash: migrationPlan.destination.storageHash },
-    summary: `Applied ${execution.operationsExecuted} operation(s), marker written`,
+    summary: `Applied ${execution.operationsExecuted} operation(s), database signed`,
   };
   return ok(result);
 }

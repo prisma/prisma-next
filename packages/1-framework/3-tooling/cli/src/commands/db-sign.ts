@@ -212,8 +212,8 @@ export function createDbSignCommand(): Command {
     command,
     'Sign the database with your contract so you can safely run queries',
     'Verifies that your database schema satisfies the emitted contract, and if so, writes or\n' +
-      'updates the contract marker in the database. This command is idempotent and safe to run\n' +
-      'in CI/deployment pipelines. The marker records that this database instance is aligned\n' +
+      'updates the database signature. This command is idempotent and safe to run\n' +
+      'in CI/deployment pipelines. The signature records that this database instance is aligned\n' +
       'with a specific contract version.',
   );
   command
