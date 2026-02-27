@@ -89,7 +89,8 @@ export function detectDestructiveChanges(
   const conflicts: MigrationPlannerConflict[] = [];
 
   for (const tableName of Object.keys(from.tables)) {
-    if (!to.tables[tableName]) {
+    const toTable = to.tables[tableName];
+    if (!toTable) {
       conflicts.push({
         kind: 'tableRemoved',
         summary: `Table "${tableName}" was removed`,
@@ -97,8 +98,8 @@ export function detectDestructiveChanges(
       continue;
     }
 
-    const fromTable = from.tables[tableName]!;
-    const toTable = to.tables[tableName]!;
+    const fromTable = from.tables[tableName];
+    if (!fromTable) continue;
 
     for (const columnName of Object.keys(fromTable.columns)) {
       if (!toTable.columns[columnName]) {

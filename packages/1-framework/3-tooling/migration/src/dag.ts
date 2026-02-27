@@ -81,7 +81,8 @@ export function findLeaf(graph: MigrationGraph): string {
   }
 
   if (realLeaves.length === 1) {
-    return realLeaves[0]!;
+    const [leaf] = realLeaves;
+    return leaf;
   }
 
   throw errorAmbiguousLeaf(realLeaves);
@@ -98,7 +99,8 @@ export function findPath(
   const queue: Array<{ node: string; path: MigrationGraphEdge[] }> = [{ node: fromHash, path: [] }];
 
   while (queue.length > 0) {
-    const current = queue.shift()!;
+    const current = queue.shift();
+    if (current === undefined) break;
 
     if (current.node === toHash) {
       return current.path;
@@ -146,7 +148,7 @@ export function detectCycles(graph: MigrationGraph): readonly string[][] {
           let cur = u;
           while (cur !== v) {
             cycle.push(cur);
-            cur = parent.get(cur)!;
+            cur = parent.get(cur) ?? v;
           }
           cycle.reverse();
           cycles.push(cycle);
@@ -178,7 +180,8 @@ export function detectOrphans(graph: MigrationGraph): readonly MigrationGraphEdg
   reachable.add(EMPTY_CONTRACT_HASH);
 
   while (queue.length > 0) {
-    const node = queue.shift()!;
+    const node = queue.shift();
+    if (node === undefined) break;
     const outgoing = graph.edges.get(node);
     if (!outgoing) continue;
 
