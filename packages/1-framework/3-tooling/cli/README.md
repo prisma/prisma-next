@@ -1198,22 +1198,26 @@ try {
 |--------|-------------|
 | `connect(url)` | Establishes database connection |
 | `close()` | Closes connection (idempotent) |
+| `readMarker()` | Reads contract marker from database (null if none) |
 | `verify(options)` | Verifies database marker matches contract |
 | `schemaVerify(options)` | Verifies database schema satisfies contract |
 | `sign(options)` | Writes contract marker to database |
 | `dbInit(options)` | Initializes database schema from contract |
 | `dbUpdate(options)` | Updates database schema to match contract |
+| `migrationApply(options)` | Applies pre-planned migration edges to database |
 | `introspect(options)` | Introspects database schema |
 
 ### Result Types
 
 Operations return structured result types:
 
+- `readMarker()` → `ContractMarkerRecord | null`
 - `verify()` → `VerifyDatabaseResult`
 - `schemaVerify()` → `VerifyDatabaseSchemaResult`
 - `sign()` → `SignDatabaseResult`
 - `dbInit()` → `Result<DbInitSuccess, DbInitFailure>` (uses Result pattern)
 - `dbUpdate()` → `Result<DbUpdateSuccess, DbUpdateFailure>` (uses Result pattern)
+- `migrationApply()` → `Result<MigrationApplySuccess, MigrationApplyFailure>` (uses Result pattern)
 - `introspect()` → Schema IR (family-specific)
 
 ### Error Handling

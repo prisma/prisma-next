@@ -1,22 +1,14 @@
 import { relative, resolve } from 'node:path';
-import type { ContractIR } from '@prisma-next/contract/ir';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/core-control-plane/constants';
-import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
-import type {
-  MigrationPlanOperation,
-  MigrationRunnerResult,
-} from '@prisma-next/core-control-plane/types';
 import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
-import type {
-  MigrationGraph,
-  MigrationGraphEdge,
-  MigrationPackage,
-} from '@prisma-next/migration-tools/types';
+import type { MigrationGraph, MigrationPackage } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
+import { createControlClient } from '../control-api/client';
+import type { MigrationApplyEdge, MigrationApplyFailure } from '../control-api/types';
 import {
   CliStructuredError,
   type CliStructuredError as CliStructuredErrorType,
@@ -27,12 +19,11 @@ import {
   errorUnexpected,
 } from '../utils/cli-errors';
 import { setCommandDescriptions } from '../utils/command-helpers';
-import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { formatCommandHelp, formatStyledHeader } from '../utils/output';
 import { handleResult } from '../utils/result-handler';
 
-interface MigrationApplyOptions {
+interface MigrationApplyCommandOptions {
   readonly db?: string;
   readonly config?: string;
   readonly json?: string | boolean;
@@ -77,25 +68,26 @@ function mapMigrationToolsError(error: unknown): CliStructuredErrorType {
   });
 }
 
-function mapRunnerFailure(
-  failure: { code: string; summary: string; why?: string; meta?: Record<string, unknown> },
-  edge: MigrationGraphEdge,
-): CliStructuredErrorType {
+function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType {
   return errorRuntime(failure.summary, {
-    why: failure.why ?? `Migration runner failed on ${edge.dirName}`,
+    why: failure.why ?? 'Migration runner failed',
     fix: 'Fix the issue and re-run `prisma-next migration apply` — previously applied migrations are preserved.',
-    meta: {
-      code: failure.code,
-      migration: edge.dirName,
-      from: edge.from,
-      to: edge.to,
-      ...(failure.meta ?? {}),
-    },
+    meta: failure.meta ?? {},
   });
 }
 
+function packageToEdge(pkg: MigrationPackage): MigrationApplyEdge {
+  return {
+    dirName: pkg.dirName,
+    from: pkg.manifest.from,
+    to: pkg.manifest.to,
+    toContract: pkg.manifest.toContract,
+    operations: pkg.ops as MigrationApplyEdge['operations'],
+  };
+}
+
 async function executeMigrationApplyCommand(
-  options: MigrationApplyOptions,
+  options: MigrationApplyCommandOptions,
   flags: GlobalFlags,
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
@@ -185,17 +177,19 @@ async function executeMigrationApplyCommand(
     throw error;
   }
 
-  // Connect to DB
-  const stack = createControlPlaneStack({
+  // Create control client for all DB operations
+  const client = createControlClient({
+    family: config.family,
     target: config.target,
     adapter: config.adapter,
+    driver: config.driver,
     extensionPacks: config.extensionPacks ?? [],
   });
-  const familyInstance = config.family.create(stack);
-  const driver = await config.driver.create(dbConnection);
 
   try {
-    const marker = await familyInstance.readMarker({ driver });
+    await client.connect(dbConnection);
+
+    const marker = await client.readMarker();
     const markerHash = marker?.storageHash ?? EMPTY_CONTRACT_HASH;
 
     if (markerHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(markerHash)) {
@@ -231,24 +225,8 @@ async function executeMigrationApplyCommand(
       });
     }
 
-    // Build framework components for schema verification
-    const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
-    const frameworkComponents = assertFrameworkComponentsCompatible(
-      config.family.familyId,
-      config.target.targetId,
-      rawComponents,
-    );
-
-    // Execute each pending migration
-    const { migrations } = config.target;
-    const runner = migrations.createRunner(familyInstance);
-    const applied: Array<{
-      dirName: string;
-      from: string;
-      to: string;
-      operationsExecuted: number;
-    }> = [];
-
+    // Resolve graph edges to full apply-ready edges
+    const pendingEdges: MigrationApplyEdge[] = [];
     for (const edge of pendingPath) {
       const pkg = packages.find((p) => p.dirName === edge.dirName);
       if (!pkg) {
@@ -259,63 +237,30 @@ async function executeMigrationApplyCommand(
           }),
         );
       }
-
-      if (!flags.quiet && flags.json !== 'object') {
-        console.log(`  Applying ${edge.dirName}...`);
-      }
-
-      // On-disk ops are SqlMigrationPlanOperation[] (serialized by migration plan).
-      // The MigrationOps type is MigrationPlanOperation[] (framework base), but the
-      // actual data includes precheck/execute/postcheck arrays from the planner.
-      // EMPTY_CONTRACT_HASH means "no prior state" — the runner expects origin: null
-      // for a fresh database (no marker present).
-      const plan = {
-        targetId: config.target.targetId,
-        origin:
-          pkg.manifest.from === EMPTY_CONTRACT_HASH ? null : { storageHash: pkg.manifest.from },
-        destination: { storageHash: pkg.manifest.to },
-        operations: pkg.ops as readonly MigrationPlanOperation[],
-      };
-
-      const destinationContract = familyInstance.validateContractIR(
-        pkg.manifest.toContract as ContractIR,
-      );
-
-      const runnerResult: MigrationRunnerResult = await runner.execute({
-        plan,
-        driver,
-        destinationContract,
-        policy: { allowedOperationClasses: ['additive'] },
-        executionChecks: {
-          prechecks: true,
-          postchecks: true,
-          idempotencyChecks: true,
-        },
-        frameworkComponents,
-      });
-
-      if (!runnerResult.ok) {
-        return notOk(mapRunnerFailure(runnerResult.failure, edge));
-      }
-
-      applied.push({
-        dirName: edge.dirName,
-        from: edge.from,
-        to: edge.to,
-        operationsExecuted: runnerResult.value.operationsExecuted,
-      });
+      pendingEdges.push(packageToEdge(pkg));
     }
 
-    const finalHash = pendingPath[pendingPath.length - 1]!.to;
-    const totalOps = applied.reduce((sum, a) => sum + a.operationsExecuted, 0);
+    if (!flags.quiet && flags.json !== 'object') {
+      for (const edge of pendingEdges) {
+        console.log(`  Applying ${edge.dirName}...`);
+      }
+    }
+
+    const applyResult = await client.migrationApply({ pendingEdges });
+
+    if (!applyResult.ok) {
+      return notOk(mapApplyFailure(applyResult.failure));
+    }
+
+    const { value } = applyResult;
 
     return ok({
       ok: true,
-      migrationsApplied: applied.length,
+      migrationsApplied: value.migrationsApplied,
       migrationsTotal: pendingPath.length,
-      markerHash: finalHash,
-      applied,
-      summary: `Applied ${applied.length} migration(s) (${totalOps} operation(s)), marker at ${finalHash}`,
+      markerHash: value.markerHash,
+      applied: value.applied,
+      summary: value.summary,
       timings: { total: Date.now() - startTime },
     });
   } catch (error) {
@@ -328,7 +273,7 @@ async function executeMigrationApplyCommand(
       }),
     );
   } finally {
-    await driver.close();
+    await client.close();
   }
 }
 
@@ -357,7 +302,7 @@ export function createMigrationApplyCommand(): Command {
     .option('--timestamps', 'Add timestamps to output')
     .option('--color', 'Force color output')
     .option('--no-color', 'Disable color output')
-    .action(async (options: MigrationApplyOptions) => {
+    .action(async (options: MigrationApplyCommandOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 

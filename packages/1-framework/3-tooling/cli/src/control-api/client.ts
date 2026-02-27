@@ -1,4 +1,5 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/contract/framework-components';
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CoreSchemaView } from '@prisma-next/core-control-plane/schema-view';
 import { createControlPlaneStack } from '@prisma-next/core-control-plane/stack';
 import type {
@@ -15,6 +16,7 @@ import { assertFrameworkComponentsCompatible } from '../utils/framework-componen
 import { ContractValidationError } from './errors';
 import { executeDbInit } from './operations/db-init';
 import { executeDbUpdate } from './operations/db-update';
+import { executeMigrationApply } from './operations/migration-apply';
 import type {
   ControlActionName,
   ControlClient,
@@ -26,6 +28,8 @@ import type {
   EmitOptions,
   EmitResult,
   IntrospectOptions,
+  MigrationApplyOptions,
+  MigrationApplyResult,
   OnControlProgress,
   SchemaVerifyOptions,
   SignOptions,
@@ -390,6 +394,31 @@ class ControlClientImpl implements ControlClient {
       frameworkComponents,
       ...ifDefined('acceptDataLoss', options.acceptDataLoss),
       ...ifDefined('onProgress', onProgress),
+    });
+  }
+
+  async readMarker(): Promise<ContractMarkerRecord | null> {
+    const { driver, familyInstance } = await this.ensureConnected();
+    return familyInstance.readMarker({ driver });
+  }
+
+  async migrationApply(options: MigrationApplyOptions): Promise<MigrationApplyResult> {
+    const { onProgress } = options;
+    await this.connectWithProgress(options.connection, 'migrationApply', onProgress);
+    const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
+
+    if (!this.options.target.migrations) {
+      throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
+    }
+
+    return executeMigrationApply({
+      driver,
+      familyInstance,
+      pendingEdges: options.pendingEdges,
+      migrations: this.options.target.migrations,
+      frameworkComponents,
+      targetId: this.options.target.targetId,
+      ...(onProgress ? { onProgress } : {}),
     });
   }
 

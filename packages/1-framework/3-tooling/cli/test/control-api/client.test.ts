@@ -737,6 +737,198 @@ describe('ControlClient progress emission', () => {
     });
   });
 
+  describe('readMarker()', () => {
+    it('returns null when no marker exists', async () => {
+      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor } = createMockComponents();
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+        driver: mockDriverDescriptor,
+      });
+
+      await client.connect('postgres://test');
+      const marker = await client.readMarker();
+      await client.close();
+
+      expect(marker).toBeNull();
+    });
+
+    it('returns marker record when marker exists', async () => {
+      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor, mockFamilyInstance } =
+        createMockComponents();
+
+      const expectedMarker = {
+        storageHash: 'sha256:abc',
+        profileHash: 'sha256:def',
+        contractJson: null,
+        canonicalVersion: 1,
+        updatedAt: new Date(),
+        appTag: null,
+        meta: {},
+      };
+      mockFamilyInstance.readMarker = async () => expectedMarker;
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+        driver: mockDriverDescriptor,
+      });
+
+      await client.connect('postgres://test');
+      const marker = await client.readMarker();
+      await client.close();
+
+      expect(marker).toEqual(expectedMarker);
+    });
+  });
+
+  describe('migrationApply()', () => {
+    it('emits connect and migration spans when connection provided', async () => {
+      const events: ControlProgressEvent[] = [];
+      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor, mockFamilyInstance } =
+        createMockComponents();
+
+      const mockTargetWithMigrations = {
+        ...mockTarget,
+        migrations: {
+          createPlanner: () => ({}),
+          createRunner: () => ({
+            execute: async () => ({
+              ok: true,
+              value: { operationsPlanned: 1, operationsExecuted: 1 },
+            }),
+          }),
+          contractToSchema: () => ({}),
+        },
+      } as typeof mockTarget;
+
+      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as ContractIR;
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTargetWithMigrations,
+        adapter: mockAdapter,
+        driver: mockDriverDescriptor,
+      });
+
+      const result = await client.migrationApply({
+        pendingEdges: [
+          {
+            dirName: '001_init',
+            from: 'sha256:empty',
+            to: 'sha256:abc',
+            toContract: {},
+            operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
+          },
+        ],
+        connection: 'postgres://test',
+        onProgress: (event) => events.push(event),
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.migrationsApplied).toBe(1);
+        expect(result.value.markerHash).toBe('sha256:abc');
+      }
+
+      const connectStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'connect');
+      const connectEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'connect');
+      expect(connectStart).toBeDefined();
+      expect(connectEnd).toMatchObject({ outcome: 'ok' });
+
+      const migrationStart = events.find(
+        (e) => e.kind === 'spanStart' && e.spanId === 'migration:001_init',
+      );
+      const migrationEnd = events.find(
+        (e) => e.kind === 'spanEnd' && e.spanId === 'migration:001_init',
+      );
+      expect(migrationStart).toBeDefined();
+      expect(migrationEnd).toMatchObject({ outcome: 'ok' });
+
+      for (const event of events) {
+        expect(event.action).toBe('migrationApply');
+      }
+    });
+
+    it('returns failure when runner fails', async () => {
+      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor, mockFamilyInstance } =
+        createMockComponents();
+
+      const mockTargetWithMigrations = {
+        ...mockTarget,
+        migrations: {
+          createPlanner: () => ({}),
+          createRunner: () => ({
+            execute: async () => ({
+              ok: false,
+              failure: {
+                code: 'RUNNER_FAILED',
+                summary: 'Schema mismatch',
+                why: 'Column type conflict',
+                meta: {},
+              },
+            }),
+          }),
+          contractToSchema: () => ({}),
+        },
+      } as typeof mockTarget;
+
+      mockFamilyInstance.validateContractIR = (ir: unknown) => ir as ContractIR;
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTargetWithMigrations,
+        adapter: mockAdapter,
+        driver: mockDriverDescriptor,
+      });
+
+      const result = await client.migrationApply({
+        pendingEdges: [
+          {
+            dirName: '001_init',
+            from: 'sha256:empty',
+            to: 'sha256:abc',
+            toContract: {},
+            operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
+          },
+        ],
+        connection: 'postgres://test',
+      });
+
+      await client.close();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('RUNNER_FAILED');
+      }
+    });
+
+    it('throws when target does not support migrations', async () => {
+      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor } = createMockComponents();
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+        driver: mockDriverDescriptor,
+      });
+
+      await expect(
+        client.migrationApply({
+          pendingEdges: [],
+          connection: 'postgres://test',
+        }),
+      ).rejects.toThrow('does not support migrations');
+
+      await client.close();
+    });
+  });
+
   describe('no onProgress callback', () => {
     it('does not throw when onProgress is omitted from verify', async () => {
       const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor } = createMockComponents();
