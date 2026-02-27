@@ -337,16 +337,16 @@ export function errorConfigValidation(
     readonly why?: string;
   },
 ): CliStructuredError {
-  return new CliStructuredError('4001', 'Config file not found', {
+  return new CliStructuredError('4009', 'Config validation error', {
     domain: 'CLI',
     why: options?.why ?? `Config must have a "${field}" field`,
-    fix: "Run 'prisma-next init' to create a config file",
+    fix: 'Check your prisma-next.config.ts and ensure all required fields are provided',
     docsUrl: 'https://prisma-next.dev/docs/cli/config',
   });
 }
 
 // ============================================================================
-// Runtime Errors (PN-RTM-3000-3020)
+// Runtime Errors (PN-RTM-3000-3030)
 // ============================================================================
 
 /**

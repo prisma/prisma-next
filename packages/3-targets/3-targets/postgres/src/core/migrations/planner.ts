@@ -127,6 +127,9 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
     // Sort table entries once for reuse across all additive operation builders.
     const sortedTables = sortedEntries(options.contract.storage.tables);
 
+    // Pre-compute constraint lookups once per schema table for O(1) checks across all builders.
+    const schemaLookups = buildSchemaLookupMap(options.schema);
+
     // Build extension operations from component-owned database dependencies
     operations.push(
       ...this.buildDatabaseDependencyOperations(options),
@@ -135,10 +138,10 @@ class PostgresMigrationPlanner implements SqlMigrationPlanner<PostgresPlanTarget
       ...this.buildTableOperations(sortedTables, options.schema, schemaName),
       ...this.buildColumnOperations(sortedTables, options.schema, schemaName),
       ...this.buildPrimaryKeyOperations(sortedTables, options.schema, schemaName),
-      ...this.buildUniqueOperations(sortedTables, options.schema, schemaName),
-      ...this.buildIndexOperations(sortedTables, options.schema, schemaName),
-      ...this.buildFkBackingIndexOperations(sortedTables, options.schema, schemaName),
-      ...this.buildForeignKeyOperations(sortedTables, options.schema, schemaName),
+      ...this.buildUniqueOperations(sortedTables, schemaLookups, schemaName),
+      ...this.buildIndexOperations(sortedTables, schemaLookups, schemaName),
+      ...this.buildFkBackingIndexOperations(sortedTables, schemaLookups, schemaName),
+      ...this.buildForeignKeyOperations(sortedTables, schemaLookups, schemaName),
     );
 
     const plan = createMigrationPlan<PostgresPlanTargetDetails>({
@@ -455,13 +458,12 @@ PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
 
   private buildUniqueOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
-    schema: SqlSchemaIR,
+    schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
-      const schemaTable = schema.tables[tableName];
-      const lookup = schemaTable ? buildSchemaTableLookup(schemaTable) : undefined;
+      const lookup = schemaLookups.get(tableName);
       for (const unique of table.uniques) {
         if (lookup && hasUniqueConstraint(lookup, unique.columns)) {
           continue;
@@ -504,13 +506,12 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
 
   private buildIndexOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
-    schema: SqlSchemaIR,
+    schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
-      const schemaTable = schema.tables[tableName];
-      const lookup = schemaTable ? buildSchemaTableLookup(schemaTable) : undefined;
+      const lookup = schemaLookups.get(tableName);
       for (const index of table.indexes) {
         if (lookup && hasIndex(lookup, index.columns)) {
           continue;
@@ -558,13 +559,12 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
    */
   private buildFkBackingIndexOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
-    schema: SqlSchemaIR,
+    schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
-      const schemaTable = schema.tables[tableName];
-      const lookup = schemaTable ? buildSchemaTableLookup(schemaTable) : undefined;
+      const lookup = schemaLookups.get(tableName);
       // Collect column sets of user-declared indexes to avoid duplicates
       const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
 
@@ -614,13 +614,12 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
 
   private buildForeignKeyOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
-    schema: SqlSchemaIR,
+    schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
   ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     for (const [tableName, table] of tables) {
-      const schemaTable = schema.tables[tableName];
-      const lookup = schemaTable ? buildSchemaTableLookup(schemaTable) : undefined;
+      const lookup = schemaLookups.get(tableName);
       for (const foreignKey of table.foreignKeys) {
         if (foreignKey.constraint === false) continue;
         if (lookup && hasForeignKey(lookup, foreignKey)) {
@@ -670,12 +669,7 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     schema: string,
     table?: string,
   ): PostgresPlanTargetDetails {
-    return {
-      schema,
-      objectType,
-      name,
-      ...ifDefined('table', table),
-    };
+    return buildTargetDetails(objectType, name, schema, table);
   }
 
   private resolvePlanningMode(policy: MigrationOperationPolicy): PlanningMode {
@@ -776,11 +770,16 @@ function assertSafeNativeType(nativeType: string): void {
   }
 }
 
+/**
+ * Sanity check against accidental SQL injection from malformed contract files.
+ * Rejects semicolons, SQL comment tokens, and dollar-quoting.
+ * Not a comprehensive security boundary — the contract is developer-authored.
+ */
 function assertSafeDefaultExpression(expression: string): void {
-  if (expression.includes(';') || /--|\/\*/.test(expression)) {
+  if (expression.includes(';') || /--|\/\*|\$\$/.test(expression)) {
     throw new Error(
       `Unsafe default expression in contract: "${expression}". ` +
-        'Default expressions must not contain semicolons or SQL comment tokens.',
+        'Default expressions must not contain semicolons, SQL comment tokens, or dollar-quoting.',
     );
   }
 }
@@ -860,7 +859,7 @@ function buildColumnDefaultSql(
         return '';
       }
       assertSafeDefaultExpression(columnDefault.expression);
-      return `DEFAULT ${columnDefault.expression}`;
+      return `DEFAULT (${columnDefault.expression})`;
     }
     case 'sequence':
       // Sequence names use quoteIdentifier for safe identifier handling
@@ -897,6 +896,20 @@ function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
     return `'${escapeLiteral(json)}'::${column.nativeType}`;
   }
   return `'${escapeLiteral(json)}'`;
+}
+
+export function buildTargetDetails(
+  objectType: OperationClass,
+  name: string,
+  schema: string,
+  table?: string,
+): PostgresPlanTargetDetails {
+  return {
+    schema,
+    objectType,
+    name,
+    ...ifDefined('table', table),
+  };
 }
 
 export function qualifyTableName(schema: string, table: string): string {
@@ -1025,6 +1038,14 @@ interface SchemaTableLookup {
   readonly indexKeys: Set<string>;
   readonly uniqueIndexKeys: Set<string>;
   readonly fkKeys: Set<string>;
+}
+
+function buildSchemaLookupMap(schema: SqlSchemaIR): ReadonlyMap<string, SchemaTableLookup> {
+  const map = new Map<string, SchemaTableLookup>();
+  for (const [tableName, table] of Object.entries(schema.tables)) {
+    map.set(tableName, buildSchemaTableLookup(table));
+  }
+  return map;
 }
 
 function buildSchemaTableLookup(table: SqlSchemaIR['tables'][string]): SchemaTableLookup {

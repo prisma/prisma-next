@@ -11,6 +11,7 @@ import type {
 } from '@prisma-next/core-control-plane/types';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbInitResult, DbInitSuccess, OnControlProgress } from '../types';
+import { extractSqlDdl } from './extract-sql-ddl';
 
 /**
  * Options for executing dbInit operation.
@@ -181,6 +182,8 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
 
   // Plan mode - don't execute
   if (mode === 'plan') {
+    const planSql =
+      familyInstance.familyId === 'sql' ? extractSqlDdl(migrationPlan.operations) : undefined;
     const result: DbInitSuccess = {
       mode: 'plan',
       plan: {
@@ -189,6 +192,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
           label: op.label,
           operationClass: op.operationClass,
         })),
+        ...(planSql !== undefined ? { sql: planSql } : {}),
       },
       summary: `Planned ${migrationPlan.operations.length} operation(s)`,
     };

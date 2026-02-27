@@ -47,8 +47,7 @@ export interface MigrationCommandOptions {
 
 /**
  * Masks the password portion of a database connection URL.
- * Uses URL parsing for robust handling of encoded characters and edge cases.
- * Safe to call with non-URL strings (returns them unchanged).
+ * Handles standard URLs, query-parameter passwords, and libpq-style key=value strings.
  */
 export function maskConnectionUrl(url: string): string {
   try {
@@ -56,9 +55,13 @@ export function maskConnectionUrl(url: string): string {
     if (parsed.password) {
       parsed.password = '****';
     }
+    // Also mask password in query parameters (e.g., ?password=secret)
+    if (parsed.searchParams.has('password')) {
+      parsed.searchParams.set('password', '****');
+    }
     return parsed.toString();
   } catch {
-    // Not a parseable URL — return as-is (safe fallback for non-URL connection strings)
-    return url;
+    // Fallback for libpq-style key=value connection strings (e.g., "host=localhost password=secret")
+    return url.replace(/password\s*=\s*\S+/gi, 'password=****');
   }
 }
