@@ -92,7 +92,7 @@ describe('contractToSchemaIR', () => {
           columns: {
             status: col({
               nativeType: 'text',
-              default: { kind: 'literal', expression: "'active'" },
+              default: { kind: 'literal', value: "'active'" },
             }),
           },
         }),
@@ -199,6 +199,8 @@ describe('contractToSchemaIR', () => {
               columns: ['authorId'],
               references: { table: 'User', columns: ['id'] },
               name: 'Post_authorId_fkey',
+              constraint: true,
+              index: true,
             },
           ],
         }),
@@ -295,6 +297,8 @@ describe('contractToSchemaIR', () => {
             {
               columns: ['authorId'],
               references: { table: 'User', columns: ['id'] },
+              constraint: true,
+              index: true,
             },
           ],
         }),

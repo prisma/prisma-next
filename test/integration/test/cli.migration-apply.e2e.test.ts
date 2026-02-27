@@ -224,7 +224,7 @@ withTempDir(({ createTempDir }) => {
                 WHERE table_schema = 'public' AND table_name = 'user'
                 ORDER BY ordinal_position
               `);
-              const columns = result.rows.map((r: Record<string, unknown>) => r.column_name);
+              const columns = result.rows.map((r: Record<string, unknown>) => r['column_name']);
               expect(columns).toContain('id');
               expect(columns).toContain('email');
               expect(columns).toContain('name');

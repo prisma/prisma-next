@@ -18,7 +18,10 @@ import type {
 } from '@prisma-next/sql-schema-ir/types';
 
 function convertDefault(def: ColumnDefault): string {
-  return def.expression;
+  if (def.kind === 'function') {
+    return def.expression;
+  }
+  return String(def.value);
 }
 
 function convertColumn(name: string, column: StorageColumn): SqlColumnIR {
