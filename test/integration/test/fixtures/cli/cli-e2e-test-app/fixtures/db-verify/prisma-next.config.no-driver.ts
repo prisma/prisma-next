@@ -1,7 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
-import { ok } from '@prisma-next/utils/result';
 import { contract } from './contract';
 
 // This config includes db.connection but no driver
@@ -13,7 +12,7 @@ export default {
   // driver is missing - this is what we're testing
   extensions: [],
   contract: {
-    source: async () => ok(contract),
+    source: async () => ({ ok: true, value: contract }),
     output: 'output/contract.json',
   },
   db: {

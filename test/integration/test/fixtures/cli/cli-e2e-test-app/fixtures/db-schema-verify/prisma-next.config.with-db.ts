@@ -14,7 +14,7 @@ export default defineConfig({
     connection: '{{DB_URL}}',
   },
   contract: {
-    source: './contract.ts',
+    source: async () => ({ ok: true, value: { targetFamily: 'sql' } as never }),
     output: './src/prisma/contract.json',
   },
 });

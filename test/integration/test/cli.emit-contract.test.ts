@@ -8,6 +8,16 @@ import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-help
 // Fixture subdirectory for emit-contract tests
 const fixtureSubdir = 'emit-contract';
 
+const resolveContractIR = async (
+  source: NonNullable<Awaited<ReturnType<typeof loadConfig>>['contract']>['source'],
+) => {
+  const sourceResult = await source();
+  if (!sourceResult.ok) {
+    throw new Error(sourceResult.failure.summary);
+  }
+  return sourceResult.value;
+};
+
 describe('emitContract API', () => {
   let testDir: string;
   let configPath: string;
@@ -35,12 +45,7 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      let contractRaw: unknown;
-      if (typeof contractConfig.source === 'function') {
-        contractRaw = await contractConfig.source();
-      } else {
-        contractRaw = contractConfig.source;
-      }
+      const contractRaw = await resolveContractIR(contractConfig.source);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -99,12 +104,7 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      let contractRaw: unknown;
-      if (typeof contractConfig.source === 'function') {
-        contractRaw = await contractConfig.source();
-      } else {
-        contractRaw = contractConfig.source;
-      }
+      const contractRaw = await resolveContractIR(contractConfig.source);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -158,12 +158,7 @@ describe('emitContract API', () => {
         }
 
         const contractConfig = config.contract;
-        let contractRaw: unknown;
-        if (typeof contractConfig.source === 'function') {
-          contractRaw = await contractConfig.source();
-        } else {
-          contractRaw = contractConfig.source;
-        }
+        const contractRaw = await resolveContractIR(contractConfig.source);
 
         if (!contractConfig.output) {
           throw new Error('Contract config must have output path');
@@ -209,12 +204,7 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      let contractRaw: unknown;
-      if (typeof contractConfig.source === 'function') {
-        contractRaw = await contractConfig.source();
-      } else {
-        contractRaw = contractConfig.source;
-      }
+      const contractRaw = await resolveContractIR(contractConfig.source);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -251,12 +241,7 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      let contractRaw: unknown;
-      if (typeof contractConfig.source === 'function') {
-        contractRaw = await contractConfig.source();
-      } else {
-        contractRaw = contractConfig.source;
-      }
+      const contractRaw = await resolveContractIR(contractConfig.source);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');
@@ -293,12 +278,7 @@ describe('emitContract API', () => {
       }
 
       const contractConfig = config.contract;
-      let contractRaw: unknown;
-      if (typeof contractConfig.source === 'function') {
-        contractRaw = await contractConfig.source();
-      } else {
-        contractRaw = contractConfig.source;
-      }
+      const contractRaw = await resolveContractIR(contractConfig.source);
 
       if (!contractConfig.output) {
         throw new Error('Contract config must have output path');

@@ -4,7 +4,6 @@ import type { ControlFamilyDescriptor } from '@prisma-next/core-control-plane/ty
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import { sqlTargetFamilyHook } from '@prisma-next/sql-contract-emitter';
 import postgres from '@prisma-next/target-postgres/control';
-import { ok } from '@prisma-next/utils/result';
 import { contract } from './contract';
 
 // Create family descriptor without create method
@@ -25,7 +24,7 @@ export default defineConfig({
   driver: postgresDriver,
   extensions: [],
   contract: {
-    source: async () => ok(contract),
+    source: async () => ({ ok: true, value: contract }),
     output: 'output/contract.json',
   },
   db: {
