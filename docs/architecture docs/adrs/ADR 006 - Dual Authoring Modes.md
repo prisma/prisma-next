@@ -10,7 +10,7 @@
 ## Decision
 
 - Support two authoring modes per project: PSL-first or TS-first
-- A project declares one authoritative mode in config
+- A project supplies one authoritative **contract source provider** in config
 - Both modes must emit the same canonical artifact: `contract.json` plus `.d.ts` types
 - Only `contract.json` is the system of record for downstream tools and hashing
 - Back-generation of the non-authoritative form is optional and clearly marked as derived
@@ -36,8 +36,8 @@
 ### Configuration
 
 `prisma-next.config.ts` declares:
-- `authoring: 'psl' | 'ts'`
-- Schema path for PSL mode or builder entry for TS mode
+- `contract.source` provider (`() => Promise<Result<ContractIR, Diagnostics>>`)
+- Provider-owned parsing/loading (PSL, TS, or future sources)
 - `outDir` for emitted artifacts
 - Target info and naming scheme used for deterministic names
 
@@ -58,8 +58,9 @@
 
 ### Meta and provenance
 
-- `contract.json.meta.source` records the authoring mode and source path
-- Tooling warns if both PSL and TS sources are present but the config declares a different authoritative mode
+- Canonical artifacts exclude provider provenance (no schema paths/sourceIds)
+- Canonical `contract.json` has no top-level `sources` field
+- Source provenance is diagnostics-only (CLI/editor output), not hash input
 
 ### Failure modes
 
@@ -92,7 +93,7 @@
 
 - PSL-first and TS-first emission producing identical `contract.json` for equivalent intent
 - Dev plugins for auto-emit and CI command for explicit emit
-- Provenance metadata in artifacts
+- Provider diagnostics with source spans; no provenance in canonical artifacts
 
 ### Out of scope for MVP
 
@@ -114,5 +115,5 @@
 ## Decision record
 
 - Adopt dual authoring modes with a single canonical artifact
-- Require projects to declare one authoritative mode, enforce determinism, and surface provenance
+- Require projects to declare one authoritative source provider, enforce determinism, and keep provenance diagnostics-only
 - Keep `.d.ts` emission types-only and rely on `makeT(contractJson)` for runtime construction

@@ -6,6 +6,8 @@ Reusable PSL parser for Prisma Next.
 
 `@prisma-next/psl-parser` parses Prisma Schema Language (PSL) source into a deterministic AST with source spans and stable machine-readable diagnostics. It is intentionally parser-only: normalization to contract IR and emit integration happen in downstream milestones/packages.
 
+In the provider-based authoring model, PSL providers call this parser and then return `Result<ContractIR, Diagnostics>` to the framework emit pipeline.
+
 ## Responsibilities
 
 - Parse PSL source text (`schema` + `sourceId`) with deterministic ordering.

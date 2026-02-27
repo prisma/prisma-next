@@ -69,6 +69,7 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { ok } from '@prisma-next/utils/result';
 import { contract } from './prisma/contract';
 
 export default defineConfig({
@@ -77,7 +78,7 @@ export default defineConfig({
   adapter: postgresAdapter,
   extensionPacks: [],
   contract: {
-    source: contract,
+    source: async () => ok(contract),
     output: 'src/prisma/contract.json',
   },
 });
@@ -148,6 +149,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { ok } from '@prisma-next/utils/result';
 import { contract } from './prisma/contract';
 
 export default defineConfig({
@@ -157,7 +159,7 @@ export default defineConfig({
   driver: postgresDriver,
   extensionPacks: [],
   contract: {
-    source: contract,
+    source: async () => ok(contract),
     output: 'src/prisma/contract.json',
   },
   db: {
@@ -458,6 +460,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { ok } from '@prisma-next/utils/result';
 import { contract } from './prisma/contract';
 
 export default defineConfig({
@@ -467,7 +470,7 @@ export default defineConfig({
   driver: postgresDriver,
   extensionPacks: [],
   contract: {
-    source: contract,
+    source: async () => ok(contract),
     output: 'src/prisma/contract.json',
   },
   db: {
@@ -668,6 +671,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { ok } from '@prisma-next/utils/result';
 import { contract } from './prisma/contract';
 
 export default defineConfig({
@@ -677,7 +681,7 @@ export default defineConfig({
   driver: postgresDriver,
   extensionPacks: [],
   contract: {
-    source: contract,
+    source: async () => ok(contract),
     output: 'src/prisma/contract.json',
   },
   db: {
@@ -801,6 +805,7 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import postgres from '@prisma-next/target-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { ok } from '@prisma-next/utils/result';
 import { contract } from './prisma/contract';
 
 export default defineConfig({
@@ -809,18 +814,16 @@ export default defineConfig({
   adapter: postgresAdapter,
   extensionPacks: [],
   contract: {
-    source: contract, // TS-first: value or function
-    // source: { kind: 'psl', schemaPath: './schema.prisma' }, // PSL-first
+    source: async () => ok(contract),
     output: 'src/prisma/contract.json', // Optional: defaults to 'src/prisma/contract.json'
   },
 });
 ```
 
 The `contract.source` field can be:
-- A direct value: `source: contract`
-- A synchronous function: `source: () => contract`
-- An asynchronous function: `source: () => import('./contract').then(m => m.contract)`
-- A PSL source selector: `source: { kind: 'psl', schemaPath: './schema.prisma' }` (requires explicit `schemaPath`)
+- A provider function that returns `Promise<Result<ContractIR, Diagnostics>>`
+- Example: `source: async () => ok(contract)`
+- Provider failures are returned as structured diagnostics for CLI rendering
 
 The `contract.output` field specifies the path to `contract.json`. This is the canonical location where other CLI commands can find the contract JSON artifact. Defaults to `'src/prisma/contract.json'` if not specified.
 
@@ -874,10 +877,10 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
 - Supports global flags (JSON, verbosity, color, timestamps)
 - **Error Handling**: Uses structured errors (`CliStructuredError`), Result pattern (`performAction`), and `process.exit()`. Commands wrap logic in `performAction()`, process results with `handleResult()`, and call `process.exit(exitCode)` directly. See `.cursor/rules/cli-error-handling.mdc` for details.
 - Loads the user's config module (`prisma-next.config.ts`)
-- Resolves contract from config:
-  - Uses `config.contract.source` (supports value, sync/async functions, and `{ kind: 'psl', schemaPath }`)
-  - PSL source reads schema text from `schemaPath` (relative to config file directory) and forwards it into the emit pipeline
-  - TS-first config keeps full control over how the contract value is loaded
+- Resolves contract from provider:
+  - Calls `config.contract.source()` and expects `Result<ContractIR, Diagnostics>`
+  - Source-specific parsing/loading stays inside providers
+  - Provider diagnostics are surfaced as actionable CLI failures
   - Throws error if `config.contract` is missing
 - Uses artifact path from `config.contract.output` (already normalized by `defineConfig()` with defaults applied)
 - Creates family instance via `config.family.create()` (assembles operation registry, type imports, extension IDs)
