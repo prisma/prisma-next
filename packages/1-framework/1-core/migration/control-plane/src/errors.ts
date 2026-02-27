@@ -416,7 +416,7 @@ export function errorMarkerRequired(options?: {
   return new CliStructuredError('3010', 'Marker required', {
     domain: 'RTM',
     why: options?.why ?? 'Contract marker not found in database',
-    fix: options?.fix ?? 'Run `prisma-next db init` first to adopt the database',
+    fix: options?.fix ?? 'Run `prisma-next db init` first to sign the database',
   });
 }
 
